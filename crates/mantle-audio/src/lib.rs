@@ -3,8 +3,13 @@
 use std::fmt;
 use std::time::Duration;
 
+mod filter;
 mod transform;
 
+pub use filter::{
+    EQUALIZER_BANDS, EqualizerFactory, FilterChainBuilder, FilterPipeline, MAX_FILTERS_PER_CHAIN,
+    PcmFilter, PcmFilterFactory,
+};
 pub use transform::{VolumeLevel, apply_volume, convert_to_i16, map_channels};
 
 pub const COMPATIBLE_SAMPLE_RATE: u32 = 48_000;
@@ -270,13 +275,36 @@ impl fmt::Debug for EncodedFrameSlot {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AudioFrameError {
-    InvalidSampleRate { sample_rate: u32 },
-    UnsupportedChannels { channels: u16 },
+    InvalidSampleRate {
+        sample_rate: u32,
+    },
+    UnsupportedChannels {
+        channels: u16,
+    },
     MissingPcmFormat,
-    MisalignedPcmSamples { samples: usize, channels: u16 },
-    PcmCapacityExceeded { required: usize, capacity: usize },
-    SampleBufferTooSmall { required: usize, capacity: usize },
-    EncodedFrameTooLarge { actual: usize, limit: usize },
+    MisalignedPcmSamples {
+        samples: usize,
+        channels: u16,
+    },
+    PcmCapacityExceeded {
+        required: usize,
+        capacity: usize,
+    },
+    SampleBufferTooSmall {
+        required: usize,
+        capacity: usize,
+    },
+    FilterLimitExceeded {
+        limit: usize,
+    },
+    PcmFormatMismatch {
+        expected: PcmFormat,
+        actual: Option<PcmFormat>,
+    },
+    EncodedFrameTooLarge {
+        actual: usize,
+        limit: usize,
+    },
 }
 
 impl fmt::Display for AudioFrameError {
@@ -306,6 +334,16 @@ impl fmt::Display for AudioFrameError {
             Self::SampleBufferTooSmall { required, capacity } => write!(
                 formatter,
                 "sample output capacity is {capacity}; {required} samples are required"
+            ),
+            Self::FilterLimitExceeded { limit } => {
+                write!(
+                    formatter,
+                    "PCM filter chain exceeds its {limit}-filter limit"
+                )
+            }
+            Self::PcmFormatMismatch { expected, actual } => write!(
+                formatter,
+                "PCM frame format {actual:?} does not match pipeline format {expected:?}"
             ),
             Self::EncodedFrameTooLarge { actual, limit } => write!(
                 formatter,
