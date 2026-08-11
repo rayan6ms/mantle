@@ -38,24 +38,31 @@ esac
 classpath_separator="${classpath_separator:-:}"
 if command -v cygpath >/dev/null 2>&1; then
   native="$(cygpath -w "$native")"
+  classes_argument="$(cygpath -w "$CLASSES")"
   jar_argument="$(cygpath -w "$JAR")"
 else
   native="$(cd "$(dirname "$native")" && pwd)/$(basename "$native")"
+  classes_argument="$CLASSES"
   jar_argument="$JAR"
 fi
 
-readonly GATE_CLASSPATH="$CLASSES$classpath_separator$JAR"
+readonly GATE_CLASSPATH="$classes_argument$classpath_separator$jar_argument"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateSmoke "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateIntegration "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" callbacks
 java -Xverify:all -Xmx256m -cp "$GATE_CLASSPATH" GateProbe "$native" lifetime
-java -Xverify:all -cp "$CLASSES" GateClassloader "$jar_argument" "$native"
+java -Xverify:all -cp "$classes_argument" GateClassloader "$jar_argument" "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" leak-manager
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" dispatcher-exit
 
 cargo run --locked -q -p mantle-jvm-gate -- emit \
   --reference-jar "$REFERENCE_JAR" --output "$MISMATCH_JAR" --expected-abi 2
-if java -Xverify:all -cp "$CLASSES$classpath_separator$MISMATCH_JAR" GateSmoke "$native" \
+if command -v cygpath >/dev/null 2>&1; then
+  mismatch_argument="$(cygpath -w "$MISMATCH_JAR")"
+else
+  mismatch_argument="$MISMATCH_JAR"
+fi
+if java -Xverify:all -cp "$classes_argument$classpath_separator$mismatch_argument" GateSmoke "$native" \
     >"$WORK/abi-mismatch.stdout" 2>"$WORK/abi-mismatch.stderr"; then
   printf 'ABI mismatch unexpectedly succeeded\n' >&2
   exit 1

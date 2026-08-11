@@ -15,7 +15,7 @@ jobs:
     name: Rust checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.97.1
         with:
           components: clippy,rustfmt
@@ -30,14 +30,14 @@ jobs:
     name: Coverage
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.97.1
         with:
           components: llvm-tools-preview
       - uses: taiki-e/install-action@cargo-llvm-cov
       - uses: Swatinem/rust-cache@v2
       - run: cargo llvm-cov --workspace --all-features --locked --lcov --output-path lcov.info
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: lcov
           path: lcov.info
@@ -46,7 +46,7 @@ jobs:
     name: Supply-chain checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.97.1
       - uses: taiki-e/install-action@v2
         with:
@@ -64,9 +64,9 @@ jobs:
         java: [11, 25, 26]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.97.1
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: ${{ matrix.java }}
@@ -80,7 +80,7 @@ jobs:
             --output .cache/reference/lavaplayer-2.2.6/lavaplayer-2.2.6.jar
           printf '%s  %s\n' \
             '84aba896d988e12ea24c25f87f2e88eca4be7adac31893eacabf93401da1282d' \
-            '.cache/reference/lavaplayer-2.2.6/lavaplayer-2.2.6.jar' | sha256sum --check
+            '.cache/reference/lavaplayer-2.2.6/lavaplayer-2.2.6.jar' | sha256sum -c
       - shell: bash
         run: scripts/run-jvm-gate-a.sh
 
@@ -88,9 +88,9 @@ jobs:
     name: Gate A independent API analysis
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.97.1
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
@@ -114,7 +114,7 @@ jobs:
             --output .cache/revapi.zip
           printf '%s  %s\n' \
             '3b9dc5949e74da76f558dfa8012b8b7dc3a4124c0b4788eadee253d932111afb' \
-            '.cache/revapi.zip' | sha256sum --check
+            '.cache/revapi.zip' | sha256sum -c
           unzip -q .cache/revapi.zip -d .cache
       - name: Compare the Gate A API slice
         run: |
