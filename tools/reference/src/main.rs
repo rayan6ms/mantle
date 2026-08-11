@@ -36,6 +36,8 @@ struct MediaProofConfig {
     input: String,
     http: bool,
     pcm: bool,
+    pcm_chunk_samples: i32,
+    decode_only: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -119,8 +121,10 @@ struct MediaProofResult {
     last_timecode_ms: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     last_frame_trailing_zero_bytes: Option<usize>,
-    seek_target_ms: i64,
-    seek_observed_ms: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    seek_target_ms: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    seek_observed_ms: Option<i64>,
 }
 
 #[derive(Debug)]
@@ -165,11 +169,19 @@ fn run_main() -> Result<()> {
 }
 
 fn parse_media_proof_config(args: &[String]) -> Result<MediaProofConfig> {
+    let pcm_chunk_samples = value(args, "--pcm-chunk-samples")
+        .unwrap_or_else(|| "960".to_owned())
+        .parse()?;
+    if !(1..=960).contains(&pcm_chunk_samples) {
+        return Err("--pcm-chunk-samples must be between 1 and 960".into());
+    }
     Ok(MediaProofConfig {
         classpath: required_value(args, "--classpath")?,
         input: required_value(args, "--input")?,
         http: args.iter().any(|arg| arg == "--http"),
         pcm: args.iter().any(|arg| arg == "--pcm"),
+        pcm_chunk_samples,
+        decode_only: args.iter().any(|arg| arg == "--decode-only"),
     })
 }
 
@@ -252,7 +264,7 @@ fn run_media_proof_attached(jni: &mut jni::Env<'_>, config: MediaProofConfig) ->
         &[],
     )?;
     if config.pcm {
-        configure_pcm_output(jni, &manager)?;
+        configure_pcm_output(jni, &manager, config.pcm_chunk_samples)?;
     }
     register_source(jni, &manager, config.http)?;
     let track = load_track(jni, &manager, &config.input)?;
@@ -268,25 +280,32 @@ fn run_media_proof_attached(jni: &mut jni::Env<'_>, config: MediaProofConfig) ->
     let (first, last_timecode_ms, decoded_frames, decoded_bytes, last_trailing_zero_bytes) =
         consume_complete_track(jni, &player)?;
 
-    let seek_track = jni
-        .call_method(
-            &track,
-            jni_str!("makeClone"),
-            jni_sig!("()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;"),
-            &[],
-        )?
-        .l()?;
-    let seek_player = create_player(jni, &manager)?;
-    start_track(jni, &seek_player, &seek_track)?;
-    wait_for_frame_proof(jni, &seek_player, Duration::from_secs(15))?;
-    let seek_target_ms = duration_ms / 2;
-    jni.call_method(
-        &seek_track,
-        jni_str!("setPosition"),
-        jni_sig!("(J)V"),
-        &[JValue::Long(seek_target_ms)],
-    )?;
-    let seek_observed_ms = wait_for_seek(jni, &seek_player, seek_target_ms)?;
+    let (seek_target_ms, seek_observed_ms) = if config.decode_only {
+        (None, None)
+    } else {
+        let seek_track = jni
+            .call_method(
+                &track,
+                jni_str!("makeClone"),
+                jni_sig!("()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;"),
+                &[],
+            )?
+            .l()?;
+        let seek_player = create_player(jni, &manager)?;
+        start_track(jni, &seek_player, &seek_track)?;
+        wait_for_frame_proof(jni, &seek_player, Duration::from_secs(15))?;
+        let target = duration_ms / 2;
+        jni.call_method(
+            &seek_track,
+            jni_str!("setPosition"),
+            jni_sig!("(J)V"),
+            &[JValue::Long(target)],
+        )?;
+        (
+            Some(target),
+            Some(wait_for_seek(jni, &seek_player, target)?),
+        )
+    };
 
     jni.call_method(&manager, jni_str!("shutdown"), jni_sig!("()V"), &[])?;
     let result = MediaProofResult {
@@ -312,17 +331,33 @@ fn run_media_proof_attached(jni: &mut jni::Env<'_>, config: MediaProofConfig) ->
     Ok(())
 }
 
-fn configure_pcm_output(jni: &mut jni::Env<'_>, manager: &JObject<'_>) -> Result<()> {
-    let format_class = jni.find_class(jni_str!(
-        "com/sedmelluq/discord/lavaplayer/format/StandardAudioDataFormats"
-    ))?;
-    let format = jni
-        .get_static_field(
+fn configure_pcm_output(
+    jni: &mut jni::Env<'_>,
+    manager: &JObject<'_>,
+    chunk_samples: i32,
+) -> Result<()> {
+    let format = if chunk_samples == 960 {
+        let format_class = jni.find_class(jni_str!(
+            "com/sedmelluq/discord/lavaplayer/format/StandardAudioDataFormats"
+        ))?;
+        jni.get_static_field(
             &format_class,
             jni_str!("DISCORD_PCM_S16_LE"),
             jni_sig!("Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;"),
         )?
-        .l()?;
+        .l()?
+    } else {
+        jni.new_object(
+            jni_str!("com/sedmelluq/discord/lavaplayer/format/Pcm16AudioDataFormat"),
+            jni_sig!("(IIIZ)V"),
+            &[
+                JValue::Int(2),
+                JValue::Int(48_000),
+                JValue::Int(chunk_samples),
+                JValue::Bool(false),
+            ],
+        )?
+    };
     let configuration = jni
         .call_method(
             manager,
@@ -1162,12 +1197,32 @@ mod tests {
             "http://127.0.0.1/media.mp3".to_owned(),
             "--http".to_owned(),
             "--pcm".to_owned(),
+            "--pcm-chunk-samples".to_owned(),
+            "64".to_owned(),
+            "--decode-only".to_owned(),
         ])?;
         assert_eq!(config.classpath, "reference.jar");
         assert_eq!(config.input, "http://127.0.0.1/media.mp3");
         assert!(config.http);
         assert!(config.pcm);
+        assert_eq!(config.pcm_chunk_samples, 64);
+        assert!(config.decode_only);
         Ok(())
+    }
+
+    #[test]
+    fn rejects_invalid_pcm_chunk_size() {
+        assert!(
+            parse_media_proof_config(&[
+                "--classpath".to_owned(),
+                "reference.jar".to_owned(),
+                "--input".to_owned(),
+                "media.m4a".to_owned(),
+                "--pcm-chunk-samples".to_owned(),
+                "0".to_owned(),
+            ])
+            .is_err()
+        );
     }
 
     #[test]
