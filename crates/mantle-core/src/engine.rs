@@ -263,6 +263,29 @@ impl<C: Clock> Engine<C> {
         self.tracks.get(&track).ok_or(EngineError::UnknownTrack)
     }
 
+    /// Replaces metadata on an inactive synthetic track after compatibility decoding.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an unknown track, invalid metadata, or a non-inactive track.
+    pub fn replace_track_info(
+        &mut self,
+        track: TrackId,
+        info: TrackInfo,
+    ) -> Result<(), EngineError> {
+        if !self.valid_info(&info) {
+            return Err(EngineError::InvalidMetadata);
+        }
+        let state = self.track_mut(track)?;
+        if state.state != TrackState::Inactive {
+            return Err(EngineError::ResourceLimit(
+                "metadata of active track cannot be replaced",
+            ));
+        }
+        state.info = info;
+        Ok(())
+    }
+
     /// Returns the player's active track.
     ///
     /// # Errors
