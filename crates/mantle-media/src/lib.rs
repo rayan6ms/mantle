@@ -1,5 +1,6 @@
 //! Bounded, backend-independent media probing, decoding, packet extraction, and seeking.
 
+use std::collections::VecDeque;
 use std::fmt;
 use std::fs::File;
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
@@ -21,6 +22,8 @@ use symphonia::core::io::{
 };
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::units::{Duration as SymphoniaDuration, Time, TimeBase, Timestamp};
+
+const MAX_XAAC_DELAYED_TIMESTAMPS: usize = 16;
 
 mod http_input;
 
@@ -283,6 +286,9 @@ pub enum MediaError {
     DecodeErrorLimitExceeded {
         limit: u32,
     },
+    DecodeDelayLimitExceeded {
+        limit: usize,
+    },
     WrongOutputKind {
         codec: Codec,
     },
@@ -335,6 +341,12 @@ impl fmt::Display for MediaError {
                 write!(
                     formatter,
                     "more than {limit} consecutive packets failed to decode"
+                )
+            }
+            Self::DecodeDelayLimitExceeded { limit } => {
+                write!(
+                    formatter,
+                    "decoder buffered more than {limit} packet timestamps without output"
                 )
             }
             Self::WrongOutputKind { codec } => {
@@ -537,33 +549,9 @@ impl MediaSession {
                 let PcmDecoder::Xaac(xaac) = decoder else {
                     unreachable!();
                 };
-                let native_status = xaac
-                    .decode_access_unit(&packet.data)
-                    .map_err(xaac_decode_error)?;
-                let XaacDecodeStatus::Frame(pcm) = native_status else {
+                if !xaac.decode_access_unit(&packet.data, timestamp, output, self.limits)? {
                     continue;
-                };
-                let sample_count = pcm.bytes().len() / 2;
-                if sample_count > self.limits.max_pcm_samples_per_frame {
-                    return Err(MediaError::PcmFrameTooLarge {
-                        actual: sample_count,
-                        limit: self.limits.max_pcm_samples_per_frame,
-                    });
                 }
-                if sample_count > output.samples.capacity() {
-                    return Err(MediaError::OutputBufferTooSmall {
-                        required: sample_count,
-                        capacity: output.samples.capacity(),
-                    });
-                }
-                output.samples.resize(sample_count, 0.0);
-                for (sample, encoded) in output.samples.iter_mut().zip(pcm.bytes().chunks_exact(2))
-                {
-                    *sample = f32::from(i16::from_ne_bytes([encoded[0], encoded[1]])) / 32_768.0;
-                }
-                output.sample_rate = pcm.sample_rate();
-                output.channels = pcm.channels();
-                output.timestamp = timestamp;
                 self.consecutive_decode_errors = 0;
                 return Ok(true);
             };
@@ -666,9 +654,7 @@ impl MediaSession {
         if let Some(decoder) = self.decoder.as_mut() {
             match decoder {
                 PcmDecoder::Symphonia(decoder) => decoder.reset(),
-                PcmDecoder::Xaac(decoder) => decoder
-                    .reset()
-                    .map_err(|error| native_backend_error("seek reset", &error))?,
+                PcmDecoder::Xaac(decoder) => decoder.reset()?,
             }
         }
         self.consecutive_decode_errors = 0;
@@ -703,7 +689,79 @@ impl MediaSession {
 
 enum PcmDecoder {
     Symphonia(Box<dyn AudioDecoder>),
-    Xaac(XaacDecoder),
+    Xaac(Box<XaacPcmDecoder>),
+}
+
+struct XaacPcmDecoder {
+    decoder: XaacDecoder,
+    pending_timestamps: VecDeque<Option<StdDuration>>,
+}
+
+impl XaacPcmDecoder {
+    fn new(decoder: XaacDecoder) -> Self {
+        Self {
+            decoder,
+            pending_timestamps: VecDeque::with_capacity(MAX_XAAC_DELAYED_TIMESTAMPS),
+        }
+    }
+
+    fn decode_access_unit(
+        &mut self,
+        data: &[u8],
+        timestamp: Option<StdDuration>,
+        output: &mut PcmFrame,
+        limits: MediaLimits,
+    ) -> Result<bool, MediaError> {
+        if self.pending_timestamps.len() >= MAX_XAAC_DELAYED_TIMESTAMPS {
+            return Err(MediaError::DecodeDelayLimitExceeded {
+                limit: MAX_XAAC_DELAYED_TIMESTAMPS,
+            });
+        }
+        self.pending_timestamps.push_back(timestamp);
+        let native_status = self
+            .decoder
+            .decode_access_unit(data)
+            .map_err(xaac_decode_error)?;
+        let XaacDecodeStatus::Frame(pcm) = native_status else {
+            return Ok(false);
+        };
+        let timestamp = self
+            .pending_timestamps
+            .pop_front()
+            .ok_or_else(|| MediaError::Backend {
+                operation: "decode",
+                message: "native decoder produced output without a queued timestamp".to_owned(),
+            })?;
+        let sample_count = pcm.bytes().len() / 2;
+        if sample_count > limits.max_pcm_samples_per_frame {
+            return Err(MediaError::PcmFrameTooLarge {
+                actual: sample_count,
+                limit: limits.max_pcm_samples_per_frame,
+            });
+        }
+        if sample_count > output.samples.capacity() {
+            return Err(MediaError::OutputBufferTooSmall {
+                required: sample_count,
+                capacity: output.samples.capacity(),
+            });
+        }
+        output.samples.resize(sample_count, 0.0);
+        for (sample, encoded) in output.samples.iter_mut().zip(pcm.bytes().chunks_exact(2)) {
+            *sample = f32::from(i16::from_ne_bytes([encoded[0], encoded[1]])) / 32_768.0;
+        }
+        output.sample_rate = pcm.sample_rate();
+        output.channels = pcm.channels();
+        output.timestamp = timestamp;
+        Ok(true)
+    }
+
+    fn reset(&mut self) -> Result<(), MediaError> {
+        self.decoder
+            .reset()
+            .map_err(|error| native_backend_error("seek reset", &error))?;
+        self.pending_timestamps.clear();
+        Ok(())
+    }
 }
 
 fn create_pcm_decoder(
@@ -714,6 +772,8 @@ fn create_pcm_decoder(
     match codec {
         Codec::Opus => Ok(None),
         Codec::HeAacV1 | Codec::HeAacV2 => create_xaac_decoder(params, codec, limits)
+            .map(XaacPcmDecoder::new)
+            .map(Box::new)
             .map(PcmDecoder::Xaac)
             .map(Some),
         _ => symphonia::default::get_codecs()

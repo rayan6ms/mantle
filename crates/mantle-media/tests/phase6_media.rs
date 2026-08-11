@@ -136,14 +136,41 @@ fn decodes_he_aac_profiles_with_bounded_reusable_storage() {
         let mut output = PcmFrame::with_capacity(session.limits().max_pcm_samples_per_frame);
         let storage = output.samples().as_ptr();
         let mut samples = 0_usize;
+        let mut first_timestamp = None;
+        let mut last_timestamp = None;
+        let mut last_samples_per_channel = 0_usize;
         while session.read_pcm(&mut output).unwrap() {
             assert_eq!(output.samples().as_ptr(), storage, "{name}");
             assert_eq!(output.sample_rate(), 48_000, "{name}");
             assert_eq!(output.channels(), 2, "{name}");
+            let timestamp = output.timestamp().expect("MP4 packet has a timestamp");
+            first_timestamp.get_or_insert(timestamp);
+            assert!(
+                last_timestamp.is_none_or(|previous| timestamp >= previous),
+                "{name}: timestamps must be monotonic"
+            );
+            last_timestamp = Some(timestamp);
+            last_samples_per_channel = output.samples().len() / usize::from(output.channels());
             samples += output.samples().len();
         }
         assert_eq!(samples, expected_samples, "{name}");
+        assert_eq!(first_timestamp, Some(Duration::ZERO), "{name}");
+        let decoded_duration = pcm_48khz_duration(expected_samples / 2);
+        let last_frame_duration = pcm_48khz_duration(last_samples_per_channel);
+        assert!(
+            last_timestamp.is_some_and(|timestamp| {
+                (timestamp + last_frame_duration).abs_diff(decoded_duration)
+                    <= Duration::from_micros(2)
+            }),
+            "{name}: {last_timestamp:?}"
+        );
     }
+}
+
+fn pcm_48khz_duration(samples_per_channel: usize) -> Duration {
+    let samples = u64::try_from(samples_per_channel).unwrap();
+    Duration::from_secs(samples / 48_000)
+        + Duration::from_nanos((samples % 48_000) * 1_000_000_000 / 48_000)
 }
 
 #[test]
