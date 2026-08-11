@@ -121,6 +121,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
+name = "cmake"
+version = "0.1.58"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0f78a02292a74a88ac736019ab962ece0bc380e3f977bf72e376c5d78ff0678"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "combine"
 version = "4.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -386,6 +395,7 @@ checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 name = "mantle-audio"
 version = "0.0.0"
 dependencies = [
+ "mantle-opus",
  "rubato",
 ]
 
@@ -437,6 +447,13 @@ dependencies = [
  "mantle-media",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "mantle-opus"
+version = "0.0.0"
+dependencies = [
+ "opus-head-sys",
 ]
 
 [[package]]
@@ -511,6 +528,15 @@ name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
+
+[[package]]
+name = "opus-head-sys"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df99c7905445bdbb5c3e74161d4808625af15dd59a52427c7eeaed70c5c1c7f4"
+dependencies = [
+ "cmake",
+]
 
 [[package]]
 name = "percent-encoding"

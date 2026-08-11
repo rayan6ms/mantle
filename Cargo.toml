@@ -4,6 +4,7 @@ members = [
     "crates/mantle-core",
     "crates/mantle-jvm",
     "crates/mantle-media",
+    "crates/mantle-opus",
     "crates/mantle-xaac",
     "tools/audio-layout-bench",
     "tools/jvm-gate",
@@ -20,6 +21,7 @@ license = "Apache-2.0"
 
 [workspace.dependencies]
 log = { version = "=0.4.33", features = ["max_level_debug"] }
+opus-head-sys = { version = "=0.3.1", default-features = false }
 rubato = { version = "=5.0.0", default-features = false }
 symphonia = { version = "=0.6.0", default-features = false, features = ["aac", "isomp4", "mkv", "mp3", "pcm", "wav"] }
 ureq = { version = "=3.4.0", default-features = false, features = ["rustls"] }

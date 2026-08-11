@@ -203,3 +203,18 @@ jobs:
       - name: Test bounded Mantle adapter
         shell: bash
         run: cargo test -p mantle-media --test phase6_media --locked
+
+  libopus-platform-build:
+    name: Phase 7 libopus encoder build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.97.1
+      - name: Build pinned static libopus and test bounded adapter
+        shell: bash
+        run: cargo test -p mantle-opus -p mantle-audio --locked
