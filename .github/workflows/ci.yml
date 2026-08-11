@@ -137,3 +137,44 @@ jobs:
             -o target/gate-a/lavaplayer-gate-a-reference.jar \
             -n target/gate-a/mantle-gate-a.jar \
             -s "$supplementary" -t "$supplementary"
+
+  differential-oracle:
+    name: Phase 3 deterministic differential oracle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 11
+      - uses: Swatinem/rust-cache@v2
+      - name: Fetch frozen API and runtime dependencies
+        shell: bash
+        run: |
+          reference=.cache/reference/lavaplayer-2.2.6
+          mkdir -p "$reference/dependencies"
+          for artifact in lavaplayer-2.2.6.jar lavaplayer-2.2.6.pom; do
+            curl --fail --location --silent --show-error \
+              "https://repo1.maven.org/maven2/dev/arbjerg/lavaplayer/2.2.6/$artifact" \
+              --output "$reference/$artifact"
+            expected=$(jq -r --arg file "$artifact" \
+              '.published_artifacts[] | select(.file == $file) | .sha256' \
+              reference/lavaplayer-2.2.6.lock.json)
+            actual=$(sha256sum "$reference/$artifact" | awk '{print $1}')
+            if [[ "$actual" != "$expected" ]]; then
+              printf '%s SHA-256 mismatch: expected %s, got %s\n' "$artifact" "$expected" "$actual" >&2
+              exit 1
+            fi
+          done
+          mvn -q -f "$reference/lavaplayer-2.2.6.pom" dependency:copy-dependencies \
+            -DincludeScope=runtime -DoutputDirectory="$PWD/$reference/dependencies"
+          while IFS=$'\t' read -r artifact expected; do
+            actual=$(sha256sum "$reference/dependencies/$artifact" | awk '{print $1}')
+            if [[ "$actual" != "$expected" ]]; then
+              printf '%s SHA-256 mismatch: expected %s, got %s\n' "$artifact" "$expected" "$actual" >&2
+              exit 1
+            fi
+          done < <(jq -r '.resolved_runtime_artifacts[] | [.file, .sha256] | @tsv' \
+            reference/lavaplayer-2.2.6.lock.json)
+      - run: scripts/run-differential-oracle.sh

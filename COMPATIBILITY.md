@@ -18,8 +18,8 @@ Run `scripts/generate-reference-contract.sh` to reacquire, hash-check, regenerat
 
 ## Gate A feasibility scope
 
-The Rust emitter preserves a 24-class closure around manager/player/track/frame, event/load callbacks, userdata, markers, and futures. In this slice, Mantle's structural diff and Revapi report no API difference from the corresponding reference slice, and unchanged source compiled against the official JAR runs against Mantle alone on Linux JDK 11/25/26.
+The Rust emitter preserves a 24-class closure around manager/player/track/frame, event/load callbacks, userdata, markers, and futures. In this slice, Mantle's structural diff and Revapi report no API difference from the corresponding reference slice, and unchanged source compiled against the official JAR runs against Mantle alone on native Ubuntu, macOS, and Windows with JDK 11/25/26. The complete matrix passed in [CI run 31468365958](https://github.com/rayan6ms/mantle-gate-a-ci/actions/runs/31468365958) at commit `7c75f543bf97a2ae0fef12265ae134c2c0d7e0f2`.
 
 This is not an `A_EXACT` classification for those symbols. The behavior is synthetic Gate A proof: no real loader/source, scheduling engine, audio decoder, serializer, or complete enum behavior exists. The checked-in classification matrix therefore remains `INITIAL_UNASSESSED`.
 
-JDK 25/26 native-loading warnings are tracked as `S-001` in `PROJECT_LEDGER.md`; macOS/Windows execution is tracked as blocker `B-001`.
+JDK 25/26 native-loading warnings remain tracked as `S-001` in `PROJECT_LEDGER.md` for the later packaging spike.

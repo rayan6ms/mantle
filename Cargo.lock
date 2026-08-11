@@ -301,6 +301,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "mantle-oracle"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "mantle-reference"
 version = "0.0.0"
 dependencies = [

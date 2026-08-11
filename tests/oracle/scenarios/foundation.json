@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "name": "synthetic-foundation",
+  "actions": [
+    { "id": "manager.create", "op": "create_manager" },
+    { "id": "player.create", "op": "create_player" },
+    { "id": "configuration.defaults", "op": "observe_configuration" },
+    {
+      "id": "load.track",
+      "op": "load",
+      "identifier": "gate:track",
+      "track": "primary"
+    },
+    { "id": "track.observe", "op": "observe_track", "track": "primary" },
+    {
+      "id": "track.user_data",
+      "op": "set_user_data",
+      "track": "primary",
+      "value": "opaque-user-value"
+    },
+    {
+      "id": "marker.set",
+      "op": "set_marker",
+      "track": "primary",
+      "marker": "marker-10",
+      "position_ms": 10
+    },
+    { "id": "track.seek", "op": "seek", "track": "primary", "position_ms": 10 },
+    {
+      "id": "track.encode",
+      "op": "encode_track",
+      "track": "primary",
+      "encoding": "encoded-primary"
+    },
+    {
+      "id": "track.decode",
+      "op": "decode_track",
+      "encoding": "encoded-primary",
+      "track": "decoded"
+    },
+    { "id": "player.play", "op": "play", "track": "primary" },
+    { "id": "player.pause", "op": "set_paused", "paused": true },
+    { "id": "player.resume", "op": "set_paused", "paused": false },
+    { "id": "frame.provide", "op": "provide_frame", "timeout_ms": 5000 },
+    { "id": "player.stop", "op": "stop" },
+    {
+      "id": "load.cancel",
+      "op": "load",
+      "identifier": "gate:pending",
+      "track": "cancelled",
+      "ordered_key": "shared-order",
+      "cancel": true
+    },
+    { "id": "manager.shutdown", "op": "shutdown" }
+  ]
+}
