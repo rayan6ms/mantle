@@ -4,11 +4,15 @@ use std::fmt;
 use std::time::Duration;
 
 mod filter;
+mod resample;
 mod transform;
 
 pub use filter::{
     EQUALIZER_BANDS, EqualizerFactory, FilterChainBuilder, FilterPipeline, MAX_FILTERS_PER_CHAIN,
     PcmFilter, PcmFilterFactory,
+};
+pub use resample::{
+    MAX_RESAMPLER_BUFFERED_FRAMES, MAX_RESAMPLER_CHUNK_FRAMES, PcmResampler, ResamplingQuality,
 };
 pub use transform::{VolumeLevel, apply_volume, convert_to_i16, map_channels};
 
@@ -301,6 +305,17 @@ pub enum AudioFrameError {
         expected: PcmFormat,
         actual: Option<PcmFormat>,
     },
+    InvalidResamplerConfiguration(&'static str),
+    UnsupportedResampleRatio {
+        source_rate: u32,
+        target_rate: u32,
+    },
+    ResamplerInputLimitExceeded {
+        required: usize,
+        limit: usize,
+    },
+    ResamplerAlreadyFinished,
+    ResamplerFailure,
     EncodedFrameTooLarge {
         actual: usize,
         limit: usize,
@@ -345,6 +360,24 @@ impl fmt::Display for AudioFrameError {
                 formatter,
                 "PCM frame format {actual:?} does not match pipeline format {expected:?}"
             ),
+            Self::InvalidResamplerConfiguration(message) => {
+                write!(formatter, "invalid resampler configuration: {message}")
+            }
+            Self::UnsupportedResampleRatio {
+                source_rate,
+                target_rate,
+            } => write!(
+                formatter,
+                "unsupported resample ratio from {source_rate} Hz to {target_rate} Hz"
+            ),
+            Self::ResamplerInputLimitExceeded { required, limit } => write!(
+                formatter,
+                "resampler input requires {required} buffered frames; limit is {limit}"
+            ),
+            Self::ResamplerAlreadyFinished => {
+                formatter.write_str("cannot push PCM after finishing the resampler")
+            }
+            Self::ResamplerFailure => formatter.write_str("PCM resampling failed"),
             Self::EncodedFrameTooLarge { actual, limit } => write!(
                 formatter,
                 "encoded frame has {actual} bytes; fixed slot limit is {limit}"
