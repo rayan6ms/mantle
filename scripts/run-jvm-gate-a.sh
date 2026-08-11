@@ -22,8 +22,14 @@ cargo run --locked -q -p mantle-jvm-gate -- verify-structure \
   --reference-jar "$REFERENCE_JAR" --candidate-jar "$JAR"
 
 for consumer in smoke probe integration classloader; do
+  case "$consumer" in
+    smoke) consumer_class='Smoke' ;;
+    probe) consumer_class='Probe' ;;
+    integration) consumer_class='Integration' ;;
+    classloader) consumer_class='Classloader' ;;
+  esac
   cargo run --locked -q -p mantle-jvm-gate -- "write-$consumer-consumer" \
-    --output "$WORK/Gate${consumer^}.java"
+    --output "$WORK/Gate${consumer_class}.java"
 done
 
 javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
