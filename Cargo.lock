@@ -383,6 +383,7 @@ name = "mantle-media"
 version = "0.0.0"
 dependencies = [
  "log",
+ "mantle-xaac",
  "symphonia",
  "ureq",
 ]
@@ -415,6 +416,10 @@ dependencies = [
  "sha2",
  "zip",
 ]
+
+[[package]]
+name = "mantle-xaac"
+version = "0.0.0"
 
 [[package]]
 name = "memchr"

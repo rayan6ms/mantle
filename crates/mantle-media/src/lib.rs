@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration as StdDuration;
 
+use mantle_xaac::{XaacConfig, XaacDecodeStatus, XaacDecoder, XaacProfile};
 use symphonia::core::codecs::audio::well_known::{
     CODEC_ID_AAC, CODEC_ID_MP3, CODEC_ID_OPUS, CODEC_ID_PCM_S16LE,
 };
@@ -32,6 +33,8 @@ pub struct MediaLimits {
     pub input_buffer_bytes: usize,
     pub max_packet_bytes: usize,
     pub max_pcm_samples_per_frame: usize,
+    pub max_native_decoder_bytes: usize,
+    pub max_codec_config_bytes: usize,
     pub max_consecutive_decode_errors: u32,
 }
 
@@ -42,6 +45,8 @@ impl Default for MediaLimits {
             input_buffer_bytes: 64 * 1024,
             max_packet_bytes: 1024 * 1024,
             max_pcm_samples_per_frame: 256 * 1024,
+            max_native_decoder_bytes: 32 * 1024 * 1024,
+            max_codec_config_bytes: 4 * 1024,
             max_consecutive_decode_errors: 8,
         }
     }
@@ -67,6 +72,16 @@ impl MediaLimits {
         if self.max_pcm_samples_per_frame == 0 {
             return Err(MediaError::InvalidLimits(
                 "max_pcm_samples_per_frame must be non-zero",
+            ));
+        }
+        if self.max_native_decoder_bytes == 0 {
+            return Err(MediaError::InvalidLimits(
+                "max_native_decoder_bytes must be non-zero",
+            ));
+        }
+        if self.max_codec_config_bytes == 0 {
+            return Err(MediaError::InvalidLimits(
+                "max_codec_config_bytes must be non-zero",
             ));
         }
         Ok(self)
@@ -138,6 +153,8 @@ pub enum Codec {
     PcmS16Le,
     Mp3,
     AacLc,
+    HeAacV1,
+    HeAacV2,
     Opus,
 }
 
@@ -251,6 +268,10 @@ pub enum MediaError {
         actual: usize,
         limit: usize,
     },
+    CodecConfigTooLarge {
+        actual: usize,
+        limit: usize,
+    },
     PcmFrameTooLarge {
         actual: usize,
         limit: usize,
@@ -296,6 +317,10 @@ impl fmt::Display for MediaError {
                     "media packet has {actual} bytes; limit is {limit}"
                 )
             }
+            Self::CodecConfigTooLarge { actual, limit } => write!(
+                formatter,
+                "codec configuration has {actual} bytes; limit is {limit}"
+            ),
             Self::PcmFrameTooLarge { actual, limit } => {
                 write!(
                     formatter,
@@ -346,7 +371,7 @@ impl From<io::Error> for MediaError {
 /// A probed audio track with a private, replaceable backend implementation.
 pub struct MediaSession {
     format: Box<dyn FormatReader>,
-    decoder: Option<Box<dyn AudioDecoder>>,
+    decoder: Option<PcmDecoder>,
     info: MediaInfo,
     track_id: u32,
     time_base: Option<TimeBase>,
@@ -441,7 +466,7 @@ impl MediaSession {
         let sample_rate = params.sample_rate.ok_or_else(|| {
             MediaError::UnsupportedCodec(format!("{} without a sample rate", params.codec))
         })?;
-        let channels = params
+        let mut channels = params
             .channels
             .as_ref()
             .map(symphonia::core::audio::Channels::count)
@@ -452,15 +477,10 @@ impl MediaSession {
                     params.codec
                 ))
             })?;
-        let decoder = if codec == Codec::Opus {
-            None
-        } else {
-            Some(
-                symphonia::default::get_codecs()
-                    .make_audio_decoder(&params, &AudioDecoderOptions::default())
-                    .map_err(|error| backend_error("decoder creation", &error))?,
-            )
-        };
+        if matches!(codec, Codec::HeAacV1 | Codec::HeAacV2) {
+            channels = 2;
+        }
+        let decoder = create_pcm_decoder(&params, codec, limits)?;
 
         Ok(Self {
             format,
@@ -508,10 +528,44 @@ impl MediaSession {
                 return Ok(false);
             };
             let timestamp = timestamp_to_std(self.time_base, packet.pts);
-            let Some(audio_decoder) = self.decoder.as_mut() else {
+            let Some(decoder) = self.decoder.as_mut() else {
                 return Err(MediaError::WrongOutputKind {
                     codec: self.info.codec,
                 });
+            };
+            let PcmDecoder::Symphonia(audio_decoder) = decoder else {
+                let PcmDecoder::Xaac(xaac) = decoder else {
+                    unreachable!();
+                };
+                let native_status = xaac
+                    .decode_access_unit(&packet.data)
+                    .map_err(xaac_decode_error)?;
+                let XaacDecodeStatus::Frame(pcm) = native_status else {
+                    continue;
+                };
+                let sample_count = pcm.bytes().len() / 2;
+                if sample_count > self.limits.max_pcm_samples_per_frame {
+                    return Err(MediaError::PcmFrameTooLarge {
+                        actual: sample_count,
+                        limit: self.limits.max_pcm_samples_per_frame,
+                    });
+                }
+                if sample_count > output.samples.capacity() {
+                    return Err(MediaError::OutputBufferTooSmall {
+                        required: sample_count,
+                        capacity: output.samples.capacity(),
+                    });
+                }
+                output.samples.resize(sample_count, 0.0);
+                for (sample, encoded) in output.samples.iter_mut().zip(pcm.bytes().chunks_exact(2))
+                {
+                    *sample = f32::from(i16::from_ne_bytes([encoded[0], encoded[1]])) / 32_768.0;
+                }
+                output.sample_rate = pcm.sample_rate();
+                output.channels = pcm.channels();
+                output.timestamp = timestamp;
+                self.consecutive_decode_errors = 0;
+                return Ok(true);
             };
             let decoded_audio = match audio_decoder.decode(&packet) {
                 Ok(audio) => audio,
@@ -610,7 +664,12 @@ impl MediaSession {
             )
             .map_err(|error| backend_error("seek", &error))?;
         if let Some(decoder) = self.decoder.as_mut() {
-            decoder.reset();
+            match decoder {
+                PcmDecoder::Symphonia(decoder) => decoder.reset(),
+                PcmDecoder::Xaac(decoder) => decoder
+                    .reset()
+                    .map_err(|error| native_backend_error("seek reset", &error))?,
+            }
         }
         self.consecutive_decode_errors = 0;
         Ok(SeekResult {
@@ -639,6 +698,29 @@ impl MediaSession {
             }
             return Ok(Some(packet));
         }
+    }
+}
+
+enum PcmDecoder {
+    Symphonia(Box<dyn AudioDecoder>),
+    Xaac(XaacDecoder),
+}
+
+fn create_pcm_decoder(
+    params: &symphonia::core::codecs::audio::AudioCodecParameters,
+    codec: Codec,
+    limits: MediaLimits,
+) -> Result<Option<PcmDecoder>, MediaError> {
+    match codec {
+        Codec::Opus => Ok(None),
+        Codec::HeAacV1 | Codec::HeAacV2 => create_xaac_decoder(params, codec, limits)
+            .map(PcmDecoder::Xaac)
+            .map(Some),
+        _ => symphonia::default::get_codecs()
+            .make_audio_decoder(params, &AudioDecoderOptions::default())
+            .map(PcmDecoder::Symphonia)
+            .map(Some)
+            .map_err(|error| backend_error("decoder creation", &error)),
     }
 }
 
@@ -723,17 +805,14 @@ fn map_codec(
         CODEC_ID_PCM_S16LE => Ok(Codec::PcmS16Le),
         CODEC_ID_MP3 => Ok(Codec::Mp3),
         CODEC_ID_OPUS => Ok(Codec::Opus),
-        CODEC_ID_AAC => {
-            validate_aac_lc(params)?;
-            Ok(Codec::AacLc)
-        }
+        CODEC_ID_AAC => classify_aac(params),
         codec => Err(MediaError::UnsupportedCodec(codec.to_string())),
     }
 }
 
-fn validate_aac_lc(
+fn classify_aac(
     params: &symphonia::core::codecs::audio::AudioCodecParameters,
-) -> Result<(), MediaError> {
+) -> Result<Codec, MediaError> {
     let Some(extra_data) = params.extra_data.as_deref() else {
         return Err(MediaError::UnsupportedCodecProfile {
             codec: "AAC",
@@ -745,20 +824,29 @@ fn validate_aac_lc(
             codec: "AAC",
             profile: "invalid AudioSpecificConfig",
         })?;
-    let declared_rate = params.sample_rate.unwrap_or(config.sample_rate);
-    if config.audio_object_type != 2 || config.explicit_he || config.sample_rate != declared_rate {
+    let declared_rate = params.sample_rate.unwrap_or(config.core_sample_rate);
+    if config.audio_object_type != 2 {
         return Err(MediaError::UnsupportedCodecProfile {
             codec: "AAC",
-            profile: "HE-AAC/SBR/PS",
+            profile: "unsupported audio object type",
         });
     }
-    Ok(())
+    if !config.explicit_he && config.core_sample_rate == declared_rate {
+        return Ok(Codec::AacLc);
+    }
+    if config.initial_audio_object_type == 29 || config.channel_configuration == 1 {
+        Ok(Codec::HeAacV2)
+    } else {
+        Ok(Codec::HeAacV1)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct AudioSpecificConfig {
+    initial_audio_object_type: u8,
     audio_object_type: u8,
-    sample_rate: u32,
+    core_sample_rate: u32,
+    channel_configuration: u8,
     explicit_he: bool,
 }
 
@@ -766,19 +854,72 @@ fn parse_audio_specific_config(bytes: &[u8]) -> Option<AudioSpecificConfig> {
     let mut bits = BitReader::new(bytes);
     let initial_object_type = read_audio_object_type(&mut bits)?;
     let initial_rate = read_sample_rate(&mut bits)?;
-    bits.read(4)?;
+    let channel_configuration = u8::try_from(bits.read(4)?).ok()?;
     let explicit_he = matches!(initial_object_type, 5 | 29);
-    let (audio_object_type, sample_rate) = if explicit_he {
-        let extension_rate = read_sample_rate(&mut bits)?;
-        (read_audio_object_type(&mut bits)?, extension_rate)
+    let (audio_object_type, core_sample_rate) = if explicit_he {
+        read_sample_rate(&mut bits)?;
+        (read_audio_object_type(&mut bits)?, initial_rate)
     } else {
         (initial_object_type, initial_rate)
     };
     Some(AudioSpecificConfig {
+        initial_audio_object_type: initial_object_type,
         audio_object_type,
-        sample_rate,
+        core_sample_rate,
+        channel_configuration,
         explicit_he,
     })
+}
+
+fn create_xaac_decoder(
+    params: &symphonia::core::codecs::audio::AudioCodecParameters,
+    codec: Codec,
+    limits: MediaLimits,
+) -> Result<XaacDecoder, MediaError> {
+    let config_bytes = params
+        .extra_data
+        .as_deref()
+        .ok_or(MediaError::UnsupportedCodecProfile {
+            codec: "AAC",
+            profile: "missing AudioSpecificConfig",
+        })?;
+    if config_bytes.len() > limits.max_codec_config_bytes {
+        return Err(MediaError::CodecConfigTooLarge {
+            actual: config_bytes.len(),
+            limit: limits.max_codec_config_bytes,
+        });
+    }
+    let parsed =
+        parse_audio_specific_config(config_bytes).ok_or(MediaError::UnsupportedCodecProfile {
+            codec: "AAC",
+            profile: "invalid AudioSpecificConfig",
+        })?;
+    let profile = match codec {
+        Codec::AacLc => XaacProfile::AacLc,
+        Codec::HeAacV1 => XaacProfile::HeAacV1,
+        Codec::HeAacV2 => XaacProfile::HeAacV2,
+        _ => {
+            return Err(MediaError::UnsupportedCodec(
+                "libxaac selected for a non-AAC codec".to_owned(),
+            ));
+        }
+    };
+    let max_pcm_bytes_per_frame =
+        limits
+            .max_pcm_samples_per_frame
+            .checked_mul(2)
+            .ok_or(MediaError::InvalidLimits(
+                "max_pcm_samples_per_frame is too large",
+            ))?;
+    XaacDecoder::new(XaacConfig {
+        audio_specific_config: config_bytes.into(),
+        core_sample_rate: parsed.core_sample_rate,
+        profile,
+        max_access_unit_bytes: limits.max_packet_bytes,
+        max_pcm_bytes_per_frame,
+        max_native_memory_bytes: limits.max_native_decoder_bytes,
+    })
+    .map_err(|error| native_backend_error("decoder creation", &error))
 }
 
 fn read_audio_object_type(bits: &mut BitReader<'_>) -> Option<u8> {
@@ -870,6 +1011,26 @@ fn backend_error(operation: &'static str, error: &SymphoniaError) -> MediaError 
     }
 }
 
+fn native_backend_error(operation: &'static str, error: &mantle_xaac::XaacError) -> MediaError {
+    MediaError::Backend {
+        operation,
+        message: error.to_string(),
+    }
+}
+
+fn xaac_decode_error(error: mantle_xaac::XaacError) -> MediaError {
+    match error {
+        mantle_xaac::XaacError::AccessUnitTooLarge { actual, limit } => {
+            MediaError::PacketTooLarge { actual, limit }
+        }
+        mantle_xaac::XaacError::OutputTooLarge { actual, limit } => MediaError::PcmFrameTooLarge {
+            actual: actual / 2,
+            limit: limit / 2,
+        },
+        error => native_backend_error("decode", &error),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
@@ -881,16 +1042,20 @@ mod tests {
         assert_eq!(
             parse_audio_specific_config(&[0x11, 0x90]),
             Some(AudioSpecificConfig {
+                initial_audio_object_type: 2,
                 audio_object_type: 2,
-                sample_rate: 48_000,
+                core_sample_rate: 48_000,
+                channel_configuration: 2,
                 explicit_he: false,
             })
         );
         assert_eq!(
             parse_audio_specific_config(&[0x2b, 0x92, 0x08]),
             Some(AudioSpecificConfig {
+                initial_audio_object_type: 5,
                 audio_object_type: 2,
-                sample_rate: 44_100,
+                core_sample_rate: 22_050,
+                channel_configuration: 2,
                 explicit_he: true,
             })
         );

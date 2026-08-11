@@ -3,6 +3,7 @@ members = [
     "crates/mantle-core",
     "crates/mantle-jvm",
     "crates/mantle-media",
+    "crates/mantle-xaac",
     "tools/jvm-gate",
     "tools/media-bench",
     "tools/oracle",

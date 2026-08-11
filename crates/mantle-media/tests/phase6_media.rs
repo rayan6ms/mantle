@@ -18,6 +18,8 @@ fn probes_primary_frozen_formats() {
         ("tone-pcm-s16le.wav", Container::Wave, Codec::PcmS16Le),
         ("tone-mp3.mp3", Container::Mp3, Codec::Mp3),
         ("tone-aac-lc.m4a", Container::Mp4, Codec::AacLc),
+        ("tone-he-aac-v1.m4a", Container::Mp4, Codec::HeAacV1),
+        ("tone-he-aac-v2.m4a", Container::Mp4, Codec::HeAacV2),
         ("tone-opus.webm", Container::WebM, Codec::Opus),
     ];
     for (name, container, codec) in cases {
@@ -88,6 +90,8 @@ fn seeks_each_primary_local_path() {
         "tone-pcm-s16le.wav",
         "tone-mp3.mp3",
         "tone-aac-lc.m4a",
+        "tone-he-aac-v1.m4a",
+        "tone-he-aac-v2.m4a",
         "tone-opus.webm",
     ] {
         let mut session = MediaSession::open_file(fixture(name), MediaLimits::default()).unwrap();
@@ -122,18 +126,23 @@ fn seeks_each_primary_local_path() {
 }
 
 #[test]
-fn rejects_implicit_sbr_and_ps_instead_of_decoding_the_lc_core() {
-    for name in ["tone-he-aac-v1.m4a", "tone-he-aac-v2.m4a"] {
-        let error = MediaSession::open_file(fixture(name), MediaLimits::default())
-            .err()
-            .expect("HE-AAC must be rejected");
-        assert!(matches!(
-            error,
-            MediaError::UnsupportedCodecProfile {
-                codec: "AAC",
-                profile: "HE-AAC/SBR/PS"
-            }
-        ));
+fn decodes_he_aac_profiles_with_bounded_reusable_storage() {
+    for (name, codec, expected_samples) in [
+        ("tone-he-aac-v1.m4a", Codec::HeAacV1, 585_728_usize),
+        ("tone-he-aac-v2.m4a", Codec::HeAacV2, 589_824_usize),
+    ] {
+        let mut session = MediaSession::open_file(fixture(name), MediaLimits::default()).unwrap();
+        assert_eq!(session.info().codec, codec, "{name}");
+        let mut output = PcmFrame::with_capacity(session.limits().max_pcm_samples_per_frame);
+        let storage = output.samples().as_ptr();
+        let mut samples = 0_usize;
+        while session.read_pcm(&mut output).unwrap() {
+            assert_eq!(output.samples().as_ptr(), storage, "{name}");
+            assert_eq!(output.sample_rate(), 48_000, "{name}");
+            assert_eq!(output.channels(), 2, "{name}");
+            samples += output.samples().len();
+        }
+        assert_eq!(samples, expected_samples, "{name}");
     }
 }
 
@@ -212,6 +221,67 @@ fn enforces_probe_packet_pcm_and_output_bounds() {
 }
 
 #[test]
+fn enforces_native_aac_configuration_memory_pcm_and_output_bounds() {
+    let he_bytes = fs::read(fixture("tone-he-aac-v1.m4a")).unwrap();
+    let tiny_config = MediaLimits {
+        max_codec_config_bytes: 1,
+        ..MediaLimits::default()
+    };
+    assert!(matches!(
+        MediaSession::open(
+            Box::new(MemoryInput::new(he_bytes.clone())),
+            Some("m4a"),
+            tiny_config,
+        ),
+        Err(MediaError::CodecConfigTooLarge { limit: 1, .. })
+    ));
+
+    let tiny_native_memory = MediaLimits {
+        max_native_decoder_bytes: 1,
+        ..MediaLimits::default()
+    };
+    assert!(matches!(
+        MediaSession::open(
+            Box::new(MemoryInput::new(he_bytes.clone())),
+            Some("m4a"),
+            tiny_native_memory,
+        ),
+        Err(MediaError::Backend {
+            operation: "decoder creation",
+            ..
+        })
+    ));
+
+    let tiny_native_pcm = MediaLimits {
+        max_pcm_samples_per_frame: 8,
+        ..MediaLimits::default()
+    };
+    let mut session = MediaSession::open(
+        Box::new(MemoryInput::new(he_bytes.clone())),
+        Some("m4a"),
+        tiny_native_pcm,
+    )
+    .unwrap();
+    let mut frame = PcmFrame::with_capacity(8);
+    assert!(matches!(
+        session.read_pcm(&mut frame),
+        Err(MediaError::PcmFrameTooLarge { limit: 8, .. })
+    ));
+
+    let mut session = MediaSession::open(
+        Box::new(MemoryInput::new(he_bytes)),
+        Some("m4a"),
+        MediaLimits::default(),
+    )
+    .unwrap();
+    let mut frame = PcmFrame::with_capacity(1);
+    assert!(matches!(
+        session.read_pcm(&mut frame),
+        Err(MediaError::OutputBufferTooSmall { capacity: 1, .. })
+    ));
+}
+
+#[test]
 fn malformed_inputs_fail_without_producing_unbounded_output() {
     for bytes in [Vec::new(), b"not media".to_vec(), vec![0xff; 4_096]] {
         let result = MediaSession::open(
@@ -225,4 +295,49 @@ fn malformed_inputs_fail_without_producing_unbounded_output() {
         );
         assert!(result.is_err());
     }
+}
+
+#[test]
+fn corrupted_he_aac_payloads_terminate_within_packet_and_output_bounds() {
+    for name in ["tone-he-aac-v1.m4a", "tone-he-aac-v2.m4a"] {
+        let mut bytes = fs::read(fixture(name)).unwrap();
+        corrupt_first_mdat_payload(&mut bytes);
+        let limits = MediaLimits::default();
+        let Ok(mut session) =
+            MediaSession::open(Box::new(MemoryInput::new(bytes)), Some("m4a"), limits)
+        else {
+            continue;
+        };
+        let mut frame = PcmFrame::with_capacity(limits.max_pcm_samples_per_frame);
+        let mut terminated = false;
+        for _ in 0..400 {
+            if matches!(session.read_pcm(&mut frame), Ok(true)) {
+                assert!(frame.samples().len() <= limits.max_pcm_samples_per_frame);
+            } else {
+                terminated = true;
+                break;
+            }
+        }
+        assert!(terminated, "{name}");
+    }
+}
+
+fn corrupt_first_mdat_payload(bytes: &mut [u8]) {
+    let mut offset = 0_usize;
+    while offset.checked_add(8).is_some_and(|end| end <= bytes.len()) {
+        let size = u32::from_be_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize;
+        if size < 8 || offset.checked_add(size).is_none_or(|end| end > bytes.len()) {
+            break;
+        }
+        if &bytes[offset + 4..offset + 8] == b"mdat" {
+            let payload_start = offset + 8;
+            let payload_end = (payload_start + 64).min(offset + size);
+            for byte in &mut bytes[payload_start..payload_end] {
+                *byte ^= 0xff;
+            }
+            return;
+        }
+        offset += size;
+    }
+    panic!("fixture has no bounded top-level mdat payload");
 }
