@@ -9,6 +9,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration as StdDuration;
 
+use mantle_audio::{AudioFrameError, PcmFormat};
 use mantle_xaac::{XaacConfig, XaacDecodeStatus, XaacDecoder, XaacProfile};
 use symphonia::core::codecs::audio::well_known::{
     CODEC_ID_AAC, CODEC_ID_MP3, CODEC_ID_OPUS, CODEC_ID_PCM_S16LE,
@@ -28,6 +29,7 @@ const MAX_XAAC_DELAYED_TIMESTAMPS: usize = 16;
 mod http_input;
 
 pub use http_input::{HttpNetworkAccess, HttpRangeInput, HttpRangeOptions};
+pub use mantle_audio::PcmFrame;
 
 /// Bounds applied before and around the media backend.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -169,47 +171,6 @@ pub struct MediaInfo {
     pub channels: u16,
     pub duration: Option<StdDuration>,
     pub seekable: bool,
-}
-
-/// Caller-owned reusable decoded PCM storage.
-#[derive(Debug)]
-pub struct PcmFrame {
-    samples: Vec<f32>,
-    sample_rate: u32,
-    channels: u16,
-    timestamp: Option<StdDuration>,
-}
-
-impl PcmFrame {
-    #[must_use]
-    pub fn with_capacity(sample_capacity: usize) -> Self {
-        Self {
-            samples: Vec::with_capacity(sample_capacity),
-            sample_rate: 0,
-            channels: 0,
-            timestamp: None,
-        }
-    }
-
-    #[must_use]
-    pub fn samples(&self) -> &[f32] {
-        &self.samples
-    }
-
-    #[must_use]
-    pub fn sample_rate(&self) -> u32 {
-        self.sample_rate
-    }
-
-    #[must_use]
-    pub fn channels(&self) -> u16 {
-        self.channels
-    }
-
-    #[must_use]
-    pub fn timestamp(&self) -> Option<StdDuration> {
-        self.timestamp
-    }
 }
 
 /// Caller-owned reusable storage for an encoded packet such as Opus.
@@ -536,7 +497,7 @@ impl MediaSession {
         }
         loop {
             let Some(packet) = self.next_audio_packet()? else {
-                output.samples.clear();
+                output.clear();
                 return Ok(false);
             };
             let timestamp = timestamp_to_std(self.time_base, packet.pts);
@@ -577,21 +538,18 @@ impl MediaSession {
                     limit: self.limits.max_pcm_samples_per_frame,
                 });
             }
-            if sample_count > output.samples.capacity() {
-                return Err(MediaError::OutputBufferTooSmall {
-                    required: sample_count,
-                    capacity: output.samples.capacity(),
-                });
-            }
             let channels =
                 u16::try_from(decoded_audio.spec().channels().count()).map_err(|_| {
                     MediaError::UnsupportedCodec("decoded channel count exceeds u16".to_owned())
                 })?;
-            output.samples.resize(sample_count, 0.0);
-            decoded_audio.copy_to_slice_interleaved(&mut output.samples);
-            output.sample_rate = decoded_audio.spec().rate();
-            output.channels = channels;
-            output.timestamp = timestamp;
+            let samples = prepare_pcm_output(
+                output,
+                sample_count,
+                decoded_audio.spec().rate(),
+                channels,
+                timestamp,
+            )?;
+            decoded_audio.copy_to_slice_interleaved(samples);
             return Ok(true);
         }
     }
@@ -739,19 +697,16 @@ impl XaacPcmDecoder {
                 limit: limits.max_pcm_samples_per_frame,
             });
         }
-        if sample_count > output.samples.capacity() {
-            return Err(MediaError::OutputBufferTooSmall {
-                required: sample_count,
-                capacity: output.samples.capacity(),
-            });
-        }
-        output.samples.resize(sample_count, 0.0);
-        for (sample, encoded) in output.samples.iter_mut().zip(pcm.bytes().chunks_exact(2)) {
+        let samples = prepare_pcm_output(
+            output,
+            sample_count,
+            pcm.sample_rate(),
+            pcm.channels(),
+            timestamp,
+        )?;
+        for (sample, encoded) in samples.iter_mut().zip(pcm.bytes().chunks_exact(2)) {
             *sample = f32::from(i16::from_ne_bytes([encoded[0], encoded[1]])) / 32_768.0;
         }
-        output.sample_rate = pcm.sample_rate();
-        output.channels = pcm.channels();
-        output.timestamp = timestamp;
         Ok(true)
     }
 
@@ -1088,6 +1043,35 @@ fn xaac_decode_error(error: mantle_xaac::XaacError) -> MediaError {
             limit: limit / 2,
         },
         error => native_backend_error("decode", &error),
+    }
+}
+
+fn prepare_pcm_output(
+    output: &mut PcmFrame,
+    sample_count: usize,
+    sample_rate: u32,
+    channels: u16,
+    timestamp: Option<StdDuration>,
+) -> Result<&mut [f32], MediaError> {
+    let format = PcmFormat::new(sample_rate, channels).map_err(map_audio_frame_error)?;
+    output
+        .prepare(sample_count, format, timestamp)
+        .map_err(map_audio_frame_error)
+}
+
+fn map_audio_frame_error(error: AudioFrameError) -> MediaError {
+    match error {
+        AudioFrameError::PcmCapacityExceeded { required, capacity } => {
+            MediaError::OutputBufferTooSmall { required, capacity }
+        }
+        AudioFrameError::InvalidSampleRate { .. } | AudioFrameError::UnsupportedChannels { .. } => {
+            MediaError::UnsupportedCodec(error.to_string())
+        }
+        AudioFrameError::MisalignedPcmSamples { .. }
+        | AudioFrameError::EncodedFrameTooLarge { .. } => MediaError::Backend {
+            operation: "decode",
+            message: error.to_string(),
+        },
     }
 }
 
