@@ -1,1 +1,1 @@
-third_party/libxaac/patches/*.patch -whitespace
+third_party/libxaac/patches/*.patch text eol=lf -whitespace
