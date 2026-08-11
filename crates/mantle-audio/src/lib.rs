@@ -6,6 +6,7 @@ use std::time::Duration;
 mod filter;
 mod opus;
 mod passthrough;
+mod queue;
 mod resample;
 mod transform;
 
@@ -16,6 +17,11 @@ pub use filter::{
 pub use opus::{OpusEncodingQuality, PcmOpusEncoder};
 pub use passthrough::{
     OpusModeTransition, OpusPacketRoute, OpusPassthrough, OpusPipelineMode, opus_packet_duration,
+};
+pub use queue::{
+    DEFAULT_ENCODED_FRAME_QUEUE_CAPACITY, EncodedFrameConsumer, EncodedFrameProducer,
+    EncodedFrameQueueConfigError, EncodedFrameQueueFull, MAX_ENCODED_FRAME_QUEUE_CAPACITY,
+    encoded_frame_queue,
 };
 pub use resample::{
     MAX_RESAMPLER_BUFFERED_FRAMES, MAX_RESAMPLER_CHUNK_FRAMES, PcmResampler, ResamplingQuality,
@@ -28,6 +34,9 @@ pub const COMPATIBLE_SAMPLES_PER_CHANNEL: usize = 960;
 pub const COMPATIBLE_PCM_SAMPLES: usize = COMPATIBLE_SAMPLES_PER_CHANNEL * 2;
 pub const COMPATIBLE_FRAME_DURATION: Duration = Duration::from_millis(20);
 pub const MAX_COMPATIBLE_OPUS_FRAME_BYTES: usize = 1_568;
+
+#[cfg(test)]
+mod allocation_tests;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PcmFormat {

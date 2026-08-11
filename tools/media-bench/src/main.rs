@@ -2,11 +2,16 @@ use std::env;
 use std::error::Error;
 use std::fs::{self, File};
 use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::mem;
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use mantle_audio::{
+    EncodedFrameConsumer, EncodedFrameProducer, EncodedFrameSlot, OpusPassthrough, PcmFormat,
+    encoded_frame_queue,
+};
 use mantle_media::{
     Codec, EncodedPacket, HttpNetworkAccess, HttpRangeInput, HttpRangeOptions, MediaLimits,
     MediaSession, PcmFrame,
@@ -51,6 +56,88 @@ struct Consumption {
     decoded_samples: u64,
     encoded_bytes: u64,
     checksum: u64,
+}
+
+enum PlaybackOutput {
+    Opus(Box<OpusPlaybackOutput>),
+    Pcm(PcmFrame),
+}
+
+struct OpusPlaybackOutput {
+    packet: EncodedPacket,
+    router: OpusPassthrough,
+    sender: EncodedFrameProducer,
+    receiver: EncodedFrameConsumer,
+    write_slot: EncodedFrameSlot,
+    read_slot: EncodedFrameSlot,
+}
+
+impl PlaybackOutput {
+    fn new(session: &MediaSession) -> Result<Self> {
+        if session.info().codec == Codec::Opus {
+            let format = PcmFormat::new(session.info().sample_rate, session.info().channels)?;
+            let (sender, receiver) = encoded_frame_queue(1)?;
+            Ok(Self::Opus(Box::new(OpusPlaybackOutput {
+                packet: EncodedPacket::with_capacity(session.limits().max_packet_bytes),
+                router: OpusPassthrough::new(format),
+                sender,
+                receiver,
+                write_slot: EncodedFrameSlot::new(),
+                read_slot: EncodedFrameSlot::new(),
+            })))
+        } else {
+            Ok(Self::Pcm(PcmFrame::with_capacity(
+                session.limits().max_pcm_samples_per_frame,
+            )))
+        }
+    }
+
+    fn read(&mut self, session: &mut MediaSession, consumption: &mut Consumption) -> Result<bool> {
+        match self {
+            Self::Opus(output) => {
+                if !session.read_encoded(&mut output.packet)? {
+                    return Ok(false);
+                }
+                if !output
+                    .router
+                    .route_packet(
+                        output.packet.data(),
+                        output.packet.timestamp(),
+                        &mut output.write_slot,
+                    )?
+                    .delivered()
+                {
+                    return Err("benchmark Opus packet unexpectedly requires transcoding".into());
+                }
+                output
+                    .sender
+                    .try_push(mem::take(&mut output.write_slot))
+                    .map_err(|_| "benchmark frame queue unexpectedly filled")?;
+                if !output.receiver.try_pop_into(&mut output.read_slot) {
+                    return Err("benchmark frame queue unexpectedly emptied".into());
+                }
+                record_packet(&output.read_slot, consumption);
+                mem::swap(&mut output.write_slot, &mut output.read_slot);
+                Ok(true)
+            }
+            Self::Pcm(frame) => {
+                if !session.read_pcm(frame)? {
+                    return Ok(false);
+                }
+                record_frame(frame, consumption);
+                Ok(true)
+            }
+        }
+    }
+
+    fn reset(&mut self) {
+        if let Self::Opus(output) = self {
+            output.router.reset();
+            output.receiver.clear();
+            output.write_slot.clear();
+            output.read_slot.clear();
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -169,15 +256,16 @@ fn run_benchmark(config: RunConfig) -> Result<()> {
     let load_elapsed_ms = elapsed_ms(load_started);
     let codec = session.info().codec;
     let duration = session.info().duration;
+    let mut output = PlaybackOutput::new(&session)?;
     let processing_started = Instant::now();
     let first_started = Instant::now();
     let mut consumption = Consumption::default();
-    read_one(&mut session, &mut consumption)?;
+    read_one(&mut session, &mut output, &mut consumption)?;
     let first_output_elapsed_ms = elapsed_ms(first_started);
     let seek_latency_ms = if config.seek {
-        Some(measure_seeks(&mut session, &mut consumption)?)
+        Some(measure_seeks(&mut session, &mut output, &mut consumption)?)
     } else {
-        consume_remaining(&mut session, &mut consumption)?;
+        consume_remaining(&mut session, &mut output, &mut consumption)?;
         None
     };
     let processing_elapsed_ms = elapsed_ms(processing_started);
@@ -229,39 +317,33 @@ fn run_benchmark(config: RunConfig) -> Result<()> {
     Ok(())
 }
 
-fn read_one(session: &mut MediaSession, consumption: &mut Consumption) -> Result<()> {
-    if session.info().codec == Codec::Opus {
-        let mut packet = EncodedPacket::with_capacity(session.limits().max_packet_bytes);
-        if !session.read_encoded(&mut packet)? {
-            return Err("media ended before its first encoded packet".into());
-        }
-        record_packet(&packet, consumption);
-    } else {
-        let mut frame = PcmFrame::with_capacity(session.limits().max_pcm_samples_per_frame);
-        if !session.read_pcm(&mut frame)? {
-            return Err("media ended before its first decoded frame".into());
-        }
-        record_frame(&frame, consumption);
+fn read_one(
+    session: &mut MediaSession,
+    output: &mut PlaybackOutput,
+    consumption: &mut Consumption,
+) -> Result<()> {
+    if !output.read(session, consumption)? {
+        return Err("media ended before its first output frame".into());
     }
     Ok(())
 }
 
-fn consume_remaining(session: &mut MediaSession, consumption: &mut Consumption) -> Result<()> {
-    if session.info().codec == Codec::Opus {
-        let mut packet = EncodedPacket::with_capacity(session.limits().max_packet_bytes);
-        while session.read_encoded(&mut packet)? {
-            record_packet(&packet, consumption);
-        }
-    } else {
-        let mut frame = PcmFrame::with_capacity(session.limits().max_pcm_samples_per_frame);
-        while session.read_pcm(&mut frame)? {
-            record_frame(&frame, consumption);
-        }
+fn consume_remaining(
+    session: &mut MediaSession,
+    output: &mut PlaybackOutput,
+    consumption: &mut Consumption,
+) -> Result<()> {
+    while output.read(session, consumption)? {
+        // The complete-read benchmark intentionally runs without playback pacing.
     }
     Ok(())
 }
 
-fn measure_seeks(session: &mut MediaSession, consumption: &mut Consumption) -> Result<Summary> {
+fn measure_seeks(
+    session: &mut MediaSession,
+    output: &mut PlaybackOutput,
+    consumption: &mut Consumption,
+) -> Result<Summary> {
     let mut latencies = Vec::with_capacity(10);
     for target_ms in [
         10_000_u64, 40_000, 15_000, 45_000, 20_000, 50_000, 25_000, 35_000, 5_000, 30_000,
@@ -269,7 +351,8 @@ fn measure_seeks(session: &mut MediaSession, consumption: &mut Consumption) -> R
         let started = Instant::now();
         let target = Duration::from_millis(target_ms);
         session.seek(target)?;
-        read_one(session, consumption)?;
+        output.reset();
+        read_one(session, output, consumption)?;
         latencies.push(elapsed_ms(started));
     }
     Ok(summarize(&latencies))
@@ -288,7 +371,7 @@ fn record_frame(frame: &PcmFrame, consumption: &mut Consumption) {
     }
 }
 
-fn record_packet(packet: &EncodedPacket, consumption: &mut Consumption) {
+fn record_packet(packet: &EncodedFrameSlot, consumption: &mut Consumption) {
     consumption.output_units = consumption.output_units.saturating_add(1);
     consumption.encoded_bytes = consumption
         .encoded_bytes
