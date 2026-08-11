@@ -8,7 +8,7 @@ use std::process::ExitCode;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use jni::objects::{JObject, JValue};
+use jni::objects::{JObject, JString, JValue};
 use jni::{InitArgsBuilder, JNIVersion, JavaVM, jni_sig, jni_str};
 use serde::Serialize;
 
@@ -28,6 +28,13 @@ struct RunConfig {
     seek: bool,
     workload: String,
     repetition: usize,
+}
+
+#[derive(Debug)]
+struct MediaProofConfig {
+    classpath: String,
+    input: String,
+    http: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -93,6 +100,36 @@ struct Summary {
     samples: usize,
 }
 
+#[derive(Debug, Serialize)]
+struct MediaProofResult {
+    schema_version: u32,
+    lavaplayer_version: &'static str,
+    input: String,
+    input_mode: &'static str,
+    duration_ms: i64,
+    seekable: bool,
+    output_codec: String,
+    output_channels: i32,
+    output_sample_rate: i32,
+    output_chunk_samples: i32,
+    decoded_frames: u64,
+    decoded_bytes: u64,
+    first_timecode_ms: i64,
+    last_timecode_ms: i64,
+    seek_target_ms: i64,
+    seek_observed_ms: i64,
+}
+
+#[derive(Debug)]
+struct FrameProof {
+    timecode_ms: i64,
+    data_length: i32,
+    codec: String,
+    channels: i32,
+    sample_rate: i32,
+    chunk_samples: i32,
+}
+
 fn main() -> ExitCode {
     match run_main() {
         Ok(()) => ExitCode::SUCCESS,
@@ -107,6 +144,9 @@ fn run_main() -> Result<()> {
     let mut args = env::args().skip(1);
     match args.next().as_deref() {
         Some("benchmark") => run_benchmark(parse_run_config(&args.collect::<Vec<_>>())?),
+        Some("media-proof") => run_media_proof(parse_media_proof_config(
+            &args.collect::<Vec<_>>(),
+        )?),
         Some("inventory") => inventory::run(&args.collect::<Vec<_>>()),
         Some("seed-classification") => inventory::seed_classification(&args.collect::<Vec<_>>()),
         Some("serve") => {
@@ -114,10 +154,18 @@ fn run_main() -> Result<()> {
             serve(Path::new(&root), "127.0.0.1:18080")
         }
         _ => Err(
-            "usage: mantle-reference benchmark <options> | inventory <options> | seed-classification <options> | serve --root <directory>"
+            "usage: mantle-reference benchmark <options> | media-proof <options> | inventory <options> | seed-classification <options> | serve --root <directory>"
                 .into(),
         ),
     }
+}
+
+fn parse_media_proof_config(args: &[String]) -> Result<MediaProofConfig> {
+    Ok(MediaProofConfig {
+        classpath: required_value(args, "--classpath")?,
+        input: required_value(args, "--input")?,
+        http: args.iter().any(|arg| arg == "--http"),
+    })
 }
 
 fn parse_run_config(args: &[String]) -> Result<RunConfig> {
@@ -177,6 +225,277 @@ fn run_benchmark(config: RunConfig) -> Result<()> {
         .build()?;
     let vm = JavaVM::new(vm_args)?;
     vm.attach_current_thread(|jni| run_benchmark_attached(jni, config, vm_start))
+}
+
+fn run_media_proof(config: MediaProofConfig) -> Result<()> {
+    let classpath_option = format!("-Djava.class.path={}", config.classpath);
+    let vm_args = InitArgsBuilder::new()
+        .version(JNIVersion::V1_8)
+        .option(&classpath_option)
+        .option("-Xms32m")
+        .option("-Xmx256m")
+        .option("-Dorg.slf4j.simpleLogger.defaultLogLevel=warn")
+        .build()?;
+    let vm = JavaVM::new(vm_args)?;
+    vm.attach_current_thread(|jni| run_media_proof_attached(jni, config))
+}
+
+fn run_media_proof_attached(jni: &mut jni::Env<'_>, config: MediaProofConfig) -> Result<()> {
+    let manager = jni.new_object(
+        jni_str!("com/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayerManager"),
+        jni_sig!("()V"),
+        &[],
+    )?;
+    register_source(jni, &manager, config.http)?;
+    let track = load_track(jni, &manager, &config.input)?;
+    let duration_ms = jni
+        .call_method(&track, jni_str!("getDuration"), jni_sig!("()J"), &[])?
+        .j()?;
+    let seekable = jni
+        .call_method(&track, jni_str!("isSeekable"), jni_sig!("()Z"), &[])?
+        .z()?;
+
+    let player = create_player(jni, &manager)?;
+    start_track(jni, &player, &track)?;
+    let (first, last_timecode_ms, decoded_frames, decoded_bytes) =
+        consume_complete_track(jni, &player)?;
+
+    let seek_track = jni
+        .call_method(
+            &track,
+            jni_str!("makeClone"),
+            jni_sig!("()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;"),
+            &[],
+        )?
+        .l()?;
+    let seek_player = create_player(jni, &manager)?;
+    start_track(jni, &seek_player, &seek_track)?;
+    wait_for_frame_proof(jni, &seek_player, Duration::from_secs(15))?;
+    let seek_target_ms = duration_ms / 2;
+    jni.call_method(
+        &seek_track,
+        jni_str!("setPosition"),
+        jni_sig!("(J)V"),
+        &[JValue::Long(seek_target_ms)],
+    )?;
+    let seek_observed_ms = wait_for_seek(jni, &seek_player, seek_target_ms)?;
+
+    jni.call_method(&manager, jni_str!("shutdown"), jni_sig!("()V"), &[])?;
+    let result = MediaProofResult {
+        schema_version: 1,
+        lavaplayer_version: "2.2.6",
+        input: config.input,
+        input_mode: if config.http { "http" } else { "local" },
+        duration_ms,
+        seekable,
+        output_codec: first.codec,
+        output_channels: first.channels,
+        output_sample_rate: first.sample_rate,
+        output_chunk_samples: first.chunk_samples,
+        decoded_frames,
+        decoded_bytes,
+        first_timecode_ms: first.timecode_ms,
+        last_timecode_ms,
+        seek_target_ms,
+        seek_observed_ms,
+    };
+    println!("{}", serde_json::to_string(&result)?);
+    Ok(())
+}
+
+fn load_track<'local>(
+    jni: &mut jni::Env<'local>,
+    manager: &JObject<'local>,
+    input: &str,
+) -> Result<JObject<'local>> {
+    let input = jni.new_string(input)?;
+    let reference = jni.new_object(
+        jni_str!("com/sedmelluq/discord/lavaplayer/track/AudioReference"),
+        jni_sig!("(Ljava/lang/String;Ljava/lang/String;)V"),
+        &[
+            JValue::Object(input.as_ref()),
+            JValue::Object(&JObject::null()),
+        ],
+    )?;
+    let track = jni
+        .call_method(
+            manager,
+            jni_str!("loadItemSync"),
+            jni_sig!("(Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;"),
+            &[JValue::Object(&reference)],
+        )?
+        .l()?;
+    if track.is_null() {
+        return Err("Lavaplayer returned no track for the media proof input".into());
+    }
+    Ok(track)
+}
+
+fn create_player<'local>(
+    jni: &mut jni::Env<'local>,
+    manager: &JObject<'local>,
+) -> Result<JObject<'local>> {
+    Ok(jni
+        .call_method(
+            manager,
+            jni_str!("createPlayer"),
+            jni_sig!("()Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;"),
+            &[],
+        )?
+        .l()?)
+}
+
+fn start_track(jni: &mut jni::Env<'_>, player: &JObject<'_>, track: &JObject<'_>) -> Result<()> {
+    let started = jni
+        .call_method(
+            player,
+            jni_str!("startTrack"),
+            jni_sig!("(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Z)Z"),
+            &[JValue::Object(track), JValue::Bool(false)],
+        )?
+        .z()?;
+    if !started {
+        return Err("Lavaplayer refused to start the media proof track".into());
+    }
+    Ok(())
+}
+
+fn consume_complete_track(
+    jni: &mut jni::Env<'_>,
+    player: &JObject<'_>,
+) -> Result<(FrameProof, i64, u64, u64)> {
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let mut first = None;
+    let mut last_timecode_ms = 0;
+    let mut decoded_frames = 0_u64;
+    let mut decoded_bytes = 0_u64;
+    loop {
+        if let Some(frame) = provide_frame_proof(jni, player)? {
+            last_timecode_ms = frame.timecode_ms;
+            decoded_frames = decoded_frames.saturating_add(1);
+            decoded_bytes = decoded_bytes.saturating_add(u64::try_from(frame.data_length)?);
+            if first.is_none() {
+                first = Some(frame);
+            }
+        } else if !has_playing_track(jni, player)? {
+            break;
+        } else {
+            thread::sleep(Duration::from_millis(1));
+        }
+        if Instant::now() >= deadline {
+            return Err("media proof track did not complete within 30 seconds".into());
+        }
+    }
+    Ok((
+        first.ok_or("media proof track completed without an audio frame")?,
+        last_timecode_ms,
+        decoded_frames,
+        decoded_bytes,
+    ))
+}
+
+fn wait_for_frame_proof(
+    jni: &mut jni::Env<'_>,
+    player: &JObject<'_>,
+    timeout: Duration,
+) -> Result<FrameProof> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        if let Some(frame) = provide_frame_proof(jni, player)? {
+            return Ok(frame);
+        }
+        if !has_playing_track(jni, player)? {
+            return Err("media proof track ended before producing an audio frame".into());
+        }
+        if Instant::now() >= deadline {
+            return Err("media proof track did not produce a frame before its deadline".into());
+        }
+        thread::sleep(Duration::from_millis(1));
+    }
+}
+
+fn wait_for_seek(jni: &mut jni::Env<'_>, player: &JObject<'_>, target_ms: i64) -> Result<i64> {
+    let deadline = Instant::now() + Duration::from_secs(15);
+    loop {
+        if let Some(frame) = provide_frame_proof(jni, player)?
+            && frame.timecode_ms.abs_diff(target_ms) <= 1_000
+        {
+            return Ok(frame.timecode_ms);
+        }
+        if !has_playing_track(jni, player)? {
+            return Err("media proof track ended before the seek target was observed".into());
+        }
+        if Instant::now() >= deadline {
+            return Err("media proof seek did not complete before its deadline".into());
+        }
+        thread::sleep(Duration::from_millis(1));
+    }
+}
+
+fn has_playing_track(jni: &mut jni::Env<'_>, player: &JObject<'_>) -> Result<bool> {
+    Ok(!jni
+        .call_method(
+            player,
+            jni_str!("getPlayingTrack"),
+            jni_sig!("()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;"),
+            &[],
+        )?
+        .l()?
+        .is_null())
+}
+
+fn provide_frame_proof(jni: &mut jni::Env<'_>, player: &JObject<'_>) -> Result<Option<FrameProof>> {
+    let frame = jni
+        .call_method(
+            player,
+            jni_str!("provide"),
+            jni_sig!("()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;"),
+            &[],
+        )?
+        .l()?;
+    if frame.is_null() {
+        return Ok(None);
+    }
+    let timecode_ms = jni
+        .call_method(&frame, jni_str!("getTimecode"), jni_sig!("()J"), &[])?
+        .j()?;
+    let data_length = jni
+        .call_method(&frame, jni_str!("getDataLength"), jni_sig!("()I"), &[])?
+        .i()?;
+    let format = jni
+        .call_method(
+            &frame,
+            jni_str!("getFormat"),
+            jni_sig!("()Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;"),
+            &[],
+        )?
+        .l()?;
+    let codec = jni
+        .call_method(
+            &format,
+            jni_str!("codecName"),
+            jni_sig!("()Ljava/lang/String;"),
+            &[],
+        )?
+        .l()?;
+    let codec = jni.cast_local::<JString>(codec)?.try_to_string(jni)?;
+    let channels = jni
+        .get_field(&format, jni_str!("channelCount"), jni_sig!("I"))?
+        .i()?;
+    let sample_rate = jni
+        .get_field(&format, jni_str!("sampleRate"), jni_sig!("I"))?
+        .i()?;
+    let chunk_samples = jni
+        .get_field(&format, jni_str!("chunkSampleCount"), jni_sig!("I"))?
+        .i()?;
+    Ok(Some(FrameProof {
+        timecode_ms,
+        data_length,
+        codec,
+        channels,
+        sample_rate,
+        chunk_samples,
+    }))
 }
 
 // Keeping this linear makes the lifetime of the JVM-local player and track references explicit.
@@ -728,6 +1047,11 @@ fn serve_connection(mut stream: TcpStream, root: &Path) -> Result<()> {
             .then(|| value.trim().to_owned())
     });
     let (status, start, end) = parse_range(range.as_deref(), data.len())?;
+    eprintln!(
+        "http_fixture method={method} path={relative} status={} range={}",
+        status.split_whitespace().next().unwrap_or("unknown"),
+        range.as_deref().unwrap_or("none")
+    );
     let length = end - start;
     let mut headers = format!(
         "HTTP/1.1 {status}\r\nContent-Length: {length}\r\nAccept-Ranges: bytes\r\nContent-Type: application/octet-stream\r\nConnection: close\r\n"
@@ -780,6 +1104,21 @@ mod tests {
         assert!((summary.median - 3.0).abs() < f64::EPSILON);
         assert!((summary.p95 - 4.0).abs() < f64::EPSILON);
         assert!((summary.mean - 2.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn parses_media_proof_options() -> Result<()> {
+        let config = parse_media_proof_config(&[
+            "--classpath".to_owned(),
+            "reference.jar".to_owned(),
+            "--input".to_owned(),
+            "http://127.0.0.1/media.mp3".to_owned(),
+            "--http".to_owned(),
+        ])?;
+        assert_eq!(config.classpath, "reference.jar");
+        assert_eq!(config.input, "http://127.0.0.1/media.mp3");
+        assert!(config.http);
+        Ok(())
     }
 
     #[test]
