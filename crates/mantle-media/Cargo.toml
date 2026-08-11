@@ -8,7 +8,7 @@ publish = false
 
 [dependencies]
 log.workspace = true
-mantle-xaac = { path = "../mantle-xaac" }
+mantle-xaac = { version = "0.0.0", path = "../mantle-xaac" }
 symphonia.workspace = true
 ureq.workspace = true
 

@@ -371,6 +371,19 @@ index 7ba4b5c..daff3da 100644
                              WORD32 max_stretch);
  
  #endif
+diff --git a/decoder/generic/ixheaacd_qmf_dec_generic.c b/decoder/generic/ixheaacd_qmf_dec_generic.c
+index e3e8e4a..83301ec 100644
+--- a/decoder/generic/ixheaacd_qmf_dec_generic.c
++++ b/decoder/generic/ixheaacd_qmf_dec_generic.c
+@@ -49,7 +49,7 @@
+ #include "ixheaacd_function_selector.h"
+ #include "ixheaacd_audioobjtypes.h"
+-#if !__ARM_NEON__
++#if !__ARM_NEON__ || defined(__APPLE__)
+ 
+ #define DCT3_LEN (32)
+ #define DCT2_LEN (64)
+ 
 diff --git a/decoder/ixheaacd_sbrqmftrans.h b/decoder/ixheaacd_sbrqmftrans.h
 index d9093c7..b402880 100644
 --- a/decoder/ixheaacd_sbrqmftrans.h
