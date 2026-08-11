@@ -15,7 +15,9 @@ rust-version = "1.97.1"
 license = "Apache-2.0"
 
 [workspace.dependencies]
+log = { version = "=0.4.33", features = ["max_level_debug"] }
 symphonia = { version = "=0.6.0", default-features = false, features = ["aac", "isomp4", "mkv", "mp3", "pcm", "wav"] }
+ureq = { version = "=3.4.0", default-features = false, features = ["rustls"] }
 
 [workspace.lints.rust]
 unsafe_code = "deny"

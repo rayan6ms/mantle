@@ -21,6 +21,10 @@ use symphonia::core::io::{
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::units::{Duration as SymphoniaDuration, Time, TimeBase, Timestamp};
 
+mod http_input;
+
+pub use http_input::{HttpNetworkAccess, HttpRangeInput, HttpRangeOptions};
+
 /// Bounds applied before and around the media backend.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MediaLimits {
@@ -232,6 +236,7 @@ pub struct SeekResult {
 pub enum MediaError {
     Io(io::Error),
     InvalidLimits(&'static str),
+    InvalidHttpOptions(&'static str),
     ProbeLimitExceeded {
         limit: u64,
     },
@@ -271,6 +276,9 @@ impl fmt::Display for MediaError {
         match self {
             Self::Io(error) => write!(formatter, "media I/O failed: {error}"),
             Self::InvalidLimits(message) => write!(formatter, "invalid media limits: {message}"),
+            Self::InvalidHttpOptions(message) => {
+                write!(formatter, "invalid HTTP range options: {message}")
+            }
             Self::ProbeLimitExceeded { limit } => {
                 write!(formatter, "media probe exceeded its {limit}-byte limit")
             }
