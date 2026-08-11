@@ -4,6 +4,7 @@ mod trace;
 
 use crate::schema::Scenario;
 use crate::trace::{Backend, Trace};
+use std::collections::BTreeSet;
 use std::env;
 use std::error::Error;
 use std::fs;
@@ -61,7 +62,18 @@ fn run() -> Result<()> {
             let comparison = trace::compare(&reference, &mantle)?;
             write_json(&required_path(&args, "--output")?, &comparison)
         }
-        _ => Err("usage: mantle-oracle <validate|protocol|write-runner|normalize|assert-deterministic|compare> [options]".into()),
+        Some("assert-differences") => {
+            let comparison: trace::Comparison =
+                serde_json::from_slice(&fs::read(required_path(&args, "--comparison")?)?)?;
+            let allowed = required_value(&args, "--allowed")?
+                .split(',')
+                .filter(|value| !value.is_empty())
+                .map(str::to_owned)
+                .collect::<BTreeSet<_>>();
+            trace::assert_difference_actions(&comparison, &allowed)?;
+            Ok(())
+        }
+        _ => Err("usage: mantle-oracle <validate|protocol|write-runner|normalize|assert-deterministic|compare|assert-differences> [options]".into()),
     }
 }
 
