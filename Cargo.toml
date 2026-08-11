@@ -1,5 +1,11 @@
 [workspace]
-members = ["crates/mantle-jvm", "tools/jvm-gate", "tools/oracle", "tools/reference"]
+members = [
+    "crates/mantle-core",
+    "crates/mantle-jvm",
+    "tools/jvm-gate",
+    "tools/oracle",
+    "tools/reference",
+]
 resolver = "3"
 
 [workspace.package]
