@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Mantle Lavaplayer compatibility classification",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "reference",
+    "status",
+    "symbols"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "reference": {
+      "type": "object",
+      "required": [
+        "artifact",
+        "version",
+        "sha256"
+      ],
+      "properties": {
+        "artifact": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "sources_jar_sha256": {
+          "type": "string"
+        },
+        "pom_sha256": {
+          "type": "string"
+        },
+        "module_metadata_sha256": {
+          "type": "string"
+        }
+      }
+    },
+    "status": {
+      "enum": [
+        "INITIAL_UNASSESSED",
+        "IN_PROGRESS",
+        "COMPLETE"
+      ]
+    },
+    "symbols": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "binary_name",
+          "symbol_kind",
+          "member_name",
+          "descriptor",
+          "assessment",
+          "notes",
+          "tests"
+        ],
+        "properties": {
+          "binary_name": {
+            "type": "string"
+          },
+          "symbol_kind": {
+            "enum": [
+              "CLASS",
+              "FIELD",
+              "METHOD"
+            ]
+          },
+          "member_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "descriptor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "assessment": {
+            "enum": [
+              "UNASSESSED",
+              "CLASSIFIED"
+            ]
+          },
+          "classification": {
+            "enum": [
+              "A_EXACT",
+              "B_SOURCE",
+              "C_SEMANTIC",
+              "D_LEGACY",
+              "X_UNSUPPORTED"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          },
+          "tests": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "assessment": {
+                  "const": "CLASSIFIED"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "classification"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "classification"
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "symbol_kind": {
+                  "const": "CLASS"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "member_name": {
+                  "type": "null"
+                },
+                "descriptor": {
+                  "type": "null"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "member_name": {
+                  "type": "string"
+                },
+                "descriptor": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

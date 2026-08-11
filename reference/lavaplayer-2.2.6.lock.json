@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "coordinate": "dev.arbjerg:lavaplayer:2.2.6",
+  "release_source": {
+    "repository": "https://github.com/lavalink-devs/lavaplayer",
+    "tag": "2.2.6",
+    "commit": "608f47e91f7bc54f6f73b83acf5e9ff07c3ee0f6",
+    "archive_url": "https://codeload.github.com/lavalink-devs/lavaplayer/tar.gz/608f47e91f7bc54f6f73b83acf5e9ff07c3ee0f6",
+    "sha256": "02a4095fb2bec8285080c49b0e7b4af442c8fdb2c7df44755d08410bc5eac000"
+  },
+  "published_artifacts": [
+    {
+      "file": "lavaplayer-2.2.6.jar",
+      "url": "https://repo1.maven.org/maven2/dev/arbjerg/lavaplayer/2.2.6/lavaplayer-2.2.6.jar",
+      "sha256": "84aba896d988e12ea24c25f87f2e88eca4be7adac31893eacabf93401da1282d"
+    },
+    {
+      "file": "lavaplayer-2.2.6-sources.jar",
+      "url": "https://repo1.maven.org/maven2/dev/arbjerg/lavaplayer/2.2.6/lavaplayer-2.2.6-sources.jar",
+      "sha256": "b094b4a84a8c1a7684bb9f5e454a4a4f8833a25b2f8c6e38d87888bc6741c2a6"
+    },
+    {
+      "file": "lavaplayer-2.2.6.pom",
+      "url": "https://repo1.maven.org/maven2/dev/arbjerg/lavaplayer/2.2.6/lavaplayer-2.2.6.pom",
+      "sha256": "2129409af1d83f6cad720247d6495e27d8334c036c51cc343e777bf5932890a8"
+    },
+    {
+      "file": "lavaplayer-2.2.6.module",
+      "url": "https://repo1.maven.org/maven2/dev/arbjerg/lavaplayer/2.2.6/lavaplayer-2.2.6.module",
+      "sha256": "65e8ad83df8050cd66b5e340ef2fa8a630bae2dbe1a683f826dd4ace5dab10ea"
+    }
+  ],
+  "resolved_runtime_artifacts": [
+    { "file": "annotations-24.0.0.jar", "sha256": "ff112f54ce874b8ae899cfd68f0315d96c9f406a338b8eca80c76d10e2e5a2f7" },
+    { "file": "base64-2.3.9.jar", "sha256": "f1a0e359eee29a5939c35e5fdedc574dd7e8ca065b056fc14b2b29e3ed3cd54d" },
+    { "file": "commons-codec-1.11.jar", "sha256": "e599d5318e97aa48f42136a2927e6dfa4e8881dff0e6c8e3109ddbbff51d7b7d" },
+    { "file": "commons-io-2.13.0.jar", "sha256": "671eaa39688dac2ffaa4645b3c9980ae2d0ea2471e4ae6a5da199cd15ae23666" },
+    { "file": "commons-logging-1.2.jar", "sha256": "daddea1ea0be0f56978ab3006b8ac92834afeefbd9b7e4e6316fca57df0fa636" },
+    { "file": "httpclient-4.5.14.jar", "sha256": "c8bc7e1c51a6d4ce72f40d2ebbabf1c4b68bfe76e732104b04381b493478e9d6" },
+    { "file": "httpcore-4.4.16.jar", "sha256": "6c9b3dd142a09dc468e23ad39aad6f75a0f2b85125104469f026e52a474e464f" },
+    { "file": "jackson-annotations-2.15.2.jar", "sha256": "04e21f94dcfee4b078fa5a5f53047b785aaba69d19de392f616e7a7fe5d3882f" },
+    { "file": "jackson-core-2.15.2.jar", "sha256": "303c99e82b1faa91a0bae5d8fbeb56f7e2adf9b526a900dd723bf140d62bd4b4" },
+    { "file": "jackson-databind-2.15.2.jar", "sha256": "0eb2fdad6e40ab8832a78c9b22f58196dd970594e8d3d5a26ead87847c4f3a96" },
+    { "file": "json-20240303.jar", "sha256": "3cf6cd6892e32e2b4c1c39e0f52f5248a2f5b37646fdfbb79a66b46b618414ed" },
+    { "file": "jsoup-1.16.1.jar", "sha256": "1f115726540ddf71958c14bc517ebfc49cf481e91cd917b0face84f01272e901" },
+    { "file": "lava-common-2.2.6.jar", "sha256": "628ea7901cbf566fe9152984f58e774759dbc4164ae2a1f9b349596e6c523644" },
+    { "file": "lavaplayer-natives-2.2.6.jar", "sha256": "6c77877aa3ff28892df56fab42ecddb29d7bceb23c0be0ffe2df9be3ee46c02b" },
+    { "file": "rhino-1.7.14.jar", "sha256": "c9290b0d801bf0dbbbc44338e0f769b7650a0c5d04e6bb1aeb85775c0211b003" },
+    { "file": "rhino-engine-1.7.14.jar", "sha256": "961ed9bb342419d6cbf9a2064508c359e9a25cd636182030584b1b742c3f9928" },
+    { "file": "slf4j-api-2.0.7.jar", "sha256": "5d6298b93a1905c32cda6478808ac14c2d4a47e91535e53c41f7feeb85d946f4" }
+  ]
+}
