@@ -4,6 +4,7 @@ members = [
     "crates/mantle-jvm",
     "crates/mantle-media",
     "tools/jvm-gate",
+    "tools/media-bench",
     "tools/oracle",
     "tools/reference",
 ]

@@ -388,6 +388,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "mantle-media-bench"
+version = "0.0.0"
+dependencies = [
+ "mantle-media",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "mantle-oracle"
 version = "0.0.0"
 dependencies = [
