@@ -49,6 +49,41 @@ impl fmt::Display for OpusError {
 
 impl std::error::Error for OpusError {}
 
+/// Validates an Opus packet and returns its total samples at `sample_rate`.
+///
+/// # Errors
+///
+/// Returns an error for an empty or oversized packet, an invalid sample rate, or a packet rejected
+/// by libopus's structural parser.
+pub fn packet_samples(packet: &[u8], sample_rate: u32) -> Result<usize, OpusError> {
+    if packet.is_empty() {
+        return Err(OpusError::InvalidConfiguration("packet must not be empty"));
+    }
+    if sample_rate == 0 || !sample_rate.is_multiple_of(400) {
+        return Err(OpusError::InvalidConfiguration(
+            "packet sample rate must be a non-zero multiple of 400 Hz",
+        ));
+    }
+    let packet_len = i32::try_from(packet.len()).map_err(|_| {
+        OpusError::InvalidConfiguration("packet length does not fit the native API")
+    })?;
+    let sample_rate = i32::try_from(sample_rate)
+        .map_err(|_| OpusError::InvalidConfiguration("sample rate does not fit the native API"))?;
+    // SAFETY: `packet` contains `packet_len` readable initialized bytes for the duration of this
+    // call, and libopus retains no pointer. The sample rate satisfies the parser's documented
+    // multiple-of-400 requirement.
+    let samples =
+        unsafe { ffi::opus_packet_get_nb_samples(packet.as_ptr(), packet_len, sample_rate) };
+    if samples < 0 {
+        return Err(OpusError::NativeStatus {
+            operation: "packet validation",
+            status: samples,
+        });
+    }
+    usize::try_from(samples)
+        .map_err(|_| OpusError::NativeContract("packet sample count is negative"))
+}
+
 /// One independently owned libopus encoder state.
 pub struct OpusEncoder {
     state: NonNull<ffi::OpusEncoder>,
@@ -224,7 +259,7 @@ fn native_status(operation: &'static str, status: i32) -> Result<(), OpusError> 
 
 #[cfg(test)]
 mod tests {
-    use super::{OpusEncoder, OpusError};
+    use super::{OpusEncoder, OpusError, packet_samples};
 
     #[test]
     fn encodes_into_caller_storage_and_reset_reproduces_the_packet() {
@@ -233,6 +268,7 @@ mod tests {
         let mut output = [0_u8; 1_568];
         let first_len = encoder.encode(&pcm, 960, &mut output).unwrap();
         let first = output[..first_len].to_vec();
+        assert_eq!(packet_samples(&first, 48_000).unwrap(), 960);
 
         encoder.reset().unwrap();
         let second_len = encoder.encode(&pcm, 960, &mut output).unwrap();
@@ -265,5 +301,7 @@ mod tests {
             })
         );
         assert_eq!(output, [0xa5; 64]);
+        assert!(packet_samples(&[], 48_000).is_err());
+        assert!(packet_samples(&[(19 << 3) | 3, 7], 48_000).is_err());
     }
 }

@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration as StdDuration;
 
-use mantle_audio::{AudioFrameError, PcmFormat};
+use mantle_audio::{AudioFrameError, PcmFormat, opus_packet_duration};
 use mantle_xaac::{XaacConfig, XaacDecodeStatus, XaacDecoder, XaacProfile};
 use symphonia::core::codecs::audio::well_known::{
     CODEC_ID_AAC, CODEC_ID_MP3, CODEC_ID_OPUS, CODEC_ID_PCM_S16LE,
@@ -997,28 +997,6 @@ fn duration_to_std(
     timestamp_to_std(time_base, timestamp)
 }
 
-fn opus_packet_duration(packet: &[u8]) -> Option<StdDuration> {
-    let toc = *packet.first()?;
-    let config = toc >> 3;
-    let frame_count = match toc & 0b11 {
-        0 => 1_u64,
-        1 | 2 => 2,
-        3 => u64::from(*packet.get(1)? & 0x3f),
-        _ => unreachable!(),
-    };
-    if frame_count == 0 {
-        return None;
-    }
-    let frame_micros = match config {
-        0..=11 => [10_000_u64, 20_000, 40_000, 60_000][usize::from(config & 0b11)],
-        12..=15 => [10_000_u64, 20_000][usize::from(config & 0b1)],
-        16..=31 => [2_500_u64, 5_000, 10_000, 20_000][usize::from(config & 0b11)],
-        _ => unreachable!(),
-    };
-    let total_micros = frame_micros.checked_mul(frame_count)?;
-    (total_micros <= 120_000).then(|| StdDuration::from_micros(total_micros))
-}
-
 fn backend_error(operation: &'static str, error: &SymphoniaError) -> MediaError {
     MediaError::Backend {
         operation,
@@ -1090,7 +1068,8 @@ fn map_audio_frame_error(error: AudioFrameError) -> MediaError {
 mod tests {
     use std::time::Duration;
 
-    use super::{AudioSpecificConfig, opus_packet_duration, parse_audio_specific_config};
+    use super::{AudioSpecificConfig, parse_audio_specific_config};
+    use mantle_audio::opus_packet_duration;
 
     #[test]
     fn parses_lc_and_explicit_he_audio_specific_configs() {

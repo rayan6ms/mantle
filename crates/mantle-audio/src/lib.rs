@@ -5,6 +5,7 @@ use std::time::Duration;
 
 mod filter;
 mod opus;
+mod passthrough;
 mod resample;
 mod transform;
 
@@ -13,6 +14,9 @@ pub use filter::{
     PcmFilter, PcmFilterFactory,
 };
 pub use opus::{OpusEncodingQuality, PcmOpusEncoder};
+pub use passthrough::{
+    OpusModeTransition, OpusPacketRoute, OpusPassthrough, OpusPipelineMode, opus_packet_duration,
+};
 pub use resample::{
     MAX_RESAMPLER_BUFFERED_FRAMES, MAX_RESAMPLER_CHUNK_FRAMES, PcmResampler, ResamplingQuality,
 };
