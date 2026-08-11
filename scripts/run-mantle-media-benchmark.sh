@@ -87,7 +87,9 @@ jq -e -s \
     all(.[] | select(.seek_latency_ms != null); .seek_latency_ms.samples == 10)
   ' "$RESULT_FILE" >/dev/null
 
-if ! grep -Eq 'fixture_response status=206 range_start=[1-9][0-9]*' "$HTTP_LOG"; then
+RANGE_REOPEN_COUNT="$(grep -Ec 'fixture_response status=206 range_start=[1-9][0-9]*' "$HTTP_LOG" || true)"
+readonly RANGE_REOPEN_COUNT
+if [[ "$RANGE_REOPEN_COUNT" -eq 0 ]]; then
   printf 'Mantle HTTP benchmark did not reopen a nonzero byte range.\n' >&2
   exit 1
 fi
@@ -130,6 +132,7 @@ jq -n \
   --arg commit "$SOURCE_COMMIT" \
   --argjson worktree_clean "$SOURCE_WORKTREE_CLEAN" \
   --argjson repetitions "$REPETITIONS" \
+  --argjson http_nonzero_range_responses "$RANGE_REOPEN_COUNT" \
   --argjson binary_bytes "$BINARY_BYTES" \
   --arg wav_sha256 "$(sha256sum "$FIXTURES/reference.wav" | cut -d ' ' -f 1)" \
   --arg mp3_sha256 "$(sha256sum "$FIXTURES/reference.mp3" | cut -d ' ' -f 1)" \
@@ -142,6 +145,7 @@ jq -n \
     toolchain: {rustc: $rustc, cargo: $cargo, profile: $profile},
     source: {commit: $commit, worktree_clean: $worktree_clean},
     repetitions: $repetitions,
+    http_nonzero_range_responses: $http_nonzero_range_responses,
     clean_build: ($build[0] + {benchmark_binary_bytes: $binary_bytes}),
     fixtures: {
       wav_sha256: $wav_sha256,
