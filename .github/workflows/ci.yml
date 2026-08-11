@@ -78,9 +78,12 @@ jobs:
           curl --fail --location --silent --show-error \
             https://repo1.maven.org/maven2/dev/arbjerg/lavaplayer/2.2.6/lavaplayer-2.2.6.jar \
             --output .cache/reference/lavaplayer-2.2.6/lavaplayer-2.2.6.jar
-          printf '%s  %s\n' \
-            '84aba896d988e12ea24c25f87f2e88eca4be7adac31893eacabf93401da1282d' \
-            '.cache/reference/lavaplayer-2.2.6/lavaplayer-2.2.6.jar' | sha256sum -c
+          expected='84aba896d988e12ea24c25f87f2e88eca4be7adac31893eacabf93401da1282d'
+          actual=$(sha256sum .cache/reference/lavaplayer-2.2.6/lavaplayer-2.2.6.jar | awk '{print $1}')
+          if [[ "$actual" != "$expected" ]]; then
+            printf 'Lavaplayer JAR SHA-256 mismatch: expected %s, got %s\n' "$expected" "$actual" >&2
+            exit 1
+          fi
       - shell: bash
         run: scripts/run-jvm-gate-a.sh
 
@@ -112,9 +115,12 @@ jobs:
           curl --fail --location --silent --show-error \
             https://repo1.maven.org/maven2/org/revapi/revapi-standalone/0.12.1/revapi-standalone-0.12.1-standalone.zip \
             --output .cache/revapi.zip
-          printf '%s  %s\n' \
-            '3b9dc5949e74da76f558dfa8012b8b7dc3a4124c0b4788eadee253d932111afb' \
-            '.cache/revapi.zip' | sha256sum -c
+          expected='3b9dc5949e74da76f558dfa8012b8b7dc3a4124c0b4788eadee253d932111afb'
+          actual=$(sha256sum .cache/revapi.zip | awk '{print $1}')
+          if [[ "$actual" != "$expected" ]]; then
+            printf 'Revapi archive SHA-256 mismatch: expected %s, got %s\n' "$expected" "$actual" >&2
+            exit 1
+          fi
           unzip -q .cache/revapi.zip -d .cache
       - name: Compare the Gate A API slice
         run: |
