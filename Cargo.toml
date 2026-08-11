@@ -2,6 +2,7 @@
 members = [
     "crates/mantle-core",
     "crates/mantle-jvm",
+    "crates/mantle-media",
     "tools/jvm-gate",
     "tools/oracle",
     "tools/reference",
@@ -12,6 +13,9 @@ resolver = "3"
 edition = "2024"
 rust-version = "1.97.1"
 license = "Apache-2.0"
+
+[workspace.dependencies]
+symphonia = { version = "=0.6.0", default-features = false, features = ["aac", "isomp4", "mkv", "mp3", "pcm", "wav"] }
 
 [workspace.lints.rust]
 unsafe_code = "deny"
