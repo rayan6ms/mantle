@@ -16,6 +16,18 @@ criteria = "safe-to-deploy"
 version = "0.2.21"
 criteria = "safe-to-deploy"
 
+[[exemptions.audioadapter]]
+version = "5.0.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.audioadapter-buffers]]
+version = "5.1.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.audioadapter-sample]]
+version = "5.1.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.autocfg]]
 version = "1.5.1"
 criteria = "safe-to-deploy"
@@ -184,6 +196,10 @@ criteria = "safe-to-deploy"
 version = "0.4.6"
 criteria = "safe-to-deploy"
 
+[[exemptions.num-integer]]
+version = "0.1.46"
+criteria = "safe-to-deploy"
+
 [[exemptions.num-traits]]
 version = "0.2.19"
 criteria = "safe-to-deploy"
@@ -218,6 +234,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.ristretto_classfile]]
 version = "0.32.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.rubato]]
+version = "5.0.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.rustc_version]]
@@ -380,6 +400,10 @@ criteria = "safe-to-deploy"
 version = "0.9.5"
 criteria = "safe-to-deploy"
 
+[[exemptions.visibility]]
+version = "0.1.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.walkdir]]
 version = "2.5.0"
 criteria = "safe-to-deploy"
@@ -414,6 +438,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.winapi-util]]
 version = "0.1.11"
+criteria = "safe-to-deploy"
+
+[[exemptions.windowfunctions]]
+version = "0.1.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.windows-link]]

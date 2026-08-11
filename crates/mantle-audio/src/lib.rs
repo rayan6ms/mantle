@@ -3,6 +3,19 @@
 use std::fmt;
 use std::time::Duration;
 
+mod filter;
+mod resample;
+mod transform;
+
+pub use filter::{
+    EQUALIZER_BANDS, EqualizerFactory, FilterChainBuilder, FilterPipeline, MAX_FILTERS_PER_CHAIN,
+    PcmFilter, PcmFilterFactory,
+};
+pub use resample::{
+    MAX_RESAMPLER_BUFFERED_FRAMES, MAX_RESAMPLER_CHUNK_FRAMES, PcmResampler, ResamplingQuality,
+};
+pub use transform::{VolumeLevel, apply_volume, convert_to_i16, map_channels};
+
 pub const COMPATIBLE_SAMPLE_RATE: u32 = 48_000;
 pub const COMPATIBLE_CHANNELS: u16 = 2;
 pub const COMPATIBLE_SAMPLES_PER_CHANNEL: usize = 960;
@@ -67,6 +80,11 @@ impl PcmFrame {
     #[must_use]
     pub fn samples(&self) -> &[f32] {
         &self.samples
+    }
+
+    #[must_use]
+    pub fn samples_mut(&mut self) -> &mut [f32] {
+        &mut self.samples
     }
 
     #[must_use]
@@ -143,6 +161,24 @@ impl PcmFrame {
         Ok(())
     }
 
+    /// Converts signed 16-bit interleaved PCM into this canonical frame without growing storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the input is not channel-aligned or exceeds capacity.
+    pub fn copy_from_i16_interleaved(
+        &mut self,
+        samples: &[i16],
+        format: PcmFormat,
+        timestamp: Option<Duration>,
+    ) -> Result<(), AudioFrameError> {
+        let output = self.prepare(samples.len(), format, timestamp)?;
+        for (output_sample, input_sample) in output.iter_mut().zip(samples) {
+            *output_sample = f32::from(*input_sample) / 32_768.0;
+        }
+        Ok(())
+    }
+
     pub fn clear(&mut self) {
         self.samples.clear();
         self.timestamp = None;
@@ -154,6 +190,7 @@ impl PcmFrame {
 pub struct EncodedFrameSlot {
     data: [u8; MAX_COMPATIBLE_OPUS_FRAME_BYTES],
     len: u16,
+    volume: VolumeLevel,
     timestamp: Option<Duration>,
 }
 
@@ -163,6 +200,7 @@ impl EncodedFrameSlot {
         Self {
             data: [0; MAX_COMPATIBLE_OPUS_FRAME_BYTES],
             len: 0,
+            volume: VolumeLevel::NORMAL,
             timestamp: None,
         }
     }
@@ -175,6 +213,11 @@ impl EncodedFrameSlot {
     #[must_use]
     pub fn timestamp(&self) -> Option<Duration> {
         self.timestamp
+    }
+
+    #[must_use]
+    pub const fn volume(&self) -> VolumeLevel {
+        self.volume
     }
 
     #[must_use]
@@ -191,6 +234,7 @@ impl EncodedFrameSlot {
         &mut self,
         data: &[u8],
         timestamp: Option<Duration>,
+        volume: VolumeLevel,
     ) -> Result<(), AudioFrameError> {
         if data.len() > MAX_COMPATIBLE_OPUS_FRAME_BYTES {
             return Err(AudioFrameError::EncodedFrameTooLarge {
@@ -204,12 +248,14 @@ impl EncodedFrameSlot {
         })?;
         self.data[..data.len()].copy_from_slice(data);
         self.len = len;
+        self.volume = volume;
         self.timestamp = timestamp;
         Ok(())
     }
 
     pub fn clear(&mut self) {
         self.len = 0;
+        self.volume = VolumeLevel::NORMAL;
         self.timestamp = None;
     }
 }
@@ -225,6 +271,7 @@ impl fmt::Debug for EncodedFrameSlot {
         formatter
             .debug_struct("EncodedFrameSlot")
             .field("len", &self.len)
+            .field("volume", &self.volume)
             .field("timestamp", &self.timestamp)
             .finish_non_exhaustive()
     }
@@ -232,11 +279,47 @@ impl fmt::Debug for EncodedFrameSlot {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AudioFrameError {
-    InvalidSampleRate { sample_rate: u32 },
-    UnsupportedChannels { channels: u16 },
-    MisalignedPcmSamples { samples: usize, channels: u16 },
-    PcmCapacityExceeded { required: usize, capacity: usize },
-    EncodedFrameTooLarge { actual: usize, limit: usize },
+    InvalidSampleRate {
+        sample_rate: u32,
+    },
+    UnsupportedChannels {
+        channels: u16,
+    },
+    MissingPcmFormat,
+    MisalignedPcmSamples {
+        samples: usize,
+        channels: u16,
+    },
+    PcmCapacityExceeded {
+        required: usize,
+        capacity: usize,
+    },
+    SampleBufferTooSmall {
+        required: usize,
+        capacity: usize,
+    },
+    FilterLimitExceeded {
+        limit: usize,
+    },
+    PcmFormatMismatch {
+        expected: PcmFormat,
+        actual: Option<PcmFormat>,
+    },
+    InvalidResamplerConfiguration(&'static str),
+    UnsupportedResampleRatio {
+        source_rate: u32,
+        target_rate: u32,
+    },
+    ResamplerInputLimitExceeded {
+        required: usize,
+        limit: usize,
+    },
+    ResamplerAlreadyFinished,
+    ResamplerFailure,
+    EncodedFrameTooLarge {
+        actual: usize,
+        limit: usize,
+    },
 }
 
 impl fmt::Display for AudioFrameError {
@@ -254,6 +337,7 @@ impl fmt::Display for AudioFrameError {
                     "PCM channel count must be one or two, got {channels}"
                 )
             }
+            Self::MissingPcmFormat => formatter.write_str("PCM frame has no initialized format"),
             Self::MisalignedPcmSamples { samples, channels } => write!(
                 formatter,
                 "{samples} interleaved PCM samples are not aligned to {channels} channels"
@@ -262,6 +346,38 @@ impl fmt::Display for AudioFrameError {
                 formatter,
                 "PCM frame capacity is {capacity} samples; {required} are required"
             ),
+            Self::SampleBufferTooSmall { required, capacity } => write!(
+                formatter,
+                "sample output capacity is {capacity}; {required} samples are required"
+            ),
+            Self::FilterLimitExceeded { limit } => {
+                write!(
+                    formatter,
+                    "PCM filter chain exceeds its {limit}-filter limit"
+                )
+            }
+            Self::PcmFormatMismatch { expected, actual } => write!(
+                formatter,
+                "PCM frame format {actual:?} does not match pipeline format {expected:?}"
+            ),
+            Self::InvalidResamplerConfiguration(message) => {
+                write!(formatter, "invalid resampler configuration: {message}")
+            }
+            Self::UnsupportedResampleRatio {
+                source_rate,
+                target_rate,
+            } => write!(
+                formatter,
+                "unsupported resample ratio from {source_rate} Hz to {target_rate} Hz"
+            ),
+            Self::ResamplerInputLimitExceeded { required, limit } => write!(
+                formatter,
+                "resampler input requires {required} buffered frames; limit is {limit}"
+            ),
+            Self::ResamplerAlreadyFinished => {
+                formatter.write_str("cannot push PCM after finishing the resampler")
+            }
+            Self::ResamplerFailure => formatter.write_str("PCM resampling failed"),
             Self::EncodedFrameTooLarge { actual, limit } => write!(
                 formatter,
                 "encoded frame has {actual} bytes; fixed slot limit is {limit}"
@@ -279,7 +395,7 @@ mod tests {
     use super::{
         AudioFrameError, COMPATIBLE_CHANNELS, COMPATIBLE_FRAME_DURATION, COMPATIBLE_PCM_SAMPLES,
         COMPATIBLE_SAMPLE_RATE, EncodedFrameSlot, MAX_COMPATIBLE_OPUS_FRAME_BYTES, PcmFormat,
-        PcmFrame,
+        PcmFrame, VolumeLevel,
     };
 
     #[test]
@@ -308,17 +424,46 @@ mod tests {
     fn fixed_encoded_slot_rejects_oversize_before_mutation() {
         let mut slot = EncodedFrameSlot::new();
         let storage = slot.data.as_ptr();
-        slot.write(&[1, 2, 3], Some(COMPATIBLE_FRAME_DURATION))
-            .unwrap();
+        slot.write(
+            &[1, 2, 3],
+            Some(COMPATIBLE_FRAME_DURATION),
+            VolumeLevel::new(175),
+        )
+        .unwrap();
         assert_eq!(slot.data(), [1, 2, 3]);
         assert_eq!(slot.data.as_ptr(), storage);
         assert_eq!(slot.duration(), COMPATIBLE_FRAME_DURATION);
+        assert_eq!(slot.volume(), VolumeLevel::new(175));
         assert!(matches!(
-            slot.write(&vec![0; MAX_COMPATIBLE_OPUS_FRAME_BYTES + 1], None),
+            slot.write(
+                &vec![0; MAX_COMPATIBLE_OPUS_FRAME_BYTES + 1],
+                None,
+                VolumeLevel::NORMAL,
+            ),
             Err(AudioFrameError::EncodedFrameTooLarge { .. })
         ));
         assert_eq!(slot.data(), [1, 2, 3]);
+        assert_eq!(slot.volume(), VolumeLevel::new(175));
         assert!(mem::size_of::<EncodedFrameSlot>() <= 1_600);
+    }
+
+    #[test]
+    fn signed_pcm_conversion_matches_the_reference_scale() {
+        let format = PcmFormat::new(48_000, 1).unwrap();
+        let mut frame = PcmFrame::with_capacity(5);
+        frame
+            .copy_from_i16_interleaved(&[i16::MIN, -1, 0, 1, i16::MAX], format, None)
+            .unwrap();
+        assert_eq!(
+            frame.samples(),
+            [
+                -1.0,
+                -1.0 / 32_768.0,
+                0.0,
+                1.0 / 32_768.0,
+                32_767.0 / 32_768.0
+            ]
+        );
     }
 
     #[test]

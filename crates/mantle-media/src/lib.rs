@@ -1067,7 +1067,16 @@ fn map_audio_frame_error(error: AudioFrameError) -> MediaError {
         AudioFrameError::InvalidSampleRate { .. } | AudioFrameError::UnsupportedChannels { .. } => {
             MediaError::UnsupportedCodec(error.to_string())
         }
-        AudioFrameError::MisalignedPcmSamples { .. }
+        AudioFrameError::MissingPcmFormat
+        | AudioFrameError::MisalignedPcmSamples { .. }
+        | AudioFrameError::SampleBufferTooSmall { .. }
+        | AudioFrameError::FilterLimitExceeded { .. }
+        | AudioFrameError::PcmFormatMismatch { .. }
+        | AudioFrameError::InvalidResamplerConfiguration(_)
+        | AudioFrameError::UnsupportedResampleRatio { .. }
+        | AudioFrameError::ResamplerInputLimitExceeded { .. }
+        | AudioFrameError::ResamplerAlreadyFinished
+        | AudioFrameError::ResamplerFailure
         | AudioFrameError::EncodedFrameTooLarge { .. } => MediaError::Backend {
             operation: "decode",
             message: error.to_string(),
