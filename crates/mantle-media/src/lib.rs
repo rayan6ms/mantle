@@ -1077,6 +1077,8 @@ fn map_audio_frame_error(error: AudioFrameError) -> MediaError {
         | AudioFrameError::ResamplerInputLimitExceeded { .. }
         | AudioFrameError::ResamplerAlreadyFinished
         | AudioFrameError::ResamplerFailure
+        | AudioFrameError::InvalidOpusPcmSamples { .. }
+        | AudioFrameError::OpusEncodingFailure
         | AudioFrameError::EncodedFrameTooLarge { .. } => MediaError::Backend {
             operation: "decode",
             message: error.to_string(),

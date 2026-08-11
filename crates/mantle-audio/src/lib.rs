@@ -4,6 +4,7 @@ use std::fmt;
 use std::time::Duration;
 
 mod filter;
+mod opus;
 mod resample;
 mod transform;
 
@@ -11,6 +12,7 @@ pub use filter::{
     EQUALIZER_BANDS, EqualizerFactory, FilterChainBuilder, FilterPipeline, MAX_FILTERS_PER_CHAIN,
     PcmFilter, PcmFilterFactory,
 };
+pub use opus::{OpusEncodingQuality, PcmOpusEncoder};
 pub use resample::{
     MAX_RESAMPLER_BUFFERED_FRAMES, MAX_RESAMPLER_CHUNK_FRAMES, PcmResampler, ResamplingQuality,
 };
@@ -316,6 +318,11 @@ pub enum AudioFrameError {
     },
     ResamplerAlreadyFinished,
     ResamplerFailure,
+    InvalidOpusPcmSamples {
+        expected: usize,
+        actual: usize,
+    },
+    OpusEncodingFailure,
     EncodedFrameTooLarge {
         actual: usize,
         limit: usize,
@@ -378,6 +385,11 @@ impl fmt::Display for AudioFrameError {
                 formatter.write_str("cannot push PCM after finishing the resampler")
             }
             Self::ResamplerFailure => formatter.write_str("PCM resampling failed"),
+            Self::InvalidOpusPcmSamples { expected, actual } => write!(
+                formatter,
+                "Opus input contains {actual} PCM samples; expected {expected}"
+            ),
+            Self::OpusEncodingFailure => formatter.write_str("Opus encoding failed"),
             Self::EncodedFrameTooLarge { actual, limit } => write!(
                 formatter,
                 "encoded frame has {actual} bytes; fixed slot limit is {limit}"
