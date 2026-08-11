@@ -23,3 +23,9 @@ The Rust emitter preserves a 24-class closure around manager/player/track/frame,
 This is not an `A_EXACT` classification for those symbols. The behavior is synthetic Gate A proof: no real loader/source, scheduling engine, audio decoder, serializer, or complete enum behavior exists. The checked-in classification matrix therefore remains `INITIAL_UNASSESSED`.
 
 JDK 25/26 native-loading warnings remain tracked as `S-001` in `PROJECT_LEDGER.md` for the later packaging spike.
+
+## Differential-oracle scope
+
+Phase 3 freezes a shared 17-action synthetic scenario and normalized reference/Mantle goldens under `tests/oracle/`. It covers lifecycle, configuration defaults, loading/cancellation, metadata, user data, markers, seeking, track-detail bytes, play/pause/stop events, deterministic frame observations, and shutdown. `scripts/run-differential-oracle.sh` proves repeat determinism and writes a structured difference report.
+
+The initial baseline has 8 equal observations and 9 expected differences. These differences are implementation inputs for Phase 4 and later phases, not compatibility classifications. In particular, reference `BYPASSED` marker behavior is tracked as `C-001`; the classification matrix remains `INITIAL_UNASSESSED` until implementation and evidence justify symbol-level claims.
