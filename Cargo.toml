@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/mantle-audio",
     "crates/mantle-core",
     "crates/mantle-jvm",
     "crates/mantle-media",
