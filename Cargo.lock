@@ -445,6 +445,7 @@ dependencies = [
 name = "mantle-media-bench"
 version = "0.0.0"
 dependencies = [
+ "mantle-audio",
  "mantle-media",
  "serde",
  "serde_json",
