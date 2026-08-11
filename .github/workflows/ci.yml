@@ -139,7 +139,7 @@ jobs:
             -s "$supplementary" -t "$supplementary"
 
   differential-oracle:
-    name: Phase 3 deterministic differential oracle
+    name: Phase 5 serialization differential gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
