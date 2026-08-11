@@ -244,6 +244,10 @@ criteria = "safe-to-deploy"
 version = "0.32.1"
 criteria = "safe-to-deploy"
 
+[[exemptions.rtrb]]
+version = "0.3.4"
+criteria = "safe-to-deploy"
+
 [[exemptions.rubato]]
 version = "5.0.0"
 criteria = "safe-to-deploy"

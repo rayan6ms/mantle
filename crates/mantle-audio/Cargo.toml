@@ -8,6 +8,7 @@ publish = false
 
 [dependencies]
 mantle-opus = { version = "0.0.0", path = "../mantle-opus" }
+rtrb.workspace = true
 rubato.workspace = true
 
 [lints]
