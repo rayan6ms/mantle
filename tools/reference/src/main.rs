@@ -8,7 +8,7 @@ use std::process::ExitCode;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use jni::objects::{JObject, JString, JValue};
+use jni::objects::{JByteArray, JObject, JString, JValue};
 use jni::{InitArgsBuilder, JNIVersion, JavaVM, jni_sig, jni_str};
 use serde::Serialize;
 
@@ -35,6 +35,7 @@ struct MediaProofConfig {
     classpath: String,
     input: String,
     http: bool,
+    pcm: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -116,6 +117,8 @@ struct MediaProofResult {
     decoded_bytes: u64,
     first_timecode_ms: i64,
     last_timecode_ms: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last_frame_trailing_zero_bytes: Option<usize>,
     seek_target_ms: i64,
     seek_observed_ms: i64,
 }
@@ -128,6 +131,7 @@ struct FrameProof {
     channels: i32,
     sample_rate: i32,
     chunk_samples: i32,
+    trailing_zero_bytes: usize,
 }
 
 fn main() -> ExitCode {
@@ -165,6 +169,7 @@ fn parse_media_proof_config(args: &[String]) -> Result<MediaProofConfig> {
         classpath: required_value(args, "--classpath")?,
         input: required_value(args, "--input")?,
         http: args.iter().any(|arg| arg == "--http"),
+        pcm: args.iter().any(|arg| arg == "--pcm"),
     })
 }
 
@@ -246,6 +251,9 @@ fn run_media_proof_attached(jni: &mut jni::Env<'_>, config: MediaProofConfig) ->
         jni_sig!("()V"),
         &[],
     )?;
+    if config.pcm {
+        configure_pcm_output(jni, &manager)?;
+    }
     register_source(jni, &manager, config.http)?;
     let track = load_track(jni, &manager, &config.input)?;
     let duration_ms = jni
@@ -257,7 +265,7 @@ fn run_media_proof_attached(jni: &mut jni::Env<'_>, config: MediaProofConfig) ->
 
     let player = create_player(jni, &manager)?;
     start_track(jni, &player, &track)?;
-    let (first, last_timecode_ms, decoded_frames, decoded_bytes) =
+    let (first, last_timecode_ms, decoded_frames, decoded_bytes, last_trailing_zero_bytes) =
         consume_complete_track(jni, &player)?;
 
     let seek_track = jni
@@ -296,10 +304,39 @@ fn run_media_proof_attached(jni: &mut jni::Env<'_>, config: MediaProofConfig) ->
         decoded_bytes,
         first_timecode_ms: first.timecode_ms,
         last_timecode_ms,
+        last_frame_trailing_zero_bytes: config.pcm.then_some(last_trailing_zero_bytes),
         seek_target_ms,
         seek_observed_ms,
     };
     println!("{}", serde_json::to_string(&result)?);
+    Ok(())
+}
+
+fn configure_pcm_output(jni: &mut jni::Env<'_>, manager: &JObject<'_>) -> Result<()> {
+    let format_class = jni.find_class(jni_str!(
+        "com/sedmelluq/discord/lavaplayer/format/StandardAudioDataFormats"
+    ))?;
+    let format = jni
+        .get_static_field(
+            &format_class,
+            jni_str!("DISCORD_PCM_S16_LE"),
+            jni_sig!("Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;"),
+        )?
+        .l()?;
+    let configuration = jni
+        .call_method(
+            manager,
+            jni_str!("getConfiguration"),
+            jni_sig!("()Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;"),
+            &[],
+        )?
+        .l()?;
+    jni.call_method(
+        &configuration,
+        jni_str!("setOutputFormat"),
+        jni_sig!("(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V"),
+        &[JValue::Object(&format)],
+    )?;
     Ok(())
 }
 
@@ -363,17 +400,19 @@ fn start_track(jni: &mut jni::Env<'_>, player: &JObject<'_>, track: &JObject<'_>
 fn consume_complete_track(
     jni: &mut jni::Env<'_>,
     player: &JObject<'_>,
-) -> Result<(FrameProof, i64, u64, u64)> {
+) -> Result<(FrameProof, i64, u64, u64, usize)> {
     let deadline = Instant::now() + Duration::from_secs(30);
     let mut first = None;
     let mut last_timecode_ms = 0;
     let mut decoded_frames = 0_u64;
     let mut decoded_bytes = 0_u64;
+    let mut last_trailing_zero_bytes = 0;
     loop {
         if let Some(frame) = provide_frame_proof(jni, player)? {
             last_timecode_ms = frame.timecode_ms;
             decoded_frames = decoded_frames.saturating_add(1);
             decoded_bytes = decoded_bytes.saturating_add(u64::try_from(frame.data_length)?);
+            last_trailing_zero_bytes = frame.trailing_zero_bytes;
             if first.is_none() {
                 first = Some(frame);
             }
@@ -391,6 +430,7 @@ fn consume_complete_track(
         last_timecode_ms,
         decoded_frames,
         decoded_bytes,
+        last_trailing_zero_bytes,
     ))
 }
 
@@ -462,6 +502,12 @@ fn provide_frame_proof(jni: &mut jni::Env<'_>, player: &JObject<'_>) -> Result<O
     let data_length = jni
         .call_method(&frame, jni_str!("getDataLength"), jni_sig!("()I"), &[])?
         .i()?;
+    let data = jni
+        .call_method(&frame, jni_str!("getData"), jni_sig!("()[B"), &[])?
+        .l()?;
+    let data = jni.cast_local::<JByteArray>(data)?;
+    let data = jni.convert_byte_array(&data)?;
+    let trailing_zero_bytes = data.iter().rev().take_while(|byte| **byte == 0).count();
     let format = jni
         .call_method(
             &frame,
@@ -495,6 +541,7 @@ fn provide_frame_proof(jni: &mut jni::Env<'_>, player: &JObject<'_>) -> Result<O
         channels,
         sample_rate,
         chunk_samples,
+        trailing_zero_bytes,
     }))
 }
 
@@ -1114,10 +1161,12 @@ mod tests {
             "--input".to_owned(),
             "http://127.0.0.1/media.mp3".to_owned(),
             "--http".to_owned(),
+            "--pcm".to_owned(),
         ])?;
         assert_eq!(config.classpath, "reference.jar");
         assert_eq!(config.input, "http://127.0.0.1/media.mp3");
         assert!(config.http);
+        assert!(config.pcm);
         Ok(())
     }
 
