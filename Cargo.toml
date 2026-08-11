@@ -4,6 +4,7 @@ members = [
     "crates/mantle-jvm",
     "crates/mantle-media",
     "crates/mantle-xaac",
+    "tools/audio-layout-bench",
     "tools/jvm-gate",
     "tools/media-bench",
     "tools/oracle",
