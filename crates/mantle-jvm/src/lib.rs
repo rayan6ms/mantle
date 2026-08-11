@@ -7,14 +7,19 @@ use std::ffi::c_void;
 use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, OnceLock};
+use std::time::Duration;
 
 use jni::EnvUnowned;
 use jni::errors::ThrowRuntimeExAndDefault;
-use jni::objects::{JClass, JObject, JObjectArray, JString, JValue};
+use jni::objects::{JByteArray, JClass, JObject, JObjectArray, JString, JValue};
 #[cfg(feature = "gate-a-direct-attachment")]
 use jni::sys;
 use jni::{jni_sig, jni_str};
-use registry::{Handle, HandleKind, Registry};
+use mantle_core::{
+    Engine, Frame, ManagerId, ResourceLimits, SerializationLimits, SystemClock, TrackInfo,
+    decode_synthetic_track_details, encode_synthetic_track_details,
+};
+use registry::{CoreObject, Handle, HandleKind, Registry};
 
 const ABI_VERSION: i32 = 1;
 const CAPABILITIES: i64 = 0b111;
@@ -27,11 +32,84 @@ fn registry() -> &'static Mutex<Registry> {
     REGISTRY.get_or_init(|| Mutex::new(Registry::default()))
 }
 
+fn engine() -> &'static Mutex<Engine<SystemClock>> {
+    static ENGINE: OnceLock<Mutex<Engine<SystemClock>>> = OnceLock::new();
+    ENGINE.get_or_init(|| Mutex::new(Engine::new(SystemClock::new(), ResourceLimits::default())))
+}
+
+fn default_manager() -> &'static Mutex<Option<ManagerId>> {
+    static DEFAULT_MANAGER: OnceLock<Mutex<Option<ManagerId>>> = OnceLock::new();
+    DEFAULT_MANAGER.get_or_init(|| Mutex::new(None))
+}
+
 fn with_registry<T>(operation: impl FnOnce(&mut Registry) -> T) -> T {
     let mut registry = registry()
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     operation(&mut registry)
+}
+
+pub(crate) fn with_engine<T>(operation: impl FnOnce(&mut Engine<SystemClock>) -> T) -> T {
+    let mut engine = engine()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    operation(&mut engine)
+}
+
+fn create_core_object(
+    kind: HandleKind,
+    identifier: Option<&str>,
+) -> Result<Option<CoreObject>, &'static str> {
+    match kind {
+        HandleKind::Manager => {
+            let manager =
+                with_engine(Engine::create_manager).map_err(|_| "could not create core manager")?;
+            *default_manager()
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(manager);
+            Ok(Some(CoreObject::Manager(manager)))
+        }
+        HandleKind::Player => {
+            let manager = default_manager()
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .ok_or("player requires a live manager")?;
+            with_engine(|engine| engine.create_player(manager))
+                .map(CoreObject::Player)
+                .map(Some)
+                .map_err(|_| "could not create core player")
+        }
+        HandleKind::Track => {
+            let identifier = identifier.unwrap_or("gate:track");
+            let info = TrackInfo {
+                title: "Synthetic title".into(),
+                author: "Synthetic author".into(),
+                duration: Duration::from_secs(1),
+                identifier: identifier.into(),
+                is_stream: false,
+                uri: Some(format!("oracle://{identifier}")),
+                artwork_url: Some("oracle://artwork".into()),
+                isrc: Some("ORACLE000001".into()),
+            };
+            with_engine(|engine| {
+                engine.create_track(info, [Frame::synthetic(Duration::ZERO, [1_u8, 2, 3, 4])])
+            })
+            .map(CoreObject::Track)
+            .map(Some)
+            .map_err(|_| "could not create core track")
+        }
+        HandleKind::Frame | HandleKind::Probe => Ok(None),
+    }
+}
+
+pub(crate) fn core_for_handle(
+    raw_handle: i64,
+    kind: HandleKind,
+) -> jni::errors::Result<CoreObject> {
+    let handle = Handle::from_jlong(raw_handle)
+        .map_err(|_| jni::errors::Error::NullPtr("invalid native handle"))?;
+    with_registry(|registry| registry.core(handle, kind))
+        .map_err(|_| jni::errors::Error::NullPtr("native handle has no core object"))
 }
 
 #[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
@@ -80,7 +158,10 @@ pub extern "system" fn Java_dev_mantle_internal_MantleNative_createHandle<'local
             5 => HandleKind::Probe,
             _ => return Err(jni::errors::Error::NullPtr("unknown native handle kind")),
         };
-        Ok(with_registry(|registry| registry.insert(kind).as_jlong()))
+        let core = create_core_object(kind, None).map_err(jni::errors::Error::NullPtr)?;
+        Ok(with_registry(|registry| {
+            registry.insert(kind, core).as_jlong()
+        }))
     })
     .resolve::<ThrowRuntimeExAndDefault>()
 }
@@ -94,13 +175,59 @@ pub extern "system" fn Java_dev_mantle_internal_MantleNative_release<'local>(
 ) {
     env.with_env(|_| {
         if let Ok(handle) = Handle::from_jlong(raw_handle) {
-            with_registry(|registry| {
-                registry.release(handle);
-            });
+            let core = with_registry(|registry| registry.release(handle));
+            if let Some(core) = core {
+                with_engine(|engine| match core {
+                    CoreObject::Manager(manager) => {
+                        let _ = engine.release_manager(manager);
+                        let mut default = default_manager()
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner);
+                        if *default == Some(manager) {
+                            *default = None;
+                        }
+                    }
+                    CoreObject::Player(player) => {
+                        let _ = engine.release_player(player);
+                    }
+                    CoreObject::Track(track) => {
+                        let _ = engine.release_track(track);
+                    }
+                });
+            }
         }
         Ok::<_, jni::errors::Error>(())
     })
     .resolve::<ThrowRuntimeExAndDefault>();
+}
+
+#[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_mantle_internal_MantleNative_createCoreHandle<'local>(
+    mut env: EnvUnowned<'local>,
+    _class: JClass<'local>,
+    kind: i32,
+    identifier: JString<'local>,
+) -> i64 {
+    env.with_env(|env| {
+        let kind = match kind {
+            2 => HandleKind::Player,
+            3 => HandleKind::Track,
+            4 => HandleKind::Frame,
+            _ => return Err(jni::errors::Error::NullPtr("unknown proxy handle kind")),
+        };
+        let identifier = if identifier.is_null() {
+            None
+        } else {
+            Some(identifier.try_to_string(env)?)
+        };
+        let core =
+            create_core_object(kind, identifier.as_deref()).map_err(jni::errors::Error::NullPtr)?;
+        Ok(with_registry(|registry| {
+            registry.insert(kind, core).as_jlong()
+        }))
+    })
+    .resolve::<ThrowRuntimeExAndDefault>()
 }
 
 #[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
@@ -384,4 +511,128 @@ pub extern "system" fn Java_dev_mantle_internal_MantleNative_loadItem<'local>(
         Ok::<_, jni::errors::Error>(future)
     })
     .resolve::<ThrowRuntimeExAndDefault>()
+}
+
+#[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_mantle_internal_MantleNative_encodeTrackDetails<'local>(
+    mut env: EnvUnowned<'local>,
+    _class: JClass<'local>,
+    track: JObject<'local>,
+) -> JByteArray<'local> {
+    env.with_env(|env| {
+        let _ = proxy::track_id_from_proxy(env, &track)?;
+        let bytes = encode_synthetic_track_details(SerializationLimits::default())
+            .map_err(|_| jni::errors::Error::NullPtr("could not encode synthetic track details"))?;
+        env.byte_array_from_slice(&bytes)
+    })
+    .resolve::<ThrowRuntimeExAndDefault>()
+}
+
+#[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_mantle_internal_MantleNative_decodeTrackDetails<'local>(
+    mut env: EnvUnowned<'local>,
+    _class: JClass<'local>,
+    info: JObject<'local>,
+    bytes: JByteArray<'local>,
+) -> JObject<'local> {
+    env.with_env(|env| {
+        let limits = SerializationLimits::default();
+        if bytes.len(env)? > limits.message_bytes {
+            return Err(jni::errors::Error::NullPtr(
+                "synthetic track details exceed their byte limit",
+            ));
+        }
+        let bytes = env.convert_byte_array(&bytes)?;
+        decode_synthetic_track_details(&bytes, limits)
+            .map_err(|_| jni::errors::Error::NullPtr("could not decode synthetic track details"))?;
+        let info = track_info_from_java(env, &info)?;
+        let identifier = env.new_string(&info.identifier)?;
+        let track = proxy::create(env, 3, identifier.as_ref())?;
+        let track_id = proxy::track_id_from_proxy(env, &track)?;
+        with_engine(|engine| engine.replace_track_info(track_id, info))
+            .map_err(|_| jni::errors::Error::NullPtr("could not apply decoded track metadata"))?;
+        Ok::<_, jni::errors::Error>(track)
+    })
+    .resolve::<ThrowRuntimeExAndDefault>()
+}
+
+fn track_info_from_java(
+    env: &mut jni::Env<'_>,
+    info: &JObject<'_>,
+) -> jni::errors::Result<TrackInfo> {
+    let duration = env
+        .get_field(info, jni_str!("length"), jni_sig!("J"))?
+        .j()?;
+    Ok(TrackInfo {
+        title: required_string_field(env, info, "title")?,
+        author: required_string_field(env, info, "author")?,
+        duration: Duration::from_millis(
+            u64::try_from(duration)
+                .map_err(|_| jni::errors::Error::NullPtr("negative track duration"))?,
+        ),
+        identifier: required_string_field(env, info, "identifier")?,
+        is_stream: env
+            .get_field(info, jni_str!("isStream"), jni_sig!("Z"))?
+            .z()?,
+        uri: optional_string_field(env, info, "uri")?,
+        artwork_url: optional_string_field(env, info, "artworkUrl")?,
+        isrc: optional_string_field(env, info, "isrc")?,
+    })
+}
+
+fn required_string_field(
+    env: &mut jni::Env<'_>,
+    object: &JObject<'_>,
+    name: &str,
+) -> jni::errors::Result<String> {
+    let value = env
+        .get_field(
+            object,
+            jni::strings::JNIString::from(name),
+            jni_sig!("Ljava/lang/String;"),
+        )?
+        .l()?;
+    validate_java_string_length(env, &value)?;
+    JString::cast_local(env, value)?.try_to_string(env)
+}
+
+fn optional_string_field(
+    env: &mut jni::Env<'_>,
+    object: &JObject<'_>,
+    name: &str,
+) -> jni::errors::Result<Option<String>> {
+    let value = env
+        .get_field(
+            object,
+            jni::strings::JNIString::from(name),
+            jni_sig!("Ljava/lang/String;"),
+        )?
+        .l()?;
+    if value.is_null() {
+        Ok(None)
+    } else {
+        validate_java_string_length(env, &value)?;
+        JString::cast_local(env, value)?
+            .try_to_string(env)
+            .map(Some)
+    }
+}
+
+fn validate_java_string_length(
+    env: &mut jni::Env<'_>,
+    value: &JObject<'_>,
+) -> jni::errors::Result<()> {
+    let length = env
+        .call_method(value, jni_str!("length"), jni_sig!("()I"), &[])?
+        .i()?;
+    let maximum = ResourceLimits::default().metadata_bytes;
+    if usize::try_from(length).map_or(true, |length| length > maximum) {
+        Err(jni::errors::Error::NullPtr(
+            "track metadata exceeds its string limit",
+        ))
+    } else {
+        Ok(())
+    }
 }

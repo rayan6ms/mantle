@@ -1,5 +1,7 @@
 use std::fmt;
 
+use mantle_core::{ManagerId, PlayerId, TrackId};
+
 const INDEX_BITS: u32 = 32;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -18,6 +20,14 @@ pub(crate) struct Handle(u64);
 struct Entry {
     generation: u32,
     kind: HandleKind,
+    core: Option<CoreObject>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum CoreObject {
+    Manager(ManagerId),
+    Player(PlayerId),
+    Track(TrackId),
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -61,7 +71,7 @@ struct Slot {
 }
 
 impl Registry {
-    pub(crate) fn insert(&mut self, kind: HandleKind) -> Handle {
+    pub(crate) fn insert(&mut self, kind: HandleKind, core: Option<CoreObject>) -> Handle {
         let index = if let Some(index) = self.free.pop() {
             index
         } else {
@@ -75,6 +85,7 @@ impl Registry {
         slot.entry = Some(Entry {
             generation: slot.generation,
             kind,
+            core,
         });
         self.live += 1;
         Handle((u64::from(slot.generation) << INDEX_BITS) | u64::from(index))
@@ -100,22 +111,33 @@ impl Registry {
         Ok(())
     }
 
-    pub(crate) fn release(&mut self, handle: Handle) -> bool {
+    pub(crate) fn core(
+        &self,
+        handle: Handle,
+        expected: HandleKind,
+    ) -> Result<CoreObject, RegistryError> {
+        self.validate(handle, expected)?;
+        let (index, _) = handle.parts();
+        self.slots[index]
+            .entry
+            .and_then(|entry| entry.core)
+            .ok_or(RegistryError::Invalid)
+    }
+
+    pub(crate) fn release(&mut self, handle: Handle) -> Option<CoreObject> {
         let (index, generation) = handle.parts();
-        let Some(slot) = self.slots.get_mut(index) else {
-            return false;
-        };
+        let slot = self.slots.get_mut(index)?;
         if slot
             .entry
             .is_none_or(|entry| entry.generation != generation)
         {
-            return false;
+            return None;
         }
-        slot.entry = None;
+        let core = slot.entry.take().and_then(|entry| entry.core);
         self.free
             .push(u32::try_from(index).expect("handle index originated as u32"));
         self.live -= 1;
-        true
+        core
     }
 
     pub(crate) fn live(&self) -> usize {
@@ -151,9 +173,9 @@ mod tests {
     #[test]
     fn generation_rejects_stale_handle_after_slot_reuse() {
         let mut registry = Registry::default();
-        let stale = registry.insert(HandleKind::Player);
-        assert!(registry.release(stale));
-        let current = registry.insert(HandleKind::Player);
+        let stale = registry.insert(HandleKind::Player, None);
+        assert_eq!(registry.release(stale), None);
+        let current = registry.insert(HandleKind::Player, None);
         assert_ne!(stale, current);
         assert_eq!(
             registry.validate(stale, HandleKind::Player),
@@ -165,13 +187,13 @@ mod tests {
     #[test]
     fn wrong_type_and_double_release_are_safe() {
         let mut registry = Registry::default();
-        let handle = registry.insert(HandleKind::Track);
+        let handle = registry.insert(HandleKind::Track, None);
         assert!(matches!(
             registry.validate(handle, HandleKind::Player),
             Err(RegistryError::WrongType { .. })
         ));
-        assert!(registry.release(handle));
-        assert!(!registry.release(handle));
+        assert_eq!(registry.release(handle), None);
+        assert_eq!(registry.release(handle), None);
         assert_eq!(registry.live(), 0);
     }
 }

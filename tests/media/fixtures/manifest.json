@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "license": "Project-generated synthetic audio; Apache-2.0",
+  "signal": {
+    "duration_seconds": 6,
+    "sample_rate": 48000,
+    "channels": 2,
+    "expression": "0.12*sin(2*PI*220*t)+0.08*sin(2*PI*997*t)+0.04*sin(2*PI*3211*t)"
+  },
+  "generator": {
+    "script": "scripts/generate-media-feasibility-fixtures.sh",
+    "ffmpeg": "8.1.2",
+    "fdk_aac": {
+      "repository": "https://github.com/mstorsjo/fdk-aac",
+      "tag": "v2.0.3",
+      "tag_object": "cac04476081a23c870fed05c36228cd02c5e7c3d",
+      "commit": "716f4394641d53f0d79c9ddac3fa93b03a49f278",
+      "use": "fixture generation only; not a Mantle runtime dependency"
+    }
+  },
+  "fixtures": [
+    {
+      "file": "tone-pcm-s16le.wav",
+      "container": "WAVE",
+      "codec": "PCM signed 16-bit little-endian",
+      "profile": null,
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 6.0,
+      "size_bytes": 1152044,
+      "sha256": "3a53c9b1a3e51c1cd61289fb1c4e361f75bc30059dd1ac873edc08d9adf84d62"
+    },
+    {
+      "file": "tone-mp3.mp3",
+      "container": "MPEG audio",
+      "codec": "MP3",
+      "profile": null,
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 6.024,
+      "size_bytes": 144596,
+      "sha256": "13c1289fed83ea173cf284097a29f2b429852ce6929289cc8b827716ff992102"
+    },
+    {
+      "file": "tone-opus.webm",
+      "container": "WebM",
+      "codec": "Opus",
+      "profile": null,
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 6.008,
+      "size_bytes": 98940,
+      "sha256": "0ebe60d836c799ab82e20708a6776a9f4fb592a3d5747cdb05cf82133754ace6"
+    },
+    {
+      "file": "tone-aac-lc.m4a",
+      "container": "ISO BMFF/MP4",
+      "codec": "AAC",
+      "profile": "AAC-LC / audio object type 2",
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 6.0,
+      "size_bytes": 98196,
+      "sha256": "983b6a7960f95a91f0cdc07f558e0b4e89e0e20db6a3d0ac9cb5a8648191fc0b"
+    },
+    {
+      "file": "tone-he-aac-v1.m4a",
+      "container": "ISO BMFF/MP4",
+      "codec": "AAC",
+      "profile": "HE-AAC v1 / SBR / audio object type 5",
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 6.144,
+      "size_bytes": 49480,
+      "sha256": "67777b23351fe58bb8ddc6af4d30b0146f2a7004ead28cc046b574ec7d49093d"
+    },
+    {
+      "file": "tone-he-aac-v2.m4a",
+      "container": "ISO BMFF/MP4",
+      "codec": "AAC",
+      "profile": "HE-AAC v2 / SBR+PS / audio object type 29",
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 6.186667,
+      "size_bytes": 37445,
+      "sha256": "5217842d822043ecf62b663b51b58c1d09a3dec4b956b661d9288dcada019a95"
+    }
+  ]
+}

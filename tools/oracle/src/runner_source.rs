@@ -366,8 +366,7 @@ pub const MANTLE: &str = r#"
 import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler;
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
 import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager;
-import com.sedmelluq.discord.lavaplayer.player.event.AudioEventListener;
-import com.sedmelluq.discord.lavaplayer.player.event.TrackStartEvent;
+import com.sedmelluq.discord.lavaplayer.player.event.*;
 import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
 import com.sedmelluq.discord.lavaplayer.track.*;
 import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
@@ -381,7 +380,7 @@ public final class OracleMantle {
   private static AudioPlayer player;
   private static final Map<String, AudioTrack> tracks = new HashMap<>();
   private static final Map<String, TrackMarker> markers = new HashMap<>();
-  private static final Map<String, byte[]> encodings = new HashMap<>();
+  private static final Map<String, Encoding> encodings = new HashMap<>();
   private static final List<String> events = new ArrayList<>();
   private static final List<String> markerEvents = new ArrayList<>();
 
@@ -418,15 +417,28 @@ public final class OracleMantle {
         player.addListener(event -> {
           if (event instanceof TrackStartEvent) {
             events.add("track_start:" + ((TrackStartEvent) event).track.getIdentifier());
+          } else if (event instanceof TrackEndEvent) {
+            TrackEndEvent end = (TrackEndEvent) event;
+            events.add("track_end:" + end.track.getIdentifier() + ":" + end.endReason.name());
+          } else if (event instanceof PlayerPauseEvent) {
+            events.add("player_pause");
+          } else if (event instanceof PlayerResumeEvent) {
+            events.add("player_resume");
           }
         });
         emit(id, "player", "created", true, "volume", player.getVolume(), "paused", player.isPaused());
         break;
-      case "observe_configuration": {
-        Object configuration = manager.getClass().getMethod("getConfiguration").invoke(manager);
-        emit(id, "configuration", "available", configuration != null);
+      case "observe_configuration":
+        emit(id, "configuration",
+            "frame_buffer_ms", manager.getFrameBufferDuration(),
+            "seek_ghosting", manager.isUsingSeekGhosting(),
+            "resampling", manager.getConfiguration().getResamplingQuality().name(),
+            "opus_quality", manager.getConfiguration().getOpusEncodingQuality(),
+            "filter_hot_swap", manager.getConfiguration().isFilterHotSwapEnabled(),
+            "channels", manager.getConfiguration().getOutputFormat().channelCount,
+            "sample_rate", manager.getConfiguration().getOutputFormat().sampleRate,
+            "chunk_samples", manager.getConfiguration().getOutputFormat().chunkSampleCount);
         break;
-      }
       case "load":
         load(id, text(fields[2]), text(fields[3]), fields[4].equals("-") ? null : text(fields[4]),
             Boolean.parseBoolean(fields[5]));
@@ -434,9 +446,11 @@ public final class OracleMantle {
       case "observe_track": {
         AudioTrack track = track(text(fields[2]));
         AudioTrackInfo info = track.getInfo();
-        emit(id, "track", "identifier", track.getIdentifier(), "metadata_available", info != null,
+        emit(id, "track",
+            "identifier", track.getIdentifier(), "title", info.title, "author", info.author,
+            "length_ms", info.length, "stream", info.isStream, "uri", info.uri,
             "seekable", track.isSeekable(), "position_ms", track.getPosition(),
-            "duration_ms", track.getDuration(), "state_available", track.getState() != null);
+            "duration_ms", track.getDuration(), "state", track.getState().name());
         break;
       }
       case "set_user_data": {
@@ -502,17 +516,24 @@ public final class OracleMantle {
             "events", drain(events), "marker_events", drain(markerEvents));
         break;
       case "encode_track": {
+        AudioTrack track = track(text(fields[2]));
         String encodingId = text(fields[3]);
-        Object encoded = manager.getClass().getMethod("encodeTrackDetails", AudioTrack.class)
-            .invoke(manager, track(text(fields[2])));
-        if (!(encoded instanceof byte[])) throw new UnsupportedOperationException("encoding unavailable");
-        byte[] data = (byte[]) encoded;
-        encodings.put(encodingId, data);
+        byte[] data = manager.encodeTrackDetails(track);
+        encodings.put(encodingId, new Encoding(track.getInfo(), data));
         emit(id, "serialization", "encoding", encodingId, "bytes", bytes(data), "length", data.length);
         break;
       }
-      case "decode_track":
-        throw new UnsupportedOperationException("decoding unavailable in Gate A slice");
+      case "decode_track": {
+        String encodingId = text(fields[2]);
+        String trackId = text(fields[3]);
+        Encoding encoding = required(encodings, encodingId);
+        AudioTrack decoded = manager.decodeTrackDetails(encoding.info, encoding.data);
+        tracks.put(trackId, decoded);
+        emit(id, "deserialization", "track", trackId,
+            "identifier", decoded == null ? null : decoded.getIdentifier(),
+            "position_ms", decoded == null ? null : decoded.getPosition());
+        break;
+      }
       case "shutdown":
         if (player != null) player.destroy();
         manager.shutdown();
@@ -601,6 +622,11 @@ public final class OracleMantle {
       else output.append(character);
     }
     return output.append('"').toString();
+  }
+  private static final class Encoding {
+    final AudioTrackInfo info;
+    final byte[] data;
+    Encoding(AudioTrackInfo info, byte[] data) { this.info = info; this.data = data; }
   }
 }
 "#;

@@ -371,8 +371,8 @@ public final class GateIntegration {
       TrackStartEvent start = (TrackStartEvent) event;
       if (start.track != loaded.get()) throw new AssertionError("event track identity");
       starts.incrementAndGet();
-      player.setPaused(true);
       player.removeListener(listener[0]);
+      player.setPaused(true);
     };
     player.addListener(listener[0]);
 
@@ -384,7 +384,7 @@ public final class GateIntegration {
         if (track.getUserData(Object.class) != userData) throw new AssertionError("typed user data");
         if (track.getUserData(String.class) != null) throw new AssertionError("typed mismatch");
         track.setMarker(new TrackMarker(10, state -> {
-          if (state != MarkerState.REACHED) throw new AssertionError("marker state " + state);
+          if (state != MarkerState.BYPASSED) throw new AssertionError("marker state " + state);
           markers.incrementAndGet();
         }));
         track.setPosition(10);
@@ -402,6 +402,25 @@ public final class GateIntegration {
     }
     if (starts.get() != 1 || !player.isPaused()) throw new AssertionError("reentrant start callback");
     if (markers.get() != 1) throw new AssertionError("marker callback");
+    player.setPaused(false);
+
+    byte[] details = manager.encodeTrackDetails(loaded.get());
+    byte[] expectedDetails = new byte[] {
+        0, 13, 'm', 'a', 'n', 't', 'l', 'e', '-', 'o', 'r', 'a', 'c', 'l', 'e',
+        0, 9, 'o', 'r', 'a', 'c', 'l', 'e', '-', 'v', '1'
+    };
+    if (!Arrays.equals(details, expectedDetails)) throw new AssertionError("track detail bytes");
+    AudioTrack decoded = manager.decodeTrackDetails(loaded.get().getInfo(), details);
+    if (!loaded.get().getIdentifier().equals(decoded.getIdentifier())
+        || !loaded.get().getInfo().title.equals(decoded.getInfo().title)) {
+      throw new AssertionError("decoded track metadata");
+    }
+    try {
+      manager.decodeTrackDetails(loaded.get().getInfo(), Arrays.copyOf(details, 1));
+      throw new AssertionError("truncated track details accepted");
+    } catch (RuntimeException expected) {
+      // Malformed compatibility input must fail without crossing JNI as a Rust panic.
+    }
 
     AudioFrame frame = player.provide();
     if (frame == null || frame.getTimecode() != 0 || frame.getVolume() != 100
@@ -415,10 +434,11 @@ public final class GateIntegration {
     if (!pending.cancel(true) || !pending.isCancelled()) throw new AssertionError("future cancellation");
 
     loaded.get().stop();
+    decoded.stop();
     player.destroy();
     manager.shutdown();
     System.out.printf(
-        "{\"probe\":\"integration\",\"starts\":%d,\"markers\":%d,\"future_complete\":true,\"future_cancel\":true}%n",
+        "{\"probe\":\"integration\",\"starts\":%d,\"markers\":%d,\"serialization\":true,\"future_complete\":true,\"future_cancel\":true}%n",
         starts.get(), markers.get());
   }
 }

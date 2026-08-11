@@ -5,32 +5,36 @@
   "records": [
     { "sequence": 0, "action_id": "manager.create", "kind": "manager", "data": { "created": true } },
     { "sequence": 1, "action_id": "player.create", "kind": "player", "data": { "created": true, "paused": false, "volume": 100 } },
-    { "sequence": 2, "action_id": "configuration.defaults", "kind": "error", "data": { "type": "NoClassDefFoundError" } },
+    { "sequence": 2, "action_id": "configuration.defaults", "kind": "configuration", "data": { "channels": 2, "chunk_samples": 960, "filter_hot_swap": false, "frame_buffer_ms": 5000, "opus_quality": 10, "resampling": "LOW", "sample_rate": 48000, "seek_ghosting": true } },
     { "sequence": 3, "action_id": "load.track", "kind": "load", "data": { "cancelled": false, "done": true, "identifier": "gate:track", "result": "track", "track": "primary" } },
     {
       "sequence": 4,
       "action_id": "track.observe",
       "kind": "track",
       "data": {
+        "author": "Synthetic author",
         "duration_ms": 1000,
         "identifier": "gate:track",
-        "metadata_available": false,
+        "length_ms": 1000,
         "position_ms": 0,
         "seekable": true,
-        "state_available": false
+        "state": "INACTIVE",
+        "stream": false,
+        "title": "Synthetic title",
+        "uri": "oracle://gate:track"
       }
     },
     { "sequence": 5, "action_id": "track.user_data", "kind": "user_data", "data": { "object_identity": true, "typed_mismatch_null": true, "value": "opaque-user-value" } },
     { "sequence": 6, "action_id": "marker.set", "kind": "marker", "data": { "events": "", "marker": "marker-10", "position_ms": 10 } },
-    { "sequence": 7, "action_id": "track.seek", "kind": "seek", "data": { "marker_events": "marker-10:REACHED", "position_ms": 10 } },
-    { "sequence": 8, "action_id": "track.encode", "kind": "error", "data": { "type": "NoClassDefFoundError" } },
-    { "sequence": 9, "action_id": "track.decode", "kind": "unsupported", "data": { "type": "UnsupportedOperationException" } },
+    { "sequence": 7, "action_id": "track.seek", "kind": "seek", "data": { "marker_events": "marker-10:BYPASSED", "position_ms": 10 } },
+    { "sequence": 8, "action_id": "track.encode", "kind": "serialization", "data": { "bytes": "000d6d616e746c652d6f7261636c6500096f7261636c652d7631", "encoding": "encoded-primary", "length": 26 } },
+    { "sequence": 9, "action_id": "track.decode", "kind": "deserialization", "data": { "identifier": "gate:track", "position_ms": 0, "track": "decoded" } },
     { "sequence": 10, "action_id": "player.play", "kind": "play", "data": { "active": "gate:track", "events": "track_start:gate:track", "started": true } },
-    { "sequence": 11, "action_id": "player.pause", "kind": "pause", "data": { "events": "", "paused": true } },
-    { "sequence": 12, "action_id": "player.resume", "kind": "pause", "data": { "events": "", "paused": false } },
+    { "sequence": 11, "action_id": "player.pause", "kind": "pause", "data": { "events": "player_pause", "paused": true } },
+    { "sequence": 12, "action_id": "player.resume", "kind": "pause", "data": { "events": "player_resume", "paused": false } },
     { "sequence": 13, "action_id": "frame.provide", "kind": "frame", "data": { "available": true, "data": "01020304", "data_length": 4, "events": "", "terminator": false, "timecode_ms": 0, "volume": 100 } },
-    { "sequence": 14, "action_id": "player.stop", "kind": "stop", "data": { "active": false, "events": "", "marker_events": "" } },
-    { "sequence": 15, "action_id": "load.cancel", "kind": "unsupported", "data": { "type": "UnsupportedOperationException" } },
+    { "sequence": 14, "action_id": "player.stop", "kind": "stop", "data": { "active": false, "events": "track_end:gate:track:STOPPED", "marker_events": "" } },
+    { "sequence": 15, "action_id": "load.cancel", "kind": "load", "data": { "cancel_accepted": true, "cancel_requested": true, "cancelled": true, "done": true, "identifier": "gate:pending" } },
     { "sequence": 16, "action_id": "manager.shutdown", "kind": "shutdown", "data": { "complete": true, "events": "", "marker_events": "" } }
   ]
 }

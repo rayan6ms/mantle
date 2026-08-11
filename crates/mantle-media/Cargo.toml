@@ -1,0 +1,16 @@
+[package]
+name = "mantle-media"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+log.workspace = true
+mantle-xaac = { version = "0.0.0", path = "../mantle-xaac" }
+symphonia.workspace = true
+ureq.workspace = true
+
+[lints]
+workspace = true

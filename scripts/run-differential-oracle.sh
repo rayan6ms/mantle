@@ -82,6 +82,8 @@ oracle assert-deterministic \
   --second "$WORK/mantle-1.trace.json"
 oracle compare --reference "$WORK/reference-1.trace.json" \
   --mantle "$WORK/mantle-1.trace.json" --output "$WORK/comparison.json"
+oracle assert-differences --comparison "$WORK/comparison.json" \
+  --allowed ''
 
-jq -r '"Differential oracle deterministic: \(.equal_records) equal records, \(.differences | length) expected differences."' \
+jq -r '"Phase 5 serialization gate passed: \(.equal_records) equal records, \(.differences | length) differences."' \
   "$WORK/comparison.json"

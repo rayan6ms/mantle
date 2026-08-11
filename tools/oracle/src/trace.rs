@@ -2,6 +2,7 @@ use crate::schema::{SCHEMA_VERSION, Scenario};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
@@ -169,11 +170,29 @@ pub fn compare(reference: &Trace, mantle: &Trace) -> Result<Comparison, String> 
     })
 }
 
+pub fn assert_difference_actions(
+    comparison: &Comparison,
+    allowed: &BTreeSet<String>,
+) -> Result<(), String> {
+    let actual = comparison
+        .differences
+        .iter()
+        .map(|difference| difference.action_id.clone())
+        .collect::<BTreeSet<_>>();
+    if actual == *allowed {
+        Ok(())
+    } else {
+        Err(format!(
+            "differential action set mismatch: expected {allowed:?}, observed {actual:?}"
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Backend, RawRecord, Trace, TraceRecord, compare};
+    use super::{Backend, RawRecord, Trace, TraceRecord, assert_difference_actions, compare};
     use serde_json::json;
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
 
     fn record(backend_value: i64) -> TraceRecord {
         TraceRecord {
@@ -201,6 +220,8 @@ mod tests {
         let comparison = compare(&reference, &mantle).unwrap();
         assert_eq!(comparison.equal_records, 0);
         assert_eq!(comparison.differences.len(), 1);
+        assert!(assert_difference_actions(&comparison, &BTreeSet::from(["a".into()])).is_ok());
+        assert!(assert_difference_actions(&comparison, &BTreeSet::new()).is_err());
     }
 
     #[test]

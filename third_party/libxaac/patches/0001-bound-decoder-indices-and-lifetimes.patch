@@ -1,0 +1,417 @@
+diff --git a/decoder/ixheaacd_channel.c b/decoder/ixheaacd_channel.c
+index f1371ec..0928203 100644
+--- a/decoder/ixheaacd_channel.c
++++ b/decoder/ixheaacd_channel.c
+@@ -187,9 +187,13 @@ WORD32 ixheaacd_read_pulse_data(ia_bit_buf_struct *it_bit_buff,
+   WORD32 error_code = 0;
+ 
+   WORD32 value = ixheaacd_read_bits_buf(it_bit_buff, 8);
+-  ptr_pulse_info->number_pulse = value >> 6;
++  ptr_pulse_info->number_pulse = (value >> 6) & 0x03;
+   ptr_pulse_info->pulse_start_band = value & 0x3F;
+ 
++  if (ptr_pulse_info->number_pulse >= MAX_LINES) {
++    return (WORD32)IA_XHEAAC_DEC_EXE_NONFATAL_PULSEDATA_ERROR;
++  }
++
+   if (ptr_pulse_info->pulse_start_band >= 52) {
+     return (WORD32)IA_XHEAAC_DEC_EXE_NONFATAL_PULSEDATA_ERROR;
+   }
+@@ -197,7 +201,7 @@ WORD32 ixheaacd_read_pulse_data(ia_bit_buf_struct *it_bit_buff,
+   total_offset = ptr_aac_tables->str_aac_sfb_info[0]
+                      .sfb_index[ptr_pulse_info->pulse_start_band];
+ 
+-  for (i = 0; i < ptr_pulse_info->number_pulse + 1; i++) {
++  for (i = 0; i < MAX_LINES && i < ptr_pulse_info->number_pulse + 1; i++) {
+     WORD32 value = ixheaacd_read_bits_buf(it_bit_buff, 9);
+     ptr_pulse_info->pulse_offset[i] = value >> 4;
+     ptr_pulse_info->pulse_amp[i] = value & 0xF;
+diff --git a/decoder/ixheaacd_create.c b/decoder/ixheaacd_create.c
+index 8b65947..76915f2 100644
+--- a/decoder/ixheaacd_create.c
++++ b/decoder/ixheaacd_create.c
+@@ -612,7 +612,7 @@ WORD32 ixheaacd_decode_create(ia_exhaacplus_dec_api_struct *handle,
+   pstr_frame_data->scal_out_sampling_frequency =
+       pstr_frame_data->str_audio_specific_config.sampling_frequency;
+ 
+-  if (&(pstr_dec_data->str_usac_data) != NULL) {
++  if (pstr_dec_data != NULL) {
+     ia_sbr_header_data_struct usac_def_header;
+     ia_audio_specific_config_struct *pstr_aud_spec_config =
+         &pstr_frame_data->str_audio_specific_config;
+diff --git a/decoder/ixheaacd_ext_ch_ele.c b/decoder/ixheaacd_ext_ch_ele.c
+index ce4b8c2..975c420 100644
+--- a/decoder/ixheaacd_ext_ch_ele.c
++++ b/decoder/ixheaacd_ext_ch_ele.c
+@@ -655,6 +655,7 @@ WORD32 ixheaacd_core_coder_data(WORD32 id, ia_usac_data_struct *usac_data,
+   ia_usac_tmp_core_coder_struct *pstr_core_coder = &str_tmp_core_coder;
+   ia_td_frame_data_struct td_frame;
+   jmp_buf local;
++  jmp_buf *previous_jmp_buf = it_bit_buff->xaac_jmp_buf;
+ 
+   if (usac_data->ec_flag) {
+     err_code = setjmp(local);
+@@ -691,7 +692,7 @@ WORD32 ixheaacd_core_coder_data(WORD32 id, ia_usac_data_struct *usac_data,
+             longjmp(*(it_bit_buff->xaac_jmp_buf),
+                     IA_XHEAAC_DEC_EXE_NONFATAL_INSUFFICIENT_INPUT_BYTES);
+           } else {
+-            return err_code;
++            goto cleanup;
+           }
+         }
+ 
+@@ -797,7 +798,7 @@ WORD32 ixheaacd_core_coder_data(WORD32 id, ia_usac_data_struct *usac_data,
+         memcpy(usac_data->spec_scale[chn], usac_data->str_error_concealment[chn].q_spec_coeff,
+                sizeof(usac_data->spec_scale[chn]));
+         err_code = ixheaacd_fd_frm_dec(usac_data, chn);
+-        if (err_code == -1) return err_code;
++        if (err_code == -1) goto cleanup;
+         for (k = 0; k < usac_data->ccfl; k++) {
+           usac_data->time_sample_vector[chn][k] = (FLOAT32)(
+               (FLOAT32)usac_data->output_data_ptr[chn][k] * (FLOAT32)(ONE_BY_TWO_POW_15));
+@@ -812,7 +813,7 @@ WORD32 ixheaacd_core_coder_data(WORD32 id, ia_usac_data_struct *usac_data,
+       }
+       if (pstr_core_coder->core_mode[ch] == 1) {
+         err_code = ixheaacd_tw_buff_update(usac_data, chn, usac_data->str_tddec[chn]);
+-        if (err_code == -1) return err_code;
++        if (err_code == -1) goto cleanup;
+ 
+         if (!usac_data->td_frame_prev[chn]) {
+           ixheaacd_fix2flt_data(usac_data, usac_data->str_tddec[chn], chn);
+@@ -825,7 +826,7 @@ WORD32 ixheaacd_core_coder_data(WORD32 id, ia_usac_data_struct *usac_data,
+         usac_data->present_chan = chn;
+         err_code = ixheaacd_lpd_channel_stream(usac_data, &td_frame, it_bit_buff,
+                                                usac_data->time_sample_vector[chn]);
+-        if (err_code == -1) return err_code;
++        if (err_code == -1) goto cleanup;
+         if (usac_data->ec_flag) {
+           it_bit_buff->xaac_jmp_buf = &local;
+         }
+@@ -866,7 +867,7 @@ WORD32 ixheaacd_core_coder_data(WORD32 id, ia_usac_data_struct *usac_data,
+             usac_data, pstr_core_coder, &pstr_core_coder->max_sfb[ch],
+             usac_data->window_sequence_last[chn], chn, usac_data->noise_filling_config[elem_idx],
+             ch, it_bit_buff);
+-        if (err_code == -1) return err_code;
++        if (err_code == -1) goto cleanup;
+       }
+     }
+ 
+@@ -883,7 +884,7 @@ WORD32 ixheaacd_core_coder_data(WORD32 id, ia_usac_data_struct *usac_data,
+           err_code = ixheaacd_tns_apply(usac_data, usac_data->coef_fix[chn],
+                                         pstr_core_coder->max_sfb[ch],
+                                         usac_data->pstr_sfb_info[chn], usac_data->pstr_tns[chn]);
+-          if (err_code) return err_code;
++          if (err_code) goto cleanup;
+         }
+       }
+     }
+@@ -907,7 +908,7 @@ WORD32 ixheaacd_core_coder_data(WORD32 id, ia_usac_data_struct *usac_data,
+             err_code = ixheaacd_tns_apply(
+                 usac_data, usac_data->coef_fix[chn], pstr_core_coder->max_sfb[ch],
+                 usac_data->pstr_sfb_info[chn], usac_data->pstr_tns[chn]);
+-            if (err_code) return err_code;
++            if (err_code) goto cleanup;
+           }
+         }
+       }
+@@ -957,7 +958,10 @@ WORD32 ixheaacd_core_coder_data(WORD32 id, ia_usac_data_struct *usac_data,
+                                  usac_data->time_sample_vector[ch], usac_data->first_lpd_flag, 0,
+                                  usac_data->bpf_control_info);
+ 
+-          if (err) return err;
++          if (err) {
++            err_code = err;
++            goto cleanup;
++          }
+ 
+           for (k = 0; k < usac_data->ccfl; k++) {
+             usac_data->output_data_ptr[ch][k] =
+@@ -982,14 +986,14 @@ WORD32 ixheaacd_core_coder_data(WORD32 id, ia_usac_data_struct *usac_data,
+         (pstr_core_coder->core_mode[ch] == CORE_MODE_FD && usac_data->ec_flag == 0)) {
+       if (usac_data->tw_mdct[elem_idx]) {
+         err_code = -1;
+-        return err_code;
++        goto cleanup;
+ 
+       } else {
+         if (usac_data->frame_ok == 0) {
+           usac_data->fac_data_present[ch] = 0;
+         }
+         err_code = ixheaacd_fd_frm_dec(usac_data, ch);
+-        if (err_code == -1) return err_code;
++        if (err_code == -1) goto cleanup;
+         if (usac_data->ec_flag) {
+           if (usac_data->str_error_concealment[ch].fade_idx < MAX_FADE_FRAMES) {
+             FLOAT32 fade_fac = (FLOAT32)(ONE_BY_TWO_POW_15)*ia_ec_fade_factors
+@@ -1065,5 +1069,9 @@ WORD32 ixheaacd_core_coder_data(WORD32 id, ia_usac_data_struct *usac_data,
+       usac_data->td_frame_prev[chn] = pstr_core_coder->core_mode[ch];
+   }
+ 
+-  return 0;
++  err_code = 0;
++
++cleanup:
++  it_bit_buff->xaac_jmp_buf = previous_jmp_buf;
++  return err_code;
+ }
+diff --git a/decoder/ixheaacd_huff_code_reorder.c b/decoder/ixheaacd_huff_code_reorder.c
+index 8ca6061..72e58f1 100644
+--- a/decoder/ixheaacd_huff_code_reorder.c
++++ b/decoder/ixheaacd_huff_code_reorder.c
+@@ -300,7 +300,6 @@ UWORD32 ixheaacd_huff_code_reorder_init(
+     WORD16 max_band;
+     WORD8 group;
+     WORD8 win_group_len;
+-    WORD8 window;
+     WORD8 num_unit_in_band;
+     WORD8 cnt_unit_in_band;
+     WORD8 grp_win;
+@@ -329,9 +328,9 @@ UWORD32 ixheaacd_huff_code_reorder_init(
+       num_unit_in_band = ((band_offsets[band + 1] - band_offsets[band]) >> 2);
+       for (cnt_unit_in_band = num_unit_in_band; cnt_unit_in_band != 0;
+            cnt_unit_in_band--) {
+-        for (window = 0, group = 0; group < num_groups; group++) {
++        for (group = 0; group < num_groups; group++) {
+           win_group_len = ptr_ics_info->window_group_length[group];
+-          for (grp_win = win_group_len; grp_win != 0; grp_win--, window++) {
++          for (grp_win = win_group_len; grp_win != 0; grp_win--) {
+             cb = ptr_code_book[group * 16 + band];
+             if (cb != cb_prev) {
+               ixheaacd_validate_hcr_sideinfo(cb, num_line,
+diff --git a/decoder/ixheaacd_mps_bitdec.c b/decoder/ixheaacd_mps_bitdec.c
+index b1fbf8d..f88f073 100644
+--- a/decoder/ixheaacd_mps_bitdec.c
++++ b/decoder/ixheaacd_mps_bitdec.c
+@@ -1458,7 +1458,7 @@ static IA_ERRORCODE ixheaacd_map_index_data(
+     WORD32 output_idx_data[][MAX_PARAMETER_SETS][MAX_PARAMETER_BANDS],
+     WORD32 cmp_idx_data[][MAX_PARAMETER_SETS][MAX_PARAMETER_BANDS],
+     WORD32 diff_idx_data[][MAX_PARAMETER_SETS][MAX_PARAMETER_BANDS], WORD32 xtt_idx,
+-    WORD32 idx_prev[MAX_NUM_OTT][MAX_PARAMETER_BANDS], WORD32 param_idx, WORD32 param_type,
++    WORD32 idx_prev[][MAX_PARAMETER_BANDS], WORD32 param_idx, WORD32 param_type,
+     WORD32 start_band, WORD32 stop_band, WORD32 default_value, WORD32 num_parameter_sets,
+     WORD32 *param_slot, WORD32 extend_frame, WORD32 quant_mode, WORD32 *ott_vs_tot_db_in,
+     WORD32 *ott_vs_tot_db_1, WORD32 *ott_vs_tot_db_2,
+diff --git a/decoder/ixheaacd_mps_hybfilter.h b/decoder/ixheaacd_mps_hybfilter.h
+index 06a8ee4..cffabac 100644
+--- a/decoder/ixheaacd_mps_hybfilter.h
++++ b/decoder/ixheaacd_mps_hybfilter.h
+@@ -30,7 +30,7 @@ VOID ixheaacd_mps_qmf_hybrid_analysis(
+ 
+ VOID ixheaacd_mps_qmf_hybrid_analysis_no_pre_mix(
+     ia_mps_hybrid_filt_struct *handle,
+-    ia_cmplx_flt_struct in_qmf[MAX_NUM_QMF_BANDS_MPS][MAX_TIME_SLOTS],
++    ia_cmplx_flt_struct in_qmf[MAX_NUM_QMF_BANDS_MPS_NEW][MAX_TIME_SLOTS],
+     WORD32 num_bands, WORD32 num_samples,
+     ia_cmplx_flt_struct v[MAX_TIME_SLOTS][MAX_HYBRID_BANDS_MPS]);
+ 
+diff --git a/decoder/ixheaacd_mps_hybrid_filt.c b/decoder/ixheaacd_mps_hybrid_filt.c
+index c166a0a..3c0380f 100644
+--- a/decoder/ixheaacd_mps_hybrid_filt.c
++++ b/decoder/ixheaacd_mps_hybrid_filt.c
+@@ -213,7 +213,7 @@ VOID ixheaacd_mps_qmf_hybrid_analysis_init(ia_mps_hybrid_filt_struct *handle) {
+ 
+ VOID ixheaacd_mps_qmf_hybrid_analysis_no_pre_mix(
+     ia_mps_hybrid_filt_struct *handle,
+-    ia_cmplx_flt_struct in_qmf[MAX_NUM_QMF_BANDS_MPS][MAX_TIME_SLOTS], WORD32 num_bands,
++    ia_cmplx_flt_struct in_qmf[MAX_NUM_QMF_BANDS_MPS_NEW][MAX_TIME_SLOTS], WORD32 num_bands,
+     WORD32 num_samples, ia_cmplx_flt_struct v[MAX_TIME_SLOTS][MAX_HYBRID_BANDS_MPS]) {
+   WORD32 lf_samples_shift;
+   WORD32 hf_samples_shift;
+diff --git a/decoder/ixheaacd_mps_res_pulsedata.c b/decoder/ixheaacd_mps_res_pulsedata.c
+index 6f7a137..c494b70 100644
+--- a/decoder/ixheaacd_mps_res_pulsedata.c
++++ b/decoder/ixheaacd_mps_res_pulsedata.c
+@@ -31,16 +31,20 @@ WORD32 ixheaacd_res_c_pulse_data_read(ia_bit_buf_struct *it_bit_buf,
+   pulse_data->pulse_data_present = (FLAG)ixheaacd_read_bits_buf(it_bit_buf, 1);
+   if (pulse_data->pulse_data_present) {
+     WORD32 tmp = ixheaacd_read_bits_buf(it_bit_buf, 8);
+-    pulse_data->number_pulse = tmp >> 6;
++    pulse_data->number_pulse = (tmp >> 6) & 0x03;
+     pulse_data->pulse_start_band = tmp & 0x3F;
+ 
++    if (pulse_data->number_pulse >= MAXIMUM_LINES) {
++      return (WORD32)IA_XHEAAC_DEC_EXE_NONFATAL_PULSEDATA_ERROR;
++    }
++
+     if (pulse_data->pulse_start_band >= 52) {
+       return (WORD32)IA_XHEAAC_DEC_EXE_NONFATAL_PULSEDATA_ERROR;
+     }
+ 
+     k = aac_tables_ptr->sfb_index_long[pulse_data->pulse_start_band];
+ 
+-    for (i = 0; i <= pulse_data->number_pulse; i++) {
++    for (i = 0; i < MAXIMUM_LINES && i <= pulse_data->number_pulse; i++) {
+       WORD32 tmp = ixheaacd_read_bits_buf(it_bit_buf, 9);
+       pulse_data->pulse_offset[i] = tmp >> 4;
+       pulse_data->pulse_amp[i] = tmp & 0xF;
+diff --git a/decoder/ixheaacd_hbe_dft_trans.c b/decoder/ixheaacd_hbe_dft_trans.c
+index 3999dd4..ce1470a 100644
+--- a/decoder/ixheaacd_hbe_dft_trans.c
++++ b/decoder/ixheaacd_hbe_dft_trans.c
+@@ -769,9 +769,9 @@ VOID ixheaacd_dft_hbe_apply_polar_t(
+ }
+ 
+ WORD32 ixheaacd_dft_hbe_apply(ia_esbr_hbe_txposer_struct *ptr_hbe_txposer,
+-                              FLOAT32 qmf_buf_real[][64], FLOAT32 qmf_buf_imag[][64],
+-                              WORD32 num_columns, FLOAT32 pv_qmf_buf_real[][64],
+-                              FLOAT32 pv_qmf_buf_imag[][64], WORD32 pitch_in_bins,
++                              FLOAT32 (*qmf_buf_real)[64], FLOAT32 (*qmf_buf_imag)[64],
++                              WORD32 num_columns, FLOAT32 (*pv_qmf_buf_real)[64],
++                              FLOAT32 (*pv_qmf_buf_imag)[64], WORD32 pitch_in_bins,
+                               FLOAT32 *dft_hbe_scratch_buf) {
+   WORD32 in_offset = 0;
+   WORD32 out_offset = 0;
+diff --git a/decoder/ixheaacd_hbe_trans.c b/decoder/ixheaacd_hbe_trans.c
+index 81a3850..65fd6fd 100644
+--- a/decoder/ixheaacd_hbe_trans.c
++++ b/decoder/ixheaacd_hbe_trans.c
+@@ -222,10 +222,10 @@ WORD32 ixheaacd_qmf_hbe_data_reinit(ia_esbr_hbe_txposer_struct *ptr_hbe_txposer,
+ }
+ 
+ WORD32 ixheaacd_qmf_hbe_apply(ia_esbr_hbe_txposer_struct *ptr_hbe_txposer,
+-                              FLOAT32 qmf_buf_real[][64],
+-                              FLOAT32 qmf_buf_imag[][64], WORD32 num_columns,
+-                              FLOAT32 pv_qmf_buf_real[][64],
+-                              FLOAT32 pv_qmf_buf_imag[][64],
++                              FLOAT32 (*qmf_buf_real)[64],
++                              FLOAT32 (*qmf_buf_imag)[64], WORD32 num_columns,
++                              FLOAT32 (*pv_qmf_buf_real)[64],
++                              FLOAT32 (*pv_qmf_buf_imag)[64],
+                               WORD32 pitch_in_bins,
+                               ia_sbr_header_data_struct *ptr_header_data) {
+   WORD32 i, qmf_band_idx;
+diff --git a/decoder/ixheaacd_mps_temp_process.c b/decoder/ixheaacd_mps_temp_process.c
+index 3e1481f..0d5bcef 100644
+--- a/decoder/ixheaacd_mps_temp_process.c
++++ b/decoder/ixheaacd_mps_temp_process.c
+@@ -348,7 +348,7 @@ static VOID ixheaacd_subband_tp(ia_heaac_mps_state_struct *pstr_mps_state, WORD3
+ 
+   WORD32 *p_hyb_out_dry_real, *p_hyb_out_dry_imag;
+ 
+-  WORD32 ch, n, no_scaling, i, k = 0, offset;
++  WORD32 ch, n, no_scaling, i, offset;
+   WORD32 i_lf = 0, i_rf = 0, i_c = 0, i_lfe = 0, i_ls = 0, i_rs = 0, i_al = 0, i_ar = 0;
+ 
+   WORD32 loop_counter = 0;
+@@ -1185,7 +1185,7 @@ static VOID ixheaacd_subband_tp(ia_heaac_mps_state_struct *pstr_mps_state, WORD3
+         *p_buf_im++ = ixheaac_add32_sat(*hyb_output_imag_dry++, *p_buffer_im++);
+       }
+ 
+-      for (; n < hybrid_bands; n++, k++) {
++      for (; n < hybrid_bands; n++) {
+         temp = (no_scaling ? ONE_IN_Q15 : scale[ch]);
+ 
+         *p_buf_re++ = ixheaac_add32_sat(*hyb_output_real_dry++, *p_buffer_re++);
+@@ -1206,7 +1206,7 @@ static VOID ixheaacd_subband_tp(ia_heaac_mps_state_struct *pstr_mps_state, WORD3
+         p_buffer_im++;
+       }
+ 
+-      for (; n < hybrid_bands; n++, k++) {
++      for (; n < hybrid_bands; n++) {
+         temp = (no_scaling ? ONE_IN_Q15 : scale[ch]);
+ 
+         *p_buf_re++ = ixheaac_add32_sat(*hyb_output_real_dry++, 
+diff --git a/decoder/ixheaacd_sbr_dec.c b/decoder/ixheaacd_sbr_dec.c
+index bccc772..8434d08 100644
+--- a/decoder/ixheaacd_sbr_dec.c
++++ b/decoder/ixheaacd_sbr_dec.c
+@@ -129,8 +129,8 @@ VOID ixheaacd_qmf_enrg_calc(ia_sbr_dec_struct *ptr_sbr_dec,
+ }
+ 
+ VOID ixheaacd_hbe_repl_spec(WORD32 x_over_qmf[MAX_NUM_PATCHES],
+-                            FLOAT32 qmf_buf_real[][64],
+-                            FLOAT32 qmf_buf_imag[][64], WORD32 no_bins,
++                            FLOAT32 (*qmf_buf_real)[64],
++                            FLOAT32 (*qmf_buf_imag)[64], WORD32 no_bins,
+                             WORD32 max_stretch) {
+   WORD32 patch_bands;
+   WORD32 patch, band, col, target, source_bands, i;
+diff --git a/decoder/ixheaacd_sbr_dec.h b/decoder/ixheaacd_sbr_dec.h
+index 7ba4b5c..daff3da 100644
+--- a/decoder/ixheaacd_sbr_dec.h
++++ b/decoder/ixheaacd_sbr_dec.h
+@@ -240,10 +240,10 @@ WORD32 ixheaacd_sbr_dec_from_mps(FLOAT32 *p_mps_qmf_output, VOID *p_sbr_dec, VOI
+                                  VOID *p_sbr_header, WORD32 ec_flag);
+ 
+ WORD32 ixheaacd_qmf_hbe_apply(ia_esbr_hbe_txposer_struct *h_hbe_txposer,
+-                              FLOAT32 qmf_buf_real[][64],
+-                              FLOAT32 qmf_buf_imag[][64], WORD32 num_columns,
+-                              FLOAT32 pv_qmf_buf_real[][64],
+-                              FLOAT32 pv_qmf_buf_imag[][64],
++                              FLOAT32 (*qmf_buf_real)[64],
++                              FLOAT32 (*qmf_buf_imag)[64], WORD32 num_columns,
++                              FLOAT32 (*pv_qmf_buf_real)[64],
++                              FLOAT32 (*pv_qmf_buf_imag)[64],
+                               WORD32 pitch_in_bins,
+                               ia_sbr_header_data_struct *ptr_header_data);
+ 
+@@ -264,10 +264,10 @@ VOID ixheaacd_hbe_apply_ifft_336(FLOAT32 *inp, FLOAT32 *ptr_scratch, WORD32 len,
+                                  WORD32 i_sign);
+ 
+ WORD32 ixheaacd_dft_hbe_apply(ia_esbr_hbe_txposer_struct *ptr_hbe_txposer,
+-                              FLOAT32 qmf_buf_real[][64],
+-                              FLOAT32 qmf_buf_imag[][64], WORD32 num_columns,
+-                              FLOAT32 pv_qmf_buf_real[][64],
+-                              FLOAT32 pv_qmf_buf_imag[][64],
++                              FLOAT32 (*qmf_buf_real)[64],
++                              FLOAT32 (*qmf_buf_imag)[64], WORD32 num_columns,
++                              FLOAT32 (*pv_qmf_buf_real)[64],
++                              FLOAT32 (*pv_qmf_buf_imag)[64],
+                               WORD32 pitch_in_bins,
+                               FLOAT32 *dft_hbe_scratch_buf);
+ 
+@@ -315,8 +315,8 @@ WORD32 ixheaacd_esbr_dec(ia_sbr_dec_struct *ptr_sbr_dec,
+                          ia_sbr_tables_struct *sbr_tables_ptr, WORD32 ch_fac);
+ 
+ VOID ixheaacd_hbe_repl_spec(WORD32 x_over_qmf[MAX_NUM_PATCHES],
+-                            FLOAT32 qmf_buf_real[][64],
+-                            FLOAT32 qmf_buf_imag[][64], WORD32 no_bins,
++                            FLOAT32 (*qmf_buf_real)[64],
++                            FLOAT32 (*qmf_buf_imag)[64], WORD32 no_bins,
+                             WORD32 max_stretch);
+ 
+ #endif
+diff --git a/decoder/generic/ixheaacd_qmf_dec_generic.c b/decoder/generic/ixheaacd_qmf_dec_generic.c
+index e3e8e4a..83301ec 100644
+--- a/decoder/generic/ixheaacd_qmf_dec_generic.c
++++ b/decoder/generic/ixheaacd_qmf_dec_generic.c
+@@ -49,7 +49,7 @@
+ #include "ixheaacd_function_selector.h"
+ #include "ixheaacd_audioobjtypes.h"
+-#if !__ARM_NEON__
++#if !__ARM_NEON__ || defined(__APPLE__)
+ 
+ #define DCT3_LEN (32)
+ #define DCT2_LEN (64)
+ 
+diff --git a/decoder/ixheaacd_sbrqmftrans.h b/decoder/ixheaacd_sbrqmftrans.h
+index d9093c7..b402880 100644
+--- a/decoder/ixheaacd_sbrqmftrans.h
++++ b/decoder/ixheaacd_sbrqmftrans.h
+@@ -21,18 +21,18 @@
+ #define IXHEAACD_SBRQMFTRANS_H
+ 
+ WORD32 ixheaacd_qmf_hbe_apply(ia_esbr_hbe_txposer_struct *h_hbe_txposer,
+-                              FLOAT32 qmf_buf_real[][64],
+-                              FLOAT32 qmf_buf_imag[][64], WORD32 num_columns,
+-                              FLOAT32 pv_qmf_buf_real[][64],
+-                              FLOAT32 pv_qmf_buf_imag[][64],
++                              FLOAT32 (*qmf_buf_real)[64],
++                              FLOAT32 (*qmf_buf_imag)[64], WORD32 num_columns,
++                              FLOAT32 (*pv_qmf_buf_real)[64],
++                              FLOAT32 (*pv_qmf_buf_imag)[64],
+                               WORD32 pitch_in_bins,
+                               ia_sbr_header_data_struct *ptr_header_data);
+ 
+ WORD32 ixheaacd_dft_hbe_apply(ia_esbr_hbe_txposer_struct *ptr_hbe_txposer,
+-                              FLOAT32 qmf_buf_real[][64],
+-                              FLOAT32 qmf_buf_imag[][64], WORD32 num_columns,
+-                              FLOAT32 pv_qmf_buf_real[][64],
+-                              FLOAT32 pv_qmf_buf_imag[][64],
++                              FLOAT32 (*qmf_buf_real)[64],
++                              FLOAT32 (*qmf_buf_imag)[64], WORD32 num_columns,
++                              FLOAT32 (*pv_qmf_buf_real)[64],
++                              FLOAT32 (*pv_qmf_buf_imag)[64],
+                               WORD32 pitch_in_bins,
+                               FLOAT32 *dft_hbe_scratch_buf);
+ 

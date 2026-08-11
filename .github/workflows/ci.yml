@@ -3,6 +3,7 @@ name: CI
 on:
   pull_request:
   push:
+    branches: [main]
 
 permissions:
   contents: read
@@ -16,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: true
       - uses: dtolnay/rust-toolchain@1.97.1
         with:
           components: clippy,rustfmt
@@ -31,6 +34,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: true
       - uses: dtolnay/rust-toolchain@1.97.1
         with:
           components: llvm-tools-preview
@@ -139,7 +144,7 @@ jobs:
             -s "$supplementary" -t "$supplementary"
 
   differential-oracle:
-    name: Phase 3 deterministic differential oracle
+    name: Phase 5 serialization differential gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -178,3 +183,23 @@ jobs:
           done < <(jq -r '.resolved_runtime_artifacts[] | [.file, .sha256] | @tsv' \
             reference/lavaplayer-2.2.6.lock.json)
       - run: scripts/run-differential-oracle.sh
+
+  libxaac-platform-build:
+    name: Phase 6 libxaac decoder build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - uses: dtolnay/rust-toolchain@1.97.1
+      - name: Build pinned decoder-only source
+        shell: bash
+        run: scripts/check-libxaac-platform-build.sh
+      - name: Test bounded Mantle adapter
+        shell: bash
+        run: cargo test -p mantle-media --test phase6_media --locked

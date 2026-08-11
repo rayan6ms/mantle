@@ -1,6 +1,6 @@
 # Mantle compatibility status
 
-Mantle currently makes no release compatibility claim. Phase 1 freezes the Lavaplayer 2.2.6 contract. Phase 2 now has a deliberately narrow feasibility slice, but symbol-by-symbol classification remains unassessed until broader behavior evidence exists.
+Mantle currently makes no release compatibility claim. Phase 1 freezes the Lavaplayer 2.2.6 contract, Phase 2 proves a deliberately narrow JVM feasibility slice, Phase 4 matches the foundation scenario's player semantics, and Phase 5 interoperates with its synthetic track serialization. Symbol-by-symbol classification remains unassessed until broader behavior evidence exists.
 
 The authoritative structural input is `reference/lavaplayer-2.2.6-inventory.json`. The initial matrix at `compatibility/lavaplayer-2.2.6-classification.json` contains all 2,762 exported class/member symbols and deliberately marks every one `UNASSESSED`. An unassessed symbol has no `A_EXACT`, `B_SOURCE`, `C_SEMANTIC`, `D_LEGACY`, or `X_UNSUPPORTED` classification until a later phase supplies evidence and tests.
 
@@ -28,4 +28,8 @@ JDK 25/26 native-loading warnings remain tracked as `S-001` in `PROJECT_LEDGER.m
 
 Phase 3 freezes a shared 17-action synthetic scenario and normalized reference/Mantle goldens under `tests/oracle/`. It covers lifecycle, configuration defaults, loading/cancellation, metadata, user data, markers, seeking, track-detail bytes, play/pause/stop events, deterministic frame observations, and shutdown. `scripts/run-differential-oracle.sh` proves repeat determinism and writes a structured difference report.
 
-The initial baseline has 8 equal observations and 9 expected differences. These differences are implementation inputs for Phase 4 and later phases, not compatibility classifications. In particular, reference `BYPASSED` marker behavior is tracked as `C-001`; the classification matrix remains `INITIAL_UNASSESSED` until implementation and evidence justify symbol-level claims.
+The Phase 5 result has all 17 observations equal and permits no expected difference. The reference's pre-play seek marker behavior matches as `BYPASSED`, and synthetic source-detail bytes match exactly in both directions. The classification matrix remains `INITIAL_UNASSESSED` until implementation and evidence justify symbol-level claims.
+
+## Intentional serialization validity divergence
+
+Java strings can contain unpaired UTF-16 surrogate code units, while Rust `String` represents well-formed Unicode scalar values. Mantle rejects serialized metadata containing unpaired surrogates. Valid Unicode, including supplementary characters encoded as Java modified UTF-8 surrogate pairs, interoperates exactly. The bounded malformed-input tests in `mantle-core` and `docs/compatibility/TRACK_SERIALIZATION.md` record this decision.
