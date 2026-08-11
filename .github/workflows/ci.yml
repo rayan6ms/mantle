@@ -178,3 +178,17 @@ jobs:
           done < <(jq -r '.resolved_runtime_artifacts[] | [.file, .sha256] | @tsv' \
             reference/lavaplayer-2.2.6.lock.json)
       - run: scripts/run-differential-oracle.sh
+
+  libxaac-platform-build:
+    name: Phase 6 libxaac decoder build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build pinned decoder-only source
+        shell: bash
+        run: scripts/check-libxaac-platform-build.sh
