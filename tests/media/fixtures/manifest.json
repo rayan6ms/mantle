@@ -64,6 +64,17 @@
       "sha256": "983b6a7960f95a91f0cdc07f558e0b4e89e0e20db6a3d0ac9cb5a8648191fc0b"
     },
     {
+      "file": "tone-flac.flac",
+      "container": "FLAC",
+      "codec": "FLAC",
+      "profile": null,
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 6.0,
+      "size_bytes": 127849,
+      "sha256": "a88be13e97494e252d4ecc9189b08c97e41eea3b65b9cc60a12910a6c14dced1"
+    },
+    {
       "file": "tone-he-aac-v1.m4a",
       "container": "ISO BMFF/MP4",
       "codec": "AAC",

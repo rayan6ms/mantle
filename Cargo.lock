@@ -479,6 +479,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "mantle-worker-bench"
+version = "0.0.0"
+dependencies = [
+ "mantle-audio",
+ "mantle-media",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "mantle-xaac"
 version = "0.0.0"
 
@@ -791,6 +801,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1758d6c853020a7244de03cc3e0185eaea3f58715122422dd3cc7452e6d4c16a"
 dependencies = [
  "lazy_static",
+ "symphonia-bundle-flac",
  "symphonia-bundle-mp3",
  "symphonia-codec-aac",
  "symphonia-codec-pcm",
@@ -798,6 +809,18 @@ dependencies = [
  "symphonia-format-isomp4",
  "symphonia-format-mkv",
  "symphonia-format-riff",
+ "symphonia-metadata",
+]
+
+[[package]]
+name = "symphonia-bundle-flac"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee69ad01236a67260b82fd1ff9790dd75ead29f2f46af145e63b7e72273e0e03"
+dependencies = [
+ "log",
+ "symphonia-common",
+ "symphonia-core",
  "symphonia-metadata",
 ]
 

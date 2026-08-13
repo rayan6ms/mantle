@@ -671,6 +671,13 @@ struct AlignedBuffer {
     len: usize,
 }
 
+// SAFETY: `AlignedBuffer` uniquely owns the allocation described by `layout`. Moving the wrapper
+// to another thread does not move its allocation or invalidate the pointers libxaac stores in its
+// caller-owned instance memory, and the global allocator permits deallocation on another thread.
+// The wrapper deliberately does not implement `Sync`: decoder access remains exclusive through
+// `&mut XaacDecoder`, so one libxaac instance is never called concurrently.
+unsafe impl Send for AlignedBuffer {}
+
 impl AlignedBuffer {
     fn new(size: usize, alignment: usize) -> Result<Self, XaacError> {
         let size = size.max(1);

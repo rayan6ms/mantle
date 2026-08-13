@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::thread;
 use std::time::Duration;
 
 use mantle_media::{
@@ -20,6 +21,7 @@ fn probes_primary_frozen_formats() {
         ("tone-aac-lc.m4a", Container::Mp4, Codec::AacLc),
         ("tone-he-aac-v1.m4a", Container::Mp4, Codec::HeAacV1),
         ("tone-he-aac-v2.m4a", Container::Mp4, Codec::HeAacV2),
+        ("tone-flac.flac", Container::Flac, Codec::Flac),
         ("tone-opus.webm", Container::WebM, Codec::Opus),
     ];
     for (name, container, codec) in cases {
@@ -39,7 +41,12 @@ fn probes_primary_frozen_formats() {
 
 #[test]
 fn decodes_pcm_without_growing_caller_storage() {
-    for name in ["tone-pcm-s16le.wav", "tone-mp3.mp3", "tone-aac-lc.m4a"] {
+    for name in [
+        "tone-pcm-s16le.wav",
+        "tone-mp3.mp3",
+        "tone-aac-lc.m4a",
+        "tone-flac.flac",
+    ] {
         let mut session = MediaSession::open_file(fixture(name), MediaLimits::default()).unwrap();
         let mut frame = PcmFrame::with_capacity(session.limits().max_pcm_samples_per_frame);
         let storage = frame.samples().as_ptr();
@@ -93,6 +100,7 @@ fn seeks_each_primary_local_path() {
         "tone-he-aac-v1.m4a",
         "tone-he-aac-v2.m4a",
         "tone-opus.webm",
+        "tone-flac.flac",
     ] {
         let mut session = MediaSession::open_file(fixture(name), MediaLimits::default()).unwrap();
         let result = session.seek(Duration::from_secs(3)).unwrap();
@@ -165,6 +173,27 @@ fn decodes_he_aac_profiles_with_bounded_reusable_storage() {
             "{name}: {last_timestamp:?}"
         );
     }
+}
+
+#[test]
+fn initialized_he_aac_session_can_transfer_to_its_media_worker() {
+    let session =
+        MediaSession::open_file(fixture("tone-he-aac-v1.m4a"), MediaLimits::default()).unwrap();
+    let (sample_rate, channels, samples) = thread::spawn(move || {
+        let mut session = session;
+        let mut output = PcmFrame::with_capacity(session.limits().max_pcm_samples_per_frame);
+        assert!(session.read_pcm(&mut output).unwrap());
+        (
+            output.sample_rate(),
+            output.channels(),
+            output.samples().len(),
+        )
+    })
+    .join()
+    .unwrap();
+    assert_eq!(sample_rate, 48_000);
+    assert_eq!(channels, 2);
+    assert!(samples > 0);
 }
 
 fn pcm_48khz_duration(samples_per_channel: usize) -> Duration {

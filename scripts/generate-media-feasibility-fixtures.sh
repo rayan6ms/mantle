@@ -29,6 +29,8 @@ ffmpeg -hide_banner -loglevel error -y -i "$FIXTURES/tone-pcm-s16le.wav" \
 ffmpeg -hide_banner -loglevel error -y -i "$FIXTURES/tone-pcm-s16le.wav" \
   -map_metadata -1 -c:a aac -profile:a aac_low -b:a 128k -movflags +faststart -bitexact \
   "$FIXTURES/tone-aac-lc.m4a"
+ffmpeg -hide_banner -loglevel error -y -i "$FIXTURES/tone-pcm-s16le.wav" \
+  -map_metadata -1 -c:a flac -bitexact "$FIXTURES/tone-flac.flac"
 
 "$FDK_AAC_ENCODER" -r 64000 -t 5 \
   "$FIXTURES/tone-pcm-s16le.wav" "$SCRATCH/tone-he-aac-v1.aac" >/dev/null

@@ -12,7 +12,7 @@ use std::time::Duration as StdDuration;
 use mantle_audio::{AudioFrameError, PcmFormat, opus_packet_duration};
 use mantle_xaac::{XaacConfig, XaacDecodeStatus, XaacDecoder, XaacProfile};
 use symphonia::core::codecs::audio::well_known::{
-    CODEC_ID_AAC, CODEC_ID_MP3, CODEC_ID_OPUS, CODEC_ID_PCM_S16LE,
+    CODEC_ID_AAC, CODEC_ID_FLAC, CODEC_ID_MP3, CODEC_ID_OPUS, CODEC_ID_PCM_S16LE,
 };
 use symphonia::core::codecs::audio::{AudioDecoder, AudioDecoderOptions};
 use symphonia::core::errors::Error as SymphoniaError;
@@ -151,6 +151,7 @@ pub enum Container {
     Mp3,
     Mp4,
     WebM,
+    Flac,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -161,6 +162,7 @@ pub enum Codec {
     HeAacV1,
     HeAacV2,
     Opus,
+    Flac,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -809,6 +811,7 @@ fn map_container(name: &str) -> Result<Container, MediaError> {
         "mp3" => Ok(Container::Mp3),
         "isomp4" => Ok(Container::Mp4),
         "matroska" => Ok(Container::WebM),
+        "flac" => Ok(Container::Flac),
         _ => Err(MediaError::UnsupportedContainer(name.to_owned())),
     }
 }
@@ -820,6 +823,7 @@ fn map_codec(
         CODEC_ID_PCM_S16LE => Ok(Codec::PcmS16Le),
         CODEC_ID_MP3 => Ok(Codec::Mp3),
         CODEC_ID_OPUS => Ok(Codec::Opus),
+        CODEC_ID_FLAC => Ok(Codec::Flac),
         CODEC_ID_AAC => classify_aac(params),
         codec => Err(MediaError::UnsupportedCodec(codec.to_string())),
     }

@@ -9,6 +9,7 @@ members = [
     "tools/audio-layout-bench",
     "tools/jvm-gate",
     "tools/media-bench",
+    "tools/worker-bench",
     "tools/oracle",
     "tools/reference",
 ]
@@ -24,7 +25,7 @@ log = { version = "=0.4.33", features = ["max_level_debug"] }
 opus-head-sys = { version = "=0.3.1", default-features = false }
 rtrb = { version = "=0.3.4", default-features = false }
 rubato = { version = "=5.0.0", default-features = false }
-symphonia = { version = "=0.6.0", default-features = false, features = ["aac", "isomp4", "mkv", "mp3", "pcm", "wav"] }
+symphonia = { version = "=0.6.0", default-features = false, features = ["aac", "flac", "isomp4", "mkv", "mp3", "pcm", "wav"] }
 ureq = { version = "=3.4.0", default-features = false, features = ["rustls"] }
 
 [workspace.lints.rust]
