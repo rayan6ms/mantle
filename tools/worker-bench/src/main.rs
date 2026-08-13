@@ -33,6 +33,7 @@ const FIRST_FRAME_TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_TRACKS: usize = 250;
 const MAX_WORKERS: usize = 256;
 const MAX_INTERVAL_SECONDS: u64 = 60;
+const TRACKS_PER_SHARED_WORKER: usize = 25;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -435,19 +436,28 @@ impl WorkerControl {
 struct Scheduler {
     control: Arc<WorkerControl>,
     joins: Vec<JoinHandle<()>>,
+    worker_threads: Vec<thread::Thread>,
 }
 
 impl Scheduler {
     fn start(&self) {
         self.control.started.store(true, Ordering::Release);
+        self.wake_workers();
     }
 
     fn check(&self) -> Result<()> {
         self.control.check()
     }
 
+    fn wake_workers(&self) {
+        for worker in &self.worker_threads {
+            worker.unpark();
+        }
+    }
+
     fn shutdown(self) -> Result<()> {
         self.control.stop.store(true, Ordering::Release);
+        self.wake_workers();
         for join in self.joins {
             join.join().map_err(|_| "media worker panicked")?;
         }
@@ -721,9 +731,10 @@ fn run_benchmark(config: &Config, process_started: Instant) -> Result<()> {
         load_latencies.push(elapsed_ms(load_started));
     }
 
+    let bounded_worker_threads = shared_worker_count(config.tracks, config.workers);
     let worker_threads = match config.architecture {
         Architecture::Dedicated => config.tracks,
-        Architecture::SharedPool | Architecture::Hybrid => config.workers.min(config.tracks),
+        Architecture::SharedPool | Architecture::Hybrid => bounded_worker_threads,
     };
     let scheduler = launch_scheduler(config.architecture, worker_threads, workers);
     let playback_started = Instant::now();
@@ -821,6 +832,10 @@ fn run_benchmark(config: &Config, process_started: Instant) -> Result<()> {
     Ok(())
 }
 
+fn shared_worker_count(tracks: usize, worker_limit: usize) -> usize {
+    tracks.div_ceil(TRACKS_PER_SHARED_WORKER).min(worker_limit)
+}
+
 fn launch_scheduler(
     architecture: Architecture,
     worker_threads: usize,
@@ -835,7 +850,12 @@ fn launch_scheduler(
         Architecture::SharedPool => launch_shared_pool(tracks, worker_threads, &control),
         Architecture::Hybrid => launch_hybrid(tracks, worker_threads, &control),
     };
-    Scheduler { control, joins }
+    let worker_threads = joins.iter().map(|join| join.thread().clone()).collect();
+    Scheduler {
+        control,
+        joins,
+        worker_threads,
+    }
 }
 
 fn spawn_owned_worker(mut tracks: Vec<TrackWorker>, control: Arc<WorkerControl>) -> JoinHandle<()> {
@@ -853,7 +873,7 @@ fn spawn_owned_worker(mut tracks: Vec<TrackWorker>, control: Arc<WorkerControl>)
                 }
             }
             if !progressed {
-                thread::park_timeout(Duration::from_millis(1));
+                thread::park();
             }
         }
     })
@@ -890,18 +910,22 @@ fn launch_shared_pool(
         joins.push(thread::spawn(move || {
             wait_for_start(&control);
             while !control.stop.load(Ordering::Acquire) {
-                let index = cursor.fetch_add(1, Ordering::Relaxed) % track_count;
-                let Ok(mut track) = tracks[index].try_lock() else {
-                    thread::yield_now();
-                    continue;
-                };
-                match track.step() {
-                    Ok(true) => {}
-                    Ok(false) => thread::park_timeout(Duration::from_micros(200)),
-                    Err(error) => {
-                        control.record_error(error.as_ref());
-                        return;
+                let mut progressed = false;
+                for _ in 0..track_count {
+                    let index = cursor.fetch_add(1, Ordering::Relaxed) % track_count;
+                    let Ok(mut track) = tracks[index].try_lock() else {
+                        continue;
+                    };
+                    match track.step() {
+                        Ok(produced) => progressed |= produced,
+                        Err(error) => {
+                            control.record_error(error.as_ref());
+                            return;
+                        }
                     }
+                }
+                if !progressed {
+                    thread::park();
                 }
             }
         }));
@@ -929,6 +953,7 @@ fn wait_for_first_frames(
                 latencies[index] = Some(elapsed_ms(started));
             }
         }
+        scheduler.wake_workers();
         if Instant::now() >= deadline {
             return Err(
                 "one or more tracks did not produce a first frame within 15 seconds".into(),
@@ -996,6 +1021,7 @@ fn consume_paced(
             }
             delivered
         }))?;
+        scheduler.wake_workers();
         next_frame += FRAME_PERIOD;
         if collect && now >= next_sample {
             samples.push(process::read_proc_sample()?);
@@ -1075,7 +1101,9 @@ mod tests {
     use mantle_audio::EncodedFrameSlot;
     use mantle_media::Codec;
 
-    use super::{Architecture, TrackSource, Workload, parse_config, summarize};
+    use super::{
+        Architecture, TrackSource, Workload, parse_config, shared_worker_count, summarize,
+    };
 
     #[test]
     fn parses_bounded_synthetic_configuration() {
@@ -1094,6 +1122,16 @@ mod tests {
         assert_eq!(config.workload, Workload::Synthetic);
         assert_eq!(config.tracks, 10);
         assert_eq!(config.workers, 3);
+    }
+
+    #[test]
+    fn shared_worker_density_is_bounded_by_track_count_and_limit() {
+        assert_eq!(shared_worker_count(1, 28), 1);
+        assert_eq!(shared_worker_count(10, 28), 1);
+        assert_eq!(shared_worker_count(50, 28), 2);
+        assert_eq!(shared_worker_count(100, 28), 4);
+        assert_eq!(shared_worker_count(250, 28), 10);
+        assert_eq!(shared_worker_count(250, 3), 3);
     }
 
     #[test]
