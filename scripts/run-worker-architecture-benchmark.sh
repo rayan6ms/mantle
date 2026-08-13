@@ -25,6 +25,7 @@ readonly SYNTHETIC_WORK="${SYNTHETIC_WORK:-2000}"
 readonly RESULT_FILE="${RESULT_FILE:-$RESULTS_DIR/mantle-worker-phase8-2026-08-13.jsonl}"
 readonly SUMMARY_FILE="${SUMMARY_FILE:-$RESULTS_DIR/mantle-worker-phase8-2026-08-13-summary.json}"
 readonly METADATA_FILE="${METADATA_FILE:-$RESULTS_DIR/mantle-worker-phase8-2026-08-13-metadata.json}"
+readonly GATE_FILE="${GATE_FILE:-$RESULTS_DIR/mantle-worker-phase8-2026-08-13-gate.json}"
 readonly BUILD_RESULT="$ROOT/.cache/mantle-worker-phase8-build.json"
 readonly HTTP_ADDRESS="127.0.0.1:18081"
 readonly HTTP_URL="http://$HTTP_ADDRESS/reference.mp3"
@@ -176,6 +177,8 @@ jq -s '
   }
   ' "$RESULT_FILE" > "$SUMMARY_FILE"
 
+"$ROOT/scripts/check-worker-scale-gate.sh" "$SUMMARY_FILE" "$GATE_FILE" hybrid
+
 jq -n \
   --slurpfile build "$BUILD_RESULT" \
   --arg measured_at "$(date --iso-8601=seconds)" \
@@ -232,4 +235,4 @@ jq -n \
   }
   ' > "$METADATA_FILE"
 
-printf 'wrote %s runs, summary, and metadata under %s\n' "$EXPECTED_RUNS" "$RESULTS_DIR"
+printf 'wrote %s runs, summary, gate, and metadata under %s\n' "$EXPECTED_RUNS" "$RESULTS_DIR"
