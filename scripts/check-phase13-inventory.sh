@@ -73,16 +73,16 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       .fields += $counts.fields |
       .methods += $counts.methods |
       .symbols += $counts.symbols)) == .totals and
-  .existing_structural_slice.classes == 40 and
-  .existing_structural_slice.symbols == 319 and
+  .existing_structural_slice.classes == 41 and
+  .existing_structural_slice.symbols == 329 and
   .existing_structural_slice.internal_runtime_classes == 11 and
-  (.existing_structural_slice.binary_names | length) == 40 and
-  (.existing_structural_slice.binary_names | unique | length) == 40 and
+  (.existing_structural_slice.binary_names | length) == 41 and
+  (.existing_structural_slice.binary_names | unique | length) == 41 and
   all(.existing_structural_slice.binary_names[];
     . as $name | any($inv.classes[]; .binary_name == $name)) and
   ([.existing_structural_slice.binary_names[] as $name |
     $inv.classes[] | select(.binary_name == $name) |
-    1 + (.fields | length) + (.methods | length)] | add) == 319 and
+    1 + (.fields | length) + (.methods | length)] | add) == 329 and
   .artifact_workstreams.resources.expected_count == $inv.counts.non_class_resources and
   (.artifact_workstreams.resources.paths | sort) == ([$inv.resources[].path] | sort) and
   .artifact_workstreams.pom_dependencies.expected_count == $inv.counts.pom_dependencies and
@@ -112,9 +112,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       .assessment == "UNASSESSED" and (has("classification") | not)
     end) and
   .cohorts[0].status == "IN_PROGRESS" and
-  .cohorts[0].classified_symbols == 214 and
-  .cohorts[0].remaining_symbols == 321 and
-  (.cohorts[0].completed_slices | length) == 11 and
+  .cohorts[0].classified_symbols == 224 and
+  .cohorts[0].remaining_symbols == 311 and
+  (.cohorts[0].completed_slices | length) == 12 and
   .cohorts[0].completed_slices[0] == {
     id: "player-events",
     classes: 9,
@@ -253,9 +253,22 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "tools/jvm-gate/src/main.rs"
     ]
   } and
+  .cohorts[0].completed_slices[11] == {
+    id: "terminator-audio-frame-contracts",
+    classes: 1,
+    fields: 1,
+    methods: 8,
+    symbols: 10,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
   ([.cohorts[0].completed_slices[].symbols] | add) == .cohorts[0].classified_symbols and
   (.cohorts[0].classified_symbols + .cohorts[0].remaining_symbols) == .cohorts[0].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 214 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 224 and
   all($classifications.symbols[] | select(.assessment == "CLASSIFIED");
     . as $symbol |
     (($symbol.binary_name | contains(".player.event.")) or
@@ -281,13 +294,14 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameRebuilder",
         "com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame",
         "com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame",
+        "com.sedmelluq.discord.lavaplayer.track.playback.TerminatorAudioFrame",
         "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration",
         "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration$ResamplingQuality"
       ][]; . == $symbol.binary_name)) and
     .classification == "A_EXACT" and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "terminator-audio-frame-contracts" and
+  .phase_entry.next_slice == "reference-mutable-audio-frame-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 ' "$PLAN" >/dev/null
@@ -295,7 +309,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '40 reference classes / 319 symbols' \
+  '41 reference classes / 329 symbols' \
   'core-player-track' \
   'Phase 12'; do
   grep --fixed-strings "$required" "$DOCUMENT" >/dev/null
@@ -303,4 +317,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 214 classified core-player-track symbols and 2,548 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 224 classified core-player-track symbols and 2,538 unassessed symbols.\n'

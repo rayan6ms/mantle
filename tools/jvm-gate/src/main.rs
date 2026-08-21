@@ -112,6 +112,9 @@ fn run() -> Result<()> {
         Some("write-audio-frame-rebuilder-consumer") => {
             write_consumer(&args, AUDIO_FRAME_REBUILDER_CONSUMER)
         }
+        Some("write-terminator-audio-frame-consumer") => {
+            write_consumer(&args, TERMINATOR_AUDIO_FRAME_CONSUMER)
+        }
         _ => Err(
             "usage: mantle-jvm-gate <emit|write-smoke-consumer|write-probe-consumer> [options]"
                 .into(),
@@ -1813,6 +1816,82 @@ public final class GateAudioFrameRebuilder {
         "dispatch=frame-identity,null-identity,return-identity;"
         + "reflection=public-abstract-interface,0-fields,1-method,0-exceptions");
   }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const TERMINATOR_AUDIO_FRAME_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.TerminatorAudioFrame;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateTerminatorAudioFrame {
+  public static void main(String[] args) throws Exception {
+    TerminatorAudioFrame singleton = TerminatorAudioFrame.INSTANCE;
+    check(singleton != null && singleton == TerminatorAudioFrame.INSTANCE,
+        "stable singleton");
+    TerminatorAudioFrame fresh = new TerminatorAudioFrame();
+    check(fresh != singleton && singleton.isTerminator() && fresh.isTerminator(),
+        "public constructor and terminator state");
+
+    UnsupportedOperationException[] failures = {
+      expectUnsupported(() -> { singleton.getTimecode(); }),
+      expectUnsupported(() -> { singleton.getVolume(); }),
+      expectUnsupported(() -> { singleton.getDataLength(); }),
+      expectUnsupported(() -> { singleton.getData(); }),
+      expectUnsupported(() -> { singleton.getData(null, -1); }),
+      expectUnsupported(() -> { singleton.getFormat(); })
+    };
+    for (int index = 0; index < failures.length; index++) {
+      check(failures[index].getMessage() == null && failures[index].getCause() == null,
+          "message-less unsupported accessor " + index);
+      if (index > 0) check(failures[index] != failures[index - 1], "fresh exception " + index);
+    }
+
+    Class<TerminatorAudioFrame> type = TerminatorAudioFrame.class;
+    int modifiers = type.getModifiers();
+    check(Modifier.isPublic(modifiers) && !Modifier.isFinal(modifiers)
+        && !Modifier.isAbstract(modifiers) && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] { AudioFrame.class }),
+        "class structure");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredMethods().length == 7
+        && type.getDeclaredConstructors().length == 1, "member counts");
+    Field instance = type.getDeclaredField("INSTANCE");
+    check(instance.getType() == type && Modifier.isPublic(instance.getModifiers())
+        && Modifier.isStatic(instance.getModifiers()) && Modifier.isFinal(instance.getModifiers()),
+        "singleton field metadata");
+    Constructor<TerminatorAudioFrame> constructor = type.getDeclaredConstructor();
+    check(Modifier.isPublic(constructor.getModifiers())
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    for (Method method : type.getDeclaredMethods()) {
+      check(Modifier.isPublic(method.getModifiers()) && !Modifier.isStatic(method.getModifiers())
+          && !Modifier.isAbstract(method.getModifiers()) && !method.isBridge()
+          && !method.isSynthetic() && method.getExceptionTypes().length == 0,
+          "method metadata " + method);
+    }
+
+    System.out.println(
+        "singleton=stable,fresh-public;accessors=6-unsupported-null-message;"
+        + "reflection=1-field,7-methods,1-constructor");
+  }
+
+  private static UnsupportedOperationException expectUnsupported(Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected UnsupportedOperationException");
+    } catch (UnsupportedOperationException error) {
+      return error;
+    }
+  }
+
+  private interface Operation { void run(); }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

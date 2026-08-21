@@ -25427,90 +25427,120 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, eager singleton identity, public construction, terminator state, message-less unsupported accessors, and reflection metadata are covered by the Phase 13 terminator-audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.TerminatorAudioFrame",
       "symbol_kind": "FIELD",
       "member_name": "INSTANCE",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/track/playback/TerminatorAudioFrame;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, eager singleton identity, public construction, terminator state, message-less unsupported accessors, and reflection metadata are covered by the Phase 13 terminator-audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.TerminatorAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, eager singleton identity, public construction, terminator state, message-less unsupported accessors, and reflection metadata are covered by the Phase 13 terminator-audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.TerminatorAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getTimecode",
       "descriptor": "()J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, eager singleton identity, public construction, terminator state, message-less unsupported accessors, and reflection metadata are covered by the Phase 13 terminator-audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.TerminatorAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getVolume",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, eager singleton identity, public construction, terminator state, message-less unsupported accessors, and reflection metadata are covered by the Phase 13 terminator-audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.TerminatorAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getDataLength",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, eager singleton identity, public construction, terminator state, message-less unsupported accessors, and reflection metadata are covered by the Phase 13 terminator-audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.TerminatorAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getData",
       "descriptor": "()[B",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, eager singleton identity, public construction, terminator state, message-less unsupported accessors, and reflection metadata are covered by the Phase 13 terminator-audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.TerminatorAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getData",
       "descriptor": "([BI)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, eager singleton identity, public construction, terminator state, message-less unsupported accessors, and reflection metadata are covered by the Phase 13 terminator-audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.TerminatorAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getFormat",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, eager singleton identity, public construction, terminator state, message-less unsupported accessors, and reflection metadata are covered by the Phase 13 terminator-audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.TerminatorAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "isTerminator",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, eager singleton identity, public construction, terminator state, message-less unsupported accessors, and reflection metadata are covered by the Phase 13 terminator-audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     }
   ]
 }

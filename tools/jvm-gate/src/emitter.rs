@@ -37,6 +37,8 @@ const AUDIO_FRAME_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameConsumer";
 const AUDIO_FRAME_REBUILDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameRebuilder";
+const TERMINATOR_FRAME_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/track/playback/TerminatorAudioFrame";
 const AUDIO_FRAME_BUFFER_FACTORY_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBufferFactory";
 const MARKER_STATE_CLASS: &str =
@@ -93,6 +95,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     AUDIO_FRAME_BUFFER_CLASS,
     AUDIO_FRAME_BUFFER_FACTORY_CLASS,
     AUDIO_FRAME_REBUILDER_CLASS,
+    TERMINATOR_FRAME_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/playback/AbstractMutableAudioFrame",
     "com/sedmelluq/discord/lavaplayer/track/playback/ImmutableAudioFrame",
     "com/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame",
@@ -452,6 +455,9 @@ fn replacement_body(
     ) {
         return audio_frame_replacement(pool, class_name, name, descriptor, required_locals);
     }
+    if class_name == TERMINATOR_FRAME_CLASS {
+        return terminator_frame_replacement(pool, name, descriptor, required_locals);
+    }
     if class_name.starts_with("com/sedmelluq/discord/lavaplayer/player/event/") {
         return event_replacement(pool, class_name, name, descriptor, required_locals);
     }
@@ -480,6 +486,19 @@ fn replacement_body(
             required_locals,
         )?,
     })
+}
+
+fn terminator_frame_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        ("isTerminator", "()Z") => boolean_return(pool, true, required_locals),
+        _ => unsupported_without_message(pool, required_locals),
+    }
 }
 
 fn track_enum_constants(class_name: &str) -> Option<&'static [&'static str]> {
@@ -983,6 +1002,9 @@ fn add_reference_implementation_state(
     if class_name == AUDIO_REFERENCE_CLASS {
         add_audio_reference_state(class)?;
     }
+    if class_name == TERMINATOR_FRAME_CLASS {
+        add_terminator_frame_state(class)?;
+    }
     if track_enum_constants(class_name).is_some() {
         add_track_enum_state(class, class_name)?;
     }
@@ -1077,6 +1099,17 @@ fn add_reference_implementation_state(
 
 fn add_audio_reference_state(class: &mut ClassFile<'static>) -> Result<()> {
     let body = audio_reference_clinit(&mut class.constant_pool)?;
+    add_method(
+        class,
+        MethodAccessFlags::STATIC,
+        "<clinit>",
+        "()V",
+        Some(body),
+    )
+}
+
+fn add_terminator_frame_state(class: &mut ClassFile<'static>) -> Result<()> {
+    let body = terminator_frame_clinit(&mut class.constant_pool)?;
     add_method(
         class,
         MethodAccessFlags::STATIC,
@@ -1954,6 +1987,25 @@ fn unsupported_body(
     )
 }
 
+fn unsupported_without_message(
+    pool: &mut ConstantPool<'static>,
+    max_locals: u16,
+) -> Result<Attribute> {
+    let exception = pool.add_class("java/lang/UnsupportedOperationException")?;
+    let init = pool.add_method_ref(exception, "<init>", "()V")?;
+    code(
+        pool,
+        2,
+        max_locals,
+        vec![
+            Instruction::New(exception),
+            Instruction::Dup,
+            Instruction::Invokespecial(init),
+            Instruction::Athrow,
+        ],
+    )
+}
+
 fn mutable_frame_freeze(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
     let owner = pool.add_class(ABSTRACT_MUTABLE_FRAME_CLASS)?;
     let immutable = pool.add_class(IMMUTABLE_FRAME_CLASS)?;
@@ -2659,6 +2711,24 @@ fn audio_reference_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute>
             Instruction::Aconst_null,
             Instruction::Invokespecial(init),
             Instruction::Putstatic(no_track),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn terminator_frame_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(TERMINATOR_FRAME_CLASS)?;
+    let init = pool.add_method_ref(owner, "<init>", "()V")?;
+    let instance = pool.add_field_ref(owner, "INSTANCE", &format!("L{TERMINATOR_FRAME_CLASS};"))?;
+    code(
+        pool,
+        2,
+        0,
+        vec![
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Invokespecial(init),
+            Instruction::Putstatic(instance),
             Instruction::Return,
         ],
     )
