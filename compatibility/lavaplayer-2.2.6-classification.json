@@ -24386,27 +24386,36 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, zero-millisecond timed delegation, return identity, null and unchecked propagation, checked-failure wrapping, interrupted-flag restoration, and reflection metadata are covered by the Phase 13 audio-frame-provider-tools-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameProviderTools",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, zero-millisecond timed delegation, return identity, null and unchecked propagation, checked-failure wrapping, interrupted-flag restoration, and reflection metadata are covered by the Phase 13 audio-frame-provider-tools-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameProviderTools",
       "symbol_kind": "METHOD",
       "member_name": "delegateToTimedProvide",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameProvider;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, zero-millisecond timed delegation, return identity, null and unchecked propagation, checked-failure wrapping, interrupted-flag restoration, and reflection metadata are covered by the Phase 13 audio-frame-provider-tools-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameRebuilder",

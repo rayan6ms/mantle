@@ -3,7 +3,9 @@ use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::Path;
 
-use ristretto_classfile::attributes::{ArrayType, Attribute, Instruction};
+use ristretto_classfile::attributes::{
+    ArrayType, Attribute, ExceptionTableEntry, Instruction, StackFrame, VerificationType,
+};
 use ristretto_classfile::{
     ClassAccessFlags, ClassFile, ConstantPool, Field, FieldAccessFlags, FieldType, JAVA_5, Method,
     MethodAccessFlags,
@@ -37,6 +39,8 @@ const AUDIO_FRAME_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameConsumer";
 const AUDIO_FRAME_REBUILDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameRebuilder";
+const AUDIO_FRAME_PROVIDER_TOOLS_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameProviderTools";
 const TERMINATOR_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/TerminatorAudioFrame";
 const AUDIO_FRAME_BUFFER_FACTORY_CLASS: &str =
@@ -93,6 +97,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState",
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrame",
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameProvider",
+    AUDIO_FRAME_PROVIDER_TOOLS_CLASS,
     AUDIO_FRAME_CONSUMER_CLASS,
     AUDIO_FRAME_BUFFER_CLASS,
     AUDIO_FRAME_BUFFER_FACTORY_CLASS,
@@ -461,6 +466,9 @@ fn replacement_body(
     if class_name == REFERENCE_MUTABLE_FRAME_CLASS {
         return reference_mutable_frame_replacement(pool, name, descriptor, required_locals);
     }
+    if class_name == AUDIO_FRAME_PROVIDER_TOOLS_CLASS {
+        return audio_frame_provider_tools_replacement(pool, name, descriptor, required_locals);
+    }
     if class_name == TERMINATOR_FRAME_CLASS {
         return terminator_frame_replacement(pool, name, descriptor, required_locals);
     }
@@ -492,6 +500,28 @@ fn replacement_body(
             required_locals,
         )?,
     })
+}
+
+fn audio_frame_provider_tools_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        (
+            "delegateToTimedProvide",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameProvider;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;",
+        ) => delegate_to_timed_provide(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {AUDIO_FRAME_PROVIDER_TOOLS_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
 }
 
 fn terminator_frame_replacement(
@@ -1814,14 +1844,105 @@ fn code(
     max_locals: u16,
     instructions: Vec<Instruction>,
 ) -> Result<Attribute> {
+    code_with_exceptions(pool, max_stack, max_locals, instructions, Vec::new())
+}
+
+fn code_with_exceptions(
+    pool: &mut ConstantPool<'static>,
+    max_stack: u16,
+    max_locals: u16,
+    instructions: Vec<Instruction>,
+    exception_table: Vec<ExceptionTableEntry>,
+) -> Result<Attribute> {
     Ok(Attribute::Code {
         name_index: pool.add_utf8("Code")?,
         max_stack,
         max_locals,
         code: instructions,
-        exception_table: Vec::new(),
+        exception_table,
         attributes: Vec::new(),
     })
+}
+
+fn delegate_to_timed_provide(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let provider =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameProvider")?;
+    let provide = pool.add_interface_method_ref(
+        provider,
+        "provide",
+        "(JLjava/util/concurrent/TimeUnit;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;",
+    )?;
+    let time_unit = pool.add_class("java/util/concurrent/TimeUnit")?;
+    let milliseconds =
+        pool.add_field_ref(time_unit, "MILLISECONDS", "Ljava/util/concurrent/TimeUnit;")?;
+    let runtime = pool.add_class("java/lang/RuntimeException")?;
+    let runtime_init = pool.add_method_ref(runtime, "<init>", "(Ljava/lang/Throwable;)V")?;
+    let thread = pool.add_class("java/lang/Thread")?;
+    let current_thread = pool.add_method_ref(thread, "currentThread", "()Ljava/lang/Thread;")?;
+    let interrupt = pool.add_method_ref(thread, "interrupt", "()V")?;
+    let timeout = pool.add_class("java/util/concurrent/TimeoutException")?;
+    let interrupted = pool.add_class("java/lang/InterruptedException")?;
+    let instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Lconst_0,
+        Instruction::Getstatic(milliseconds),
+        Instruction::Invokeinterface(provide, 4),
+        Instruction::Areturn,
+        Instruction::Astore_1,
+        Instruction::New(runtime),
+        Instruction::Dup,
+        Instruction::Aload_1,
+        Instruction::Invokespecial(runtime_init),
+        Instruction::Athrow,
+        Instruction::Astore_1,
+        Instruction::Invokestatic(current_thread),
+        Instruction::Invokevirtual(interrupt),
+        Instruction::New(runtime),
+        Instruction::Dup,
+        Instruction::Aload_1,
+        Instruction::Invokespecial(runtime_init),
+        Instruction::Athrow,
+    ];
+    let mut body = code_with_exceptions(
+        pool,
+        4,
+        2,
+        instructions,
+        vec![
+            ExceptionTableEntry {
+                range_pc: 0..4,
+                handler_pc: 5,
+                catch_type: timeout,
+            },
+            ExceptionTableEntry {
+                range_pc: 0..4,
+                handler_pc: 11,
+                catch_type: interrupted,
+            },
+        ],
+    )?;
+    let stack_map_name = pool.add_utf8("StackMapTable")?;
+    let Attribute::Code { attributes, .. } = &mut body else {
+        return Err("expected generated code attribute".into());
+    };
+    attributes.push(Attribute::StackMapTable {
+        name_index: stack_map_name,
+        frames: vec![
+            StackFrame::SameLocals1StackItemFrame {
+                frame_type: 69,
+                stack: vec![VerificationType::Object {
+                    cpool_index: timeout,
+                }],
+            },
+            StackFrame::SameLocals1StackItemFrame {
+                frame_type: 69,
+                stack: vec![VerificationType::Object {
+                    cpool_index: interrupted,
+                }],
+            },
+        ],
+    });
+    Ok(body)
 }
 
 fn null_return(pool: &mut ConstantPool<'static>, max_locals: u16) -> Result<Attribute> {

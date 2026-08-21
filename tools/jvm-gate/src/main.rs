@@ -61,6 +61,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-frame-buffer-factory-consumer" => Some(FRAME_BUFFER_FACTORY_CONSUMER),
         "write-audio-frame-buffer-consumer" => Some(AUDIO_FRAME_BUFFER_CONSUMER),
         "write-audio-frame-rebuilder-consumer" => Some(AUDIO_FRAME_REBUILDER_CONSUMER),
+        "write-audio-frame-provider-tools-consumer" => Some(AUDIO_FRAME_PROVIDER_TOOLS_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -1943,6 +1944,125 @@ public final class GateReferenceMutableAudioFrame {
       throw new AssertionError("expected " + type.getName());
     } catch (Throwable error) {
       if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_FRAME_PROVIDER_TOOLS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameProvider;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameProviderTools;
+import com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+public final class GateAudioFrameProviderTools {
+  public static void main(String[] args) throws Exception {
+    AudioFrame frame = new ImmutableAudioFrame(42L, new byte[] { 1 }, 100, null);
+    StubProvider provider = new StubProvider(frame);
+    check(AudioFrameProviderTools.delegateToTimedProvide(provider) == frame
+        && provider.timeout == 0L && provider.unit == TimeUnit.MILLISECONDS,
+        "timed delegation and return identity");
+
+    provider.failure = new TimeoutException("timeout");
+    RuntimeException timeout = expectRuntime(() ->
+        AudioFrameProviderTools.delegateToTimedProvide(provider));
+    check(timeout.getClass() == RuntimeException.class && timeout.getCause() == provider.failure
+        && timeout.getMessage().equals(provider.failure.toString())
+        && !Thread.currentThread().isInterrupted(), "timeout wrapping");
+
+    Thread.interrupted();
+    provider.failure = new InterruptedException("interrupted");
+    RuntimeException interrupted = expectRuntime(() ->
+        AudioFrameProviderTools.delegateToTimedProvide(provider));
+    check(interrupted.getClass() == RuntimeException.class
+        && interrupted.getCause() == provider.failure && Thread.interrupted(),
+        "interruption wrapping and restoration");
+
+    IllegalStateException unchecked = new IllegalStateException("unchecked");
+    provider.failure = unchecked;
+    try {
+      AudioFrameProviderTools.delegateToTimedProvide(provider);
+      throw new AssertionError("expected unchecked failure");
+    } catch (IllegalStateException error) {
+      check(error == unchecked, "unchecked failure identity");
+    }
+    expect(NullPointerException.class, () ->
+        AudioFrameProviderTools.delegateToTimedProvide(null));
+
+    Class<AudioFrameProviderTools> type = AudioFrameProviderTools.class;
+    int modifiers = type.getModifiers();
+    check(Modifier.isPublic(modifiers) && !Modifier.isFinal(modifiers)
+        && !Modifier.isAbstract(modifiers) && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 0
+        && type.getDeclaredMethods().length == 1
+        && type.getDeclaredConstructors().length == 1, "class structure");
+    Constructor<AudioFrameProviderTools> constructor = type.getDeclaredConstructor();
+    check(Modifier.isPublic(constructor.getModifiers())
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    Method delegate = type.getDeclaredMethod("delegateToTimedProvide", AudioFrameProvider.class);
+    check(Modifier.isPublic(delegate.getModifiers()) && Modifier.isStatic(delegate.getModifiers())
+        && !Modifier.isAbstract(delegate.getModifiers()) && !delegate.isBridge()
+        && !delegate.isSynthetic() && delegate.getReturnType() == AudioFrame.class
+        && Arrays.equals(delegate.getParameterTypes(), new Class<?>[] { AudioFrameProvider.class })
+        && delegate.getExceptionTypes().length == 0, "delegate metadata");
+
+    System.out.println(
+        "delegate=zero-milliseconds,return-identity,null;"
+        + "failures=timeout-wrap,interrupt-wrap-restore,unchecked-identity;"
+        + "reflection=0-fields,1-method,1-constructor");
+  }
+
+  private static RuntimeException expectRuntime(Runnable operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected RuntimeException");
+    } catch (RuntimeException error) {
+      return error;
+    }
+  }
+
+  private static void expect(Class<? extends Throwable> type, Runnable operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
+  }
+
+  private static final class StubProvider implements AudioFrameProvider {
+    private final AudioFrame frame;
+    private Throwable failure;
+    private long timeout;
+    private TimeUnit unit;
+
+    private StubProvider(AudioFrame value) { frame = value; }
+    public AudioFrame provide() { throw new AssertionError("untimed provide called"); }
+    public AudioFrame provide(long value, TimeUnit valueUnit)
+        throws TimeoutException, InterruptedException {
+      timeout = value;
+      unit = valueUnit;
+      if (failure instanceof TimeoutException) throw (TimeoutException) failure;
+      if (failure instanceof InterruptedException) throw (InterruptedException) failure;
+      if (failure instanceof RuntimeException) throw (RuntimeException) failure;
+      return frame;
+    }
+    public boolean provide(MutableAudioFrame targetFrame) {
+      throw new AssertionError("mutable provide called");
+    }
+    public boolean provide(MutableAudioFrame targetFrame, long value, TimeUnit valueUnit) {
+      throw new AssertionError("timed mutable provide called");
     }
   }
 

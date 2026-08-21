@@ -22,7 +22,7 @@ cargo run --locked -q -p mantle-jvm-gate -- emit \
 cargo run --locked -q -p mantle-jvm-gate -- verify-structure \
   --reference-jar "$REFERENCE_JAR" --candidate-jar "$JAR"
 
-for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame; do
+for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame audio-frame-provider-tools; do
   case "$consumer" in
     smoke) consumer_class='Smoke' ;;
     probe) consumer_class='Probe' ;;
@@ -39,6 +39,7 @@ for consumer in smoke probe integration classloader event track-value track-enum
     audio-frame-rebuilder) consumer_class='AudioFrameRebuilder' ;;
     terminator-audio-frame) consumer_class='TerminatorAudioFrame' ;;
     reference-mutable-audio-frame) consumer_class='ReferenceMutableAudioFrame' ;;
+    audio-frame-provider-tools) consumer_class='AudioFrameProviderTools' ;;
   esac
   cargo run --locked -q -p mantle-jvm-gate -- "write-$consumer-consumer" \
     --output "$WORK/Gate${consumer_class}.java"
@@ -50,7 +51,8 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateTrackContracts.java" "$WORK/GateAudioFrames.java" \
   "$WORK/GateAudioConfiguration.java" "$WORK/GateFrameBufferFactory.java" \
   "$WORK/GateAudioFrameBuffer.java" "$WORK/GateAudioFrameRebuilder.java" \
-  "$WORK/GateTerminatorAudioFrame.java" "$WORK/GateReferenceMutableAudioFrame.java"
+  "$WORK/GateTerminatorAudioFrame.java" "$WORK/GateReferenceMutableAudioFrame.java" \
+  "$WORK/GateAudioFrameProviderTools.java"
 javac --release 11 -d "$CLASSES" "$WORK/GateClassloader.java"
 
 case "$(uname -s)" in
@@ -70,6 +72,17 @@ else
   jar_argument="$JAR"
   reference_argument="$REFERENCE_JAR"
 fi
+
+reference_provider_tools_classpath="$classes_argument$classpath_separator$reference_argument"
+while IFS= read -r dependency; do
+  if command -v cygpath >/dev/null 2>&1; then
+    dependency_argument="$(cygpath -w "$dependency")"
+  else
+    dependency_argument="$dependency"
+  fi
+  reference_provider_tools_classpath+="$classpath_separator$dependency_argument"
+done < <(find "$(dirname "$REFERENCE_JAR")/dependencies" -maxdepth 1 -type f -name '*.jar' -print | sort)
+readonly REFERENCE_PROVIDER_TOOLS_CLASSPATH="$reference_provider_tools_classpath"
 
 readonly GATE_CLASSPATH="$classes_argument$classpath_separator$jar_argument"
 java -Xverify:all \
@@ -183,6 +196,17 @@ cmp "$WORK/reference-mutable-audio-frame-reference.txt" \
 grep --fixed-strings \
   'reference=identity,window,copy,mutation,freeze;invalid=deferred,negative,range,overflow;' \
   "$WORK/reference-mutable-audio-frame-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateAudioFrameProviderTools \
+  >"$WORK/audio-frame-provider-tools-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$reference_argument" GateAudioFrameProviderTools \
+  >"$WORK/audio-frame-provider-tools-candidate.txt"
+cmp "$WORK/audio-frame-provider-tools-reference.txt" \
+  "$WORK/audio-frame-provider-tools-candidate.txt"
+grep --fixed-strings \
+  'failures=timeout-wrap,interrupt-wrap-restore,unchecked-identity;' \
+  "$WORK/audio-frame-provider-tools-candidate.txt" >/dev/null
 java -Xverify:all -cp "$GATE_CLASSPATH" GateSmoke "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateIntegration "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" callbacks
