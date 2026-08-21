@@ -22,7 +22,7 @@ cargo run --locked -q -p mantle-jvm-gate -- emit \
 cargo run --locked -q -p mantle-jvm-gate -- verify-structure \
   --reference-jar "$REFERENCE_JAR" --candidate-jar "$JAR"
 
-for consumer in smoke probe integration classloader event track-value; do
+for consumer in smoke probe integration classloader event track-value track-enum; do
   case "$consumer" in
     smoke) consumer_class='Smoke' ;;
     probe) consumer_class='Probe' ;;
@@ -30,6 +30,7 @@ for consumer in smoke probe integration classloader event track-value; do
     classloader) consumer_class='Classloader' ;;
     event) consumer_class='Events' ;;
     track-value) consumer_class='TrackValues' ;;
+    track-enum) consumer_class='TrackEnums' ;;
   esac
   cargo run --locked -q -p mantle-jvm-gate -- "write-$consumer-consumer" \
     --output "$WORK/Gate${consumer_class}.java"
@@ -37,7 +38,7 @@ done
 
 javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateSmoke.java" "$WORK/GateProbe.java" "$WORK/GateIntegration.java" \
-  "$WORK/GateEvents.java" "$WORK/GateTrackValues.java"
+  "$WORK/GateEvents.java" "$WORK/GateTrackValues.java" "$WORK/GateTrackEnums.java"
 javac --release 11 -d "$CLASSES" "$WORK/GateClassloader.java"
 
 case "$(uname -s)" in
@@ -78,6 +79,16 @@ cmp "$WORK/track-values-reference.txt" "$WORK/track-values-candidate.txt"
 grep --fixed-strings \
   'playlist=identity,mutable,true;marker=987654321,identity' \
   "$WORK/track-values-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$classes_argument$classpath_separator$reference_argument" GateTrackEnums \
+  >"$WORK/track-enums-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$reference_argument" GateTrackEnums \
+  >"$WORK/track-enums-candidate.txt"
+cmp "$WORK/track-enums-reference.txt" "$WORK/track-enums-candidate.txt"
+grep --fixed-strings \
+  'copy=true;lookup-errors=iae,npe;reflection=5,6,7' \
+  "$WORK/track-enums-candidate.txt" >/dev/null
 java -Xverify:all -cp "$GATE_CLASSPATH" GateSmoke "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateIntegration "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" callbacks

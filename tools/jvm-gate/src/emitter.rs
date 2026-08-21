@@ -32,6 +32,8 @@ const RESAMPLING_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/AudioConfiguration$ResamplingQuality";
 const MARKER_STATE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState";
+const TRACK_STATE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/AudioTrackState";
+const TRACK_END_REASON_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/AudioTrackEndReason";
 const EVENT_ADAPTER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/event/AudioEventAdapter";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
@@ -418,6 +420,9 @@ fn replacement_body(
     if class_name == BASIC_PLAYLIST_CLASS {
         return basic_playlist_replacement(pool, name, descriptor, required_locals);
     }
+    if track_enum_constants(class_name).is_some() {
+        return track_enum_replacement(pool, class_name, name, descriptor, required_locals);
+    }
     if class_name.starts_with("com/sedmelluq/discord/lavaplayer/player/event/") {
         return event_replacement(pool, class_name, name, descriptor, required_locals);
     }
@@ -472,6 +477,102 @@ fn replacement_body(
             &format!("Gate A does not implement {class_name}.{name}{descriptor}"),
             required_locals,
         )?,
+    })
+}
+
+fn track_enum_constants(class_name: &str) -> Option<&'static [&'static str]> {
+    match class_name {
+        TRACK_END_REASON_CLASS => {
+            Some(&["FINISHED", "LOAD_FAILED", "STOPPED", "REPLACED", "CLEANUP"])
+        }
+        TRACK_STATE_CLASS => Some(&[
+            "INACTIVE", "LOADING", "PLAYING", "SEEKING", "STOPPING", "FINISHED",
+        ]),
+        MARKER_STATE_CLASS => Some(&[
+            "REACHED",
+            "REMOVED",
+            "OVERWRITTEN",
+            "BYPASSED",
+            "STOPPED",
+            "LATE",
+            "ENDED",
+        ]),
+        _ => None,
+    }
+}
+
+fn track_enum_replacement(
+    pool: &mut ConstantPool<'static>,
+    class_name: &str,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    let values_descriptor = format!("()[L{class_name};");
+    let value_of_descriptor = format!("(Ljava/lang/String;)L{class_name};");
+    match (name, descriptor) {
+        ("values", value) if value == values_descriptor => track_enum_values(pool, class_name),
+        ("valueOf", value) if value == value_of_descriptor => track_enum_value_of(pool, class_name),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {class_name}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn track_enum_values(pool: &mut ConstantPool<'static>, class_name: &str) -> Result<Attribute> {
+    let constants = track_enum_constants(class_name).ok_or("unknown track enum")?;
+    let owner = pool.add_class(class_name)?;
+    let descriptor = format!("L{class_name};");
+    let mut instructions = vec![
+        small_integer_instruction(constants.len())?,
+        Instruction::Anewarray(owner),
+    ];
+    for (ordinal, name) in constants.iter().enumerate() {
+        let field = pool.add_field_ref(owner, *name, &descriptor)?;
+        instructions.extend([
+            Instruction::Dup,
+            small_integer_instruction(ordinal)?,
+            Instruction::Getstatic(field),
+            Instruction::Aastore,
+        ]);
+    }
+    instructions.push(Instruction::Areturn);
+    code(pool, 4, 0, instructions)
+}
+
+fn track_enum_value_of(pool: &mut ConstantPool<'static>, class_name: &str) -> Result<Attribute> {
+    let owner = pool.add_class(class_name)?;
+    let enumeration = pool.add_class("java/lang/Enum")?;
+    let value_of = pool.add_method_ref(
+        enumeration,
+        "valueOf",
+        "(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/Enum;",
+    )?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Aload_0,
+            Instruction::Invokestatic(value_of),
+            Instruction::Checkcast(owner),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn small_integer_instruction(value: usize) -> Result<Instruction> {
+    Ok(match value {
+        0 => Instruction::Iconst_0,
+        1 => Instruction::Iconst_1,
+        2 => Instruction::Iconst_2,
+        3 => Instruction::Iconst_3,
+        4 => Instruction::Iconst_4,
+        5 => Instruction::Iconst_5,
+        value => Instruction::Bipush(i8::try_from(value)?),
     })
 }
 
@@ -696,35 +797,8 @@ fn add_reference_implementation_state(
     if class_name == AUDIO_REFERENCE_CLASS {
         add_audio_reference_state(class)?;
     }
-    if class_name == MARKER_STATE_CLASS {
-        let body = marker_state_constructor(&mut class.constant_pool)?;
-        add_method(
-            class,
-            MethodAccessFlags::PRIVATE,
-            "<init>",
-            "(Ljava/lang/String;I)V",
-            Some(body),
-        )?;
-    }
-    if class_name == "com/sedmelluq/discord/lavaplayer/track/AudioTrackState" {
-        let body = enum_constructor(&mut class.constant_pool)?;
-        add_method(
-            class,
-            MethodAccessFlags::PRIVATE,
-            "<init>",
-            "(Ljava/lang/String;I)V",
-            Some(body),
-        )?;
-    }
-    if class_name == "com/sedmelluq/discord/lavaplayer/track/AudioTrackEndReason" {
-        let body = end_reason_constructor(&mut class.constant_pool)?;
-        add_method(
-            class,
-            MethodAccessFlags::PRIVATE,
-            "<init>",
-            "(Ljava/lang/String;IZ)V",
-            Some(body),
-        )?;
+    if track_enum_constants(class_name).is_some() {
+        add_track_enum_state(class, class_name)?;
     }
     if class_name == RESAMPLING_CLASS {
         let body = enum_constructor(&mut class.constant_pool)?;
@@ -802,6 +876,78 @@ fn add_audio_reference_state(class: &mut ClassFile<'static>) -> Result<()> {
         "<clinit>",
         "()V",
         Some(body),
+    )
+}
+
+fn add_track_enum_state(class: &mut ClassFile<'static>, class_name: &str) -> Result<()> {
+    let constructor_descriptor = if class_name == TRACK_END_REASON_CLASS {
+        "(Ljava/lang/String;IZ)V"
+    } else {
+        "(Ljava/lang/String;I)V"
+    };
+    let constructor = if class_name == TRACK_END_REASON_CLASS {
+        end_reason_constructor(&mut class.constant_pool)?
+    } else {
+        enum_constructor(&mut class.constant_pool)?
+    };
+    add_method(
+        class,
+        MethodAccessFlags::PRIVATE,
+        "<init>",
+        constructor_descriptor,
+        Some(constructor),
+    )?;
+    let initializer =
+        track_enum_initializer(&mut class.constant_pool, class_name, constructor_descriptor)?;
+    add_method(
+        class,
+        MethodAccessFlags::STATIC,
+        "<clinit>",
+        "()V",
+        Some(initializer),
+    )
+}
+
+fn track_enum_initializer(
+    pool: &mut ConstantPool<'static>,
+    class_name: &str,
+    constructor_descriptor: &str,
+) -> Result<Attribute> {
+    let constants = track_enum_constants(class_name).ok_or("unknown track enum")?;
+    let owner = pool.add_class(class_name)?;
+    let constructor = pool.add_method_ref(owner, "<init>", constructor_descriptor)?;
+    let descriptor = format!("L{class_name};");
+    let mut instructions = Vec::with_capacity(constants.len() * 7 + 1);
+    for (ordinal, name) in constants.iter().enumerate() {
+        instructions.extend([
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Ldc_w(pool.add_string(*name)?),
+            small_integer_instruction(ordinal)?,
+        ]);
+        if class_name == TRACK_END_REASON_CLASS {
+            instructions.push(if ordinal < 2 {
+                Instruction::Iconst_1
+            } else {
+                Instruction::Iconst_0
+            });
+        }
+        let field = pool.add_field_ref(owner, *name, &descriptor)?;
+        instructions.extend([
+            Instruction::Invokespecial(constructor),
+            Instruction::Putstatic(field),
+        ]);
+    }
+    instructions.push(Instruction::Return);
+    code(
+        pool,
+        if class_name == TRACK_END_REASON_CLASS {
+            5
+        } else {
+            4
+        },
+        0,
+        instructions,
     )
 }
 

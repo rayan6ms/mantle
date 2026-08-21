@@ -83,6 +83,14 @@ fn run() -> Result<()> {
             fs::write(output, TRACK_VALUE_CONSUMER)?;
             Ok(())
         }
+        Some("write-track-enum-consumer") => {
+            let output = required_path(&args, "--output")?;
+            if let Some(parent) = output.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::write(output, TRACK_ENUM_CONSUMER)?;
+            Ok(())
+        }
         _ => Err(
             "usage: mantle-jvm-gate <emit|write-smoke-consumer|write-probe-consumer> [options]"
                 .into(),
@@ -310,6 +318,80 @@ public final class GateTrackValues {
     if (type == double.class) return 0.0d;
     if (type == char.class) return (char) 0;
     return null;
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const TRACK_ENUM_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackEndReason;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackState;
+import com.sedmelluq.discord.lavaplayer.track.TrackMarkerHandler.MarkerState;
+import java.util.Arrays;
+
+public final class GateTrackEnums {
+  public static void main(String[] args) {
+    AudioTrackEndReason[] reasons = AudioTrackEndReason.values();
+    check(Arrays.toString(reasons).equals(
+        "[FINISHED, LOAD_FAILED, STOPPED, REPLACED, CLEANUP]"), "reason order");
+    check(flags(reasons).equals("true,true,false,false,false"), "reason flags");
+    check(reasons[0] == AudioTrackEndReason.FINISHED
+        && reasons[1] == AudioTrackEndReason.valueOf("LOAD_FAILED"), "reason lookup");
+    check(reasons[4].name().equals("CLEANUP") && reasons[4].ordinal() == 4,
+        "reason inherited enum behavior");
+    reasons[0] = null;
+    check(AudioTrackEndReason.values()[0] == AudioTrackEndReason.FINISHED,
+        "reason values copy");
+
+    AudioTrackState[] states = AudioTrackState.values();
+    check(Arrays.toString(states).equals(
+        "[INACTIVE, LOADING, PLAYING, SEEKING, STOPPING, FINISHED]"), "state order");
+    check(states[2] == AudioTrackState.valueOf("PLAYING") && states[5].ordinal() == 5,
+        "state lookup");
+    states[1] = null;
+    check(AudioTrackState.values()[1] == AudioTrackState.LOADING, "state values copy");
+
+    MarkerState[] markers = MarkerState.values();
+    check(Arrays.toString(markers).equals(
+        "[REACHED, REMOVED, OVERWRITTEN, BYPASSED, STOPPED, LATE, ENDED]"),
+        "marker order");
+    check(markers[2] == MarkerState.valueOf("OVERWRITTEN") && markers[6].ordinal() == 6,
+        "marker lookup");
+    markers[0] = null;
+    check(MarkerState.values()[0] == MarkerState.REACHED, "marker values copy");
+
+    expect(IllegalArgumentException.class, () -> AudioTrackState.valueOf("missing"));
+    expect(NullPointerException.class, () -> MarkerState.valueOf(null));
+    check(AudioTrackEndReason.class.getEnumConstants().length == 5, "reflection reasons");
+    check(AudioTrackState.class.getEnumConstants().length == 6, "reflection states");
+    check(MarkerState.class.getEnumConstants().length == 7, "reflection markers");
+
+    System.out.println(
+        "reasons=FINISHED,LOAD_FAILED,STOPPED,REPLACED,CLEANUP:true,true,false,false,false;"
+        + "states=INACTIVE,LOADING,PLAYING,SEEKING,STOPPING,FINISHED;"
+        + "markers=REACHED,REMOVED,OVERWRITTEN,BYPASSED,STOPPED,LATE,ENDED;"
+        + "copy=true;lookup-errors=iae,npe;reflection=5,6,7");
+  }
+
+  private static String flags(AudioTrackEndReason[] values) {
+    StringBuilder result = new StringBuilder();
+    for (AudioTrackEndReason value : values) {
+      if (result.length() > 0) result.append(',');
+      result.append(value.mayStartNext);
+    }
+    return result.toString();
+  }
+
+  private static void expect(Class<? extends Throwable> type, Runnable operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
   }
 
   private static void check(boolean condition, String message) {
