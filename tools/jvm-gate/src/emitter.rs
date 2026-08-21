@@ -29,6 +29,8 @@ const FRAME_BUFFER_FACTORY_CLASS: &str = "dev/mantle/internal/NativeAudioFrameBu
 const EVENT_DISPATCHER_CLASS: &str = "dev/mantle/internal/NativeEventDispatcher";
 const MANAGER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayerManager";
 const AUDIO_REFERENCE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/AudioReference";
+const DECODED_TRACK_HOLDER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/track/DecodedTrackHolder";
 const BASIC_PLAYLIST_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/BasicAudioPlaylist";
 const CONFIGURATION_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/AudioConfiguration";
 const AUDIO_PLAYER_OPTIONS_CLASS: &str =
@@ -96,6 +98,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/track/AudioTrackEndReason",
     "com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo",
     "com/sedmelluq/discord/lavaplayer/track/AudioTrackState",
+    DECODED_TRACK_HOLDER_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoProvider",
     "com/sedmelluq/discord/lavaplayer/track/TrackMarker",
     "com/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler",
@@ -454,6 +457,9 @@ fn replacement_body(
     if class_name == AUDIO_REFERENCE_CLASS {
         return audio_reference_replacement(pool, name, descriptor, required_locals);
     }
+    if class_name == DECODED_TRACK_HOLDER_CLASS {
+        return decoded_track_holder_replacement(pool, name, descriptor, required_locals);
+    }
     if class_name == BASIC_PLAYLIST_CLASS {
         return basic_playlist_replacement(pool, name, descriptor, required_locals);
     }
@@ -531,6 +537,24 @@ fn audio_frame_provider_tools_replacement(
             &format!(
                 "Phase 13 does not implement {AUDIO_FRAME_PROVIDER_TOOLS_CLASS}.{name}{descriptor}"
             ),
+            required_locals,
+        ),
+    }
+}
+
+fn decoded_track_holder_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)V") => {
+            decoded_track_holder_constructor(pool)
+        }
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {DECODED_TRACK_HOLDER_CLASS}.{name}{descriptor}"),
             required_locals,
         ),
     }
@@ -2233,6 +2257,30 @@ fn audio_processing_context_constructor(pool: &mut ConstantPool<'static>) -> Res
             Instruction::Aload_1,
             Instruction::Invokevirtual(is_filter_hot_swap_enabled),
             Instruction::Putfield(filter_hot_swap_enabled),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn decoded_track_holder_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(DECODED_TRACK_HOLDER_CLASS)?;
+    let decoded_track = pool.add_field_ref(
+        owner,
+        "decodedTrack",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+    )?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(decoded_track),
             Instruction::Return,
         ],
     )

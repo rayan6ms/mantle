@@ -64,6 +64,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-audio-frame-provider-tools-consumer" => Some(AUDIO_FRAME_PROVIDER_TOOLS_CONSUMER),
         "write-audio-processing-context-consumer" => Some(AUDIO_PROCESSING_CONTEXT_CONSUMER),
         "write-audio-player-options-consumer" => Some(AUDIO_PLAYER_OPTIONS_CONSUMER),
+        "write-decoded-track-holder-consumer" => Some(DECODED_TRACK_HOLDER_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -2230,6 +2231,52 @@ public final class GateAudioPlayerOptions {
         && Modifier.isPublic(field.getModifiers()) && Modifier.isFinal(field.getModifiers())
         && !Modifier.isStatic(field.getModifiers()) && !field.isSynthetic(),
         "field metadata " + field.getName());
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const DECODED_TRACK_HOLDER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.DecodedTrackHolder;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+
+public final class GateDecodedTrackHolder {
+  public static void main(String[] args) throws Exception {
+    AudioTrack track = (AudioTrack) Proxy.newProxyInstance(
+        GateDecodedTrackHolder.class.getClassLoader(),
+        new Class<?>[] { AudioTrack.class }, (proxy, method, values) -> null);
+    DecodedTrackHolder holder = new DecodedTrackHolder(track);
+    check(holder.decodedTrack == track, "track identity");
+    check(new DecodedTrackHolder(null).decodedTrack == null, "null track");
+
+    Class<DecodedTrackHolder> type = DecodedTrackHolder.class;
+    int modifiers = type.getModifiers();
+    check(Modifier.isPublic(modifiers) && !Modifier.isFinal(modifiers)
+        && !Modifier.isAbstract(modifiers) && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0, "class structure");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredMethods().length == 0
+        && type.getDeclaredConstructors().length == 1, "member counts");
+    Field field = type.getDeclaredField("decodedTrack");
+    check(field.getType() == AudioTrack.class && Modifier.isPublic(field.getModifiers())
+        && Modifier.isFinal(field.getModifiers()) && !Modifier.isStatic(field.getModifiers())
+        && !field.isSynthetic(), "field metadata");
+    Constructor<DecodedTrackHolder> constructor =
+        type.getDeclaredConstructor(AudioTrack.class);
+    check(Modifier.isPublic(constructor.getModifiers())
+        && Arrays.equals(constructor.getParameterTypes(), new Class<?>[] { AudioTrack.class })
+        && constructor.getExceptionTypes().length == 0
+        && constructor.getTypeParameters().length == 0, "constructor metadata");
+
+    System.out.println(
+        "holder=track-identity,null;reflection=1-field,0-methods,1-constructor");
   }
 
   private static void check(boolean condition, String message) {
