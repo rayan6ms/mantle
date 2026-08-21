@@ -22,7 +22,7 @@ cargo run --locked -q -p mantle-jvm-gate -- emit \
 cargo run --locked -q -p mantle-jvm-gate -- verify-structure \
   --reference-jar "$REFERENCE_JAR" --candidate-jar "$JAR"
 
-for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame audio-frame-provider-tools audio-processing-context; do
+for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame audio-frame-provider-tools audio-processing-context audio-player-options; do
   case "$consumer" in
     smoke) consumer_class='Smoke' ;;
     probe) consumer_class='Probe' ;;
@@ -41,6 +41,7 @@ for consumer in smoke probe integration classloader event track-value track-enum
     reference-mutable-audio-frame) consumer_class='ReferenceMutableAudioFrame' ;;
     audio-frame-provider-tools) consumer_class='AudioFrameProviderTools' ;;
     audio-processing-context) consumer_class='AudioProcessingContext' ;;
+    audio-player-options) consumer_class='AudioPlayerOptions' ;;
   esac
   cargo run --locked -q -p mantle-jvm-gate -- "write-$consumer-consumer" \
     --output "$WORK/Gate${consumer_class}.java"
@@ -53,7 +54,8 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateAudioConfiguration.java" "$WORK/GateFrameBufferFactory.java" \
   "$WORK/GateAudioFrameBuffer.java" "$WORK/GateAudioFrameRebuilder.java" \
   "$WORK/GateTerminatorAudioFrame.java" "$WORK/GateReferenceMutableAudioFrame.java" \
-  "$WORK/GateAudioFrameProviderTools.java" "$WORK/GateAudioProcessingContext.java"
+  "$WORK/GateAudioFrameProviderTools.java" "$WORK/GateAudioProcessingContext.java" \
+  "$WORK/GateAudioPlayerOptions.java"
 javac --release 11 -d "$CLASSES" "$WORK/GateClassloader.java"
 
 case "$(uname -s)" in
@@ -219,6 +221,17 @@ cmp "$WORK/audio-processing-context-reference.txt" \
 grep --fixed-strings \
   'filter=snapshot,true,false;nulls=optional,configuration-npe;' \
   "$WORK/audio-processing-context-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$classes_argument$classpath_separator$reference_argument" GateAudioPlayerOptions \
+  >"$WORK/audio-player-options-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$reference_argument" GateAudioPlayerOptions \
+  >"$WORK/audio-player-options-candidate.txt"
+cmp "$WORK/audio-player-options-reference.txt" \
+  "$WORK/audio-player-options-candidate.txt"
+grep --fixed-strings \
+  'defaults=100,null,null;holders=distinct,per-instance;' \
+  "$WORK/audio-player-options-candidate.txt" >/dev/null
 java -Xverify:all -cp "$GATE_CLASSPATH" GateSmoke "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateIntegration "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" callbacks

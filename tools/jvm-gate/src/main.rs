@@ -63,6 +63,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-audio-frame-rebuilder-consumer" => Some(AUDIO_FRAME_REBUILDER_CONSUMER),
         "write-audio-frame-provider-tools-consumer" => Some(AUDIO_FRAME_PROVIDER_TOOLS_CONSUMER),
         "write-audio-processing-context-consumer" => Some(AUDIO_PROCESSING_CONTEXT_CONSUMER),
+        "write-audio-player-options-consumer" => Some(AUDIO_PLAYER_OPTIONS_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -2153,6 +2154,82 @@ public final class GateAudioProcessingContext {
     } catch (Throwable error) {
       if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_PLAYER_OPTIONS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.PcmFilterFactory;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerOptions;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+
+public final class GateAudioPlayerOptions {
+  public static void main(String[] args) throws Exception {
+    AudioPlayerOptions options = new AudioPlayerOptions();
+    check(options.volumeLevel != null && options.volumeLevel.get() == 100,
+        "volume default");
+    check(options.filterFactory != null && options.filterFactory.get() == null,
+        "filter default");
+    check(options.frameBufferDuration != null && options.frameBufferDuration.get() == null,
+        "duration default");
+    check(options.filterFactory != (Object) options.frameBufferDuration,
+        "distinct reference holders");
+
+    PcmFilterFactory factory = (PcmFilterFactory) Proxy.newProxyInstance(
+        GateAudioPlayerOptions.class.getClassLoader(),
+        new Class<?>[] { PcmFilterFactory.class }, (proxy, method, values) -> null);
+    options.volumeLevel.set(Integer.MIN_VALUE);
+    options.filterFactory.set(factory);
+    options.frameBufferDuration.set(-1);
+    check(options.volumeLevel.get() == Integer.MIN_VALUE
+        && options.filterFactory.get() == factory
+        && options.frameBufferDuration.get().equals(-1), "atomic mutation");
+
+    AudioPlayerOptions second = new AudioPlayerOptions();
+    check(second.volumeLevel != options.volumeLevel
+        && second.filterFactory != options.filterFactory
+        && second.frameBufferDuration != options.frameBufferDuration,
+        "per-instance holders");
+    check(second.volumeLevel.get() == 100 && second.filterFactory.get() == null
+        && second.frameBufferDuration.get() == null, "independent defaults");
+
+    Class<AudioPlayerOptions> type = AudioPlayerOptions.class;
+    int modifiers = type.getModifiers();
+    check(Modifier.isPublic(modifiers) && !Modifier.isFinal(modifiers)
+        && !Modifier.isAbstract(modifiers) && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0, "class structure");
+    check(type.getDeclaredFields().length == 3 && type.getDeclaredMethods().length == 0
+        && type.getDeclaredConstructors().length == 1, "member counts");
+    checkField(type.getDeclaredField("volumeLevel"), AtomicInteger.class,
+        "java.util.concurrent.atomic.AtomicInteger");
+    checkField(type.getDeclaredField("filterFactory"), AtomicReference.class,
+        "java.util.concurrent.atomic.AtomicReference<com.sedmelluq.discord.lavaplayer.filter.PcmFilterFactory>");
+    checkField(type.getDeclaredField("frameBufferDuration"), AtomicReference.class,
+        "java.util.concurrent.atomic.AtomicReference<java.lang.Integer>");
+    Constructor<AudioPlayerOptions> constructor = type.getDeclaredConstructor();
+    check(Modifier.isPublic(constructor.getModifiers())
+        && constructor.getExceptionTypes().length == 0
+        && constructor.getTypeParameters().length == 0, "constructor metadata");
+
+    System.out.println(
+        "defaults=100,null,null;holders=distinct,per-instance;"
+        + "mutation=minimum,factory,-1;reflection=3-fields,0-methods,1-constructor,generics");
+  }
+
+  private static void checkField(Field field, Class<?> type, String genericType) {
+    check(field.getType() == type && field.getGenericType().getTypeName().equals(genericType)
+        && Modifier.isPublic(field.getModifiers()) && Modifier.isFinal(field.getModifiers())
+        && !Modifier.isStatic(field.getModifiers()) && !field.isSynthetic(),
+        "field metadata " + field.getName());
   }
 
   private static void check(boolean condition, String message) {

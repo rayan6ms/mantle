@@ -31,6 +31,8 @@ const MANAGER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/DefaultAudi
 const AUDIO_REFERENCE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/AudioReference";
 const BASIC_PLAYLIST_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/BasicAudioPlaylist";
 const CONFIGURATION_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/AudioConfiguration";
+const AUDIO_PLAYER_OPTIONS_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/player/AudioPlayerOptions";
 const RESAMPLING_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/AudioConfiguration$ResamplingQuality";
 const AUDIO_FRAME_BUFFER_CLASS: &str =
@@ -69,6 +71,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler",
     CONFIGURATION_CLASS,
     RESAMPLING_CLASS,
+    AUDIO_PLAYER_OPTIONS_CLASS,
     "com/sedmelluq/discord/lavaplayer/player/AudioPlayer",
     "com/sedmelluq/discord/lavaplayer/player/AudioPlayerManager",
     MANAGER_CLASS,
@@ -457,6 +460,9 @@ fn replacement_body(
     if class_name == CONFIGURATION_CLASS {
         return audio_configuration_replacement(pool, name, descriptor, required_locals);
     }
+    if class_name == AUDIO_PLAYER_OPTIONS_CLASS {
+        return audio_player_options_replacement(pool, name, descriptor, required_locals);
+    }
     if track_enum_constants(class_name).is_some() {
         return track_enum_replacement(pool, class_name, name, descriptor, required_locals);
     }
@@ -525,6 +531,22 @@ fn audio_frame_provider_tools_replacement(
             &format!(
                 "Phase 13 does not implement {AUDIO_FRAME_PROVIDER_TOOLS_CLASS}.{name}{descriptor}"
             ),
+            required_locals,
+        ),
+    }
+}
+
+fn audio_player_options_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => audio_player_options_constructor(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {AUDIO_PLAYER_OPTIONS_CLASS}.{name}{descriptor}"),
             required_locals,
         ),
     }
@@ -2211,6 +2233,57 @@ fn audio_processing_context_constructor(pool: &mut ConstantPool<'static>) -> Res
             Instruction::Aload_1,
             Instruction::Invokevirtual(is_filter_hot_swap_enabled),
             Instruction::Putfield(filter_hot_swap_enabled),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn audio_player_options_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(AUDIO_PLAYER_OPTIONS_CLASS)?;
+    let atomic_integer = pool.add_class("java/util/concurrent/atomic/AtomicInteger")?;
+    let atomic_integer_init = pool.add_method_ref(atomic_integer, "<init>", "(I)V")?;
+    let atomic_reference = pool.add_class("java/util/concurrent/atomic/AtomicReference")?;
+    let atomic_reference_init = pool.add_method_ref(atomic_reference, "<init>", "()V")?;
+    let volume_level = pool.add_field_ref(
+        owner,
+        "volumeLevel",
+        "Ljava/util/concurrent/atomic/AtomicInteger;",
+    )?;
+    let filter_factory = pool.add_field_ref(
+        owner,
+        "filterFactory",
+        "Ljava/util/concurrent/atomic/AtomicReference;",
+    )?;
+    let frame_buffer_duration = pool.add_field_ref(
+        owner,
+        "frameBufferDuration",
+        "Ljava/util/concurrent/atomic/AtomicReference;",
+    )?;
+    code(
+        pool,
+        4,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::New(atomic_integer),
+            Instruction::Dup,
+            Instruction::Bipush(100),
+            Instruction::Invokespecial(atomic_integer_init),
+            Instruction::Putfield(volume_level),
+            Instruction::Aload_0,
+            Instruction::New(atomic_reference),
+            Instruction::Dup,
+            Instruction::Invokespecial(atomic_reference_init),
+            Instruction::Putfield(filter_factory),
+            Instruction::Aload_0,
+            Instruction::New(atomic_reference),
+            Instruction::Dup,
+            Instruction::Invokespecial(atomic_reference_init),
+            Instruction::Putfield(frame_buffer_duration),
             Instruction::Return,
         ],
     )

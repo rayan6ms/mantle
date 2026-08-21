@@ -10985,45 +10985,70 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, atomic-holder defaults and independence, unrestricted atomic mutation, per-instance allocation, generic field signatures, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerOptions",
       "symbol_kind": "FIELD",
       "member_name": "volumeLevel",
       "descriptor": "Ljava/util/concurrent/atomic/AtomicInteger;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, atomic-holder defaults and independence, unrestricted atomic mutation, per-instance allocation, generic field signatures, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerOptions",
       "symbol_kind": "FIELD",
       "member_name": "filterFactory",
       "descriptor": "Ljava/util/concurrent/atomic/AtomicReference;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, atomic-holder defaults and independence, unrestricted atomic mutation, per-instance allocation, generic field signatures, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerOptions",
       "symbol_kind": "FIELD",
       "member_name": "frameBufferDuration",
       "descriptor": "Ljava/util/concurrent/atomic/AtomicReference;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, atomic-holder defaults and independence, unrestricted atomic mutation, per-instance allocation, generic field signatures, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerOptions",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, atomic-holder defaults and independence, unrestricted atomic mutation, per-instance allocation, generic field signatures, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayer",
