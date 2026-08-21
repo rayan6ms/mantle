@@ -25346,81 +25346,108 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, byte-array reference identity, windowed copies, mutation visibility, inherited freeze behavior, deferred invalid-window failures, and reflection metadata are covered by the Phase 13 reference-mutable-audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.ReferenceMutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, byte-array reference identity, windowed copies, mutation visibility, inherited freeze behavior, deferred invalid-window failures, and reflection metadata are covered by the Phase 13 reference-mutable-audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.ReferenceMutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getFrameBuffer",
       "descriptor": "()[B",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, byte-array reference identity, windowed copies, mutation visibility, inherited freeze behavior, deferred invalid-window failures, and reflection metadata are covered by the Phase 13 reference-mutable-audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.ReferenceMutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getFrameOffset",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, byte-array reference identity, windowed copies, mutation visibility, inherited freeze behavior, deferred invalid-window failures, and reflection metadata are covered by the Phase 13 reference-mutable-audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.ReferenceMutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getFrameEndOffset",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, byte-array reference identity, windowed copies, mutation visibility, inherited freeze behavior, deferred invalid-window failures, and reflection metadata are covered by the Phase 13 reference-mutable-audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.ReferenceMutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getDataLength",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, byte-array reference identity, windowed copies, mutation visibility, inherited freeze behavior, deferred invalid-window failures, and reflection metadata are covered by the Phase 13 reference-mutable-audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.ReferenceMutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getData",
       "descriptor": "()[B",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, byte-array reference identity, windowed copies, mutation visibility, inherited freeze behavior, deferred invalid-window failures, and reflection metadata are covered by the Phase 13 reference-mutable-audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.ReferenceMutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getData",
       "descriptor": "([BI)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, byte-array reference identity, windowed copies, mutation visibility, inherited freeze behavior, deferred invalid-window failures, and reflection metadata are covered by the Phase 13 reference-mutable-audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.ReferenceMutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "setDataReference",
       "descriptor": "([BII)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, byte-array reference identity, windowed copies, mutation visibility, inherited freeze behavior, deferred invalid-window failures, and reflection metadata are covered by the Phase 13 reference-mutable-audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.TerminatorAudioFrame",

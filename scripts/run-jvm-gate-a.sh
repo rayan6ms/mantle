@@ -22,7 +22,7 @@ cargo run --locked -q -p mantle-jvm-gate -- emit \
 cargo run --locked -q -p mantle-jvm-gate -- verify-structure \
   --reference-jar "$REFERENCE_JAR" --candidate-jar "$JAR"
 
-for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame; do
+for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame; do
   case "$consumer" in
     smoke) consumer_class='Smoke' ;;
     probe) consumer_class='Probe' ;;
@@ -38,6 +38,7 @@ for consumer in smoke probe integration classloader event track-value track-enum
     audio-frame-buffer) consumer_class='AudioFrameBuffer' ;;
     audio-frame-rebuilder) consumer_class='AudioFrameRebuilder' ;;
     terminator-audio-frame) consumer_class='TerminatorAudioFrame' ;;
+    reference-mutable-audio-frame) consumer_class='ReferenceMutableAudioFrame' ;;
   esac
   cargo run --locked -q -p mantle-jvm-gate -- "write-$consumer-consumer" \
     --output "$WORK/Gate${consumer_class}.java"
@@ -49,7 +50,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateTrackContracts.java" "$WORK/GateAudioFrames.java" \
   "$WORK/GateAudioConfiguration.java" "$WORK/GateFrameBufferFactory.java" \
   "$WORK/GateAudioFrameBuffer.java" "$WORK/GateAudioFrameRebuilder.java" \
-  "$WORK/GateTerminatorAudioFrame.java"
+  "$WORK/GateTerminatorAudioFrame.java" "$WORK/GateReferenceMutableAudioFrame.java"
 javac --release 11 -d "$CLASSES" "$WORK/GateClassloader.java"
 
 case "$(uname -s)" in
@@ -171,6 +172,17 @@ cmp "$WORK/terminator-audio-frame-reference.txt" \
 grep --fixed-strings \
   'singleton=stable,fresh-public;accessors=6-unsupported-null-message;' \
   "$WORK/terminator-audio-frame-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$classes_argument$classpath_separator$reference_argument" GateReferenceMutableAudioFrame \
+  >"$WORK/reference-mutable-audio-frame-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$reference_argument" GateReferenceMutableAudioFrame \
+  >"$WORK/reference-mutable-audio-frame-candidate.txt"
+cmp "$WORK/reference-mutable-audio-frame-reference.txt" \
+  "$WORK/reference-mutable-audio-frame-candidate.txt"
+grep --fixed-strings \
+  'reference=identity,window,copy,mutation,freeze;invalid=deferred,negative,range,overflow;' \
+  "$WORK/reference-mutable-audio-frame-candidate.txt" >/dev/null
 java -Xverify:all -cp "$GATE_CLASSPATH" GateSmoke "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateIntegration "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" callbacks

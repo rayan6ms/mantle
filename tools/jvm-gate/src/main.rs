@@ -20,7 +20,11 @@ fn main() -> ExitCode {
 
 fn run() -> Result<()> {
     let args = env::args().skip(1).collect::<Vec<_>>();
-    match args.first().map(String::as_str) {
+    let command = args.first().map(String::as_str);
+    if let Some(source) = command.and_then(consumer_source) {
+        return write_consumer(&args, source);
+    }
+    match command {
         Some("emit") => emitter::emit(
             &required_path(&args, "--reference-jar")?,
             &required_path(&args, "--output")?,
@@ -35,90 +39,33 @@ fn run() -> Result<()> {
             &required_path(&args, "--reference-jar")?,
             &required_path(&args, "--candidate-jar")?,
         ),
-        Some("write-smoke-consumer") => {
-            let output = required_path(&args, "--output")?;
-            if let Some(parent) = output.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            fs::write(output, SMOKE_CONSUMER)?;
-            Ok(())
-        }
-        Some("write-probe-consumer") => {
-            let output = required_path(&args, "--output")?;
-            if let Some(parent) = output.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            fs::write(output, PROBE_CONSUMER)?;
-            Ok(())
-        }
-        Some("write-integration-consumer") => {
-            let output = required_path(&args, "--output")?;
-            if let Some(parent) = output.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            fs::write(output, INTEGRATION_CONSUMER)?;
-            Ok(())
-        }
-        Some("write-classloader-consumer") => {
-            let output = required_path(&args, "--output")?;
-            if let Some(parent) = output.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            fs::write(output, CLASSLOADER_CONSUMER)?;
-            Ok(())
-        }
-        Some("write-event-consumer") => {
-            let output = required_path(&args, "--output")?;
-            if let Some(parent) = output.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            fs::write(output, EVENT_CONSUMER)?;
-            Ok(())
-        }
-        Some("write-track-value-consumer") => {
-            let output = required_path(&args, "--output")?;
-            if let Some(parent) = output.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            fs::write(output, TRACK_VALUE_CONSUMER)?;
-            Ok(())
-        }
-        Some("write-track-enum-consumer") => {
-            let output = required_path(&args, "--output")?;
-            if let Some(parent) = output.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            fs::write(output, TRACK_ENUM_CONSUMER)?;
-            Ok(())
-        }
-        Some("write-track-contract-consumer") => {
-            let output = required_path(&args, "--output")?;
-            if let Some(parent) = output.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            fs::write(output, TRACK_CONTRACT_CONSUMER)?;
-            Ok(())
-        }
-        Some("write-audio-frame-consumer") => write_consumer(&args, AUDIO_FRAME_CONSUMER),
-        Some("write-audio-configuration-consumer") => {
-            write_consumer(&args, AUDIO_CONFIGURATION_CONSUMER)
-        }
-        Some("write-frame-buffer-factory-consumer") => {
-            write_consumer(&args, FRAME_BUFFER_FACTORY_CONSUMER)
-        }
-        Some("write-audio-frame-buffer-consumer") => {
-            write_consumer(&args, AUDIO_FRAME_BUFFER_CONSUMER)
-        }
-        Some("write-audio-frame-rebuilder-consumer") => {
-            write_consumer(&args, AUDIO_FRAME_REBUILDER_CONSUMER)
-        }
-        Some("write-terminator-audio-frame-consumer") => {
-            write_consumer(&args, TERMINATOR_AUDIO_FRAME_CONSUMER)
-        }
         _ => Err(
             "usage: mantle-jvm-gate <emit|write-smoke-consumer|write-probe-consumer> [options]"
                 .into(),
         ),
+    }
+}
+
+fn consumer_source(command: &str) -> Option<&'static str> {
+    match command {
+        "write-smoke-consumer" => Some(SMOKE_CONSUMER),
+        "write-probe-consumer" => Some(PROBE_CONSUMER),
+        "write-integration-consumer" => Some(INTEGRATION_CONSUMER),
+        "write-classloader-consumer" => Some(CLASSLOADER_CONSUMER),
+        "write-event-consumer" => Some(EVENT_CONSUMER),
+        "write-track-value-consumer" => Some(TRACK_VALUE_CONSUMER),
+        "write-track-enum-consumer" => Some(TRACK_ENUM_CONSUMER),
+        "write-track-contract-consumer" => Some(TRACK_CONTRACT_CONSUMER),
+        "write-audio-frame-consumer" => Some(AUDIO_FRAME_CONSUMER),
+        "write-audio-configuration-consumer" => Some(AUDIO_CONFIGURATION_CONSUMER),
+        "write-frame-buffer-factory-consumer" => Some(FRAME_BUFFER_FACTORY_CONSUMER),
+        "write-audio-frame-buffer-consumer" => Some(AUDIO_FRAME_BUFFER_CONSUMER),
+        "write-audio-frame-rebuilder-consumer" => Some(AUDIO_FRAME_REBUILDER_CONSUMER),
+        "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
+        "write-reference-mutable-audio-frame-consumer" => {
+            Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
+        }
+        _ => None,
     }
 }
 
@@ -1892,6 +1839,112 @@ public final class GateTerminatorAudioFrame {
   }
 
   private interface Operation { void run(); }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.track.playback.AbstractMutableAudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.ReferenceMutableAudioFrame;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateReferenceMutableAudioFrame {
+  public static void main(String[] args) throws Exception {
+    ReferenceMutableAudioFrame frame = new ReferenceMutableAudioFrame();
+    check(frame.getFrameBuffer() == null && frame.getFrameOffset() == 0
+        && frame.getFrameEndOffset() == 0 && frame.getDataLength() == 0,
+        "default state");
+    expect(NullPointerException.class, () -> { frame.getData(); });
+
+    byte[] backing = { 9, 1, 2, 3, 8 };
+    frame.setDataReference(backing, 1, 3);
+    check(frame.getFrameBuffer() == backing && frame.getFrameOffset() == 1
+        && frame.getFrameEndOffset() == 4 && frame.getDataLength() == 3,
+        "reference window");
+    byte[] firstCopy = frame.getData();
+    byte[] secondCopy = frame.getData();
+    check(Arrays.equals(firstCopy, new byte[] { 1, 2, 3 })
+        && Arrays.equals(secondCopy, firstCopy) && firstCopy != secondCopy,
+        "independent copies");
+    byte[] destination = { 7, 7, 7, 7, 7 };
+    frame.getData(destination, 1);
+    check(Arrays.equals(destination, new byte[] { 7, 1, 2, 3, 7 }),
+        "destination offset");
+    backing[2] = 6;
+    check(Arrays.equals(frame.getData(), new byte[] { 1, 6, 3 }),
+        "backing mutation remains visible");
+
+    frame.setTimecode(42L);
+    frame.setVolume(73);
+    frame.setFormat(null);
+    frame.setTerminator(true);
+    ImmutableAudioFrame frozen = frame.freeze();
+    check(frozen.getTimecode() == 42L && frozen.getVolume() == 73
+        && frozen.getFormat() == null && !frozen.isTerminator()
+        && Arrays.equals(frozen.getData(), new byte[] { 1, 6, 3 }),
+        "inherited state and freeze");
+    backing[2] = 2;
+    check(Arrays.equals(frozen.getData(), new byte[] { 1, 6, 3 }),
+        "freeze owns copied data");
+
+    frame.setDataReference(null, 7, -2);
+    check(frame.getFrameBuffer() == null && frame.getFrameOffset() == 7
+        && frame.getFrameEndOffset() == 5 && frame.getDataLength() == -2,
+        "invalid state stored verbatim");
+    expect(NegativeArraySizeException.class, () -> { frame.getData(); });
+    frame.setDataReference(new byte[] { 1, 2 }, 1, 3);
+    expect(ArrayIndexOutOfBoundsException.class, () -> { frame.getData(); });
+    frame.setDataReference(new byte[0], Integer.MAX_VALUE, 1);
+    check(frame.getFrameEndOffset() == Integer.MIN_VALUE, "end offset overflow");
+
+    Class<ReferenceMutableAudioFrame> type = ReferenceMutableAudioFrame.class;
+    int modifiers = type.getModifiers();
+    check(Modifier.isPublic(modifiers) && !Modifier.isFinal(modifiers)
+        && !Modifier.isAbstract(modifiers)
+        && type.getSuperclass() == AbstractMutableAudioFrame.class
+        && type.getInterfaces().length == 0, "class structure");
+    check(type.getDeclaredFields().length == 3 && type.getDeclaredMethods().length == 7
+        && type.getDeclaredConstructors().length == 1, "member counts");
+    checkField(type.getDeclaredField("frameBuffer"), byte[].class);
+    checkField(type.getDeclaredField("frameOffset"), int.class);
+    checkField(type.getDeclaredField("frameLength"), int.class);
+    Constructor<ReferenceMutableAudioFrame> constructor = type.getDeclaredConstructor();
+    check(Modifier.isPublic(constructor.getModifiers())
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    for (Method method : type.getDeclaredMethods()) {
+      check(Modifier.isPublic(method.getModifiers()) && !Modifier.isStatic(method.getModifiers())
+          && !Modifier.isAbstract(method.getModifiers()) && !method.isBridge()
+          && !method.isSynthetic() && method.getExceptionTypes().length == 0,
+          "method metadata " + method);
+    }
+
+    System.out.println(
+        "reference=identity,window,copy,mutation,freeze;"
+        + "invalid=deferred,negative,range,overflow;reflection=3-fields,7-methods,1-constructor");
+  }
+
+  private static void checkField(Field field, Class<?> type) {
+    check(field.getType() == type && Modifier.isPrivate(field.getModifiers())
+        && !Modifier.isStatic(field.getModifiers()) && !Modifier.isFinal(field.getModifiers()),
+        "field metadata " + field.getName());
+  }
+
+  private static void expect(Class<? extends Throwable> type, Runnable operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
+  }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

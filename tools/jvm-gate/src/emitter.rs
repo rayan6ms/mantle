@@ -51,6 +51,8 @@ const IMMUTABLE_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/ImmutableAudioFrame";
 const MUTABLE_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame";
+const REFERENCE_MUTABLE_FRAME_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/track/playback/ReferenceMutableAudioFrame";
 const EVENT_ADAPTER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/event/AudioEventAdapter";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
@@ -99,6 +101,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/track/playback/AbstractMutableAudioFrame",
     "com/sedmelluq/discord/lavaplayer/track/playback/ImmutableAudioFrame",
     "com/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame",
+    REFERENCE_MUTABLE_FRAME_CLASS,
 ];
 
 #[derive(Serialize)]
@@ -455,6 +458,9 @@ fn replacement_body(
     ) {
         return audio_frame_replacement(pool, class_name, name, descriptor, required_locals);
     }
+    if class_name == REFERENCE_MUTABLE_FRAME_CLASS {
+        return reference_mutable_frame_replacement(pool, name, descriptor, required_locals);
+    }
     if class_name == TERMINATOR_FRAME_CLASS {
         return terminator_frame_replacement(pool, name, descriptor, required_locals);
     }
@@ -700,6 +706,36 @@ fn audio_frame_replacement(
         _ => unsupported_body(
             pool,
             &format!("Phase 13 does not implement {class_name}.{name}{descriptor}"),
+            required_locals,
+        )?,
+    };
+    Ok(body)
+}
+
+fn reference_mutable_frame_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    let body = match (name, descriptor) {
+        ("<init>", "()V") => mutable_frame_constructor(pool, false)?,
+        ("getFrameBuffer", "()[B") => {
+            object_getter(pool, REFERENCE_MUTABLE_FRAME_CLASS, "frameBuffer", "[B")?
+        }
+        ("getFrameOffset", "()I") => {
+            int_getter(pool, REFERENCE_MUTABLE_FRAME_CLASS, "frameOffset")?
+        }
+        ("getFrameEndOffset", "()I") => reference_mutable_frame_end_offset(pool)?,
+        ("getDataLength", "()I") => int_getter(pool, REFERENCE_MUTABLE_FRAME_CLASS, "frameLength")?,
+        ("getData", "()[B") => frame_get_data_copy(pool, REFERENCE_MUTABLE_FRAME_CLASS)?,
+        ("getData", "([BI)V") => reference_mutable_frame_copy_data(pool)?,
+        ("setDataReference", "([BII)V") => reference_mutable_frame_set_data(pool)?,
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {REFERENCE_MUTABLE_FRAME_CLASS}.{name}{descriptor}"
+            ),
             required_locals,
         )?,
     };
@@ -1008,28 +1044,7 @@ fn add_reference_implementation_state(
     if track_enum_constants(class_name).is_some() {
         add_track_enum_state(class, class_name)?;
     }
-    if class_name == ABSTRACT_MUTABLE_FRAME_CLASS {
-        for (name, descriptor) in [
-            ("timecode", "J"),
-            ("volume", "I"),
-            (
-                "format",
-                "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
-            ),
-            ("terminator", "Z"),
-        ] {
-            add_field(class, FieldAccessFlags::PRIVATE, name, descriptor)?;
-        }
-    }
-    if class_name == MUTABLE_FRAME_CLASS {
-        for (name, descriptor) in [
-            ("frameBuffer", "Ljava/nio/ByteBuffer;"),
-            ("framePosition", "I"),
-            ("frameLength", "I"),
-        ] {
-            add_field(class, FieldAccessFlags::PRIVATE, name, descriptor)?;
-        }
-    }
+    add_audio_frame_implementation_state(class, class_name)?;
     if class_name == CONFIGURATION_CLASS {
         for (name, descriptor) in [
             (
@@ -1093,6 +1108,38 @@ fn add_reference_implementation_state(
     }
     if class_name == BASIC_PLAYLIST_CLASS {
         add_basic_playlist_state(class)?;
+    }
+    Ok(())
+}
+
+fn add_audio_frame_implementation_state(
+    class: &mut ClassFile<'static>,
+    class_name: &str,
+) -> Result<()> {
+    let fields: &[(&str, &str)] = match class_name {
+        ABSTRACT_MUTABLE_FRAME_CLASS => &[
+            ("timecode", "J"),
+            ("volume", "I"),
+            (
+                "format",
+                "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+            ),
+            ("terminator", "Z"),
+        ],
+        MUTABLE_FRAME_CLASS => &[
+            ("frameBuffer", "Ljava/nio/ByteBuffer;"),
+            ("framePosition", "I"),
+            ("frameLength", "I"),
+        ],
+        REFERENCE_MUTABLE_FRAME_CLASS => &[
+            ("frameBuffer", "[B"),
+            ("frameOffset", "I"),
+            ("frameLength", "I"),
+        ],
+        _ => &[],
+    };
+    for (name, descriptor) in fields {
+        add_field(class, FieldAccessFlags::PRIVATE, name, descriptor)?;
     }
     Ok(())
 }
@@ -2219,7 +2266,11 @@ fn mutable_frame_store(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
 }
 
 fn mutable_frame_get_data(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
-    let owner = pool.add_class(MUTABLE_FRAME_CLASS)?;
+    frame_get_data_copy(pool, MUTABLE_FRAME_CLASS)
+}
+
+fn frame_get_data_copy(pool: &mut ConstantPool<'static>, class_name: &str) -> Result<Attribute> {
+    let owner = pool.add_class(class_name)?;
     let get_length = pool.add_method_ref(owner, "getDataLength", "()I")?;
     let copy = pool.add_method_ref(owner, "getData", "([BI)V")?;
     code(
@@ -2237,6 +2288,79 @@ fn mutable_frame_get_data(pool: &mut ConstantPool<'static>) -> Result<Attribute>
             Instruction::Invokevirtual(copy),
             Instruction::Aload_1,
             Instruction::Areturn,
+        ],
+    )
+}
+
+fn reference_mutable_frame_end_offset(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(REFERENCE_MUTABLE_FRAME_CLASS)?;
+    let frame_offset = pool.add_field_ref(owner, "frameOffset", "I")?;
+    let frame_length = pool.add_field_ref(owner, "frameLength", "I")?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_offset),
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_length),
+            Instruction::Iadd,
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+fn reference_mutable_frame_copy_data(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(REFERENCE_MUTABLE_FRAME_CLASS)?;
+    let frame_buffer = pool.add_field_ref(owner, "frameBuffer", "[B")?;
+    let frame_offset = pool.add_field_ref(owner, "frameOffset", "I")?;
+    let frame_length = pool.add_field_ref(owner, "frameLength", "I")?;
+    let system = pool.add_class("java/lang/System")?;
+    let arraycopy = pool.add_method_ref(
+        system,
+        "arraycopy",
+        "(Ljava/lang/Object;ILjava/lang/Object;II)V",
+    )?;
+    code(
+        pool,
+        5,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_buffer),
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_offset),
+            Instruction::Aload_1,
+            Instruction::Iload_2,
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_length),
+            Instruction::Invokestatic(arraycopy),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn reference_mutable_frame_set_data(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(REFERENCE_MUTABLE_FRAME_CLASS)?;
+    let frame_buffer = pool.add_field_ref(owner, "frameBuffer", "[B")?;
+    let frame_offset = pool.add_field_ref(owner, "frameOffset", "I")?;
+    let frame_length = pool.add_field_ref(owner, "frameLength", "I")?;
+    code(
+        pool,
+        2,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(frame_buffer),
+            Instruction::Aload_0,
+            Instruction::Iload_2,
+            Instruction::Putfield(frame_offset),
+            Instruction::Aload_0,
+            Instruction::Iload_3,
+            Instruction::Putfield(frame_length),
+            Instruction::Return,
         ],
     )
 }
