@@ -7,9 +7,17 @@ license.workspace = true
 publish = false
 
 [dependencies]
+aes.workspace = true
+cbc.workspace = true
+form_urlencoded.workspace = true
 log.workspace = true
 mantle-audio = { version = "0.0.0", path = "../mantle-audio" }
+mantle-core = { version = "0.0.0", path = "../mantle-core" }
 mantle-xaac = { version = "0.0.0", path = "../mantle-xaac" }
+md-5.workspace = true
+quick-xml.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 symphonia.workspace = true
 ureq.workspace = true
 

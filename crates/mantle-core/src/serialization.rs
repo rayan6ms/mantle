@@ -1,4 +1,6 @@
-use crate::{Track, TrackInfo};
+use crate::{
+    LoadedSourceItem, SourceDetails, SourceRegistry, SourceRegistryError, Track, TrackInfo,
+};
 use std::fmt;
 use std::time::Duration;
 
@@ -28,6 +30,42 @@ impl Default for SerializationLimits {
 pub struct DecodedTrack {
     pub info: TrackInfo,
     pub position: Duration,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DecodedSourceTrack<T> {
+    pub info: TrackInfo,
+    pub position: Duration,
+    pub item: LoadedSourceItem<T>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SourceTrackCodecError {
+    Serialization(SerializationError),
+    Source(SourceRegistryError),
+}
+
+impl fmt::Display for SourceTrackCodecError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Serialization(error) => error.fmt(formatter),
+            Self::Source(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl std::error::Error for SourceTrackCodecError {}
+
+impl From<SerializationError> for SourceTrackCodecError {
+    fn from(error: SerializationError) -> Self {
+        Self::Serialization(error)
+    }
+}
+
+impl From<SourceRegistryError> for SourceTrackCodecError {
+    fn from(error: SourceRegistryError) -> Self {
+        Self::Source(error)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -103,6 +141,124 @@ pub fn decode_synthetic_track_details(
     Ok(())
 }
 
+/// Encodes one complete version-3 track record with details from the item's owning registration.
+///
+/// # Errors
+///
+/// Returns a source ownership/encoding error or a configured wire-format bound error.
+pub fn encode_source_track<T>(
+    info: &TrackInfo,
+    position: Duration,
+    item: &LoadedSourceItem<T>,
+    registry: &SourceRegistry<T>,
+    limits: SerializationLimits,
+) -> Result<Vec<u8>, SourceTrackCodecError> {
+    let details = registry.encode_details(item)?;
+    let mut payload = Writer::new(limits);
+    payload.write_u8(TRACK_INFO_VERSION)?;
+    write_track_info(&mut payload, info)?;
+    payload.write_modified_utf8(&details.source_name)?;
+    payload.write_bytes(&details.payload)?;
+    payload.write_i64(position_millis(position)?)?;
+    finish_track_message(&payload.finish()).map_err(Into::into)
+}
+
+/// Encodes the source-name prefix and opaque manager payload used by
+/// `DefaultAudioPlayerManager.encodeTrackDetails`.
+///
+/// # Errors
+///
+/// Returns an error when the source name or complete detail payload exceeds its configured bound.
+pub fn encode_source_details(
+    details: &SourceDetails,
+    limits: SerializationLimits,
+) -> Result<Vec<u8>, SerializationError> {
+    let mut output = Writer::new(limits);
+    output.write_modified_utf8(&details.source_name)?;
+    output.write_bytes(&details.payload)?;
+    Ok(output.finish())
+}
+
+/// Decodes the source-name prefix and retains the rest as the source manager's opaque payload.
+///
+/// # Errors
+///
+/// Returns an error for malformed modified UTF-8 or an oversized detail record.
+pub fn decode_source_details(
+    bytes: &[u8],
+    limits: SerializationLimits,
+) -> Result<SourceDetails, SerializationError> {
+    if bytes.len() > limits.message_bytes {
+        return Err(SerializationError::MessageTooLarge);
+    }
+    let mut input = Reader::new(bytes, limits);
+    let source_name = input.read_modified_utf8()?;
+    let payload = input.read_exact(input.remaining())?.to_vec();
+    Ok(SourceDetails {
+        source_name,
+        payload,
+    })
+}
+
+/// Decodes one complete track record and dispatches source bytes by first matching source name.
+///
+/// Unknown source names return `Ok(None)`, matching Lavaplayer's null-track holder behavior.
+///
+/// # Errors
+///
+/// Returns a source decoding error or malformed/bounded wire-format error.
+pub fn decode_source_track<T>(
+    bytes: &[u8],
+    registry: &SourceRegistry<T>,
+    limits: SerializationLimits,
+) -> Result<Option<DecodedSourceTrack<T>>, SourceTrackCodecError> {
+    if bytes.len() > limits.message_bytes.saturating_add(4) {
+        return Err(SerializationError::MessageTooLarge.into());
+    }
+    let mut envelope = Reader::new(bytes, limits);
+    let header = envelope.read_u32()?;
+    let message_size = (header & MESSAGE_SIZE_MASK) as usize;
+    if message_size == 0 {
+        return Err(SerializationError::UnexpectedTerminator.into());
+    }
+    if message_size > limits.message_bytes {
+        return Err(SerializationError::MessageTooLarge.into());
+    }
+    let flags = header >> 30;
+    let message = envelope.read_exact(message_size)?;
+    let mut input = Reader::new(message, limits);
+    let version = if flags & TRACK_INFO_VERSIONED != 0 {
+        input.read_u8()?
+    } else {
+        1
+    };
+    let info = read_track_info(&mut input, version)?;
+    let source_name = input.read_modified_utf8()?;
+    let detail_length = input
+        .bytes
+        .len()
+        .checked_sub(input.offset)
+        .and_then(|remaining| remaining.checked_sub(8))
+        .ok_or(SerializationError::Truncated)?;
+    let payload = input.read_exact(detail_length)?.to_vec();
+    let position = nonnegative_duration(input.read_i64()?, SerializationError::InvalidPosition)?;
+    let Some(item) = registry.decode_details_with_info(
+        &info,
+        &SourceDetails {
+            source_name,
+            payload,
+        },
+    )?
+    else {
+        return Ok(None);
+    };
+    Ok(Some(DecodedSourceTrack {
+        info,
+        position,
+        item,
+    }))
+}
+
 /// Encodes one complete Lavaplayer `MessageOutput` track record using version 3 metadata.
 ///
 /// # Errors
@@ -114,27 +270,10 @@ pub fn encode_synthetic_track(
 ) -> Result<Vec<u8>, SerializationError> {
     let mut payload = Writer::new(limits);
     payload.write_u8(TRACK_INFO_VERSION)?;
-    payload.write_modified_utf8(&track.info.title)?;
-    payload.write_modified_utf8(&track.info.author)?;
-    payload.write_i64(duration_millis(track.info.duration)?)?;
-    payload.write_modified_utf8(&track.info.identifier)?;
-    payload.write_u8(u8::from(track.info.is_stream))?;
-    payload.write_optional_modified_utf8(track.info.uri.as_deref())?;
-    payload.write_optional_modified_utf8(track.info.artwork_url.as_deref())?;
-    payload.write_optional_modified_utf8(track.info.isrc.as_deref())?;
+    write_track_info(&mut payload, &track.info)?;
     payload.write_bytes(&encode_synthetic_track_details(limits)?)?;
     payload.write_i64(position_millis(track.position)?)?;
-    let payload = payload.finish();
-    if payload.len() > MESSAGE_SIZE_MASK as usize {
-        return Err(SerializationError::MessageTooLarge);
-    }
-
-    let mut encoded = Vec::with_capacity(payload.len().saturating_add(4));
-    let header = u32::try_from(payload.len()).map_err(|_| SerializationError::MessageTooLarge)?
-        | TRACK_INFO_VERSIONED << 30;
-    encoded.extend_from_slice(&header.to_be_bytes());
-    encoded.extend_from_slice(&payload);
-    Ok(encoded)
+    finish_track_message(&payload.finish())
 }
 
 /// Decodes one complete Lavaplayer `MessageInput` track record.
@@ -169,6 +308,30 @@ pub fn decode_synthetic_track(
     } else {
         1
     };
+    let info = read_track_info(&mut input, version)?;
+    if input.read_modified_utf8()? != SYNTHETIC_SOURCE {
+        return Err(SerializationError::UnknownSource);
+    }
+    if input.read_modified_utf8()? != SYNTHETIC_PAYLOAD {
+        return Err(SerializationError::UnknownSourcePayload);
+    }
+    let position = nonnegative_duration(input.read_i64()?, SerializationError::InvalidPosition)?;
+
+    Ok(DecodedTrack { info, position })
+}
+
+fn write_track_info(output: &mut Writer, info: &TrackInfo) -> Result<(), SerializationError> {
+    output.write_modified_utf8(&info.title)?;
+    output.write_modified_utf8(&info.author)?;
+    output.write_i64(duration_millis(info.duration)?)?;
+    output.write_modified_utf8(&info.identifier)?;
+    output.write_u8(u8::from(info.is_stream))?;
+    output.write_optional_modified_utf8(info.uri.as_deref())?;
+    output.write_optional_modified_utf8(info.artwork_url.as_deref())?;
+    output.write_optional_modified_utf8(info.isrc.as_deref())
+}
+
+fn read_track_info(input: &mut Reader<'_>, version: u8) -> Result<TrackInfo, SerializationError> {
     let title = input.read_modified_utf8()?;
     let author = input.read_modified_utf8()?;
     let duration = nonnegative_duration(input.read_i64()?, SerializationError::InvalidDuration)?;
@@ -187,27 +350,28 @@ pub fn decode_synthetic_track(
     } else {
         (None, None)
     };
-    if input.read_modified_utf8()? != SYNTHETIC_SOURCE {
-        return Err(SerializationError::UnknownSource);
-    }
-    if input.read_modified_utf8()? != SYNTHETIC_PAYLOAD {
-        return Err(SerializationError::UnknownSourcePayload);
-    }
-    let position = nonnegative_duration(input.read_i64()?, SerializationError::InvalidPosition)?;
-
-    Ok(DecodedTrack {
-        info: TrackInfo {
-            title,
-            author,
-            duration,
-            identifier,
-            is_stream,
-            uri,
-            artwork_url,
-            isrc,
-        },
-        position,
+    Ok(TrackInfo {
+        title,
+        author,
+        duration,
+        identifier,
+        is_stream,
+        uri,
+        artwork_url,
+        isrc,
     })
+}
+
+fn finish_track_message(payload: &[u8]) -> Result<Vec<u8>, SerializationError> {
+    if payload.len() > MESSAGE_SIZE_MASK as usize {
+        return Err(SerializationError::MessageTooLarge);
+    }
+    let mut encoded = Vec::with_capacity(payload.len().saturating_add(4));
+    let header = u32::try_from(payload.len()).map_err(|_| SerializationError::MessageTooLarge)?
+        | TRACK_INFO_VERSIONED << 30;
+    encoded.extend_from_slice(&header.to_be_bytes());
+    encoded.extend_from_slice(payload);
+    Ok(encoded)
 }
 
 fn duration_millis(value: Duration) -> Result<i64, SerializationError> {
@@ -384,6 +548,10 @@ impl<'a> Reader<'a> {
         self.offset = end;
         Ok(value)
     }
+
+    fn remaining(&self) -> usize {
+        self.bytes.len().saturating_sub(self.offset)
+    }
 }
 
 fn decode_modified_utf8(bytes: &[u8]) -> Result<String, SerializationError> {
@@ -479,6 +647,21 @@ mod tests {
         assert_eq!(
             decode_synthetic_track_details(REFERENCE_DETAILS, limits),
             Ok(())
+        );
+    }
+
+    #[test]
+    fn generic_source_details_preserve_modified_utf_name_and_opaque_payload() {
+        let limits = SerializationLimits::default();
+        let details = SourceDetails {
+            source_name: "jvm-\0-source".to_owned(),
+            payload: vec![0, 1, 2, 255],
+        };
+        let encoded = encode_source_details(&details, limits).unwrap();
+        assert_eq!(decode_source_details(&encoded, limits).unwrap(), details);
+        assert_eq!(
+            decode_source_details(&encoded[..1], limits),
+            Err(SerializationError::Truncated)
         );
     }
 

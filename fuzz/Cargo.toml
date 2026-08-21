@@ -1,0 +1,67 @@
+[package]
+name = "mantle-media-fuzz"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "=0.4.13"
+mantle-media = { path = "../crates/mantle-media" }
+
+[workspace]
+members = ["."]
+resolver = "3"
+
+[[bin]]
+name = "local_wav"
+path = "fuzz_targets/local_wav.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "local_matroska"
+path = "fuzz_targets/local_matroska.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "local_mp4"
+path = "fuzz_targets/local_mp4.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "local_flac"
+path = "fuzz_targets/local_flac.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "local_ogg"
+path = "fuzz_targets/local_ogg.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "local_mp3"
+path = "fuzz_targets/local_mp3.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "local_adts"
+path = "fuzz_targets/local_adts.rs"
+test = false
+doc = false
+bench = false

@@ -10,9 +10,12 @@ use ureq::http::header::{
 use ureq::http::{HeaderMap, HeaderName, Uri};
 use ureq::unversioned::resolver::{DefaultResolver, ResolvedSocketAddrs, Resolver};
 use ureq::unversioned::transport::{DefaultConnector, NextTimeout};
-use ureq::{Agent, BodyReader, Error as UreqError};
+use ureq::{Agent, BodyReader, Error as UreqError, ResponseExt};
 
-use crate::{MediaError, MediaInput};
+use crate::{MediaCancellation, MediaError, MediaInput};
+
+pub(crate) const MAX_CONFIGURED_REDIRECTS: u32 = 16;
+pub(crate) const MAX_CONFIGURED_RETRIES: u32 = 8;
 
 /// Controls whether the HTTP resolver may return non-public destination addresses.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -35,6 +38,8 @@ pub struct HttpRangeOptions {
     pub socket_buffer_bytes: usize,
     pub connect_timeout: Duration,
     pub request_timeout: Duration,
+    pub max_redirects: u32,
+    pub max_retries: u32,
     pub network_access: HttpNetworkAccess,
 }
 
@@ -47,6 +52,8 @@ impl Default for HttpRangeOptions {
             socket_buffer_bytes: 64 * 1024,
             connect_timeout: Duration::from_secs(10),
             request_timeout: Duration::from_secs(30),
+            max_redirects: 5,
+            max_retries: 1,
             network_access: HttpNetworkAccess::PublicInternetOnly,
         }
     }
@@ -84,6 +91,7 @@ impl HttpRangeOptions {
                 "request_timeout must be non-zero",
             ));
         }
+        validate_request_counts(self.max_redirects, self.max_retries)?;
         Ok(self)
     }
 }
@@ -99,6 +107,7 @@ pub struct HttpRangeInput {
     source_len: u64,
     active: Option<ActiveRange>,
     validator: Option<Validator>,
+    cancellation: MediaCancellation,
 }
 
 impl HttpRangeInput {
@@ -110,27 +119,30 @@ impl HttpRangeInput {
     /// resolved address, the request fails, or the server does not return a bounded and internally
     /// consistent `206 Partial Content` response.
     pub fn open(url: impl AsRef<str>, options: HttpRangeOptions) -> Result<Self, MediaError> {
+        Self::open_with_cancellation(url, options, MediaCancellation::new())
+    }
+
+    /// Opens an HTTP(S) object with a caller-owned cancellation signal.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MediaError::Cancelled`] when cancellation is already requested, in addition to
+    /// the errors from [`Self::open`]. Reads and range reopens observe the same signal.
+    pub fn open_with_cancellation(
+        url: impl AsRef<str>,
+        options: HttpRangeOptions,
+        cancellation: MediaCancellation,
+    ) -> Result<Self, MediaError> {
         let options = options.validate()?;
+        cancellation.check()?;
         let uri = parse_uri(url.as_ref())?;
-        let config = Agent::config_builder()
-            .proxy(None)
-            .max_redirects(0)
-            .http_status_as_error(false)
-            .accept_encoding("")
-            .max_response_header_size(options.max_response_header_bytes)
-            .input_buffer_size(options.socket_buffer_bytes)
-            .output_buffer_size(options.socket_buffer_bytes)
-            .timeout_global(Some(options.request_timeout))
-            .timeout_connect(Some(options.connect_timeout))
-            .timeout_recv_response(Some(options.request_timeout))
-            .timeout_recv_body(Some(options.request_timeout))
-            .build();
-        let agent = Agent::with_parts(
-            config,
-            DefaultConnector::default(),
-            PolicyResolver {
-                access: options.network_access,
-            },
+        let agent = create_agent(
+            options.max_response_header_bytes,
+            options.socket_buffer_bytes,
+            options.connect_timeout,
+            options.request_timeout,
+            options.max_redirects,
+            options.network_access,
         );
         let mut input = Self {
             agent,
@@ -140,12 +152,19 @@ impl HttpRangeInput {
             source_len: 0,
             active: None,
             validator: None,
+            cancellation,
         };
         input.open_range()?;
         Ok(input)
     }
 
+    #[must_use]
+    pub fn final_uri(&self) -> &Uri {
+        &self.uri
+    }
+
     fn open_range(&mut self) -> io::Result<()> {
+        self.cancellation.check_io()?;
         if self.source_len != 0 && self.position >= self.source_len {
             self.active = None;
             return Ok(());
@@ -156,17 +175,24 @@ impl HttpRangeInput {
             .saturating_add(window.saturating_sub(1))
             .min(self.options.max_source_bytes.saturating_sub(1));
         let range_value = format!("bytes={}-{}", self.position, requested_end);
-        let mut request = self
-            .agent
-            .get(self.uri.clone())
-            .header(RANGE, range_value)
-            .header(ACCEPT_ENCODING, "identity");
-        if let Some(validator) = &self.validator {
-            request = request.header(IF_RANGE, validator.value.as_str());
-        }
-        let response = request
-            .call()
-            .map_err(|error| sanitize_ureq_error(&error))?;
+        let agent = self.agent.clone();
+        let uri = self.uri.clone();
+        let validator = self.validator.clone();
+        let response = call_with_retries(
+            || {
+                let mut request = agent
+                    .get(uri.clone())
+                    .header(RANGE, range_value.as_str())
+                    .header(ACCEPT_ENCODING, "identity");
+                if let Some(validator) = &validator {
+                    request = request.header(IF_RANGE, validator.value.as_str());
+                }
+                request.call()
+            },
+            self.options.max_retries,
+            &self.cancellation,
+        )?;
+        self.uri = response.get_uri().clone();
         let status = response.status().as_u16();
         if status != 206 {
             return Err(invalid_response(format_args!(
@@ -212,9 +238,7 @@ impl HttpRangeInput {
             )));
         }
         let response_validator = read_validator(response.headers())?;
-        if let (Some(expected), Some(actual)) = (&self.validator, &response_validator)
-            && expected != actual
-        {
+        if self.validator.is_some() && self.validator != response_validator {
             return Err(invalid_response(format_args!(
                 "HTTP source validator changed between ranges"
             )));
@@ -233,6 +257,7 @@ impl HttpRangeInput {
 
 impl Read for HttpRangeInput {
     fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        self.cancellation.check_io()?;
         if buffer.is_empty() || self.position >= self.source_len {
             return Ok(0);
         }
@@ -249,6 +274,7 @@ impl Read for HttpRangeInput {
             .reader
             .read(&mut buffer[..allowed])
             .map_err(|error| sanitize_body_error(&error))?;
+        self.cancellation.check_io()?;
         if count == 0 {
             return Err(io::Error::new(
                 io::ErrorKind::UnexpectedEof,
@@ -266,6 +292,7 @@ impl Read for HttpRangeInput {
 
 impl Seek for HttpRangeInput {
     fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+        self.cancellation.check_io()?;
         let target = match position {
             SeekFrom::Start(offset) => i128::from(offset),
             SeekFrom::Current(offset) => i128::from(self.position) + i128::from(offset),
@@ -285,6 +312,208 @@ impl Seek for HttpRangeInput {
             self.active = None;
         }
         Ok(self.position)
+    }
+}
+
+/// Resource and network policy for a finite or bounded unknown-length HTTP response.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct HttpStreamOptions {
+    pub max_response_bytes: u64,
+    pub max_response_header_bytes: usize,
+    pub socket_buffer_bytes: usize,
+    pub connect_timeout: Duration,
+    pub request_timeout: Duration,
+    pub max_redirects: u32,
+    pub max_retries: u32,
+    pub network_access: HttpNetworkAccess,
+}
+
+impl Default for HttpStreamOptions {
+    fn default() -> Self {
+        Self {
+            max_response_bytes: 8 * 1024 * 1024,
+            max_response_header_bytes: 32 * 1024,
+            socket_buffer_bytes: 64 * 1024,
+            connect_timeout: Duration::from_secs(10),
+            request_timeout: Duration::from_secs(30),
+            max_redirects: 5,
+            max_retries: 1,
+            network_access: HttpNetworkAccess::PublicInternetOnly,
+        }
+    }
+}
+
+impl HttpStreamOptions {
+    pub(crate) fn validate(self) -> Result<Self, MediaError> {
+        if self.max_response_bytes == 0 {
+            return Err(MediaError::InvalidHttpOptions(
+                "max_response_bytes must be non-zero",
+            ));
+        }
+        if self.max_response_header_bytes < 1024 {
+            return Err(MediaError::InvalidHttpOptions(
+                "max_response_header_bytes must be at least 1 KiB",
+            ));
+        }
+        if self.socket_buffer_bytes < 1024 {
+            return Err(MediaError::InvalidHttpOptions(
+                "socket_buffer_bytes must be at least 1 KiB",
+            ));
+        }
+        if self.connect_timeout.is_zero() || self.request_timeout.is_zero() {
+            return Err(MediaError::InvalidHttpOptions(
+                "HTTP stream timeouts must be non-zero",
+            ));
+        }
+        validate_request_counts(self.max_redirects, self.max_retries)?;
+        Ok(self)
+    }
+}
+
+/// A non-seekable HTTP(S) response with a hard total-byte ceiling.
+pub struct HttpStreamInput {
+    reader: BodyReader<'static>,
+    final_uri: Uri,
+    declared_len: Option<u64>,
+    position: u64,
+    max_response_bytes: u64,
+    cancellation: MediaCancellation,
+}
+
+impl HttpStreamInput {
+    /// Opens a finite or unknown-length HTTP response.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid policy, rejected destinations, request failures, non-success
+    /// status, non-identity encoding, or a declared length above the configured ceiling.
+    pub fn open(url: impl AsRef<str>, options: HttpStreamOptions) -> Result<Self, MediaError> {
+        Self::open_with_cancellation(url, options, MediaCancellation::new())
+    }
+
+    /// Opens a finite or unknown-length HTTP response with cancellation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MediaError::Cancelled`] when cancellation is already requested, in addition to
+    /// the errors from [`Self::open`]. Body reads observe the same signal.
+    pub fn open_with_cancellation(
+        url: impl AsRef<str>,
+        options: HttpStreamOptions,
+        cancellation: MediaCancellation,
+    ) -> Result<Self, MediaError> {
+        let options = options.validate()?;
+        cancellation.check()?;
+        let uri = parse_uri(url.as_ref())?;
+        let agent = create_agent(
+            options.max_response_header_bytes,
+            options.socket_buffer_bytes,
+            options.connect_timeout,
+            options.request_timeout,
+            options.max_redirects,
+            options.network_access,
+        );
+        let response = call_with_retries(
+            || {
+                agent
+                    .get(uri.clone())
+                    .header(ACCEPT_ENCODING, "identity")
+                    .call()
+            },
+            options.max_retries,
+            &cancellation,
+        )?;
+        let status = response.status().as_u16();
+        if !(200..300).contains(&status) {
+            return Err(MediaError::Io(invalid_response(format_args!(
+                "HTTP stream request returned status {status}"
+            ))));
+        }
+        reject_content_encoding(response.headers())?;
+        let declared_len = response.body().content_length();
+        if declared_len.is_some_and(|length| length > options.max_response_bytes) {
+            return Err(MediaError::Io(invalid_response(format_args!(
+                "HTTP source length exceeds the configured {}-byte limit",
+                options.max_response_bytes
+            ))));
+        }
+        let final_uri = response.get_uri().clone();
+        Ok(Self {
+            reader: response.into_body().into_reader(),
+            final_uri,
+            declared_len,
+            position: 0,
+            max_response_bytes: options.max_response_bytes,
+            cancellation,
+        })
+    }
+
+    pub(crate) fn final_uri(&self) -> &Uri {
+        &self.final_uri
+    }
+}
+
+impl Read for HttpStreamInput {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        self.cancellation.check_io()?;
+        if buffer.is_empty() {
+            return Ok(0);
+        }
+        if self.position == self.max_response_bytes {
+            let mut extra = [0_u8; 1];
+            let count = self
+                .reader
+                .read(&mut extra)
+                .map_err(|error| sanitize_body_error(&error))?;
+            self.cancellation.check_io()?;
+            if count == 0 {
+                return Ok(0);
+            }
+            return Err(invalid_response(format_args!(
+                "HTTP stream exceeded its {}-byte limit",
+                self.max_response_bytes
+            )));
+        }
+        let remaining = self.max_response_bytes - self.position;
+        let allowed = usize::try_from(remaining)
+            .unwrap_or(usize::MAX)
+            .min(buffer.len());
+        let count = self
+            .reader
+            .read(&mut buffer[..allowed])
+            .map_err(|error| sanitize_body_error(&error))?;
+        self.cancellation.check_io()?;
+        if count == 0
+            && self
+                .declared_len
+                .is_some_and(|length| self.position < length)
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "HTTP stream body ended before its declared length",
+            ));
+        }
+        self.position = self.position.saturating_add(count as u64);
+        Ok(count)
+    }
+}
+
+impl Seek for HttpStreamInput {
+    fn seek(&mut self, _: SeekFrom) -> io::Result<u64> {
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "HTTP stream input is not seekable",
+        ))
+    }
+}
+
+impl MediaInput for HttpStreamInput {
+    fn is_seekable(&self) -> bool {
+        false
+    }
+
+    fn byte_len(&self) -> Option<u64> {
+        self.declared_len
     }
 }
 
@@ -408,7 +637,7 @@ fn reject_content_encoding(headers: &HeaderMap) -> io::Result<()> {
             .is_ok_and(|encoding| encoding.eq_ignore_ascii_case("identity"))
     {
         return Err(invalid_response(format_args!(
-            "HTTP range response uses a non-identity content encoding"
+            "HTTP response uses a non-identity content encoding"
         )));
     }
     Ok(())
@@ -454,8 +683,96 @@ fn invalid_response(arguments: fmt::Arguments<'_>) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, arguments.to_string())
 }
 
+fn validate_request_counts(max_redirects: u32, max_retries: u32) -> Result<(), MediaError> {
+    if max_redirects > MAX_CONFIGURED_REDIRECTS {
+        return Err(MediaError::InvalidHttpOptions(
+            "max_redirects must not exceed 16",
+        ));
+    }
+    if max_retries > MAX_CONFIGURED_RETRIES {
+        return Err(MediaError::InvalidHttpOptions(
+            "max_retries must not exceed 8",
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn create_agent(
+    max_response_header_bytes: usize,
+    socket_buffer_bytes: usize,
+    connect_timeout: Duration,
+    request_timeout: Duration,
+    max_redirects: u32,
+    network_access: HttpNetworkAccess,
+) -> Agent {
+    let config = Agent::config_builder()
+        .proxy(None)
+        .max_redirects(max_redirects)
+        .max_redirects_will_error(true)
+        .http_status_as_error(false)
+        .accept_encoding("")
+        .max_response_header_size(max_response_header_bytes)
+        .input_buffer_size(socket_buffer_bytes)
+        .output_buffer_size(socket_buffer_bytes)
+        .timeout_global(Some(request_timeout))
+        .timeout_connect(Some(connect_timeout))
+        .timeout_recv_response(Some(request_timeout))
+        .timeout_recv_body(Some(request_timeout))
+        .build();
+    Agent::with_parts(
+        config,
+        DefaultConnector::default(),
+        PolicyResolver {
+            access: network_access,
+        },
+    )
+}
+
+fn call_with_retries(
+    mut call: impl FnMut() -> Result<ureq::http::Response<ureq::Body>, UreqError>,
+    max_retries: u32,
+    cancellation: &MediaCancellation,
+) -> io::Result<ureq::http::Response<ureq::Body>> {
+    let mut retries = 0;
+    loop {
+        cancellation.check_io()?;
+        match call() {
+            Ok(response) if response.status().is_server_error() && retries < max_retries => {
+                retries += 1;
+            }
+            Ok(response) => {
+                cancellation.check_io()?;
+                return Ok(response);
+            }
+            Err(error) if is_retriable_request_error(&error) && retries < max_retries => {
+                retries += 1;
+            }
+            Err(error) => return Err(sanitize_ureq_error(&error)),
+        }
+    }
+}
+
+fn is_retriable_request_error(error: &UreqError) -> bool {
+    match error {
+        UreqError::Timeout(_) => true,
+        UreqError::Io(source) => matches!(
+            source.kind(),
+            io::ErrorKind::ConnectionAborted
+                | io::ErrorKind::ConnectionRefused
+                | io::ErrorKind::ConnectionReset
+                | io::ErrorKind::TimedOut
+                | io::ErrorKind::UnexpectedEof
+        ),
+        _ => false,
+    }
+}
+
+pub(crate) fn is_blocked_destination_error(error: &UreqError) -> bool {
+    matches!(error, UreqError::Other(inner) if inner.is::<BlockedDestination>())
+}
+
 fn sanitize_ureq_error(error: &UreqError) -> io::Error {
-    if matches!(error, UreqError::Other(inner) if inner.is::<BlockedDestination>()) {
+    if is_blocked_destination_error(error) {
         return io::Error::new(
             io::ErrorKind::PermissionDenied,
             "HTTP destination rejected by network access policy",
@@ -598,5 +915,25 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_RANGE, "bytes 9-10/10".parse().unwrap());
         assert!(parse_content_range(&headers).is_err());
+    }
+
+    #[test]
+    fn request_count_configuration_has_hard_ceilings() {
+        assert!(
+            HttpRangeOptions {
+                max_redirects: 17,
+                ..HttpRangeOptions::default()
+            }
+            .validate()
+            .is_err()
+        );
+        assert!(
+            HttpStreamOptions {
+                max_retries: 9,
+                ..HttpStreamOptions::default()
+            }
+            .validate()
+            .is_err()
+        );
     }
 }

@@ -31,6 +31,50 @@
       "sha256": "3a53c9b1a3e51c1cd61289fb1c4e361f75bc30059dd1ac873edc08d9adf84d62"
     },
     {
+      "file": "tone-pcm-s16le-mono-8k.wav",
+      "container": "WAVE",
+      "codec": "PCM signed 16-bit little-endian",
+      "profile": "mono lower-rate edge within the frozen 8x PCM transform scope",
+      "sample_rate": 8000,
+      "channels": 1,
+      "duration_seconds": 1.0,
+      "size_bytes": 16044,
+      "sha256": "4209818f468ee6cd66406e6797702940f8c4be9b13d5a6e4af2e1f37bf4f4c91"
+    },
+    {
+      "file": "tone-pcm-s16le-stereo-384k.wav",
+      "container": "WAVE",
+      "codec": "PCM signed 16-bit little-endian",
+      "profile": "stereo upper sample-rate edge accepted by Lavaplayer 2.2.6",
+      "sample_rate": 384000,
+      "channels": 2,
+      "duration_seconds": 0.25,
+      "size_bytes": 384068,
+      "sha256": "1669b0779fa22d4c1a906e93d53ed63862e5129f7509579917c70551dfe925df"
+    },
+    {
+      "file": "tone-pcm-s24le-extensible.wav",
+      "container": "WAVE",
+      "codec": "PCM signed 24-bit little-endian",
+      "profile": "WAVE_FORMAT_EXTENSIBLE PCM",
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 0.5,
+      "size_bytes": 144068,
+      "sha256": "7417c7bf70b3f4a43d37b3bc26ec0d59b1fe63168dc825472df9358bcd5a82f7"
+    },
+    {
+      "file": "tone-pcm-s32le-extensible.wav",
+      "container": "WAVE",
+      "codec": "PCM signed 32-bit little-endian",
+      "profile": "WAVE_FORMAT_EXTENSIBLE PCM",
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 0.5,
+      "size_bytes": 192068,
+      "sha256": "0a9160208c55963af2fccc5e76ce7c43ebc9a587f2b411dc17327ed3de78801a"
+    },
+    {
       "file": "tone-mp3.mp3",
       "container": "MPEG audio",
       "codec": "MP3",
@@ -40,6 +84,17 @@
       "duration_seconds": 6.024,
       "size_bytes": 144596,
       "sha256": "13c1289fed83ea173cf284097a29f2b429852ce6929289cc8b827716ff992102"
+    },
+    {
+      "file": "tone-mp3-vbr-id3.mp3",
+      "container": "MPEG audio",
+      "codec": "MP3",
+      "profile": "Xing VBR with ID3v2.3 title, artist, and ISRC",
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 2.0,
+      "size_bytes": 16157,
+      "sha256": "192849a8d326e0ddeda1737c50d0ee6eb49bf2c7d5111e03eef3b4bb38b599ba"
     },
     {
       "file": "tone-opus.webm",
@@ -53,6 +108,39 @@
       "sha256": "0ebe60d836c799ab82e20708a6776a9f4fb592a3d5747cdb05cf82133754ace6"
     },
     {
+      "file": "tone-opus-tags.ogg",
+      "container": "Ogg",
+      "codec": "Opus",
+      "profile": "Vorbis comments: title, artist, ISRC",
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 2.0065,
+      "size_bytes": 32809,
+      "sha256": "de10aeec74affd186b3672062f5477b9fd623516a3098b311dc5ba759c5deeda"
+    },
+    {
+      "file": "tone-vorbis-tags.ogg",
+      "container": "Ogg",
+      "codec": "Vorbis",
+      "profile": "Vorbis comments: title, artist, ISRC",
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 2.0,
+      "size_bytes": 13918,
+      "sha256": "129709e5df0b25ba66a8b57cdb26f6ede048d1a16ab3431530e511911c8626a9"
+    },
+    {
+      "file": "tone-flac-tags.oga",
+      "container": "Ogg",
+      "codec": "FLAC",
+      "profile": "Vorbis comments: title, artist, ISRC",
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 2.0,
+      "size_bytes": 40315,
+      "sha256": "cf848d270d9b40ca43ab24d85ae39958ed0f49654ddad07d5638ebbc91fe2577"
+    },
+    {
       "file": "tone-aac-lc.m4a",
       "container": "ISO BMFF/MP4",
       "codec": "AAC",
@@ -64,6 +152,138 @@
       "sha256": "983b6a7960f95a91f0cdc07f558e0b4e89e0e20db6a3d0ac9cb5a8648191fc0b"
     },
     {
+      "file": "tone-aac-lc.adts",
+      "container": "raw ADTS",
+      "codec": "AAC",
+      "profile": "AAC-LC with protection_absent=1",
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 2.037554,
+      "size_bytes": 33015,
+      "sha256": "a72df64dd1a98244a3b2054f63bca49a7748d5957bb4b4065ff1039fadac6826"
+    },
+    {
+      "file": "tone-aac-lc.ts",
+      "container": "MPEG-TS",
+      "codec": "AAC",
+      "profile": "AAC-LC in PES with PAT, PMT, and SDT service metadata",
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 1.898667,
+      "size_bytes": 40796,
+      "sha256": "f66de7c0fb98f58e7409574386f2dc203707af62d0fe129f2afbc0c6e1656675"
+    },
+    {
+      "file": "tone-aac-lc-crc.adts",
+      "container": "raw ADTS",
+      "codec": "AAC",
+      "profile": "AAC-LC with protection_absent=0 and deterministic zero CRC words",
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 2.037492,
+      "size_bytes": 33205,
+      "sha256": "522d439d280c0f2f993ebbaf447a559439a943dfd7c7ad3ea77adb1dc3a37793"
+    },
+    {
+      "file": "tone-he-aac-v1.adts",
+      "container": "raw ADTS",
+      "codec": "AAC",
+      "profile": "HE-AAC v1 with implicit SBR signaling",
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 6.143453,
+      "size_bytes": 49153,
+      "sha256": "9419aa8f80d2a81f887efab5187c72afd1ddfc7b77c58f7d4b324665769425f7"
+    },
+    {
+      "file": "tone-he-aac-v2.adts",
+      "container": "raw ADTS",
+      "codec": "AAC",
+      "profile": "HE-AAC v2 with implicit SBR and PS signaling",
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 6.184901,
+      "size_bytes": 37121,
+      "sha256": "a8ddd8fe3e1b0f976afd7c9c9fa0fa96c1287c68672e9e368dab0c8413440c57"
+    },
+    {
+      "file": "tone-aac-lc-metadata.m4a",
+      "container": "ISO BMFF/MP4",
+      "codec": "AAC",
+      "profile": "AAC-LC standard MP4 with title and artist",
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 2.005,
+      "size_bytes": 33588,
+      "sha256": "3876888679f7e78d94fd4a38b8317108c52f46e8317dda22079065fe07554253"
+    },
+    {
+      "file": "tone-aac-lc-fragmented.m4a",
+      "container": "ISO BMFF/MP4",
+      "codec": "AAC",
+      "profile": "AAC-LC fragmented MP4 with global sidx, title, and artist",
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 4.032,
+      "size_bytes": 67190,
+      "sha256": "0ea0bdc2bfcec419e45ae1484ea2c170a0c7fb29df8041c4947589ca2da264c1"
+    },
+    {
+      "file": "tone-vorbis-tags.mkv",
+      "container": "Matroska",
+      "codec": "Vorbis",
+      "profile": "Segment title plus artist and ISRC tags",
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 2.003,
+      "size_bytes": 14812,
+      "sha256": "a7e8469b3f9cbcaf2f814fabd9ed8186bb1529b7a26b2130d60826956eb8b831"
+    },
+    {
+      "file": "tone-aac-lc-tags.mkv",
+      "container": "Matroska",
+      "codec": "AAC",
+      "profile": "AAC-LC with segment title and artist tag",
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 2.026,
+      "size_bytes": 33554,
+      "sha256": "14d2e64ea6435d1cf1ccea43e803af5b62f6291e02f648c3071b1d3b394f25e7"
+    },
+    {
+      "file": "tone-aac-lc-24k.mkv",
+      "container": "Matroska",
+      "codec": "AAC",
+      "profile": "AAC-LC low-rate profile counterexample",
+      "sample_rate": 24000,
+      "channels": 2,
+      "duration_seconds": 2.043,
+      "size_bytes": 25358,
+      "sha256": "710abfd84822d3bdc3c2ecc8b97b8d82b33105f5f7a4efc5ab37fa1cbe7b67bf"
+    },
+    {
+      "file": "tone-he-aac-v1.mkv",
+      "container": "Matroska",
+      "codec": "AAC",
+      "profile": "HE-AAC v1 with implicit SBR signaling",
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 6.144,
+      "size_bytes": 49633,
+      "sha256": "b1451265915ba2fe553cd819f8bd6c0c083d31864bf0d169f9ebd98cf53c0a08"
+    },
+    {
+      "file": "tone-he-aac-v2.mkv",
+      "container": "Matroska",
+      "codec": "AAC",
+      "profile": "HE-AAC v2 with implicit SBR and PS signaling",
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 6.187,
+      "size_bytes": 37601,
+      "sha256": "68bfdac3d275787ce5dd8529df19d9d0040e8774e0c404301bb0adc60ed937c1"
+    },
+    {
       "file": "tone-flac.flac",
       "container": "FLAC",
       "codec": "FLAC",
@@ -73,6 +293,17 @@
       "duration_seconds": 6.0,
       "size_bytes": 127849,
       "sha256": "a88be13e97494e252d4ecc9189b08c97e41eea3b65b9cc60a12910a6c14dced1"
+    },
+    {
+      "file": "tone-metadata.flac",
+      "container": "FLAC",
+      "codec": "FLAC",
+      "profile": "Vorbis comments: title, artist, ISRC",
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_seconds": 6.0,
+      "size_bytes": 127932,
+      "sha256": "6e42355591423d2ef821a6b95ef233a1cba51e5471b1e02619e8994474efbe87"
     },
     {
       "file": "tone-he-aac-v1.m4a",

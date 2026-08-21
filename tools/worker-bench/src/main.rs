@@ -133,12 +133,14 @@ enum TrackSource {
         sequence: u64,
         work: u32,
     },
-    Opus {
-        session: MediaSession,
-        packet: EncodedPacket,
-        router: OpusPassthrough,
-    },
+    Opus(Box<OpusTrackSource>),
     Pcm(Box<PcmTrackSource>),
+}
+
+struct OpusTrackSource {
+    session: MediaSession,
+    packet: EncodedPacket,
+    router: OpusPassthrough,
 }
 
 struct PcmTrackSource {
@@ -168,11 +170,11 @@ impl TrackSource {
         }
         let format = PcmFormat::new(session.info().sample_rate, session.info().channels)?;
         let packet = EncodedPacket::with_capacity(session.limits().max_packet_bytes);
-        Ok(Self::Opus {
+        Ok(Self::Opus(Box::new(OpusTrackSource {
             session,
             packet,
             router: OpusPassthrough::new(format),
-        })
+        })))
     }
 
     fn pcm(path: &Path, expected_codec: Codec, equalizer: bool) -> Result<Self> {
@@ -264,18 +266,15 @@ impl TrackSource {
                 )?;
                 *sequence = sequence.saturating_add(1);
             }
-            Self::Opus {
-                session,
-                packet,
-                router,
-            } => {
-                if !session.read_encoded(packet)? {
+            Self::Opus(source) => {
+                if !source.session.read_encoded(&mut source.packet)? {
                     return Err(
                         "real workload reached EOF during the bounded benchmark interval".into(),
                     );
                 }
-                if !router
-                    .route_packet(packet.data(), packet.timestamp(), output)?
+                if !source
+                    .router
+                    .route_packet(source.packet.data(), source.packet.timestamp(), output)?
                     .delivered()
                 {
                     return Err("real Opus workload unexpectedly required transcoding".into());

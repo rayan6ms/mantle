@@ -1,5 +1,9 @@
+mod load_bridge;
+mod ordering_key;
 mod proxy;
 mod registry;
+
+pub use ordering_key::{JvmOrderingKeyReleaseQueue, JvmOrderingKeyTable};
 
 #[cfg(feature = "gate-a-direct-attachment")]
 use std::ffi::c_void;
@@ -11,7 +15,7 @@ use std::time::Duration;
 
 use jni::EnvUnowned;
 use jni::errors::ThrowRuntimeExAndDefault;
-use jni::objects::{JByteArray, JClass, JObject, JObjectArray, JString, JValue};
+use jni::objects::{JByteArray, JClass, JObject, JObjectArray, JString};
 #[cfg(feature = "gate-a-direct-attachment")]
 use jni::sys;
 use jni::{jni_sig, jni_str};
@@ -26,6 +30,10 @@ const CAPABILITIES: i64 = 0b111;
 const BUILD_ID: &str = "mantle-gate-a-1";
 
 static CALLBACK_EXCEPTIONS: AtomicUsize = AtomicUsize::new(0);
+
+pub(crate) fn record_callback_exception() {
+    CALLBACK_EXCEPTIONS.fetch_add(1, Ordering::Relaxed);
+}
 
 fn registry() -> &'static Mutex<Registry> {
     static REGISTRY: OnceLock<Mutex<Registry>> = OnceLock::new();
@@ -173,10 +181,13 @@ pub extern "system" fn Java_dev_mantle_internal_MantleNative_release<'local>(
     _class: JClass<'local>,
     raw_handle: i64,
 ) {
-    env.with_env(|_| {
+    env.with_env(|env| {
         if let Ok(handle) = Handle::from_jlong(raw_handle) {
             let core = with_registry(|registry| registry.release(handle));
             if let Some(core) = core {
+                if matches!(core, CoreObject::Manager(_)) {
+                    load_bridge::shutdown(env);
+                }
                 with_engine(|engine| match core {
                     CoreObject::Manager(manager) => {
                         let _ = engine.release_manager(manager);
@@ -485,32 +496,131 @@ pub extern "system" fn Java_dev_mantle_internal_MantleNative_loadItem<'local>(
     identifier: JString<'local>,
     result_handler: JObject<'local>,
 ) -> JObject<'local> {
+    env.with_env(|env| load_bridge::submit(env, &identifier, &result_handler, None))
+        .resolve::<ThrowRuntimeExAndDefault>()
+}
+
+#[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_mantle_internal_MantleNative_loadItemOrdered<'local>(
+    mut env: EnvUnowned<'local>,
+    _class: JClass<'local>,
+    ordering_key: JObject<'local>,
+    identifier: JString<'local>,
+    result_handler: JObject<'local>,
+) -> JObject<'local> {
+    env.with_env(|env| load_bridge::submit(env, &identifier, &result_handler, Some(&ordering_key)))
+        .resolve::<ThrowRuntimeExAndDefault>()
+}
+
+#[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_mantle_internal_MantleNative_loadItemReference<'local>(
+    mut env: EnvUnowned<'local>,
+    _class: JClass<'local>,
+    reference: JObject<'local>,
+    result_handler: JObject<'local>,
+) -> JObject<'local> {
+    env.with_env(|env| load_bridge::submit_java_reference(env, &reference, &result_handler, None))
+        .resolve::<ThrowRuntimeExAndDefault>()
+}
+
+#[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_mantle_internal_MantleNative_loadItemOrderedReference<'local>(
+    mut env: EnvUnowned<'local>,
+    _class: JClass<'local>,
+    ordering_key: JObject<'local>,
+    reference: JObject<'local>,
+    result_handler: JObject<'local>,
+) -> JObject<'local> {
     env.with_env(|env| {
-        let pending = identifier.try_to_string(env)? == "gate:pending";
-        let identifier = JObject::from(identifier);
-        let track = proxy::create(env, 3, &identifier)?;
-        let future = env.new_object(
-            jni_str!("java/util/concurrent/CompletableFuture"),
-            jni_sig!("()V"),
-            &[],
-        )?;
-        let _ = env.call_method(
-            &result_handler,
-            jni_str!("trackLoaded"),
-            jni_sig!("(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)V"),
-            &[JValue::Object(&track)],
-        )?;
-        if !pending {
-            let _ = env.call_method(
-                &future,
-                jni_str!("complete"),
-                jni_sig!("(Ljava/lang/Object;)Z"),
-                &[JValue::Object(&JObject::null())],
-            )?;
-        }
-        Ok::<_, jni::errors::Error>(future)
+        load_bridge::submit_java_reference(env, &reference, &result_handler, Some(&ordering_key))
     })
     .resolve::<ThrowRuntimeExAndDefault>()
+}
+
+#[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_mantle_internal_MantleNative_loadItemSync<'local>(
+    mut env: EnvUnowned<'local>,
+    _class: JClass<'local>,
+    reference: JObject<'local>,
+) -> JObject<'local> {
+    env.with_env(|env| load_bridge::load_sync(env, &reference))
+        .resolve::<ThrowRuntimeExAndDefault>()
+}
+
+#[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_mantle_internal_MantleNative_loadItemSyncHandled<'local>(
+    mut env: EnvUnowned<'local>,
+    _class: JClass<'local>,
+    reference: JObject<'local>,
+    result_handler: JObject<'local>,
+) {
+    env.with_env(|env| load_bridge::load_sync_handled(env, &reference, &result_handler))
+        .resolve::<ThrowRuntimeExAndDefault>();
+}
+
+#[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_mantle_internal_MantleNative_cancelLoad<'local>(
+    mut env: EnvUnowned<'local>,
+    _class: JClass<'local>,
+    load_id: i64,
+    _may_interrupt: bool,
+) -> bool {
+    env.with_env(|_| Ok::<_, jni::errors::Error>(load_bridge::cancel(load_id)))
+        .resolve::<ThrowRuntimeExAndDefault>()
+}
+
+#[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_mantle_internal_MantleNative_dispatchLoad<'local>(
+    mut env: EnvUnowned<'local>,
+    _class: JClass<'local>,
+    load_id: i64,
+) {
+    env.with_env(|env| load_bridge::dispatch(env, load_id))
+        .resolve::<ThrowRuntimeExAndDefault>();
+}
+
+#[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_mantle_internal_MantleNative_orderingKeyCount<'local>(
+    mut env: EnvUnowned<'local>,
+    _class: JClass<'local>,
+) -> i32 {
+    env.with_env(|_| {
+        i32::try_from(load_bridge::ordering_key_count())
+            .map_err(|_| jni::errors::Error::NullPtr("ordering-key count overflow"))
+    })
+    .resolve::<ThrowRuntimeExAndDefault>()
+}
+
+#[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_mantle_internal_MantleNative_registerSourceManager<'local>(
+    mut env: EnvUnowned<'local>,
+    _class: JClass<'local>,
+    player_manager: JObject<'local>,
+    source: JObject<'local>,
+) {
+    env.with_env(|env| load_bridge::register(env, &player_manager, &source))
+        .resolve::<ThrowRuntimeExAndDefault>();
+}
+
+#[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_mantle_internal_MantleNative_sourceManager<'local>(
+    mut env: EnvUnowned<'local>,
+    _class: JClass<'local>,
+    player_manager: JObject<'local>,
+    requested_class: JClass<'local>,
+) -> JObject<'local> {
+    env.with_env(|env| load_bridge::source_manager(env, &player_manager, &requested_class))
+        .resolve::<ThrowRuntimeExAndDefault>()
 }
 
 #[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
@@ -521,10 +631,26 @@ pub extern "system" fn Java_dev_mantle_internal_MantleNative_encodeTrackDetails<
     track: JObject<'local>,
 ) -> JByteArray<'local> {
     env.with_env(|env| {
+        if let Some(bytes) = load_bridge::encode_track_details(env, &track)? {
+            return env.byte_array_from_slice(&bytes);
+        }
         let _ = proxy::track_id_from_proxy(env, &track)?;
         let bytes = encode_synthetic_track_details(SerializationLimits::default())
             .map_err(|_| jni::errors::Error::NullPtr("could not encode synthetic track details"))?;
         env.byte_array_from_slice(&bytes)
+    })
+    .resolve::<ThrowRuntimeExAndDefault>()
+}
+
+#[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_mantle_internal_MantleNative_trackedSourceItemCount<'local>(
+    mut env: EnvUnowned<'local>,
+    _class: JClass<'local>,
+) -> i32 {
+    env.with_env(|env| {
+        i32::try_from(load_bridge::tracked_source_item_count(env)?)
+            .map_err(|_| jni::errors::Error::NullPtr("tracked source-item count exceeds i32"))
     })
     .resolve::<ThrowRuntimeExAndDefault>()
 }
@@ -545,9 +671,12 @@ pub extern "system" fn Java_dev_mantle_internal_MantleNative_decodeTrackDetails<
             ));
         }
         let bytes = env.convert_byte_array(&bytes)?;
+        let info = track_info_from_java(env, &info)?;
+        if let Some(track) = load_bridge::decode_track_details(env, &info, &bytes)? {
+            return Ok(track);
+        }
         decode_synthetic_track_details(&bytes, limits)
             .map_err(|_| jni::errors::Error::NullPtr("could not decode synthetic track details"))?;
-        let info = track_info_from_java(env, &info)?;
         let identifier = env.new_string(&info.identifier)?;
         let track = proxy::create(env, 3, identifier.as_ref())?;
         let track_id = proxy::track_id_from_proxy(env, &track)?;

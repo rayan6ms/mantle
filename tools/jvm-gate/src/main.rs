@@ -345,15 +345,25 @@ import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager;
 import com.sedmelluq.discord.lavaplayer.player.event.AudioEventListener;
 import com.sedmelluq.discord.lavaplayer.player.event.TrackStartEvent;
 import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.track.AudioItem;
 import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 import com.sedmelluq.discord.lavaplayer.track.TrackMarker;
 import com.sedmelluq.discord.lavaplayer.track.TrackMarkerHandler.MarkerState;
 import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.lang.reflect.Method;
 
 public final class GateIntegration {
   public static void main(String[] args) throws Exception {
@@ -363,7 +373,60 @@ public final class GateIntegration {
     AtomicReference<AudioTrack> loaded = new AtomicReference<>();
     AtomicInteger starts = new AtomicInteger();
     AtomicInteger markers = new AtomicInteger();
+    AtomicInteger sourceLoads = new AtomicInteger();
+    AtomicInteger sourceShutdowns = new AtomicInteger();
     Object userData = new Object();
+    AudioPlaylist registeredPlaylist = new AudioPlaylist() {
+      public String getName() { return "JVM playlist"; }
+      public List<AudioTrack> getTracks() { return Collections.singletonList(loaded.get()); }
+      public AudioTrack getSelectedTrack() { return loaded.get(); }
+      public boolean isSearchResult() { return false; }
+    };
+
+    AudioSourceManager[] sourceHolder = new AudioSourceManager[1];
+    AudioSourceManager registeredSource = new AudioSourceManager() {
+      public String getSourceName() { return "gate-jvm"; }
+      public AudioItem loadItem(com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager ignored,
+                                AudioReference reference) {
+        sourceLoads.incrementAndGet();
+        if ("jvm:track".equals(reference.identifier)) {
+          return new AudioReference("gate:track", "referred");
+        }
+        if ("jvm:direct".equals(reference.identifier)) return loaded.get();
+        if ("jvm:playlist".equals(reference.identifier)) return registeredPlaylist;
+        if ("jvm:reentrant".equals(reference.identifier)) {
+          manager.registerSourceManager(sourceHolder[0]);
+          return loaded.get();
+        }
+        if ("jvm:fail".equals(reference.identifier)) throw new IllegalStateException("gate failure");
+        return null;
+      }
+      public boolean isTrackEncodable(AudioTrack track) { return track == loaded.get(); }
+      public void encodeTrack(AudioTrack track, DataOutput output) throws java.io.IOException {
+        output.writeUTF("jvm-v1");
+      }
+      public AudioTrack decodeTrack(com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo info,
+                                    DataInput input) throws java.io.IOException {
+        if (!"jvm-v1".equals(input.readUTF())) throw new java.io.IOException("wrong details");
+        return loaded.get();
+      }
+      public void shutdown() { sourceShutdowns.incrementAndGet(); }
+    };
+    sourceHolder[0] = registeredSource;
+    manager.registerSourceManager(registeredSource);
+    if (manager.getSourceManagers().size() != 1
+        || manager.getSourceManagers().get(0) != registeredSource) {
+      throw new AssertionError("registered source visibility");
+    }
+    try {
+      manager.getSourceManagers().clear();
+      throw new AssertionError("registered source view is mutable");
+    } catch (UnsupportedOperationException expected) {
+      // The reference returns an unmodifiable live view.
+    }
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    AudioSourceManager foundSource = manager.source((Class) registeredSource.getClass());
+    if (foundSource != registeredSource) throw new AssertionError("source class lookup");
 
     AudioEventListener[] listener = new AudioEventListener[1];
     listener[0] = event -> {
@@ -395,19 +458,96 @@ public final class GateIntegration {
       public void loadFailed(FriendlyException error) { throw new AssertionError(error); }
     };
 
-    Future<Void> completed = manager.loadItem("gate:track", handler);
+    Future<Void> completed = manager.loadItem("jvm:track", handler);
+    completed.get();
     if (!completed.isDone() || completed.isCancelled()) throw new AssertionError("future completion");
-    if (loaded.get() == null || !"gate:track".equals(loaded.get().getIdentifier())) {
+    if (loaded.get() == null || !"gate:track".equals(loaded.get().getIdentifier())
+        || sourceLoads.get() != 1) {
       throw new AssertionError("track identifier");
     }
     if (starts.get() != 1 || !player.isPaused()) throw new AssertionError("reentrant start callback");
     if (markers.get() != 1) throw new AssertionError("marker callback");
     player.setPaused(false);
 
-    byte[] details = manager.encodeTrackDetails(loaded.get());
+    AudioItem syncItem = manager.loadItemSync(new AudioReference("jvm:direct", null));
+    if (syncItem != loaded.get() || sourceLoads.get() != 2) {
+      throw new AssertionError("synchronous JVM source item");
+    }
+    AtomicReference<AudioPlaylist> syncPlaylist = new AtomicReference<>();
+    manager.loadItemSync(new AudioReference("jvm:playlist", null), new AudioLoadResultHandler() {
+      public void trackLoaded(AudioTrack track) { throw new AssertionError("track"); }
+      public void playlistLoaded(AudioPlaylist value) { syncPlaylist.set(value); }
+      public void noMatches() { throw new AssertionError("no matches"); }
+      public void loadFailed(FriendlyException error) { throw new AssertionError(error); }
+    });
+    if (syncPlaylist.get() != registeredPlaylist || sourceLoads.get() != 3) {
+      throw new AssertionError("synchronous JVM source callback");
+    }
+
+    manager.registerSourceManager(registeredSource);
+    if (manager.getSourceManagers().size() != 2) {
+      throw new AssertionError("late duplicate source registration");
+    }
+
+    AtomicReference<AudioTrack> direct = new AtomicReference<>();
+    Future<Void> directFuture = manager.loadItem(
+        new AudioReference("jvm:direct", null), new AudioLoadResultHandler() {
+      public void trackLoaded(AudioTrack track) { direct.set(track); }
+      public void playlistLoaded(AudioPlaylist playlist) { throw new AssertionError("playlist"); }
+      public void noMatches() { throw new AssertionError("no matches"); }
+      public void loadFailed(FriendlyException error) { throw new AssertionError(error); }
+    });
+    directFuture.get();
+    if (direct.get() != loaded.get() || sourceLoads.get() != 4) {
+      throw new AssertionError("direct JVM source item");
+    }
+
+    AtomicReference<AudioPlaylist> playlist = new AtomicReference<>();
+    manager.loadItem("jvm:playlist", new AudioLoadResultHandler() {
+      public void trackLoaded(AudioTrack track) { throw new AssertionError("track"); }
+      public void playlistLoaded(AudioPlaylist value) { playlist.set(value); }
+      public void noMatches() { throw new AssertionError("no matches"); }
+      public void loadFailed(FriendlyException error) { throw new AssertionError(error); }
+    }).get();
+    if (playlist.get() != registeredPlaylist || sourceLoads.get() != 5) {
+      throw new AssertionError("direct JVM playlist item");
+    }
+
+    AtomicInteger failures = new AtomicInteger();
+    manager.loadItem("jvm:fail", new AudioLoadResultHandler() {
+      public void trackLoaded(AudioTrack track) { throw new AssertionError("track"); }
+      public void playlistLoaded(AudioPlaylist value) { throw new AssertionError("playlist"); }
+      public void noMatches() { throw new AssertionError("no matches"); }
+      public void loadFailed(FriendlyException error) { failures.incrementAndGet(); }
+    }).get();
+    if (failures.get() != 1 || sourceLoads.get() != 6) {
+      throw new AssertionError("JVM source failure callback");
+    }
+
+    AtomicInteger noMatches = new AtomicInteger();
+    manager.loadItem("jvm:missing", new AudioLoadResultHandler() {
+      public void trackLoaded(AudioTrack track) { throw new AssertionError("track"); }
+      public void playlistLoaded(AudioPlaylist value) { throw new AssertionError("playlist"); }
+      public void noMatches() { noMatches.incrementAndGet(); }
+      public void loadFailed(FriendlyException error) { throw new AssertionError(error); }
+    }).get();
+    if (noMatches.get() != 1) throw new AssertionError("JVM source no-match callback");
+
+    AtomicReference<AudioTrack> reentrant = new AtomicReference<>();
+    manager.loadItem("jvm:reentrant", new AudioLoadResultHandler() {
+      public void trackLoaded(AudioTrack track) { reentrant.set(track); }
+      public void playlistLoaded(AudioPlaylist value) { throw new AssertionError("playlist"); }
+      public void noMatches() { throw new AssertionError("no matches"); }
+      public void loadFailed(FriendlyException error) { throw new AssertionError(error); }
+    }).get();
+    if (reentrant.get() != loaded.get() || manager.getSourceManagers().size() != 3) {
+      throw new AssertionError("reentrant JVM source registration");
+    }
+
+    byte[] details = manager.encodeTrackDetails(direct.get());
     byte[] expectedDetails = new byte[] {
-        0, 13, 'm', 'a', 'n', 't', 'l', 'e', '-', 'o', 'r', 'a', 'c', 'l', 'e',
-        0, 9, 'o', 'r', 'a', 'c', 'l', 'e', '-', 'v', '1'
+        0, 8, 'g', 'a', 't', 'e', '-', 'j', 'v', 'm',
+        0, 6, 'j', 'v', 'm', '-', 'v', '1'
     };
     if (!Arrays.equals(details, expectedDetails)) throw new AssertionError("track detail bytes");
     AudioTrack decoded = manager.decodeTrackDetails(loaded.get().getInfo(), details);
@@ -422,6 +562,129 @@ public final class GateIntegration {
       // Malformed compatibility input must fail without crossing JNI as a Rust panic.
     }
 
+    Class<?> nativeClass = Class.forName("dev.mantle.internal.MantleNative");
+    Method liveHandles = nativeClass.getMethod("liveHandles");
+    Method trackedSourceItems = nativeClass.getMethod("trackedSourceItemCount");
+    int handleBaseline = (Integer) liveHandles.invoke(null);
+    int trackedBaseline = (Integer) trackedSourceItems.invoke(null);
+    final int youtubeResourceRounds = 5_000;
+    for (int batch = 0; batch < 20; batch++) {
+      youtubeSerializationBatch(manager, 250);
+      awaitNativeSourceResources(
+          liveHandles, trackedSourceItems, handleBaseline, trackedBaseline, 10_000);
+    }
+    final int yandexResourceRounds = 5_000;
+    for (int batch = 0; batch < 20; batch++) {
+      yandexSerializationBatch(manager, 250);
+      awaitNativeSourceResources(
+          liveHandles, trackedSourceItems, handleBaseline, trackedBaseline, 10_000);
+    }
+
+    AudioItem youtubeItem = manager.loadItemSync(
+        new AudioReference("gate:youtube-track", null));
+    if (!(youtubeItem instanceof AudioTrack)) throw new AssertionError("YouTube track result");
+    AudioTrack youtubeTrack = (AudioTrack) youtubeItem;
+    if (!"dQw4w9WgXcQ".equals(youtubeTrack.getIdentifier())
+        || !"YouTube fixture".equals(youtubeTrack.getInfo().title)
+        || !"Fixture channel".equals(youtubeTrack.getInfo().author)
+        || youtubeTrack.getInfo().length != 213_000L
+        || youtubeTrack.getInfo().isStream
+        || !"https://www.youtube.com/watch?v=dQw4w9WgXcQ".equals(youtubeTrack.getInfo().uri)
+        || !"https://i.ytimg.com/fixture.jpg".equals(youtubeTrack.getInfo().artworkUrl)) {
+      throw new AssertionError("YouTube track metadata");
+    }
+    byte[] youtubeDetails = manager.encodeTrackDetails(youtubeTrack);
+    byte[] expectedYoutubeDetails = new byte[] {
+        0, 7, 'y', 'o', 'u', 't', 'u', 'b', 'e'
+    };
+    if (!Arrays.equals(youtubeDetails, expectedYoutubeDetails)) {
+      throw new AssertionError("YouTube detail bytes");
+    }
+    AudioTrack decodedYoutube = manager.decodeTrackDetails(
+        youtubeTrack.getInfo(), youtubeDetails);
+    if (!youtubeTrack.getIdentifier().equals(decodedYoutube.getIdentifier())
+        || !youtubeTrack.getInfo().title.equals(decodedYoutube.getInfo().title)) {
+      throw new AssertionError("decoded YouTube metadata");
+    }
+
+    AudioItem youtubePlaylistItem = manager.loadItemSync(
+        new AudioReference("gate:youtube-playlist", null));
+    if (!(youtubePlaylistItem instanceof AudioPlaylist)) {
+      throw new AssertionError("YouTube playlist result");
+    }
+    AudioPlaylist youtubePlaylist = (AudioPlaylist) youtubePlaylistItem;
+    if (!"YouTube fixture playlist".equals(youtubePlaylist.getName())
+        || youtubePlaylist.isSearchResult()
+        || youtubePlaylist.getTracks().size() != 2
+        || youtubePlaylist.getSelectedTrack() != youtubePlaylist.getTracks().get(1)) {
+      throw new AssertionError("YouTube playlist shape");
+    }
+    if (!Arrays.equals(
+        manager.encodeTrackDetails(youtubePlaylist.getTracks().get(0)),
+        expectedYoutubeDetails)) {
+      throw new AssertionError("YouTube playlist member ownership");
+    }
+
+    AudioPlaylist youtubeSearch = (AudioPlaylist) manager.loadItemSync(
+        new AudioReference("gate:youtube-search", null));
+    if (!youtubeSearch.isSearchResult() || youtubeSearch.getSelectedTrack() != null
+        || youtubeSearch.getTracks().size() != 2) {
+      throw new AssertionError("YouTube search result shape");
+    }
+
+    AudioItem yandexItem = manager.loadItemSync(
+        new AudioReference("gate:yandex-track", null));
+    if (!(yandexItem instanceof AudioTrack)) throw new AssertionError("Yandex track result");
+    AudioTrack yandexTrack = (AudioTrack) yandexItem;
+    if (!"71663565".equals(yandexTrack.getIdentifier())
+        || !"Animals".equals(yandexTrack.getInfo().title)
+        || !"Architects".equals(yandexTrack.getInfo().author)
+        || yandexTrack.getInfo().length != 244_321L
+        || yandexTrack.getInfo().isStream
+        || !"https://music.yandex.ru/album/1/track/71663565".equals(yandexTrack.getInfo().uri)
+        || !"https://avatars.yandex.net/get-music-content/fixture/400x400".equals(
+            yandexTrack.getInfo().artworkUrl)) {
+      throw new AssertionError("Yandex track metadata");
+    }
+    byte[] yandexDetails = manager.encodeTrackDetails(yandexTrack);
+    byte[] expectedYandexDetails = new byte[] {
+        0, 12, 'y', 'a', 'n', 'd', 'e', 'x', '-', 'm', 'u', 's', 'i', 'c'
+    };
+    if (!Arrays.equals(yandexDetails, expectedYandexDetails)) {
+      throw new AssertionError("Yandex detail bytes");
+    }
+    AudioTrack decodedYandex = manager.decodeTrackDetails(
+        yandexTrack.getInfo(), yandexDetails);
+    if (!yandexTrack.getIdentifier().equals(decodedYandex.getIdentifier())
+        || !yandexTrack.getInfo().title.equals(decodedYandex.getInfo().title)) {
+      throw new AssertionError("decoded Yandex metadata");
+    }
+
+    AudioItem yandexPlaylistItem = manager.loadItemSync(
+        new AudioReference("gate:yandex-playlist", null));
+    if (!(yandexPlaylistItem instanceof AudioPlaylist)) {
+      throw new AssertionError("Yandex playlist result");
+    }
+    AudioPlaylist yandexPlaylist = (AudioPlaylist) yandexPlaylistItem;
+    if (!"Yandex fixture playlist".equals(yandexPlaylist.getName())
+        || yandexPlaylist.isSearchResult()
+        || yandexPlaylist.getTracks().size() != 2
+        || yandexPlaylist.getSelectedTrack() != null) {
+      throw new AssertionError("Yandex playlist shape");
+    }
+    if (!Arrays.equals(
+        manager.encodeTrackDetails(yandexPlaylist.getTracks().get(0)),
+        expectedYandexDetails)) {
+      throw new AssertionError("Yandex playlist member ownership");
+    }
+
+    AudioPlaylist yandexSearch = (AudioPlaylist) manager.loadItemSync(
+        new AudioReference("gate:yandex-search", null));
+    if (!yandexSearch.isSearchResult() || yandexSearch.getSelectedTrack() != null
+        || yandexSearch.getTracks().size() != 2) {
+      throw new AssertionError("Yandex search result shape");
+    }
+
     AudioFrame frame = player.provide();
     if (frame == null || frame.getTimecode() != 0 || frame.getVolume() != 100
         || frame.getDataLength() != 4 || !Arrays.equals(frame.getData(), new byte[] {1, 2, 3, 4})) {
@@ -429,17 +692,111 @@ public final class GateIntegration {
     }
     if (player.provide() != null) throw new AssertionError("frame should be consumed");
 
-    Future<Void> pending = manager.loadItem("gate:pending", handler);
+    Future<Void> pending = manager.loadItemOrdered(
+        new String("gate-key"), new AudioReference("gate:pending", null), handler);
     if (pending.isDone()) throw new AssertionError("pending future completed");
     if (!pending.cancel(true) || !pending.isCancelled()) throw new AssertionError("future cancellation");
+    Method orderingKeyCount = nativeClass.getMethod("orderingKeyCount");
+    long keyDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    while ((Integer) orderingKeyCount.invoke(null) != 0 && System.nanoTime() < keyDeadline) {
+      Thread.sleep(1);
+    }
+    if ((Integer) orderingKeyCount.invoke(null) != 0) throw new AssertionError("ordering-key leak");
+
+    List<Integer> orderedCallbacks = Collections.synchronizedList(new ArrayList<>());
+    List<String> callbackThreads = Collections.synchronizedList(new ArrayList<>());
+    @SuppressWarnings("unchecked")
+    Future<Void>[] ordered = new Future[16];
+    Object sharedKey = new String("shared-key");
+    for (int index = 0; index < ordered.length; index++) {
+      final int callbackIndex = index;
+      ordered[index] = manager.loadItemOrdered(sharedKey, "gate:track", new AudioLoadResultHandler() {
+        public void trackLoaded(AudioTrack track) {
+          orderedCallbacks.add(callbackIndex);
+          callbackThreads.add(Thread.currentThread().getName());
+        }
+        public void playlistLoaded(AudioPlaylist playlist) { throw new AssertionError("playlist"); }
+        public void noMatches() { throw new AssertionError("no matches"); }
+        public void loadFailed(FriendlyException error) { throw new AssertionError(error); }
+      });
+    }
+    for (Future<Void> orderedFuture : ordered) orderedFuture.get();
+    for (int index = 0; index < ordered.length; index++) {
+      if (orderedCallbacks.get(index) != index) throw new AssertionError("ordered callback FIFO");
+      if (callbackThreads.get(index).startsWith("mantle-info-loader-")) {
+        throw new AssertionError("callback ran on native loader");
+      }
+    }
+    long orderedDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    while ((Integer) orderingKeyCount.invoke(null) != 0 && System.nanoTime() < orderedDeadline) {
+      Thread.sleep(1);
+    }
+    if ((Integer) orderingKeyCount.invoke(null) != 0) throw new AssertionError("ordered key leak");
 
     loaded.get().stop();
     decoded.stop();
+    youtubeTrack.stop();
+    decodedYoutube.stop();
+    for (AudioTrack track : youtubePlaylist.getTracks()) track.stop();
+    for (AudioTrack track : youtubeSearch.getTracks()) track.stop();
+    yandexTrack.stop();
+    decodedYandex.stop();
+    for (AudioTrack track : yandexPlaylist.getTracks()) track.stop();
+    for (AudioTrack track : yandexSearch.getTracks()) track.stop();
     player.destroy();
     manager.shutdown();
+    if (sourceShutdowns.get() != 3) throw new AssertionError("source shutdown count");
     System.out.printf(
-        "{\"probe\":\"integration\",\"starts\":%d,\"markers\":%d,\"serialization\":true,\"future_complete\":true,\"future_cancel\":true}%n",
-        starts.get(), markers.get());
+        "{\"probe\":\"integration\",\"starts\":%d,\"markers\":%d,\"serialization\":true,\"youtube_results\":true,\"youtube_resource_rounds\":%d,\"yandex_results\":true,\"yandex_resource_rounds\":%d,\"future_complete\":true,\"future_cancel\":true,\"ordered_callbacks\":%d}%n",
+        starts.get(), markers.get(), youtubeResourceRounds, yandexResourceRounds,
+        orderedCallbacks.size());
+  }
+
+  private static void youtubeSerializationBatch(
+      DefaultAudioPlayerManager manager, int count) throws Exception {
+    byte[] expected = new byte[] {0, 7, 'y', 'o', 'u', 't', 'u', 'b', 'e'};
+    for (int index = 0; index < count; index++) {
+      AudioTrack track = (AudioTrack) manager.loadItemSync(
+          new AudioReference("gate:youtube-track", null));
+      byte[] details = manager.encodeTrackDetails(track);
+      if (!Arrays.equals(details, expected)) throw new AssertionError("YouTube resource details");
+      AudioTrack decoded = manager.decodeTrackDetails(track.getInfo(), details);
+      track.stop();
+      decoded.stop();
+    }
+  }
+
+  private static void yandexSerializationBatch(
+      DefaultAudioPlayerManager manager, int count) throws Exception {
+    byte[] expected = new byte[] {
+        0, 12, 'y', 'a', 'n', 'd', 'e', 'x', '-', 'm', 'u', 's', 'i', 'c'
+    };
+    for (int index = 0; index < count; index++) {
+      AudioTrack track = (AudioTrack) manager.loadItemSync(
+          new AudioReference("gate:yandex-track", null));
+      byte[] details = manager.encodeTrackDetails(track);
+      if (!Arrays.equals(details, expected)) throw new AssertionError("Yandex resource details");
+      AudioTrack decoded = manager.decodeTrackDetails(track.getInfo(), details);
+      track.stop();
+      decoded.stop();
+    }
+  }
+
+  private static void awaitNativeSourceResources(
+      Method liveHandles, Method trackedSourceItems, int expectedHandles, int expectedTracked,
+      long timeoutMillis) throws Exception {
+    long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
+    int handles;
+    int tracked;
+    do {
+      System.gc();
+      Thread.sleep(2);
+      handles = (Integer) liveHandles.invoke(null);
+      tracked = (Integer) trackedSourceItems.invoke(null);
+      if (handles == expectedHandles && tracked <= expectedTracked) return;
+    } while (System.nanoTime() < deadline);
+    throw new AssertionError(
+        "native source resource leak handles=" + handles + ", tracked=" + tracked);
   }
 }
 "#;
