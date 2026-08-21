@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-08-14",
+  "provider": "yt-dlp/ejs",
+  "version": "0.8.0",
+  "license": "Unlicense",
+  "source": "https://github.com/yt-dlp/ejs/releases/tag/0.8.0",
+  "source_commit": "4fb477f4af56880cfd324c48bd4294a2d2294e50",
+  "inputs": {
+    "yt.solver.core.js": {
+      "bytes": 12607,
+      "sha256": "ca259e4e3cdd37d92fc266d9af08d4fd66da8479e240f4d984f29da402c22ead",
+      "sha3_512": "c163a6f376db6ce3da47d516a28a8f2a0554ae95c58dc766f0a6e2b3894f2cef1ee07fa84beb442fa471aac4f300985added1657c7c94c4d1cfefe68920ab599"
+    },
+    "yt.solver.lib.js": {
+      "bytes": 366728,
+      "sha256": "770831df5c46474fbff06732315b28f4fb090e427ca669a51da61e2457d41c82",
+      "sha3_512": "1ee3753a8222fc855f5c39db30a9ccbb7967dbe1fb810e86dc9a89aa073a0907f294c720e9b65427d560a35aa1ce6af19ef854d9126a05ca00afe03f72047733"
+    }
+  },
+  "package": {
+    "path": "crates/mantle-media/assets/youtube-ejs/0.8.0/mantle-youtube-ejs.js",
+    "bytes": 382691,
+    "sha256": "1092864f066a3b243bcf7bed212a5807d06327f244693f5ab175a3b534aaeefe",
+    "sha3_512": "2872a0596fdc33b49251b2aab1caf58c614a9064cac43a4aa2875fd5f9566b75757f25955b0a0e1f2b8cf60ff1a19aa034bd94bc3d5b991b966f0de8bf3c387a",
+    "license_path": "crates/mantle-media/assets/youtube-ejs/0.8.0/LICENSE"
+  },
+  "bundled_dependency_licenses": [
+    "ISC",
+    "MIT"
+  ],
+  "runtime": {
+    "name": "Deno",
+    "minimum_version": "2.9.5",
+    "tested_version": "2.9.5",
+    "permissions_granted": [],
+    "permissions_denied": [
+      "read",
+      "write",
+      "net",
+      "env",
+      "sys",
+      "run",
+      "ffi",
+      "import"
+    ],
+    "remote_modules": false,
+    "npm_modules": false,
+    "inherited_environment": false,
+    "default_timeout_ms": 10000,
+    "default_heap_megabytes": 128,
+    "default_stdout_bytes": 65536,
+    "default_stderr_bytes": 65536
+  }
+}

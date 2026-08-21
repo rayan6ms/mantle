@@ -1,0 +1,236 @@
+{
+  "schema_version": 1,
+  "compatibility_baseline": "lavaplayer-2.2.6",
+  "source_status": "reference/remote-source-status-2026-08-13.json",
+  "offline_gate": {
+    "cargo_packages": [
+      "mantle-core",
+      "mantle-media",
+      "mantle-jvm"
+    ],
+    "required_checkers": [
+      "scripts/check-source-manager-inventory.sh",
+      "scripts/check-remote-source-status.sh",
+      "scripts/check-http-playlist-inventory.sh",
+      "scripts/check-local-media-inventory.sh",
+      "scripts/check-youtube-ejs-provider.sh"
+    ]
+  },
+  "sources": [
+    {
+      "order": 1,
+      "class": "YoutubeAudioSourceManager",
+      "source_name": "youtube",
+      "disposition": "native_required",
+      "implementation": [
+        "crates/mantle-media/src/youtube.rs",
+        "crates/mantle-media/src/youtube_playback.rs",
+        "crates/mantle-media/src/youtube_cipher_process.rs"
+      ],
+      "replay_tests": [
+        "crates/mantle-media/tests/phase12_youtube.rs"
+      ],
+      "live": {
+        "category": "public",
+        "test_target": "phase12_youtube",
+        "test_name": "scheduled_live_video_and_playback_discovery_smoke",
+        "required_environment": [],
+        "optional_environment": [
+          "MANTLE_YOUTUBE_SMOKE_URL"
+        ]
+      }
+    },
+    {
+      "order": 2,
+      "class": "YandexMusicAudioSourceManager",
+      "source_name": "yandex-music",
+      "disposition": "native_required",
+      "implementation": [
+        "crates/mantle-media/src/yandex_music.rs"
+      ],
+      "replay_tests": [
+        "crates/mantle-media/tests/phase12_yandex_music.rs"
+      ],
+      "live": {
+        "category": "none",
+        "reason": "lavaplayer_2_2_6_oauth_is_optional_and_has_no_supported_credential_provisioning_contract"
+      }
+    },
+    {
+      "order": 3,
+      "class": "SoundCloudAudioSourceManager",
+      "source_name": "soundcloud",
+      "disposition": "native_required",
+      "implementation": [
+        "crates/mantle-media/src/soundcloud.rs"
+      ],
+      "replay_tests": [
+        "crates/mantle-media/tests/phase12_soundcloud.rs"
+      ],
+      "live": {
+        "category": "none",
+        "reason": "official_application_credentials_require_artist_pro_and_are_not_project_owned"
+      }
+    },
+    {
+      "order": 4,
+      "class": "BandcampAudioSourceManager",
+      "source_name": "bandcamp",
+      "disposition": "native_required",
+      "implementation": [
+        "crates/mantle-media/src/bandcamp.rs"
+      ],
+      "replay_tests": [
+        "crates/mantle-media/tests/phase12_bandcamp.rs"
+      ],
+      "live": {
+        "category": "public",
+        "test_target": "phase12_bandcamp",
+        "test_name": "scheduled_live_track_smoke",
+        "required_environment": [],
+        "optional_environment": [
+          "MANTLE_BANDCAMP_SMOKE_URL"
+        ]
+      }
+    },
+    {
+      "order": 5,
+      "class": "VimeoAudioSourceManager",
+      "source_name": "vimeo",
+      "disposition": "native_required",
+      "implementation": [
+        "crates/mantle-media/src/vimeo.rs"
+      ],
+      "replay_tests": [
+        "crates/mantle-media/tests/phase12_vimeo.rs"
+      ],
+      "live": {
+        "category": "public",
+        "test_target": "phase12_vimeo",
+        "test_name": "scheduled_live_public_config_smoke",
+        "required_environment": [],
+        "optional_environment": [
+          "MANTLE_VIMEO_SMOKE_URL"
+        ]
+      }
+    },
+    {
+      "order": 6,
+      "class": "TwitchStreamAudioSourceManager",
+      "source_name": "twitch",
+      "disposition": "native_required",
+      "implementation": [
+        "crates/mantle-media/src/twitch.rs"
+      ],
+      "replay_tests": [
+        "crates/mantle-media/tests/phase12_twitch.rs"
+      ],
+      "live": {
+        "category": "credentialed",
+        "test_target": "phase12_twitch",
+        "test_name": "scheduled_live_helix_metadata_smoke",
+        "required_environment": [
+          "MANTLE_TWITCH_SMOKE_URL",
+          "MANTLE_TWITCH_CLIENT_ID",
+          "MANTLE_TWITCH_ACCESS_TOKEN"
+        ],
+        "optional_environment": []
+      }
+    },
+    {
+      "order": 7,
+      "class": "BeamAudioSourceManager",
+      "source_name": "beam.pro",
+      "disposition": "compatibility_only",
+      "implementation": [
+        "crates/mantle-media/src/beam.rs"
+      ],
+      "replay_tests": [
+        "crates/mantle-media/tests/phase12_beam.rs"
+      ],
+      "live": {
+        "category": "none",
+        "reason": "service_closed"
+      }
+    },
+    {
+      "order": 8,
+      "class": "GetyarnAudioSourceManager",
+      "source_name": "getyarn.io",
+      "disposition": "compatibility_only",
+      "implementation": [
+        "crates/mantle-media/src/getyarn.rs"
+      ],
+      "replay_tests": [
+        "crates/mantle-media/tests/phase12_getyarn.rs"
+      ],
+      "live": {
+        "category": "none",
+        "reason": "no_current_stable_playback_contract"
+      }
+    },
+    {
+      "order": 9,
+      "class": "NicoAudioSourceManager",
+      "source_name": "niconico",
+      "disposition": "native_required",
+      "implementation": [
+        "crates/mantle-media/src/niconico.rs"
+      ],
+      "replay_tests": [
+        "crates/mantle-media/tests/phase12_niconico.rs"
+      ],
+      "live": {
+        "category": "region_conditional",
+        "test_target": "phase12_niconico",
+        "test_name": "scheduled_live_watch_and_access_rights_smoke",
+        "required_environment": [],
+        "optional_environment": [
+          "MANTLE_NICONICO_SMOKE_URL",
+          "MANTLE_NICONICO_USER_SESSION"
+        ]
+      }
+    },
+    {
+      "order": 10,
+      "class": "HttpAudioSourceManager",
+      "source_name": "http",
+      "disposition": "foundation_complete",
+      "implementation": [
+        "crates/mantle-media/src/source.rs",
+        "crates/mantle-media/src/http_input.rs",
+        "crates/mantle-media/src/playlist.rs",
+        "crates/mantle-media/src/hls.rs",
+        "crates/mantle-media/src/mpeg_ts.rs"
+      ],
+      "replay_tests": [
+        "crates/mantle-media/tests/phase6_http.rs",
+        "crates/mantle-media/tests/phase10_playlists.rs",
+        "crates/mantle-media/tests/phase10_hls.rs",
+        "crates/mantle-media/tests/phase10_mpeg_ts.rs",
+        "crates/mantle-media/tests/phase11_sources.rs"
+      ],
+      "live": {
+        "category": "none",
+        "reason": "protocol_foundation_has_deterministic_loopback_coverage"
+      }
+    },
+    {
+      "order": 11,
+      "class": "LocalAudioSourceManager",
+      "source_name": "local",
+      "disposition": "foundation_complete",
+      "implementation": [
+        "crates/mantle-media/src/source.rs"
+      ],
+      "replay_tests": [
+        "crates/mantle-media/tests/phase9_contracts.rs",
+        "crates/mantle-media/tests/phase11_sources.rs"
+      ],
+      "live": {
+        "category": "none",
+        "reason": "local_filesystem_source_requires_no_internet_validation"
+      }
+    }
+  ]
+}

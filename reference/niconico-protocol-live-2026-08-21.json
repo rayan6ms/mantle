@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-08-21",
+  "probe_region": "BR",
+  "identifier": "sm9",
+  "credentials_used": false,
+  "watch": {
+    "endpoint_class": "www.nicovideo.jp/api/watch/v3_guest",
+    "http_status": 200,
+    "metadata_present": true,
+    "media_family": "domand",
+    "available_video_count": 2,
+    "available_audio_count": 2,
+    "access_right_key_present": true,
+    "watch_track_id_present": true
+  },
+  "access_rights": {
+    "endpoint_class": "nvapi.nicovideo.jp/v1/watch/{id}/access-rights/hls",
+    "http_status": 201,
+    "content_url_origin": "https://delivery.domand.nicovideo.jp",
+    "heartbeat_fields_present": false
+  },
+  "mantle_adapter_smoke": {
+    "watch_and_access_rights_passed": true,
+    "delivery_fetch_attempted": false
+  },
+  "delivery": {
+    "http_status_from_probe_region": 403,
+    "classification": "region_conditional"
+  },
+  "maintained_extractor_evidence": {
+    "repository": "https://github.com/yt-dlp/yt-dlp",
+    "commit": "81ecd58b1394793e6da9998cc19fdb45657f1685",
+    "path": "yt_dlp/extractor/niconico.py",
+    "sha256": "9a31000cb9e2fe67a17bc59b592d3d91fa3a82bfc5113bd43cb139fd9e162048"
+  },
+  "secrets_recorded": false
+}

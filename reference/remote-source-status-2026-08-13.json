@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-08-13",
+  "compatibility_baseline": "lavaplayer-2.2.6",
+  "required_controls": [
+    "bounded_response_bytes",
+    "bounded_redirects",
+    "bounded_retries",
+    "cancellation",
+    "credential_safe_diagnostics",
+    "rate_limit_classification",
+    "ssrf_policy",
+    "timeouts"
+  ],
+  "upstream_snapshots": [
+    {
+      "id": "lavaplayer-head",
+      "repository": "https://github.com/lavalink-devs/lavaplayer",
+      "commit": "f09c808f7d594206ae149453970015474bbcd222",
+      "path": "main/src/main/java/com/sedmelluq/discord/lavaplayer/source/AudioSourceManagers.java",
+      "sha256": "841af5d9f1af663098913d88ad816a8f9119c2691ad95677179ea1ad7fa5b9d0"
+    },
+    {
+      "id": "lavalink-config",
+      "repository": "https://github.com/lavalink-devs/Lavalink",
+      "commit": "d3e6039bed8dde4c7c6d15a19e6968c5a6e5cc9d",
+      "path": "LavalinkServer/application.yml.example",
+      "sha256": "25681f18581011fed12de9778937ce5753d108430e4781f7e0fde9525db51efd"
+    },
+    {
+      "id": "youtube-source-readme",
+      "repository": "https://github.com/lavalink-devs/youtube-source",
+      "commit": "158726dc7d570e8ff32512d6ab15736d561040b7",
+      "path": "README.md",
+      "sha256": "be06d223218c896f22866fca5e73405f3c431a21b5b9acc7c76796c198e2b656"
+    },
+    {
+      "id": "lavasrc-readme",
+      "repository": "https://github.com/topi314/LavaSrc",
+      "commit": "20d6b0bd1cdddcde86ba4d3fc8e78b97a00e159d",
+      "path": "README.md",
+      "sha256": "b5c706e84a556fa51d92c9867aced903d1be8dd3fe37d541f70a5a102a79730b"
+    },
+    {
+      "id": "yt-dlp-niconico",
+      "repository": "https://github.com/yt-dlp/yt-dlp",
+      "commit": "81ecd58b1394793e6da9998cc19fdb45657f1685",
+      "path": "yt_dlp/extractor/niconico.py",
+      "sha256": "9a31000cb9e2fe67a17bc59b592d3d91fa3a82bfc5113bd43cb139fd9e162048"
+    }
+  ],
+  "external_evidence": [
+    {
+      "id": "mixer-closure",
+      "url": "https://news.xbox.com/en-us/2020/06/22/bringing-more-players-into-our-gaming-vision/",
+      "claim": "Microsoft closed Mixer operations and redirected its sites and apps in July 2020."
+    },
+    {
+      "id": "soundcloud-playback",
+      "url": "https://developers.soundcloud.com/docs/api/",
+      "claim": "SoundCloud documents OAuth 2.1 access through a registered application, including client-credentials access to public resources."
+    },
+    {
+      "id": "soundcloud-api-registration",
+      "url": "https://developers.soundcloud.com/docs/api/register-app",
+      "claim": "SoundCloud requires an Artist Pro subscription to register an API application and receive a client ID and client secret."
+    },
+    {
+      "id": "vimeo-files",
+      "url": "https://developer.vimeo.com/api/files/video-links",
+      "claim": "Vimeo documents expiring direct file links through an authenticated API and video_files scope."
+    },
+    {
+      "id": "twitch-playback",
+      "url": "https://dev.twitch.tv/docs/embed/video-and-clips/",
+      "claim": "Twitch documents current live/VOD playback and HLS-backed player behavior."
+    },
+    {
+      "id": "bandcamp-api",
+      "url": "https://bandcamp.com/developer",
+      "claim": "Bandcamp's public developer surface documents account, sales, and merchandise APIs but not a supported playback API."
+    }
+  ],
+  "sources": [
+    {
+      "order": 1,
+      "class": "YoutubeAudioSourceManager",
+      "source_name": "youtube",
+      "disposition": "native_required",
+      "access": "anonymous_with_optional_oauth_or_po_token",
+      "capabilities": [
+        "video",
+        "playlist",
+        "search",
+        "music_search",
+        "livestream",
+        "opus_preference",
+        "transcode_fallback",
+        "source_details"
+      ],
+      "remote_cipher_required": false,
+      "evidence": ["lavaplayer-head", "lavalink-config", "youtube-source-readme"]
+    },
+    {
+      "order": 2,
+      "class": "YandexMusicAudioSourceManager",
+      "source_name": "yandex-music",
+      "disposition": "native_required",
+      "access": "configured_token_and_region_conditional_replay_only",
+      "capabilities": ["track", "album", "playlist", "search", "recommendations", "direct_playback", "source_details"],
+      "evidence": ["lavaplayer-head", "lavasrc-readme"]
+    },
+    {
+      "order": 3,
+      "class": "SoundCloudAudioSourceManager",
+      "source_name": "soundcloud",
+      "disposition": "native_required",
+      "access": "registered_application_credentials_require_artist_pro_replay_only",
+      "capabilities": ["track", "playlist", "search", "transcoded_streams", "source_details"],
+      "evidence": ["lavaplayer-head", "lavalink-config", "soundcloud-playback", "soundcloud-api-registration"]
+    },
+    {
+      "order": 4,
+      "class": "BandcampAudioSourceManager",
+      "source_name": "bandcamp",
+      "disposition": "native_required",
+      "access": "public_web_resolver_no_official_playback_api",
+      "capabilities": ["track", "album", "source_details"],
+      "evidence": ["lavaplayer-head", "lavalink-config", "bandcamp-api"]
+    },
+    {
+      "order": 5,
+      "class": "VimeoAudioSourceManager",
+      "source_name": "vimeo",
+      "disposition": "native_required",
+      "access": "public_web_resolver_with_optional_authenticated_file_api",
+      "capabilities": ["video", "expiring_file_links", "source_details"],
+      "evidence": ["lavaplayer-head", "lavalink-config", "vimeo-files"]
+    },
+    {
+      "order": 6,
+      "class": "TwitchStreamAudioSourceManager",
+      "source_name": "twitch",
+      "disposition": "native_required",
+      "access": "public_live_playback_with_service_tokens_where_required",
+      "capabilities": ["live_channel", "hls", "source_details"],
+      "evidence": ["lavaplayer-head", "lavalink-config", "twitch-playback"]
+    },
+    {
+      "order": 7,
+      "class": "BeamAudioSourceManager",
+      "source_name": "beam.pro",
+      "disposition": "compatibility_only",
+      "access": "service_closed",
+      "capabilities": [],
+      "evidence": ["lavaplayer-head", "mixer-closure"]
+    },
+    {
+      "order": 8,
+      "class": "GetyarnAudioSourceManager",
+      "source_name": "getyarn.io",
+      "disposition": "compatibility_only",
+      "access": "no_maintained_lavalink_registration_or_stable_public_playback_contract",
+      "capabilities": [],
+      "evidence": ["lavaplayer-head", "lavalink-config"]
+    },
+    {
+      "order": 9,
+      "class": "NicoAudioSourceManager",
+      "source_name": "niconico",
+      "disposition": "native_required",
+      "access": "public_video_with_optional_user_session_and_region_conditional_delivery",
+      "capabilities": ["video", "access_rights_hls", "aes_128_cmaf", "source_details"],
+      "evidence": ["lavaplayer-head", "lavalink-config", "yt-dlp-niconico"]
+    },
+    {
+      "order": 10,
+      "class": "HttpAudioSourceManager",
+      "source_name": "http",
+      "disposition": "foundation_complete",
+      "access": "bounded_http_with_ssrf_policy",
+      "capabilities": ["http", "icy", "playlists", "hls", "source_details"],
+      "evidence": ["lavaplayer-head", "lavalink-config"]
+    },
+    {
+      "order": 11,
+      "class": "LocalAudioSourceManager",
+      "source_name": "local",
+      "disposition": "foundation_complete",
+      "access": "local_filesystem_policy",
+      "capabilities": ["local_file", "probe", "seek", "source_details"],
+      "evidence": ["lavaplayer-head"]
+    }
+  ]
+}

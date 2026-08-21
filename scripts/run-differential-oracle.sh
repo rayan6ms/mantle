@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+readonly ROOT
 readonly WORK="$ROOT/target/oracle"
 readonly SCENARIO="$ROOT/tests/oracle/scenarios/foundation.json"
 readonly REFERENCE="$ROOT/.cache/reference/lavaplayer-2.2.6"
@@ -85,5 +86,5 @@ oracle compare --reference "$WORK/reference-1.trace.json" \
 oracle assert-differences --comparison "$WORK/comparison.json" \
   --allowed ''
 
-jq -r '"Phase 5 serialization gate passed: \(.equal_records) equal records, \(.differences | length) differences."' \
+jq -r '"Phase 11 JVM load/serialization gate passed: \(.equal_records) equal records, \(.differences | length) differences."' \
   "$WORK/comparison.json"

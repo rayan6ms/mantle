@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-08-14",
+  "embedUrl": "https://www.youtube.com/embed/",
+  "playerScriptPath": "/s/player/b0d2d49a/player_embed.vflset/pt_BR/base.js",
+  "playerScriptBytes": 1837192,
+  "playerScriptSha256": "5984f0dcbdeb88c2b1d95b9eee3755c2b60f699788cb8bb416dde768005cfef6",
+  "signatureTimestamp": 20676,
+  "nativeClassicGrammarSupported": false,
+  "ejsProviderProbe": {
+    "provider": "yt-dlp/ejs",
+    "version": "0.8.0",
+    "runtimeCompatibilityProbe": "Node 24.18.0",
+    "signatureInputBytes": 26,
+    "signatureOutputBytes": 22,
+    "nInputBytes": 26,
+    "nOutputBytes": 22,
+    "outputsChanged": true,
+    "denoRuntimeProbe": "Deno 2.9.5",
+    "denoPermissionProfileExecuted": true
+  },
+  "decision": "Retain the fail-closed native classic transformer and route current scripts through a separately reviewed bounded resolver provider.",
+  "sources": [
+    "https://github.com/yt-dlp/yt-dlp/wiki/EJS",
+    "https://github.com/yt-dlp/yt-dlp/issues/14404"
+  ]
+}
