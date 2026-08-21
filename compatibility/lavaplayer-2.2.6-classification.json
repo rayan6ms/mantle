@@ -24233,18 +24233,24 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, callable factory dispatch, argument identity, null return propagation, and reflection metadata are covered by the Phase 13 frame-buffer-factory-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBufferFactory",
       "symbol_kind": "METHOD",
       "member_name": "create",
       "descriptor": "(ILcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;Ljava/util/concurrent/atomic/AtomicBoolean;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBuffer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, callable factory dispatch, argument identity, null return propagation, and reflection metadata are covered by the Phase 13 frame-buffer-factory-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameConsumer",

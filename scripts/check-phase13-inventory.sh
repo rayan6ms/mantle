@@ -112,9 +112,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       .assessment == "UNASSESSED" and (has("classification") | not)
     end) and
   .cohorts[0].status == "IN_PROGRESS" and
-  .cohorts[0].classified_symbols == 196 and
-  .cohorts[0].remaining_symbols == 339 and
-  (.cohorts[0].completed_slices | length) == 8 and
+  .cohorts[0].classified_symbols == 198 and
+  .cohorts[0].remaining_symbols == 337 and
+  (.cohorts[0].completed_slices | length) == 9 and
   .cohorts[0].completed_slices[0] == {
     id: "player-events",
     classes: 9,
@@ -216,9 +216,21 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "tools/jvm-gate/src/main.rs"
     ]
   } and
+  .cohorts[0].completed_slices[8] == {
+    id: "frame-buffer-factory-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 1,
+    symbols: 2,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
   ([.cohorts[0].completed_slices[].symbols] | add) == .cohorts[0].classified_symbols and
   (.cohorts[0].classified_symbols + .cohorts[0].remaining_symbols) == .cohorts[0].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 196 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 198 and
   all($classifications.symbols[] | select(.assessment == "CLASSIFIED");
     . as $symbol |
     (($symbol.binary_name | contains(".player.event.")) or
@@ -237,6 +249,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider",
         "com.sedmelluq.discord.lavaplayer.track.playback.AbstractMutableAudioFrame",
         "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame",
+        "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBufferFactory",
         "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameProvider",
         "com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame",
         "com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame",
@@ -246,7 +259,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
     .classification == "A_EXACT" and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "frame-buffer-factory-contracts" and
+  .phase_entry.next_slice == "audio-frame-buffer-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 ' "$PLAN" >/dev/null
@@ -262,4 +275,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 196 classified core-player-track symbols and 2,566 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 198 classified core-player-track symbols and 2,564 unassessed symbols.\n'

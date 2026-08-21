@@ -110,6 +110,9 @@ fn run() -> Result<()> {
         Some("write-audio-configuration-consumer") => {
             write_consumer(&args, AUDIO_CONFIGURATION_CONSUMER)
         }
+        Some("write-frame-buffer-factory-consumer") => {
+            write_consumer(&args, FRAME_BUFFER_FACTORY_CONSUMER)
+        }
         _ => Err(
             "usage: mantle-jvm-gate <emit|write-smoke-consumer|write-probe-consumer> [options]"
                 .into(),
@@ -1576,6 +1579,66 @@ public final class GateAudioConfiguration {
     } catch (Throwable error) {
       if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const FRAME_BUFFER_FACTORY_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBufferFactory;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+public final class GateFrameBufferFactory {
+  private static int duration;
+  private static AudioDataFormat format;
+  private static AtomicBoolean stopping;
+
+  public static void main(String[] args) throws Exception {
+    AudioDataFormat expectedFormat = null;
+    AtomicBoolean expectedStopping = new AtomicBoolean(true);
+    AudioFrameBufferFactory factory = new AudioFrameBufferFactory() {
+      public AudioFrameBuffer create(int value, AudioDataFormat valueFormat,
+          AtomicBoolean valueStopping) {
+        duration = value;
+        format = valueFormat;
+        stopping = valueStopping;
+        return null;
+      }
+    };
+    check(factory.create(2_500, expectedFormat, expectedStopping) == null,
+        "factory return dispatch");
+    check(duration == 2_500 && format == expectedFormat && stopping == expectedStopping,
+        "factory argument dispatch");
+
+    check(AudioFrameBufferFactory.class.isInterface()
+        && Modifier.isPublic(AudioFrameBufferFactory.class.getModifiers())
+        && Modifier.isAbstract(AudioFrameBufferFactory.class.getModifiers())
+        && AudioFrameBufferFactory.class.getInterfaces().length == 0
+        && AudioFrameBufferFactory.class.getDeclaredFields().length == 0
+        && AudioFrameBufferFactory.class.getDeclaredMethods().length == 1,
+        "factory structure");
+    Method create = AudioFrameBufferFactory.class.getDeclaredMethod(
+        "create", int.class, AudioDataFormat.class, AtomicBoolean.class);
+    check(Modifier.isPublic(create.getModifiers()) && Modifier.isAbstract(create.getModifiers())
+        && !create.isDefault() && !create.isBridge() && !create.isSynthetic()
+        && create.getReturnType() == AudioFrameBuffer.class
+        && Arrays.equals(create.getParameterTypes(), new Class<?>[] {
+            int.class, AudioDataFormat.class, AtomicBoolean.class })
+        && create.getExceptionTypes().length == 0
+        && create.getTypeParameters().length == 0,
+        "factory method metadata");
+
+    System.out.println(
+        "dispatch=duration,format-identity,stopping-identity,null-return;"
+        + "reflection=public-abstract-interface,0-fields,1-method,0-exceptions");
   }
 
   private static void check(boolean condition, String message) {
