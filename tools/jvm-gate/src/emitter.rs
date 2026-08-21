@@ -23,6 +23,7 @@ const LOAD_FUTURE_CLASS: &str = "dev/mantle/internal/NativeLoadFuture";
 const LOAD_CALLBACK_CLASS: &str = "dev/mantle/internal/NativeLoadCallback";
 const LOADER_CLASS: &str = "dev/mantle/internal/NativeLoader";
 const FORMAT_CLASS: &str = "dev/mantle/internal/NativeAudioDataFormat";
+const EVENT_DISPATCHER_CLASS: &str = "dev/mantle/internal/NativeEventDispatcher";
 const MANAGER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayerManager";
 const AUDIO_REFERENCE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/AudioReference";
 const BASIC_PLAYLIST_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/BasicAudioPlaylist";
@@ -31,6 +32,11 @@ const RESAMPLING_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/AudioConfiguration$ResamplingQuality";
 const MARKER_STATE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState";
+const EVENT_ADAPTER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/event/AudioEventAdapter";
+const TRACK_EXCEPTION_EVENT_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
+const TRACK_STUCK_EVENT_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/player/event/TrackStuckEvent";
 
 const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler",
@@ -40,11 +46,14 @@ const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/player/AudioPlayerManager",
     MANAGER_CLASS,
     "com/sedmelluq/discord/lavaplayer/player/event/AudioEvent",
+    EVENT_ADAPTER_CLASS,
     "com/sedmelluq/discord/lavaplayer/player/event/AudioEventListener",
     "com/sedmelluq/discord/lavaplayer/player/event/PlayerPauseEvent",
     "com/sedmelluq/discord/lavaplayer/player/event/PlayerResumeEvent",
     "com/sedmelluq/discord/lavaplayer/player/event/TrackEndEvent",
+    TRACK_EXCEPTION_EVENT_CLASS,
     "com/sedmelluq/discord/lavaplayer/player/event/TrackStartEvent",
+    TRACK_STUCK_EVENT_CLASS,
     "com/sedmelluq/discord/lavaplayer/filter/PcmFilterFactory",
     "com/sedmelluq/discord/lavaplayer/format/AudioDataFormat",
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
@@ -109,6 +118,7 @@ pub fn emit(
         native_load_callback_class()?,
         native_loader_class()?,
         native_audio_data_format_class()?,
+        native_event_dispatcher_class()?,
     ]);
 
     if let Some(parent) = output.parent() {
@@ -408,28 +418,10 @@ fn replacement_body(
     if class_name == BASIC_PLAYLIST_CLASS {
         return basic_playlist_replacement(pool, name, descriptor, required_locals);
     }
+    if class_name.starts_with("com/sedmelluq/discord/lavaplayer/player/event/") {
+        return event_replacement(pool, class_name, name, descriptor, required_locals);
+    }
     Ok(match (class_name, name, descriptor) {
-        (
-            "com/sedmelluq/discord/lavaplayer/player/event/AudioEvent",
-            "<init>",
-            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;)V",
-        ) => audio_event_constructor(pool)?,
-        (
-            "com/sedmelluq/discord/lavaplayer/player/event/TrackStartEvent",
-            "<init>",
-            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)V",
-        ) => track_start_constructor(pool)?,
-        (
-            "com/sedmelluq/discord/lavaplayer/player/event/TrackEndEvent",
-            "<init>",
-            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackEndReason;)V",
-        ) => track_end_constructor(pool)?,
-        (
-            "com/sedmelluq/discord/lavaplayer/player/event/PlayerPauseEvent"
-            | "com/sedmelluq/discord/lavaplayer/player/event/PlayerResumeEvent",
-            "<init>",
-            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;)V",
-        ) => simple_audio_event_constructor(pool)?,
         (
             "com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo",
             "<init>",
@@ -481,6 +473,89 @@ fn replacement_body(
             required_locals,
         )?,
     })
+}
+
+fn event_replacement(
+    pool: &mut ConstantPool<'static>,
+    class_name: &str,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    if class_name == EVENT_ADAPTER_CLASS && event_adapter_method_is_noop(name, descriptor) {
+        return void_return(pool, required_locals);
+    }
+    Ok(match (class_name, name, descriptor) {
+        (
+            "com/sedmelluq/discord/lavaplayer/player/event/AudioEvent",
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;)V",
+        ) => audio_event_constructor(pool)?,
+        (
+            "com/sedmelluq/discord/lavaplayer/player/event/TrackStartEvent",
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)V",
+        ) => track_start_constructor(pool)?,
+        (
+            "com/sedmelluq/discord/lavaplayer/player/event/TrackEndEvent",
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackEndReason;)V",
+        ) => track_end_constructor(pool)?,
+        (
+            "com/sedmelluq/discord/lavaplayer/player/event/PlayerPauseEvent"
+            | "com/sedmelluq/discord/lavaplayer/player/event/PlayerResumeEvent",
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;)V",
+        ) => simple_audio_event_constructor(pool)?,
+        (EVENT_ADAPTER_CLASS, "<init>", "()V") => object_constructor(pool)?,
+        (
+            EVENT_ADAPTER_CLASS,
+            "onTrackStuck",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;J[Ljava/lang/StackTraceElement;)V",
+        ) => event_adapter_stuck_with_trace(pool)?,
+        (
+            EVENT_ADAPTER_CLASS,
+            "onEvent",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/event/AudioEvent;)V",
+        ) => event_adapter_dispatch(pool)?,
+        (
+            TRACK_EXCEPTION_EVENT_CLASS,
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException;)V",
+        ) => track_exception_constructor(pool)?,
+        (
+            TRACK_STUCK_EVENT_CLASS,
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;J[Ljava/lang/StackTraceElement;)V",
+        ) => track_stuck_constructor(pool)?,
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {class_name}.{name}{descriptor}"),
+            required_locals,
+        )?,
+    })
+}
+
+fn event_adapter_method_is_noop(name: &str, descriptor: &str) -> bool {
+    matches!(
+        (name, descriptor),
+        (
+            "onPlayerPause" | "onPlayerResume",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;)V"
+        ) | (
+            "onTrackStart",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)V"
+        ) | (
+            "onTrackEnd",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackEndReason;)V"
+        ) | (
+            "onTrackException",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException;)V"
+        ) | (
+            "onTrackStuck",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;J)V"
+        )
+    )
 }
 
 fn manager_replacement(
@@ -1173,6 +1248,32 @@ fn native_audio_data_format_class() -> Result<ClassFile<'static>> {
     Ok(class)
 }
 
+fn native_event_dispatcher_class() -> Result<ClassFile<'static>> {
+    let mut class = new_class(
+        EVENT_DISPATCHER_CLASS,
+        "java/lang/Object",
+        ClassAccessFlags::PUBLIC | ClassAccessFlags::FINAL | ClassAccessFlags::SUPER,
+        &[],
+    )?;
+    let constructor = object_constructor(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PRIVATE,
+        "<init>",
+        "()V",
+        Some(constructor),
+    )?;
+    let dispatch = event_dispatch_body(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+        "dispatch",
+        "(Lcom/sedmelluq/discord/lavaplayer/player/event/AudioEventAdapter;Lcom/sedmelluq/discord/lavaplayer/player/event/AudioEvent;)V",
+        Some(dispatch),
+    )?;
+    Ok(class)
+}
+
 fn new_class(
     name: &str,
     superclass: &str,
@@ -1298,6 +1399,10 @@ fn boolean_return(
     max_locals: u16,
 ) -> Result<Attribute> {
     integer_return(pool, i16::from(value), max_locals)
+}
+
+fn void_return(pool: &mut ConstantPool<'static>, max_locals: u16) -> Result<Attribute> {
+    code(pool, 0, max_locals, vec![Instruction::Return])
 }
 
 fn object_getter(
@@ -2256,6 +2361,266 @@ fn track_end_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> 
             Instruction::Aload_0,
             Instruction::Aload_3,
             Instruction::Putfield(reason),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn track_exception_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let event = pool.add_class("com/sedmelluq/discord/lavaplayer/player/event/AudioEvent")?;
+    let init = pool.add_method_ref(
+        event,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;)V",
+    )?;
+    let owner = pool.add_class(TRACK_EXCEPTION_EVENT_CLASS)?;
+    let track = pool.add_field_ref(
+        owner,
+        "track",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+    )?;
+    let exception = pool.add_field_ref(
+        owner,
+        "exception",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException;",
+    )?;
+    code(
+        pool,
+        2,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(init),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(track),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Putfield(exception),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn track_stuck_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let event = pool.add_class("com/sedmelluq/discord/lavaplayer/player/event/AudioEvent")?;
+    let init = pool.add_method_ref(
+        event,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;)V",
+    )?;
+    let owner = pool.add_class(TRACK_STUCK_EVENT_CLASS)?;
+    let track = pool.add_field_ref(
+        owner,
+        "track",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+    )?;
+    let threshold = pool.add_field_ref(owner, "thresholdMs", "J")?;
+    let stack_trace = pool.add_field_ref(owner, "stackTrace", "[Ljava/lang/StackTraceElement;")?;
+    code(
+        pool,
+        3,
+        6,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(init),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(track),
+            Instruction::Aload_0,
+            Instruction::Lload_3,
+            Instruction::Putfield(threshold),
+            Instruction::Aload_0,
+            Instruction::Aload(5),
+            Instruction::Putfield(stack_trace),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn event_adapter_stuck_with_trace(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(EVENT_ADAPTER_CLASS)?;
+    let callback = pool.add_method_ref(
+        owner,
+        "onTrackStuck",
+        "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;J)V",
+    )?;
+    code(
+        pool,
+        5,
+        6,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Lload_3,
+            Instruction::Invokevirtual(callback),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn event_adapter_dispatch(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let dispatcher = pool.add_class(EVENT_DISPATCHER_CLASS)?;
+    let dispatch = pool.add_method_ref(
+        dispatcher,
+        "dispatch",
+        "(Lcom/sedmelluq/discord/lavaplayer/player/event/AudioEventAdapter;Lcom/sedmelluq/discord/lavaplayer/player/event/AudioEvent;)V",
+    )?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokestatic(dispatch),
+            Instruction::Return,
+        ],
+    )
+}
+
+// Keeping the dispatch bytecode linear makes its branch targets directly auditable against javap.
+#[allow(clippy::too_many_lines)]
+fn event_dispatch_body(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    const PLAYER_DESCRIPTOR: &str = "Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;";
+    const TRACK_DESCRIPTOR: &str = "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;";
+    let event = pool.add_class("com/sedmelluq/discord/lavaplayer/player/event/AudioEvent")?;
+    let player = pool.add_field_ref(event, "player", PLAYER_DESCRIPTOR)?;
+    let pause = pool.add_class("com/sedmelluq/discord/lavaplayer/player/event/PlayerPauseEvent")?;
+    let resume =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/player/event/PlayerResumeEvent")?;
+    let start = pool.add_class("com/sedmelluq/discord/lavaplayer/player/event/TrackStartEvent")?;
+    let end = pool.add_class("com/sedmelluq/discord/lavaplayer/player/event/TrackEndEvent")?;
+    let exception = pool.add_class(TRACK_EXCEPTION_EVENT_CLASS)?;
+    let stuck = pool.add_class(TRACK_STUCK_EVENT_CLASS)?;
+    let start_track = pool.add_field_ref(start, "track", TRACK_DESCRIPTOR)?;
+    let end_track = pool.add_field_ref(end, "track", TRACK_DESCRIPTOR)?;
+    let end_reason = pool.add_field_ref(
+        end,
+        "endReason",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackEndReason;",
+    )?;
+    let exception_track = pool.add_field_ref(exception, "track", TRACK_DESCRIPTOR)?;
+    let exception_value = pool.add_field_ref(
+        exception,
+        "exception",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException;",
+    )?;
+    let stuck_track = pool.add_field_ref(stuck, "track", TRACK_DESCRIPTOR)?;
+    let stuck_threshold = pool.add_field_ref(stuck, "thresholdMs", "J")?;
+    let stuck_stack_trace =
+        pool.add_field_ref(stuck, "stackTrace", "[Ljava/lang/StackTraceElement;")?;
+    let adapter = pool.add_class(EVENT_ADAPTER_CLASS)?;
+    let on_pause =
+        pool.add_method_ref(adapter, "onPlayerPause", &format!("({PLAYER_DESCRIPTOR})V"))?;
+    let on_resume = pool.add_method_ref(
+        adapter,
+        "onPlayerResume",
+        &format!("({PLAYER_DESCRIPTOR})V"),
+    )?;
+    let on_start = pool.add_method_ref(
+        adapter,
+        "onTrackStart",
+        &format!("({PLAYER_DESCRIPTOR}{TRACK_DESCRIPTOR})V"),
+    )?;
+    let on_end = pool.add_method_ref(
+        adapter,
+        "onTrackEnd",
+        &format!(
+            "({PLAYER_DESCRIPTOR}{TRACK_DESCRIPTOR}Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackEndReason;)V"
+        ),
+    )?;
+    let on_exception = pool.add_method_ref(
+        adapter,
+        "onTrackException",
+        &format!(
+            "({PLAYER_DESCRIPTOR}{TRACK_DESCRIPTOR}Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException;)V"
+        ),
+    )?;
+    let on_stuck = pool.add_method_ref(
+        adapter,
+        "onTrackStuck",
+        &format!("({PLAYER_DESCRIPTOR}{TRACK_DESCRIPTOR}J[Ljava/lang/StackTraceElement;)V"),
+    )?;
+    code(
+        pool,
+        6,
+        2,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Instanceof(pause),
+            Instruction::Ifeq(8),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Getfield(player),
+            Instruction::Invokevirtual(on_pause),
+            Instruction::Goto(71),
+            Instruction::Aload_1,
+            Instruction::Instanceof(resume),
+            Instruction::Ifeq(16),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Getfield(player),
+            Instruction::Invokevirtual(on_resume),
+            Instruction::Goto(71),
+            Instruction::Aload_1,
+            Instruction::Instanceof(start),
+            Instruction::Ifeq(27),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Getfield(player),
+            Instruction::Aload_1,
+            Instruction::Checkcast(start),
+            Instruction::Getfield(start_track),
+            Instruction::Invokevirtual(on_start),
+            Instruction::Goto(71),
+            Instruction::Aload_1,
+            Instruction::Instanceof(end),
+            Instruction::Ifeq(41),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Getfield(player),
+            Instruction::Aload_1,
+            Instruction::Checkcast(end),
+            Instruction::Getfield(end_track),
+            Instruction::Aload_1,
+            Instruction::Checkcast(end),
+            Instruction::Getfield(end_reason),
+            Instruction::Invokevirtual(on_end),
+            Instruction::Goto(71),
+            Instruction::Aload_1,
+            Instruction::Instanceof(exception),
+            Instruction::Ifeq(55),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Getfield(player),
+            Instruction::Aload_1,
+            Instruction::Checkcast(exception),
+            Instruction::Getfield(exception_track),
+            Instruction::Aload_1,
+            Instruction::Checkcast(exception),
+            Instruction::Getfield(exception_value),
+            Instruction::Invokevirtual(on_exception),
+            Instruction::Goto(71),
+            Instruction::Aload_1,
+            Instruction::Instanceof(stuck),
+            Instruction::Ifeq(71),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Getfield(player),
+            Instruction::Aload_1,
+            Instruction::Checkcast(stuck),
+            Instruction::Getfield(stuck_track),
+            Instruction::Aload_1,
+            Instruction::Checkcast(stuck),
+            Instruction::Getfield(stuck_threshold),
+            Instruction::Aload_1,
+            Instruction::Checkcast(stuck),
+            Instruction::Getfield(stuck_stack_trace),
+            Instruction::Invokevirtual(on_stuck),
             Instruction::Return,
         ],
     )

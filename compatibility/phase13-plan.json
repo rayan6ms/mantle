@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "PREPARED",
+  "status": "IN_PROGRESS",
   "compatibility_baseline": "lavaplayer-2.2.6",
   "inventory": "reference/lavaplayer-2.2.6-inventory.json",
   "classification_ledger": "compatibility/lavaplayer-2.2.6-classification.json",
@@ -26,10 +26,10 @@
     ]
   },
   "existing_structural_slice": {
-    "scope": "Gate A feasibility evidence only; not a bulk A_EXACT classification",
-    "classes": 33,
-    "symbols": 282,
-    "internal_runtime_classes": 9,
+    "scope": "Gate A plus completed Phase 13 slices; only symbols classified in the canonical ledger carry a compatibility claim",
+    "classes": 36,
+    "symbols": 301,
+    "internal_runtime_classes": 10,
     "binary_names": [
       "com.sedmelluq.discord.lavaplayer.filter.PcmFilterFactory",
       "com.sedmelluq.discord.lavaplayer.format.AudioDataFormat",
@@ -40,11 +40,14 @@
       "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "com.sedmelluq.discord.lavaplayer.player.event.AudioEvent",
+      "com.sedmelluq.discord.lavaplayer.player.event.AudioEventAdapter",
       "com.sedmelluq.discord.lavaplayer.player.event.AudioEventListener",
       "com.sedmelluq.discord.lavaplayer.player.event.PlayerPauseEvent",
       "com.sedmelluq.discord.lavaplayer.player.event.PlayerResumeEvent",
       "com.sedmelluq.discord.lavaplayer.player.event.TrackEndEvent",
+      "com.sedmelluq.discord.lavaplayer.player.event.TrackExceptionEvent",
       "com.sedmelluq.discord.lavaplayer.player.event.TrackStartEvent",
+      "com.sedmelluq.discord.lavaplayer.player.event.TrackStuckEvent",
       "com.sedmelluq.discord.lavaplayer.source.AudioSourceManager",
       "com.sedmelluq.discord.lavaplayer.tools.FriendlyException",
       "com.sedmelluq.discord.lavaplayer.track.AudioItem",
@@ -78,6 +81,24 @@
       "fields": 69,
       "methods": 405,
       "symbols": 535,
+      "status": "IN_PROGRESS",
+      "classified_symbols": 35,
+      "remaining_symbols": 500,
+      "completed_slices": [
+        {
+          "id": "player-events",
+          "classes": 9,
+          "fields": 9,
+          "methods": 17,
+          "symbols": 35,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
+        }
+      ],
       "objective": "Complete the player, event, track, marker, and frame contract around the proven Gate A slice.",
       "exit_evidence": "Per-symbol ledger entries, generated class structure, Revapi diff, and behavioral oracle coverage."
     },
@@ -212,6 +233,7 @@
   "phase_entry": {
     "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
     "first_execution_cohort": "core-player-track",
+    "next_slice": "track-value-contracts",
     "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
   }
 }

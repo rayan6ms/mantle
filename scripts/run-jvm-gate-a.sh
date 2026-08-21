@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+readonly ROOT
 readonly REFERENCE_JAR="${MANTLE_REFERENCE_JAR:-$ROOT/.cache/reference/lavaplayer-2.2.6/lavaplayer-2.2.6.jar}"
 readonly WORK="$ROOT/target/gate-a"
 readonly CLASSES="$WORK/consumer-classes"
@@ -21,19 +22,21 @@ cargo run --locked -q -p mantle-jvm-gate -- emit \
 cargo run --locked -q -p mantle-jvm-gate -- verify-structure \
   --reference-jar "$REFERENCE_JAR" --candidate-jar "$JAR"
 
-for consumer in smoke probe integration classloader; do
+for consumer in smoke probe integration classloader event; do
   case "$consumer" in
     smoke) consumer_class='Smoke' ;;
     probe) consumer_class='Probe' ;;
     integration) consumer_class='Integration' ;;
     classloader) consumer_class='Classloader' ;;
+    event) consumer_class='Events' ;;
   esac
   cargo run --locked -q -p mantle-jvm-gate -- "write-$consumer-consumer" \
     --output "$WORK/Gate${consumer_class}.java"
 done
 
 javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
-  "$WORK/GateSmoke.java" "$WORK/GateProbe.java" "$WORK/GateIntegration.java"
+  "$WORK/GateSmoke.java" "$WORK/GateProbe.java" "$WORK/GateIntegration.java" \
+  "$WORK/GateEvents.java"
 javac --release 11 -d "$CLASSES" "$WORK/GateClassloader.java"
 
 case "$(uname -s)" in
@@ -46,13 +49,24 @@ if command -v cygpath >/dev/null 2>&1; then
   native="$(cygpath -w "$native")"
   classes_argument="$(cygpath -w "$CLASSES")"
   jar_argument="$(cygpath -w "$JAR")"
+  reference_argument="$(cygpath -w "$REFERENCE_JAR")"
 else
   native="$(cd "$(dirname "$native")" && pwd)/$(basename "$native")"
   classes_argument="$CLASSES"
   jar_argument="$JAR"
+  reference_argument="$REFERENCE_JAR"
 fi
 
 readonly GATE_CLASSPATH="$classes_argument$classpath_separator$jar_argument"
+java -Xverify:all \
+  -cp "$classes_argument$classpath_separator$reference_argument" GateEvents \
+  >"$WORK/event-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$reference_argument" GateEvents \
+  >"$WORK/event-candidate.txt"
+cmp "$WORK/event-reference.txt" "$WORK/event-candidate.txt"
+grep --fixed-strings \
+  'pause,resume,start,end,exception,stuck,|legacy-stuck' "$WORK/event-candidate.txt" >/dev/null
 java -Xverify:all -cp "$GATE_CLASSPATH" GateSmoke "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateIntegration "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" callbacks

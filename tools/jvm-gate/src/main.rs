@@ -67,6 +67,14 @@ fn run() -> Result<()> {
             fs::write(output, CLASSLOADER_CONSUMER)?;
             Ok(())
         }
+        Some("write-event-consumer") => {
+            let output = required_path(&args, "--output")?;
+            if let Some(parent) = output.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::write(output, EVENT_CONSUMER)?;
+            Ok(())
+        }
         _ => Err(
             "usage: mantle-jvm-gate <emit|write-smoke-consumer|write-probe-consumer> [options]"
                 .into(),
@@ -83,6 +91,130 @@ public final class GateSmoke {
     DefaultAudioPlayerManager manager = new DefaultAudioPlayerManager();
     manager.shutdown();
     System.out.println("gate-smoke-ok");
+  }
+}
+"#;
+
+const EVENT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
+import com.sedmelluq.discord.lavaplayer.player.event.AudioEvent;
+import com.sedmelluq.discord.lavaplayer.player.event.AudioEventAdapter;
+import com.sedmelluq.discord.lavaplayer.player.event.PlayerPauseEvent;
+import com.sedmelluq.discord.lavaplayer.player.event.PlayerResumeEvent;
+import com.sedmelluq.discord.lavaplayer.player.event.TrackEndEvent;
+import com.sedmelluq.discord.lavaplayer.player.event.TrackExceptionEvent;
+import com.sedmelluq.discord.lavaplayer.player.event.TrackStartEvent;
+import com.sedmelluq.discord.lavaplayer.player.event.TrackStuckEvent;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import java.lang.reflect.Field;
+import java.lang.reflect.Proxy;
+
+public final class GateEvents {
+  private static AudioPlayer player;
+  private static AudioTrack track;
+  private static FriendlyException exception;
+  private static StackTraceElement[] stackTrace;
+
+  public static void main(String[] args) throws Exception {
+    player = proxy(AudioPlayer.class);
+    track = proxy(AudioTrack.class);
+    exception = allocate(FriendlyException.class);
+    stackTrace = new StackTraceElement[] {
+      new StackTraceElement("GateEvents", "main", "GateEvents.java", 1)
+    };
+
+    PlayerPauseEvent pause = new PlayerPauseEvent(player);
+    PlayerResumeEvent resume = new PlayerResumeEvent(player);
+    TrackStartEvent start = new TrackStartEvent(player, track);
+    TrackEndEvent end = new TrackEndEvent(player, track, null);
+    TrackExceptionEvent failed = new TrackExceptionEvent(player, track, exception);
+    TrackStuckEvent stuck = new TrackStuckEvent(player, track, 321L, stackTrace);
+    check(pause.player == player && resume.player == player, "player fields");
+    check(start.player == player && start.track == track, "start fields");
+    check(end.player == player && end.track == track && end.endReason == null, "end fields");
+    check(failed.player == player && failed.track == track && failed.exception == exception,
+        "exception fields");
+    check(stuck.player == player && stuck.track == track && stuck.thresholdMs == 321L
+        && stuck.stackTrace == stackTrace, "stuck fields");
+
+    StringBuilder observed = new StringBuilder();
+    AudioEventAdapter adapter = new AudioEventAdapter() {
+      public void onPlayerPause(AudioPlayer value) {
+        check(value == player, "pause player"); observed.append("pause,");
+      }
+      public void onPlayerResume(AudioPlayer value) {
+        check(value == player, "resume player"); observed.append("resume,");
+      }
+      public void onTrackStart(AudioPlayer value, AudioTrack item) {
+        check(value == player && item == track, "start values"); observed.append("start,");
+      }
+      public void onTrackEnd(AudioPlayer value, AudioTrack item,
+                             com.sedmelluq.discord.lavaplayer.track.AudioTrackEndReason reason) {
+        check(value == player && item == track && reason == null, "end values");
+        observed.append("end,");
+      }
+      public void onTrackException(AudioPlayer value, AudioTrack item, FriendlyException error) {
+        check(value == player && item == track && error == exception, "exception values");
+        observed.append("exception,");
+      }
+      public void onTrackStuck(AudioPlayer value, AudioTrack item, long threshold,
+                               StackTraceElement[] trace) {
+        check(value == player && item == track && threshold == 321L && trace == stackTrace,
+            "stuck values");
+        observed.append("stuck,");
+      }
+    };
+    adapter.onEvent(pause);
+    adapter.onEvent(resume);
+    adapter.onEvent(start);
+    adapter.onEvent(end);
+    adapter.onEvent(failed);
+    adapter.onEvent(stuck);
+    adapter.onEvent(new AudioEvent(player) {});
+
+    StringBuilder legacy = new StringBuilder();
+    AudioEventAdapter legacyAdapter = new AudioEventAdapter() {
+      public void onTrackStuck(AudioPlayer value, AudioTrack item, long threshold) {
+        check(value == player && item == track && threshold == 654L, "legacy stuck values");
+        legacy.append("legacy-stuck");
+      }
+    };
+    legacyAdapter.onTrackStuck(player, track, 654L, stackTrace);
+    new AudioEventAdapter() {}.onEvent(start);
+
+    System.out.println(observed + "|" + legacy);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] { type },
+        (instance, method, arguments) -> defaultValue(method.getReturnType()));
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
+  }
+
+  private static <T> T allocate(Class<T> type) throws Exception {
+    Class<?> unsafeType = Class.forName("sun.misc.Unsafe");
+    Field singleton = unsafeType.getDeclaredField("theUnsafe");
+    singleton.setAccessible(true);
+    Object unsafe = singleton.get(null);
+    return type.cast(unsafeType.getMethod("allocateInstance", Class.class).invoke(unsafe, type));
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
   }
 }
 "#;
