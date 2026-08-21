@@ -245,18 +245,22 @@ public final class GateEvents {
 
 const TRACK_VALUE_CONSUMER: &str = r#"
 import com.sedmelluq.discord.lavaplayer.container.MediaContainerDescriptor;
+import com.sedmelluq.discord.lavaplayer.track.AudioItem;
+import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
 import com.sedmelluq.discord.lavaplayer.track.AudioReference;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
 import com.sedmelluq.discord.lavaplayer.track.BasicAudioPlaylist;
 import com.sedmelluq.discord.lavaplayer.track.TrackMarker;
 import com.sedmelluq.discord.lavaplayer.track.TrackMarkerHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
 
 public final class GateTrackValues {
-  public static void main(String[] args) {
+  public static void main(String[] args) throws Exception {
     MediaContainerDescriptor descriptor = new MediaContainerDescriptor(null, "container-params");
     AudioReference full = new AudioReference("identifier", "title", descriptor);
     check(full.identifier.equals("identifier"), "reference identifier field");
@@ -291,13 +295,29 @@ public final class GateTrackValues {
     AudioTrack track = proxy(AudioTrack.class);
     List<AudioTrack> tracks = new ArrayList<>();
     tracks.add(track);
-    BasicAudioPlaylist playlist = new BasicAudioPlaylist("playlist", tracks, track, true);
+    AudioPlaylist playlist = new BasicAudioPlaylist("playlist", tracks, track, true);
     check(playlist.getName().equals("playlist"), "playlist name");
     check(playlist.getTracks() == tracks && playlist.getSelectedTrack() == track,
         "playlist object identity");
     check(playlist.isSearchResult(), "playlist search flag");
     tracks.clear();
     check(playlist.getTracks().isEmpty(), "playlist retains caller list");
+    check(playlist instanceof AudioItem, "playlist item inheritance");
+    check(AudioPlaylist.class.isInterface()
+        && AudioPlaylist.class.getDeclaredMethods().length == 4,
+        "playlist interface structure");
+    check(AudioPlaylist.class.getInterfaces().length == 1
+        && AudioPlaylist.class.getInterfaces()[0] == AudioItem.class,
+        "playlist interface parent");
+    for (Method method : AudioPlaylist.class.getDeclaredMethods()) {
+      check(Modifier.isPublic(method.getModifiers())
+          && Modifier.isAbstract(method.getModifiers()) && !method.isDefault(),
+          "playlist abstract method");
+    }
+    Method tracksMethod = AudioPlaylist.class.getMethod("getTracks");
+    check(tracksMethod.getGenericReturnType().getTypeName().equals(
+        "java.util.List<com.sedmelluq.discord.lavaplayer.track.AudioTrack>"),
+        "playlist generic track list");
 
     TrackMarkerHandler handler = state -> { };
     TrackMarker marker = new TrackMarker(987654321L, handler);
@@ -306,7 +326,8 @@ public final class GateTrackValues {
     System.out.println(
         "reference=identifier,title,container-params,null-defaults;"
         + "info=123456789,true,optional-fields;"
-        + "playlist=identity,mutable,true;marker=987654321,identity");
+        + "playlist=identity,mutable,true;marker=987654321,identity;"
+        + "playlist-contract=AudioItem,4,List<AudioTrack>");
   }
 
   @SuppressWarnings("unchecked")

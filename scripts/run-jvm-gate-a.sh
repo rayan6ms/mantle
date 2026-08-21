@@ -79,7 +79,7 @@ java -Xverify:all \
   >"$WORK/track-values-candidate.txt"
 cmp "$WORK/track-values-reference.txt" "$WORK/track-values-candidate.txt"
 grep --fixed-strings \
-  'playlist=identity,mutable,true;marker=987654321,identity' \
+  'playlist=identity,mutable,true;marker=987654321,identity;playlist-contract=AudioItem,4,List<AudioTrack>' \
   "$WORK/track-values-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$classes_argument$classpath_separator$reference_argument" GateTrackEnums \
