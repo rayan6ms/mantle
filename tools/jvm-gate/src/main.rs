@@ -319,15 +319,33 @@ public final class GateTrackValues {
         "java.util.List<com.sedmelluq.discord.lavaplayer.track.AudioTrack>"),
         "playlist generic track list");
 
-    TrackMarkerHandler handler = state -> { };
+    TrackMarkerHandler.MarkerState[] handled = new TrackMarkerHandler.MarkerState[1];
+    TrackMarkerHandler handler = state -> handled[0] = state;
     TrackMarker marker = new TrackMarker(987654321L, handler);
     check(marker.timecode == 987654321L && marker.handler == handler, "marker fields");
+    handler.handle(TrackMarkerHandler.MarkerState.BYPASSED);
+    check(handled[0] == TrackMarkerHandler.MarkerState.BYPASSED, "marker handler dispatch");
+    check(TrackMarkerHandler.class.isInterface()
+        && TrackMarkerHandler.class.getDeclaredMethods().length == 1,
+        "marker handler structure");
+    Method handleMethod = TrackMarkerHandler.class.getMethod(
+        "handle", TrackMarkerHandler.MarkerState.class);
+    check(Modifier.isPublic(handleMethod.getModifiers())
+        && Modifier.isAbstract(handleMethod.getModifiers()) && !handleMethod.isDefault(),
+        "marker handler method");
+    check(handleMethod.getReturnType() == void.class
+        && handleMethod.getParameterTypes()[0] == TrackMarkerHandler.MarkerState.class,
+        "marker handler descriptor");
+    check(TrackMarkerHandler.MarkerState.class.getDeclaringClass() == TrackMarkerHandler.class
+        && Modifier.isStatic(TrackMarkerHandler.MarkerState.class.getModifiers()),
+        "marker handler nested enum");
 
     System.out.println(
         "reference=identifier,title,container-params,null-defaults;"
         + "info=123456789,true,optional-fields;"
         + "playlist=identity,mutable,true;marker=987654321,identity;"
-        + "playlist-contract=AudioItem,4,List<AudioTrack>");
+        + "playlist-contract=AudioItem,4,List<AudioTrack>;"
+        + "marker-handler=BYPASSED,public-abstract,void(MarkerState),nested-static");
   }
 
   @SuppressWarnings("unchecked")

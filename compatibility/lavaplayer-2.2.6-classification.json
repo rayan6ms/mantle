@@ -23039,18 +23039,24 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure, callback dispatch, abstract method metadata, and nested MarkerState linkage are covered by the Phase 13 marker-handler-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.TrackMarkerHandler",
       "symbol_kind": "METHOD",
       "member_name": "handle",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure, callback dispatch, abstract method metadata, and nested MarkerState linkage are covered by the Phase 13 marker-handler-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.TrackMarkerHandler$MarkerState",
