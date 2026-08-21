@@ -66,6 +66,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-audio-player-options-consumer" => Some(AUDIO_PLAYER_OPTIONS_CONSUMER),
         "write-decoded-track-holder-consumer" => Some(DECODED_TRACK_HOLDER_CONSUMER),
         "write-track-state-listener-consumer" => Some(TRACK_STATE_LISTENER_CONSUMER),
+        "write-audio-output-hook-consumer" => Some(AUDIO_OUTPUT_HOOK_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -2364,6 +2365,87 @@ public final class GateTrackStateListener {
     singleton.setAccessible(true);
     Object unsafe = singleton.get(null);
     return type.cast(unsafeType.getMethod("allocateInstance", Class.class).invoke(unsafe, type));
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_OUTPUT_HOOK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
+import com.sedmelluq.discord.lavaplayer.player.hook.AudioOutputHook;
+import com.sedmelluq.discord.lavaplayer.player.hook.AudioOutputHookFactory;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+
+public final class GateAudioOutputHook {
+  public static void main(String[] args) throws Exception {
+    AudioPlayer player = (AudioPlayer) Proxy.newProxyInstance(
+        GateAudioOutputHook.class.getClassLoader(), new Class<?>[] { AudioPlayer.class },
+        (proxy, method, values) -> null);
+    AudioFrame input = new ImmutableAudioFrame(1L, new byte[] { 1 }, 100, null);
+    AudioFrame replacement = new ImmutableAudioFrame(2L, new byte[] { 2 }, 50, null);
+    int[] calls = { 0 };
+    AudioOutputHook hook = (value, frame) -> {
+      calls[0]++;
+      if (calls[0] == 1) {
+        check(value == player && frame == input, "hook argument identity");
+        return replacement;
+      }
+      if (calls[0] == 2) {
+        check(value == player && frame == replacement, "hook passthrough arguments");
+        return frame;
+      }
+      check(value == null && frame == null, "hook nullable arguments");
+      return null;
+    };
+    check(hook.outgoingFrame(player, input) == replacement, "replacement identity");
+    check(hook.outgoingFrame(player, replacement) == replacement, "passthrough identity");
+    check(hook.outgoingFrame(null, null) == null && calls[0] == 3, "nullable return");
+
+    AudioOutputHookFactory factory = () -> hook;
+    check(factory.createOutputHook() == hook, "factory hook identity");
+    AudioOutputHookFactory nullFactory = () -> null;
+    check(nullFactory.createOutputHook() == null, "factory nullable return");
+
+    checkInterface(AudioOutputHook.class, 1);
+    checkInterface(AudioOutputHookFactory.class, 1);
+    Method outgoing = AudioOutputHook.class.getDeclaredMethod(
+        "outgoingFrame", AudioPlayer.class, AudioFrame.class);
+    checkMethod(outgoing, AudioFrame.class,
+        new Class<?>[] { AudioPlayer.class, AudioFrame.class });
+    Method create = AudioOutputHookFactory.class.getDeclaredMethod("createOutputHook");
+    checkMethod(create, AudioOutputHook.class, new Class<?>[0]);
+
+    System.out.println(
+        "hook=replacement,passthrough,null;factory=identity,null;"
+        + "reflection=2-interfaces,0-fields,2-methods,0-constructors");
+  }
+
+  private static void checkInterface(Class<?> type, int methodCount) {
+    int modifiers = type.getModifiers();
+    check(Modifier.isPublic(modifiers) && Modifier.isInterface(modifiers)
+        && Modifier.isAbstract(modifiers) && !Modifier.isFinal(modifiers)
+        && type.getSuperclass() == null && type.getInterfaces().length == 0
+        && type.getDeclaredFields().length == 0
+        && type.getDeclaredMethods().length == methodCount
+        && type.getDeclaredConstructors().length == 0,
+        "interface structure " + type.getName());
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, Class<?>[] parameters) {
+    check(Modifier.isPublic(method.getModifiers()) && Modifier.isAbstract(method.getModifiers())
+        && !Modifier.isStatic(method.getModifiers()) && !method.isDefault()
+        && !method.isBridge() && !method.isSynthetic() && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0,
+        "method metadata " + method.getName());
   }
 
   private static void check(boolean condition, String message) {

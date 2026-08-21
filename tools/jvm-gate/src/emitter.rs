@@ -86,6 +86,8 @@ const REFERENCE_CLASSES: &[&str] = &[
     TRACK_EXCEPTION_EVENT_CLASS,
     "com/sedmelluq/discord/lavaplayer/player/event/TrackStartEvent",
     TRACK_STUCK_EVENT_CLASS,
+    "com/sedmelluq/discord/lavaplayer/player/hook/AudioOutputHook",
+    "com/sedmelluq/discord/lavaplayer/player/hook/AudioOutputHookFactory",
     "com/sedmelluq/discord/lavaplayer/filter/PcmFilterFactory",
     "com/sedmelluq/discord/lavaplayer/format/AudioDataFormat",
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",

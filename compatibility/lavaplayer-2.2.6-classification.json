@@ -11997,36 +11997,52 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface structure, hook argument and return identity, replacement and pass-through behavior, nullable returns, factory dispatch, and method reflection are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.hook.AudioOutputHook",
       "symbol_kind": "METHOD",
       "member_name": "outgoingFrame",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface structure, hook argument and return identity, replacement and pass-through behavior, nullable returns, factory dispatch, and method reflection are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.hook.AudioOutputHookFactory",
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface structure, hook argument and return identity, replacement and pass-through behavior, nullable returns, factory dispatch, and method reflection are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.hook.AudioOutputHookFactory",
       "symbol_kind": "METHOD",
       "member_name": "createOutputHook",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/player/hook/AudioOutputHook;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface structure, hook argument and return identity, replacement and pass-through behavior, nullable returns, factory dispatch, and method reflection are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.AudioSourceManager",

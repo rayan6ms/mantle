@@ -22,7 +22,7 @@ cargo run --locked -q -p mantle-jvm-gate -- emit \
 cargo run --locked -q -p mantle-jvm-gate -- verify-structure \
   --reference-jar "$REFERENCE_JAR" --candidate-jar "$JAR"
 
-for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame audio-frame-provider-tools audio-processing-context audio-player-options decoded-track-holder track-state-listener; do
+for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame audio-frame-provider-tools audio-processing-context audio-player-options decoded-track-holder track-state-listener audio-output-hook; do
   case "$consumer" in
     smoke) consumer_class='Smoke' ;;
     probe) consumer_class='Probe' ;;
@@ -44,6 +44,7 @@ for consumer in smoke probe integration classloader event track-value track-enum
     audio-player-options) consumer_class='AudioPlayerOptions' ;;
     decoded-track-holder) consumer_class='DecodedTrackHolder' ;;
     track-state-listener) consumer_class='TrackStateListener' ;;
+    audio-output-hook) consumer_class='AudioOutputHook' ;;
   esac
   cargo run --locked -q -p mantle-jvm-gate -- "write-$consumer-consumer" \
     --output "$WORK/Gate${consumer_class}.java"
@@ -58,7 +59,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateTerminatorAudioFrame.java" "$WORK/GateReferenceMutableAudioFrame.java" \
   "$WORK/GateAudioFrameProviderTools.java" "$WORK/GateAudioProcessingContext.java" \
   "$WORK/GateAudioPlayerOptions.java" "$WORK/GateDecodedTrackHolder.java" \
-  "$WORK/GateTrackStateListener.java"
+  "$WORK/GateTrackStateListener.java" "$WORK/GateAudioOutputHook.java"
 javac --release 11 -d "$CLASSES" "$WORK/GateClassloader.java"
 
 case "$(uname -s)" in
@@ -257,6 +258,17 @@ cmp "$WORK/track-state-listener-reference.txt" \
 grep --fixed-strings \
   'dispatch=exception,stuck-min,nullable,stuck-max;' \
   "$WORK/track-state-listener-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$classes_argument$classpath_separator$reference_argument" GateAudioOutputHook \
+  >"$WORK/audio-output-hook-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$reference_argument" GateAudioOutputHook \
+  >"$WORK/audio-output-hook-candidate.txt"
+cmp "$WORK/audio-output-hook-reference.txt" \
+  "$WORK/audio-output-hook-candidate.txt"
+grep --fixed-strings \
+  'hook=replacement,passthrough,null;factory=identity,null;' \
+  "$WORK/audio-output-hook-candidate.txt" >/dev/null
 java -Xverify:all -cp "$GATE_CLASSPATH" GateSmoke "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateIntegration "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" callbacks

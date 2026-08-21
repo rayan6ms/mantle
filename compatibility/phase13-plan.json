@@ -27,8 +27,8 @@
   },
   "existing_structural_slice": {
     "scope": "Gate A plus completed Phase 13 slices; only symbols classified in the canonical ledger carry a compatibility claim",
-    "classes": 47,
-    "symbols": 359,
+    "classes": 49,
+    "symbols": 363,
     "internal_runtime_classes": 11,
     "binary_names": [
       "com.sedmelluq.discord.lavaplayer.filter.PcmFilterFactory",
@@ -49,6 +49,8 @@
       "com.sedmelluq.discord.lavaplayer.player.event.TrackExceptionEvent",
       "com.sedmelluq.discord.lavaplayer.player.event.TrackStartEvent",
       "com.sedmelluq.discord.lavaplayer.player.event.TrackStuckEvent",
+      "com.sedmelluq.discord.lavaplayer.player.hook.AudioOutputHook",
+      "com.sedmelluq.discord.lavaplayer.player.hook.AudioOutputHookFactory",
       "com.sedmelluq.discord.lavaplayer.source.AudioSourceManager",
       "com.sedmelluq.discord.lavaplayer.tools.FriendlyException",
       "com.sedmelluq.discord.lavaplayer.track.AudioItem",
@@ -93,8 +95,8 @@
       "methods": 405,
       "symbols": 535,
       "status": "IN_PROGRESS",
-      "classified_symbols": 254,
-      "remaining_symbols": 281,
+      "classified_symbols": 258,
+      "remaining_symbols": 277,
       "completed_slices": [
         {
           "id": "player-events",
@@ -324,6 +326,19 @@
             "tools/jvm-gate/src/emitter.rs",
             "tools/jvm-gate/src/main.rs"
           ]
+        },
+        {
+          "id": "audio-output-hook-contracts",
+          "classes": 2,
+          "fields": 0,
+          "methods": 2,
+          "symbols": 4,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
         }
       ],
       "objective": "Complete the player, event, track, marker, and frame contract around the proven Gate A slice.",
@@ -460,7 +475,7 @@
   "phase_entry": {
     "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
     "first_execution_cohort": "core-player-track",
-    "next_slice": "audio-output-hook-contracts",
+    "next_slice": "audio-load-result-handler-contracts",
     "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
   }
 }
