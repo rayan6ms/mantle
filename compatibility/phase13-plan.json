@@ -1,0 +1,217 @@
+{
+  "schema_version": 1,
+  "status": "PREPARED",
+  "compatibility_baseline": "lavaplayer-2.2.6",
+  "inventory": "reference/lavaplayer-2.2.6-inventory.json",
+  "classification_ledger": "compatibility/lavaplayer-2.2.6-classification.json",
+  "totals": {
+    "classes": 399,
+    "fields": 407,
+    "methods": 1956,
+    "symbols": 2762
+  },
+  "classification_policy": {
+    "allowed": [
+      "A_EXACT",
+      "B_SOURCE",
+      "C_SEMANTIC",
+      "D_LEGACY",
+      "X_UNSUPPORTED"
+    ],
+    "rules": [
+      "The frozen symbol ledger remains the only symbol-level classification record.",
+      "Cohort membership never implies a compatibility classification.",
+      "A symbol changes from UNASSESSED only with linked structural or behavioral evidence.",
+      "No difficult method or external public type may be silently omitted."
+    ]
+  },
+  "existing_structural_slice": {
+    "scope": "Gate A feasibility evidence only; not a bulk A_EXACT classification",
+    "classes": 33,
+    "symbols": 282,
+    "internal_runtime_classes": 9,
+    "binary_names": [
+      "com.sedmelluq.discord.lavaplayer.filter.PcmFilterFactory",
+      "com.sedmelluq.discord.lavaplayer.format.AudioDataFormat",
+      "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration",
+      "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration$ResamplingQuality",
+      "com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler",
+      "com.sedmelluq.discord.lavaplayer.player.AudioPlayer",
+      "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
+      "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
+      "com.sedmelluq.discord.lavaplayer.player.event.AudioEvent",
+      "com.sedmelluq.discord.lavaplayer.player.event.AudioEventListener",
+      "com.sedmelluq.discord.lavaplayer.player.event.PlayerPauseEvent",
+      "com.sedmelluq.discord.lavaplayer.player.event.PlayerResumeEvent",
+      "com.sedmelluq.discord.lavaplayer.player.event.TrackEndEvent",
+      "com.sedmelluq.discord.lavaplayer.player.event.TrackStartEvent",
+      "com.sedmelluq.discord.lavaplayer.source.AudioSourceManager",
+      "com.sedmelluq.discord.lavaplayer.tools.FriendlyException",
+      "com.sedmelluq.discord.lavaplayer.track.AudioItem",
+      "com.sedmelluq.discord.lavaplayer.track.AudioPlaylist",
+      "com.sedmelluq.discord.lavaplayer.track.AudioReference",
+      "com.sedmelluq.discord.lavaplayer.track.AudioTrack",
+      "com.sedmelluq.discord.lavaplayer.track.AudioTrackEndReason",
+      "com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo",
+      "com.sedmelluq.discord.lavaplayer.track.AudioTrackState",
+      "com.sedmelluq.discord.lavaplayer.track.BasicAudioPlaylist",
+      "com.sedmelluq.discord.lavaplayer.track.TrackMarker",
+      "com.sedmelluq.discord.lavaplayer.track.TrackMarkerHandler",
+      "com.sedmelluq.discord.lavaplayer.track.TrackMarkerHandler$MarkerState",
+      "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider",
+      "com.sedmelluq.discord.lavaplayer.track.playback.AbstractMutableAudioFrame",
+      "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame",
+      "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameProvider",
+      "com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame",
+      "com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame"
+    ]
+  },
+  "cohorts": [
+    {
+      "order": 1,
+      "id": "core-player-track",
+      "package_roots": [
+        "player",
+        "track"
+      ],
+      "classes": 61,
+      "fields": 69,
+      "methods": 405,
+      "symbols": 535,
+      "objective": "Complete the player, event, track, marker, and frame contract around the proven Gate A slice.",
+      "exit_evidence": "Per-symbol ledger entries, generated class structure, Revapi diff, and behavioral oracle coverage."
+    },
+    {
+      "order": 2,
+      "id": "source-spi-managers",
+      "package_roots": [
+        "source"
+      ],
+      "classes": 109,
+      "fields": 53,
+      "methods": 536,
+      "symbols": 698,
+      "objective": "Expand source SPI, built-in manager shells, class lookup, and serialization-visible types.",
+      "exit_evidence": "Source SPI extension tests, source lookup tests, per-symbol ledger entries, and Revapi diff."
+    },
+    {
+      "order": 3,
+      "id": "filter-format",
+      "package_roots": [
+        "filter",
+        "format"
+      ],
+      "classes": 40,
+      "fields": 19,
+      "methods": 160,
+      "symbols": 219,
+      "objective": "Cover filter factories, extension classes, PCM filters, and audio format contracts.",
+      "exit_evidence": "Filter extension/identity tests, format behavior tests, per-symbol ledger entries, and Revapi diff."
+    },
+    {
+      "order": 4,
+      "id": "container-media",
+      "package_roots": [
+        "container"
+      ],
+      "classes": 118,
+      "fields": 215,
+      "methods": 491,
+      "symbols": 824,
+      "objective": "Cover public container, probe, seek, and media-facing extension contracts.",
+      "exit_evidence": "Container fixtures, protected-extension tests, per-symbol ledger entries, and Revapi diff."
+    },
+    {
+      "order": 5,
+      "id": "tools-http",
+      "package_roots": [
+        "tools"
+      ],
+      "classes": 58,
+      "fields": 28,
+      "methods": 305,
+      "symbols": 391,
+      "objective": "Cover public utilities, HTTP configuration surfaces, scheduling, and exception behavior.",
+      "exit_evidence": "Utility/HTTP behavioral tests, external-type resolution, per-symbol ledger entries, and Revapi diff."
+    },
+    {
+      "order": 6,
+      "id": "native-legacy",
+      "package_roots": [
+        "natives"
+      ],
+      "classes": 13,
+      "fields": 23,
+      "methods": 59,
+      "symbols": 95,
+      "objective": "Classify the legacy native surface explicitly without inheriting obsolete implementation choices.",
+      "exit_evidence": "Explicit legacy/unsupported decisions or tests for every symbol, plus the applicable Revapi diff."
+    }
+  ],
+  "artifact_workstreams": {
+    "resources": {
+      "expected_count": 4,
+      "paths": [
+        "META-INF/MANIFEST.MF",
+        "certificates/bundled.txt",
+        "certificates/dst-root-ca-x3.jks",
+        "com/sedmelluq/discord/lavaplayer/tools/version.txt"
+      ]
+    },
+    "pom_dependencies": {
+      "expected_count": 12
+    },
+    "external_public_types": {
+      "expected_count": 35,
+      "groups": [
+        {
+          "id": "apache-http",
+          "selector": "prefix",
+          "value": "org.apache.http",
+          "expected_count": 30
+        },
+        {
+          "id": "jackson",
+          "selector": "exact",
+          "value": "com.fasterxml.jackson.core.type.TypeReference",
+          "expected_count": 1
+        },
+        {
+          "id": "lava-common",
+          "selector": "exact",
+          "value": "com.sedmelluq.lava.common.natives.NativeResourceHolder",
+          "expected_count": 1
+        },
+        {
+          "id": "jetbrains-annotations",
+          "selector": "exact",
+          "value": "org.jetbrains.annotations.Nullable",
+          "expected_count": 1
+        },
+        {
+          "id": "org-json",
+          "selector": "exact",
+          "value": "org.json.JSONObject",
+          "expected_count": 1
+        },
+        {
+          "id": "slf4j",
+          "selector": "exact",
+          "value": "org.slf4j.Logger",
+          "expected_count": 1
+        }
+      ]
+    },
+    "packaging_constraints": [
+      "Publish under Mantle-owned Maven coordinates.",
+      "Preserve required resources and metadata deliberately rather than copying the reference artifact wholesale.",
+      "Resolve Java 25+ native-access packaging before claiming future-JDK support.",
+      "Generate JVM artifacts without committed Java or Kotlin source."
+    ]
+  },
+  "phase_entry": {
+    "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
+    "first_execution_cohort": "core-player-track",
+    "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
+  }
+}
