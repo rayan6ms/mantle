@@ -62,6 +62,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-audio-frame-buffer-consumer" => Some(AUDIO_FRAME_BUFFER_CONSUMER),
         "write-audio-frame-rebuilder-consumer" => Some(AUDIO_FRAME_REBUILDER_CONSUMER),
         "write-audio-frame-provider-tools-consumer" => Some(AUDIO_FRAME_PROVIDER_TOOLS_CONSUMER),
+        "write-audio-processing-context-consumer" => Some(AUDIO_PROCESSING_CONTEXT_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -2063,6 +2064,94 @@ public final class GateAudioFrameProviderTools {
     }
     public boolean provide(MutableAudioFrame targetFrame, long value, TimeUnit valueUnit) {
       throw new AssertionError("timed mutable provide called");
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_PROCESSING_CONTEXT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerOptions;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+
+public final class GateAudioProcessingContext {
+  public static void main(String[] args) throws Exception {
+    AudioConfiguration configuration = new AudioConfiguration();
+    configuration.setFilterHotSwapEnabled(true);
+    AudioFrameBuffer buffer = (AudioFrameBuffer) Proxy.newProxyInstance(
+        GateAudioProcessingContext.class.getClassLoader(),
+        new Class<?>[] { AudioFrameBuffer.class }, (proxy, method, values) -> null);
+    AudioPlayerOptions options = new AudioPlayerOptions();
+    AudioDataFormat format = configuration.getOutputFormat();
+
+    AudioProcessingContext context =
+        new AudioProcessingContext(configuration, buffer, options, format);
+    check(context.configuration == configuration && context.frameBuffer == buffer
+        && context.playerOptions == options && context.outputFormat == format,
+        "constructor identity");
+    check(context.filterHotSwapEnabled, "initial hot-swap snapshot");
+    configuration.setFilterHotSwapEnabled(false);
+    check(context.filterHotSwapEnabled, "snapshot remains stable");
+    check(!new AudioProcessingContext(configuration, buffer, options, format)
+        .filterHotSwapEnabled, "later snapshot observes mutation");
+
+    AudioProcessingContext nullable =
+        new AudioProcessingContext(configuration, null, null, null);
+    check(nullable.frameBuffer == null && nullable.playerOptions == null
+        && nullable.outputFormat == null, "nullable auxiliary fields");
+    expect(NullPointerException.class,
+        () -> new AudioProcessingContext(null, buffer, options, format));
+
+    Class<AudioProcessingContext> type = AudioProcessingContext.class;
+    int modifiers = type.getModifiers();
+    check(Modifier.isPublic(modifiers) && !Modifier.isFinal(modifiers)
+        && !Modifier.isAbstract(modifiers) && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0, "class structure");
+    check(type.getDeclaredFields().length == 5 && type.getDeclaredMethods().length == 0
+        && type.getDeclaredConstructors().length == 1, "member counts");
+    checkField(type.getDeclaredField("configuration"), AudioConfiguration.class);
+    checkField(type.getDeclaredField("frameBuffer"), AudioFrameBuffer.class);
+    checkField(type.getDeclaredField("playerOptions"), AudioPlayerOptions.class);
+    checkField(type.getDeclaredField("outputFormat"), AudioDataFormat.class);
+    checkField(type.getDeclaredField("filterHotSwapEnabled"), boolean.class);
+    Constructor<AudioProcessingContext> constructor = type.getDeclaredConstructor(
+        AudioConfiguration.class, AudioFrameBuffer.class,
+        AudioPlayerOptions.class, AudioDataFormat.class);
+    check(Modifier.isPublic(constructor.getModifiers())
+        && Arrays.equals(constructor.getParameterTypes(), new Class<?>[] {
+            AudioConfiguration.class, AudioFrameBuffer.class,
+            AudioPlayerOptions.class, AudioDataFormat.class })
+        && constructor.getExceptionTypes().length == 0
+        && constructor.getTypeParameters().length == 0, "constructor metadata");
+
+    System.out.println(
+        "identity=configuration,buffer,options,format;filter=snapshot,true,false;"
+        + "nulls=optional,configuration-npe;reflection=5-fields,0-methods,1-constructor");
+  }
+
+  private static void checkField(Field field, Class<?> type) {
+    check(field.getType() == type && Modifier.isPublic(field.getModifiers())
+        && Modifier.isFinal(field.getModifiers()) && !Modifier.isStatic(field.getModifiers())
+        && !field.isSynthetic(), "field metadata " + field.getName());
+  }
+
+  private static void expect(Class<? extends Throwable> type, Runnable operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
     }
   }
 

@@ -41,6 +41,8 @@ const AUDIO_FRAME_REBUILDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameRebuilder";
 const AUDIO_FRAME_PROVIDER_TOOLS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameProviderTools";
+const AUDIO_PROCESSING_CONTEXT_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext";
 const TERMINATOR_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/TerminatorAudioFrame";
 const AUDIO_FRAME_BUFFER_FACTORY_CLASS: &str =
@@ -98,6 +100,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrame",
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameProvider",
     AUDIO_FRAME_PROVIDER_TOOLS_CLASS,
+    AUDIO_PROCESSING_CONTEXT_CLASS,
     AUDIO_FRAME_CONSUMER_CLASS,
     AUDIO_FRAME_BUFFER_CLASS,
     AUDIO_FRAME_BUFFER_FACTORY_CLASS,
@@ -469,6 +472,9 @@ fn replacement_body(
     if class_name == AUDIO_FRAME_PROVIDER_TOOLS_CLASS {
         return audio_frame_provider_tools_replacement(pool, name, descriptor, required_locals);
     }
+    if class_name == AUDIO_PROCESSING_CONTEXT_CLASS {
+        return audio_processing_context_replacement(pool, name, descriptor, required_locals);
+    }
     if class_name == TERMINATOR_FRAME_CLASS {
         return terminator_frame_replacement(pool, name, descriptor, required_locals);
     }
@@ -518,6 +524,27 @@ fn audio_frame_provider_tools_replacement(
             pool,
             &format!(
                 "Phase 13 does not implement {AUDIO_FRAME_PROVIDER_TOOLS_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn audio_processing_context_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBuffer;Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerOptions;Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V",
+        ) => audio_processing_context_constructor(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {AUDIO_PROCESSING_CONTEXT_CLASS}.{name}{descriptor}"
             ),
             required_locals,
         ),
@@ -2128,6 +2155,62 @@ fn object_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
         vec![
             Instruction::Aload_0,
             Instruction::Invokespecial(init),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn audio_processing_context_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(AUDIO_PROCESSING_CONTEXT_CLASS)?;
+    let configuration = pool.add_field_ref(
+        owner,
+        "configuration",
+        "Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;",
+    )?;
+    let frame_buffer = pool.add_field_ref(
+        owner,
+        "frameBuffer",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBuffer;",
+    )?;
+    let player_options = pool.add_field_ref(
+        owner,
+        "playerOptions",
+        "Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerOptions;",
+    )?;
+    let output_format = pool.add_field_ref(
+        owner,
+        "outputFormat",
+        "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let filter_hot_swap_enabled = pool.add_field_ref(owner, "filterHotSwapEnabled", "Z")?;
+    let configuration_class = pool.add_class(CONFIGURATION_CLASS)?;
+    let is_filter_hot_swap_enabled =
+        pool.add_method_ref(configuration_class, "isFilterHotSwapEnabled", "()Z")?;
+    code(
+        pool,
+        2,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(configuration),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(frame_buffer),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Putfield(player_options),
+            Instruction::Aload_0,
+            Instruction::Aload(4),
+            Instruction::Putfield(output_format),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(is_filter_hot_swap_enabled),
+            Instruction::Putfield(filter_hot_swap_enabled),
             Instruction::Return,
         ],
     )

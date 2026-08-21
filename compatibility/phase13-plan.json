@@ -27,8 +27,8 @@
   },
   "existing_structural_slice": {
     "scope": "Gate A plus completed Phase 13 slices; only symbols classified in the canonical ledger carry a compatibility claim",
-    "classes": 43,
-    "symbols": 341,
+    "classes": 44,
+    "symbols": 348,
     "internal_runtime_classes": 11,
     "binary_names": [
       "com.sedmelluq.discord.lavaplayer.filter.PcmFilterFactory",
@@ -69,6 +69,7 @@
       "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameConsumer",
       "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameProvider",
       "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameProviderTools",
+      "com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext",
       "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameRebuilder",
       "com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame",
       "com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame",
@@ -89,8 +90,8 @@
       "methods": 405,
       "symbols": 535,
       "status": "IN_PROGRESS",
-      "classified_symbols": 236,
-      "remaining_symbols": 299,
+      "classified_symbols": 243,
+      "remaining_symbols": 292,
       "completed_slices": [
         {
           "id": "player-events",
@@ -268,6 +269,19 @@
             "tools/jvm-gate/src/emitter.rs",
             "tools/jvm-gate/src/main.rs"
           ]
+        },
+        {
+          "id": "audio-processing-context-contracts",
+          "classes": 1,
+          "fields": 5,
+          "methods": 1,
+          "symbols": 7,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
         }
       ],
       "objective": "Complete the player, event, track, marker, and frame contract around the proven Gate A slice.",
@@ -404,7 +418,7 @@
   "phase_entry": {
     "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
     "first_execution_cohort": "core-player-track",
-    "next_slice": "audio-processing-context-contracts",
+    "next_slice": "audio-player-options-contracts",
     "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
   }
 }

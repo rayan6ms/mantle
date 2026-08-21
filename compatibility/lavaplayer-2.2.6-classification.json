@@ -24446,63 +24446,98 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor identity assignments, nullable auxiliary fields, filter hot-swap snapshot semantics, null-configuration failure, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext",
       "symbol_kind": "FIELD",
       "member_name": "configuration",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor identity assignments, nullable auxiliary fields, filter hot-swap snapshot semantics, null-configuration failure, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext",
       "symbol_kind": "FIELD",
       "member_name": "frameBuffer",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBuffer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor identity assignments, nullable auxiliary fields, filter hot-swap snapshot semantics, null-configuration failure, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext",
       "symbol_kind": "FIELD",
       "member_name": "playerOptions",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerOptions;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor identity assignments, nullable auxiliary fields, filter hot-swap snapshot semantics, null-configuration failure, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext",
       "symbol_kind": "FIELD",
       "member_name": "outputFormat",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor identity assignments, nullable auxiliary fields, filter hot-swap snapshot semantics, null-configuration failure, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext",
       "symbol_kind": "FIELD",
       "member_name": "filterHotSwapEnabled",
       "descriptor": "Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor identity assignments, nullable auxiliary fields, filter hot-swap snapshot semantics, null-configuration failure, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBuffer;Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerOptions;Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor identity assignments, nullable auxiliary fields, filter hot-swap snapshot semantics, null-configuration failure, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioTrackExecutor",
