@@ -109,6 +109,9 @@ fn run() -> Result<()> {
         Some("write-audio-frame-buffer-consumer") => {
             write_consumer(&args, AUDIO_FRAME_BUFFER_CONSUMER)
         }
+        Some("write-audio-frame-rebuilder-consumer") => {
+            write_consumer(&args, AUDIO_FRAME_REBUILDER_CONSUMER)
+        }
         _ => Err(
             "usage: mantle-jvm-gate <emit|write-smoke-consumer|write-probe-consumer> [options]"
                 .into(),
@@ -1759,6 +1762,56 @@ public final class GateAudioFrameBuffer {
       if (!operations.isEmpty()) operations += ',';
       operations += value;
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_FRAME_REBUILDER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameRebuilder;
+import com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateAudioFrameRebuilder {
+  private static AudioFrame input;
+
+  public static void main(String[] args) throws Exception {
+    AudioFrame original = new ImmutableAudioFrame(1L, new byte[] { 1 }, 100, null);
+    AudioFrame replacement = new ImmutableAudioFrame(2L, new byte[] { 2 }, 50, null);
+    AudioFrameRebuilder rebuilder = value -> {
+      input = value;
+      return value == null ? original : replacement;
+    };
+    check(rebuilder.rebuild(original) == replacement && input == original,
+        "frame identity and return dispatch");
+    check(rebuilder.rebuild(null) == original && input == null,
+        "null argument and return dispatch");
+
+    check(AudioFrameRebuilder.class.isInterface()
+        && Modifier.isPublic(AudioFrameRebuilder.class.getModifiers())
+        && Modifier.isAbstract(AudioFrameRebuilder.class.getModifiers())
+        && AudioFrameRebuilder.class.getInterfaces().length == 0
+        && AudioFrameRebuilder.class.getDeclaredFields().length == 0
+        && AudioFrameRebuilder.class.getDeclaredMethods().length == 1,
+        "rebuilder structure");
+    Method rebuild = AudioFrameRebuilder.class.getDeclaredMethod("rebuild", AudioFrame.class);
+    check(Modifier.isPublic(rebuild.getModifiers()) && Modifier.isAbstract(rebuild.getModifiers())
+        && !rebuild.isDefault() && !rebuild.isBridge() && !rebuild.isSynthetic()
+        && rebuild.getReturnType() == AudioFrame.class
+        && Arrays.equals(rebuild.getParameterTypes(), new Class<?>[] { AudioFrame.class })
+        && rebuild.getExceptionTypes().length == 0
+        && rebuild.getTypeParameters().length == 0,
+        "rebuilder method metadata");
+
+    System.out.println(
+        "dispatch=frame-identity,null-identity,return-identity;"
+        + "reflection=public-abstract-interface,0-fields,1-method,0-exceptions");
   }
 
   private static void check(boolean condition, String message) {

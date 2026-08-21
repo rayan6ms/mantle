@@ -24413,18 +24413,24 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, lambda dispatch, nullable input identity, return identity, and reflection metadata are covered by the Phase 13 audio-frame-rebuilder-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameRebuilder",
       "symbol_kind": "METHOD",
       "member_name": "rebuild",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, lambda dispatch, nullable input identity, return identity, and reflection metadata are covered by the Phase 13 audio-frame-rebuilder-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext",
