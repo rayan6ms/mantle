@@ -23729,99 +23729,132 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractMutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractMutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getTimecode",
       "descriptor": "()J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractMutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "setTimecode",
       "descriptor": "(J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractMutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getVolume",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractMutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "setVolume",
       "descriptor": "(I)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractMutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getFormat",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractMutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "setFormat",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractMutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "isTerminator",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractMutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "setTerminator",
       "descriptor": "(Z)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractMutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "freeze",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/playback/ImmutableAudioFrame;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AllocatingAudioFrameBuffer",
@@ -23945,72 +23978,96 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getTimecode",
       "descriptor": "()J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getVolume",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getDataLength",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getData",
       "descriptor": "()[B",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getData",
       "descriptor": "([BI)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getFormat",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "isTerminator",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer",
@@ -24161,45 +24218,60 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameProvider",
       "symbol_kind": "METHOD",
       "member_name": "provide",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameProvider",
       "symbol_kind": "METHOD",
       "member_name": "provide",
       "descriptor": "(JLjava/util/concurrent/TimeUnit;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameProvider",
       "symbol_kind": "METHOD",
       "member_name": "provide",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameProvider",
       "symbol_kind": "METHOD",
       "member_name": "provide",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;JLjava/util/concurrent/TimeUnit;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameProviderTools",
@@ -24413,117 +24485,156 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame",
       "symbol_kind": "FIELD",
       "member_name": "timecode",
       "descriptor": "J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame",
       "symbol_kind": "FIELD",
       "member_name": "data",
       "descriptor": "[B",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame",
       "symbol_kind": "FIELD",
       "member_name": "volume",
       "descriptor": "I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame",
       "symbol_kind": "FIELD",
       "member_name": "format",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(J[BILcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getTimecode",
       "descriptor": "()J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getVolume",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getDataLength",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getData",
       "descriptor": "()[B",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getData",
       "descriptor": "([BI)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getFormat",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "isTerminator",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor",
@@ -24755,72 +24866,96 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Ljava/nio/ByteBuffer;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "setBuffer",
       "descriptor": "(Ljava/nio/ByteBuffer;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "store",
       "descriptor": "([BII)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getDataLength",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getData",
       "descriptor": "()[B",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame",
       "symbol_kind": "METHOD",
       "member_name": "getData",
       "descriptor": "([BI)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal interface, immutable-frame, mutable-buffer, copy, exception, and freeze behavior are covered by the Phase 13 audio-frame-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.NonAllocatingAudioFrameBuffer",

@@ -3,7 +3,7 @@ use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::Path;
 
-use ristretto_classfile::attributes::{Attribute, Instruction};
+use ristretto_classfile::attributes::{ArrayType, Attribute, Instruction};
 use ristretto_classfile::{
     ClassAccessFlags, ClassFile, ConstantPool, Field, FieldAccessFlags, FieldType, JAVA_5, Method,
     MethodAccessFlags,
@@ -34,6 +34,12 @@ const MARKER_STATE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState";
 const TRACK_STATE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/AudioTrackState";
 const TRACK_END_REASON_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/AudioTrackEndReason";
+const ABSTRACT_MUTABLE_FRAME_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/track/playback/AbstractMutableAudioFrame";
+const IMMUTABLE_FRAME_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/track/playback/ImmutableAudioFrame";
+const MUTABLE_FRAME_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame";
 const EVENT_ADAPTER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/event/AudioEventAdapter";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
@@ -423,6 +429,12 @@ fn replacement_body(
     if track_enum_constants(class_name).is_some() {
         return track_enum_replacement(pool, class_name, name, descriptor, required_locals);
     }
+    if matches!(
+        class_name,
+        ABSTRACT_MUTABLE_FRAME_CLASS | IMMUTABLE_FRAME_CLASS | MUTABLE_FRAME_CLASS
+    ) {
+        return audio_frame_replacement(pool, class_name, name, descriptor, required_locals);
+    }
     if class_name.starts_with("com/sedmelluq/discord/lavaplayer/player/event/") {
         return event_replacement(pool, class_name, name, descriptor, required_locals);
     }
@@ -499,6 +511,107 @@ fn track_enum_constants(class_name: &str) -> Option<&'static [&'static str]> {
         ]),
         _ => None,
     }
+}
+
+fn audio_frame_replacement(
+    pool: &mut ConstantPool<'static>,
+    class_name: &str,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    let body = match (class_name, name, descriptor) {
+        (ABSTRACT_MUTABLE_FRAME_CLASS, "<init>", "()V") => object_constructor(pool)?,
+        (ABSTRACT_MUTABLE_FRAME_CLASS, "getTimecode", "()J") => {
+            long_getter(pool, ABSTRACT_MUTABLE_FRAME_CLASS, "timecode")?
+        }
+        (ABSTRACT_MUTABLE_FRAME_CLASS, "setTimecode", "(J)V") => {
+            long_setter(pool, ABSTRACT_MUTABLE_FRAME_CLASS, "timecode")?
+        }
+        (ABSTRACT_MUTABLE_FRAME_CLASS, "getVolume", "()I") => {
+            int_getter(pool, ABSTRACT_MUTABLE_FRAME_CLASS, "volume")?
+        }
+        (ABSTRACT_MUTABLE_FRAME_CLASS, "setVolume", "(I)V") => {
+            int_setter(pool, ABSTRACT_MUTABLE_FRAME_CLASS, "volume")?
+        }
+        (
+            ABSTRACT_MUTABLE_FRAME_CLASS,
+            "getFormat",
+            "()Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+        ) => object_getter(
+            pool,
+            ABSTRACT_MUTABLE_FRAME_CLASS,
+            "format",
+            "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+        )?,
+        (
+            ABSTRACT_MUTABLE_FRAME_CLASS,
+            "setFormat",
+            "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V",
+        ) => object_setter(
+            pool,
+            ABSTRACT_MUTABLE_FRAME_CLASS,
+            "format",
+            "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+        )?,
+        (ABSTRACT_MUTABLE_FRAME_CLASS, "isTerminator", "()Z") => {
+            bool_getter(pool, ABSTRACT_MUTABLE_FRAME_CLASS, "terminator")?
+        }
+        (ABSTRACT_MUTABLE_FRAME_CLASS, "setTerminator", "(Z)V") => {
+            bool_setter(pool, ABSTRACT_MUTABLE_FRAME_CLASS, "terminator")?
+        }
+        (
+            ABSTRACT_MUTABLE_FRAME_CLASS,
+            "freeze",
+            "()Lcom/sedmelluq/discord/lavaplayer/track/playback/ImmutableAudioFrame;",
+        ) => mutable_frame_freeze(pool)?,
+        (
+            IMMUTABLE_FRAME_CLASS,
+            "<init>",
+            "(J[BILcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V",
+        ) => immutable_frame_constructor(pool)?,
+        (IMMUTABLE_FRAME_CLASS, "getTimecode", "()J") => {
+            long_getter(pool, IMMUTABLE_FRAME_CLASS, "timecode")?
+        }
+        (IMMUTABLE_FRAME_CLASS, "getVolume", "()I") => {
+            int_getter(pool, IMMUTABLE_FRAME_CLASS, "volume")?
+        }
+        (IMMUTABLE_FRAME_CLASS, "getDataLength", "()I") => immutable_frame_data_length(pool)?,
+        (IMMUTABLE_FRAME_CLASS, "getData", "()[B") => {
+            object_getter(pool, IMMUTABLE_FRAME_CLASS, "data", "[B")?
+        }
+        (IMMUTABLE_FRAME_CLASS, "getData", "([BI)V") => immutable_frame_copy_data(pool)?,
+        (
+            IMMUTABLE_FRAME_CLASS,
+            "getFormat",
+            "()Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+        ) => object_getter(
+            pool,
+            IMMUTABLE_FRAME_CLASS,
+            "format",
+            "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+        )?,
+        (IMMUTABLE_FRAME_CLASS, "isTerminator", "()Z") => boolean_return(pool, false, 1)?,
+        (MUTABLE_FRAME_CLASS, "<init>", "()V") => mutable_frame_constructor(pool, false)?,
+        (MUTABLE_FRAME_CLASS, "<init>", "(Ljava/nio/ByteBuffer;)V") => {
+            mutable_frame_constructor(pool, true)?
+        }
+        (MUTABLE_FRAME_CLASS, "setBuffer", "(Ljava/nio/ByteBuffer;)V") => {
+            mutable_frame_set_buffer(pool)?
+        }
+        (MUTABLE_FRAME_CLASS, "store", "([BII)V") => mutable_frame_store(pool)?,
+        (MUTABLE_FRAME_CLASS, "getDataLength", "()I") => {
+            int_getter(pool, MUTABLE_FRAME_CLASS, "frameLength")?
+        }
+        (MUTABLE_FRAME_CLASS, "getData", "()[B") => mutable_frame_get_data(pool)?,
+        (MUTABLE_FRAME_CLASS, "getData", "([BI)V") => mutable_frame_copy_data(pool)?,
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {class_name}.{name}{descriptor}"),
+            required_locals,
+        )?,
+    };
+    Ok(body)
 }
 
 fn track_enum_replacement(
@@ -799,6 +912,28 @@ fn add_reference_implementation_state(
     }
     if track_enum_constants(class_name).is_some() {
         add_track_enum_state(class, class_name)?;
+    }
+    if class_name == ABSTRACT_MUTABLE_FRAME_CLASS {
+        for (name, descriptor) in [
+            ("timecode", "J"),
+            ("volume", "I"),
+            (
+                "format",
+                "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+            ),
+            ("terminator", "Z"),
+        ] {
+            add_field(class, FieldAccessFlags::PRIVATE, name, descriptor)?;
+        }
+    }
+    if class_name == MUTABLE_FRAME_CLASS {
+        for (name, descriptor) in [
+            ("frameBuffer", "Ljava/nio/ByteBuffer;"),
+            ("framePosition", "I"),
+            ("frameLength", "I"),
+        ] {
+            add_field(class, FieldAccessFlags::PRIVATE, name, descriptor)?;
+        }
     }
     if class_name == RESAMPLING_CLASS {
         let body = enum_constructor(&mut class.constant_pool)?;
@@ -1589,8 +1724,79 @@ fn int_getter(pool: &mut ConstantPool<'static>, owner: &str, field: &str) -> Res
     primitive_getter(pool, owner, field, "I")
 }
 
+fn long_getter(pool: &mut ConstantPool<'static>, owner: &str, field: &str) -> Result<Attribute> {
+    let owner = pool.add_class(owner)?;
+    let field = pool.add_field_ref(owner, field, "J")?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Lreturn,
+        ],
+    )
+}
+
 fn bool_getter(pool: &mut ConstantPool<'static>, owner: &str, field: &str) -> Result<Attribute> {
     primitive_getter(pool, owner, field, "Z")
+}
+
+fn int_setter(pool: &mut ConstantPool<'static>, owner: &str, field: &str) -> Result<Attribute> {
+    primitive_setter(pool, owner, field, "I", Instruction::Iload_1, 2)
+}
+
+fn bool_setter(pool: &mut ConstantPool<'static>, owner: &str, field: &str) -> Result<Attribute> {
+    primitive_setter(pool, owner, field, "Z", Instruction::Iload_1, 2)
+}
+
+fn long_setter(pool: &mut ConstantPool<'static>, owner: &str, field: &str) -> Result<Attribute> {
+    primitive_setter(pool, owner, field, "J", Instruction::Lload_1, 3)
+}
+
+fn primitive_setter(
+    pool: &mut ConstantPool<'static>,
+    owner: &str,
+    field: &str,
+    descriptor: &str,
+    load: Instruction,
+    max_locals: u16,
+) -> Result<Attribute> {
+    let owner = pool.add_class(owner)?;
+    let field = pool.add_field_ref(owner, field, descriptor)?;
+    code(
+        pool,
+        3,
+        max_locals,
+        vec![
+            Instruction::Aload_0,
+            load,
+            Instruction::Putfield(field),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn object_setter(
+    pool: &mut ConstantPool<'static>,
+    owner: &str,
+    field: &str,
+    descriptor: &str,
+) -> Result<Attribute> {
+    let owner = pool.add_class(owner)?;
+    let field = pool.add_field_ref(owner, field, descriptor)?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(field),
+            Instruction::Return,
+        ],
+    )
 }
 
 fn primitive_getter(
@@ -1646,6 +1852,283 @@ fn unsupported_body(
             Instruction::Ldc_w(message),
             Instruction::Invokespecial(init),
             Instruction::Athrow,
+        ],
+    )
+}
+
+fn mutable_frame_freeze(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(ABSTRACT_MUTABLE_FRAME_CLASS)?;
+    let immutable = pool.add_class(IMMUTABLE_FRAME_CLASS)?;
+    let timecode = pool.add_field_ref(owner, "timecode", "J")?;
+    let volume = pool.add_field_ref(owner, "volume", "I")?;
+    let format = pool.add_field_ref(
+        owner,
+        "format",
+        "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let get_data = pool.add_method_ref(owner, "getData", "()[B")?;
+    let init = pool.add_method_ref(
+        immutable,
+        "<init>",
+        "(J[BILcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V",
+    )?;
+    code(
+        pool,
+        7,
+        1,
+        vec![
+            Instruction::New(immutable),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(timecode),
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(get_data),
+            Instruction::Aload_0,
+            Instruction::Getfield(volume),
+            Instruction::Aload_0,
+            Instruction::Getfield(format),
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn immutable_frame_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(IMMUTABLE_FRAME_CLASS)?;
+    let timecode = pool.add_field_ref(owner, "timecode", "J")?;
+    let data = pool.add_field_ref(owner, "data", "[B")?;
+    let volume = pool.add_field_ref(owner, "volume", "I")?;
+    let format = pool.add_field_ref(
+        owner,
+        "format",
+        "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    code(
+        pool,
+        3,
+        6,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Lload_1,
+            Instruction::Putfield(timecode),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Putfield(data),
+            Instruction::Aload_0,
+            Instruction::Iload(4),
+            Instruction::Putfield(volume),
+            Instruction::Aload_0,
+            Instruction::Aload(5),
+            Instruction::Putfield(format),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn immutable_frame_data_length(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(IMMUTABLE_FRAME_CLASS)?;
+    let data = pool.add_field_ref(owner, "data", "[B")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(data),
+            Instruction::Arraylength,
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+fn immutable_frame_copy_data(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(IMMUTABLE_FRAME_CLASS)?;
+    let data = pool.add_field_ref(owner, "data", "[B")?;
+    let system = pool.add_class("java/lang/System")?;
+    let arraycopy = pool.add_method_ref(
+        system,
+        "arraycopy",
+        "(Ljava/lang/Object;ILjava/lang/Object;II)V",
+    )?;
+    code(
+        pool,
+        5,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(data),
+            Instruction::Iconst_0,
+            Instruction::Aload_1,
+            Instruction::Iload_2,
+            Instruction::Aload_0,
+            Instruction::Getfield(data),
+            Instruction::Arraylength,
+            Instruction::Invokestatic(arraycopy),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn mutable_frame_constructor(
+    pool: &mut ConstantPool<'static>,
+    with_buffer: bool,
+) -> Result<Attribute> {
+    let parent = pool.add_class(ABSTRACT_MUTABLE_FRAME_CLASS)?;
+    let parent_init = pool.add_method_ref(parent, "<init>", "()V")?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Invokespecial(parent_init),
+    ];
+    if with_buffer {
+        let owner = pool.add_class(MUTABLE_FRAME_CLASS)?;
+        let set_buffer = pool.add_method_ref(owner, "setBuffer", "(Ljava/nio/ByteBuffer;)V")?;
+        instructions.extend([
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(set_buffer),
+        ]);
+    }
+    instructions.push(Instruction::Return);
+    code(pool, 2, if with_buffer { 2 } else { 1 }, instructions)
+}
+
+fn mutable_frame_set_buffer(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MUTABLE_FRAME_CLASS)?;
+    let frame_buffer = pool.add_field_ref(owner, "frameBuffer", "Ljava/nio/ByteBuffer;")?;
+    let frame_position = pool.add_field_ref(owner, "framePosition", "I")?;
+    let frame_length = pool.add_field_ref(owner, "frameLength", "I")?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let position = pool.add_method_ref(byte_buffer, "position", "()I")?;
+    let remaining = pool.add_method_ref(byte_buffer, "remaining", "()I")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(frame_buffer),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(position),
+            Instruction::Putfield(frame_position),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(remaining),
+            Instruction::Putfield(frame_length),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn mutable_frame_store(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MUTABLE_FRAME_CLASS)?;
+    let frame_buffer = pool.add_field_ref(owner, "frameBuffer", "Ljava/nio/ByteBuffer;")?;
+    let frame_position = pool.add_field_ref(owner, "framePosition", "I")?;
+    let frame_length = pool.add_field_ref(owner, "frameLength", "I")?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let position = pool.add_method_ref(byte_buffer, "position", "(I)Ljava/nio/ByteBuffer;")?;
+    let capacity = pool.add_method_ref(byte_buffer, "capacity", "()I")?;
+    let limit = pool.add_method_ref(byte_buffer, "limit", "(I)Ljava/nio/ByteBuffer;")?;
+    let put = pool.add_method_ref(byte_buffer, "put", "([BII)Ljava/nio/ByteBuffer;")?;
+    code(
+        pool,
+        4,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_buffer),
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_position),
+            Instruction::Invokevirtual(position),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_buffer),
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_buffer),
+            Instruction::Invokevirtual(capacity),
+            Instruction::Invokevirtual(limit),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_buffer),
+            Instruction::Aload_1,
+            Instruction::Iload_2,
+            Instruction::Iload_3,
+            Instruction::Invokevirtual(put),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Iload_3,
+            Instruction::Putfield(frame_length),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn mutable_frame_get_data(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MUTABLE_FRAME_CLASS)?;
+    let get_length = pool.add_method_ref(owner, "getDataLength", "()I")?;
+    let copy = pool.add_method_ref(owner, "getData", "([BI)V")?;
+    code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(get_length),
+            Instruction::Newarray(ArrayType::Byte),
+            Instruction::Astore_1,
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Iconst_0,
+            Instruction::Invokevirtual(copy),
+            Instruction::Aload_1,
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn mutable_frame_copy_data(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MUTABLE_FRAME_CLASS)?;
+    let frame_buffer = pool.add_field_ref(owner, "frameBuffer", "Ljava/nio/ByteBuffer;")?;
+    let frame_position = pool.add_field_ref(owner, "framePosition", "I")?;
+    let frame_length = pool.add_field_ref(owner, "frameLength", "I")?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let get_position = pool.add_method_ref(byte_buffer, "position", "()I")?;
+    let set_position = pool.add_method_ref(byte_buffer, "position", "(I)Ljava/nio/ByteBuffer;")?;
+    let get = pool.add_method_ref(byte_buffer, "get", "([BII)Ljava/nio/ByteBuffer;")?;
+    code(
+        pool,
+        4,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_buffer),
+            Instruction::Invokevirtual(get_position),
+            Instruction::Istore_3,
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_buffer),
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_position),
+            Instruction::Invokevirtual(set_position),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_buffer),
+            Instruction::Aload_1,
+            Instruction::Iload_2,
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_length),
+            Instruction::Invokevirtual(get),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_buffer),
+            Instruction::Iload_3,
+            Instruction::Invokevirtual(set_position),
+            Instruction::Pop,
+            Instruction::Return,
         ],
     )
 }

@@ -99,6 +99,14 @@ fn run() -> Result<()> {
             fs::write(output, TRACK_CONTRACT_CONSUMER)?;
             Ok(())
         }
+        Some("write-audio-frame-consumer") => {
+            let output = required_path(&args, "--output")?;
+            if let Some(parent) = output.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::write(output, AUDIO_FRAME_CONSUMER)?;
+            Ok(())
+        }
         _ => Err(
             "usage: mantle-jvm-gate <emit|write-smoke-consumer|write-probe-consumer> [options]"
                 .into(),
@@ -568,6 +576,175 @@ public final class GateTrackContracts {
     public String getUri() { return "uri"; }
     public String getArtworkUrl() { return "art"; }
     public String getISRC() { return "isrc"; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_FRAME_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.track.playback.AbstractMutableAudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameProvider;
+import com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+public final class GateAudioFrames {
+  public static void main(String[] args) throws Exception {
+    byte[] data = new byte[] { 1, 2, 3 };
+    ImmutableAudioFrame immutableValue = new ImmutableAudioFrame(42L, data, 77, null);
+    AudioFrame immutable = immutableValue;
+    check(immutable.getTimecode() == 42L && immutable.getVolume() == 77,
+        "immutable scalar accessors");
+    check(immutable.getDataLength() == 3 && immutable.getData() == data,
+        "immutable data identity");
+    check(immutable.getFormat() == null && !immutable.isTerminator(),
+        "immutable format and terminator");
+    check(immutableValue.timecode == 42L && immutableValue.data == data
+        && immutableValue.volume == 77 && immutableValue.format == null,
+        "immutable public fields");
+    byte[] immutableCopy = new byte[5];
+    immutable.getData(immutableCopy, 1);
+    check(Arrays.equals(immutableCopy, new byte[] { 0, 1, 2, 3, 0 }),
+        "immutable copy offset");
+    data[0] = 9;
+    check(immutable.getData()[0] == 9, "immutable retains source array");
+    expect(ArrayIndexOutOfBoundsException.class,
+        () -> immutable.getData(new byte[2], 0));
+    expect(NullPointerException.class,
+        () -> new ImmutableAudioFrame(0L, null, 0, null).getDataLength());
+
+    ByteBuffer buffer = ByteBuffer.wrap(new byte[] { 9, 8, 7, 6, 5 });
+    buffer.position(1);
+    buffer.limit(4);
+    MutableAudioFrame mutable = new MutableAudioFrame(buffer);
+    check(mutable.getDataLength() == 3
+        && Arrays.equals(mutable.getData(), new byte[] { 8, 7, 6 }),
+        "mutable initial buffer window");
+    check(buffer.position() == 1, "mutable read preserves buffer position");
+    mutable.setTimecode(99L);
+    mutable.setVolume(55);
+    mutable.setFormat(null);
+    mutable.setTerminator(true);
+    check(mutable.getTimecode() == 99L && mutable.getVolume() == 55
+        && mutable.getFormat() == null && mutable.isTerminator(),
+        "mutable inherited state");
+    mutable.store(new byte[] { 0, 2, 3, 4, 0 }, 1, 3);
+    check(mutable.getDataLength() == 3
+        && Arrays.equals(mutable.getData(), new byte[] { 2, 3, 4 }),
+        "mutable store");
+    check(buffer.position() == 4 && buffer.limit() == buffer.capacity(),
+        "mutable store buffer state");
+    byte[] mutableCopy = new byte[7];
+    mutable.getData(mutableCopy, 2);
+    check(Arrays.equals(mutableCopy, new byte[] { 0, 0, 2, 3, 4, 0, 0 })
+        && buffer.position() == 4, "mutable copy offset and position");
+
+    ImmutableAudioFrame frozen = mutable.freeze();
+    check(frozen.getTimecode() == 99L && frozen.getVolume() == 55
+        && Arrays.equals(frozen.getData(), new byte[] { 2, 3, 4 })
+        && frozen.getFormat() == null && !frozen.isTerminator(), "mutable freeze");
+    mutable.store(new byte[] { 5, 6, 7 }, 0, 3);
+    check(Arrays.equals(frozen.getData(), new byte[] { 2, 3, 4 }),
+        "freeze owns copied data");
+    MutableAudioFrame empty = new MutableAudioFrame();
+    check(empty.getDataLength() == 0 && empty.getTimecode() == 0L
+        && empty.getVolume() == 0 && empty.getFormat() == null && !empty.isTerminator(),
+        "mutable defaults");
+    expect(NullPointerException.class, empty::getData);
+
+    StubProvider implementation = new StubProvider(immutable);
+    AudioFrameProvider provider = implementation;
+    check(provider.provide() == immutable, "provider immediate frame");
+    check(provider.provide(7L, TimeUnit.MILLISECONDS) == immutable
+        && implementation.timeout == 7L && implementation.unit == TimeUnit.MILLISECONDS,
+        "provider timed frame");
+    check(provider.provide(mutable), "provider mutable frame");
+    check(provider.provide(mutable, 8L, TimeUnit.SECONDS)
+        && implementation.mutable == mutable && implementation.timeout == 8L
+        && implementation.unit == TimeUnit.SECONDS, "provider timed mutable frame");
+
+    checkInterface(AudioFrame.class, 7);
+    checkInterface(AudioFrameProvider.class, 4);
+    Method timedProvide = AudioFrameProvider.class.getMethod(
+        "provide", long.class, TimeUnit.class);
+    check(Arrays.equals(timedProvide.getExceptionTypes(),
+        new Class<?>[] { TimeoutException.class, InterruptedException.class }),
+        "provider checked exceptions");
+    check(Modifier.isPublic(AbstractMutableAudioFrame.class.getModifiers())
+        && Modifier.isAbstract(AbstractMutableAudioFrame.class.getModifiers())
+        && AbstractMutableAudioFrame.class.getInterfaces().length == 1
+        && AbstractMutableAudioFrame.class.getInterfaces()[0] == AudioFrame.class,
+        "abstract mutable structure");
+    check(AbstractMutableAudioFrame.class.getDeclaredMethods().length == 9
+        && AbstractMutableAudioFrame.class.getConstructors().length == 1,
+        "abstract mutable members");
+    check(ImmutableAudioFrame.class.getDeclaredFields().length == 4
+        && ImmutableAudioFrame.class.getDeclaredMethods().length == 7
+        && ImmutableAudioFrame.class.getConstructors().length == 1,
+        "immutable members");
+    check(MutableAudioFrame.class.getSuperclass() == AbstractMutableAudioFrame.class
+        && MutableAudioFrame.class.getDeclaredMethods().length == 5
+        && MutableAudioFrame.class.getConstructors().length == 2,
+        "mutable members");
+
+    System.out.println(
+        "immutable=42,77,identity,copy,false,exceptions;"
+        + "mutable=window,state,store,position,freeze,defaults;"
+        + "provider=immediate,timed,mutable,timed-mutable,exceptions;"
+        + "reflection=7,4,9+1,4+7+1,5+2");
+  }
+
+  private static void checkInterface(Class<?> type, int methodCount) {
+    check(type.isInterface() && type.getDeclaredMethods().length == methodCount,
+        type.getName() + " structure");
+    for (Method method : type.getDeclaredMethods()) {
+      check(Modifier.isPublic(method.getModifiers())
+          && Modifier.isAbstract(method.getModifiers()) && !method.isDefault(),
+          type.getName() + " method " + method.getName());
+    }
+  }
+
+  private static final class StubProvider implements AudioFrameProvider {
+    private final AudioFrame frame;
+    private MutableAudioFrame mutable;
+    private long timeout;
+    private TimeUnit unit;
+
+    private StubProvider(AudioFrame frame) { this.frame = frame; }
+    public AudioFrame provide() { return frame; }
+    public AudioFrame provide(long value, TimeUnit valueUnit) {
+      timeout = value;
+      unit = valueUnit;
+      return frame;
+    }
+    public boolean provide(MutableAudioFrame value) {
+      mutable = value;
+      return true;
+    }
+    public boolean provide(MutableAudioFrame value, long timeoutValue, TimeUnit valueUnit) {
+      mutable = value;
+      timeout = timeoutValue;
+      unit = valueUnit;
+      return true;
+    }
+  }
+
+  private static void expect(Class<? extends Throwable> type, Runnable operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
   }
 
   private static void check(boolean condition, String message) {
