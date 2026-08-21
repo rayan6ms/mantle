@@ -27,8 +27,8 @@
   },
   "existing_structural_slice": {
     "scope": "Gate A plus completed Phase 13 slices; only symbols classified in the canonical ledger carry a compatibility claim",
-    "classes": 46,
-    "symbols": 356,
+    "classes": 47,
+    "symbols": 359,
     "internal_runtime_classes": 11,
     "binary_names": [
       "com.sedmelluq.discord.lavaplayer.filter.PcmFilterFactory",
@@ -63,6 +63,7 @@
       "com.sedmelluq.discord.lavaplayer.track.TrackMarker",
       "com.sedmelluq.discord.lavaplayer.track.TrackMarkerHandler",
       "com.sedmelluq.discord.lavaplayer.track.TrackMarkerHandler$MarkerState",
+      "com.sedmelluq.discord.lavaplayer.track.TrackStateListener",
       "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider",
       "com.sedmelluq.discord.lavaplayer.track.playback.AbstractMutableAudioFrame",
       "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame",
@@ -92,8 +93,8 @@
       "methods": 405,
       "symbols": 535,
       "status": "IN_PROGRESS",
-      "classified_symbols": 251,
-      "remaining_symbols": 284,
+      "classified_symbols": 254,
+      "remaining_symbols": 281,
       "completed_slices": [
         {
           "id": "player-events",
@@ -310,6 +311,19 @@
             "tools/jvm-gate/src/emitter.rs",
             "tools/jvm-gate/src/main.rs"
           ]
+        },
+        {
+          "id": "track-state-listener-contracts",
+          "classes": 1,
+          "fields": 0,
+          "methods": 2,
+          "symbols": 3,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
         }
       ],
       "objective": "Complete the player, event, track, marker, and frame contract around the proven Gate A slice.",
@@ -446,7 +460,7 @@
   "phase_entry": {
     "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
     "first_execution_cohort": "core-player-track",
-    "next_slice": "track-state-listener-contracts",
+    "next_slice": "audio-output-hook-contracts",
     "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
   }
 }

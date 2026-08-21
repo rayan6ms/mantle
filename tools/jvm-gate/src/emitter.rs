@@ -103,6 +103,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/track/TrackMarker",
     "com/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler",
     "com/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState",
+    "com/sedmelluq/discord/lavaplayer/track/TrackStateListener",
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrame",
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameProvider",
     AUDIO_FRAME_PROVIDER_TOOLS_CLASS,

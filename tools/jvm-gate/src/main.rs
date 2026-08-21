@@ -65,6 +65,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-audio-processing-context-consumer" => Some(AUDIO_PROCESSING_CONTEXT_CONSUMER),
         "write-audio-player-options-consumer" => Some(AUDIO_PLAYER_OPTIONS_CONSUMER),
         "write-decoded-track-holder-consumer" => Some(DECODED_TRACK_HOLDER_CONSUMER),
+        "write-track-state-listener-consumer" => Some(TRACK_STATE_LISTENER_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -2277,6 +2278,92 @@ public final class GateDecodedTrackHolder {
 
     System.out.println(
         "holder=track-identity,null;reflection=1-field,0-methods,1-constructor");
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const TRACK_STATE_LISTENER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.TrackStateListener;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+
+public final class GateTrackStateListener {
+  public static void main(String[] args) throws Exception {
+    AudioTrack track = (AudioTrack) Proxy.newProxyInstance(
+        GateTrackStateListener.class.getClassLoader(),
+        new Class<?>[] { AudioTrack.class }, (proxy, method, values) -> null);
+    FriendlyException exception = allocate(FriendlyException.class);
+    StringBuilder calls = new StringBuilder();
+    TrackStateListener listener = new TrackStateListener() {
+      public void onTrackException(AudioTrack value, FriendlyException error) {
+        if (calls.length() == 0) {
+          check(value == track && error == exception, "exception identities");
+          calls.append("exception,");
+        } else {
+          check(value == null && error == null, "nullable exception values");
+          calls.append("exception-null,");
+        }
+      }
+      public void onTrackStuck(AudioTrack value, long thresholdMs) {
+        if (thresholdMs == Long.MIN_VALUE) {
+          check(value == track, "stuck track identity");
+          calls.append("stuck-min,");
+        } else {
+          check(value == null && thresholdMs == Long.MAX_VALUE, "nullable stuck values");
+          calls.append("stuck-max");
+        }
+      }
+    };
+    listener.onTrackException(track, exception);
+    listener.onTrackStuck(track, Long.MIN_VALUE);
+    listener.onTrackException(null, null);
+    listener.onTrackStuck(null, Long.MAX_VALUE);
+    check(calls.toString().equals("exception,stuck-min,exception-null,stuck-max"),
+        "callback order");
+
+    Class<TrackStateListener> type = TrackStateListener.class;
+    int modifiers = type.getModifiers();
+    check(Modifier.isPublic(modifiers) && Modifier.isInterface(modifiers)
+        && Modifier.isAbstract(modifiers) && !Modifier.isFinal(modifiers)
+        && type.getSuperclass() == null && type.getInterfaces().length == 0,
+        "interface structure");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredMethods().length == 2
+        && type.getDeclaredConstructors().length == 0, "member counts");
+    checkMethod(type.getDeclaredMethod("onTrackException",
+        AudioTrack.class, FriendlyException.class),
+        new Class<?>[] { AudioTrack.class, FriendlyException.class });
+    checkMethod(type.getDeclaredMethod("onTrackStuck", AudioTrack.class, long.class),
+        new Class<?>[] { AudioTrack.class, long.class });
+
+    System.out.println(
+        "dispatch=exception,stuck-min,nullable,stuck-max;"
+        + "reflection=interface,0-fields,2-methods,0-constructors");
+  }
+
+  private static void checkMethod(Method method, Class<?>[] parameters) {
+    check(Modifier.isPublic(method.getModifiers()) && Modifier.isAbstract(method.getModifiers())
+        && !Modifier.isStatic(method.getModifiers()) && !method.isDefault()
+        && !method.isBridge() && !method.isSynthetic() && method.getReturnType() == void.class
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0,
+        "method metadata " + method.getName());
+  }
+
+  private static <T> T allocate(Class<T> type) throws Exception {
+    Class<?> unsafeType = Class.forName("sun.misc.Unsafe");
+    Field singleton = unsafeType.getDeclaredField("theUnsafe");
+    singleton.setAccessible(true);
+    Object unsafe = singleton.get(null);
+    return type.cast(unsafeType.getMethod("allocateInstance", Class.class).invoke(unsafe, type));
   }
 
   private static void check(boolean condition, String message) {
