@@ -27,8 +27,8 @@
   },
   "existing_structural_slice": {
     "scope": "Gate A plus completed Phase 13 slices; only symbols classified in the canonical ledger carry a compatibility claim",
-    "classes": 37,
-    "symbols": 303,
+    "classes": 39,
+    "symbols": 317,
     "internal_runtime_classes": 11,
     "binary_names": [
       "com.sedmelluq.discord.lavaplayer.filter.PcmFilterFactory",
@@ -64,7 +64,9 @@
       "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider",
       "com.sedmelluq.discord.lavaplayer.track.playback.AbstractMutableAudioFrame",
       "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame",
+      "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer",
       "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBufferFactory",
+      "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameConsumer",
       "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameProvider",
       "com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame",
       "com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame"
@@ -83,8 +85,8 @@
       "methods": 405,
       "symbols": 535,
       "status": "IN_PROGRESS",
-      "classified_symbols": 198,
-      "remaining_symbols": 337,
+      "classified_symbols": 212,
+      "remaining_symbols": 323,
       "completed_slices": [
         {
           "id": "player-events",
@@ -196,6 +198,19 @@
           "classification": "A_EXACT",
           "evidence": [
             "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/main.rs"
+          ]
+        },
+        {
+          "id": "audio-frame-buffer-contracts",
+          "classes": 2,
+          "fields": 0,
+          "methods": 12,
+          "symbols": 14,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
             "tools/jvm-gate/src/main.rs"
           ]
         }
@@ -334,7 +349,7 @@
   "phase_entry": {
     "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
     "first_execution_cohort": "core-player-track",
-    "next_slice": "audio-frame-buffer-contracts",
+    "next_slice": "audio-frame-rebuilder-contracts",
     "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
   }
 }

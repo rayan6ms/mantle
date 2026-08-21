@@ -31,6 +31,10 @@ const BASIC_PLAYLIST_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/Basic
 const CONFIGURATION_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/AudioConfiguration";
 const RESAMPLING_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/AudioConfiguration$ResamplingQuality";
+const AUDIO_FRAME_BUFFER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBuffer";
+const AUDIO_FRAME_CONSUMER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameConsumer";
 const AUDIO_FRAME_BUFFER_FACTORY_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBufferFactory";
 const MARKER_STATE_CLASS: &str =
@@ -83,6 +87,8 @@ const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState",
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrame",
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameProvider",
+    AUDIO_FRAME_CONSUMER_CLASS,
+    AUDIO_FRAME_BUFFER_CLASS,
     AUDIO_FRAME_BUFFER_FACTORY_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/playback/AbstractMutableAudioFrame",
     "com/sedmelluq/discord/lavaplayer/track/playback/ImmutableAudioFrame",

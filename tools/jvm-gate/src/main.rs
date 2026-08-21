@@ -99,19 +99,15 @@ fn run() -> Result<()> {
             fs::write(output, TRACK_CONTRACT_CONSUMER)?;
             Ok(())
         }
-        Some("write-audio-frame-consumer") => {
-            let output = required_path(&args, "--output")?;
-            if let Some(parent) = output.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            fs::write(output, AUDIO_FRAME_CONSUMER)?;
-            Ok(())
-        }
+        Some("write-audio-frame-consumer") => write_consumer(&args, AUDIO_FRAME_CONSUMER),
         Some("write-audio-configuration-consumer") => {
             write_consumer(&args, AUDIO_CONFIGURATION_CONSUMER)
         }
         Some("write-frame-buffer-factory-consumer") => {
             write_consumer(&args, FRAME_BUFFER_FACTORY_CONSUMER)
+        }
+        Some("write-audio-frame-buffer-consumer") => {
+            write_consumer(&args, AUDIO_FRAME_BUFFER_CONSUMER)
         }
         _ => Err(
             "usage: mantle-jvm-gate <emit|write-smoke-consumer|write-probe-consumer> [options]"
@@ -1639,6 +1635,130 @@ public final class GateFrameBufferFactory {
     System.out.println(
         "dispatch=duration,format-identity,stopping-identity,null-return;"
         + "reflection=public-abstract-interface,0-fields,1-method,0-exceptions");
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_FRAME_BUFFER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameConsumer;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameProvider;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameRebuilder;
+import com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+public final class GateAudioFrameBuffer {
+  public static void main(String[] args) throws Exception {
+    AudioFrame frame = new ImmutableAudioFrame(42L, new byte[] { 1 }, 100, null);
+    StubBuffer implementation = new StubBuffer(frame);
+    AudioFrameBuffer buffer = implementation;
+    check(buffer.getRemainingCapacity() == 7 && buffer.getFullCapacity() == 9,
+        "capacity dispatch");
+    buffer.waitForTermination();
+    buffer.setTerminateOnEmpty();
+    buffer.setClearOnInsert();
+    check(buffer.hasClearOnInsert(), "clear-on-insert dispatch");
+    buffer.clear();
+    buffer.lockBuffer();
+    check(buffer.hasReceivedFrames() && buffer.getLastInputTimecode().equals(42L),
+        "buffer state dispatch");
+    buffer.consume(frame);
+    buffer.rebuild(null);
+    check(implementation.consumed == frame && implementation.rebuilder == null,
+        "consumer dispatch");
+    check(buffer.provide() == frame
+        && buffer.provide(3L, TimeUnit.MILLISECONDS) == frame,
+        "provider frame dispatch");
+    MutableAudioFrame mutable = new MutableAudioFrame();
+    check(buffer.provide(mutable)
+        && buffer.provide(mutable, 4L, TimeUnit.SECONDS)
+        && implementation.mutable == mutable && implementation.timeout == 4L
+        && implementation.unit == TimeUnit.SECONDS, "provider mutable dispatch");
+    check("wait,terminate,clear-on-insert,clear,lock,consume,rebuild".equals(
+        implementation.operations), "operation order");
+
+    checkInterface(AudioFrameConsumer.class, 2);
+    checkInterface(AudioFrameBuffer.class, 10);
+    check(Arrays.equals(AudioFrameBuffer.class.getInterfaces(), new Class<?>[] {
+        AudioFrameProvider.class, AudioFrameConsumer.class }), "buffer inheritance");
+    Method consume = AudioFrameConsumer.class.getMethod("consume", AudioFrame.class);
+    Method rebuild = AudioFrameConsumer.class.getMethod("rebuild", AudioFrameRebuilder.class);
+    Method waitForTermination = AudioFrameBuffer.class.getMethod("waitForTermination");
+    check(Arrays.equals(consume.getExceptionTypes(), new Class<?>[] {
+        InterruptedException.class }) && rebuild.getExceptionTypes().length == 0
+        && Arrays.equals(waitForTermination.getExceptionTypes(), new Class<?>[] {
+            InterruptedException.class }), "checked exceptions");
+    check(AudioFrameBuffer.class.getMethods().length == 16,
+        "declared and inherited method count");
+
+    System.out.println(
+        "dispatch=capacity,lifecycle,consumer,provider,order;"
+        + "reflection=consumer-2,buffer-10,inherited-16,exceptions");
+  }
+
+  private static void checkInterface(Class<?> type, int methodCount) {
+    check(type.isInterface() && Modifier.isPublic(type.getModifiers())
+        && Modifier.isAbstract(type.getModifiers())
+        && type.getDeclaredFields().length == 0
+        && type.getDeclaredMethods().length == methodCount,
+        type.getName() + " structure");
+    for (Method method : type.getDeclaredMethods()) {
+      check(Modifier.isPublic(method.getModifiers())
+          && Modifier.isAbstract(method.getModifiers()) && !method.isDefault()
+          && !method.isBridge() && !method.isSynthetic(),
+          type.getName() + " method " + method.getName());
+    }
+  }
+
+  private static final class StubBuffer implements AudioFrameBuffer {
+    private final AudioFrame frame;
+    private String operations = "";
+    private AudioFrame consumed;
+    private AudioFrameRebuilder rebuilder;
+    private MutableAudioFrame mutable;
+    private long timeout;
+    private TimeUnit unit;
+
+    private StubBuffer(AudioFrame value) { frame = value; }
+    public int getRemainingCapacity() { return 7; }
+    public int getFullCapacity() { return 9; }
+    public void waitForTermination() { record("wait"); }
+    public void setTerminateOnEmpty() { record("terminate"); }
+    public void setClearOnInsert() { record("clear-on-insert"); }
+    public boolean hasClearOnInsert() { return true; }
+    public void clear() { record("clear"); }
+    public void lockBuffer() { record("lock"); }
+    public boolean hasReceivedFrames() { return true; }
+    public Long getLastInputTimecode() { return 42L; }
+    public void consume(AudioFrame value) { consumed = value; record("consume"); }
+    public void rebuild(AudioFrameRebuilder value) { rebuilder = value; record("rebuild"); }
+    public AudioFrame provide() { return frame; }
+    public AudioFrame provide(long value, TimeUnit valueUnit) {
+      timeout = value;
+      unit = valueUnit;
+      return frame;
+    }
+    public boolean provide(MutableAudioFrame value) { mutable = value; return true; }
+    public boolean provide(MutableAudioFrame value, long timeoutValue, TimeUnit valueUnit) {
+      mutable = value;
+      timeout = timeoutValue;
+      unit = valueUnit;
+      return true;
+    }
+    private void record(String value) {
+      if (!operations.isEmpty()) operations += ',';
+      operations += value;
+    }
   }
 
   private static void check(boolean condition, String message) {

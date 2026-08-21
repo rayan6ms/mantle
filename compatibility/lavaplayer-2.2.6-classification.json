@@ -24134,99 +24134,132 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, buffer/consumer/provider dispatch, inheritance order, operation ordering, identity propagation, and checked-exception metadata are covered by the Phase 13 audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer",
       "symbol_kind": "METHOD",
       "member_name": "getRemainingCapacity",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, buffer/consumer/provider dispatch, inheritance order, operation ordering, identity propagation, and checked-exception metadata are covered by the Phase 13 audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer",
       "symbol_kind": "METHOD",
       "member_name": "getFullCapacity",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, buffer/consumer/provider dispatch, inheritance order, operation ordering, identity propagation, and checked-exception metadata are covered by the Phase 13 audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer",
       "symbol_kind": "METHOD",
       "member_name": "waitForTermination",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, buffer/consumer/provider dispatch, inheritance order, operation ordering, identity propagation, and checked-exception metadata are covered by the Phase 13 audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer",
       "symbol_kind": "METHOD",
       "member_name": "setTerminateOnEmpty",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, buffer/consumer/provider dispatch, inheritance order, operation ordering, identity propagation, and checked-exception metadata are covered by the Phase 13 audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer",
       "symbol_kind": "METHOD",
       "member_name": "setClearOnInsert",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, buffer/consumer/provider dispatch, inheritance order, operation ordering, identity propagation, and checked-exception metadata are covered by the Phase 13 audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer",
       "symbol_kind": "METHOD",
       "member_name": "hasClearOnInsert",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, buffer/consumer/provider dispatch, inheritance order, operation ordering, identity propagation, and checked-exception metadata are covered by the Phase 13 audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer",
       "symbol_kind": "METHOD",
       "member_name": "clear",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, buffer/consumer/provider dispatch, inheritance order, operation ordering, identity propagation, and checked-exception metadata are covered by the Phase 13 audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer",
       "symbol_kind": "METHOD",
       "member_name": "lockBuffer",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, buffer/consumer/provider dispatch, inheritance order, operation ordering, identity propagation, and checked-exception metadata are covered by the Phase 13 audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer",
       "symbol_kind": "METHOD",
       "member_name": "hasReceivedFrames",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, buffer/consumer/provider dispatch, inheritance order, operation ordering, identity propagation, and checked-exception metadata are covered by the Phase 13 audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer",
       "symbol_kind": "METHOD",
       "member_name": "getLastInputTimecode",
       "descriptor": "()Ljava/lang/Long;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, buffer/consumer/provider dispatch, inheritance order, operation ordering, identity propagation, and checked-exception metadata are covered by the Phase 13 audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBufferFactory",
@@ -24257,27 +24290,36 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, buffer/consumer/provider dispatch, inheritance order, operation ordering, identity propagation, and checked-exception metadata are covered by the Phase 13 audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameConsumer",
       "symbol_kind": "METHOD",
       "member_name": "consume",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, buffer/consumer/provider dispatch, inheritance order, operation ordering, identity propagation, and checked-exception metadata are covered by the Phase 13 audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameConsumer",
       "symbol_kind": "METHOD",
       "member_name": "rebuild",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameRebuilder;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, buffer/consumer/provider dispatch, inheritance order, operation ordering, identity propagation, and checked-exception metadata are covered by the Phase 13 audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameProvider",
