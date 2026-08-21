@@ -107,11 +107,23 @@ fn run() -> Result<()> {
             fs::write(output, AUDIO_FRAME_CONSUMER)?;
             Ok(())
         }
+        Some("write-audio-configuration-consumer") => {
+            write_consumer(&args, AUDIO_CONFIGURATION_CONSUMER)
+        }
         _ => Err(
             "usage: mantle-jvm-gate <emit|write-smoke-consumer|write-probe-consumer> [options]"
                 .into(),
         ),
     }
+}
+
+fn write_consumer(args: &[String], source: &str) -> Result<()> {
+    let output = required_path(args, "--output")?;
+    if let Some(parent) = output.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(output, source)?;
+    Ok(())
 }
 
 const SMOKE_CONSUMER: &str = r#"
@@ -1463,6 +1475,111 @@ public final class GateIntegration {
     } while (System.nanoTime() < deadline);
     throw new AssertionError(
         "native source resource leak handles=" + handles + ", tracked=" + tracked);
+  }
+}
+"#;
+
+const AUDIO_CONFIGURATION_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration.ResamplingQuality;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBufferFactory;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+public final class GateAudioConfiguration {
+  public static void main(String[] args) {
+    AudioConfiguration configuration = new AudioConfiguration();
+    check(AudioConfiguration.OPUS_QUALITY_MAX == 10, "opus max constant");
+    check(configuration.getResamplingQuality() == ResamplingQuality.LOW,
+        "default resampling quality");
+    check(configuration.getOpusEncodingQuality() == 10,
+        "default opus quality");
+    AudioDataFormat format = configuration.getOutputFormat();
+    check(format != null && format.channelCount == 2 && format.sampleRate == 48000
+        && format.chunkSampleCount == 960 && "OPUS".equals(format.codecName()),
+        "default output format");
+    check(!configuration.isFilterHotSwapEnabled(), "default hot swap");
+    check(configuration.getFrameBufferFactory() != null, "default frame factory");
+
+    configuration.setResamplingQuality(ResamplingQuality.HIGH);
+    check(configuration.getResamplingQuality() == ResamplingQuality.HIGH,
+        "resampling setter");
+    configuration.setResamplingQuality(null);
+    check(configuration.getResamplingQuality() == null, "null resampling setter");
+    configuration.setOpusEncodingQuality(-1);
+    check(configuration.getOpusEncodingQuality() == 0, "low opus clamp");
+    configuration.setOpusEncodingQuality(7);
+    check(configuration.getOpusEncodingQuality() == 7, "middle opus quality");
+    configuration.setOpusEncodingQuality(99);
+    check(configuration.getOpusEncodingQuality() == 10, "high opus clamp");
+    configuration.setOutputFormat(null);
+    check(configuration.getOutputFormat() == null, "null output setter");
+    configuration.setFilterHotSwapEnabled(true);
+    check(configuration.isFilterHotSwapEnabled(), "hot swap setter");
+
+    AudioFrameBufferFactory factory = new AudioFrameBufferFactory() {
+      public AudioFrameBuffer create(int duration, AudioDataFormat dataFormat,
+          AtomicBoolean stopping) {
+        return null;
+      }
+    };
+    configuration.setFrameBufferFactory(factory);
+    check(configuration.getFrameBufferFactory() == factory, "factory setter");
+
+    configuration.setResamplingQuality(ResamplingQuality.MEDIUM);
+    configuration.setOpusEncodingQuality(6);
+    AudioConfiguration copy = configuration.copy();
+    check(copy != configuration && copy.getResamplingQuality() == ResamplingQuality.MEDIUM
+        && copy.getOpusEncodingQuality() == 6 && copy.getOutputFormat() == null
+        && copy.isFilterHotSwapEnabled() && copy.getFrameBufferFactory() == factory,
+        "copy state");
+    configuration.setResamplingQuality(ResamplingQuality.LOW);
+    configuration.setOpusEncodingQuality(2);
+    configuration.setFilterHotSwapEnabled(false);
+    configuration.setFrameBufferFactory(null);
+    check(copy.getResamplingQuality() == ResamplingQuality.MEDIUM
+        && copy.getOpusEncodingQuality() == 6 && copy.isFilterHotSwapEnabled()
+        && copy.getFrameBufferFactory() == factory, "copy independence");
+
+    ResamplingQuality[] values = ResamplingQuality.values();
+    check(Arrays.equals(values, new ResamplingQuality[] {
+        ResamplingQuality.HIGH, ResamplingQuality.MEDIUM, ResamplingQuality.LOW }),
+        "enum order");
+    values[0] = ResamplingQuality.LOW;
+    check(ResamplingQuality.values()[0] == ResamplingQuality.HIGH, "enum values copy");
+    check(ResamplingQuality.valueOf("MEDIUM") == ResamplingQuality.MEDIUM
+        && ResamplingQuality.HIGH.ordinal() == 0
+        && ResamplingQuality.LOW.ordinal() == 2, "enum lookup and ordinals");
+    expect(IllegalArgumentException.class, () -> ResamplingQuality.valueOf("missing"));
+    expect(NullPointerException.class, () -> ResamplingQuality.valueOf(null));
+    check(ResamplingQuality.class.isEnum()
+        && ResamplingQuality.class.getEnumConstants().length == 3,
+        "enum reflection");
+    check(Modifier.isPublic(AudioConfiguration.class.getModifiers())
+        && AudioConfiguration.class.getDeclaredMethods().length == 11
+        && AudioConfiguration.class.getConstructors().length == 1,
+        "configuration reflection");
+
+    System.out.println(
+        "defaults=LOW,10,OPUS,2x48000x960,false,factory;"
+        + "mutation=null,clamp,format,hot-swap,factory;copy=independent;"
+        + "enum=HIGH,MEDIUM,LOW,lookup-errors,reflection;surface=11+1");
+  }
+
+  private static void expect(Class<? extends Throwable> type, Runnable operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
   }
 }
 "#;

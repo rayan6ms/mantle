@@ -10259,180 +10259,240 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, mutation, clamping, copy independence, enum order, lookup failures, and reflection behavior are covered by the Phase 13 audio-configuration-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration",
       "symbol_kind": "FIELD",
       "member_name": "OPUS_QUALITY_MAX",
       "descriptor": "I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, mutation, clamping, copy independence, enum order, lookup failures, and reflection behavior are covered by the Phase 13 audio-configuration-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, mutation, clamping, copy independence, enum order, lookup failures, and reflection behavior are covered by the Phase 13 audio-configuration-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration",
       "symbol_kind": "METHOD",
       "member_name": "getResamplingQuality",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration$ResamplingQuality;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, mutation, clamping, copy independence, enum order, lookup failures, and reflection behavior are covered by the Phase 13 audio-configuration-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration",
       "symbol_kind": "METHOD",
       "member_name": "setResamplingQuality",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration$ResamplingQuality;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, mutation, clamping, copy independence, enum order, lookup failures, and reflection behavior are covered by the Phase 13 audio-configuration-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration",
       "symbol_kind": "METHOD",
       "member_name": "getOpusEncodingQuality",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, mutation, clamping, copy independence, enum order, lookup failures, and reflection behavior are covered by the Phase 13 audio-configuration-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration",
       "symbol_kind": "METHOD",
       "member_name": "setOpusEncodingQuality",
       "descriptor": "(I)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, mutation, clamping, copy independence, enum order, lookup failures, and reflection behavior are covered by the Phase 13 audio-configuration-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration",
       "symbol_kind": "METHOD",
       "member_name": "getOutputFormat",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, mutation, clamping, copy independence, enum order, lookup failures, and reflection behavior are covered by the Phase 13 audio-configuration-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration",
       "symbol_kind": "METHOD",
       "member_name": "setOutputFormat",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, mutation, clamping, copy independence, enum order, lookup failures, and reflection behavior are covered by the Phase 13 audio-configuration-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration",
       "symbol_kind": "METHOD",
       "member_name": "isFilterHotSwapEnabled",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, mutation, clamping, copy independence, enum order, lookup failures, and reflection behavior are covered by the Phase 13 audio-configuration-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration",
       "symbol_kind": "METHOD",
       "member_name": "setFilterHotSwapEnabled",
       "descriptor": "(Z)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, mutation, clamping, copy independence, enum order, lookup failures, and reflection behavior are covered by the Phase 13 audio-configuration-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration",
       "symbol_kind": "METHOD",
       "member_name": "getFrameBufferFactory",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBufferFactory;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, mutation, clamping, copy independence, enum order, lookup failures, and reflection behavior are covered by the Phase 13 audio-configuration-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration",
       "symbol_kind": "METHOD",
       "member_name": "setFrameBufferFactory",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBufferFactory;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, mutation, clamping, copy independence, enum order, lookup failures, and reflection behavior are covered by the Phase 13 audio-configuration-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration",
       "symbol_kind": "METHOD",
       "member_name": "copy",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, mutation, clamping, copy independence, enum order, lookup failures, and reflection behavior are covered by the Phase 13 audio-configuration-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration$ResamplingQuality",
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, mutation, clamping, copy independence, enum order, lookup failures, and reflection behavior are covered by the Phase 13 audio-configuration-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration$ResamplingQuality",
       "symbol_kind": "FIELD",
       "member_name": "HIGH",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration$ResamplingQuality;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, mutation, clamping, copy independence, enum order, lookup failures, and reflection behavior are covered by the Phase 13 audio-configuration-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration$ResamplingQuality",
       "symbol_kind": "FIELD",
       "member_name": "MEDIUM",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration$ResamplingQuality;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, mutation, clamping, copy independence, enum order, lookup failures, and reflection behavior are covered by the Phase 13 audio-configuration-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration$ResamplingQuality",
       "symbol_kind": "FIELD",
       "member_name": "LOW",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration$ResamplingQuality;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, mutation, clamping, copy independence, enum order, lookup failures, and reflection behavior are covered by the Phase 13 audio-configuration-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration$ResamplingQuality",
       "symbol_kind": "METHOD",
       "member_name": "values",
       "descriptor": "()[Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration$ResamplingQuality;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, mutation, clamping, copy independence, enum order, lookup failures, and reflection behavior are covered by the Phase 13 audio-configuration-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioConfiguration$ResamplingQuality",
       "symbol_kind": "METHOD",
       "member_name": "valueOf",
       "descriptor": "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration$ResamplingQuality;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, mutation, clamping, copy independence, enum order, lookup failures, and reflection behavior are covered by the Phase 13 audio-configuration-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler",

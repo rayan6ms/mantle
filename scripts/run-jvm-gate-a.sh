@@ -22,7 +22,7 @@ cargo run --locked -q -p mantle-jvm-gate -- emit \
 cargo run --locked -q -p mantle-jvm-gate -- verify-structure \
   --reference-jar "$REFERENCE_JAR" --candidate-jar "$JAR"
 
-for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame; do
+for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration; do
   case "$consumer" in
     smoke) consumer_class='Smoke' ;;
     probe) consumer_class='Probe' ;;
@@ -33,6 +33,7 @@ for consumer in smoke probe integration classloader event track-value track-enum
     track-enum) consumer_class='TrackEnums' ;;
     track-contract) consumer_class='TrackContracts' ;;
     audio-frame) consumer_class='AudioFrames' ;;
+    audio-configuration) consumer_class='AudioConfiguration' ;;
   esac
   cargo run --locked -q -p mantle-jvm-gate -- "write-$consumer-consumer" \
     --output "$WORK/Gate${consumer_class}.java"
@@ -41,7 +42,8 @@ done
 javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateSmoke.java" "$WORK/GateProbe.java" "$WORK/GateIntegration.java" \
   "$WORK/GateEvents.java" "$WORK/GateTrackValues.java" "$WORK/GateTrackEnums.java" \
-  "$WORK/GateTrackContracts.java" "$WORK/GateAudioFrames.java"
+  "$WORK/GateTrackContracts.java" "$WORK/GateAudioFrames.java" \
+  "$WORK/GateAudioConfiguration.java"
 javac --release 11 -d "$CLASSES" "$WORK/GateClassloader.java"
 
 case "$(uname -s)" in
@@ -112,6 +114,16 @@ cmp "$WORK/audio-frames-reference.txt" "$WORK/audio-frames-candidate.txt"
 grep --fixed-strings \
   'provider=immediate,timed,mutable,timed-mutable,exceptions;reflection=7,4,9+1,4+7+1,5+2' \
   "$WORK/audio-frames-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$classes_argument$classpath_separator$reference_argument" GateAudioConfiguration \
+  >"$WORK/audio-configuration-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$reference_argument" GateAudioConfiguration \
+  >"$WORK/audio-configuration-candidate.txt"
+cmp "$WORK/audio-configuration-reference.txt" "$WORK/audio-configuration-candidate.txt"
+grep --fixed-strings \
+  'mutation=null,clamp,format,hot-swap,factory;copy=independent;' \
+  "$WORK/audio-configuration-candidate.txt" >/dev/null
 java -Xverify:all -cp "$GATE_CLASSPATH" GateSmoke "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateIntegration "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" callbacks

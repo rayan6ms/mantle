@@ -23,6 +23,7 @@ const LOAD_FUTURE_CLASS: &str = "dev/mantle/internal/NativeLoadFuture";
 const LOAD_CALLBACK_CLASS: &str = "dev/mantle/internal/NativeLoadCallback";
 const LOADER_CLASS: &str = "dev/mantle/internal/NativeLoader";
 const FORMAT_CLASS: &str = "dev/mantle/internal/NativeAudioDataFormat";
+const FRAME_BUFFER_FACTORY_CLASS: &str = "dev/mantle/internal/NativeAudioFrameBufferFactory";
 const EVENT_DISPATCHER_CLASS: &str = "dev/mantle/internal/NativeEventDispatcher";
 const MANAGER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayerManager";
 const AUDIO_REFERENCE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/AudioReference";
@@ -30,6 +31,8 @@ const BASIC_PLAYLIST_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/Basic
 const CONFIGURATION_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/AudioConfiguration";
 const RESAMPLING_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/AudioConfiguration$ResamplingQuality";
+const AUDIO_FRAME_BUFFER_FACTORY_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBufferFactory";
 const MARKER_STATE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState";
 const TRACK_STATE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/AudioTrackState";
@@ -80,6 +83,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState",
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrame",
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameProvider",
+    AUDIO_FRAME_BUFFER_FACTORY_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/playback/AbstractMutableAudioFrame",
     "com/sedmelluq/discord/lavaplayer/track/playback/ImmutableAudioFrame",
     "com/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame",
@@ -126,6 +130,7 @@ pub fn emit(
         native_load_callback_class()?,
         native_loader_class()?,
         native_audio_data_format_class()?,
+        native_audio_frame_buffer_factory_class()?,
         native_event_dispatcher_class()?,
     ]);
 
@@ -426,6 +431,9 @@ fn replacement_body(
     if class_name == BASIC_PLAYLIST_CLASS {
         return basic_playlist_replacement(pool, name, descriptor, required_locals);
     }
+    if class_name == CONFIGURATION_CLASS {
+        return audio_configuration_replacement(pool, name, descriptor, required_locals);
+    }
     if track_enum_constants(class_name).is_some() {
         return track_enum_replacement(pool, class_name, name, descriptor, required_locals);
     }
@@ -449,33 +457,6 @@ fn replacement_body(
             "<init>",
             "(Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;ZLjava/lang/String;)V",
         ) => track_info_short_constructor(pool)?,
-        (CONFIGURATION_CLASS, "<init>", "()V") => audio_configuration_constructor(pool)?,
-        (
-            CONFIGURATION_CLASS,
-            "getResamplingQuality",
-            "()Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration$ResamplingQuality;",
-        ) => object_getter(
-            pool,
-            CONFIGURATION_CLASS,
-            "resamplingQuality",
-            "Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration$ResamplingQuality;",
-        )?,
-        (CONFIGURATION_CLASS, "getOpusEncodingQuality", "()I") => {
-            int_getter(pool, CONFIGURATION_CLASS, "opusEncodingQuality")?
-        }
-        (
-            CONFIGURATION_CLASS,
-            "getOutputFormat",
-            "()Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
-        ) => object_getter(
-            pool,
-            CONFIGURATION_CLASS,
-            "outputFormat",
-            "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
-        )?,
-        (CONFIGURATION_CLASS, "isFilterHotSwapEnabled", "()Z") => {
-            bool_getter(pool, CONFIGURATION_CLASS, "filterHotSwapEnabled")?
-        }
         ("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat", "<init>", "(III)V") => {
             audio_data_format_constructor(pool)?
         }
@@ -509,8 +490,91 @@ fn track_enum_constants(class_name: &str) -> Option<&'static [&'static str]> {
             "LATE",
             "ENDED",
         ]),
+        RESAMPLING_CLASS => Some(&["HIGH", "MEDIUM", "LOW"]),
         _ => None,
     }
+}
+
+fn audio_configuration_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    let body = match (name, descriptor) {
+        ("<init>", "()V") => audio_configuration_constructor(pool)?,
+        (
+            "getResamplingQuality",
+            "()Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration$ResamplingQuality;",
+        ) => object_getter(
+            pool,
+            CONFIGURATION_CLASS,
+            "resamplingQuality",
+            "Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration$ResamplingQuality;",
+        )?,
+        (
+            "setResamplingQuality",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration$ResamplingQuality;)V",
+        ) => object_setter(
+            pool,
+            CONFIGURATION_CLASS,
+            "resamplingQuality",
+            "Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration$ResamplingQuality;",
+        )?,
+        ("getOpusEncodingQuality", "()I") => {
+            int_getter(pool, CONFIGURATION_CLASS, "opusEncodingQuality")?
+        }
+        ("setOpusEncodingQuality", "(I)V") => audio_configuration_set_opus_quality(pool)?,
+        ("getOutputFormat", "()Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;") => {
+            object_getter(
+                pool,
+                CONFIGURATION_CLASS,
+                "outputFormat",
+                "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+            )?
+        }
+        ("setOutputFormat", "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V") => {
+            object_setter(
+                pool,
+                CONFIGURATION_CLASS,
+                "outputFormat",
+                "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+            )?
+        }
+        ("isFilterHotSwapEnabled", "()Z") => {
+            bool_getter(pool, CONFIGURATION_CLASS, "filterHotSwapEnabled")?
+        }
+        ("setFilterHotSwapEnabled", "(Z)V") => {
+            bool_setter(pool, CONFIGURATION_CLASS, "filterHotSwapEnabled")?
+        }
+        (
+            "getFrameBufferFactory",
+            "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBufferFactory;",
+        ) => object_getter(
+            pool,
+            CONFIGURATION_CLASS,
+            "frameBufferFactory",
+            "Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBufferFactory;",
+        )?,
+        (
+            "setFrameBufferFactory",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBufferFactory;)V",
+        ) => object_setter(
+            pool,
+            CONFIGURATION_CLASS,
+            "frameBufferFactory",
+            "Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBufferFactory;",
+        )?,
+        ("copy", "()Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;") => {
+            audio_configuration_copy(pool)?
+        }
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {CONFIGURATION_CLASS}.{name}{descriptor}"),
+            required_locals,
+        )?,
+    };
+    Ok(body)
 }
 
 fn audio_frame_replacement(
@@ -935,16 +999,6 @@ fn add_reference_implementation_state(
             add_field(class, FieldAccessFlags::PRIVATE, name, descriptor)?;
         }
     }
-    if class_name == RESAMPLING_CLASS {
-        let body = enum_constructor(&mut class.constant_pool)?;
-        add_method(
-            class,
-            MethodAccessFlags::PRIVATE,
-            "<init>",
-            "(Ljava/lang/String;I)V",
-            Some(body),
-        )?;
-    }
     if class_name == CONFIGURATION_CLASS {
         for (name, descriptor) in [
             (
@@ -957,8 +1011,17 @@ fn add_reference_implementation_state(
                 "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
             ),
             ("filterHotSwapEnabled", "Z"),
+            (
+                "frameBufferFactory",
+                "Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBufferFactory;",
+            ),
         ] {
-            add_field(class, FieldAccessFlags::PRIVATE, name, descriptor)?;
+            add_field(
+                class,
+                FieldAccessFlags::PRIVATE | FieldAccessFlags::VOLATILE,
+                name,
+                descriptor,
+            )?;
         }
     }
     if class_name == MANAGER_CLASS {
@@ -1499,7 +1562,7 @@ fn native_audio_data_format_class() -> Result<ClassFile<'static>> {
         "(III)V",
         Some(constructor),
     )?;
-    let codec = string_return(&mut class.constant_pool, "opus", 1)?;
+    let codec = string_return(&mut class.constant_pool, "OPUS", 1)?;
     add_method(
         &mut class,
         MethodAccessFlags::PUBLIC,
@@ -1540,6 +1603,32 @@ fn native_audio_data_format_class() -> Result<ClassFile<'static>> {
             Some(body),
         )?;
     }
+    Ok(class)
+}
+
+fn native_audio_frame_buffer_factory_class() -> Result<ClassFile<'static>> {
+    let mut class = new_class(
+        FRAME_BUFFER_FACTORY_CLASS,
+        "java/lang/Object",
+        ClassAccessFlags::PUBLIC | ClassAccessFlags::FINAL | ClassAccessFlags::SUPER,
+        &[AUDIO_FRAME_BUFFER_FACTORY_CLASS],
+    )?;
+    let constructor = object_constructor(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC,
+        "<init>",
+        "()V",
+        Some(constructor),
+    )?;
+    let create = null_return(&mut class.constant_pool, 4)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC,
+        "create",
+        "(ILcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;Ljava/util/concurrent/atomic/AtomicBoolean;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBuffer;",
+        Some(create),
+    )?;
     Ok(class)
 }
 
@@ -3359,11 +3448,21 @@ fn audio_configuration_constructor(pool: &mut ConstantPool<'static>) -> Result<A
         "outputFormat",
         "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
     )?;
+    let frame_buffer_factory = pool.add_field_ref(
+        owner,
+        "frameBufferFactory",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBufferFactory;",
+    )?;
     let quality = pool.add_class(RESAMPLING_CLASS)?;
-    let quality_init = pool.add_method_ref(quality, "<init>", "(Ljava/lang/String;I)V")?;
-    let quality_name = pool.add_string("LOW")?;
+    let low = pool.add_field_ref(
+        quality,
+        "LOW",
+        "Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration$ResamplingQuality;",
+    )?;
     let format = pool.add_class(FORMAT_CLASS)?;
     let format_init = pool.add_method_ref(format, "<init>", "(III)V")?;
+    let factory = pool.add_class(FRAME_BUFFER_FACTORY_CLASS)?;
+    let factory_init = pool.add_method_ref(factory, "<init>", "()V")?;
     let sample_rate = pool.add_integer(48_000)?;
     code(
         pool,
@@ -3373,11 +3472,7 @@ fn audio_configuration_constructor(pool: &mut ConstantPool<'static>) -> Result<A
             Instruction::Aload_0,
             Instruction::Invokespecial(object_init),
             Instruction::Aload_0,
-            Instruction::New(quality),
-            Instruction::Dup,
-            Instruction::Ldc_w(quality_name),
-            Instruction::Iconst_2,
-            Instruction::Invokespecial(quality_init),
+            Instruction::Getstatic(low),
             Instruction::Putfield(quality_field),
             Instruction::Aload_0,
             Instruction::Bipush(10),
@@ -3390,9 +3485,78 @@ fn audio_configuration_constructor(pool: &mut ConstantPool<'static>) -> Result<A
             Instruction::Sipush(960),
             Instruction::Invokespecial(format_init),
             Instruction::Putfield(output),
+            Instruction::Aload_0,
+            Instruction::New(factory),
+            Instruction::Dup,
+            Instruction::Invokespecial(factory_init),
+            Instruction::Putfield(frame_buffer_factory),
             Instruction::Return,
         ],
     )
+}
+
+fn audio_configuration_set_opus_quality(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(CONFIGURATION_CLASS)?;
+    let field = pool.add_field_ref(owner, "opusEncodingQuality", "I")?;
+    let math = pool.add_class("java/lang/Math")?;
+    let min = pool.add_method_ref(math, "min", "(II)I")?;
+    let max = pool.add_method_ref(math, "max", "(II)I")?;
+    code(
+        pool,
+        4,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Iconst_0,
+            Instruction::Iload_1,
+            Instruction::Bipush(10),
+            Instruction::Invokestatic(min),
+            Instruction::Invokestatic(max),
+            Instruction::Putfield(field),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn audio_configuration_copy(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(CONFIGURATION_CLASS)?;
+    let init = pool.add_method_ref(owner, "<init>", "()V")?;
+    let fields = [
+        (
+            "resamplingQuality",
+            "Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration$ResamplingQuality;",
+        ),
+        ("opusEncodingQuality", "I"),
+        (
+            "outputFormat",
+            "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+        ),
+        ("filterHotSwapEnabled", "Z"),
+        (
+            "frameBufferFactory",
+            "Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBufferFactory;",
+        ),
+    ];
+    let field_refs = fields
+        .iter()
+        .map(|(name, descriptor)| pool.add_field_ref(owner, *name, *descriptor))
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    let mut instructions = vec![
+        Instruction::New(owner),
+        Instruction::Dup,
+        Instruction::Invokespecial(init),
+        Instruction::Astore_1,
+    ];
+    for field in field_refs {
+        instructions.extend([
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Putfield(field),
+        ]);
+    }
+    instructions.extend([Instruction::Aload_1, Instruction::Areturn]);
+    code(pool, 3, 2, instructions)
 }
 
 fn audio_data_format_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
