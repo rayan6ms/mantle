@@ -75,6 +75,14 @@ fn run() -> Result<()> {
             fs::write(output, EVENT_CONSUMER)?;
             Ok(())
         }
+        Some("write-track-value-consumer") => {
+            let output = required_path(&args, "--output")?;
+            if let Some(parent) = output.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::write(output, TRACK_VALUE_CONSUMER)?;
+            Ok(())
+        }
         _ => Err(
             "usage: mantle-jvm-gate <emit|write-smoke-consumer|write-probe-consumer> [options]"
                 .into(),
@@ -211,6 +219,97 @@ public final class GateEvents {
     singleton.setAccessible(true);
     Object unsafe = singleton.get(null);
     return type.cast(unsafeType.getMethod("allocateInstance", Class.class).invoke(unsafe, type));
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const TRACK_VALUE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDescriptor;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.BasicAudioPlaylist;
+import com.sedmelluq.discord.lavaplayer.track.TrackMarker;
+import com.sedmelluq.discord.lavaplayer.track.TrackMarkerHandler;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.List;
+
+public final class GateTrackValues {
+  public static void main(String[] args) {
+    MediaContainerDescriptor descriptor = new MediaContainerDescriptor(null, "container-params");
+    AudioReference full = new AudioReference("identifier", "title", descriptor);
+    check(full.identifier.equals("identifier"), "reference identifier field");
+    check(full.title.equals("title"), "reference title field");
+    check(full.containerDescriptor == descriptor, "reference descriptor identity");
+    check(full.getIdentifier().equals("identifier") && full.getUri().equals("identifier"),
+        "reference identifier accessors");
+    check(full.getTitle().equals("title"), "reference title accessor");
+    check(full.getAuthor() == null && full.getLength() == null && full.getArtworkUrl() == null
+        && full.getISRC() == null, "reference nullable accessors");
+
+    AudioReference shortReference = new AudioReference("short-id", "short-title");
+    check(shortReference.containerDescriptor == null, "short reference descriptor");
+    check(AudioReference.NO_TRACK != null && AudioReference.NO_TRACK == AudioReference.NO_TRACK,
+        "no-track singleton");
+    check(AudioReference.NO_TRACK.identifier == null && AudioReference.NO_TRACK.title == null
+        && AudioReference.NO_TRACK.containerDescriptor == null, "no-track fields");
+
+    AudioTrackInfo rich = new AudioTrackInfo(
+        "track-title", "author", 123456789L, "track-id", true,
+        "https://example.invalid/track", "https://example.invalid/art", "ISRC-1");
+    check(rich.title.equals("track-title") && rich.author.equals("author"), "track info text");
+    check(rich.length == 123456789L && rich.identifier.equals("track-id") && rich.isStream,
+        "track info scalar fields");
+    check(rich.uri.endsWith("/track") && rich.artworkUrl.endsWith("/art")
+        && rich.isrc.equals("ISRC-1"), "track info optional fields");
+    AudioTrackInfo shortInfo = new AudioTrackInfo(
+        "short-track", "short-author", 7L, "short-track-id", false, null);
+    check(shortInfo.uri == null && shortInfo.artworkUrl == null && shortInfo.isrc == null,
+        "short track info defaults");
+
+    AudioTrack track = proxy(AudioTrack.class);
+    List<AudioTrack> tracks = new ArrayList<>();
+    tracks.add(track);
+    BasicAudioPlaylist playlist = new BasicAudioPlaylist("playlist", tracks, track, true);
+    check(playlist.getName().equals("playlist"), "playlist name");
+    check(playlist.getTracks() == tracks && playlist.getSelectedTrack() == track,
+        "playlist object identity");
+    check(playlist.isSearchResult(), "playlist search flag");
+    tracks.clear();
+    check(playlist.getTracks().isEmpty(), "playlist retains caller list");
+
+    TrackMarkerHandler handler = state -> { };
+    TrackMarker marker = new TrackMarker(987654321L, handler);
+    check(marker.timecode == 987654321L && marker.handler == handler, "marker fields");
+
+    System.out.println(
+        "reference=identifier,title,container-params,null-defaults;"
+        + "info=123456789,true,optional-fields;"
+        + "playlist=identity,mutable,true;marker=987654321,identity");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] { type },
+        (instance, method, arguments) -> defaultValue(method.getReturnType()));
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
   }
 
   private static void check(boolean condition, String message) {

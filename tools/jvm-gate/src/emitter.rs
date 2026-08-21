@@ -693,6 +693,9 @@ fn add_reference_implementation_state(
     class: &mut ClassFile<'static>,
     class_name: &str,
 ) -> Result<()> {
+    if class_name == AUDIO_REFERENCE_CLASS {
+        add_audio_reference_state(class)?;
+    }
     if class_name == MARKER_STATE_CLASS {
         let body = marker_state_constructor(&mut class.constant_pool)?;
         add_method(
@@ -789,6 +792,17 @@ fn add_reference_implementation_state(
         add_basic_playlist_state(class)?;
     }
     Ok(())
+}
+
+fn add_audio_reference_state(class: &mut ClassFile<'static>) -> Result<()> {
+    let body = audio_reference_clinit(&mut class.constant_pool)?;
+    add_method(
+        class,
+        MethodAccessFlags::STATIC,
+        "<clinit>",
+        "()V",
+        Some(body),
+    )
 }
 
 fn add_basic_playlist_state(class: &mut ClassFile<'static>) -> Result<()> {

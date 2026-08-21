@@ -22,13 +22,14 @@ cargo run --locked -q -p mantle-jvm-gate -- emit \
 cargo run --locked -q -p mantle-jvm-gate -- verify-structure \
   --reference-jar "$REFERENCE_JAR" --candidate-jar "$JAR"
 
-for consumer in smoke probe integration classloader event; do
+for consumer in smoke probe integration classloader event track-value; do
   case "$consumer" in
     smoke) consumer_class='Smoke' ;;
     probe) consumer_class='Probe' ;;
     integration) consumer_class='Integration' ;;
     classloader) consumer_class='Classloader' ;;
     event) consumer_class='Events' ;;
+    track-value) consumer_class='TrackValues' ;;
   esac
   cargo run --locked -q -p mantle-jvm-gate -- "write-$consumer-consumer" \
     --output "$WORK/Gate${consumer_class}.java"
@@ -36,7 +37,7 @@ done
 
 javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateSmoke.java" "$WORK/GateProbe.java" "$WORK/GateIntegration.java" \
-  "$WORK/GateEvents.java"
+  "$WORK/GateEvents.java" "$WORK/GateTrackValues.java"
 javac --release 11 -d "$CLASSES" "$WORK/GateClassloader.java"
 
 case "$(uname -s)" in
@@ -67,6 +68,16 @@ java -Xverify:all \
 cmp "$WORK/event-reference.txt" "$WORK/event-candidate.txt"
 grep --fixed-strings \
   'pause,resume,start,end,exception,stuck,|legacy-stuck' "$WORK/event-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$classes_argument$classpath_separator$reference_argument" GateTrackValues \
+  >"$WORK/track-values-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$reference_argument" GateTrackValues \
+  >"$WORK/track-values-candidate.txt"
+cmp "$WORK/track-values-reference.txt" "$WORK/track-values-candidate.txt"
+grep --fixed-strings \
+  'playlist=identity,mutable,true;marker=987654321,identity' \
+  "$WORK/track-values-candidate.txt" >/dev/null
 java -Xverify:all -cp "$GATE_CLASSPATH" GateSmoke "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateIntegration "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" callbacks
