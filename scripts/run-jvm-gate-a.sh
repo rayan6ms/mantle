@@ -22,7 +22,7 @@ cargo run --locked -q -p mantle-jvm-gate -- emit \
 cargo run --locked -q -p mantle-jvm-gate -- verify-structure \
   --reference-jar "$REFERENCE_JAR" --candidate-jar "$JAR"
 
-for consumer in smoke probe integration classloader event track-value track-enum; do
+for consumer in smoke probe integration classloader event track-value track-enum track-contract; do
   case "$consumer" in
     smoke) consumer_class='Smoke' ;;
     probe) consumer_class='Probe' ;;
@@ -31,6 +31,7 @@ for consumer in smoke probe integration classloader event track-value track-enum
     event) consumer_class='Events' ;;
     track-value) consumer_class='TrackValues' ;;
     track-enum) consumer_class='TrackEnums' ;;
+    track-contract) consumer_class='TrackContracts' ;;
   esac
   cargo run --locked -q -p mantle-jvm-gate -- "write-$consumer-consumer" \
     --output "$WORK/Gate${consumer_class}.java"
@@ -38,7 +39,8 @@ done
 
 javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateSmoke.java" "$WORK/GateProbe.java" "$WORK/GateIntegration.java" \
-  "$WORK/GateEvents.java" "$WORK/GateTrackValues.java" "$WORK/GateTrackEnums.java"
+  "$WORK/GateEvents.java" "$WORK/GateTrackValues.java" "$WORK/GateTrackEnums.java" \
+  "$WORK/GateTrackContracts.java"
 javac --release 11 -d "$CLASSES" "$WORK/GateClassloader.java"
 
 case "$(uname -s)" in
@@ -89,6 +91,16 @@ cmp "$WORK/track-enums-reference.txt" "$WORK/track-enums-candidate.txt"
 grep --fixed-strings \
   'copy=true;lookup-errors=iae,npe;reflection=5,6,7' \
   "$WORK/track-enums-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$classes_argument$classpath_separator$reference_argument" GateTrackContracts \
+  >"$WORK/track-contracts-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$reference_argument" GateTrackContracts \
+  >"$WORK/track-contracts-candidate.txt"
+cmp "$WORK/track-contracts-reference.txt" "$WORK/track-contracts-candidate.txt"
+grep --fixed-strings \
+  'provider=title,author,123,provider-id,uri,art,isrc;reflection=0,16,7,T,java.lang.Class<T>' \
+  "$WORK/track-contracts-candidate.txt" >/dev/null
 java -Xverify:all -cp "$GATE_CLASSPATH" GateSmoke "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateIntegration "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" callbacks

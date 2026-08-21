@@ -82,8 +82,8 @@
       "methods": 405,
       "symbols": 535,
       "status": "IN_PROGRESS",
-      "classified_symbols": 98,
-      "remaining_symbols": 437,
+      "classified_symbols": 124,
+      "remaining_symbols": 411,
       "completed_slices": [
         {
           "id": "player-events",
@@ -121,6 +121,18 @@
           "evidence": [
             "scripts/run-jvm-gate-a.sh",
             "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
+        },
+        {
+          "id": "track-info-contracts",
+          "classes": 3,
+          "fields": 0,
+          "methods": 23,
+          "symbols": 26,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
             "tools/jvm-gate/src/main.rs"
           ]
         }
@@ -259,7 +271,7 @@
   "phase_entry": {
     "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
     "first_execution_cohort": "core-player-track",
-    "next_slice": "track-info-contracts",
+    "next_slice": "playlist-contracts",
     "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
   }
 }

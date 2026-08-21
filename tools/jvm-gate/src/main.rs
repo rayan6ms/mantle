@@ -91,6 +91,14 @@ fn run() -> Result<()> {
             fs::write(output, TRACK_ENUM_CONSUMER)?;
             Ok(())
         }
+        Some("write-track-contract-consumer") => {
+            let output = required_path(&args, "--output")?;
+            if let Some(parent) = output.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::write(output, TRACK_CONTRACT_CONSUMER)?;
+            Ok(())
+        }
         _ => Err(
             "usage: mantle-jvm-gate <emit|write-smoke-consumer|write-probe-consumer> [options]"
                 .into(),
@@ -392,6 +400,135 @@ public final class GateTrackEnums {
     } catch (Throwable error) {
       if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const TRACK_CONTRACT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.track.AudioItem;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackState;
+import com.sedmelluq.discord.lavaplayer.track.TrackMarker;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+
+public final class GateTrackContracts {
+  public static void main(String[] args) throws Exception {
+    StubTrack track = new StubTrack();
+    AudioItem item = track;
+    check(item instanceof AudioTrack, "audio item marker interface");
+    check(track.getInfo().identifier.equals("contract-id"), "track info linkage");
+    check(track.getIdentifier().equals("contract-id"), "track identifier");
+    check(track.getState() == AudioTrackState.INACTIVE, "track state");
+    check(track.isSeekable() && track.getDuration() == 654321L, "track scalar methods");
+    track.setPosition(321L);
+    check(track.getPosition() == 321L, "track position");
+
+    TrackMarker marker = new TrackMarker(17L, state -> { });
+    track.setMarker(marker);
+    track.addMarker(marker);
+    track.removeMarker(marker);
+    check(track.marker == marker && track.markerOperations.equals("set,add,remove"),
+        "track marker methods");
+    track.stop();
+    check(track.stopped, "track stop");
+    check(track.makeClone() == track && track.getSourceManager() == null,
+        "track clone and source");
+
+    StringBuilder userData = new StringBuilder("payload");
+    track.setUserData(userData);
+    check(track.getUserData() == userData, "untyped user data");
+    check(track.getUserData(StringBuilder.class) == userData, "typed user data");
+    check(track.getUserData(String.class) == null, "typed user data mismatch");
+
+    AudioTrackInfoProvider provider = new StubInfoProvider();
+    check(provider.getTitle().equals("title") && provider.getAuthor().equals("author"),
+        "provider title and author");
+    check(provider.getLength().equals(123L) && provider.getIdentifier().equals("provider-id"),
+        "provider length and identifier");
+    check(provider.getUri().equals("uri") && provider.getArtworkUrl().equals("art")
+        && provider.getISRC().equals("isrc"), "provider optional metadata");
+
+    check(AudioItem.class.isInterface() && AudioItem.class.getDeclaredMethods().length == 0,
+        "audio item structure");
+    check(AudioTrack.class.isInterface() && AudioTrack.class.getDeclaredMethods().length == 16,
+        "audio track structure");
+    check(AudioTrack.class.getInterfaces().length == 1
+        && AudioTrack.class.getInterfaces()[0] == AudioItem.class, "audio track parent");
+    check(AudioTrackInfoProvider.class.isInterface()
+        && AudioTrackInfoProvider.class.getDeclaredMethods().length == 7,
+        "info provider structure");
+    check(allAbstract(AudioTrack.class) && allAbstract(AudioTrackInfoProvider.class),
+        "abstract interface methods");
+    Method typedUserData = AudioTrack.class.getMethod("getUserData", Class.class);
+    check(typedUserData.getTypeParameters().length == 1
+        && typedUserData.getGenericReturnType().getTypeName().equals("T")
+        && typedUserData.getGenericParameterTypes()[0].getTypeName().equals("java.lang.Class<T>"),
+        "typed user data signature");
+
+    System.out.println(
+        "track=info,id,INACTIVE,true,321,654321,set-add-remove,stopped,clone,userdata;"
+        + "provider=title,author,123,provider-id,uri,art,isrc;"
+        + "reflection=0,16,7,T,java.lang.Class<T>");
+  }
+
+  private static boolean allAbstract(Class<?> type) {
+    for (Method method : type.getDeclaredMethods()) {
+      if (!Modifier.isPublic(method.getModifiers())
+          || !Modifier.isAbstract(method.getModifiers()) || method.isDefault()) return false;
+    }
+    return true;
+  }
+
+  private static final class StubTrack implements AudioTrack {
+    private final AudioTrackInfo info = new AudioTrackInfo(
+        "contract-title", "contract-author", 654321L, "contract-id", false, "contract-uri");
+    private long position;
+    private Object userData;
+    private TrackMarker marker;
+    private String markerOperations = "";
+    private boolean stopped;
+
+    public AudioTrackInfo getInfo() { return info; }
+    public String getIdentifier() { return info.identifier; }
+    public AudioTrackState getState() { return AudioTrackState.INACTIVE; }
+    public void stop() { stopped = true; }
+    public boolean isSeekable() { return true; }
+    public long getPosition() { return position; }
+    public void setPosition(long value) { position = value; }
+    public void setMarker(TrackMarker value) { marker = value; record("set"); }
+    public void addMarker(TrackMarker value) { marker = value; record("add"); }
+    public void removeMarker(TrackMarker value) { marker = value; record("remove"); }
+    public long getDuration() { return info.length; }
+    public AudioTrack makeClone() { return this; }
+    public AudioSourceManager getSourceManager() { return null; }
+    public void setUserData(Object value) { userData = value; }
+    public Object getUserData() { return userData; }
+    public <T> T getUserData(Class<T> type) {
+      return type.isInstance(userData) ? type.cast(userData) : null;
+    }
+
+    private void record(String operation) {
+      if (!markerOperations.isEmpty()) markerOperations += ',';
+      markerOperations += operation;
+    }
+  }
+
+  private static final class StubInfoProvider implements AudioTrackInfoProvider {
+    public String getTitle() { return "title"; }
+    public String getAuthor() { return "author"; }
+    public Long getLength() { return 123L; }
+    public String getIdentifier() { return "provider-id"; }
+    public String getUri() { return "uri"; }
+    public String getArtworkUrl() { return "art"; }
+    public String getISRC() { return "isrc"; }
   }
 
   private static void check(boolean condition, String message) {
