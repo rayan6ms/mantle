@@ -29,6 +29,8 @@ const FRAME_BUFFER_FACTORY_CLASS: &str = "dev/mantle/internal/NativeAudioFrameBu
 const EVENT_DISPATCHER_CLASS: &str = "dev/mantle/internal/NativeEventDispatcher";
 const PLAYER_LIFECYCLE_HELPER_CLASS: &str = "dev/mantle/internal/NativeAudioPlayerLifecycle";
 const MANAGER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayerManager";
+const AUDIO_PLAYER_MANAGER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/player/AudioPlayerManager";
 const PLAYER_LIFECYCLE_MANAGER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/AudioPlayerLifecycleManager";
 const FUNCTIONAL_RESULT_HANDLER_CLASS: &str =
@@ -82,7 +84,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     RESAMPLING_CLASS,
     AUDIO_PLAYER_OPTIONS_CLASS,
     "com/sedmelluq/discord/lavaplayer/player/AudioPlayer",
-    "com/sedmelluq/discord/lavaplayer/player/AudioPlayerManager",
+    AUDIO_PLAYER_MANAGER_CLASS,
     MANAGER_CLASS,
     "com/sedmelluq/discord/lavaplayer/player/event/AudioEvent",
     EVENT_ADAPTER_CLASS,
@@ -472,6 +474,9 @@ fn replacement_body(
     if class_name == MANAGER_CLASS {
         return manager_replacement(pool, name, descriptor, required_locals);
     }
+    if class_name == AUDIO_PLAYER_MANAGER_CLASS {
+        return audio_player_manager_replacement(pool, name, descriptor, required_locals);
+    }
     if class_name == AUDIO_REFERENCE_CLASS {
         return audio_reference_replacement(pool, name, descriptor, required_locals);
     }
@@ -542,6 +547,226 @@ fn replacement_body(
             required_locals,
         )?,
     })
+}
+
+fn audio_player_manager_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "registerSourceManagers",
+            "([Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;)V",
+        ) => audio_player_manager_register_sources(pool),
+        (
+            "loadItem",
+            "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler;)Ljava/util/concurrent/Future;",
+        ) => audio_player_manager_string_load(pool, "loadItem", descriptor),
+        (
+            "loadItemSync",
+            "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler;)V"
+            | "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+        ) => audio_player_manager_string_load(pool, "loadItemSync", descriptor),
+        (
+            "loadItemOrdered",
+            "(Ljava/lang/Object;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler;)Ljava/util/concurrent/Future;",
+        ) => audio_player_manager_ordered_string_load(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {AUDIO_PLAYER_MANAGER_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn audio_player_manager_register_sources(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(AUDIO_PLAYER_MANAGER_CLASS)?;
+    let register = pool.add_interface_method_ref(
+        owner,
+        "registerSourceManager",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;)V",
+    )?;
+    let source_array =
+        pool.add_class("[Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;")?;
+    let mut body = code(
+        pool,
+        2,
+        6,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Astore_2,
+            Instruction::Aload_2,
+            Instruction::Arraylength,
+            Instruction::Istore_3,
+            Instruction::Iconst_0,
+            Instruction::Istore(4),
+            Instruction::Iload(4),
+            Instruction::Iload_3,
+            Instruction::If_icmpge(19),
+            Instruction::Aload_2,
+            Instruction::Iload(4),
+            Instruction::Aaload,
+            Instruction::Astore(5),
+            Instruction::Aload_0,
+            Instruction::Aload(5),
+            Instruction::Invokeinterface(register, 2),
+            Instruction::Iinc(4, 1),
+            Instruction::Goto(7),
+            Instruction::Return,
+        ],
+    )?;
+    let Attribute::Code { attributes, .. } = &mut body else {
+        return Err("expected generated code attribute".into());
+    };
+    attributes.push(Attribute::StackMapTable {
+        name_index: pool.add_utf8("StackMapTable")?,
+        frames: vec![
+            StackFrame::AppendFrame {
+                frame_type: 254,
+                offset_delta: 7,
+                locals: vec![
+                    VerificationType::Object {
+                        cpool_index: source_array,
+                    },
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                ],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 248,
+                offset_delta: 11,
+            },
+        ],
+    });
+    Ok(body)
+}
+
+fn audio_player_manager_string_load(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+) -> Result<Attribute> {
+    let reference = pool.add_class(AUDIO_REFERENCE_CLASS)?;
+    let reference_init = pool.add_method_ref(
+        reference,
+        "<init>",
+        "(Ljava/lang/String;Ljava/lang/String;)V",
+    )?;
+    let owner = pool.add_class(AUDIO_PLAYER_MANAGER_CLASS)?;
+    match (name, descriptor) {
+        (
+            "loadItem",
+            "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler;)Ljava/util/concurrent/Future;",
+        ) => {
+            let load = pool.add_interface_method_ref(
+                owner,
+                "loadItem",
+                "(Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler;)Ljava/util/concurrent/Future;",
+            )?;
+            code(
+                pool,
+                5,
+                3,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::New(reference),
+                    Instruction::Dup,
+                    Instruction::Aload_1,
+                    Instruction::Aconst_null,
+                    Instruction::Invokespecial(reference_init),
+                    Instruction::Aload_2,
+                    Instruction::Invokeinterface(load, 3),
+                    Instruction::Areturn,
+                ],
+            )
+        }
+        (
+            "loadItemSync",
+            "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler;)V",
+        ) => {
+            let load = pool.add_interface_method_ref(
+                owner,
+                "loadItemSync",
+                "(Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler;)V",
+            )?;
+            code(
+                pool,
+                5,
+                3,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::New(reference),
+                    Instruction::Dup,
+                    Instruction::Aload_1,
+                    Instruction::Aconst_null,
+                    Instruction::Invokespecial(reference_init),
+                    Instruction::Aload_2,
+                    Instruction::Invokeinterface(load, 3),
+                    Instruction::Return,
+                ],
+            )
+        }
+        (
+            "loadItemSync",
+            "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+        ) => {
+            let load = pool.add_interface_method_ref(
+                owner,
+                "loadItemSync",
+                "(Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+            )?;
+            code(
+                pool,
+                5,
+                2,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::New(reference),
+                    Instruction::Dup,
+                    Instruction::Aload_1,
+                    Instruction::Aconst_null,
+                    Instruction::Invokespecial(reference_init),
+                    Instruction::Invokeinterface(load, 2),
+                    Instruction::Areturn,
+                ],
+            )
+        }
+        _ => Err(format!("unsupported manager default {name}{descriptor}").into()),
+    }
+}
+
+fn audio_player_manager_ordered_string_load(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let reference = pool.add_class(AUDIO_REFERENCE_CLASS)?;
+    let reference_init = pool.add_method_ref(
+        reference,
+        "<init>",
+        "(Ljava/lang/String;Ljava/lang/String;)V",
+    )?;
+    let owner = pool.add_class(AUDIO_PLAYER_MANAGER_CLASS)?;
+    let load = pool.add_interface_method_ref(
+        owner,
+        "loadItemOrdered",
+        "(Ljava/lang/Object;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler;)Ljava/util/concurrent/Future;",
+    )?;
+    code(
+        pool,
+        6,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::New(reference),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Aconst_null,
+            Instruction::Invokespecial(reference_init),
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(load, 4),
+            Instruction::Areturn,
+        ],
+    )
 }
 
 fn audio_frame_provider_tools_replacement(

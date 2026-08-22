@@ -10843,252 +10843,392 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "shutdown",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "enableGcMonitoring",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "registerSourceManager",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "registerSourceManagers",
       "descriptor": "([Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "source",
       "descriptor": "(Ljava/lang/Class;)Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "getSourceManagers",
       "descriptor": "()Ljava/util/List;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "loadItem",
       "descriptor": "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler;)Ljava/util/concurrent/Future;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "loadItem",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler;)Ljava/util/concurrent/Future;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "loadItemSync",
       "descriptor": "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "loadItemSync",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "loadItemSync",
       "descriptor": "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "loadItemSync",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "loadItemOrdered",
       "descriptor": "(Ljava/lang/Object;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler;)Ljava/util/concurrent/Future;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "loadItemOrdered",
       "descriptor": "(Ljava/lang/Object;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler;)Ljava/util/concurrent/Future;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "encodeTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/MessageOutput;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "decodeTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/MessageInput;)Lcom/sedmelluq/discord/lavaplayer/track/DecodedTrackHolder;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "getConfiguration",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "isUsingSeekGhosting",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "setUseSeekGhosting",
       "descriptor": "(Z)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "getFrameBufferDuration",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "setFrameBufferDuration",
       "descriptor": "(I)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "setTrackStuckThreshold",
       "descriptor": "(J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "setPlayerCleanupThreshold",
       "descriptor": "(J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "setItemLoaderThreadPoolSize",
       "descriptor": "(I)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "createPlayer",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "setHttpRequestConfigurator",
       "descriptor": "(Ljava/util/function/Function;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "setHttpBuilderConfigurator",
       "descriptor": "(Ljava/util/function/Consumer;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact interface and method metadata, generic signatures, checked exceptions, all five default-method behaviors, reference construction, identity returns, null edges, full-width primitive values, and complete abstract dispatch are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerOptions",

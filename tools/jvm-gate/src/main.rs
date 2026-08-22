@@ -73,6 +73,9 @@ fn consumer_source(command: &str) -> Option<&'static str> {
             Some(AUDIO_PLAYER_LIFECYCLE_MANAGER_CONSUMER)
         }
         "write-audio-player-interface-consumer" => Some(AUDIO_PLAYER_INTERFACE_CONSUMER),
+        "write-audio-player-manager-interface-consumer" => {
+            Some(AUDIO_PLAYER_MANAGER_INTERFACE_CONSUMER)
+        }
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -3199,6 +3202,401 @@ public final class GateAudioPlayerInterface {
           "mutable timed provide arguments");
       names.add("provide-mutable-timed");
       return false;
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_PLAYER_MANAGER_INTERFACE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.tools.io.MessageInput;
+import com.sedmelluq.discord.lavaplayer.tools.io.MessageOutput;
+import com.sedmelluq.discord.lavaplayer.track.AudioItem;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.DecodedTrackHolder;
+import java.lang.invoke.MethodHandles;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
+import java.util.function.Consumer;
+import java.util.function.Function;
+
+public final class GateAudioPlayerManagerInterface {
+  public static void main(String[] args) throws Exception {
+    AudioSourceManager firstSource = proxy(AudioSourceManager.class);
+    AudioSourceManager secondSource = proxy(AudioSourceManager.class);
+    AudioLoadResultHandler resultHandler = proxy(AudioLoadResultHandler.class);
+    AudioTrack track = proxy(AudioTrack.class);
+    AudioItem item = proxy(AudioItem.class);
+    AudioPlayer player = proxy(AudioPlayer.class);
+    AudioConfiguration configuration = new AudioConfiguration();
+    DecodedTrackHolder decoded = new DecodedTrackHolder(track);
+    Future<Void> asyncFuture = new CompletableFuture<>();
+    Future<Void> orderedFuture = new CompletableFuture<>();
+    List<AudioSourceManager> sources = Arrays.asList(firstSource, secondSource);
+    MessageInput input = null;
+    MessageOutput output = null;
+    Object orderingKey = new Object();
+    Function<Object, Object> requestConfigurator = value -> value;
+    Consumer<Object> builderConfigurator = value -> { };
+
+    ManagerHandler calls = new ManagerHandler(
+        firstSource, secondSource, resultHandler, track, item, player, configuration, decoded,
+        asyncFuture, orderedFuture, sources, input, output, orderingKey,
+        requestConfigurator, builderConfigurator);
+    AudioPlayerManager manager = proxy(AudioPlayerManager.class, calls);
+
+    manager.registerSourceManagers(firstSource, null, secondSource);
+    manager.registerSourceManagers();
+    int registrations = calls.names.size();
+    try {
+      manager.registerSourceManagers((AudioSourceManager[]) null);
+      throw new AssertionError("null source array accepted");
+    } catch (NullPointerException expected) {
+      check(calls.names.size() == registrations, "null array dispatched");
+    }
+
+    check(manager.loadItem("async-id", resultHandler) == asyncFuture,
+        "async default return identity");
+    manager.loadItemSync("sync-id", resultHandler);
+    check(manager.loadItemSync("item-id") == item, "sync item default return identity");
+    check(manager.loadItemOrdered(orderingKey, "ordered-id", resultHandler) == orderedFuture,
+        "ordered default return identity");
+    manager.loadItemSync((String) null, resultHandler);
+
+    AudioReference direct = new AudioReference("direct-id", "direct-title");
+    manager.shutdown();
+    manager.enableGcMonitoring();
+    manager.registerSourceManager(firstSource);
+    check(manager.source(AudioSourceManager.class) == firstSource, "source return identity");
+    check(manager.getSourceManagers() == sources, "source list return identity");
+    check(manager.loadItem(direct, resultHandler) == asyncFuture, "direct async identity");
+    manager.loadItemSync(direct, resultHandler);
+    check(manager.loadItemSync(direct) == item, "direct item identity");
+    check(manager.loadItemOrdered(orderingKey, direct, resultHandler) == orderedFuture,
+        "direct ordered identity");
+    manager.encodeTrack(output, track);
+    check(manager.decodeTrack(input) == decoded, "decoded holder identity");
+    check(manager.getConfiguration() == configuration, "configuration identity");
+    check(manager.isUsingSeekGhosting(), "seek ghosting return");
+    manager.setUseSeekGhosting(false);
+    manager.setUseSeekGhosting(true);
+    check(manager.getFrameBufferDuration() == Integer.MIN_VALUE, "duration return width");
+    manager.setFrameBufferDuration(Integer.MIN_VALUE);
+    manager.setFrameBufferDuration(Integer.MAX_VALUE);
+    manager.setTrackStuckThreshold(Long.MIN_VALUE);
+    manager.setTrackStuckThreshold(Long.MAX_VALUE);
+    manager.setPlayerCleanupThreshold(Long.MIN_VALUE);
+    manager.setPlayerCleanupThreshold(Long.MAX_VALUE);
+    manager.setItemLoaderThreadPoolSize(Integer.MIN_VALUE);
+    manager.setItemLoaderThreadPoolSize(Integer.MAX_VALUE);
+    check(manager.createPlayer() == player, "player return identity");
+    Method requestMethod = AudioPlayerManager.class.getDeclaredMethod(
+        "setHttpRequestConfigurator", Function.class);
+    Method builderMethod = AudioPlayerManager.class.getDeclaredMethod(
+        "setHttpBuilderConfigurator", Consumer.class);
+    requestMethod.invoke(manager, requestConfigurator);
+    requestMethod.invoke(manager, new Object[] { null });
+    builderMethod.invoke(manager, builderConfigurator);
+    builderMethod.invoke(manager, new Object[] { null });
+
+    check(calls.names.equals(Arrays.asList(
+        "register-first", "register-null", "register-second",
+        "load-async:async-id:null", "load-sync-handler:sync-id:null",
+        "load-sync-item:item-id:null", "load-ordered:ordered-id:null",
+        "load-sync-handler:null:null", "shutdown", "enable-gc", "register-first",
+        "source", "get-sources", "load-async:direct-id:direct-title",
+        "load-sync-handler:direct-id:direct-title",
+        "load-sync-item:direct-id:direct-title",
+        "load-ordered:direct-id:direct-title", "encode", "decode", "configuration",
+        "get-seek", "set-seek-false", "set-seek-true", "get-duration",
+        "set-duration-min", "set-duration-max", "track-stuck-min", "track-stuck-max",
+        "cleanup-min", "cleanup-max", "loader-min", "loader-max", "create-player",
+        "request", "request-null", "builder", "builder-null")), "dispatch order");
+
+    checkReflection();
+    System.out.println(
+        "defaults=register-order,string-reference,identity-return,null-array;"
+        + "dispatch=loads,serialization,configuration,thresholds,http;"
+        + "reflection=interface,0-fields,27-methods,0-constructors");
+  }
+
+  private static void checkReflection() throws Exception {
+    Class<AudioPlayerManager> type = AudioPlayerManager.class;
+    int modifiers = type.getModifiers();
+    check(Modifier.isPublic(modifiers) && Modifier.isInterface(modifiers)
+        && Modifier.isAbstract(modifiers) && !Modifier.isFinal(modifiers)
+        && type.getSuperclass() == null && type.getInterfaces().length == 0
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0,
+        "interface structure");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredMethods().length == 27
+        && type.getDeclaredConstructors().length == 0, "member counts");
+
+    checkAbstract(type.getDeclaredMethod("shutdown"), void.class, new Class<?>[0]);
+    checkAbstract(type.getDeclaredMethod("enableGcMonitoring"), void.class, new Class<?>[0]);
+    checkAbstract(type.getDeclaredMethod("registerSourceManager", AudioSourceManager.class),
+        void.class, new Class<?>[] { AudioSourceManager.class });
+    checkDefault(type.getDeclaredMethod("registerSourceManagers", AudioSourceManager[].class),
+        void.class, new Class<?>[] { AudioSourceManager[].class }, true);
+
+    Method source = type.getDeclaredMethod("source", Class.class);
+    checkAbstract(source, AudioSourceManager.class, new Class<?>[] { Class.class });
+    TypeVariable<Method>[] sourceVariables = source.getTypeParameters();
+    check(sourceVariables.length == 1 && sourceVariables[0].getName().equals("T")
+        && Arrays.equals(sourceVariables[0].getBounds(), new Type[] { AudioSourceManager.class })
+        && source.getGenericReturnType() == sourceVariables[0]
+        && source.getGenericParameterTypes()[0].getTypeName().equals("java.lang.Class<T>"),
+        "source generic metadata");
+    Method getSources = type.getDeclaredMethod("getSourceManagers");
+    checkAbstract(getSources, List.class, new Class<?>[0]);
+    check(getSources.getGenericReturnType().getTypeName().equals(
+        "java.util.List<com.sedmelluq.discord.lavaplayer.source.AudioSourceManager>"),
+        "source list generic metadata");
+
+    Method loadString = type.getDeclaredMethod(
+        "loadItem", String.class, AudioLoadResultHandler.class);
+    checkDefault(loadString, Future.class,
+        new Class<?>[] { String.class, AudioLoadResultHandler.class }, false);
+    checkFutureVoid(loadString);
+    Method loadReference = type.getDeclaredMethod(
+        "loadItem", AudioReference.class, AudioLoadResultHandler.class);
+    checkAbstract(loadReference, Future.class,
+        new Class<?>[] { AudioReference.class, AudioLoadResultHandler.class });
+    checkFutureVoid(loadReference);
+    checkDefault(type.getDeclaredMethod(
+        "loadItemSync", String.class, AudioLoadResultHandler.class), void.class,
+        new Class<?>[] { String.class, AudioLoadResultHandler.class }, false);
+    checkAbstract(type.getDeclaredMethod(
+        "loadItemSync", AudioReference.class, AudioLoadResultHandler.class), void.class,
+        new Class<?>[] { AudioReference.class, AudioLoadResultHandler.class });
+    checkDefault(type.getDeclaredMethod("loadItemSync", String.class), AudioItem.class,
+        new Class<?>[] { String.class }, false);
+    checkAbstract(type.getDeclaredMethod("loadItemSync", AudioReference.class), AudioItem.class,
+        new Class<?>[] { AudioReference.class });
+    Method orderedString = type.getDeclaredMethod(
+        "loadItemOrdered", Object.class, String.class, AudioLoadResultHandler.class);
+    checkDefault(orderedString, Future.class,
+        new Class<?>[] { Object.class, String.class, AudioLoadResultHandler.class }, false);
+    checkFutureVoid(orderedString);
+    Method orderedReference = type.getDeclaredMethod(
+        "loadItemOrdered", Object.class, AudioReference.class, AudioLoadResultHandler.class);
+    checkAbstract(orderedReference, Future.class,
+        new Class<?>[] { Object.class, AudioReference.class, AudioLoadResultHandler.class });
+    checkFutureVoid(orderedReference);
+
+    Method encode = type.getDeclaredMethod("encodeTrack", MessageOutput.class, AudioTrack.class);
+    checkAbstract(encode, void.class, new Class<?>[] { MessageOutput.class, AudioTrack.class });
+    check(Arrays.equals(encode.getExceptionTypes(), new Class<?>[] { java.io.IOException.class }),
+        "encode exceptions");
+    Method decode = type.getDeclaredMethod("decodeTrack", MessageInput.class);
+    checkAbstract(decode, DecodedTrackHolder.class, new Class<?>[] { MessageInput.class });
+    check(Arrays.equals(decode.getExceptionTypes(), new Class<?>[] { java.io.IOException.class }),
+        "decode exceptions");
+    checkAbstract(type.getDeclaredMethod("getConfiguration"), AudioConfiguration.class,
+        new Class<?>[0]);
+    checkAbstract(type.getDeclaredMethod("isUsingSeekGhosting"), boolean.class, new Class<?>[0]);
+    checkAbstract(type.getDeclaredMethod("setUseSeekGhosting", boolean.class), void.class,
+        new Class<?>[] { boolean.class });
+    checkAbstract(type.getDeclaredMethod("getFrameBufferDuration"), int.class, new Class<?>[0]);
+    checkAbstract(type.getDeclaredMethod("setFrameBufferDuration", int.class), void.class,
+        new Class<?>[] { int.class });
+    checkAbstract(type.getDeclaredMethod("setTrackStuckThreshold", long.class), void.class,
+        new Class<?>[] { long.class });
+    checkAbstract(type.getDeclaredMethod("setPlayerCleanupThreshold", long.class), void.class,
+        new Class<?>[] { long.class });
+    checkAbstract(type.getDeclaredMethod("setItemLoaderThreadPoolSize", int.class), void.class,
+        new Class<?>[] { int.class });
+    checkAbstract(type.getDeclaredMethod("createPlayer"), AudioPlayer.class, new Class<?>[0]);
+    checkAbstract(type.getDeclaredMethod("setHttpRequestConfigurator", Function.class), void.class,
+        new Class<?>[] { Function.class });
+    checkAbstract(type.getDeclaredMethod("setHttpBuilderConfigurator", Consumer.class), void.class,
+        new Class<?>[] { Consumer.class });
+  }
+
+  private static void checkFutureVoid(Method method) {
+    ParameterizedType type = (ParameterizedType) method.getGenericReturnType();
+    check(type.getRawType() == Future.class
+        && Arrays.equals(type.getActualTypeArguments(), new Type[] { Void.class }),
+        "future generic metadata " + method);
+  }
+
+  private static void checkAbstract(Method method, Class<?> returnType, Class<?>[] parameters) {
+    check(Modifier.isPublic(method.getModifiers()) && Modifier.isAbstract(method.getModifiers())
+        && !Modifier.isStatic(method.getModifiers()) && !method.isDefault()
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs()
+        && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getDeclaredAnnotations().length == 0,
+        "abstract metadata " + method);
+  }
+
+  private static void checkDefault(
+      Method method, Class<?> returnType, Class<?>[] parameters, boolean varargs) {
+    check(Modifier.isPublic(method.getModifiers()) && !Modifier.isAbstract(method.getModifiers())
+        && !Modifier.isStatic(method.getModifiers()) && method.isDefault()
+        && !method.isBridge() && !method.isSynthetic() && method.isVarArgs() == varargs
+        && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && method.getDeclaredAnnotations().length == 0,
+        "default metadata " + method);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] { type },
+        (instance, method, arguments) -> null);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type, InvocationHandler handler) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] { type }, handler);
+  }
+
+  private static final class ManagerHandler implements InvocationHandler {
+    final List<String> names = new java.util.ArrayList<>();
+    final AudioSourceManager firstSource;
+    final AudioSourceManager secondSource;
+    final AudioLoadResultHandler resultHandler;
+    final AudioTrack track;
+    final AudioItem item;
+    final AudioPlayer player;
+    final AudioConfiguration configuration;
+    final DecodedTrackHolder decoded;
+    final Future<Void> asyncFuture;
+    final Future<Void> orderedFuture;
+    final List<AudioSourceManager> sources;
+    final MessageInput input;
+    final MessageOutput output;
+    final Object orderingKey;
+    final Function<Object, Object> requestConfigurator;
+    final Consumer<Object> builderConfigurator;
+
+    ManagerHandler(AudioSourceManager firstSource, AudioSourceManager secondSource,
+        AudioLoadResultHandler resultHandler, AudioTrack track, AudioItem item, AudioPlayer player,
+        AudioConfiguration configuration, DecodedTrackHolder decoded, Future<Void> asyncFuture,
+        Future<Void> orderedFuture, List<AudioSourceManager> sources, MessageInput input,
+        MessageOutput output, Object orderingKey, Function<Object, Object> requestConfigurator,
+        Consumer<Object> builderConfigurator) {
+      this.firstSource = firstSource;
+      this.secondSource = secondSource;
+      this.resultHandler = resultHandler;
+      this.track = track;
+      this.item = item;
+      this.player = player;
+      this.configuration = configuration;
+      this.decoded = decoded;
+      this.asyncFuture = asyncFuture;
+      this.orderedFuture = orderedFuture;
+      this.sources = sources;
+      this.input = input;
+      this.output = output;
+      this.orderingKey = orderingKey;
+      this.requestConfigurator = requestConfigurator;
+      this.builderConfigurator = builderConfigurator;
+    }
+
+    public Object invoke(Object proxy, Method method, Object[] arguments) throws Throwable {
+      if (method.isDefault()) {
+        MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(
+            method.getDeclaringClass(), MethodHandles.lookup());
+        Object[] values = arguments == null ? new Object[0] : arguments;
+        return lookup.unreflectSpecial(method, method.getDeclaringClass())
+            .bindTo(proxy).invokeWithArguments(values);
+      }
+      switch (method.getName()) {
+        case "shutdown": names.add("shutdown"); return null;
+        case "enableGcMonitoring": names.add("enable-gc"); return null;
+        case "registerSourceManager":
+          Object source = arguments[0];
+          check(source == firstSource || source == secondSource || source == null,
+              "registered source identity");
+          names.add(source == firstSource ? "register-first"
+              : source == secondSource ? "register-second" : "register-null");
+          return null;
+        case "source":
+          check(arguments[0] == AudioSourceManager.class, "source class identity");
+          names.add("source");
+          return firstSource;
+        case "getSourceManagers": names.add("get-sources"); return sources;
+        case "loadItem":
+          check(arguments[1] == resultHandler, "async handler identity");
+          names.add(referenceName("load-async", (AudioReference) arguments[0]));
+          return asyncFuture;
+        case "loadItemSync":
+          if (arguments.length == 2) {
+            check(arguments[1] == resultHandler, "sync handler identity");
+            names.add(referenceName("load-sync-handler", (AudioReference) arguments[0]));
+            return null;
+          }
+          names.add(referenceName("load-sync-item", (AudioReference) arguments[0]));
+          return item;
+        case "loadItemOrdered":
+          check(arguments[0] == orderingKey && arguments[2] == resultHandler,
+              "ordered argument identity");
+          names.add(referenceName("load-ordered", (AudioReference) arguments[1]));
+          return orderedFuture;
+        case "encodeTrack":
+          check(arguments[0] == output && arguments[1] == track, "encode identity");
+          names.add("encode"); return null;
+        case "decodeTrack":
+          check(arguments[0] == input, "decode identity");
+          names.add("decode"); return decoded;
+        case "getConfiguration": names.add("configuration"); return configuration;
+        case "isUsingSeekGhosting": names.add("get-seek"); return true;
+        case "setUseSeekGhosting":
+          names.add((Boolean) arguments[0] ? "set-seek-true" : "set-seek-false");
+          return null;
+        case "getFrameBufferDuration": names.add("get-duration"); return Integer.MIN_VALUE;
+        case "setFrameBufferDuration":
+          names.add(((Integer) arguments[0]) == Integer.MIN_VALUE
+              ? "set-duration-min" : "set-duration-max");
+          return null;
+        case "setTrackStuckThreshold":
+          names.add(((Long) arguments[0]) == Long.MIN_VALUE
+              ? "track-stuck-min" : "track-stuck-max");
+          return null;
+        case "setPlayerCleanupThreshold":
+          names.add(((Long) arguments[0]) == Long.MIN_VALUE ? "cleanup-min" : "cleanup-max");
+          return null;
+        case "setItemLoaderThreadPoolSize":
+          names.add(((Integer) arguments[0]) == Integer.MIN_VALUE ? "loader-min" : "loader-max");
+          return null;
+        case "createPlayer": names.add("create-player"); return player;
+        case "setHttpRequestConfigurator":
+          check(arguments[0] == requestConfigurator || arguments[0] == null,
+              "request configurator identity");
+          names.add(arguments[0] == null ? "request-null" : "request");
+          return null;
+        case "setHttpBuilderConfigurator":
+          check(arguments[0] == builderConfigurator || arguments[0] == null,
+              "builder configurator identity");
+          names.add(arguments[0] == null ? "builder-null" : "builder");
+          return null;
+        default: throw new AssertionError("unexpected manager method " + method);
+      }
+    }
+
+    private static String referenceName(String prefix, AudioReference reference) {
+      check(reference != null, prefix + " reference null");
+      return prefix + ":" + reference.identifier + ":" + reference.title;
     }
   }
 
