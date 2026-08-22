@@ -113,6 +113,9 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-heartbeating-http-stream-consumer" => Some(HEARTBEATING_HTTP_STREAM_CONSUMER),
         "write-nico-audio-source-manager-consumer" => Some(NICO_AUDIO_SOURCE_MANAGER_CONSUMER),
         "write-nico-audio-track-consumer" => Some(NICO_AUDIO_TRACK_CONSUMER),
+        "write-default-sound-cloud-data-loader-consumer" => {
+            Some(DEFAULT_SOUND_CLOUD_DATA_LOADER_CONSUMER)
+        }
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -8580,6 +8583,168 @@ public final class GateNicoAudioTrack {
   private static final class ExposedTrack extends NicoAudioTrack {
     ExposedTrack(AudioTrackInfo info, NicoAudioSourceManager source) { super(info, source); }
     AudioTrack shallowClone() { return super.makeShallowClone(); }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const DEFAULT_SOUND_CLOUD_DATA_LOADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudDataLoader;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudDataLoader;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import org.apache.http.HttpEntity;
+import org.apache.http.ProtocolVersion;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.message.BasicStatusLine;
+
+public final class GateDefaultSoundCloudDataLoader {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1 && (args[0].equals("reference") || args[0].equals("candidate")),
+        "expected disposition");
+    reflectionContract();
+    behaviorContract();
+    System.out.println("public-concrete,0-fields,1-constructor,1-exported-method;"
+        + "resolve-v2,get,encoded-url,404-null-browser,json,close,status-error,suppressed-close");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<DefaultSoundCloudDataLoader> type = DefaultSoundCloudDataLoader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {SoundCloudDataLoader.class}),
+        "class metadata");
+    check(type.getDeclaredFields().length == 0, "field count");
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC, "constructor metadata");
+    check(type.getDeclaredMethods().length == 2, "method count");
+    checkMethod(type.getDeclaredMethod("load", HttpInterface.class, String.class),
+        JsonBrowser.class, Modifier.PUBLIC, IOException.class);
+    checkMethod(type.getDeclaredMethod("buildUri", String.class),
+        java.net.URI.class, Modifier.PRIVATE);
+  }
+
+  private static void behaviorContract() throws Exception {
+    DefaultSoundCloudDataLoader loader = new DefaultSoundCloudDataLoader();
+    String sourceUrl = "https://soundcloud.com/a b/tr?x=1&emoji=é";
+    String expectedUri = "https://api-v2.soundcloud.com/resolve?url="
+        + "https%3A%2F%2Fsoundcloud.com%2Fa+b%2Ftr%3Fx%3D1%26emoji%3D%C3%A9";
+
+    RecordingHttpInterface success = new RecordingHttpInterface(
+        200, "{\"kind\":\"track\",\"id\":42}", null, null);
+    JsonBrowser result = loader.load(success, sourceUrl);
+    check("track".equals(result.get("kind").text()) && result.get("id").asLong(-1) == 42L,
+        "parsed JSON");
+    success.checkRequest(expectedUri);
+    check(success.closeCount == 1, "success response close");
+
+    RecordingHttpInterface missing = new RecordingHttpInterface(404, null, null, null);
+    check(loader.load(missing, sourceUrl) == JsonBrowser.NULL_BROWSER, "404 null browser identity");
+    missing.checkRequest(expectedUri);
+    check(missing.closeCount == 1, "404 response close");
+
+    RecordingHttpInterface failed = new RecordingHttpInterface(500, null, null, null);
+    IOException status = expect(IOException.class, () -> loader.load(failed, sourceUrl));
+    check("Invalid status code for video page response: 500".equals(status.getMessage()),
+        "status diagnostic");
+    check(failed.closeCount == 1, "failed response close");
+
+    IOException closeFailure = new IOException("close-failure");
+    RecordingHttpInterface malformed = new RecordingHttpInterface(
+        200, "{", null, closeFailure);
+    IOException parse = expect(IOException.class, () -> loader.load(malformed, sourceUrl));
+    check(parse.getSuppressed().length == 1 && parse.getSuppressed()[0] == closeFailure,
+        "suppressed close failure");
+    check(malformed.closeCount == 1, "malformed response close");
+
+    IOException executeFailure = new IOException("execute-failure");
+    RecordingHttpInterface unavailable = new RecordingHttpInterface(
+        200, "{}", executeFailure, null);
+    check(expect(IOException.class, () -> loader.load(unavailable, sourceUrl)) == executeFailure,
+        "execute failure identity");
+    check(unavailable.closeCount == 0, "no response to close");
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, int modifiers,
+                                  Class<?>... exceptions) {
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs()
+        && Arrays.equals(method.getExceptionTypes(), exceptions), method + " metadata");
+  }
+
+  private static final class RecordingHttpInterface extends HttpInterface {
+    private final int status;
+    private final String body;
+    private final IOException executeFailure;
+    private final IOException closeFailure;
+    private HttpUriRequest request;
+    private int closeCount;
+
+    RecordingHttpInterface(int status, String body, IOException executeFailure,
+                           IOException closeFailure) {
+      super(null, null, false, null);
+      this.status = status;
+      this.body = body;
+      this.executeFailure = executeFailure;
+      this.closeFailure = closeFailure;
+    }
+
+    @Override
+    public CloseableHttpResponse execute(HttpUriRequest request) throws IOException {
+      this.request = request;
+      if (executeFailure != null) throw executeFailure;
+      HttpEntity entity = body == null ? null : new StringEntity(body, ContentType.APPLICATION_JSON);
+      InvocationHandler handler = (proxy, method, args) -> {
+        switch (method.getName()) {
+          case "getStatusLine":
+            return new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), status, "");
+          case "getEntity":
+            return entity;
+          case "close":
+            closeCount++;
+            if (closeFailure != null) throw closeFailure;
+            return null;
+          case "toString":
+            return "RecordingCloseableHttpResponse(" + status + ")";
+          default:
+            throw new AssertionError("unexpected response method: " + method);
+        }
+      };
+      return (CloseableHttpResponse) Proxy.newProxyInstance(
+          CloseableHttpResponse.class.getClassLoader(),
+          new Class<?>[] {CloseableHttpResponse.class}, handler);
+    }
+
+    void checkRequest(String expectedUri) {
+      check(request != null && "GET".equals(request.getMethod())
+          && expectedUri.equals(request.getURI().toASCIIString()), "resolve request");
+    }
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
   }
 
   private interface Operation { void run() throws Exception; }

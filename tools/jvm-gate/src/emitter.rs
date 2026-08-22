@@ -119,6 +119,8 @@ const HEARTBEATING_HTTP_STREAM_CLASS: &str =
 const NICO_AUDIO_SOURCE_MANAGER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/nico/NicoAudioSourceManager";
 const NICO_AUDIO_TRACK_CLASS: &str = "com/sedmelluq/discord/lavaplayer/source/nico/NicoAudioTrack";
+const DEFAULT_SOUND_CLOUD_DATA_LOADER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/soundcloud/DefaultSoundCloudDataLoader";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -157,6 +159,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     HEARTBEATING_HTTP_STREAM_CLASS,
     NICO_AUDIO_SOURCE_MANAGER_CLASS,
     NICO_AUDIO_TRACK_CLASS,
+    DEFAULT_SOUND_CLOUD_DATA_LOADER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -530,6 +533,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | HEARTBEATING_HTTP_STREAM_CLASS
                 | NICO_AUDIO_SOURCE_MANAGER_CLASS
                 | NICO_AUDIO_TRACK_CLASS
+                | DEFAULT_SOUND_CLOUD_DATA_LOADER_CLASS
         ) || method
             .access_flags
             .intersects(MethodAccessFlags::PUBLIC | MethodAccessFlags::PROTECTED)
@@ -605,6 +609,14 @@ fn replacement_body(
     }
     if class_name == NICO_AUDIO_TRACK_CLASS {
         return nico_audio_track_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == DEFAULT_SOUND_CLOUD_DATA_LOADER_CLASS {
+        return default_sound_cloud_data_loader_replacement(
+            pool,
+            name,
+            descriptor,
+            required_locals,
+        );
     }
     if class_name == AUDIO_REFERENCE_CLASS {
         return audio_reference_replacement(pool, name, descriptor, required_locals);
@@ -3154,6 +3166,294 @@ fn nico_audio_track_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute
             Instruction::Return,
         ],
     )
+}
+
+fn default_sound_cloud_data_loader_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        (
+            "load",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+        ) => default_sound_cloud_data_loader_load(pool),
+        ("buildUri", "(Ljava/lang/String;)Ljava/net/URI;") => {
+            default_sound_cloud_data_loader_build_uri(pool)
+        }
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {DEFAULT_SOUND_CLOUD_DATA_LOADER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn default_sound_cloud_data_loader_build_uri(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let uri_builder = pool.add_class("org/apache/http/client/utils/URIBuilder")?;
+    let init = pool.add_method_ref(uri_builder, "<init>", "(Ljava/lang/String;)V")?;
+    let add_parameter = pool.add_method_ref(
+        uri_builder,
+        "addParameter",
+        "(Ljava/lang/String;Ljava/lang/String;)Lorg/apache/http/client/utils/URIBuilder;",
+    )?;
+    let build = pool.add_method_ref(uri_builder, "build", "()Ljava/net/URI;")?;
+    let resolve_url = pool.add_string("https://api-v2.soundcloud.com/resolve")?;
+    let url_parameter = pool.add_string("url")?;
+    let syntax_error = pool.add_class("java/net/URISyntaxException")?;
+    let runtime_error = pool.add_class("java/lang/RuntimeException")?;
+    let runtime_init = pool.add_method_ref(runtime_error, "<init>", "(Ljava/lang/Throwable;)V")?;
+    let mut body = code_with_exceptions(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::New(uri_builder),
+            Instruction::Dup,
+            Instruction::Ldc_w(resolve_url),
+            Instruction::Invokespecial(init),
+            Instruction::Ldc_w(url_parameter),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(add_parameter),
+            Instruction::Invokevirtual(build),
+            Instruction::Areturn,
+            Instruction::Astore_2,
+            Instruction::New(runtime_error),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Invokespecial(runtime_init),
+            Instruction::Athrow,
+        ],
+        vec![ExceptionTableEntry {
+            range_pc: 0..9,
+            handler_pc: 9,
+            catch_type: syntax_error,
+        }],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::SameLocals1StackItemFrame {
+            frame_type: 73,
+            stack: vec![VerificationType::Object {
+                cpool_index: syntax_error,
+            }],
+        }],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn default_sound_cloud_data_loader_load(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_SOUND_CLOUD_DATA_LOADER_CLASS)?;
+    let http_get = pool.add_class("org/apache/http/client/methods/HttpGet")?;
+    let build_uri = pool.add_method_ref(owner, "buildUri", "(Ljava/lang/String;)Ljava/net/URI;")?;
+    let http_get_init = pool.add_method_ref(http_get, "<init>", "(Ljava/net/URI;)V")?;
+    let http_interface =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpInterface")?;
+    let execute = pool.add_method_ref(
+        http_interface,
+        "execute",
+        "(Lorg/apache/http/client/methods/HttpUriRequest;)Lorg/apache/http/client/methods/CloseableHttpResponse;",
+    )?;
+    let response = pool.add_class("org/apache/http/client/methods/CloseableHttpResponse")?;
+    let status_line =
+        pool.add_interface_method_ref(response, "getStatusLine", "()Lorg/apache/http/StatusLine;")?;
+    let status = pool.add_class("org/apache/http/StatusLine")?;
+    let status_code = pool.add_interface_method_ref(status, "getStatusCode", "()I")?;
+    let close = pool.add_interface_method_ref(response, "close", "()V")?;
+    let json_browser = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let null_browser = pool.add_field_ref(
+        json_browser,
+        "NULL_BROWSER",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let http_client_tools =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpClientTools")?;
+    let assert_success = pool.add_method_ref(
+        http_client_tools,
+        "assertSuccessWithContent",
+        "(Lorg/apache/http/HttpResponse;Ljava/lang/String;)V",
+    )?;
+    let response_context = pool.add_string("video page response")?;
+    let get_entity =
+        pool.add_interface_method_ref(response, "getEntity", "()Lorg/apache/http/HttpEntity;")?;
+    let standard_charsets = pool.add_class("java/nio/charset/StandardCharsets")?;
+    let utf8 = pool.add_field_ref(standard_charsets, "UTF_8", "Ljava/nio/charset/Charset;")?;
+    let entity_utils = pool.add_class("org/apache/http/util/EntityUtils")?;
+    let entity_to_string = pool.add_method_ref(
+        entity_utils,
+        "toString",
+        "(Lorg/apache/http/HttpEntity;Ljava/nio/charset/Charset;)Ljava/lang/String;",
+    )?;
+    let parse = pool.add_method_ref(
+        json_browser,
+        "parse",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let string = pool.add_class("java/lang/String")?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let add_suppressed =
+        pool.add_method_ref(throwable, "addSuppressed", "(Ljava/lang/Throwable;)V")?;
+
+    let mut body = code_with_exceptions(
+        pool,
+        5,
+        6,
+        vec![
+            Instruction::Aload_1,
+            Instruction::New(http_get),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(build_uri),
+            Instruction::Invokespecial(http_get_init),
+            Instruction::Invokevirtual(execute),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(status_line, 1),
+            Instruction::Invokeinterface(status_code, 1),
+            Instruction::Sipush(404),
+            Instruction::If_icmpne(22),
+            Instruction::Getstatic(null_browser),
+            Instruction::Astore(4),
+            Instruction::Aload_3,
+            Instruction::Ifnull(20),
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(close, 1),
+            Instruction::Aload(4),
+            Instruction::Areturn,
+            Instruction::Aload_3,
+            Instruction::Ldc_w(response_context),
+            Instruction::Invokestatic(assert_success),
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(get_entity, 1),
+            Instruction::Getstatic(utf8),
+            Instruction::Invokestatic(entity_to_string),
+            Instruction::Astore(4),
+            Instruction::Aload(4),
+            Instruction::Invokestatic(parse),
+            Instruction::Astore(5),
+            Instruction::Aload_3,
+            Instruction::Ifnull(37),
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(close, 1),
+            Instruction::Aload(5),
+            Instruction::Areturn,
+            Instruction::Astore(4),
+            Instruction::Aload_3,
+            Instruction::Ifnull(49),
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(close, 1),
+            Instruction::Goto(49),
+            Instruction::Astore(5),
+            Instruction::Aload(4),
+            Instruction::Aload(5),
+            Instruction::Invokevirtual(add_suppressed),
+            Instruction::Aload(4),
+            Instruction::Athrow,
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 9..16,
+                handler_pc: 39,
+                catch_type: throwable,
+            },
+            ExceptionTableEntry {
+                range_pc: 22..33,
+                handler_pc: 39,
+                catch_type: throwable,
+            },
+            ExceptionTableEntry {
+                range_pc: 42..44,
+                handler_pc: 45,
+                catch_type: throwable,
+            },
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 253,
+                offset_delta: 20,
+                locals: vec![
+                    VerificationType::Object {
+                        cpool_index: response,
+                    },
+                    VerificationType::Object {
+                        cpool_index: json_browser,
+                    },
+                ],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: 1,
+            },
+            StackFrame::AppendFrame {
+                frame_type: 253,
+                offset_delta: 14,
+                locals: vec![
+                    VerificationType::Object {
+                        cpool_index: string,
+                    },
+                    VerificationType::Object {
+                        cpool_index: json_browser,
+                    },
+                ],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 1,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: http_interface,
+                    },
+                    VerificationType::Object {
+                        cpool_index: string,
+                    },
+                    VerificationType::Object {
+                        cpool_index: response,
+                    },
+                ],
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 5,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: http_interface,
+                    },
+                    VerificationType::Object {
+                        cpool_index: string,
+                    },
+                    VerificationType::Object {
+                        cpool_index: response,
+                    },
+                    VerificationType::Object {
+                        cpool_index: throwable,
+                    },
+                ],
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+            StackFrame::SameFrame { frame_type: 3 },
+        ],
+    )?;
+    Ok(body)
 }
 
 fn audio_player_manager_replacement(
