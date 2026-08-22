@@ -23602,45 +23602,60 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure, inheritance, abstract method descriptors, checked exception metadata, and proxy dispatch are covered by the Phase 13 internal-audio-track slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.InternalAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "assignExecutor",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;Z)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure, inheritance, abstract method descriptors, checked exception metadata, and proxy dispatch are covered by the Phase 13 internal-audio-track slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.InternalAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "getActiveExecutor",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure, inheritance, abstract method descriptors, checked exception metadata, and proxy dispatch are covered by the Phase 13 internal-audio-track slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.InternalAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure, inheritance, abstract method descriptors, checked exception metadata, and proxy dispatch are covered by the Phase 13 internal-audio-track slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.InternalAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "createLocalExecutor",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure, inheritance, abstract method descriptors, checked exception metadata, and proxy dispatch are covered by the Phase 13 internal-audio-track slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.TrackMarker",

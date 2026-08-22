@@ -80,6 +80,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-default-audio-player-manager-consumer" => {
             Some(DEFAULT_AUDIO_PLAYER_MANAGER_CONSUMER)
         }
+        "write-internal-audio-track-consumer" => Some(INTERNAL_AUDIO_TRACK_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -4219,6 +4220,152 @@ public final class GateDefaultAudioPlayerManager {
     if (type == double.class) return 0.0d;
     if (type == char.class) return (char) 0;
     return null;
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const INTERNAL_AUDIO_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.InternalAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameProvider;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioTrackExecutor;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+public final class GateInternalAudioTrack {
+  public static void main(String[] args) throws Exception {
+    AudioTrackExecutor active = proxy(AudioTrackExecutor.class, (instance, method, arguments) ->
+        defaultValue(method.getReturnType()));
+    AudioTrackExecutor custom = proxy(AudioTrackExecutor.class, (instance, method, arguments) ->
+        defaultValue(method.getReturnType()));
+    AudioPlayerManager manager = proxy(AudioPlayerManager.class, (instance, method, arguments) ->
+        defaultValue(method.getReturnType()));
+    LocalAudioTrackExecutor local = allocate(LocalAudioTrackExecutor.class);
+    Exception processFailure = new Exception("process-sentinel");
+    List<String> calls = new ArrayList<>();
+
+    InternalAudioTrack track = proxy(InternalAudioTrack.class, (instance, method, arguments) -> {
+      switch (method.getName()) {
+        case "assignExecutor":
+          check(arguments[0] == active, "assigned executor identity");
+          calls.add("assign:" + arguments[1]);
+          return null;
+        case "getActiveExecutor":
+          calls.add("active");
+          return active;
+        case "process":
+          check(arguments[0] == local, "process executor identity");
+          calls.add("process");
+          throw processFailure;
+        case "createLocalExecutor":
+          check(arguments[0] == manager, "manager identity");
+          calls.add("create");
+          return custom;
+        default:
+          return defaultValue(method.getReturnType());
+      }
+    });
+
+    track.assignExecutor(active, true);
+    track.assignExecutor(active, false);
+    check(track.getActiveExecutor() == active, "active executor return identity");
+    try {
+      track.process(local);
+      throw new AssertionError("process exception was swallowed");
+    } catch (Exception error) {
+      check(error == processFailure, "process checked exception identity");
+    }
+    check(track.createLocalExecutor(manager) == custom, "custom executor return identity");
+    check(track instanceof AudioTrack && track instanceof AudioFrameProvider,
+        "inherited interfaces");
+    check(calls.equals(Arrays.asList(
+        "assign:true", "assign:false", "active", "process", "create")),
+        "dispatch order");
+
+    checkReflection();
+    System.out.println(
+        "dispatch=assign-true,assign-false,active,process-exception,custom;"
+        + "inheritance=AudioTrack,AudioFrameProvider;"
+        + "reflection=interface,0-fields,4-methods,0-constructors,process-throws-Exception");
+  }
+
+  private static void checkReflection() throws Exception {
+    Class<InternalAudioTrack> type = InternalAudioTrack.class;
+    int modifiers = type.getModifiers();
+    check(Modifier.isPublic(modifiers) && Modifier.isInterface(modifiers)
+        && Modifier.isAbstract(modifiers) && !Modifier.isFinal(modifiers)
+        && type.getSuperclass() == null && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0, "interface structure");
+    check(Arrays.equals(type.getInterfaces(), new Class<?>[] {
+        AudioTrack.class, AudioFrameProvider.class }), "direct interface order");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredMethods().length == 4
+        && type.getDeclaredConstructors().length == 0, "member counts");
+
+    Method assign = type.getDeclaredMethod(
+        "assignExecutor", AudioTrackExecutor.class, boolean.class);
+    checkAbstract(assign, void.class,
+        new Class<?>[] { AudioTrackExecutor.class, boolean.class }, new Class<?>[0]);
+    Method active = type.getDeclaredMethod("getActiveExecutor");
+    checkAbstract(active, AudioTrackExecutor.class, new Class<?>[0], new Class<?>[0]);
+    Method process = type.getDeclaredMethod("process", LocalAudioTrackExecutor.class);
+    checkAbstract(process, void.class, new Class<?>[] { LocalAudioTrackExecutor.class },
+        new Class<?>[] { Exception.class });
+    Method create = type.getDeclaredMethod("createLocalExecutor", AudioPlayerManager.class);
+    checkAbstract(create, AudioTrackExecutor.class,
+        new Class<?>[] { AudioPlayerManager.class }, new Class<?>[0]);
+  }
+
+  private static void checkAbstract(Method method, Class<?> returnType,
+      Class<?>[] parameterTypes, Class<?>[] exceptionTypes) {
+    int modifiers = method.getModifiers();
+    check(Modifier.isPublic(modifiers) && Modifier.isAbstract(modifiers)
+        && !Modifier.isStatic(modifiers) && !Modifier.isFinal(modifiers)
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic(),
+        method.getName() + " modifiers");
+    check(method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameterTypes)
+        && Arrays.equals(method.getExceptionTypes(), exceptionTypes)
+        && method.getTypeParameters().length == 0
+        && method.getDeclaredAnnotations().length == 0,
+        method.getName() + " metadata");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type, InvocationHandler handler) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] { type }, handler);
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
+  }
+
+  private static <T> T allocate(Class<T> type) throws Exception {
+    Class<?> unsafeType = Class.forName("sun.misc.Unsafe");
+    Field singleton = unsafeType.getDeclaredField("theUnsafe");
+    singleton.setAccessible(true);
+    Object unsafe = singleton.get(null);
+    return type.cast(unsafeType.getMethod("allocateInstance", Class.class).invoke(unsafe, type));
   }
 
   private static void check(boolean condition, String message) {
