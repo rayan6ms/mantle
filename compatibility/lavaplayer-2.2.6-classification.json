@@ -11613,270 +11613,420 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "shutdown",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "enableGcMonitoring",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "registerSourceManager",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "source",
       "descriptor": "(Ljava/lang/Class;)Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "getSourceManagers",
       "descriptor": "()Ljava/util/List;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "loadItemSync",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "loadItemSync",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "loadItem",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler;)Ljava/util/concurrent/Future;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "loadItemOrdered",
       "descriptor": "(Ljava/lang/Object;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler;)Ljava/util/concurrent/Future;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "encodeTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/MessageOutput;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "decodeTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/MessageInput;)Lcom/sedmelluq/discord/lavaplayer/track/DecodedTrackHolder;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "encodeTrackDetails",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)[B",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "decodeTrackDetails",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;[B)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "executeTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/TrackStateListener;Lcom/sedmelluq/discord/lavaplayer/track/InternalAudioTrack;Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerOptions;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "getConfiguration",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "isUsingSeekGhosting",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "setUseSeekGhosting",
       "descriptor": "(Z)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "getFrameBufferDuration",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "setFrameBufferDuration",
       "descriptor": "(I)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "setTrackStuckThreshold",
       "descriptor": "(J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "getTrackStuckThresholdNanos",
       "descriptor": "()J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "setPlayerCleanupThreshold",
       "descriptor": "(J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "setItemLoaderThreadPoolSize",
       "descriptor": "(I)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "getExecutor",
       "descriptor": "()Ljava/util/concurrent/ExecutorService;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "createPlayer",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "constructPlayer",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "setHttpRequestConfigurator",
       "descriptor": "(Ljava/util/function/Function;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager",
       "symbol_kind": "METHOD",
       "member_name": "setHttpBuilderConfigurator",
       "descriptor": "(Ljava/util/function/Consumer;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, constructor defaults and identity, mutable setting clamps and edge conversions, source registry and HTTP configuration, synchronous and asynchronous loading, source-detail and full-envelope serialization, custom track execution, default-player construction, shutdown, and reflection metadata are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.FunctionalResultHandler",

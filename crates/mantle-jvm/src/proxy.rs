@@ -17,7 +17,7 @@ pub(crate) fn create<'local>(
 ) -> jni::errors::Result<JObject<'local>> {
     let interface_name = match kind {
         2 => jni_str!("com/sedmelluq/discord/lavaplayer/player/AudioPlayer"),
-        3 => jni_str!("com/sedmelluq/discord/lavaplayer/track/AudioTrack"),
+        3 => jni_str!("com/sedmelluq/discord/lavaplayer/track/InternalAudioTrack"),
         4 => jni_str!("com/sedmelluq/discord/lavaplayer/track/playback/AudioFrame"),
         _ => return Err(jni::errors::Error::NullPtr("unknown proxy kind")),
     };
@@ -337,9 +337,24 @@ fn invoke_track<'local>(
             clean(env, handler)?;
             Ok(JObject::null())
         }
-        "getSourceManager" => Ok(JObject::null()),
+        "getSourceManager"
+        | "assignExecutor"
+        | "process"
+        | "getActiveExecutor"
+        | "createLocalExecutor" => Ok(JObject::null()),
+        "provide" => track_provide(env, handler),
         _ => unsupported(env, name),
     }
+}
+
+fn track_provide<'local>(
+    env: &mut Env<'local>,
+    handler: &JObject<'local>,
+) -> jni::errors::Result<JObject<'local>> {
+    let track = track_id(env, handler)?;
+    let frame = crate::with_engine(|engine| engine.provide_track(track))
+        .map_err(|_| jni::errors::Error::NullPtr("core track frame provision failed"))?;
+    frame.map_or_else(|| Ok(JObject::null()), |_| create(env, 4, &JObject::null()))
 }
 
 fn track_set_user_data<'local>(

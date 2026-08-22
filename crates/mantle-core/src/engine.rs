@@ -535,6 +535,24 @@ impl<C: Clock> Engine<C> {
         Ok((None, transition))
     }
 
+    /// Provides one queued frame directly from a track.
+    ///
+    /// This is used by compatibility adapters where the reference player delegates frame
+    /// delivery to its active `InternalAudioTrack`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the track is unknown.
+    pub fn provide_track(&mut self, track: TrackId) -> Result<Option<Frame>, EngineError> {
+        Ok(self
+            .tracks
+            .get_mut(&track)
+            .ok_or(EngineError::UnknownTrack)?
+            .frames
+            .pop_front()
+            .filter(|frame| !frame.terminator))
+    }
+
     /// Stops an idle active player once its manager cleanup threshold is reached.
     ///
     /// # Errors
@@ -1049,6 +1067,14 @@ mod tests {
                 .as_ref(),
             [1, 2, 3, 4]
         );
+    }
+
+    #[test]
+    fn internal_track_adapter_can_consume_its_queued_frame() {
+        let (_clock, mut engine, _manager, _player, track) = fixture();
+        let frame = engine.provide_track(track).unwrap().unwrap();
+        assert_eq!(frame.data.as_ref(), [1, 2, 3, 4]);
+        assert!(engine.provide_track(track).unwrap().is_none());
     }
 
     #[test]

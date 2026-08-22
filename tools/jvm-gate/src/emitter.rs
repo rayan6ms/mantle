@@ -30,6 +30,8 @@ const FRAME_BUFFER_FACTORY_CLASS: &str = "dev/mantle/internal/NativeAudioFrameBu
 const EVENT_DISPATCHER_CLASS: &str = "dev/mantle/internal/NativeEventDispatcher";
 const PLAYER_LIFECYCLE_HELPER_CLASS: &str = "dev/mantle/internal/NativeAudioPlayerLifecycle";
 const DEFAULT_PLAYER_HELPER_CLASS: &str = "dev/mantle/internal/NativeDefaultAudioPlayer";
+const MANAGER_HELPER_CLASS: &str = "dev/mantle/internal/NativeDefaultAudioPlayerManager";
+const MANAGER_EXECUTOR_TASK_CLASS: &str = "dev/mantle/internal/NativeTrackExecutorTask";
 const MANAGER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayerManager";
 const DEFAULT_PLAYER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayer";
 const AUDIO_PLAYER_MANAGER_CLASS: &str =
@@ -104,12 +106,14 @@ const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/filter/PcmFilterFactory",
     "com/sedmelluq/discord/lavaplayer/format/AudioDataFormat",
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
+    "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     "com/sedmelluq/discord/lavaplayer/tools/FriendlyException",
     "com/sedmelluq/discord/lavaplayer/track/AudioItem",
     AUDIO_REFERENCE_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/AudioPlaylist",
     BASIC_PLAYLIST_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/AudioTrack",
+    "com/sedmelluq/discord/lavaplayer/track/InternalAudioTrack",
     "com/sedmelluq/discord/lavaplayer/track/AudioTrackEndReason",
     "com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo",
     "com/sedmelluq/discord/lavaplayer/track/AudioTrackState",
@@ -123,6 +127,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameProvider",
     AUDIO_FRAME_PROVIDER_TOOLS_CLASS,
     AUDIO_PROCESSING_CONTEXT_CLASS,
+    "com/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor",
     AUDIO_FRAME_CONSUMER_CLASS,
     AUDIO_FRAME_BUFFER_CLASS,
     AUDIO_FRAME_BUFFER_FACTORY_CLASS,
@@ -130,6 +135,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     TERMINATOR_FRAME_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/playback/AbstractMutableAudioFrame",
     "com/sedmelluq/discord/lavaplayer/track/playback/ImmutableAudioFrame",
+    "com/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor",
     "com/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame",
     REFERENCE_MUTABLE_FRAME_CLASS,
 ];
@@ -262,6 +268,8 @@ fn internal_classes(expected_abi: u8) -> Result<Vec<ClassFile<'static>>> {
         native_event_dispatcher_class()?,
         native_audio_player_lifecycle_class()?,
         native_default_audio_player_class()?,
+        native_default_audio_player_manager_class()?,
+        native_track_executor_task_class()?,
     ])
 }
 
@@ -1339,11 +1347,41 @@ fn manager_replacement(
     Ok(match (name, descriptor) {
         ("<init>", "()V") => manager_constructor(pool)?,
         ("shutdown", "()V") => manager_shutdown(pool)?,
+        ("enableGcMonitoring", "()V") => void_return(pool, 1)?,
         ("getConfiguration", "()Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;") => {
             manager_configuration(pool)?
         }
-        ("getFrameBufferDuration", "()I") => integer_return(pool, 5_000, 1)?,
-        ("isUsingSeekGhosting", "()Z") => boolean_return(pool, true, 1)?,
+        ("getFrameBufferDuration", "()I") => manager_get_int(pool, "mantleFrameBufferDuration")?,
+        ("setFrameBufferDuration", "(I)V") => manager_set_frame_buffer_duration(pool)?,
+        ("isUsingSeekGhosting", "()Z") => manager_get_boolean(pool, "mantleUseSeekGhosting")?,
+        ("setUseSeekGhosting", "(Z)V") => {
+            manager_set_field(pool, "mantleUseSeekGhosting", "Z", Instruction::Iload_1, 2)?
+        }
+        ("setTrackStuckThreshold", "(J)V") => manager_set_track_stuck_threshold(pool)?,
+        ("getTrackStuckThresholdNanos", "()J") => {
+            manager_get_long(pool, "mantleTrackStuckThresholdNanos")?
+        }
+        ("setPlayerCleanupThreshold", "(J)V") => manager_set_cleanup_threshold(pool)?,
+        ("setItemLoaderThreadPoolSize", "(I)V") => manager_set_loader_pool_size(pool)?,
+        ("getExecutor", "()Ljava/util/concurrent/ExecutorService;") => manager_get_executor(pool)?,
+        ("setHttpRequestConfigurator", "(Ljava/util/function/Function;)V") => {
+            manager_set_http_configurator(pool, true)?
+        }
+        ("setHttpBuilderConfigurator", "(Ljava/util/function/Consumer;)V") => {
+            manager_set_http_configurator(pool, false)?
+        }
+        (
+            "executeTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/TrackStateListener;Lcom/sedmelluq/discord/lavaplayer/track/InternalAudioTrack;Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerOptions;)V",
+        ) => manager_execute_track(pool)?,
+        (
+            "encodeTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/MessageOutput;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)V",
+        ) => manager_encode_track(pool)?,
+        (
+            "decodeTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/MessageInput;)Lcom/sedmelluq/discord/lavaplayer/track/DecodedTrackHolder;",
+        ) => manager_decode_track(pool)?,
         (
             "createPlayer" | "constructPlayer",
             "()Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;",
@@ -1545,6 +1583,7 @@ fn basic_playlist_replacement(
     })
 }
 
+#[allow(clippy::too_many_lines)]
 fn add_reference_implementation_state(
     class: &mut ClassFile<'static>,
     class_name: &str,
@@ -1603,22 +1642,55 @@ fn add_reference_implementation_state(
             "mantleSources",
             "Ljava/util/ArrayList;",
         )?;
-        let body = manager_load_string(&mut class.constant_pool)?;
-        add_method(
-            class,
-            MethodAccessFlags::PUBLIC,
-            "loadItem",
-            "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler;)Ljava/util/concurrent/Future;",
-            Some(body),
-        )?;
-        let body = manager_load_ordered_string(&mut class.constant_pool)?;
-        add_method(
-            class,
-            MethodAccessFlags::PUBLIC,
-            "loadItemOrdered",
-            "(Ljava/lang/Object;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler;)Ljava/util/concurrent/Future;",
-            Some(body),
-        )?;
+        for (name, descriptor, flags) in [
+            (
+                "mantleConfiguration",
+                "Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;",
+                FieldAccessFlags::PRIVATE | FieldAccessFlags::FINAL,
+            ),
+            (
+                "mantleUseSeekGhosting",
+                "Z",
+                FieldAccessFlags::PRIVATE | FieldAccessFlags::VOLATILE,
+            ),
+            (
+                "mantleFrameBufferDuration",
+                "I",
+                FieldAccessFlags::PRIVATE | FieldAccessFlags::VOLATILE,
+            ),
+            (
+                "mantleTrackStuckThresholdNanos",
+                "J",
+                FieldAccessFlags::PRIVATE | FieldAccessFlags::VOLATILE,
+            ),
+            (
+                "mantleCleanupThreshold",
+                "Ljava/util/concurrent/atomic/AtomicLong;",
+                FieldAccessFlags::PRIVATE | FieldAccessFlags::FINAL,
+            ),
+            (
+                "mantlePlaybackExecutor",
+                "Ljava/util/concurrent/ExecutorService;",
+                FieldAccessFlags::PRIVATE | FieldAccessFlags::FINAL,
+            ),
+            (
+                "mantleLoaderExecutor",
+                "Ljava/util/concurrent/ThreadPoolExecutor;",
+                FieldAccessFlags::PRIVATE | FieldAccessFlags::FINAL,
+            ),
+            (
+                "mantleHttpConfigurator",
+                "Ljava/util/function/Function;",
+                FieldAccessFlags::PRIVATE | FieldAccessFlags::VOLATILE,
+            ),
+            (
+                "mantleHttpBuilderConfigurator",
+                "Ljava/util/function/Consumer;",
+                FieldAccessFlags::PRIVATE | FieldAccessFlags::VOLATILE,
+            ),
+        ] {
+            add_field(class, flags, name, descriptor)?;
+        }
     }
     if class_name == DEFAULT_PLAYER_CLASS {
         add_field(
@@ -2512,6 +2584,130 @@ fn native_default_audio_player_class() -> Result<ClassFile<'static>> {
             Some(body),
         )?;
     }
+    Ok(class)
+}
+
+fn native_default_audio_player_manager_class() -> Result<ClassFile<'static>> {
+    let mut class = new_class(
+        MANAGER_HELPER_CLASS,
+        "java/lang/Object",
+        ClassAccessFlags::PUBLIC | ClassAccessFlags::FINAL | ClassAccessFlags::SUPER,
+        &[],
+    )?;
+    let constructor = object_constructor(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PRIVATE,
+        "<init>",
+        "()V",
+        Some(constructor),
+    )?;
+    let write_nullable = manager_helper_write_nullable(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+        "writeNullable",
+        "(Ljava/io/DataOutput;Ljava/lang/String;)V",
+        Some(write_nullable),
+    )?;
+    let read_nullable = manager_helper_read_nullable(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+        "readNullable",
+        "(Ljava/io/DataInput;)Ljava/lang/String;",
+        Some(read_nullable),
+    )?;
+    let shutdown = manager_helper_shutdown(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+        "shutdown",
+        "(Ljava/util/List;Ljava/util/concurrent/ExecutorService;Ljava/util/concurrent/ExecutorService;Ljava/lang/ref/Cleaner$Cleanable;)V",
+        Some(shutdown),
+    )?;
+    let configure_source = manager_helper_configure_source(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+        "configureSource",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;Ljava/util/function/Function;Ljava/util/function/Consumer;)V",
+        Some(configure_source),
+    )?;
+    for (name, request) in [("configureRequests", true), ("configureBuilders", false)] {
+        let configure = manager_helper_configure_sources(&mut class.constant_pool, request)?;
+        let descriptor = if request {
+            "(Ljava/util/List;Ljava/util/function/Function;)V"
+        } else {
+            "(Ljava/util/List;Ljava/util/function/Consumer;)V"
+        };
+        add_method(
+            &mut class,
+            MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+            name,
+            descriptor,
+            Some(configure),
+        )?;
+    }
+    let execute = manager_helper_execute_track(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+        "executeTrack",
+        "(Ljava/util/concurrent/ExecutorService;Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/track/TrackStateListener;Lcom/sedmelluq/discord/lavaplayer/track/InternalAudioTrack;)V",
+        Some(execute),
+    )?;
+    let decode = manager_helper_decode_track(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+        "decodeTrack",
+        "(Lcom/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/tools/io/MessageInput;)Lcom/sedmelluq/discord/lavaplayer/track/DecodedTrackHolder;",
+        Some(decode),
+    )?;
+    Ok(class)
+}
+
+fn native_track_executor_task_class() -> Result<ClassFile<'static>> {
+    let mut class = new_class(
+        MANAGER_EXECUTOR_TASK_CLASS,
+        "java/lang/Object",
+        ClassAccessFlags::PUBLIC | ClassAccessFlags::FINAL | ClassAccessFlags::SUPER,
+        &["java/lang/Runnable"],
+    )?;
+    for (name, descriptor) in [
+        (
+            "executor",
+            "Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;",
+        ),
+        (
+            "listener",
+            "Lcom/sedmelluq/discord/lavaplayer/track/TrackStateListener;",
+        ),
+    ] {
+        add_field(
+            &mut class,
+            FieldAccessFlags::PRIVATE | FieldAccessFlags::FINAL,
+            name,
+            descriptor,
+        )?;
+    }
+    let constructor = manager_executor_task_constructor(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;Lcom/sedmelluq/discord/lavaplayer/track/TrackStateListener;)V",
+        Some(constructor),
+    )?;
+    let run = manager_executor_task_run(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC,
+        "run",
+        "()V",
+        Some(run),
+    )?;
     Ok(class)
 }
 
@@ -5268,6 +5464,7 @@ fn ensure_abi_body(pool: &mut ConstantPool<'static>, expected: u8) -> Result<Att
     )
 }
 
+#[allow(clippy::too_many_lines)]
 fn manager_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
     let object = pool.add_class("java/lang/Object")?;
     let object_init = pool.add_method_ref(object, "<init>", "()V")?;
@@ -5282,8 +5479,50 @@ fn manager_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
         "Ljava/lang/ref/Cleaner$Cleanable;",
     )?;
     let sources = pool.add_field_ref(manager, "mantleSources", "Ljava/util/ArrayList;")?;
+    let configuration_field = pool.add_field_ref(
+        manager,
+        "mantleConfiguration",
+        "Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;",
+    )?;
+    let seek_ghosting = pool.add_field_ref(manager, "mantleUseSeekGhosting", "Z")?;
+    let frame_duration = pool.add_field_ref(manager, "mantleFrameBufferDuration", "I")?;
+    let stuck_threshold = pool.add_field_ref(manager, "mantleTrackStuckThresholdNanos", "J")?;
+    let cleanup_threshold = pool.add_field_ref(
+        manager,
+        "mantleCleanupThreshold",
+        "Ljava/util/concurrent/atomic/AtomicLong;",
+    )?;
+    let playback_executor = pool.add_field_ref(
+        manager,
+        "mantlePlaybackExecutor",
+        "Ljava/util/concurrent/ExecutorService;",
+    )?;
+    let loader_executor = pool.add_field_ref(
+        manager,
+        "mantleLoaderExecutor",
+        "Ljava/util/concurrent/ThreadPoolExecutor;",
+    )?;
     let list = pool.add_class("java/util/ArrayList")?;
     let list_init = pool.add_method_ref(list, "<init>", "()V")?;
+    let configuration = pool.add_class(CONFIGURATION_CLASS)?;
+    let configuration_init = pool.add_method_ref(configuration, "<init>", "()V")?;
+    let atomic_long = pool.add_class("java/util/concurrent/atomic/AtomicLong")?;
+    let atomic_long_init = pool.add_method_ref(atomic_long, "<init>", "(J)V")?;
+    let executors = pool.add_class("java/util/concurrent/Executors")?;
+    let cached = pool.add_method_ref(
+        executors,
+        "newCachedThreadPool",
+        "()Ljava/util/concurrent/ExecutorService;",
+    )?;
+    let fixed = pool.add_method_ref(
+        executors,
+        "newFixedThreadPool",
+        "(I)Ljava/util/concurrent/ExecutorService;",
+    )?;
+    let thread_pool = pool.add_class("java/util/concurrent/ThreadPoolExecutor")?;
+    let set_maximum = pool.add_method_ref(thread_pool, "setMaximumPoolSize", "(I)V")?;
+    let stuck_default = pool.add_long(10_000_000_000)?;
+    let cleanup_default = pool.add_long(60_000)?;
     let cleaner = pool.add_class(CLEANER_CLASS)?;
     let register = pool.add_method_ref(
         cleaner,
@@ -5292,7 +5531,7 @@ fn manager_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
     )?;
     code(
         pool,
-        4,
+        5,
         1,
         vec![
             Instruction::Aload_0,
@@ -5302,6 +5541,38 @@ fn manager_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
             Instruction::Dup,
             Instruction::Invokespecial(list_init),
             Instruction::Putfield(sources),
+            Instruction::Aload_0,
+            Instruction::New(configuration),
+            Instruction::Dup,
+            Instruction::Invokespecial(configuration_init),
+            Instruction::Putfield(configuration_field),
+            Instruction::Aload_0,
+            Instruction::Iconst_1,
+            Instruction::Putfield(seek_ghosting),
+            Instruction::Aload_0,
+            Instruction::Sipush(5_000),
+            Instruction::Putfield(frame_duration),
+            Instruction::Aload_0,
+            Instruction::Ldc2_w(stuck_default),
+            Instruction::Putfield(stuck_threshold),
+            Instruction::Aload_0,
+            Instruction::New(atomic_long),
+            Instruction::Dup,
+            Instruction::Ldc2_w(cleanup_default),
+            Instruction::Invokespecial(atomic_long_init),
+            Instruction::Putfield(cleanup_threshold),
+            Instruction::Aload_0,
+            Instruction::Invokestatic(cached),
+            Instruction::Putfield(playback_executor),
+            Instruction::Aload_0,
+            Instruction::Iconst_1,
+            Instruction::Invokestatic(fixed),
+            Instruction::Checkcast(thread_pool),
+            Instruction::Putfield(loader_executor),
+            Instruction::Aload_0,
+            Instruction::Getfield(loader_executor),
+            Instruction::Bipush(10),
+            Instruction::Invokevirtual(set_maximum),
             Instruction::Invokestatic(ensure),
             Instruction::Aload_0,
             Instruction::Iconst_1,
@@ -5319,63 +5590,870 @@ fn manager_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
 }
 
 fn manager_shutdown(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
-    clean_method(pool, MANAGER_CLASS, "mantleCleanable")
+    let manager = pool.add_class(MANAGER_CLASS)?;
+    let sources = pool.add_field_ref(manager, "mantleSources", "Ljava/util/ArrayList;")?;
+    let playback = pool.add_field_ref(
+        manager,
+        "mantlePlaybackExecutor",
+        "Ljava/util/concurrent/ExecutorService;",
+    )?;
+    let loader = pool.add_field_ref(
+        manager,
+        "mantleLoaderExecutor",
+        "Ljava/util/concurrent/ThreadPoolExecutor;",
+    )?;
+    let cleanable = pool.add_field_ref(
+        manager,
+        "mantleCleanable",
+        "Ljava/lang/ref/Cleaner$Cleanable;",
+    )?;
+    let helper = pool.add_class(MANAGER_HELPER_CLASS)?;
+    let shutdown = pool.add_method_ref(
+        helper,
+        "shutdown",
+        "(Ljava/util/List;Ljava/util/concurrent/ExecutorService;Ljava/util/concurrent/ExecutorService;Ljava/lang/ref/Cleaner$Cleanable;)V",
+    )?;
+    code(
+        pool,
+        4,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(sources),
+            Instruction::Aload_0,
+            Instruction::Getfield(playback),
+            Instruction::Aload_0,
+            Instruction::Getfield(loader),
+            Instruction::Aload_0,
+            Instruction::Getfield(cleanable),
+            Instruction::Invokestatic(shutdown),
+            Instruction::Return,
+        ],
+    )
 }
 
 fn manager_configuration(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
-    let configuration = pool.add_class(CONFIGURATION_CLASS)?;
-    let init = pool.add_method_ref(configuration, "<init>", "()V")?;
+    let manager = pool.add_class(MANAGER_CLASS)?;
+    let configuration = pool.add_field_ref(
+        manager,
+        "mantleConfiguration",
+        "Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;",
+    )?;
     code(
         pool,
-        2,
+        1,
         1,
         vec![
-            Instruction::New(configuration),
-            Instruction::Dup,
-            Instruction::Invokespecial(init),
+            Instruction::Aload_0,
+            Instruction::Getfield(configuration),
             Instruction::Areturn,
         ],
     )
 }
 
 fn manager_create_player(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
-    let native = pool.add_class(NATIVE_CLASS)?;
-    let create = pool.add_method_ref(
-        native,
-        "createProxy",
-        "(ILjava/lang/String;)Ljava/lang/Object;",
+    let player = pool.add_class(DEFAULT_PLAYER_CLASS)?;
+    let init = pool.add_method_ref(
+        player,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayerManager;)V",
     )?;
-    let player = pool.add_class("com/sedmelluq/discord/lavaplayer/player/AudioPlayer")?;
     code(
         pool,
-        2,
+        3,
         1,
         vec![
-            Instruction::Iconst_2,
-            Instruction::Aconst_null,
-            Instruction::Invokestatic(create),
-            Instruction::Checkcast(player),
+            Instruction::New(player),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Invokespecial(init),
             Instruction::Areturn,
         ],
     )
 }
 
-fn manager_load_string(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
-    let native = pool.add_class(NATIVE_CLASS)?;
-    let load = pool.add_method_ref(
-        native,
-        "loadItem",
-        "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler;)Ljava/util/concurrent/Future;",
+fn manager_get_boolean(pool: &mut ConstantPool<'static>, name: &str) -> Result<Attribute> {
+    let manager = pool.add_class(MANAGER_CLASS)?;
+    let field = pool.add_field_ref(manager, name, "Z")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+fn manager_get_int(pool: &mut ConstantPool<'static>, name: &str) -> Result<Attribute> {
+    let manager = pool.add_class(MANAGER_CLASS)?;
+    let field = pool.add_field_ref(manager, name, "I")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+fn manager_get_long(pool: &mut ConstantPool<'static>, name: &str) -> Result<Attribute> {
+    let manager = pool.add_class(MANAGER_CLASS)?;
+    let field = pool.add_field_ref(manager, name, "J")?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Lreturn,
+        ],
+    )
+}
+
+fn manager_set_field(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    value: Instruction,
+    locals: u16,
+) -> Result<Attribute> {
+    let manager = pool.add_class(MANAGER_CLASS)?;
+    let field = pool.add_field_ref(manager, name, descriptor)?;
+    code(
+        pool,
+        3,
+        locals,
+        vec![
+            Instruction::Aload_0,
+            value,
+            Instruction::Putfield(field),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn manager_set_frame_buffer_duration(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let manager = pool.add_class(MANAGER_CLASS)?;
+    let field = pool.add_field_ref(manager, "mantleFrameBufferDuration", "I")?;
+    let math = pool.add_class("java/lang/Math")?;
+    let max = pool.add_method_ref(math, "max", "(II)I")?;
+    code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Sipush(200),
+            Instruction::Iload_1,
+            Instruction::Invokestatic(max),
+            Instruction::Putfield(field),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn manager_set_track_stuck_threshold(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let manager = pool.add_class(MANAGER_CLASS)?;
+    let field = pool.add_field_ref(manager, "mantleTrackStuckThresholdNanos", "J")?;
+    let time_unit = pool.add_class("java/util/concurrent/TimeUnit")?;
+    let milliseconds =
+        pool.add_field_ref(time_unit, "MILLISECONDS", "Ljava/util/concurrent/TimeUnit;")?;
+    let to_nanos = pool.add_method_ref(time_unit, "toNanos", "(J)J")?;
+    code(
+        pool,
+        4,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getstatic(milliseconds),
+            Instruction::Lload_1,
+            Instruction::Invokevirtual(to_nanos),
+            Instruction::Putfield(field),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn manager_set_cleanup_threshold(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let manager = pool.add_class(MANAGER_CLASS)?;
+    let field = pool.add_field_ref(
+        manager,
+        "mantleCleanupThreshold",
+        "Ljava/util/concurrent/atomic/AtomicLong;",
+    )?;
+    let atomic = pool.add_class("java/util/concurrent/atomic/AtomicLong")?;
+    let set = pool.add_method_ref(atomic, "set", "(J)V")?;
+    code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Lload_1,
+            Instruction::Invokevirtual(set),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn manager_set_loader_pool_size(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let manager = pool.add_class(MANAGER_CLASS)?;
+    let field = pool.add_field_ref(
+        manager,
+        "mantleLoaderExecutor",
+        "Ljava/util/concurrent/ThreadPoolExecutor;",
+    )?;
+    let executor = pool.add_class("java/util/concurrent/ThreadPoolExecutor")?;
+    let set = pool.add_method_ref(executor, "setMaximumPoolSize", "(I)V")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Iload_1,
+            Instruction::Invokevirtual(set),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn manager_get_executor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let manager = pool.add_class(MANAGER_CLASS)?;
+    let field = pool.add_field_ref(
+        manager,
+        "mantlePlaybackExecutor",
+        "Ljava/util/concurrent/ExecutorService;",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn manager_set_http_configurator(
+    pool: &mut ConstantPool<'static>,
+    request: bool,
+) -> Result<Attribute> {
+    let manager = pool.add_class(MANAGER_CLASS)?;
+    let (field_name, field_descriptor, configure_name, configure_descriptor) = if request {
+        (
+            "mantleHttpConfigurator",
+            "Ljava/util/function/Function;",
+            "configureRequests",
+            "(Ljava/util/List;Ljava/util/function/Function;)V",
+        )
+    } else {
+        (
+            "mantleHttpBuilderConfigurator",
+            "Ljava/util/function/Consumer;",
+            "configureBuilders",
+            "(Ljava/util/List;Ljava/util/function/Consumer;)V",
+        )
+    };
+    let field = pool.add_field_ref(manager, field_name, field_descriptor)?;
+    let sources = pool.add_field_ref(manager, "mantleSources", "Ljava/util/ArrayList;")?;
+    let helper = pool.add_class(MANAGER_HELPER_CLASS)?;
+    let configure = pool.add_method_ref(helper, configure_name, configure_descriptor)?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(field),
+            Instruction::Aload_0,
+            Instruction::Getfield(sources),
+            Instruction::Aload_1,
+            Instruction::Invokestatic(configure),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn manager_execute_track(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let manager = pool.add_class(MANAGER_CLASS)?;
+    let playback = pool.add_field_ref(
+        manager,
+        "mantlePlaybackExecutor",
+        "Ljava/util/concurrent/ExecutorService;",
+    )?;
+    let helper = pool.add_class(MANAGER_HELPER_CLASS)?;
+    let execute = pool.add_method_ref(
+        helper,
+        "executeTrack",
+        "(Ljava/util/concurrent/ExecutorService;Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/track/TrackStateListener;Lcom/sedmelluq/discord/lavaplayer/track/InternalAudioTrack;)V",
+    )?;
+    code(
+        pool,
+        4,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(playback),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Invokestatic(execute),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn manager_encode_track(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let output_class = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/MessageOutput")?;
+    let start = pool.add_method_ref(output_class, "startMessage", "()Ljava/io/DataOutput;")?;
+    let commit = pool.add_method_ref(output_class, "commitMessage", "(I)V")?;
+    let data_output = pool.add_class("java/io/DataOutput")?;
+    let write = pool.add_interface_method_ref(data_output, "write", "(I)V")?;
+    let write_utf =
+        pool.add_interface_method_ref(data_output, "writeUTF", "(Ljava/lang/String;)V")?;
+    let write_long = pool.add_interface_method_ref(data_output, "writeLong", "(J)V")?;
+    let write_boolean = pool.add_interface_method_ref(data_output, "writeBoolean", "(Z)V")?;
+    let write_bytes = pool.add_interface_method_ref(data_output, "write", "([B)V")?;
+    let track_class = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrack")?;
+    let get_info = pool.add_interface_method_ref(
+        track_class,
+        "getInfo",
+        "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let get_position = pool.add_interface_method_ref(track_class, "getPosition", "()J")?;
+    let info_class = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo")?;
+    let title = pool.add_field_ref(info_class, "title", "Ljava/lang/String;")?;
+    let author = pool.add_field_ref(info_class, "author", "Ljava/lang/String;")?;
+    let length = pool.add_field_ref(info_class, "length", "J")?;
+    let identifier = pool.add_field_ref(info_class, "identifier", "Ljava/lang/String;")?;
+    let is_stream = pool.add_field_ref(info_class, "isStream", "Z")?;
+    let uri = pool.add_field_ref(info_class, "uri", "Ljava/lang/String;")?;
+    let artwork = pool.add_field_ref(info_class, "artworkUrl", "Ljava/lang/String;")?;
+    let isrc = pool.add_field_ref(info_class, "isrc", "Ljava/lang/String;")?;
+    let helper = pool.add_class(MANAGER_HELPER_CLASS)?;
+    let nullable = pool.add_method_ref(
+        helper,
+        "writeNullable",
+        "(Ljava/io/DataOutput;Ljava/lang/String;)V",
+    )?;
+    let manager = pool.add_class(MANAGER_CLASS)?;
+    let details = pool.add_method_ref(
+        manager,
+        "encodeTrackDetails",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)[B",
+    )?;
+    code(
+        pool,
+        3,
+        5,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(start),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Iconst_3,
+            Instruction::Invokeinterface(write, 2),
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(get_info, 1),
+            Instruction::Astore(4),
+            Instruction::Aload_3,
+            Instruction::Aload(4),
+            Instruction::Getfield(title),
+            Instruction::Invokeinterface(write_utf, 2),
+            Instruction::Aload_3,
+            Instruction::Aload(4),
+            Instruction::Getfield(author),
+            Instruction::Invokeinterface(write_utf, 2),
+            Instruction::Aload_3,
+            Instruction::Aload(4),
+            Instruction::Getfield(length),
+            Instruction::Invokeinterface(write_long, 3),
+            Instruction::Aload_3,
+            Instruction::Aload(4),
+            Instruction::Getfield(identifier),
+            Instruction::Invokeinterface(write_utf, 2),
+            Instruction::Aload_3,
+            Instruction::Aload(4),
+            Instruction::Getfield(is_stream),
+            Instruction::Invokeinterface(write_boolean, 2),
+            Instruction::Aload_3,
+            Instruction::Aload(4),
+            Instruction::Getfield(uri),
+            Instruction::Invokestatic(nullable),
+            Instruction::Aload_3,
+            Instruction::Aload(4),
+            Instruction::Getfield(artwork),
+            Instruction::Invokestatic(nullable),
+            Instruction::Aload_3,
+            Instruction::Aload(4),
+            Instruction::Getfield(isrc),
+            Instruction::Invokestatic(nullable),
+            Instruction::Aload_3,
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(details),
+            Instruction::Invokeinterface(write_bytes, 2),
+            Instruction::Aload_3,
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(get_position, 1),
+            Instruction::Invokeinterface(write_long, 3),
+            Instruction::Aload_1,
+            Instruction::Iconst_1,
+            Instruction::Invokevirtual(commit),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn manager_decode_track(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let helper = pool.add_class(MANAGER_HELPER_CLASS)?;
+    let decode = pool.add_method_ref(
+        helper,
+        "decodeTrack",
+        "(Lcom/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/tools/io/MessageInput;)Lcom/sedmelluq/discord/lavaplayer/track/DecodedTrackHolder;",
+    )?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokestatic(decode),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn manager_helper_decode_track(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let input_class = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/MessageInput")?;
+    let next = pool.add_method_ref(input_class, "nextMessage", "()Ljava/io/DataInput;")?;
+    let flags = pool.add_method_ref(input_class, "getMessageFlags", "()I")?;
+    let skip = pool.add_method_ref(input_class, "skipRemainingBytes", "()V")?;
+    let data_input = pool.add_class("java/io/DataInput")?;
+    let read_byte = pool.add_interface_method_ref(data_input, "readByte", "()B")?;
+    let read_utf = pool.add_interface_method_ref(data_input, "readUTF", "()Ljava/lang/String;")?;
+    let read_long = pool.add_interface_method_ref(data_input, "readLong", "()J")?;
+    let read_boolean = pool.add_interface_method_ref(data_input, "readBoolean", "()Z")?;
+    let info = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo")?;
+    let info_init = pool.add_method_ref(
+        info,
+        "<init>",
+        "(Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+    )?;
+    let helper = pool.add_class(MANAGER_HELPER_CLASS)?;
+    let nullable = pool.add_method_ref(
+        helper,
+        "readNullable",
+        "(Ljava/io/DataInput;)Ljava/lang/String;",
+    )?;
+    let data_stream = pool.add_class("java/io/DataInputStream")?;
+    let read = pool.add_method_ref(data_stream, "read", "()I")?;
+    let byte_output = pool.add_class("java/io/ByteArrayOutputStream")?;
+    let byte_output_init = pool.add_method_ref(byte_output, "<init>", "()V")?;
+    let write_byte = pool.add_method_ref(byte_output, "write", "(I)V")?;
+    let to_byte_array = pool.add_method_ref(byte_output, "toByteArray", "()[B")?;
+    let arrays = pool.add_class("java/util/Arrays")?;
+    let copy_of = pool.add_method_ref(arrays, "copyOf", "([BI)[B")?;
+    let byte_stream = pool.add_class("java/io/ByteArrayInputStream")?;
+    let byte_stream_init = pool.add_method_ref(byte_stream, "<init>", "([BII)V")?;
+    let data_stream_init =
+        pool.add_method_ref(data_stream, "<init>", "(Ljava/io/InputStream;)V")?;
+    let manager = pool.add_class(MANAGER_CLASS)?;
+    let decode_details = pool.add_method_ref(
+        manager,
+        "decodeTrackDetails",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;[B)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+    )?;
+    let track = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrack")?;
+    let set_position = pool.add_interface_method_ref(track, "setPosition", "(J)V")?;
+    let holder = pool.add_class("com/sedmelluq/discord/lavaplayer/track/DecodedTrackHolder")?;
+    let holder_init = pool.add_method_ref(
+        holder,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)V",
+    )?;
+    code(
+        pool,
+        11,
+        12,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(next),
+            Instruction::Astore_2,
+            Instruction::Aload_2,
+            Instruction::Ifnonnull(7),
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(flags),
+            Instruction::Iconst_1,
+            Instruction::Iand,
+            Instruction::Ifeq(17),
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(read_byte, 1),
+            Instruction::Sipush(255),
+            Instruction::Iand,
+            Instruction::Goto(18),
+            Instruction::Iconst_1,
+            Instruction::Istore_3,
+            Instruction::New(info),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(read_utf, 1),
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(read_utf, 1),
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(read_long, 1),
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(read_utf, 1),
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(read_boolean, 1),
+            Instruction::Aload_2,
+            Instruction::Invokestatic(nullable),
+            Instruction::Aload_2,
+            Instruction::Invokestatic(nullable),
+            Instruction::Aload_2,
+            Instruction::Invokestatic(nullable),
+            Instruction::Invokespecial(info_init),
+            Instruction::Astore(4),
+            Instruction::New(byte_output),
+            Instruction::Dup,
+            Instruction::Invokespecial(byte_output_init),
+            Instruction::Astore(5),
+            Instruction::Aload_2,
+            Instruction::Checkcast(data_stream),
+            Instruction::Invokevirtual(read),
+            Instruction::Istore(6),
+            Instruction::Iload(6),
+            Instruction::Iflt(53),
+            Instruction::Aload(5),
+            Instruction::Iload(6),
+            Instruction::Invokevirtual(write_byte),
+            Instruction::Goto(43),
+            Instruction::Aload(5),
+            Instruction::Invokevirtual(to_byte_array),
+            Instruction::Astore(7),
+            Instruction::Aload(7),
+            Instruction::Arraylength,
+            Instruction::Istore(6),
+            Instruction::Aload(7),
+            Instruction::Iload(6),
+            Instruction::Bipush(8),
+            Instruction::Isub,
+            Instruction::Invokestatic(copy_of),
+            Instruction::Astore(8),
+            Instruction::New(data_stream),
+            Instruction::Dup,
+            Instruction::New(byte_stream),
+            Instruction::Dup,
+            Instruction::Aload(7),
+            Instruction::Iload(6),
+            Instruction::Bipush(8),
+            Instruction::Isub,
+            Instruction::Bipush(8),
+            Instruction::Invokespecial(byte_stream_init),
+            Instruction::Invokespecial(data_stream_init),
+            Instruction::Invokeinterface(read_long, 1),
+            Instruction::Lstore(9),
+            Instruction::Aload_0,
+            Instruction::Aload(4),
+            Instruction::Aload(8),
+            Instruction::Invokevirtual(decode_details),
+            Instruction::Astore(11),
+            Instruction::Aload(11),
+            Instruction::Ifnull(88),
+            Instruction::Aload(11),
+            Instruction::Lload(9),
+            Instruction::Invokeinterface(set_position, 3),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(skip),
+            Instruction::New(holder),
+            Instruction::Dup,
+            Instruction::Aload(11),
+            Instruction::Invokespecial(holder_init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn manager_helper_write_nullable(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let output = pool.add_class("java/io/DataOutput")?;
+    let write_boolean = pool.add_interface_method_ref(output, "writeBoolean", "(Z)V")?;
+    let write_utf = pool.add_interface_method_ref(output, "writeUTF", "(Ljava/lang/String;)V")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Ifnull(9),
+            Instruction::Aload_0,
+            Instruction::Iconst_1,
+            Instruction::Invokeinterface(write_boolean, 2),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(write_utf, 2),
+            Instruction::Return,
+            Instruction::Aload_0,
+            Instruction::Iconst_0,
+            Instruction::Invokeinterface(write_boolean, 2),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn manager_helper_read_nullable(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let input = pool.add_class("java/io/DataInput")?;
+    let read_boolean = pool.add_interface_method_ref(input, "readBoolean", "()Z")?;
+    let read_utf = pool.add_interface_method_ref(input, "readUTF", "()Ljava/lang/String;")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokeinterface(read_boolean, 1),
+            Instruction::Ifeq(6),
+            Instruction::Aload_0,
+            Instruction::Invokeinterface(read_utf, 1),
+            Instruction::Areturn,
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn manager_helper_shutdown(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let executor = pool.add_class("java/util/concurrent/ExecutorService")?;
+    let shutdown_executor = pool.add_interface_method_ref(executor, "shutdown", "()V")?;
+    let cleanable = pool.add_class("java/lang/ref/Cleaner$Cleanable")?;
+    let clean = pool.add_interface_method_ref(cleanable, "clean", "()V")?;
+    code(
+        pool,
+        1,
+        4,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(shutdown_executor, 1),
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(shutdown_executor, 1),
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(clean, 1),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn manager_helper_configure_source(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let configurable =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable")?;
+    let requests = pool.add_interface_method_ref(
+        configurable,
+        "configureRequests",
+        "(Ljava/util/function/Function;)V",
+    )?;
+    let builder = pool.add_interface_method_ref(
+        configurable,
+        "configureBuilder",
+        "(Ljava/util/function/Consumer;)V",
     )?;
     code(
         pool,
         2,
         3,
         vec![
+            Instruction::Aload_0,
+            Instruction::Instanceof(configurable),
+            Instruction::Ifeq(15),
             Instruction::Aload_1,
+            Instruction::Ifnull(9),
+            Instruction::Aload_0,
+            Instruction::Checkcast(configurable),
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(requests, 2),
             Instruction::Aload_2,
-            Instruction::Invokestatic(load),
-            Instruction::Areturn,
+            Instruction::Ifnull(15),
+            Instruction::Aload_0,
+            Instruction::Checkcast(configurable),
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(builder, 2),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn manager_helper_configure_sources(
+    pool: &mut ConstantPool<'static>,
+    request: bool,
+) -> Result<Attribute> {
+    let list = pool.add_class("java/util/List")?;
+    let iterator = pool.add_interface_method_ref(list, "iterator", "()Ljava/util/Iterator;")?;
+    let iterator_class = pool.add_class("java/util/Iterator")?;
+    let has_next = pool.add_interface_method_ref(iterator_class, "hasNext", "()Z")?;
+    let next = pool.add_interface_method_ref(iterator_class, "next", "()Ljava/lang/Object;")?;
+    let configurable =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable")?;
+    let (name, descriptor) = if request {
+        ("configureRequests", "(Ljava/util/function/Function;)V")
+    } else {
+        ("configureBuilder", "(Ljava/util/function/Consumer;)V")
+    };
+    let configure = pool.add_interface_method_ref(configurable, name, descriptor)?;
+    code(
+        pool,
+        2,
+        4,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Ifnull(19),
+            Instruction::Aload_0,
+            Instruction::Invokeinterface(iterator, 1),
+            Instruction::Astore_2,
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(has_next, 1),
+            Instruction::Ifeq(19),
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(next, 1),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Instanceof(configurable),
+            Instruction::Ifeq(5),
+            Instruction::Aload_3,
+            Instruction::Checkcast(configurable),
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(configure, 2),
+            Instruction::Goto(5),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn manager_helper_execute_track(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let internal_track =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/InternalAudioTrack")?;
+    let create = pool.add_interface_method_ref(
+        internal_track,
+        "createLocalExecutor",
+        "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;",
+    )?;
+    let assign = pool.add_interface_method_ref(
+        internal_track,
+        "assignExecutor",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;Z)V",
+    )?;
+    let task = pool.add_class(MANAGER_EXECUTOR_TASK_CLASS)?;
+    let task_init = pool.add_method_ref(
+        task,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;Lcom/sedmelluq/discord/lavaplayer/track/TrackStateListener;)V",
+    )?;
+    let executor_service = pool.add_class("java/util/concurrent/ExecutorService")?;
+    let execute =
+        pool.add_interface_method_ref(executor_service, "execute", "(Ljava/lang/Runnable;)V")?;
+    code(
+        pool,
+        5,
+        5,
+        vec![
+            Instruction::Aload_3,
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(create, 2),
+            Instruction::Astore(4),
+            Instruction::Aload(4),
+            Instruction::Ifnull(17),
+            Instruction::Aload_3,
+            Instruction::Aload(4),
+            Instruction::Iconst_1,
+            Instruction::Invokeinterface(assign, 3),
+            Instruction::Aload_0,
+            Instruction::New(task),
+            Instruction::Dup,
+            Instruction::Aload(4),
+            Instruction::Aload_2,
+            Instruction::Invokespecial(task_init),
+            Instruction::Invokeinterface(execute, 2),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn manager_executor_task_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(MANAGER_EXECUTOR_TASK_CLASS)?;
+    let executor = pool.add_field_ref(
+        owner,
+        "executor",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;",
+    )?;
+    let listener = pool.add_field_ref(
+        owner,
+        "listener",
+        "Lcom/sedmelluq/discord/lavaplayer/track/TrackStateListener;",
+    )?;
+    code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(executor),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(listener),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn manager_executor_task_run(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MANAGER_EXECUTOR_TASK_CLASS)?;
+    let executor_field = pool.add_field_ref(
+        owner,
+        "executor",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;",
+    )?;
+    let listener_field = pool.add_field_ref(
+        owner,
+        "listener",
+        "Lcom/sedmelluq/discord/lavaplayer/track/TrackStateListener;",
+    )?;
+    let executor =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor")?;
+    let execute = pool.add_interface_method_ref(
+        executor,
+        "execute",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/TrackStateListener;)V",
+    )?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(executor_field),
+            Instruction::Aload_0,
+            Instruction::Getfield(listener_field),
+            Instruction::Invokeinterface(execute, 2),
+            Instruction::Return,
         ],
     )
 }
@@ -5394,27 +6472,6 @@ fn manager_load_reference(pool: &mut ConstantPool<'static>) -> Result<Attribute>
         vec![
             Instruction::Aload_1,
             Instruction::Aload_2,
-            Instruction::Invokestatic(load),
-            Instruction::Areturn,
-        ],
-    )
-}
-
-fn manager_load_ordered_string(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
-    let native = pool.add_class(NATIVE_CLASS)?;
-    let load = pool.add_method_ref(
-        native,
-        "loadItemOrdered",
-        "(Ljava/lang/Object;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler;)Ljava/util/concurrent/Future;",
-    )?;
-    code(
-        pool,
-        3,
-        4,
-        vec![
-            Instruction::Aload_1,
-            Instruction::Aload_2,
-            Instruction::Aload_3,
             Instruction::Invokestatic(load),
             Instruction::Areturn,
         ],
@@ -5453,19 +6510,41 @@ fn manager_register_source(pool: &mut ConstantPool<'static>) -> Result<Attribute
         "registerSourceManager",
         "(Lcom/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;)V",
     )?;
+    let request_field = pool.add_field_ref(
+        manager,
+        "mantleHttpConfigurator",
+        "Ljava/util/function/Function;",
+    )?;
+    let builder_field = pool.add_field_ref(
+        manager,
+        "mantleHttpBuilderConfigurator",
+        "Ljava/util/function/Consumer;",
+    )?;
+    let helper = pool.add_class(MANAGER_HELPER_CLASS)?;
+    let configure = pool.add_method_ref(
+        helper,
+        "configureSource",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;Ljava/util/function/Function;Ljava/util/function/Consumer;)V",
+    )?;
     code(
         pool,
-        2,
+        3,
         2,
         vec![
-            Instruction::Aload_0,
-            Instruction::Aload_1,
-            Instruction::Invokestatic(register),
             Instruction::Aload_0,
             Instruction::Getfield(sources),
             Instruction::Aload_1,
             Instruction::Invokevirtual(add),
             Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokestatic(register),
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(request_field),
+            Instruction::Aload_0,
+            Instruction::Getfield(builder_field),
+            Instruction::Invokestatic(configure),
             Instruction::Return,
         ],
     )
