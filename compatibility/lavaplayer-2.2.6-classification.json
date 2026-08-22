@@ -15035,45 +15035,68 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The exact exported and private shell is retained, while the Phase 13 sound-cloud-client-id-tracker-contracts slice replaces obsolete web-client credential scraping with a bounded explicit JVM property and proves that the legacy helper fails before HTTP acquisition under ADR-0015.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0015-bounded-soundcloud-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudClientIdTracker",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact construction, dependency identity, fresh lock state, null client ID, zero update timestamp, and reflection metadata are covered by the Phase 13 sound-cloud-client-id-tracker-contracts oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudClientIdTracker",
       "symbol_kind": "METHOD",
       "member_name": "updateClientId",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The frozen web-client scrape is replaced by explicit dev.mantle.soundcloud.clientId refresh with a 1-to-256 printable-ASCII bound, credential-safe failures, validated state publication, and zero HTTP acquisition under ADR-0015.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0015-bounded-soundcloud-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudClientIdTracker",
       "symbol_kind": "METHOD",
       "member_name": "getClientId",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Lazy client-ID access preserves cached identity while replacing implicit credential scraping with bounded explicit-property loading and deterministic missing/invalid failures before network access under ADR-0015.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0015-bounded-soundcloud-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudClientIdTracker",
       "symbol_kind": "METHOD",
       "member_name": "isIdFetchContext",
       "descriptor": "(Lorg/apache/http/client/protocol/HttpClientContext;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact sc-raw Boolean.TRUE identity behavior, false and missing attributes, null-context failure, signature, and reflection metadata are covered by the Phase 13 sound-cloud-client-id-tracker-contracts oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudDataLoader",

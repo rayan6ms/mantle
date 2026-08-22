@@ -135,6 +135,9 @@ fn consumer_source(command: &str) -> Option<&'static str> {
             Some(SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CONSUMER)
         }
         "write-sound-cloud-audio-track-consumer" => Some(SOUND_CLOUD_AUDIO_TRACK_CONSUMER),
+        "write-sound-cloud-client-id-tracker-consumer" => {
+            Some(SOUND_CLOUD_CLIENT_ID_TRACKER_CONSUMER)
+        }
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -8750,6 +8753,238 @@ public final class GateSoundCloudAudioTrack {
     }
     AudioTrack shallowClone() { return makeShallowClone(); }
   }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const SOUND_CLOUD_CLIENT_ID_TRACKER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudClientIdTracker;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.apache.http.client.protocol.HttpClientContext;
+
+public final class GateSoundCloudClientIdTracker {
+  private static final String PROPERTY = "dev.mantle.soundcloud.clientId";
+
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1 && (args[0].equals("reference") || args[0].equals("candidate")),
+        "expected disposition");
+    boolean reference = args[0].equals("reference");
+    reflectionContract();
+    commonBehavior();
+    if (reference) referenceDisposition(); else currentDisposition();
+    System.out.println(
+        "common=public-concrete,11-fields,1-constructor,3-exported-methods,"
+        + "dependency-capture,context-marker,private-shell;service="
+        + (reference ? "legacy-web-client-scrape" :
+            "bounded-explicit-property,no-http,no-client-scrape"));
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<SoundCloudClientIdTracker> type = SoundCloudClientIdTracker.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0, "class metadata");
+    check(type.getDeclaredFields().length == 11, "field count");
+    checkField(type, "log", Class.forName("org.slf4j.Logger"),
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "ID_FETCH_CONTEXT_ATTRIBUTE", String.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "CLIENT_ID_REFRESH_INTERVAL", long.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "PAGE_APP_SCRIPT_REGEX", String.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "APP_SCRIPT_CLIENT_ID_REGEX", String.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "pageAppScriptPattern", Pattern.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "appScriptClientIdPattern", Pattern.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "clientIdLock", Object.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "httpInterfaceManager", HttpInterfaceManager.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "clientId", String.class, Modifier.PRIVATE);
+    checkField(type, "lastClientIdUpdate", long.class, Modifier.PRIVATE);
+
+    Constructor<?> constructor = type.getDeclaredConstructor(HttpInterfaceManager.class);
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC, "constructor metadata");
+    check(type.getDeclaredMethods().length == 7, "method count");
+    long exported = Arrays.stream(type.getDeclaredMethods())
+        .filter(method -> Modifier.isPublic(method.getModifiers())
+            || Modifier.isProtected(method.getModifiers()))
+        .count();
+    check(exported == 3L, "exported method count");
+    checkMethod(type.getDeclaredMethod("updateClientId"), void.class, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("getClientId"), String.class, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("isIdFetchContext", HttpClientContext.class),
+        boolean.class, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("findClientIdFromSite"), String.class,
+        Modifier.PRIVATE, IOException.class);
+    checkMethod(type.getDeclaredMethod("findApplicationScriptUrl",
+        Class.forName("com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface")),
+        String.class, Modifier.PRIVATE, IOException.class);
+    checkMethod(type.getDeclaredMethod("getLastMatchWithinLimit", Matcher.class, int.class),
+        String.class, Modifier.PRIVATE);
+    checkMethod(type.getDeclaredMethod("findClientIdFromApplicationScript",
+        Class.forName("com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface"), String.class),
+        String.class, Modifier.PRIVATE, IOException.class);
+
+    check(stringField("ID_FETCH_CONTEXT_ATTRIBUTE").equals("sc-raw"), "context constant");
+    check(longField("CLIENT_ID_REFRESH_INTERVAL") == 3_600_000L, "refresh constant");
+    check(stringField("PAGE_APP_SCRIPT_REGEX").equals(
+        "https://[A-Za-z0-9-.]+/assets/[a-f0-9-]+\\.js"), "page regex constant");
+    check(stringField("APP_SCRIPT_CLIENT_ID_REGEX").equals(
+        "[^_]client_id:\"([a-zA-Z0-9-_]+)\""), "client regex constant");
+    check(((Pattern) field("pageAppScriptPattern").get(null)).pattern().equals(
+        stringField("PAGE_APP_SCRIPT_REGEX")), "page pattern");
+    check(((Pattern) field("appScriptClientIdPattern").get(null)).pattern().equals(
+        stringField("APP_SCRIPT_CLIENT_ID_REGEX")), "client pattern");
+  }
+
+  private static void commonBehavior() throws Exception {
+    AtomicInteger acquisitions = new AtomicInteger();
+    HttpInterfaceManager manager = manager(acquisitions);
+    SoundCloudClientIdTracker tracker = new SoundCloudClientIdTracker(manager);
+    check(field("httpInterfaceManager").get(tracker) == manager
+        && field("clientIdLock").get(tracker) != null
+        && field("clientId").get(tracker) == null
+        && field("lastClientIdUpdate").getLong(tracker) == 0L, "constructor state");
+    HttpClientContext context = HttpClientContext.create();
+    check(!tracker.isIdFetchContext(context), "missing context marker");
+    context.setAttribute("sc-raw", Boolean.FALSE);
+    check(!tracker.isIdFetchContext(context), "false context marker");
+    context.setAttribute("sc-raw", Boolean.TRUE);
+    check(tracker.isIdFetchContext(context), "true identity context marker");
+    expect(NullPointerException.class, () -> tracker.isIdFetchContext(null));
+    check(acquisitions.get() == 0, "common behavior stays offline");
+  }
+
+  private static void referenceDisposition() throws Exception {
+    AtomicInteger acquisitions = new AtomicInteger();
+    SoundCloudClientIdTracker tracker = new SoundCloudClientIdTracker(manager(acquisitions));
+    field("clientId").set(tracker, "frozen-id");
+    check(tracker.getClientId().equals("frozen-id") && acquisitions.get() == 0,
+        "cached reference ID");
+  }
+
+  private static void currentDisposition() throws Exception {
+    AtomicInteger acquisitions = new AtomicInteger();
+    SoundCloudClientIdTracker tracker = new SoundCloudClientIdTracker(manager(acquisitions));
+    String previous = System.getProperty(PROPERTY);
+    try {
+      System.setProperty(PROPERTY, "caller-id_1");
+      check(tracker.getClientId().equals("caller-id_1"), "lazy explicit ID");
+      check(field("lastClientIdUpdate").getLong(tracker) > 0L, "successful update timestamp");
+      System.setProperty(PROPERTY, "caller-id_2");
+      tracker.updateClientId();
+      check(tracker.getClientId().equals("caller-id_2"), "explicit refresh");
+
+      System.clearProperty(PROPERTY);
+      SoundCloudClientIdTracker missing = new SoundCloudClientIdTracker(manager(acquisitions));
+      IllegalStateException absent = expect(IllegalStateException.class, missing::getClientId);
+      check(absent.getMessage().contains(PROPERTY), "missing credential message");
+      check(field("clientId").get(missing) == null
+          && field("lastClientIdUpdate").getLong(missing) == 0L, "missing state unchanged");
+
+      for (String invalid : new String[] {"", "space id", "é", "x".repeat(257)}) {
+        System.setProperty(PROPERTY, invalid);
+        SoundCloudClientIdTracker rejected =
+            new SoundCloudClientIdTracker(manager(acquisitions));
+        IllegalArgumentException error =
+            expect(IllegalArgumentException.class, rejected::updateClientId);
+        check(error.getMessage().equals("Invalid explicit SoundCloud client ID")
+            && field("clientId").get(rejected) == null,
+            "invalid credential redaction and state");
+      }
+
+      Method legacy = SoundCloudClientIdTracker.class.getDeclaredMethod("findClientIdFromSite");
+      legacy.setAccessible(true);
+      UnsupportedOperationException disabled = expectInvocation(
+          UnsupportedOperationException.class, () -> legacy.invoke(tracker));
+      check(disabled.getMessage().contains("unsupported"), "legacy scraper failure");
+      check(acquisitions.get() == 0, "candidate never acquires HTTP");
+    } finally {
+      if (previous == null) System.clearProperty(PROPERTY);
+      else System.setProperty(PROPERTY, previous);
+    }
+  }
+
+  private static HttpInterfaceManager manager(AtomicInteger acquisitions) {
+    return (HttpInterfaceManager) java.lang.reflect.Proxy.newProxyInstance(
+        GateSoundCloudClientIdTracker.class.getClassLoader(),
+        new Class<?>[] {HttpInterfaceManager.class}, (proxy, method, args) -> {
+          if (method.getName().equals("getInterface")) acquisitions.incrementAndGet();
+          if (method.getName().equals("toString")) return "manager-proxy";
+          if (method.getReturnType() == boolean.class) return false;
+          if (method.getReturnType() == int.class) return 0;
+          if (method.getReturnType() == long.class) return 0L;
+          return null;
+        });
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = SoundCloudClientIdTracker.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static String stringField(String name) throws Exception {
+    return (String) field(name).get(null);
+  }
+
+  private static long longField(String name) throws Exception {
+    return field(name).getLong(null);
+  }
+
+  private static void checkField(Class<?> type, String name, Class<?> fieldType, int modifiers)
+      throws Exception {
+    Field field = type.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getModifiers() == modifiers
+        && !field.isSynthetic(), field + " metadata");
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, int modifiers,
+                                  Class<?>... exceptions) {
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isBridge() && !method.isSynthetic(), method + " metadata");
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private static <T extends Throwable> T expectInvocation(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (InvocationTargetException error) {
+      if (!type.isInstance(error.getCause())) throw new AssertionError("wrong exception", error);
+      return type.cast(error.getCause());
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

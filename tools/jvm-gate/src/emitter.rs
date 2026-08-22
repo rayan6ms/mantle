@@ -135,6 +135,8 @@ const SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager$Builder";
 const SOUND_CLOUD_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioTrack";
+const SOUND_CLOUD_CLIENT_ID_TRACKER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudClientIdTracker";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -181,6 +183,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     SOUND_CLOUD_AUDIO_SOURCE_MANAGER_CLASS,
     SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS,
     SOUND_CLOUD_AUDIO_TRACK_CLASS,
+    SOUND_CLOUD_CLIENT_ID_TRACKER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -547,6 +550,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | SOUND_CLOUD_AUDIO_SOURCE_MANAGER_CLASS
                 | SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS
                 | SOUND_CLOUD_AUDIO_TRACK_CLASS
+                | SOUND_CLOUD_CLIENT_ID_TRACKER_CLASS
         ) || field
             .access_flags
             .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
@@ -567,6 +571,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS
                 | SOUND_CLOUD_AUDIO_SOURCE_MANAGER_CLASS
                 | SOUND_CLOUD_AUDIO_TRACK_CLASS
+                | SOUND_CLOUD_CLIENT_ID_TRACKER_CLASS
         ) || method
             .access_flags
             .intersects(MethodAccessFlags::PUBLIC | MethodAccessFlags::PROTECTED)
@@ -693,6 +698,9 @@ fn replacement_body(
     }
     if class_name == SOUND_CLOUD_AUDIO_TRACK_CLASS {
         return sound_cloud_audio_track_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == SOUND_CLOUD_CLIENT_ID_TRACKER_CLASS {
+        return sound_cloud_client_id_tracker_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS {
         return sound_cloud_audio_source_manager_builder_replacement(
@@ -3394,6 +3402,406 @@ fn sound_cloud_audio_track_clinit(pool: &mut ConstantPool<'static>) -> Result<At
             Instruction::Ldc_w(owner),
             Instruction::Invokestatic(get_logger),
             Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn sound_cloud_client_id_tracker_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;)V") => {
+            sound_cloud_client_id_tracker_constructor(pool)
+        }
+        ("updateClientId", "()V") => sound_cloud_client_id_tracker_update(pool),
+        ("getClientId", "()Ljava/lang/String;") => sound_cloud_client_id_tracker_get(pool),
+        ("isIdFetchContext", "(Lorg/apache/http/client/protocol/HttpClientContext;)Z") => {
+            sound_cloud_client_id_tracker_is_fetch_context(pool)
+        }
+        ("getLastMatchWithinLimit", "(Ljava/util/regex/Matcher;I)Ljava/lang/String;") => {
+            sound_cloud_client_id_tracker_last_match(pool)
+        }
+        ("<clinit>", "()V") => sound_cloud_client_id_tracker_clinit(pool),
+        (
+            "findClientIdFromSite"
+            | "findApplicationScriptUrl"
+            | "findClientIdFromApplicationScript",
+            _,
+        ) => unsupported_body(
+            pool,
+            "Legacy SoundCloud web-client credential scraping is unsupported.",
+            required_locals,
+        ),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {SOUND_CLOUD_CLIENT_ID_TRACKER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn sound_cloud_client_id_tracker_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(SOUND_CLOUD_CLIENT_ID_TRACKER_CLASS)?;
+    let lock = pool.add_field_ref(owner, "clientIdLock", "Ljava/lang/Object;")?;
+    let manager = pool.add_field_ref(
+        owner,
+        "httpInterfaceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::New(object),
+            Instruction::Dup,
+            Instruction::Invokespecial(object_init),
+            Instruction::Putfield(lock),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(manager),
+            Instruction::Return,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn sound_cloud_client_id_tracker_update(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(SOUND_CLOUD_CLIENT_ID_TRACKER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let string = pool.add_class("java/lang/String")?;
+    let system = pool.add_class("java/lang/System")?;
+    let get_property = pool.add_method_ref(
+        system,
+        "getProperty",
+        "(Ljava/lang/String;)Ljava/lang/String;",
+    )?;
+    let current_time = pool.add_method_ref(system, "currentTimeMillis", "()J")?;
+    let matches = pool.add_method_ref(string, "matches", "(Ljava/lang/String;)Z")?;
+    let lock = pool.add_field_ref(owner, "clientIdLock", "Ljava/lang/Object;")?;
+    let client_id = pool.add_field_ref(owner, "clientId", "Ljava/lang/String;")?;
+    let last_update = pool.add_field_ref(owner, "lastClientIdUpdate", "J")?;
+    let missing = pool.add_class("java/lang/IllegalStateException")?;
+    let missing_init = pool.add_method_ref(missing, "<init>", "(Ljava/lang/String;)V")?;
+    let invalid = pool.add_class("java/lang/IllegalArgumentException")?;
+    let invalid_init = pool.add_method_ref(invalid, "<init>", "(Ljava/lang/String;)V")?;
+    let property = pool.add_string("dev.mantle.soundcloud.clientId")?;
+    let valid_pattern = pool.add_string("[\\x21-\\x7e]{1,256}")?;
+    let missing_message =
+        pool.add_string("SoundCloud client ID requires dev.mantle.soundcloud.clientId")?;
+    let invalid_message = pool.add_string("Invalid explicit SoundCloud client ID")?;
+    let mut body = code_with_exceptions(
+        pool,
+        3,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(lock),
+            Instruction::Dup,
+            Instruction::Astore_1,
+            Instruction::Monitorenter,
+            Instruction::Ldc_w(property),
+            Instruction::Invokestatic(get_property),
+            Instruction::Astore_2,
+            Instruction::Aload_2,
+            Instruction::Ifnonnull(15),
+            Instruction::New(missing),
+            Instruction::Dup,
+            Instruction::Ldc_w(missing_message),
+            Instruction::Invokespecial(missing_init),
+            Instruction::Athrow,
+            Instruction::Aload_2,
+            Instruction::Ldc_w(valid_pattern),
+            Instruction::Invokevirtual(matches),
+            Instruction::Ifne(24),
+            Instruction::New(invalid),
+            Instruction::Dup,
+            Instruction::Ldc_w(invalid_message),
+            Instruction::Invokespecial(invalid_init),
+            Instruction::Athrow,
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(client_id),
+            Instruction::Aload_0,
+            Instruction::Invokestatic(current_time),
+            Instruction::Putfield(last_update),
+            Instruction::Aload_1,
+            Instruction::Monitorexit,
+            Instruction::Return,
+            Instruction::Astore_3,
+            Instruction::Aload_1,
+            Instruction::Monitorexit,
+            Instruction::Aload_3,
+            Instruction::Athrow,
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 5..32,
+                handler_pc: 33,
+                catch_type: 0,
+            },
+            ExceptionTableEntry {
+                range_pc: 33..36,
+                handler_pc: 33,
+                catch_type: 0,
+            },
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 15,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: object,
+                    },
+                    VerificationType::Object {
+                        cpool_index: string,
+                    },
+                ],
+                stack: vec![],
+            },
+            StackFrame::SameFrame { frame_type: 8 },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 8,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: object,
+                    },
+                ],
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn sound_cloud_client_id_tracker_get(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(SOUND_CLOUD_CLIENT_ID_TRACKER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let lock = pool.add_field_ref(owner, "clientIdLock", "Ljava/lang/Object;")?;
+    let client_id = pool.add_field_ref(owner, "clientId", "Ljava/lang/String;")?;
+    let update = pool.add_method_ref(owner, "updateClientId", "()V")?;
+    let mut body = code_with_exceptions(
+        pool,
+        2,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(lock),
+            Instruction::Dup,
+            Instruction::Astore_1,
+            Instruction::Monitorenter,
+            Instruction::Aload_0,
+            Instruction::Getfield(client_id),
+            Instruction::Ifnonnull(10),
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(update),
+            Instruction::Aload_0,
+            Instruction::Getfield(client_id),
+            Instruction::Astore_2,
+            Instruction::Aload_1,
+            Instruction::Monitorexit,
+            Instruction::Aload_2,
+            Instruction::Areturn,
+            Instruction::Astore_3,
+            Instruction::Aload_1,
+            Instruction::Monitorexit,
+            Instruction::Aload_3,
+            Instruction::Athrow,
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 5..15,
+                handler_pc: 17,
+                catch_type: 0,
+            },
+            ExceptionTableEntry {
+                range_pc: 17..20,
+                handler_pc: 17,
+                catch_type: 0,
+            },
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: 10,
+                locals: vec![VerificationType::Object {
+                    cpool_index: object,
+                }],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 6,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: object,
+                    },
+                ],
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn sound_cloud_client_id_tracker_is_fetch_context(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let context = pool.add_class("org/apache/http/client/protocol/HttpClientContext")?;
+    let get_attribute = pool.add_method_ref(
+        context,
+        "getAttribute",
+        "(Ljava/lang/String;)Ljava/lang/Object;",
+    )?;
+    let boolean = pool.add_class("java/lang/Boolean")?;
+    let true_value = pool.add_field_ref(boolean, "TRUE", "Ljava/lang/Boolean;")?;
+    let attribute = pool.add_string("sc-raw")?;
+    let mut body = code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Ldc_w(attribute),
+            Instruction::Invokevirtual(get_attribute),
+            Instruction::Getstatic(true_value),
+            Instruction::If_acmpne(7),
+            Instruction::Iconst_1,
+            Instruction::Ireturn,
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::SameFrame { frame_type: 7 }],
+    )?;
+    Ok(body)
+}
+
+fn sound_cloud_client_id_tracker_last_match(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let matcher = pool.add_class("java/util/regex/Matcher")?;
+    let string = pool.add_class("java/lang/String")?;
+    let find = pool.add_method_ref(matcher, "find", "()Z")?;
+    let group = pool.add_method_ref(matcher, "group", "()Ljava/lang/String;")?;
+    let mut body = code(
+        pool,
+        2,
+        5,
+        vec![
+            Instruction::Aconst_null,
+            Instruction::Astore_3,
+            Instruction::Iconst_0,
+            Instruction::Istore(4),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(find),
+            Instruction::Ifeq(15),
+            Instruction::Iload(4),
+            Instruction::Iload_2,
+            Instruction::If_icmpge(15),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(group),
+            Instruction::Astore_3,
+            Instruction::Iinc(4, 1),
+            Instruction::Goto(4),
+            Instruction::Aload_3,
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 253,
+                offset_delta: 4,
+                locals: vec![
+                    VerificationType::Object {
+                        cpool_index: string,
+                    },
+                    VerificationType::Integer,
+                ],
+            },
+            StackFrame::SameFrame { frame_type: 10 },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn sound_cloud_client_id_tracker_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(SOUND_CLOUD_CLIENT_ID_TRACKER_CLASS)?;
+    let factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let refresh = pool.add_field_ref(owner, "CLIENT_ID_REFRESH_INTERVAL", "J")?;
+    let pattern = pool.add_class("java/util/regex/Pattern")?;
+    let compile = pool.add_method_ref(
+        pattern,
+        "compile",
+        "(Ljava/lang/String;)Ljava/util/regex/Pattern;",
+    )?;
+    let page_pattern =
+        pool.add_field_ref(owner, "pageAppScriptPattern", "Ljava/util/regex/Pattern;")?;
+    let client_pattern = pool.add_field_ref(
+        owner,
+        "appScriptClientIdPattern",
+        "Ljava/util/regex/Pattern;",
+    )?;
+    let page_regex = pool.add_string("https://[A-Za-z0-9-.]+/assets/[a-f0-9-]+\\.js")?;
+    let client_regex = pool.add_string("[^_]client_id:\"([a-zA-Z0-9-_]+)\"")?;
+    let refresh_millis = pool.add_long(3_600_000)?;
+    code(
+        pool,
+        2,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Ldc2_w(refresh_millis),
+            Instruction::Putstatic(refresh),
+            Instruction::Ldc_w(page_regex),
+            Instruction::Invokestatic(compile),
+            Instruction::Putstatic(page_pattern),
+            Instruction::Ldc_w(client_regex),
+            Instruction::Invokestatic(compile),
+            Instruction::Putstatic(client_pattern),
             Instruction::Return,
         ],
     )
