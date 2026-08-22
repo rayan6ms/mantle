@@ -140,6 +140,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-sound-cloud-data-loader-consumer" => Some(SOUND_CLOUD_DATA_LOADER_CONSUMER),
         "write-sound-cloud-data-reader-consumer" => Some(SOUND_CLOUD_DATA_READER_CONSUMER),
+        "write-sound-cloud-format-handler-consumer" => Some(SOUND_CLOUD_FORMAT_HANDLER_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -9283,6 +9284,171 @@ public final class GateSoundCloudDataReader {
   private static <T> T proxy(Class<T> type) {
     return type.cast(Proxy.newProxyInstance(
         GateSoundCloudDataReader.class.getClassLoader(), new Class<?>[] {type},
+        (proxy, method, args) -> null));
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const SOUND_CLOUD_FORMAT_HANDLER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudFormatHandler;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudM3uInfo;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudTrackFormat;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateSoundCloudFormatHandler {
+  public static void main(String[] args) throws Exception {
+    dispatchContract();
+    nullContract();
+    failureContract();
+    reflectionContract();
+    System.out.println(
+        "public-abstract-interface,0-fields,0-constructors,4-methods;"
+        + "dispatch,argument-identity,return-identity,nulls,unchecked,"
+        + "generic-list-parameter,reflection");
+  }
+
+  private static void dispatchContract() {
+    SoundCloudTrackFormat format = proxy(SoundCloudTrackFormat.class);
+    List<SoundCloudTrackFormat> formats = Collections.singletonList(format);
+    String formatIdentifier = new String("O:format");
+    String m3uIdentifier = new String("O:m3u");
+    String mp3Identifier = new String("M:mp3");
+    String mp3Url = new String("https://media/mp3");
+    SoundCloudM3uInfo m3uInfo = new SoundCloudM3uInfo("https://media/m3u", null);
+    RecordingHandler state = new RecordingHandler(format, formatIdentifier, m3uInfo, mp3Url);
+    SoundCloudFormatHandler handler = state.proxy();
+
+    check(handler.chooseBestFormat(formats) == format, "choose return identity");
+    state.checkCall("chooseBestFormat", formats);
+    check(handler.buildFormatIdentifier(format) == formatIdentifier,
+        "identifier return identity");
+    state.checkCall("buildFormatIdentifier", format);
+    check(handler.getM3uInfo(m3uIdentifier) == m3uInfo, "M3U return identity");
+    state.checkCall("getM3uInfo", m3uIdentifier);
+    check(handler.getMp3LookupUrl(mp3Identifier) == mp3Url, "MP3 return identity");
+    state.checkCall("getMp3LookupUrl", mp3Identifier);
+    check(state.calls == 4, "dispatch count");
+  }
+
+  private static void nullContract() {
+    RecordingHandler state = new RecordingHandler(null, null, null, null);
+    SoundCloudFormatHandler handler = state.proxy();
+    check(handler.chooseBestFormat(null) == null, "null format list");
+    state.checkCall("chooseBestFormat", (Object) null);
+    check(handler.buildFormatIdentifier(null) == null, "null format");
+    state.checkCall("buildFormatIdentifier", (Object) null);
+    check(handler.getM3uInfo(null) == null, "null M3U identifier");
+    state.checkCall("getM3uInfo", (Object) null);
+    check(handler.getMp3LookupUrl(null) == null, "null MP3 identifier");
+    state.checkCall("getMp3LookupUrl", (Object) null);
+    check(state.calls == 4, "null dispatch count");
+  }
+
+  private static void failureContract() {
+    RuntimeException failure = new RuntimeException("format-handler-sentinel");
+    SoundCloudFormatHandler handler = (SoundCloudFormatHandler) Proxy.newProxyInstance(
+        SoundCloudFormatHandler.class.getClassLoader(),
+        new Class<?>[] {SoundCloudFormatHandler.class},
+        (proxy, method, args) -> { throw failure; });
+    try {
+      handler.getMp3LookupUrl(null);
+      throw new AssertionError("expected failure");
+    } catch (RuntimeException error) {
+      check(error == failure, "unchecked failure identity");
+    }
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<SoundCloudFormatHandler> type = SoundCloudFormatHandler.class;
+    check(type.isInterface() && Modifier.isPublic(type.getModifiers())
+        && Modifier.isAbstract(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == null && type.getInterfaces().length == 0
+        && type.getTypeParameters().length == 0 && type.getAnnotations().length == 0,
+        "interface metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 4, "member counts");
+    Method choose = checkMethod(type, "chooseBestFormat", SoundCloudTrackFormat.class,
+        new Class<?>[] {List.class});
+    check(choose.getGenericParameterTypes()[0] instanceof ParameterizedType,
+        "choose parameterized list");
+    ParameterizedType formatList = (ParameterizedType) choose.getGenericParameterTypes()[0];
+    check(formatList.getRawType() == List.class
+        && Arrays.equals(formatList.getActualTypeArguments(),
+            new Object[] {SoundCloudTrackFormat.class}), "choose generic list parameter");
+    checkMethod(type, "buildFormatIdentifier", String.class,
+        new Class<?>[] {SoundCloudTrackFormat.class});
+    checkMethod(type, "getM3uInfo", SoundCloudM3uInfo.class,
+        new Class<?>[] {String.class});
+    checkMethod(type, "getMp3LookupUrl", String.class,
+        new Class<?>[] {String.class});
+  }
+
+  private static Method checkMethod(Class<?> owner, String name, Class<?> returnType,
+                                    Class<?>[] parameters) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getGenericReturnType() == returnType
+        && method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), name + " metadata");
+    return method;
+  }
+
+  private static final class RecordingHandler implements InvocationHandler {
+    private final Object[] returns;
+    private String methodName;
+    private Object[] arguments;
+    private int calls;
+
+    RecordingHandler(SoundCloudTrackFormat format, String identifier,
+                     SoundCloudM3uInfo m3uInfo, String mp3Url) {
+      returns = new Object[] {format, identifier, m3uInfo, mp3Url};
+    }
+
+    SoundCloudFormatHandler proxy() {
+      return (SoundCloudFormatHandler) Proxy.newProxyInstance(
+          SoundCloudFormatHandler.class.getClassLoader(),
+          new Class<?>[] {SoundCloudFormatHandler.class}, this);
+    }
+
+    @Override
+    public Object invoke(Object proxy, Method method, Object[] args) {
+      methodName = method.getName();
+      arguments = args;
+      calls++;
+      switch (methodName) {
+        case "chooseBestFormat": return returns[0];
+        case "buildFormatIdentifier": return returns[1];
+        case "getM3uInfo": return returns[2];
+        case "getMp3LookupUrl": return returns[3];
+        default: throw new AssertionError("unexpected method: " + method);
+      }
+    }
+
+    void checkCall(String expectedMethod, Object... expectedArguments) {
+      check(expectedMethod.equals(methodName) && arguments.length == expectedArguments.length,
+          expectedMethod + " dispatch");
+      for (int index = 0; index < arguments.length; index++) {
+        check(arguments[index] == expectedArguments[index], expectedMethod + " argument identity");
+      }
+    }
+  }
+
+  private static <T> T proxy(Class<T> type) {
+    return type.cast(Proxy.newProxyInstance(
+        GateSoundCloudFormatHandler.class.getClassLoader(), new Class<?>[] {type},
         (proxy, method, args) -> null));
   }
 

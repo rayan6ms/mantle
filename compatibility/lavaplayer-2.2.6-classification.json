@@ -15259,45 +15259,65 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The exact caller-defined four-method format SPI, argument and return identity, nullable dispatch, unchecked failure identity, generic format-list parameter, and reflection metadata are covered by the Phase 13 sound-cloud-format-handler-contracts oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudFormatHandler",
       "symbol_kind": "METHOD",
       "member_name": "chooseBestFormat",
       "descriptor": "(Ljava/util/List;)Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudTrackFormat;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The exact caller-defined four-method format SPI, argument and return identity, nullable dispatch, unchecked failure identity, generic format-list parameter, and reflection metadata are covered by the Phase 13 sound-cloud-format-handler-contracts oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudFormatHandler",
       "symbol_kind": "METHOD",
       "member_name": "buildFormatIdentifier",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudTrackFormat;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The exact caller-defined four-method format SPI, argument and return identity, nullable dispatch, unchecked failure identity, generic format-list parameter, and reflection metadata are covered by the Phase 13 sound-cloud-format-handler-contracts oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudFormatHandler",
       "symbol_kind": "METHOD",
       "member_name": "getM3uInfo",
       "descriptor": "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudM3uInfo;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The exact caller-defined four-method format SPI, argument and return identity, nullable dispatch, unchecked failure identity, generic format-list parameter, and reflection metadata are covered by the Phase 13 sound-cloud-format-handler-contracts oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudFormatHandler",
       "symbol_kind": "METHOD",
       "member_name": "getMp3LookupUrl",
       "descriptor": "(Ljava/lang/String;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The exact caller-defined four-method format SPI, argument and return identity, nullable dispatch, unchecked failure identity, generic format-list parameter, and reflection metadata are covered by the Phase 13 sound-cloud-format-handler-contracts oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudHelper",
