@@ -168,6 +168,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-sound-cloud-segment-decoder-factory-consumer" => {
             Some(SOUND_CLOUD_SEGMENT_DECODER_FACTORY_CONSUMER)
         }
+        "write-sound-cloud-track-format-consumer" => Some(SOUND_CLOUD_TRACK_FORMAT_CONSUMER),
         _ => None,
     }
 }
@@ -9499,6 +9500,141 @@ public final class GateSoundCloudSegmentDecoderFactory {
           return null;
         }));
   }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const SOUND_CLOUD_TRACK_FORMAT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudTrackFormat;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+
+public final class GateSoundCloudTrackFormat {
+  private static final String[] METHODS = {
+      "getTrackId", "getProtocol", "getMimeType", "getLookupUrl"
+  };
+
+  public static void main(String[] args) throws Exception {
+    dispatchContract();
+    nullContract();
+    failureContract();
+    reflectionContract();
+    System.out.println(
+        "public-abstract-interface,0-fields,0-constructors,4-methods;"
+        + "ordered-dispatch,return-identity,nulls,unchecked,reflection");
+  }
+
+  private static void dispatchContract() {
+    String trackId = new String("track-id");
+    String protocol = new String("hls");
+    String mimeType = new String("audio/mpeg");
+    String lookupUrl = new String("https://media/fixture");
+    RecordingHandler handler = new RecordingHandler(
+        new Object[] {trackId, protocol, mimeType, lookupUrl}, null);
+    SoundCloudTrackFormat format = handler.proxy();
+    check(format.getTrackId() == trackId, "track ID identity");
+    check(format.getProtocol() == protocol, "protocol identity");
+    check(format.getMimeType() == mimeType, "MIME type identity");
+    check(format.getLookupUrl() == lookupUrl, "lookup URL identity");
+    check(handler.events.toString().equals(
+        "getTrackId;getProtocol;getMimeType;getLookupUrl;"), "ordered dispatch");
+  }
+
+  private static void nullContract() {
+    RecordingHandler handler = new RecordingHandler(new Object[4], null);
+    SoundCloudTrackFormat format = handler.proxy();
+    check(format.getTrackId() == null && format.getProtocol() == null
+        && format.getMimeType() == null && format.getLookupUrl() == null,
+        "null returns");
+    check(handler.events.toString().equals(
+        "getTrackId;getProtocol;getMimeType;getLookupUrl;"), "null dispatch order");
+  }
+
+  private static void failureContract() {
+    for (int index = 0; index < METHODS.length; index++) {
+      RuntimeException failure = new RuntimeException(METHODS[index] + "-sentinel");
+      SoundCloudTrackFormat format = new RecordingHandler(new Object[4], failure).proxy();
+      final int methodIndex = index;
+      check(capture(() -> invoke(format, methodIndex)) == failure,
+          METHODS[index] + " failure identity");
+    }
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<SoundCloudTrackFormat> type = SoundCloudTrackFormat.class;
+    check(type.isInterface() && Modifier.isPublic(type.getModifiers())
+        && Modifier.isAbstract(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == null && type.getInterfaces().length == 0
+        && type.getTypeParameters().length == 0 && type.getAnnotations().length == 0,
+        "interface metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 4 && type.getDeclaredClasses().length == 0,
+        "member counts");
+    for (String name : METHODS) {
+      Method method = type.getDeclaredMethod(name);
+      check(method.getReturnType() == String.class
+          && method.getGenericReturnType() == String.class
+          && method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+          && method.getParameterTypes().length == 0 && method.getExceptionTypes().length == 0
+          && method.getTypeParameters().length == 0 && !method.isDefault()
+          && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs(),
+          name + " metadata");
+    }
+  }
+
+  private static String invoke(SoundCloudTrackFormat format, int index) {
+    switch (index) {
+      case 0: return format.getTrackId();
+      case 1: return format.getProtocol();
+      case 2: return format.getMimeType();
+      case 3: return format.getLookupUrl();
+      default: throw new AssertionError("invalid method index");
+    }
+  }
+
+  private static Throwable capture(Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected failure");
+    } catch (Throwable error) {
+      return error;
+    }
+  }
+
+  private static final class RecordingHandler implements InvocationHandler {
+    private final Object[] returns;
+    private final RuntimeException failure;
+    private final StringBuilder events = new StringBuilder();
+
+    RecordingHandler(Object[] values, RuntimeException valueFailure) {
+      returns = values;
+      failure = valueFailure;
+    }
+
+    SoundCloudTrackFormat proxy() {
+      return (SoundCloudTrackFormat) Proxy.newProxyInstance(
+          SoundCloudTrackFormat.class.getClassLoader(),
+          new Class<?>[] {SoundCloudTrackFormat.class}, this);
+    }
+
+    @Override
+    public Object invoke(Object proxy, Method method, Object[] arguments) {
+      if (failure != null) throw failure;
+      events.append(method.getName()).append(';');
+      for (int index = 0; index < METHODS.length; index++) {
+        if (METHODS[index].equals(method.getName())) return returns[index];
+      }
+      throw new AssertionError("unexpected method: " + method);
+    }
+  }
+
+  private interface Operation { void run(); }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

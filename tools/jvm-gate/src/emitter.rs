@@ -161,6 +161,8 @@ const SOUND_CLOUD_SEGMENT_DECODER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudSegmentDecoder";
 const SOUND_CLOUD_SEGMENT_DECODER_FACTORY_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudSegmentDecoder$Factory";
+const SOUND_CLOUD_TRACK_FORMAT_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudTrackFormat";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -220,6 +222,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     SOUND_CLOUD_PLAYLIST_LOADER_CLASS,
     SOUND_CLOUD_SEGMENT_DECODER_CLASS,
     SOUND_CLOUD_SEGMENT_DECODER_FACTORY_CLASS,
+    SOUND_CLOUD_TRACK_FORMAT_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
