@@ -10564,135 +10564,195 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact parent-interface and method metadata plus complete proxy dispatch, identity and null arguments, boolean results, full-width integer and long values, and inherited frame-provider overloads are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayer",
       "symbol_kind": "METHOD",
       "member_name": "getPlayingTrack",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact parent-interface and method metadata plus complete proxy dispatch, identity and null arguments, boolean results, full-width integer and long values, and inherited frame-provider overloads are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayer",
       "symbol_kind": "METHOD",
       "member_name": "playTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact parent-interface and method metadata plus complete proxy dispatch, identity and null arguments, boolean results, full-width integer and long values, and inherited frame-provider overloads are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayer",
       "symbol_kind": "METHOD",
       "member_name": "startTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Z)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact parent-interface and method metadata plus complete proxy dispatch, identity and null arguments, boolean results, full-width integer and long values, and inherited frame-provider overloads are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayer",
       "symbol_kind": "METHOD",
       "member_name": "stopTrack",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact parent-interface and method metadata plus complete proxy dispatch, identity and null arguments, boolean results, full-width integer and long values, and inherited frame-provider overloads are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayer",
       "symbol_kind": "METHOD",
       "member_name": "getVolume",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact parent-interface and method metadata plus complete proxy dispatch, identity and null arguments, boolean results, full-width integer and long values, and inherited frame-provider overloads are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayer",
       "symbol_kind": "METHOD",
       "member_name": "setVolume",
       "descriptor": "(I)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact parent-interface and method metadata plus complete proxy dispatch, identity and null arguments, boolean results, full-width integer and long values, and inherited frame-provider overloads are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayer",
       "symbol_kind": "METHOD",
       "member_name": "setFilterFactory",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/filter/PcmFilterFactory;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact parent-interface and method metadata plus complete proxy dispatch, identity and null arguments, boolean results, full-width integer and long values, and inherited frame-provider overloads are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayer",
       "symbol_kind": "METHOD",
       "member_name": "setFrameBufferDuration",
       "descriptor": "(Ljava/lang/Integer;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact parent-interface and method metadata plus complete proxy dispatch, identity and null arguments, boolean results, full-width integer and long values, and inherited frame-provider overloads are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayer",
       "symbol_kind": "METHOD",
       "member_name": "isPaused",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact parent-interface and method metadata plus complete proxy dispatch, identity and null arguments, boolean results, full-width integer and long values, and inherited frame-provider overloads are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayer",
       "symbol_kind": "METHOD",
       "member_name": "setPaused",
       "descriptor": "(Z)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact parent-interface and method metadata plus complete proxy dispatch, identity and null arguments, boolean results, full-width integer and long values, and inherited frame-provider overloads are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayer",
       "symbol_kind": "METHOD",
       "member_name": "destroy",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact parent-interface and method metadata plus complete proxy dispatch, identity and null arguments, boolean results, full-width integer and long values, and inherited frame-provider overloads are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayer",
       "symbol_kind": "METHOD",
       "member_name": "addListener",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/event/AudioEventListener;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact parent-interface and method metadata plus complete proxy dispatch, identity and null arguments, boolean results, full-width integer and long values, and inherited frame-provider overloads are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayer",
       "symbol_kind": "METHOD",
       "member_name": "removeListener",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/event/AudioEventListener;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact parent-interface and method metadata plus complete proxy dispatch, identity and null arguments, boolean results, full-width integer and long values, and inherited frame-provider overloads are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayer",
       "symbol_kind": "METHOD",
       "member_name": "checkCleanup",
       "descriptor": "(J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact parent-interface and method metadata plus complete proxy dispatch, identity and null arguments, boolean results, full-width integer and long values, and inherited frame-provider overloads are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerLifecycleManager",

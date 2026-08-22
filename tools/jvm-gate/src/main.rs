@@ -72,6 +72,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-audio-player-lifecycle-manager-consumer" => {
             Some(AUDIO_PLAYER_LIFECYCLE_MANAGER_CONSUMER)
         }
+        "write-audio-player-interface-consumer" => Some(AUDIO_PLAYER_INTERFACE_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -2948,6 +2949,256 @@ public final class GateAudioPlayerLifecycleManager {
         return true;
       }
       return super.invoke(proxy, method, arguments);
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_PLAYER_INTERFACE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.PcmFilterFactory;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
+import com.sedmelluq.discord.lavaplayer.player.event.AudioEventListener;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameProvider;
+import com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+public final class GateAudioPlayerInterface {
+  public static void main(String[] args) throws Exception {
+    AudioTrack track = proxy(AudioTrack.class);
+    PcmFilterFactory filterFactory = proxy(PcmFilterFactory.class);
+    AudioEventListener listener = proxy(AudioEventListener.class);
+    AudioFrame frame = proxy(AudioFrame.class);
+    PlayerHandler calls = new PlayerHandler(track, filterFactory, listener, frame);
+    AudioPlayer player = proxy(AudioPlayer.class, calls);
+
+    check(player.getPlayingTrack() == track, "playing track return");
+    player.playTrack(track);
+    player.playTrack(null);
+    check(player.startTrack(track, false), "start false return");
+    check(!player.startTrack(null, true), "start true return");
+    player.stopTrack();
+    check(player.getVolume() == Integer.MIN_VALUE, "volume return width");
+    player.setVolume(Integer.MIN_VALUE);
+    player.setVolume(Integer.MAX_VALUE);
+    player.setFilterFactory(filterFactory);
+    player.setFilterFactory(null);
+    player.setFrameBufferDuration(Integer.MAX_VALUE);
+    player.setFrameBufferDuration(null);
+    check(player.isPaused(), "paused return");
+    player.setPaused(false);
+    player.setPaused(true);
+    player.destroy();
+    player.addListener(listener);
+    player.addListener(null);
+    player.removeListener(listener);
+    player.removeListener(null);
+    player.checkCleanup(Long.MIN_VALUE);
+    player.checkCleanup(Long.MAX_VALUE);
+
+    check(player.provide() == frame, "inherited provide return");
+    check(player.provide(Long.MIN_VALUE, TimeUnit.NANOSECONDS) == frame,
+        "inherited timed provide return");
+    check(player.provide((MutableAudioFrame) null), "inherited mutable provide return");
+    check(!player.provide(null, Long.MAX_VALUE, TimeUnit.DAYS),
+        "inherited timed mutable provide return");
+
+    check(calls.names.equals(Arrays.asList(
+        "get-track", "play", "play-null", "start-false", "start-null-true", "stop",
+        "get-volume", "set-volume-min", "set-volume-max", "set-filter", "set-filter-null",
+        "set-buffer-max", "set-buffer-null", "is-paused", "set-paused-false",
+        "set-paused-true", "destroy", "add-listener", "add-listener-null",
+        "remove-listener", "remove-listener-null", "cleanup-min", "cleanup-max",
+        "provide", "provide-timed", "provide-mutable", "provide-mutable-timed")),
+        "dispatch order");
+
+    checkReflection();
+    System.out.println(
+        "dispatch=track,start,volume,filter,buffer,pause,listener,cleanup,inherited-frame;"
+        + "values=identity,nulls,int-width,long-width;"
+        + "reflection=interface,0-fields,14-methods,0-constructors");
+  }
+
+  private static void checkReflection() throws Exception {
+    Class<AudioPlayer> type = AudioPlayer.class;
+    int modifiers = type.getModifiers();
+    check(Modifier.isPublic(modifiers) && Modifier.isInterface(modifiers)
+        && Modifier.isAbstract(modifiers) && !Modifier.isFinal(modifiers)
+        && type.getSuperclass() == null
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] { AudioFrameProvider.class })
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0,
+        "interface structure");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredMethods().length == 14
+        && type.getDeclaredConstructors().length == 0 && type.getMethods().length == 18,
+        "member counts");
+    checkMethod(type.getDeclaredMethod("getPlayingTrack"), AudioTrack.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("playTrack", AudioTrack.class), void.class,
+        new Class<?>[] { AudioTrack.class });
+    checkMethod(type.getDeclaredMethod("startTrack", AudioTrack.class, boolean.class),
+        boolean.class, new Class<?>[] { AudioTrack.class, boolean.class });
+    checkMethod(type.getDeclaredMethod("stopTrack"), void.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("getVolume"), int.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("setVolume", int.class), void.class,
+        new Class<?>[] { int.class });
+    checkMethod(type.getDeclaredMethod("setFilterFactory", PcmFilterFactory.class), void.class,
+        new Class<?>[] { PcmFilterFactory.class });
+    checkMethod(type.getDeclaredMethod("setFrameBufferDuration", Integer.class), void.class,
+        new Class<?>[] { Integer.class });
+    checkMethod(type.getDeclaredMethod("isPaused"), boolean.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("setPaused", boolean.class), void.class,
+        new Class<?>[] { boolean.class });
+    checkMethod(type.getDeclaredMethod("destroy"), void.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("addListener", AudioEventListener.class), void.class,
+        new Class<?>[] { AudioEventListener.class });
+    checkMethod(type.getDeclaredMethod("removeListener", AudioEventListener.class), void.class,
+        new Class<?>[] { AudioEventListener.class });
+    checkMethod(type.getDeclaredMethod("checkCleanup", long.class), void.class,
+        new Class<?>[] { long.class });
+
+    checkInherited(type.getMethod("provide"), new Class<?>[0]);
+    Method timed = type.getMethod("provide", long.class, TimeUnit.class);
+    checkInherited(timed, new Class<?>[] { long.class, TimeUnit.class });
+    check(Arrays.equals(timed.getExceptionTypes(),
+        new Class<?>[] { java.util.concurrent.TimeoutException.class, InterruptedException.class }),
+        "timed inherited exceptions");
+    checkInherited(type.getMethod("provide", MutableAudioFrame.class),
+        new Class<?>[] { MutableAudioFrame.class });
+    Method mutableTimed = type.getMethod(
+        "provide", MutableAudioFrame.class, long.class, TimeUnit.class);
+    checkInherited(mutableTimed,
+        new Class<?>[] { MutableAudioFrame.class, long.class, TimeUnit.class });
+    check(Arrays.equals(mutableTimed.getExceptionTypes(),
+        new Class<?>[] { java.util.concurrent.TimeoutException.class, InterruptedException.class }),
+        "mutable timed inherited exceptions");
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, Class<?>[] parameters) {
+    check(Modifier.isPublic(method.getModifiers()) && Modifier.isAbstract(method.getModifiers())
+        && !Modifier.isStatic(method.getModifiers()) && !method.isDefault()
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs()
+        && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && method.getDeclaredAnnotations().length == 0,
+        "method metadata " + method.getName());
+  }
+
+  private static void checkInherited(Method method, Class<?>[] parameters) {
+    check(method.getDeclaringClass() == AudioFrameProvider.class
+        && Arrays.equals(method.getParameterTypes(), parameters),
+        "inherited method " + method);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] { type },
+        (instance, method, arguments) -> null);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type, InvocationHandler handler) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] { type }, handler);
+  }
+
+  private static final class PlayerHandler implements InvocationHandler {
+    final List<String> names = new java.util.ArrayList<>();
+    final AudioTrack track;
+    final PcmFilterFactory filterFactory;
+    final AudioEventListener listener;
+    final AudioFrame frame;
+
+    PlayerHandler(AudioTrack track, PcmFilterFactory filterFactory,
+        AudioEventListener listener, AudioFrame frame) {
+      this.track = track;
+      this.filterFactory = filterFactory;
+      this.listener = listener;
+      this.frame = frame;
+    }
+
+    public Object invoke(Object proxy, Method method, Object[] arguments) {
+      switch (method.getName()) {
+        case "getPlayingTrack":
+          names.add("get-track");
+          return track;
+        case "playTrack":
+          check(arguments[0] == track || arguments[0] == null, "play identity");
+          names.add(arguments[0] == null ? "play-null" : "play");
+          return null;
+        case "startTrack":
+          check(arguments[0] == track || arguments[0] == null, "start identity");
+          boolean noInterrupt = (Boolean) arguments[1];
+          names.add((arguments[0] == null ? "start-null-" : "start-") + noInterrupt);
+          return !noInterrupt;
+        case "stopTrack": names.add("stop"); return null;
+        case "getVolume": names.add("get-volume"); return Integer.MIN_VALUE;
+        case "setVolume":
+          int volume = (Integer) arguments[0];
+          names.add(volume == Integer.MIN_VALUE ? "set-volume-min" : "set-volume-max");
+          return null;
+        case "setFilterFactory":
+          check(arguments[0] == filterFactory || arguments[0] == null, "filter identity");
+          names.add(arguments[0] == null ? "set-filter-null" : "set-filter");
+          return null;
+        case "setFrameBufferDuration":
+          check(arguments[0] == null || arguments[0].equals(Integer.MAX_VALUE), "buffer duration");
+          names.add(arguments[0] == null ? "set-buffer-null" : "set-buffer-max");
+          return null;
+        case "isPaused": names.add("is-paused"); return true;
+        case "setPaused":
+          names.add((Boolean) arguments[0] ? "set-paused-true" : "set-paused-false");
+          return null;
+        case "destroy": names.add("destroy"); return null;
+        case "addListener":
+          check(arguments[0] == listener || arguments[0] == null, "add listener identity");
+          names.add(arguments[0] == null ? "add-listener-null" : "add-listener");
+          return null;
+        case "removeListener":
+          check(arguments[0] == listener || arguments[0] == null, "remove listener identity");
+          names.add(arguments[0] == null ? "remove-listener-null" : "remove-listener");
+          return null;
+        case "checkCleanup":
+          long threshold = (Long) arguments[0];
+          names.add(threshold == Long.MIN_VALUE ? "cleanup-min" : "cleanup-max");
+          return null;
+        case "provide":
+          return provide(method, arguments);
+        default:
+          throw new AssertionError("unexpected method " + method);
+      }
+    }
+
+    private Object provide(Method method, Object[] arguments) {
+      Class<?>[] parameters = method.getParameterTypes();
+      if (parameters.length == 0) {
+        names.add("provide");
+        return frame;
+      }
+      if (parameters[0] == long.class) {
+        check(arguments[0].equals(Long.MIN_VALUE) && arguments[1] == TimeUnit.NANOSECONDS,
+            "timed provide arguments");
+        names.add("provide-timed");
+        return frame;
+      }
+      check(arguments[0] == null, "mutable frame null");
+      if (parameters.length == 1) {
+        names.add("provide-mutable");
+        return true;
+      }
+      check(arguments[1].equals(Long.MAX_VALUE) && arguments[2] == TimeUnit.DAYS,
+          "mutable timed provide arguments");
+      names.add("provide-mutable-timed");
+      return false;
     }
   }
 
