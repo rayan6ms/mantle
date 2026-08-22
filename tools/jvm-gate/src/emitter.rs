@@ -108,6 +108,8 @@ const AUDIO_SOURCE_MANAGERS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManagers";
 const PROBING_AUDIO_SOURCE_MANAGER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/ProbingAudioSourceManager";
+const LOCAL_AUDIO_SOURCE_MANAGER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/local/LocalAudioSourceManager";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -140,6 +142,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
+    LOCAL_AUDIO_SOURCE_MANAGER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -561,6 +564,9 @@ fn replacement_body(
     }
     if class_name == PROBING_AUDIO_SOURCE_MANAGER_CLASS {
         return probing_audio_source_manager_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == LOCAL_AUDIO_SOURCE_MANAGER_CLASS {
+        return local_audio_source_manager_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == AUDIO_REFERENCE_CLASS {
         return audio_reference_replacement(pool, name, descriptor, required_locals);
@@ -1361,6 +1367,381 @@ fn probing_audio_source_manager_decode_factory(
                 ],
             },
         ],
+    )?;
+    Ok(body)
+}
+
+fn local_audio_source_manager_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => local_audio_source_manager_default_constructor(pool),
+        ("<init>", "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;)V") => {
+            local_audio_source_manager_registry_constructor(pool)
+        }
+        ("getSourceName", "()Ljava/lang/String;") => string_return(pool, "local", required_locals),
+        (
+            "loadItem",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+        ) => local_audio_source_manager_load_item(pool),
+        (
+            "createTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+        ) => local_audio_source_manager_create_track(pool),
+        ("isTrackEncodable", "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)Z") => code(
+            pool,
+            1,
+            required_locals,
+            vec![Instruction::Iconst_1, Instruction::Ireturn],
+        ),
+        (
+            "encodeTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Ljava/io/DataOutput;)V",
+        ) => local_audio_source_manager_encode_track(pool),
+        (
+            "decodeTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+        ) => local_audio_source_manager_decode_track(pool),
+        ("shutdown", "()V") => code(pool, 0, required_locals, vec![Instruction::Return]),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {LOCAL_AUDIO_SOURCE_MANAGER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn local_audio_source_manager_default_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let registry =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry")?;
+    let default_registry = pool.add_field_ref(
+        registry,
+        "DEFAULT_REGISTRY",
+        "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;",
+    )?;
+    let owner = pool.add_class(LOCAL_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let init = pool.add_method_ref(
+        owner,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;)V",
+    )?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getstatic(default_registry),
+            Instruction::Invokespecial(init),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn local_audio_source_manager_registry_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let parent = pool.add_class(PROBING_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let init = pool.add_method_ref(
+        parent,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;)V",
+    )?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(init),
+            Instruction::Return,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn local_audio_source_manager_load_item(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let file = pool.add_class("java/io/File")?;
+    let file_init = pool.add_method_ref(file, "<init>", "(Ljava/lang/String;)V")?;
+    let exists = pool.add_method_ref(file, "exists", "()Z")?;
+    let is_file = pool.add_method_ref(file, "isFile", "()Z")?;
+    let can_read = pool.add_method_ref(file, "canRead", "()Z")?;
+    let get_name = pool.add_method_ref(file, "getName", "()Ljava/lang/String;")?;
+    let reference = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioReference")?;
+    let player_manager =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/player/AudioPlayerManager")?;
+    let identifier = pool.add_field_ref(reference, "identifier", "Ljava/lang/String;")?;
+    let stream =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/source/local/LocalSeekableInputStream")?;
+    let stream_init = pool.add_method_ref(stream, "<init>", "(Ljava/io/File;)V")?;
+    let close = pool.add_method_ref(stream, "close", "()V")?;
+    let string = pool.add_class("java/lang/String")?;
+    let last_index = pool.add_method_ref(string, "lastIndexOf", "(I)I")?;
+    let substring = pool.add_method_ref(string, "substring", "(I)Ljava/lang/String;")?;
+    let hints = pool.add_class("com/sedmelluq/discord/lavaplayer/container/MediaContainerHints")?;
+    let hints_from = pool.add_method_ref(
+        hints,
+        "from",
+        "(Ljava/lang/String;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerHints;",
+    )?;
+    let detection =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/MediaContainerDetection")?;
+    let detection_init = pool.add_method_ref(
+        detection,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerHints;)V",
+    )?;
+    let detect = pool.add_method_ref(
+        detection,
+        "detectContainer",
+        "()Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
+    )?;
+    let owner = pool.add_class(LOCAL_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let registry = pool.add_field_ref(
+        owner,
+        "containerRegistry",
+        "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;",
+    )?;
+    let handle = pool.add_method_ref(
+        owner,
+        "handleLoadResult",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+    )?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let mut body = code_with_exceptions(
+        pool,
+        7,
+        8,
+        vec![
+            Instruction::New(file),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Getfield(identifier),
+            Instruction::Invokespecial(file_init),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(exists),
+            Instruction::Ifeq(54),
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(is_file),
+            Instruction::Ifeq(54),
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(can_read),
+            Instruction::Ifeq(54),
+            Instruction::New(stream),
+            Instruction::Dup,
+            Instruction::Aload_3,
+            Instruction::Invokespecial(stream_init),
+            Instruction::Astore(4),
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(get_name),
+            Instruction::Bipush(46),
+            Instruction::Invokevirtual(last_index),
+            Instruction::Istore(5),
+            Instruction::Iload(5),
+            Instruction::Iflt(34),
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(get_name),
+            Instruction::Iload(5),
+            Instruction::Iconst_1,
+            Instruction::Iadd,
+            Instruction::Invokevirtual(substring),
+            Instruction::Goto(35),
+            Instruction::Aconst_null,
+            Instruction::Astore(6),
+            Instruction::New(detection),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(registry),
+            Instruction::Aload_2,
+            Instruction::Aload(4),
+            Instruction::Aconst_null,
+            Instruction::Aload(6),
+            Instruction::Invokestatic(hints_from),
+            Instruction::Invokespecial(detection_init),
+            Instruction::Invokevirtual(detect),
+            Instruction::Astore(7),
+            Instruction::Aload(4),
+            Instruction::Invokevirtual(close),
+            Instruction::Aload_0,
+            Instruction::Aload(7),
+            Instruction::Invokevirtual(handle),
+            Instruction::Areturn,
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+            Instruction::Astore(7),
+            Instruction::Aload(4),
+            Instruction::Invokevirtual(close),
+            Instruction::Aload(7),
+            Instruction::Athrow,
+        ],
+        vec![ExceptionTableEntry {
+            range_pc: 36..48,
+            handler_pc: 56,
+            catch_type: throwable,
+        }],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 254,
+                offset_delta: 34,
+                locals: vec![
+                    VerificationType::Object { cpool_index: file },
+                    VerificationType::Object {
+                        cpool_index: stream,
+                    },
+                    VerificationType::Integer,
+                ],
+            },
+            StackFrame::SameLocals1StackItemFrame {
+                frame_type: 64,
+                stack: vec![VerificationType::Object {
+                    cpool_index: string,
+                }],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 249,
+                offset_delta: 18,
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 1,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: player_manager,
+                    },
+                    VerificationType::Object {
+                        cpool_index: reference,
+                    },
+                    VerificationType::Object { cpool_index: file },
+                    VerificationType::Object {
+                        cpool_index: stream,
+                    },
+                    VerificationType::Integer,
+                    VerificationType::Object {
+                        cpool_index: string,
+                    },
+                ],
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn local_audio_source_manager_create_track(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let track = pool.add_class("com/sedmelluq/discord/lavaplayer/source/local/LocalAudioTrack")?;
+    let init = pool.add_method_ref(
+        track,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor;Lcom/sedmelluq/discord/lavaplayer/source/local/LocalAudioSourceManager;)V",
+    )?;
+    code(
+        pool,
+        5,
+        3,
+        vec![
+            Instruction::New(track),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Aload_0,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn local_audio_source_manager_encode_track(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let track = pool.add_class("com/sedmelluq/discord/lavaplayer/source/local/LocalAudioTrack")?;
+    let descriptor = pool.add_method_ref(
+        track,
+        "getContainerTrackFactory",
+        "()Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor;",
+    )?;
+    let owner = pool.add_class(LOCAL_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let encode = pool.add_method_ref(
+        owner,
+        "encodeTrackFactory",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor;Ljava/io/DataOutput;)V",
+    )?;
+    code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Checkcast(track),
+            Instruction::Invokevirtual(descriptor),
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(encode),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn local_audio_source_manager_decode_track(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(LOCAL_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let decode = pool.add_method_ref(
+        owner,
+        "decodeTrackFactory",
+        "(Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor;",
+    )?;
+    let descriptor =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor")?;
+    let track = pool.add_class("com/sedmelluq/discord/lavaplayer/source/local/LocalAudioTrack")?;
+    let init = pool.add_method_ref(
+        track,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor;Lcom/sedmelluq/discord/lavaplayer/source/local/LocalAudioSourceManager;)V",
+    )?;
+    let mut body = code(
+        pool,
+        5,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(decode),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Ifnull(13),
+            Instruction::New(track),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Aload_3,
+            Instruction::Aload_0,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::AppendFrame {
+            frame_type: 252,
+            offset_delta: 13,
+            locals: vec![VerificationType::Object {
+                cpool_index: descriptor,
+            }],
+        }],
     )?;
     Ok(body)
 }

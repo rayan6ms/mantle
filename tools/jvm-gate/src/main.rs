@@ -107,6 +107,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-probing-audio-source-manager-consumer" => {
             Some(PROBING_AUDIO_SOURCE_MANAGER_CONSUMER)
         }
+        "write-local-audio-source-manager-consumer" => Some(LOCAL_AUDIO_SOURCE_MANAGER_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -7751,6 +7752,287 @@ public final class GateProbingAudioSourceManager {
     public AudioTrack decodeTrack(AudioTrackInfo info, DataInput input) { return null; }
     public void shutdown() { }
   }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const LOCAL_AUDIO_SOURCE_MANAGER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDescriptor;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerHints;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerProbe;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerRegistry;
+import com.sedmelluq.discord.lavaplayer.source.ProbingAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.local.LocalAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.local.LocalAudioTrack;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioItem;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInput;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Collections;
+
+public final class GateLocalAudioSourceManager {
+  public static void main(String[] args) throws Exception {
+    constructorsAndReflection();
+    loading();
+    trackCreationAndSerialization();
+    lifecycle();
+    System.out.println(
+        "constructors=default,custom,null-registry;"
+        + "load=missing,directory,eligible,extension,closed,nulls;"
+        + "track=create,encodable,encode,decode,unknown,failures;"
+        + "lifecycle=name,shutdown;reflection=public-concrete,2-constructors,7-exported-methods");
+  }
+
+  private static void constructorsAndReflection() throws Exception {
+    ExposedManager defaults = new ExposedManager();
+    check(defaults.registry() == MediaContainerRegistry.DEFAULT_REGISTRY,
+        "default registry identity");
+    MediaContainerRegistry custom = new MediaContainerRegistry(Collections.emptyList());
+    check(new ExposedManager(custom).registry() == custom, "custom registry identity");
+    check(new ExposedManager(null).registry() == null, "null registry retained");
+
+    Class<LocalAudioSourceManager> type = LocalAudioSourceManager.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == ProbingAudioSourceManager.class
+        && type.getInterfaces().length == 0, "class metadata");
+    check(type.getDeclaredFields().length == 0, "field count");
+    Constructor<?>[] constructors = type.getDeclaredConstructors();
+    check(constructors.length == 2, "constructor count");
+    for (Constructor<?> constructor : constructors) {
+      check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isVarArgs()
+          && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    }
+
+    int exported = 0;
+    for (Method method : type.getDeclaredMethods()) {
+      if (Modifier.isPublic(method.getModifiers()) || Modifier.isProtected(method.getModifiers())) {
+        exported++;
+      }
+    }
+    check(exported == 7, "exported method count");
+    checkMethod(type.getDeclaredMethod("getSourceName"), String.class, Modifier.PUBLIC, false);
+    checkMethod(type.getDeclaredMethod("loadItem",
+        com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager.class, AudioReference.class),
+        AudioItem.class, Modifier.PUBLIC, false);
+    checkMethod(type.getDeclaredMethod("createTrack",
+        AudioTrackInfo.class, MediaContainerDescriptor.class),
+        AudioTrack.class, Modifier.PROTECTED, false);
+    checkMethod(type.getDeclaredMethod("isTrackEncodable", AudioTrack.class),
+        boolean.class, Modifier.PUBLIC, false);
+    checkMethod(type.getDeclaredMethod("encodeTrack", AudioTrack.class, java.io.DataOutput.class),
+        void.class, Modifier.PUBLIC, true);
+    checkMethod(type.getDeclaredMethod("decodeTrack", AudioTrackInfo.class, DataInput.class),
+        AudioTrack.class, Modifier.PUBLIC, true);
+    checkMethod(type.getDeclaredMethod("shutdown"), void.class, Modifier.PUBLIC, false);
+  }
+
+  private static void loading() throws Exception {
+    AudioTrackInfo info = new AudioTrackInfo(
+        "local-title", "local-author", 17L, "local-id", false, "file:///local");
+    ProbeState state = new ProbeState(info);
+    MediaContainerProbe probe = state.proxy();
+    ExposedManager manager = new ExposedManager(
+        new MediaContainerRegistry(Collections.singletonList(probe)));
+
+    Path directory = Files.createTempDirectory("mantle-local-source-");
+    Path missing = directory.resolve("missing.bin");
+    check(manager.loadItem(null, new AudioReference(missing.toString(), null)) == null,
+        "missing path");
+    check(manager.loadItem(null, new AudioReference(directory.toString(), null)) == null,
+        "directory path");
+
+    Path file = directory.resolve("sample.part.MP3");
+    Files.write(file, new byte[] { 42, 43, 44 });
+    AudioReference reference = new AudioReference(file.toString(), "container");
+    AudioItem loaded = manager.loadItem(null, reference);
+    check(loaded instanceof LocalAudioTrack, "eligible path result");
+    LocalAudioTrack track = (LocalAudioTrack) loaded;
+    check(track.getInfo() == info && track.getSourceManager() == manager,
+        "loaded track identities");
+    MediaContainerDescriptor descriptor = track.getContainerTrackFactory();
+    check(descriptor.probe == probe && descriptor.parameters.equals("load-settings"),
+        "loaded descriptor");
+    check(state.reference == reference && state.firstByte == 42 && state.matches == 1
+        && state.probes == 1 && state.hints.mimeType == null
+        && state.hints.fileExtension.equals("MP3"), "detection dispatch and extension");
+    expect(IOException.class, () -> state.stream.seek(3));
+
+    ProbeState failingState = new ProbeState(info);
+    AssertionError probeFailure = new AssertionError("probe-sentinel");
+    failingState.failure = probeFailure;
+    ExposedManager failingManager = new ExposedManager(new MediaContainerRegistry(
+        Collections.singletonList(failingState.proxy())));
+    expectIdentity(probeFailure, () -> failingManager.loadItem(null, reference));
+    expect(IOException.class, () -> failingState.stream.seek(3));
+
+    expect(NullPointerException.class, () -> manager.loadItem(null, null));
+    expect(NullPointerException.class,
+        () -> manager.loadItem(null, new AudioReference(null, null)));
+    Files.delete(file);
+    Files.delete(directory);
+  }
+
+  private static void trackCreationAndSerialization() throws Exception {
+    MediaContainerProbe probe = new ProbeState(null).proxy();
+    MediaContainerRegistry registry = new MediaContainerRegistry(Collections.singletonList(probe));
+    ExposedManager manager = new ExposedManager(registry);
+    AudioTrackInfo info = new AudioTrackInfo(
+        "title", "author", 23L, "identifier", false, "file:///identifier");
+    MediaContainerDescriptor descriptor = new MediaContainerDescriptor(probe, "a|b");
+    LocalAudioTrack track = (LocalAudioTrack) manager.create(info, descriptor);
+    check(track.getInfo() == info && track.getContainerTrackFactory() == descriptor
+        && track.getSourceManager() == manager, "protected create track");
+    check(manager.isTrackEncodable(null) && manager.isTrackEncodable(track)
+        && manager.isTrackEncodable(proxy(AudioTrack.class)), "encodable result");
+
+    ByteArrayOutputStream encoded = new ByteArrayOutputStream();
+    manager.encodeTrack(track, new DataOutputStream(encoded));
+    check(new DataInputStream(new ByteArrayInputStream(encoded.toByteArray())).readUTF()
+        .equals("probe|a|b"), "encode descriptor");
+    expect(ClassCastException.class,
+        () -> manager.encodeTrack(proxy(AudioTrack.class), new DataOutputStream(encoded)));
+    expect(NullPointerException.class,
+        () -> manager.encodeTrack(null, new DataOutputStream(encoded)));
+
+    LocalAudioTrack decoded = (LocalAudioTrack) manager.decodeTrack(info, input("probe|decoded"));
+    check(decoded.getInfo() == info && decoded.getSourceManager() == manager
+        && decoded.getContainerTrackFactory().probe == probe
+        && decoded.getContainerTrackFactory().parameters.equals("decoded"), "decode descriptor");
+    check(manager.decodeTrack(info, input("missing")) == null, "unknown descriptor");
+    IOException failure = new IOException("read-sentinel");
+    DataInput failing = (DataInput) Proxy.newProxyInstance(
+        DataInput.class.getClassLoader(), new Class<?>[] { DataInput.class },
+        (instance, method, arguments) -> {
+          if (method.getName().equals("readUTF")) throw failure;
+          return null;
+        });
+    expectIdentity(failure, () -> manager.decodeTrack(info, failing));
+    expect(NullPointerException.class, () -> manager.decodeTrack(info, null));
+  }
+
+  private static void lifecycle() {
+    LocalAudioSourceManager manager = new LocalAudioSourceManager();
+    check(manager.getSourceName() == "local", "source name");
+    manager.shutdown();
+    manager.shutdown();
+  }
+
+  private static DataInput input(String value) throws IOException {
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    new DataOutputStream(bytes).writeUTF(value);
+    return new DataInputStream(new ByteArrayInputStream(bytes.toByteArray()));
+  }
+
+  private static void checkMethod(
+      Method method, Class<?> returnType, int modifiers, boolean throwsIo) {
+    check(method.getModifiers() == modifiers && method.getReturnType() == returnType
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs()
+        && Arrays.equals(method.getExceptionTypes(),
+            throwsIo ? new Class<?>[] { IOException.class } : new Class<?>[0]),
+        method + " metadata");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] { type },
+        (instance, method, arguments) -> {
+          if (method.getName().equals("toString")) return type.getSimpleName() + "Proxy";
+          if (method.getName().equals("hashCode")) return System.identityHashCode(instance);
+          if (method.getName().equals("equals")) return instance == arguments[0];
+          Class<?> result = method.getReturnType();
+          if (result == boolean.class) return false;
+          if (result == int.class) return 0;
+          if (result == long.class) return 0L;
+          return null;
+        });
+  }
+
+  private static final class ProbeState {
+    final AudioTrackInfo info;
+    AudioReference reference;
+    SeekableInputStream stream;
+    MediaContainerHints hints;
+    int firstByte;
+    int matches;
+    int probes;
+    AssertionError failure;
+
+    ProbeState(AudioTrackInfo info) { this.info = info; }
+
+    MediaContainerProbe proxy() {
+      return (MediaContainerProbe) Proxy.newProxyInstance(
+          MediaContainerProbe.class.getClassLoader(), new Class<?>[] { MediaContainerProbe.class },
+          (instance, method, arguments) -> {
+            switch (method.getName()) {
+              case "getName": return "probe";
+              case "matchesHints":
+                matches++;
+                hints = (MediaContainerHints) arguments[0];
+                return true;
+              case "probe":
+                probes++;
+                reference = (AudioReference) arguments[0];
+                stream = (SeekableInputStream) arguments[1];
+                firstByte = stream.read();
+                if (failure != null) throw failure;
+                return MediaContainerDetectionResult.supportedFormat(
+                    (MediaContainerProbe) instance, "load-settings", info);
+              case "toString": return "ProbeState";
+              case "hashCode": return System.identityHashCode(instance);
+              case "equals": return instance == arguments[0];
+              default: return null;
+            }
+          });
+    }
+  }
+
+  private static final class ExposedManager extends LocalAudioSourceManager {
+    ExposedManager() { super(); }
+    ExposedManager(MediaContainerRegistry registry) { super(registry); }
+    MediaContainerRegistry registry() { return containerRegistry; }
+    AudioTrack create(AudioTrackInfo info, MediaContainerDescriptor descriptor) {
+      return super.createTrack(info, descriptor);
+    }
+  }
+
+  private static void expect(Class<? extends Throwable> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
+  }
+
+  private static void expectIdentity(Throwable expected, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("failure was swallowed");
+    } catch (Throwable error) {
+      check(error == expected, "failure identity");
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
