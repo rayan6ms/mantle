@@ -15601,54 +15601,82 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The exact public decoder shell, private generic supplier state, construction, and no-op lifecycle remain, while legacy HLS MP3 segment decoding is replaced by Mantle's explicit bounded progressive-only SoundCloud playback boundary under ADR-0015.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-media/tests/phase12_soundcloud.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0015-bounded-soundcloud-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudMp3SegmentDecoder",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Ljava/util/function/Supplier;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public construction and generic Supplier<SeekableInputStream> reference capture, including null, are covered by the Phase 13 sound-cloud-mp3-segment-decoder-contracts oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudMp3SegmentDecoder",
       "symbol_kind": "METHOD",
       "member_name": "prepareStream",
       "descriptor": "(Z)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public no-op behavior for beginning and continuation segments, narrowed no-throws metadata, and zero supplier access are covered by the Phase 13 oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudMp3SegmentDecoder",
       "symbol_kind": "METHOD",
       "member_name": "resetStream",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public no-op behavior, narrowed no-throws metadata, and zero supplier access are covered by the Phase 13 oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudMp3SegmentDecoder",
       "symbol_kind": "METHOD",
       "member_name": "playStream",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;JJ)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The exact public signature and checked InterruptedException/IOException metadata remain, while legacy supplier-driven HLS MP3 parsing, seeking, and frame delivery fail before supplier access because Mantle supports bounded progressive SoundCloud playback under ADR-0015.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-media/tests/phase12_soundcloud.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0015-bounded-soundcloud-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudMp3SegmentDecoder",
       "symbol_kind": "METHOD",
       "member_name": "close",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public no-op close behavior, narrowed no-throws metadata, and zero supplier access are covered by the Phase 13 oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudOpusSegmentDecoder",

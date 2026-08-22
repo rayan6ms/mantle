@@ -157,6 +157,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-sound-cloud-m3u-audio-track-consumer" => Some(SOUND_CLOUD_M3U_AUDIO_TRACK_CONSUMER),
         "write-sound-cloud-m3u-info-consumer" => Some(SOUND_CLOUD_M3U_INFO_CONSUMER),
+        "write-sound-cloud-mp3-segment-decoder-consumer" => {
+            Some(SOUND_CLOUD_MP3_SEGMENT_DECODER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -10139,6 +10142,143 @@ public final class GateSoundCloudM3uInfo {
         && !field.isSynthetic() && field.getAnnotations().length == 0,
         name + " metadata");
   }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const SOUND_CLOUD_MP3_SEGMENT_DECODER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudMp3SegmentDecoder;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudSegmentDecoder;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.function.Supplier;
+
+public final class GateSoundCloudMp3SegmentDecoder {
+  private static final String HLS_DISABLED =
+      "Legacy SoundCloud MP3 HLS segment playback is unsupported; "
+      + "use Mantle's bounded progressive native source.";
+
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1 && (args[0].equals("reference") || args[0].equals("candidate")),
+        "expected disposition");
+    reflectionContract();
+    commonContract();
+    if (args[0].equals("reference")) {
+      referenceServiceContract();
+      System.out.println("common=public-concrete,1-field,1-constructor,4-methods,capture,"
+          + "no-op-lifecycle,generic-supplier,checked-signatures,reflection;"
+          + "service=legacy-mp3-segment-supplier");
+    } else {
+      candidateServiceContract();
+      System.out.println("common=public-concrete,1-field,1-constructor,4-methods,capture,"
+          + "no-op-lifecycle,generic-supplier,checked-signatures,reflection;"
+          + "service=bounded-progressive-only,no-supplier,hls-explicitly-unsupported");
+    }
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<SoundCloudMp3SegmentDecoder> type = SoundCloudMp3SegmentDecoder.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {SoundCloudSegmentDecoder.class})
+        && type.getAnnotations().length == 0, "class metadata");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredMethods().length == 4,
+        "member counts");
+    Field supplier = type.getDeclaredField("nextStreamProvider");
+    check(supplier.getType() == Supplier.class
+        && supplier.getGenericType().getTypeName().equals(
+            "java.util.function.Supplier<com.sedmelluq.discord.lavaplayer.tools.io."
+                + "SeekableInputStream>")
+        && supplier.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && !supplier.isSynthetic(), "supplier metadata");
+
+    Constructor<?> constructor = type.getDeclaredConstructor(Supplier.class);
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getGenericParameterTypes()[0].getTypeName().equals(
+            "java.util.function.Supplier<com.sedmelluq.discord.lavaplayer.tools.io."
+                + "SeekableInputStream>")
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic()
+        && !constructor.isVarArgs(), "constructor metadata");
+
+    checkMethod(type, "prepareStream", new Class<?>[] {boolean.class}, new Class<?>[0]);
+    checkMethod(type, "resetStream", new Class<?>[0], new Class<?>[0]);
+    checkMethod(type, "playStream",
+        new Class<?>[] {AudioProcessingContext.class, long.class, long.class},
+        new Class<?>[] {InterruptedException.class, IOException.class});
+    checkMethod(type, "close", new Class<?>[0], new Class<?>[0]);
+  }
+
+  private static void commonContract() throws Exception {
+    CountingSupplier supplier = new CountingSupplier();
+    SoundCloudMp3SegmentDecoder decoder = new SoundCloudMp3SegmentDecoder(supplier);
+    Field field = SoundCloudMp3SegmentDecoder.class.getDeclaredField("nextStreamProvider");
+    field.setAccessible(true);
+    check(field.get(decoder) == supplier, "constructor capture");
+    check(field.get(new SoundCloudMp3SegmentDecoder(null)) == null, "null capture");
+
+    decoder.prepareStream(true);
+    decoder.prepareStream(false);
+    decoder.resetStream();
+    decoder.close();
+    check(supplier.calls == 0, "no-op lifecycle");
+  }
+
+  private static void referenceServiceContract() throws Exception {
+    CountingSupplier supplier = new CountingSupplier();
+    SoundCloudMp3SegmentDecoder decoder = new SoundCloudMp3SegmentDecoder(supplier);
+    Throwable error = capture(() -> decoder.playStream(null, -1L, Long.MAX_VALUE));
+    check(error == supplier.sentinel && supplier.calls == 1, "legacy supplier dispatch");
+  }
+
+  private static void candidateServiceContract() throws Exception {
+    CountingSupplier supplier = new CountingSupplier();
+    SoundCloudMp3SegmentDecoder decoder = new SoundCloudMp3SegmentDecoder(supplier);
+    Throwable error = capture(() -> decoder.playStream(null, -1L, Long.MAX_VALUE));
+    check(error instanceof UnsupportedOperationException
+        && HLS_DISABLED.equals(error.getMessage()) && supplier.calls == 0,
+        "bounded progressive-only policy");
+  }
+
+  private static Method checkMethod(Class<?> owner, String name, Class<?>[] parameters,
+                                    Class<?>[] exceptions) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == void.class && method.getModifiers() == Modifier.PUBLIC
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs(),
+        name + " metadata");
+    return method;
+  }
+
+  private static Throwable capture(Operation operation) throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected failure");
+    } catch (Throwable error) {
+      return error;
+    }
+  }
+
+  private static final class CountingSupplier implements Supplier<SeekableInputStream> {
+    private final RuntimeException sentinel = new RuntimeException("supplier-sentinel");
+    private int calls;
+
+    @Override
+    public SeekableInputStream get() {
+      calls++;
+      throw sentinel;
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

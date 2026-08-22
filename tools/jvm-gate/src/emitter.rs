@@ -151,6 +151,8 @@ const SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudM3uAudioTrack";
 const SOUND_CLOUD_M3U_INFO_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudM3uInfo";
+const SOUND_CLOUD_MP3_SEGMENT_DECODER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudMp3SegmentDecoder";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -205,6 +207,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     SOUND_CLOUD_HTTP_CONTEXT_FILTER_CLASS,
     SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS,
     SOUND_CLOUD_M3U_INFO_CLASS,
+    SOUND_CLOUD_MP3_SEGMENT_DECODER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -574,6 +577,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | SOUND_CLOUD_CLIENT_ID_TRACKER_CLASS
                 | SOUND_CLOUD_HTTP_CONTEXT_FILTER_CLASS
                 | SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS
+                | SOUND_CLOUD_MP3_SEGMENT_DECODER_CLASS
         ) || field
             .access_flags
             .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
@@ -743,6 +747,14 @@ fn replacement_body(
     }
     if class_name == SOUND_CLOUD_M3U_INFO_CLASS {
         return sound_cloud_m3u_info_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == SOUND_CLOUD_MP3_SEGMENT_DECODER_CLASS {
+        return sound_cloud_mp3_segment_decoder_replacement(
+            pool,
+            name,
+            descriptor,
+            required_locals,
+        );
     }
     if class_name == SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS {
         return sound_cloud_audio_source_manager_builder_replacement(
@@ -3952,6 +3964,60 @@ fn sound_cloud_m3u_info_constructor(pool: &mut ConstantPool<'static>) -> Result<
             Instruction::Aload_0,
             Instruction::Aload_2,
             Instruction::Putfield(decoder_factory),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn sound_cloud_mp3_segment_decoder_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(Ljava/util/function/Supplier;)V") => {
+            sound_cloud_mp3_segment_decoder_constructor(pool)
+        }
+        ("prepareStream", "(Z)V") | ("resetStream" | "close", "()V") => {
+            code(pool, 0, required_locals, vec![Instruction::Return])
+        }
+        (
+            "playStream",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;JJ)V",
+        ) => unsupported_body(
+            pool,
+            "Legacy SoundCloud MP3 HLS segment playback is unsupported; use Mantle's bounded progressive native source.",
+            required_locals,
+        ),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {SOUND_CLOUD_MP3_SEGMENT_DECODER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn sound_cloud_mp3_segment_decoder_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(SOUND_CLOUD_MP3_SEGMENT_DECODER_CLASS)?;
+    let supplier =
+        pool.add_field_ref(owner, "nextStreamProvider", "Ljava/util/function/Supplier;")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(supplier),
             Instruction::Return,
         ],
     )
