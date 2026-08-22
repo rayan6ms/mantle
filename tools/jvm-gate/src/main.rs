@@ -165,6 +165,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-sound-cloud-playlist-loader-consumer" => Some(SOUND_CLOUD_PLAYLIST_LOADER_CONSUMER),
         "write-sound-cloud-segment-decoder-consumer" => Some(SOUND_CLOUD_SEGMENT_DECODER_CONSUMER),
+        "write-sound-cloud-segment-decoder-factory-consumer" => {
+            Some(SOUND_CLOUD_SEGMENT_DECODER_FACTORY_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -9392,6 +9395,110 @@ public final class GateSoundCloudSegmentDecoder {
   }
 
   private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const SOUND_CLOUD_SEGMENT_DECODER_FACTORY_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudSegmentDecoder;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import java.util.function.Supplier;
+
+public final class GateSoundCloudSegmentDecoderFactory {
+  public static void main(String[] args) throws Exception {
+    dispatchContract();
+    failureContract();
+    reflectionContract();
+    System.out.println(
+        "public-static-abstract-interface,0-fields,0-constructors,1-method;"
+        + "dispatch,argument-identity,return-identity,nulls,unchecked,no-supplier-invocation,"
+        + "generic-supplier,reflection");
+  }
+
+  private static void dispatchContract() {
+    int[] supplierCalls = new int[1];
+    Supplier<SeekableInputStream> supplier = () -> {
+      supplierCalls[0]++;
+      return null;
+    };
+    SoundCloudSegmentDecoder decoder = proxy(SoundCloudSegmentDecoder.class);
+    Object[] observed = new Object[1];
+    int[] factoryCalls = new int[1];
+    SoundCloudSegmentDecoder.Factory factory = actualSupplier -> {
+      observed[0] = actualSupplier;
+      factoryCalls[0]++;
+      return decoder;
+    };
+    check(factory.create(supplier) == decoder && observed[0] == supplier
+        && factoryCalls[0] == 1 && supplierCalls[0] == 0,
+        "ordinary dispatch identity");
+    check(factory.create(null) == decoder && observed[0] == null
+        && factoryCalls[0] == 2 && supplierCalls[0] == 0,
+        "null argument identity");
+
+    SoundCloudSegmentDecoder.Factory nullFactory = actualSupplier -> null;
+    check(nullFactory.create(supplier) == null && supplierCalls[0] == 0, "null return");
+  }
+
+  private static void failureContract() {
+    RuntimeException failure = new RuntimeException("factory-sentinel");
+    SoundCloudSegmentDecoder.Factory factory = supplier -> { throw failure; };
+    try {
+      factory.create(null);
+      throw new AssertionError("expected failure");
+    } catch (RuntimeException error) {
+      check(error == failure, "unchecked failure identity");
+    }
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<SoundCloudSegmentDecoder.Factory> type = SoundCloudSegmentDecoder.Factory.class;
+    int modifiers = type.getModifiers();
+    check(type.isInterface() && modifiers == (Modifier.PUBLIC | Modifier.STATIC
+            | Modifier.INTERFACE | Modifier.ABSTRACT)
+        && type.getSuperclass() == null && type.getInterfaces().length == 0
+        && type.getTypeParameters().length == 0 && type.getAnnotations().length == 0,
+        "interface metadata");
+    check(type.isMemberClass() && type.getDeclaringClass() == SoundCloudSegmentDecoder.class
+        && type.getEnclosingClass() == SoundCloudSegmentDecoder.class
+        && type.getSimpleName().equals("Factory"), "nest metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 1 && type.getDeclaredClasses().length == 0,
+        "member counts");
+    Method method = type.getDeclaredMethod("create", Supplier.class);
+    check(method.getReturnType() == SoundCloudSegmentDecoder.class
+        && method.getGenericReturnType() == SoundCloudSegmentDecoder.class
+        && method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && Arrays.equals(method.getParameterTypes(), new Class<?>[] {Supplier.class})
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && method.getGenericParameterTypes()[0] instanceof ParameterizedType
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), "method metadata");
+    ParameterizedType supplierType =
+        (ParameterizedType) method.getGenericParameterTypes()[0];
+    check(supplierType.getRawType() == Supplier.class
+        && Arrays.equals(supplierType.getActualTypeArguments(),
+            new Object[] {SeekableInputStream.class}), "generic supplier metadata");
+  }
+
+  private static <T> T proxy(Class<T> type) {
+    return type.cast(Proxy.newProxyInstance(
+        GateSoundCloudSegmentDecoderFactory.class.getClassLoader(), new Class<?>[] {type},
+        (proxy, method, args) -> {
+          if (method.getReturnType() == boolean.class) return false;
+          if (method.getReturnType() == int.class) return 0;
+          if (method.getReturnType() == long.class) return 0L;
+          return null;
+        }));
+  }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

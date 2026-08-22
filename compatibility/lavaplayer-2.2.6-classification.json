@@ -15845,18 +15845,26 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated shell and reference-differential oracle preserve the exact public static abstract member-interface shape, decoder nest linkage, and empty field/constructor surface.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudSegmentDecoder$Factory",
       "symbol_kind": "METHOD",
       "member_name": "create",
       "descriptor": "(Ljava/util/function/Supplier;)Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudSegmentDecoder;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential execution preserves supplier identity including null without invoking it, decoder return identity including null, unchecked failure identity, and Supplier<SeekableInputStream> generic metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudTrackFormat",

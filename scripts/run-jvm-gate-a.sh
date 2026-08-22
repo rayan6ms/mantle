@@ -22,7 +22,7 @@ cargo run --locked -q -p mantle-jvm-gate -- emit \
 cargo run --locked -q -p mantle-jvm-gate -- verify-structure \
   --reference-jar "$REFERENCE_JAR" --candidate-jar "$JAR"
 
-for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame audio-frame-provider-tools audio-processing-context audio-player-options decoded-track-holder track-state-listener audio-output-hook audio-load-result-handler functional-result-handler audio-player-lifecycle-manager audio-player-interface default-audio-player default-audio-player-manager internal-audio-track audio-track-executor local-audio-track-executor-callback local-audio-track-executor track-marker-tracker base-audio-track primordial-audio-track-executor delegated-audio-track audio-track-info-builder abstract-audio-frame-buffer allocating-audio-frame-buffer non-allocating-audio-frame-buffer audio-source-manager-interface audio-source-managers probing-audio-source-manager local-audio-source-manager local-audio-track local-seekable-input-stream heartbeating-http-stream nico-audio-source-manager nico-audio-track default-sound-cloud-data-loader default-sound-cloud-data-reader default-sound-cloud-format-handler default-sound-cloud-playlist-loader default-sound-cloud-track-format sound-cloud-audio-source-manager sound-cloud-audio-source-manager-builder sound-cloud-audio-track sound-cloud-client-id-tracker sound-cloud-data-loader sound-cloud-data-reader sound-cloud-format-handler sound-cloud-helper sound-cloud-http-context-filter sound-cloud-m3u-audio-track sound-cloud-m3u-info sound-cloud-mp3-segment-decoder sound-cloud-opus-segment-decoder sound-cloud-playlist-loader sound-cloud-segment-decoder; do
+for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame audio-frame-provider-tools audio-processing-context audio-player-options decoded-track-holder track-state-listener audio-output-hook audio-load-result-handler functional-result-handler audio-player-lifecycle-manager audio-player-interface default-audio-player default-audio-player-manager internal-audio-track audio-track-executor local-audio-track-executor-callback local-audio-track-executor track-marker-tracker base-audio-track primordial-audio-track-executor delegated-audio-track audio-track-info-builder abstract-audio-frame-buffer allocating-audio-frame-buffer non-allocating-audio-frame-buffer audio-source-manager-interface audio-source-managers probing-audio-source-manager local-audio-source-manager local-audio-track local-seekable-input-stream heartbeating-http-stream nico-audio-source-manager nico-audio-track default-sound-cloud-data-loader default-sound-cloud-data-reader default-sound-cloud-format-handler default-sound-cloud-playlist-loader default-sound-cloud-track-format sound-cloud-audio-source-manager sound-cloud-audio-source-manager-builder sound-cloud-audio-track sound-cloud-client-id-tracker sound-cloud-data-loader sound-cloud-data-reader sound-cloud-format-handler sound-cloud-helper sound-cloud-http-context-filter sound-cloud-m3u-audio-track sound-cloud-m3u-info sound-cloud-mp3-segment-decoder sound-cloud-opus-segment-decoder sound-cloud-playlist-loader sound-cloud-segment-decoder sound-cloud-segment-decoder-factory; do
   case "$consumer" in
     smoke) consumer_class='Smoke' ;;
     probe) consumer_class='Probe' ;;
@@ -93,6 +93,7 @@ for consumer in smoke probe integration classloader event track-value track-enum
     sound-cloud-opus-segment-decoder) consumer_class='SoundCloudOpusSegmentDecoder' ;;
     sound-cloud-playlist-loader) consumer_class='SoundCloudPlaylistLoader' ;;
     sound-cloud-segment-decoder) consumer_class='SoundCloudSegmentDecoder' ;;
+    sound-cloud-segment-decoder-factory) consumer_class='SoundCloudSegmentDecoderFactory' ;;
   esac
   cargo run --locked -q -p mantle-jvm-gate -- "write-$consumer-consumer" \
     --output "$WORK/Gate${consumer_class}.java"
@@ -173,7 +174,8 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateSoundCloudMp3SegmentDecoder.java" \
   "$WORK/GateSoundCloudOpusSegmentDecoder.java" \
   "$WORK/GateSoundCloudPlaylistLoader.java" \
-  "$WORK/GateSoundCloudSegmentDecoder.java"
+  "$WORK/GateSoundCloudSegmentDecoder.java" \
+  "$WORK/GateSoundCloudSegmentDecoderFactory.java"
 
 readonly GATE_CLASSPATH="$classes_argument$classpath_separator$jar_argument"
 java -Xverify:all \
@@ -938,6 +940,19 @@ cmp "$WORK/sound-cloud-segment-decoder-reference.txt" \
 grep --fixed-strings \
   'public-abstract-interface,autocloseable,0-fields,0-constructors,3-methods;ordered-dispatch,boolean,longs,context-identity,nulls,checked-failures,reflection' \
   "$WORK/sound-cloud-segment-decoder-candidate.txt" >/dev/null
+# Retain the exact nested caller-defined decoder-factory SPI and generic stream supplier.
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateSoundCloudSegmentDecoderFactory \
+  >"$WORK/sound-cloud-segment-decoder-factory-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateSoundCloudSegmentDecoderFactory \
+  >"$WORK/sound-cloud-segment-decoder-factory-candidate.txt"
+cmp "$WORK/sound-cloud-segment-decoder-factory-reference.txt" \
+  "$WORK/sound-cloud-segment-decoder-factory-candidate.txt"
+grep --fixed-strings \
+  'public-static-abstract-interface,0-fields,0-constructors,1-method;dispatch,argument-identity,return-identity,nulls,unchecked,no-supplier-invocation,generic-supplier,reflection' \
+  "$WORK/sound-cloud-segment-decoder-factory-candidate.txt" >/dev/null
 java -Xverify:all -cp "$GATE_CLASSPATH" GateSmoke "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateIntegration "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" callbacks
