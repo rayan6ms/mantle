@@ -111,6 +111,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-local-audio-track-consumer" => Some(LOCAL_AUDIO_TRACK_CONSUMER),
         "write-local-seekable-input-stream-consumer" => Some(LOCAL_SEEKABLE_INPUT_STREAM_CONSUMER),
         "write-heartbeating-http-stream-consumer" => Some(HEARTBEATING_HTTP_STREAM_CONSUMER),
+        "write-nico-audio-source-manager-consumer" => Some(NICO_AUDIO_SOURCE_MANAGER_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -8221,6 +8222,202 @@ public final class GateHeartbeatingHttpStream {
     void heartbeat() throws IOException { super.sendHeartbeat(); }
     boolean sameInterface(HttpInterface value) { return httpInterface == value; }
     boolean sameContentUrl(URI value) { return contentUrl == value; }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const NICO_AUDIO_SOURCE_MANAGER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.nico.NicoAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.nico.NicoAudioTrack;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpConfigurable;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
+
+public final class GateNicoAudioSourceManager {
+  public static void main(String[] args) throws Exception {
+    check(args.length >= 1 && args.length <= 2, "expected disposition and optional native path");
+    boolean reference = args[0].equals("reference");
+    check(reference || args[0].equals("candidate"), "unknown disposition");
+    check(reference == (args.length == 1), "candidate requires native path");
+    reflectionContract();
+    commonBehavior();
+    if (!reference) currentDisposition(args[1]);
+    System.out.println(
+        "common=public-concrete,4-fields,2-constructors,9-exported-methods,"
+        + "source-name,route-filter,empty-details,decode,shutdown,http-config;service="
+        + (reference ? "legacy-xml-login" : "current-native,no-legacy-login"));
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<NicoAudioSourceManager> type = NicoAudioSourceManager.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(),
+            new Class<?>[] { AudioSourceManager.class, HttpConfigurable.class }),
+        "class metadata");
+    check(type.getDeclaredFields().length == 4, "field count");
+    checkField(type.getDeclaredField("TRACK_URL_REGEX"), String.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type.getDeclaredField("trackUrlPattern"), Pattern.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type.getDeclaredField("httpInterfaceManager"), HttpInterfaceManager.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type.getDeclaredField("loggedIn"), AtomicBoolean.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+
+    Constructor<?> defaultConstructor = type.getDeclaredConstructor();
+    Constructor<?> credentialConstructor = type.getDeclaredConstructor(String.class, String.class);
+    check(type.getDeclaredConstructors().length == 2
+        && defaultConstructor.getModifiers() == Modifier.PUBLIC
+        && credentialConstructor.getModifiers() == Modifier.PUBLIC,
+        "constructor metadata");
+    check(type.getDeclaredMethods().length == 13, "method count");
+    long exported = Arrays.stream(type.getDeclaredMethods())
+        .filter(method -> Modifier.isPublic(method.getModifiers())
+            || Modifier.isProtected(method.getModifiers()))
+        .count();
+    check(exported == 9L, "exported method count");
+    checkMethod(type.getDeclaredMethod("getSourceName"), String.class, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("loadItem",
+        com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager.class,
+        AudioReference.class),
+        com.sedmelluq.discord.lavaplayer.track.AudioItem.class, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("isTrackEncodable", AudioTrack.class),
+        boolean.class, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("encodeTrack", AudioTrack.class, DataOutput.class),
+        void.class, Modifier.PUBLIC, java.io.IOException.class);
+    checkMethod(type.getDeclaredMethod("decodeTrack", AudioTrackInfo.class, DataInput.class),
+        AudioTrack.class, Modifier.PUBLIC, java.io.IOException.class);
+    checkMethod(type.getDeclaredMethod("shutdown"), void.class, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("getHttpInterface"), HttpInterface.class, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("configureRequests", java.util.function.Function.class),
+        void.class, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("configureBuilder", java.util.function.Consumer.class),
+        void.class, Modifier.PUBLIC);
+  }
+
+  private static void commonBehavior() throws Exception {
+    NicoAudioSourceManager manager = new NicoAudioSourceManager();
+    NicoAudioSourceManager nullCredentials = new NicoAudioSourceManager(null, null);
+    check(manager.getSourceName().equals("niconico")
+        && nullCredentials.getSourceName().equals("niconico"), "source name");
+    check(field("httpInterfaceManager").get(manager) != null
+        && field("loggedIn").get(manager) instanceof AtomicBoolean
+        && !((AtomicBoolean) field("loggedIn").get(manager)).get(), "constructor state");
+
+    for (String rejected : new String[] {
+        "https://example.invalid/watch/sm9", "https://www.nicovideo.jp/shorts/sm9",
+        "https://www.nicovideo.jp/watch/not-a-video", "prefix sm9" }) {
+      check(manager.loadItem(null, new AudioReference(rejected, null)) == null,
+          "route rejection: " + rejected);
+    }
+    expect(NullPointerException.class, () -> manager.loadItem(null, null));
+    expect(NullPointerException.class,
+        () -> manager.loadItem(null, new AudioReference(null, null)));
+
+    check(manager.isTrackEncodable(null), "encodability");
+    manager.encodeTrack(null, null);
+    AudioTrackInfo info = new AudioTrackInfo(
+        "title", "author", 1234L, "sm9", false,
+        "https://www.nicovideo.jp/watch/sm9", "art", null);
+    AudioTrack decoded = manager.decodeTrack(info, null);
+    check(decoded instanceof NicoAudioTrack && decoded.getInfo() == info
+        && decoded.getSourceManager() == manager, "empty-detail decode");
+    manager.shutdown();
+    manager.shutdown();
+
+    HttpInterface http = manager.getHttpInterface();
+    check(http != null, "HTTP interface");
+    http.close();
+    Method requests = NicoAudioSourceManager.class.getDeclaredMethod(
+        "configureRequests", java.util.function.Function.class);
+    Method builder = NicoAudioSourceManager.class.getDeclaredMethod(
+        "configureBuilder", java.util.function.Consumer.class);
+    expectInvocation(NullPointerException.class,
+        () -> requests.invoke(manager, new Object[] { null }));
+    expectInvocation(NullPointerException.class,
+        () -> builder.invoke(manager, new Object[] { null }));
+  }
+
+  private static void currentDisposition(String nativeLibrary) throws Exception {
+    Class.forName("dev.mantle.internal.NativeLoader")
+        .getMethod("load", String.class).invoke(null, nativeLibrary);
+    NicoAudioSourceManager manager = new NicoAudioSourceManager("legacy@example.invalid", "secret");
+    check(!((AtomicBoolean) field("loggedIn").get(manager)).get(), "legacy login disabled");
+    Method login = NicoAudioSourceManager.class.getDeclaredMethod(
+        "logIn", String.class, String.class);
+    login.setAccessible(true);
+    UnsupportedOperationException error = expectInvocation(
+        UnsupportedOperationException.class, () -> login.invoke(manager, "legacy", "secret"));
+    check(error.getMessage().equals(
+        "Legacy NicoNico email/password login is unsupported."), "legacy login message");
+    Class<?> nativeType = Class.forName("dev.mantle.internal.MantleNative");
+    Method load = nativeType.getDeclaredMethod(
+        "loadNicoItem", NicoAudioSourceManager.class, AudioReference.class);
+    check(Modifier.isPublic(load.getModifiers()) && Modifier.isStatic(load.getModifiers())
+        && Modifier.isNative(load.getModifiers()), "current native route");
+    check(manager.loadItem(null, new AudioReference(
+        "https://www.nicovideo.jp/watch/XX123", null)) == null,
+        "recognized legacy route crosses strict native router");
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = NicoAudioSourceManager.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static void checkField(Field field, Class<?> type, int modifiers) {
+    check(field.getType() == type && field.getModifiers() == modifiers && !field.isSynthetic(),
+        field + " metadata");
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, int modifiers,
+                                  Class<?>... exceptions) {
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs()
+        && Arrays.equals(method.getExceptionTypes(), exceptions), method + " metadata");
+  }
+
+  private static <T extends Throwable> T expect(
+      Class<T> type, Operation operation) throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private static <T extends Throwable> T expectInvocation(
+      Class<T> type, Operation operation) throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (java.lang.reflect.InvocationTargetException error) {
+      Throwable cause = error.getCause();
+      if (!type.isInstance(cause)) throw new AssertionError("wrong exception", cause);
+      return type.cast(cause);
+    }
   }
 
   private interface Operation { void run() throws Exception; }

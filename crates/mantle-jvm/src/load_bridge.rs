@@ -10,8 +10,9 @@ use mantle_core::{
     encode_source_details,
 };
 use mantle_media::{
-    YandexMusicPlaylistKind, YandexMusicSourceItem, YandexMusicSourcePlaylist,
-    YandexMusicSourceTrack, YoutubeSourceItem, YoutubeSourcePlaylist, YoutubeSourceTrack,
+    NicoNicoSourceManager, NicoNicoSourceOptions, NicoNicoSourceTrack, YandexMusicPlaylistKind,
+    YandexMusicSourceItem, YandexMusicSourcePlaylist, YandexMusicSourceTrack, YoutubeSourceItem,
+    YoutubeSourcePlaylist, YoutubeSourceTrack,
 };
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -1006,6 +1007,23 @@ pub(crate) fn load_sync_handled(
     invoke_load_callback(env, &handler, result)
 }
 
+pub(crate) fn load_nico_item<'local>(
+    env: &mut Env<'local>,
+    source: &JObject<'local>,
+    reference: &JObject<'local>,
+) -> jni::errors::Result<JObject<'local>> {
+    let reference = source_reference_from_java(env, reference)?;
+    let manager = NicoNicoSourceManager::new(NicoNicoSourceOptions::default())
+        .map_err(|_| jni::errors::Error::NullPtr("could not create current NicoNico source"))?;
+    let item = manager
+        .load(&reference)
+        .map_err(|_| jni::errors::Error::NullPtr("current NicoNico metadata load failed"))?;
+    match item {
+        Some(SourceLoad::Item(track)) => create_nico_track(env, &track, source),
+        Some(SourceLoad::Referral(_)) | None => Ok(JObject::null()),
+    }
+}
+
 fn current_executor(
     env: &mut Env<'_>,
 ) -> jni::errors::Result<Arc<SourceLoadExecutor<BridgeItem, OpaqueLoadKey>>> {
@@ -1503,6 +1521,41 @@ fn create_native_track<'local>(
     crate::with_engine(|engine| engine.replace_track_info(track_id, info.clone()))
         .map_err(|_| jni::errors::Error::NullPtr("could not apply native track metadata"))?;
     Ok(track)
+}
+
+fn create_nico_track<'local>(
+    env: &mut Env<'local>,
+    track: &NicoNicoSourceTrack,
+    source: &JObject<'local>,
+) -> jni::errors::Result<JObject<'local>> {
+    let info = &track.info;
+    let duration = i64::try_from(info.duration.as_millis())
+        .map_err(|_| jni::errors::Error::NullPtr("NicoNico duration exceeds JVM range"))?;
+    let title = JObject::from(env.new_string(&info.title)?);
+    let author = JObject::from(env.new_string(&info.author)?);
+    let identifier = JObject::from(env.new_string(&info.identifier)?);
+    let uri = optional_java_string(env, info.uri.as_deref())?;
+    let artwork = optional_java_string(env, info.artwork_url.as_deref())?;
+    let isrc = optional_java_string(env, info.isrc.as_deref())?;
+    let java_info = env.new_object(
+        jni_str!("com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo"),
+        jni_sig!("(Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V"),
+        &[
+            JValue::Object(&title),
+            JValue::Object(&author),
+            JValue::Long(duration),
+            JValue::Object(&identifier),
+            JValue::Bool(info.is_stream),
+            JValue::Object(&uri),
+            JValue::Object(&artwork),
+            JValue::Object(&isrc),
+        ],
+    )?;
+    env.new_object(
+        jni_str!("com/sedmelluq/discord/lavaplayer/source/nico/NicoAudioTrack"),
+        jni_sig!("(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/nico/NicoAudioSourceManager;)V"),
+        &[JValue::Object(&java_info), JValue::Object(source)],
+    )
 }
 
 fn create_youtube_playlist<'local>(

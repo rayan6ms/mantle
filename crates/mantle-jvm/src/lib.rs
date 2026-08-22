@@ -565,6 +565,18 @@ pub extern "system" fn Java_dev_mantle_internal_MantleNative_loadItemSyncHandled
 
 #[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
 #[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_mantle_internal_MantleNative_loadNicoItem<'local>(
+    mut env: EnvUnowned<'local>,
+    _class: JClass<'local>,
+    source: JObject<'local>,
+    reference: JObject<'local>,
+) -> JObject<'local> {
+    env.with_env(|env| load_bridge::load_nico_item(env, &source, &reference))
+        .resolve::<ThrowRuntimeExAndDefault>()
+}
+
+#[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_dev_mantle_internal_MantleNative_cancelLoad<'local>(
     mut env: EnvUnowned<'local>,
     _class: JClass<'local>,

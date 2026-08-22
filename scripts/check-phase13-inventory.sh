@@ -605,9 +605,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[0].completed_slices[].symbols] | add) == .cohorts[0].classified_symbols and
   (.cohorts[0].classified_symbols + .cohorts[0].remaining_symbols) == .cohorts[0].symbols and
   .cohorts[1].status == "IN_PROGRESS" and
-  .cohorts[1].classified_symbols == 56 and
-  .cohorts[1].remaining_symbols == 642 and
-  (.cohorts[1].completed_slices | length) == 7 and
+  .cohorts[1].classified_symbols == 68 and
+  .cohorts[1].remaining_symbols == 630 and
+  (.cohorts[1].completed_slices | length) == 8 and
   .cohorts[1].completed_slices[0] == {
     id: "audio-source-manager-interface-contracts",
     classes: 1,
@@ -700,11 +700,28 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "docs/architecture/ADR-0021-bounded-current-niconico-source.md"
     ]
   } and
+  .cohorts[1].completed_slices[7] == {
+    id: "nico-audio-source-manager-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 11,
+    symbols: 12,
+    classification: "A_EXACT/C_SEMANTIC",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "crates/mantle-media/tests/phase12_niconico.rs",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs",
+      "docs/architecture/ADR-0021-bounded-current-niconico-source.md"
+    ]
+  } and
   ([.cohorts[1].completed_slices[].symbols] | add) == .cohorts[1].classified_symbols and
   (.cohorts[1].classified_symbols + .cohorts[1].remaining_symbols) == .cohorts[1].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 591 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 603 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 586 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 592 and
+  ([$classifications.symbols[] |
+    select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 6 and
   ([$classifications.symbols[] |
     select(.assessment == "CLASSIFIED" and .classification == "D_LEGACY")] | length) == 5 and
   all($classifications.symbols[] | select(.assessment == "CLASSIFIED");
@@ -769,17 +786,26 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.source.local.LocalAudioSourceManager",
         "com.sedmelluq.discord.lavaplayer.source.local.LocalAudioTrack",
         "com.sedmelluq.discord.lavaplayer.source.local.LocalSeekableInputStream",
-        "com.sedmelluq.discord.lavaplayer.source.nico.HeartbeatingHttpStream"
+        "com.sedmelluq.discord.lavaplayer.source.nico.HeartbeatingHttpStream",
+        "com.sedmelluq.discord.lavaplayer.source.nico.NicoAudioSourceManager"
       ][]; . == $symbol.binary_name)) and
     (if $symbol.binary_name ==
         "com.sedmelluq.discord.lavaplayer.source.nico.HeartbeatingHttpStream"
       then .classification == "D_LEGACY" and
         (.tests | index("scripts/check-remote-source-status.sh")) != null
+      elif $symbol.binary_name ==
+          "com.sedmelluq.discord.lavaplayer.source.nico.NicoAudioSourceManager" and
+          ($symbol.symbol_kind == "CLASS" or
+            ($symbol.member_name == "<init>" and
+              $symbol.descriptor == "(Ljava/lang/String;Ljava/lang/String;)V") or
+            ($symbol.member_name | IN("loadItem", "getHttpInterface", "configureRequests", "configureBuilder")))
+      then .classification == "C_SEMANTIC" and
+        (.tests | index("crates/mantle-media/tests/phase12_niconico.rs")) != null
       else .classification == "A_EXACT"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "nico-audio-source-manager-contracts" and
+  .phase_entry.next_slice == "nico-audio-track-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 ' "$PLAN" >/dev/null
@@ -787,7 +813,8 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '73 reference classes / 620 symbols' \
+  '74 reference classes / 632 symbols' \
+  'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
   'Phase 12'; do
@@ -796,4 +823,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 591 classified symbols and 2,171 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 603 classified symbols and 2,159 unassessed symbols.\n'

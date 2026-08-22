@@ -116,6 +116,8 @@ const LOCAL_SEEKABLE_INPUT_STREAM_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/local/LocalSeekableInputStream";
 const HEARTBEATING_HTTP_STREAM_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/nico/HeartbeatingHttpStream";
+const NICO_AUDIO_SOURCE_MANAGER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/nico/NicoAudioSourceManager";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -152,6 +154,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     LOCAL_AUDIO_TRACK_CLASS,
     LOCAL_SEEKABLE_INPUT_STREAM_CLASS,
     HEARTBEATING_HTTP_STREAM_CLASS,
+    NICO_AUDIO_SOURCE_MANAGER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -509,6 +512,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | LOCAL_AUDIO_TRACK_CLASS
                 | LOCAL_SEEKABLE_INPUT_STREAM_CLASS
                 | HEARTBEATING_HTTP_STREAM_CLASS
+                | NICO_AUDIO_SOURCE_MANAGER_CLASS
         ) || field
             .access_flags
             .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
@@ -521,6 +525,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
                 | LOCAL_SEEKABLE_INPUT_STREAM_CLASS
                 | HEARTBEATING_HTTP_STREAM_CLASS
+                | NICO_AUDIO_SOURCE_MANAGER_CLASS
         ) || method
             .access_flags
             .intersects(MethodAccessFlags::PUBLIC | MethodAccessFlags::PROTECTED)
@@ -590,6 +595,9 @@ fn replacement_body(
     }
     if class_name == HEARTBEATING_HTTP_STREAM_CLASS {
         return heartbeating_http_stream_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == NICO_AUDIO_SOURCE_MANAGER_CLASS {
+        return nico_audio_source_manager_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == AUDIO_REFERENCE_CLASS {
         return audio_reference_replacement(pool, name, descriptor, required_locals);
@@ -2628,6 +2636,363 @@ fn heartbeating_http_stream_clinit(pool: &mut ConstantPool<'static>) -> Result<A
             Instruction::Ldc_w(owner),
             Instruction::Invokestatic(get_logger),
             Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn nico_audio_source_manager_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => nico_audio_source_manager_default_constructor(pool),
+        ("<init>", "(Ljava/lang/String;Ljava/lang/String;)V") => {
+            nico_audio_source_manager_credential_constructor(pool)
+        }
+        ("getSourceName", "()Ljava/lang/String;") => {
+            string_return(pool, "niconico", required_locals)
+        }
+        (
+            "loadItem",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+        ) => nico_audio_source_manager_load_item(pool),
+        (
+            "loadTrack",
+            "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+        ) => nico_audio_source_manager_load_track(pool),
+        (
+            "extractTrackFromXml",
+            "(Ljava/lang/String;Lorg/jsoup/nodes/Document;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+        ) => unsupported_body(
+            pool,
+            "Legacy NicoNico XML metadata extraction is unsupported.",
+            required_locals,
+        ),
+        ("isTrackEncodable", "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)Z") => code(
+            pool,
+            1,
+            required_locals,
+            vec![Instruction::Iconst_1, Instruction::Ireturn],
+        ),
+        (
+            "encodeTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Ljava/io/DataOutput;)V",
+        )
+        | ("shutdown", "()V") => code(pool, 0, required_locals, vec![Instruction::Return]),
+        (
+            "decodeTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+        ) => nico_audio_source_manager_decode_track(pool),
+        ("getHttpInterface", "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;") => {
+            nico_audio_source_manager_get_http_interface(pool)
+        }
+        ("configureRequests", "(Ljava/util/function/Function;)V") => {
+            nico_audio_source_manager_configure(pool, true)
+        }
+        ("configureBuilder", "(Ljava/util/function/Consumer;)V") => {
+            nico_audio_source_manager_configure(pool, false)
+        }
+        ("logIn", "(Ljava/lang/String;Ljava/lang/String;)V") => unsupported_body(
+            pool,
+            "Legacy NicoNico email/password login is unsupported.",
+            required_locals,
+        ),
+        ("getWatchUrl", "(Ljava/lang/String;)Ljava/lang/String;") => {
+            nico_audio_source_manager_watch_url(pool)
+        }
+        ("<clinit>", "()V") => nico_audio_source_manager_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {NICO_AUDIO_SOURCE_MANAGER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn nico_audio_source_manager_default_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(NICO_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let init = pool.add_method_ref(owner, "<init>", "(Ljava/lang/String;Ljava/lang/String;)V")?;
+    code(
+        pool,
+        3,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aconst_null,
+            Instruction::Aconst_null,
+            Instruction::Invokespecial(init),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn nico_audio_source_manager_credential_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(NICO_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let manager_field = pool.add_field_ref(
+        owner,
+        "httpInterfaceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let tools = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpClientTools")?;
+    let create = pool.add_method_ref(
+        tools,
+        "createDefaultThreadLocalManager",
+        "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let logged_in = pool.add_field_ref(
+        owner,
+        "loggedIn",
+        "Ljava/util/concurrent/atomic/AtomicBoolean;",
+    )?;
+    let atomic = pool.add_class("java/util/concurrent/atomic/AtomicBoolean")?;
+    let atomic_init = pool.add_method_ref(atomic, "<init>", "()V")?;
+    code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Invokestatic(create),
+            Instruction::Putfield(manager_field),
+            Instruction::Aload_0,
+            Instruction::New(atomic),
+            Instruction::Dup,
+            Instruction::Invokespecial(atomic_init),
+            Instruction::Putfield(logged_in),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn nico_audio_source_manager_load_item(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(NICO_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let pattern_field =
+        pool.add_field_ref(owner, "trackUrlPattern", "Ljava/util/regex/Pattern;")?;
+    let reference = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioReference")?;
+    let identifier = pool.add_field_ref(reference, "identifier", "Ljava/lang/String;")?;
+    let pattern = pool.add_class("java/util/regex/Pattern")?;
+    let create_matcher = pool.add_method_ref(
+        pattern,
+        "matcher",
+        "(Ljava/lang/CharSequence;)Ljava/util/regex/Matcher;",
+    )?;
+    let matcher_class = pool.add_class("java/util/regex/Matcher")?;
+    let test_match = pool.add_method_ref(matcher_class, "matches", "()Z")?;
+    let group = pool.add_method_ref(matcher_class, "group", "(I)Ljava/lang/String;")?;
+    let load = pool.add_method_ref(
+        owner,
+        "loadTrack",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+    )?;
+    let mut body = code(
+        pool,
+        3,
+        4,
+        vec![
+            Instruction::Getstatic(pattern_field),
+            Instruction::Aload_2,
+            Instruction::Getfield(identifier),
+            Instruction::Invokevirtual(create_matcher),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(test_match),
+            Instruction::Ifeq(14),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Iconst_1,
+            Instruction::Invokevirtual(group),
+            Instruction::Invokevirtual(load),
+            Instruction::Areturn,
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::AppendFrame {
+            frame_type: 252,
+            offset_delta: 14,
+            locals: vec![VerificationType::Object {
+                cpool_index: matcher_class,
+            }],
+        }],
+    )?;
+    Ok(body)
+}
+
+fn nico_audio_source_manager_load_track(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(NICO_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let watch = pool.add_method_ref(
+        owner,
+        "getWatchUrl",
+        "(Ljava/lang/String;)Ljava/lang/String;",
+    )?;
+    let reference = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioReference")?;
+    let reference_init = pool.add_method_ref(
+        reference,
+        "<init>",
+        "(Ljava/lang/String;Ljava/lang/String;)V",
+    )?;
+    let native = pool.add_class(NATIVE_CLASS)?;
+    let load = pool.add_method_ref(
+        native,
+        "loadNicoItem",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/nico/NicoAudioSourceManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+    )?;
+    let audio_track = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrack")?;
+    code(
+        pool,
+        5,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::New(reference),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Invokestatic(watch),
+            Instruction::Aconst_null,
+            Instruction::Invokespecial(reference_init),
+            Instruction::Invokestatic(load),
+            Instruction::Checkcast(audio_track),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn nico_audio_source_manager_decode_track(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let track = pool.add_class("com/sedmelluq/discord/lavaplayer/source/nico/NicoAudioTrack")?;
+    let init = pool.add_method_ref(
+        track,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/nico/NicoAudioSourceManager;)V",
+    )?;
+    code(
+        pool,
+        4,
+        3,
+        vec![
+            Instruction::New(track),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn nico_audio_source_manager_get_http_interface(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(NICO_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let field = pool.add_field_ref(
+        owner,
+        "httpInterfaceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let manager =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager")?;
+    let get = pool.add_interface_method_ref(
+        manager,
+        "getInterface",
+        "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Invokeinterface(get, 1),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn nico_audio_source_manager_configure(
+    pool: &mut ConstantPool<'static>,
+    requests: bool,
+) -> Result<Attribute> {
+    let owner = pool.add_class(NICO_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let field = pool.add_field_ref(
+        owner,
+        "httpInterfaceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let manager =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager")?;
+    let (name, descriptor) = if requests {
+        ("configureRequests", "(Ljava/util/function/Function;)V")
+    } else {
+        ("configureBuilder", "(Ljava/util/function/Consumer;)V")
+    };
+    let configure = pool.add_interface_method_ref(manager, name, descriptor)?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(configure, 2),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn nico_audio_source_manager_watch_url(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let prefix = pool.add_string("https://www.nicovideo.jp/watch/")?;
+    let string = pool.add_class("java/lang/String")?;
+    let concat = pool.add_method_ref(string, "concat", "(Ljava/lang/String;)Ljava/lang/String;")?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Ldc_w(prefix),
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(concat),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn nico_audio_source_manager_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(NICO_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let field = pool.add_field_ref(owner, "trackUrlPattern", "Ljava/util/regex/Pattern;")?;
+    let pattern = pool.add_class("java/util/regex/Pattern")?;
+    let compile = pool.add_method_ref(
+        pattern,
+        "compile",
+        "(Ljava/lang/String;)Ljava/util/regex/Pattern;",
+    )?;
+    let regex = pool.add_string(
+        "^(?:http://|https://|)(?:www\\.|)nicovideo\\.jp/watch/(.{2}[0-9]+)(?:\\?.*|)$",
+    )?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(regex),
+            Instruction::Invokestatic(compile),
+            Instruction::Putstatic(field),
             Instruction::Return,
         ],
     )
@@ -8290,6 +8655,10 @@ fn native_class(expected_abi: u8) -> Result<ClassFile<'static>> {
         (
             "loadItemSyncHandled",
             "(Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler;)V",
+        ),
+        (
+            "loadNicoItem",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/nico/NicoAudioSourceManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
         ),
         (
             "loadItemReference",
