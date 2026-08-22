@@ -15683,54 +15683,84 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The exact public decoder shell, three private fields, construction, and stateful reset/close behavior remain, while legacy HLS Opus preparation and playback are replaced by Mantle's bounded progressive-only SoundCloud boundary under ADR-0015.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-media/tests/phase12_soundcloud.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0015-bounded-soundcloud-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudOpusSegmentDecoder",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Ljava/util/function/Supplier;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public construction, generic Supplier<SeekableInputStream> reference capture, and null initial joined-stream/blueprint state are covered by the Phase 13 oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudOpusSegmentDecoder",
       "symbol_kind": "METHOD",
       "member_name": "prepareStream",
       "descriptor": "(Z)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The exact public IOException signature remains, while legacy joined-stream acquisition, OGG blueprint parsing, and track continuation fail before supplier access under ADR-0015.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-media/tests/phase12_soundcloud.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0015-bounded-soundcloud-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudOpusSegmentDecoder",
       "symbol_kind": "METHOD",
       "member_name": "resetStream",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public IOException signature, clean no-op behavior, joined-stream close/clear, blueprint retention, and zero supplier access are covered by the Phase 13 oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudOpusSegmentDecoder",
       "symbol_kind": "METHOD",
       "member_name": "playStream",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;JJ)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The exact public checked InterruptedException/IOException signature remains, while legacy supplier-driven joined OGG handler initialization and frame delivery fail before supplier access under ADR-0015.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-media/tests/phase12_soundcloud.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0015-bounded-soundcloud-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudOpusSegmentDecoder",
       "symbol_kind": "METHOD",
       "member_name": "close",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public checked Exception signature and delegation to stateful reset, including joined-stream close/clear and blueprint retention, are covered by the Phase 13 oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudPlaylistLoader",

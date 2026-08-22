@@ -160,6 +160,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-sound-cloud-mp3-segment-decoder-consumer" => {
             Some(SOUND_CLOUD_MP3_SEGMENT_DECODER_CONSUMER)
         }
+        "write-sound-cloud-opus-segment-decoder-consumer" => {
+            Some(SOUND_CLOUD_OPUS_SEGMENT_DECODER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -10278,6 +10281,207 @@ public final class GateSoundCloudMp3SegmentDecoder {
     }
   }
 
+  private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const SOUND_CLOUD_OPUS_SEGMENT_DECODER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackBlueprint;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudOpusSegmentDecoder;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudSegmentDecoder;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.function.Supplier;
+
+public final class GateSoundCloudOpusSegmentDecoder {
+  private static final String HLS_DISABLED =
+      "Legacy SoundCloud Opus HLS segment playback is unsupported; "
+      + "use Mantle's bounded progressive native source.";
+
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1 && (args[0].equals("reference") || args[0].equals("candidate")),
+        "expected disposition");
+    reflectionContract();
+    commonContract();
+    if (args[0].equals("reference")) {
+      referenceServiceContract();
+      System.out.println("common=public-concrete,3-fields,1-constructor,4-exported-methods,"
+          + "capture,stateful-reset-close,generic-supplier,checked-signatures,reflection;"
+          + "service=legacy-opus-segment-supplier");
+    } else {
+      candidateServiceContract();
+      System.out.println("common=public-concrete,3-fields,1-constructor,4-exported-methods,"
+          + "capture,stateful-reset-close,generic-supplier,checked-signatures,reflection;"
+          + "service=bounded-progressive-only,no-supplier,hls-explicitly-unsupported");
+    }
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<SoundCloudOpusSegmentDecoder> type = SoundCloudOpusSegmentDecoder.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {SoundCloudSegmentDecoder.class})
+        && type.getAnnotations().length == 0, "class metadata");
+    check(type.getDeclaredFields().length == 3 && type.getDeclaredMethods().length == 5,
+        "member counts");
+    Field supplier = checkField(type, "nextStreamProvider", Supplier.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    check(supplier.getGenericType().getTypeName().equals(
+        "java.util.function.Supplier<com.sedmelluq.discord.lavaplayer.tools.io."
+            + "SeekableInputStream>"), "supplier generic metadata");
+    checkField(type, "lastJoinedStream", OggPacketInputStream.class, Modifier.PRIVATE);
+    checkField(type, "blueprint", OggTrackBlueprint.class, Modifier.PRIVATE);
+
+    Constructor<?> constructor = type.getDeclaredConstructor(Supplier.class);
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getGenericParameterTypes()[0].getTypeName().equals(
+            "java.util.function.Supplier<com.sedmelluq.discord.lavaplayer.tools.io."
+                + "SeekableInputStream>")
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic()
+        && !constructor.isVarArgs(), "constructor metadata");
+
+    checkMethod(type, "prepareStream", Modifier.PUBLIC,
+        new Class<?>[] {boolean.class}, new Class<?>[] {IOException.class});
+    checkMethod(type, "resetStream", Modifier.PUBLIC,
+        new Class<?>[0], new Class<?>[] {IOException.class});
+    checkMethod(type, "playStream", Modifier.PUBLIC,
+        new Class<?>[] {AudioProcessingContext.class, long.class, long.class},
+        new Class<?>[] {InterruptedException.class, IOException.class});
+    checkMethod(type, "close", Modifier.PUBLIC,
+        new Class<?>[0], new Class<?>[] {Exception.class});
+    checkMethod(type, "obtainStream", Modifier.PRIVATE, new Class<?>[0], new Class<?>[0]);
+  }
+
+  private static void commonContract() throws Exception {
+    CountingSupplier supplier = new CountingSupplier();
+    SoundCloudOpusSegmentDecoder decoder = new SoundCloudOpusSegmentDecoder(supplier);
+    check(field("nextStreamProvider").get(decoder) == supplier, "constructor capture");
+    check(field("nextStreamProvider").get(new SoundCloudOpusSegmentDecoder(null)) == null,
+        "null capture");
+    check(field("lastJoinedStream").get(decoder) == null
+        && field("blueprint").get(decoder) == null, "initial state");
+    decoder.resetStream();
+    decoder.close();
+    check(supplier.calls == 0, "clean lifecycle");
+
+    OggTrackBlueprint blueprint = (OggTrackBlueprint) Proxy.newProxyInstance(
+        GateSoundCloudOpusSegmentDecoder.class.getClassLoader(),
+        new Class<?>[] {OggTrackBlueprint.class}, (proxy, method, values) -> null);
+    field("blueprint").set(decoder, blueprint);
+    ClosingStream resetInput = new ClosingStream();
+    field("lastJoinedStream").set(decoder, new OggPacketInputStream(resetInput, true));
+    decoder.resetStream();
+    check(resetInput.closed && field("lastJoinedStream").get(decoder) == null
+        && field("blueprint").get(decoder) == blueprint, "stateful reset");
+
+    ClosingStream closeInput = new ClosingStream();
+    field("lastJoinedStream").set(decoder, new OggPacketInputStream(closeInput, true));
+    decoder.close();
+    check(closeInput.closed && field("lastJoinedStream").get(decoder) == null
+        && field("blueprint").get(decoder) == blueprint, "stateful close");
+  }
+
+  private static void referenceServiceContract() throws Exception {
+    assertSupplierFailure(decoder -> decoder.prepareStream(true));
+    assertSupplierFailure(decoder -> decoder.prepareStream(false));
+    assertSupplierFailure(decoder -> decoder.playStream(null, -1L, Long.MAX_VALUE));
+  }
+
+  private static void candidateServiceContract() throws Exception {
+    assertUnsupported(decoder -> decoder.prepareStream(true));
+    assertUnsupported(decoder -> decoder.prepareStream(false));
+    assertUnsupported(decoder -> decoder.playStream(null, -1L, Long.MAX_VALUE));
+  }
+
+  private static void assertSupplierFailure(DecoderOperation operation) throws Exception {
+    CountingSupplier supplier = new CountingSupplier();
+    Throwable error = capture(() -> operation.run(new SoundCloudOpusSegmentDecoder(supplier)));
+    check(error == supplier.sentinel && supplier.calls == 1, "legacy supplier dispatch");
+  }
+
+  private static void assertUnsupported(DecoderOperation operation) throws Exception {
+    CountingSupplier supplier = new CountingSupplier();
+    Throwable error = capture(() -> operation.run(new SoundCloudOpusSegmentDecoder(supplier)));
+    check(error instanceof UnsupportedOperationException
+        && HLS_DISABLED.equals(error.getMessage()) && supplier.calls == 0,
+        "bounded progressive-only policy");
+  }
+
+  private static Field checkField(Class<?> owner, String name, Class<?> type, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == type && field.getModifiers() == modifiers && !field.isSynthetic(),
+        name + " metadata");
+    return field;
+  }
+
+  private static Method checkMethod(Class<?> owner, String name, int modifiers,
+                                    Class<?>[] parameters, Class<?>[] exceptions) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == modifiers && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs(),
+        name + " metadata");
+    return method;
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = SoundCloudOpusSegmentDecoder.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static Throwable capture(Operation operation) throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected failure");
+    } catch (Throwable error) {
+      return error;
+    }
+  }
+
+  private static final class CountingSupplier implements Supplier<SeekableInputStream> {
+    private final RuntimeException sentinel = new RuntimeException("supplier-sentinel");
+    private int calls;
+
+    @Override
+    public SeekableInputStream get() {
+      calls++;
+      throw sentinel;
+    }
+  }
+
+  private static final class ClosingStream extends SeekableInputStream {
+    private boolean closed;
+
+    ClosingStream() { super(0L, 0L); }
+    @Override public int read() { return -1; }
+    @Override public long getPosition() { return 0L; }
+    @Override protected void seekHard(long position) { }
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      return Collections.emptyList();
+    }
+    @Override public void close() { closed = true; }
+  }
+
+  private interface DecoderOperation {
+    void run(SoundCloudOpusSegmentDecoder decoder) throws Exception;
+  }
   private interface Operation { void run() throws Exception; }
 
   private static void check(boolean condition, String message) {
