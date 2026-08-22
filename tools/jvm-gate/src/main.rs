@@ -113,6 +113,16 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-heartbeating-http-stream-consumer" => Some(HEARTBEATING_HTTP_STREAM_CONSUMER),
         "write-nico-audio-source-manager-consumer" => Some(NICO_AUDIO_SOURCE_MANAGER_CONSUMER),
         "write-nico-audio-track-consumer" => Some(NICO_AUDIO_TRACK_CONSUMER),
+        "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
+        "write-reference-mutable-audio-frame-consumer" => {
+            Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
+        }
+        _ => sound_cloud_consumer_source(command),
+    }
+}
+
+fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
+    match command {
         "write-default-sound-cloud-data-loader-consumer" => {
             Some(DEFAULT_SOUND_CLOUD_DATA_LOADER_CONSUMER)
         }
@@ -141,10 +151,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-sound-cloud-data-loader-consumer" => Some(SOUND_CLOUD_DATA_LOADER_CONSUMER),
         "write-sound-cloud-data-reader-consumer" => Some(SOUND_CLOUD_DATA_READER_CONSUMER),
         "write-sound-cloud-format-handler-consumer" => Some(SOUND_CLOUD_FORMAT_HANDLER_CONSUMER),
-        "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
-        "write-reference-mutable-audio-frame-consumer" => {
-            Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
-        }
+        "write-sound-cloud-helper-consumer" => Some(SOUND_CLOUD_HELPER_CONSUMER),
         _ => None,
     }
 }
@@ -9451,6 +9458,183 @@ public final class GateSoundCloudFormatHandler {
         GateSoundCloudFormatHandler.class.getClassLoader(), new Class<?>[] {type},
         (proxy, method, args) -> null));
   }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const SOUND_CLOUD_HELPER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudHelper;
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import org.apache.http.client.methods.HttpHead;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.protocol.HttpClientContext;
+
+public final class GateSoundCloudHelper {
+  private static final String PLAYBACK_DISABLED =
+      "SoundCloud playback URL resolution is handled by Mantle's bounded native source.";
+  private static final String MOBILE_DISABLED =
+      "Legacy SoundCloud mobile redirects are unsupported.";
+  private static final String SHORT_DISABLED =
+      "SoundCloud short-link resolution requires Mantle's bounded native source.";
+
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1 && (args[0].equals("reference") || args[0].equals("candidate")),
+        "expected disposition");
+    reflectionContract();
+    commonContract();
+    if (args[0].equals("reference")) {
+      referenceServiceContract();
+      System.out.println("common=public-concrete,0-fields,1-constructor,4-static-methods,"
+          + "non-mobile,checked-io,reflection;"
+          + "service=legacy-http-playback,mobile-get,short-head");
+    } else {
+      candidateServiceContract();
+      System.out.println("common=public-concrete,0-fields,1-constructor,4-static-methods,"
+          + "non-mobile,checked-io,reflection;"
+          + "service=bounded-native-source,no-http,legacy-mobile-disabled,short-link-disabled");
+    }
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<SoundCloudHelper> type = SoundCloudHelper.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getAnnotations().length == 0,
+        "class metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredMethods().length == 4,
+        "member counts");
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC, "constructor metadata");
+    checkMethod(type, "nonMobileUrl", String.class, new Class<?>[] {String.class});
+    checkMethod(type, "loadPlaybackUrl", String.class,
+        new Class<?>[] {HttpInterface.class, String.class}, IOException.class);
+    checkMethod(type, "redirectMobileLink", AudioReference.class,
+        new Class<?>[] {HttpInterface.class, AudioReference.class});
+    checkMethod(type, "resolveShortTrackUrl", AudioReference.class,
+        new Class<?>[] {HttpInterface.class, AudioReference.class});
+  }
+
+  private static void commonContract() throws Exception {
+    check(new SoundCloudHelper().getClass() == SoundCloudHelper.class, "construction");
+    check(SoundCloudHelper.nonMobileUrl("https://m.soundcloud.com/user/track?x=1")
+        .equals("https://soundcloud.com/user/track?x=1"), "mobile normalization");
+    String ordinary = new String("https://www.soundcloud.com/user/track");
+    check(SoundCloudHelper.nonMobileUrl(ordinary) == ordinary, "ordinary identity");
+    String insecure = new String("http://m.soundcloud.com/user/track");
+    check(SoundCloudHelper.nonMobileUrl(insecure) == insecure, "scheme-sensitive identity");
+    expect(NullPointerException.class, () -> SoundCloudHelper.nonMobileUrl(null));
+  }
+
+  private static void referenceServiceContract() throws Exception {
+    RecordingHttpInterface playback = new RecordingHttpInterface();
+    expect(IOException.class, () -> SoundCloudHelper.loadPlaybackUrl(
+        playback, "https://media.example/playback"));
+    playback.checkRequest("GET", "https://media.example/playback");
+
+    RecordingHttpInterface mobile = new RecordingHttpInterface();
+    expect(RuntimeException.class, () -> SoundCloudHelper.redirectMobileLink(
+        mobile, new AudioReference("https://soundcloud.app.goo.gl/fixture", "container")));
+    mobile.checkRequest("GET", "https://soundcloud.app.goo.gl/fixture");
+
+    RecordingHttpInterface shortLink = new RecordingHttpInterface();
+    expect(RuntimeException.class, () -> SoundCloudHelper.resolveShortTrackUrl(
+        shortLink, new AudioReference("https://on.soundcloud.com/fixture", "container")));
+    shortLink.checkRequest("HEAD", "https://on.soundcloud.com/fixture");
+    check(shortLink.request instanceof HttpHead
+        && ((HttpHead) shortLink.request).getConfig() != null
+        && !((HttpHead) shortLink.request).getConfig().isRedirectsEnabled(),
+        "short redirect policy");
+  }
+
+  private static void candidateServiceContract() throws Exception {
+    RecordingHttpInterface playback = new RecordingHttpInterface();
+    UnsupportedOperationException playbackFailure = expect(UnsupportedOperationException.class,
+        () -> SoundCloudHelper.loadPlaybackUrl(playback, "https://media.example/playback"));
+    check(PLAYBACK_DISABLED.equals(playbackFailure.getMessage()) && playback.executes == 0,
+        "bounded playback policy");
+
+    RecordingHttpInterface mobile = new RecordingHttpInterface();
+    UnsupportedOperationException mobileFailure = expect(UnsupportedOperationException.class,
+        () -> SoundCloudHelper.redirectMobileLink(
+            mobile, new AudioReference("https://soundcloud.app.goo.gl/fixture", "container")));
+    check(MOBILE_DISABLED.equals(mobileFailure.getMessage()) && mobile.executes == 0,
+        "legacy mobile policy");
+
+    RecordingHttpInterface shortLink = new RecordingHttpInterface();
+    UnsupportedOperationException shortFailure = expect(UnsupportedOperationException.class,
+        () -> SoundCloudHelper.resolveShortTrackUrl(
+            shortLink, new AudioReference("https://on.soundcloud.com/fixture", "container")));
+    check(SHORT_DISABLED.equals(shortFailure.getMessage()) && shortLink.executes == 0,
+        "short-link policy");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+                                  Class<?>[] parameters, Class<?>... exceptions) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getGenericReturnType() == returnType
+        && method.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.getTypeParameters().length == 0 && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), name + " metadata");
+  }
+
+  private static final class RecordingHttpInterface extends HttpInterface {
+    private final IOException failure = new IOException("network-sentinel");
+    private HttpUriRequest request;
+    private int executes;
+
+    RecordingHttpInterface() {
+      super(null, HttpClientContext.create(), false, proxy(HttpContextFilter.class));
+    }
+
+    @Override
+    public org.apache.http.client.methods.CloseableHttpResponse execute(HttpUriRequest request)
+        throws IOException {
+      this.request = request;
+      executes++;
+      throw failure;
+    }
+
+    void checkRequest(String method, String uri) {
+      check(executes == 1 && request != null && method.equals(request.getMethod())
+          && uri.equals(request.getURI().toString()), method + " request");
+    }
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private static <T> T proxy(Class<T> type) {
+    return type.cast(Proxy.newProxyInstance(
+        GateSoundCloudHelper.class.getClassLoader(), new Class<?>[] {type},
+        (proxy, method, args) -> {
+          if (method.getReturnType() == boolean.class) return false;
+          if (method.getReturnType() == int.class) return 0;
+          return null;
+        }));
+  }
+
+  private interface Operation { void run() throws Exception; }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

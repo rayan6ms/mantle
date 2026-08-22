@@ -15324,54 +15324,85 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The exact public concrete zero-field shell is retained, while its service-bearing helpers require Mantle's bounded native SoundCloud source and fail before caller HTTP access under ADR-0015.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-media/tests/phase12_soundcloud.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0015-bounded-soundcloud-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudHelper",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public zero-argument construction and reflection metadata are covered by the Phase 13 sound-cloud-helper-contracts oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudHelper",
       "symbol_kind": "METHOD",
       "member_name": "nonMobileUrl",
       "descriptor": "(Ljava/lang/String;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact HTTPS mobile-host normalization, ordinary reference identity, scheme sensitivity, null failure, and reflection metadata are covered by the Phase 13 sound-cloud-helper-contracts oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudHelper",
       "symbol_kind": "METHOD",
       "member_name": "loadPlaybackUrl",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/lang/String;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The exact public static checked-IOException signature remains, while legacy unbounded caller-HTTP JSON playback lookup is disabled before network access in favor of Mantle's bounded credentialed native resolver under ADR-0015.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-media/tests/phase12_soundcloud.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0015-bounded-soundcloud-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudHelper",
       "symbol_kind": "METHOD",
       "member_name": "redirectMobileLink",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "D_LEGACY",
+      "notes": "The exact public static linkage remains, but the obsolete soundcloud.app.goo.gl redirect flow is disabled deterministically before caller HTTP access under ADR-0015.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0015-bounded-soundcloud-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudHelper",
       "symbol_kind": "METHOD",
       "member_name": "resolveShortTrackUrl",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The exact public static linkage remains, while the compatibility helper requires the bounded native SoundCloud source for current short-link resolution and fails before caller HTTP access under ADR-0015.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-media/tests/phase12_soundcloud.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0015-bounded-soundcloud-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudHttpContextFilter",

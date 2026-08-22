@@ -143,6 +143,8 @@ const SOUND_CLOUD_DATA_READER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataReader";
 const SOUND_CLOUD_FORMAT_HANDLER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudFormatHandler";
+const SOUND_CLOUD_HELPER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudHelper";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -193,6 +195,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     SOUND_CLOUD_DATA_LOADER_CLASS,
     SOUND_CLOUD_DATA_READER_CLASS,
     SOUND_CLOUD_FORMAT_HANDLER_CLASS,
+    SOUND_CLOUD_HELPER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -710,6 +713,9 @@ fn replacement_body(
     }
     if class_name == SOUND_CLOUD_CLIENT_ID_TRACKER_CLASS {
         return sound_cloud_client_id_tracker_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == SOUND_CLOUD_HELPER_CLASS {
+        return sound_cloud_helper_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS {
         return sound_cloud_audio_source_manager_builder_replacement(
@@ -3414,6 +3420,83 @@ fn sound_cloud_audio_track_clinit(pool: &mut ConstantPool<'static>) -> Result<At
             Instruction::Return,
         ],
     )
+}
+
+fn sound_cloud_helper_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        ("nonMobileUrl", "(Ljava/lang/String;)Ljava/lang/String;") => {
+            sound_cloud_helper_non_mobile_url(pool)
+        }
+        (
+            "loadPlaybackUrl",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/lang/String;)Ljava/lang/String;",
+        ) => unsupported_body(
+            pool,
+            "SoundCloud playback URL resolution is handled by Mantle's bounded native source.",
+            required_locals,
+        ),
+        (
+            "redirectMobileLink",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;",
+        ) => unsupported_body(
+            pool,
+            "Legacy SoundCloud mobile redirects are unsupported.",
+            required_locals,
+        ),
+        (
+            "resolveShortTrackUrl",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;",
+        ) => unsupported_body(
+            pool,
+            "SoundCloud short-link resolution requires Mantle's bounded native source.",
+            required_locals,
+        ),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {SOUND_CLOUD_HELPER_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn sound_cloud_helper_non_mobile_url(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let string = pool.add_class("java/lang/String")?;
+    let starts_with = pool.add_method_ref(string, "startsWith", "(Ljava/lang/String;)Z")?;
+    let substring = pool.add_method_ref(string, "substring", "(I)Ljava/lang/String;")?;
+    let concat = pool.add_method_ref(string, "concat", "(Ljava/lang/String;)Ljava/lang/String;")?;
+    let mobile_prefix = pool.add_string("https://m.")?;
+    let secure_prefix = pool.add_string("https://")?;
+    let mut body = code(
+        pool,
+        3,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Ldc_w(mobile_prefix),
+            Instruction::Invokevirtual(starts_with),
+            Instruction::Ifeq(10),
+            Instruction::Ldc_w(secure_prefix),
+            Instruction::Aload_0,
+            Instruction::Bipush(10),
+            Instruction::Invokevirtual(substring),
+            Instruction::Invokevirtual(concat),
+            Instruction::Areturn,
+            Instruction::Aload_0,
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::SameFrame { frame_type: 10 }],
+    )?;
+    Ok(body)
 }
 
 fn sound_cloud_client_id_tracker_replacement(
