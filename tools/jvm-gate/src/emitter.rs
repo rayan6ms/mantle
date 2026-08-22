@@ -27,7 +27,10 @@ const LOADER_CLASS: &str = "dev/mantle/internal/NativeLoader";
 const FORMAT_CLASS: &str = "dev/mantle/internal/NativeAudioDataFormat";
 const FRAME_BUFFER_FACTORY_CLASS: &str = "dev/mantle/internal/NativeAudioFrameBufferFactory";
 const EVENT_DISPATCHER_CLASS: &str = "dev/mantle/internal/NativeEventDispatcher";
+const PLAYER_LIFECYCLE_HELPER_CLASS: &str = "dev/mantle/internal/NativeAudioPlayerLifecycle";
 const MANAGER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayerManager";
+const PLAYER_LIFECYCLE_MANAGER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/player/AudioPlayerLifecycleManager";
 const AUDIO_REFERENCE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/AudioReference";
 const DECODED_TRACK_HOLDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/DecodedTrackHolder";
@@ -71,6 +74,7 @@ const TRACK_STUCK_EVENT_CLASS: &str =
 
 const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler",
+    PLAYER_LIFECYCLE_MANAGER_CLASS,
     CONFIGURATION_CLASS,
     RESAMPLING_CLASS,
     AUDIO_PLAYER_OPTIONS_CLASS,
@@ -152,19 +156,7 @@ pub fn emit(
         let class = ClassFile::from_bytes(&bytes)?;
         classes.push(transform_reference_class(class)?);
     }
-    classes.extend([
-        native_class(expected_abi)?,
-        native_state_class()?,
-        native_cleaner_class()?,
-        native_probe_class()?,
-        native_invocation_handler_class()?,
-        native_load_future_class()?,
-        native_load_callback_class()?,
-        native_loader_class()?,
-        native_audio_data_format_class()?,
-        native_audio_frame_buffer_factory_class()?,
-        native_event_dispatcher_class()?,
-    ]);
+    classes.extend(internal_classes(expected_abi)?);
 
     if let Some(parent) = output.parent() {
         fs::create_dir_all(parent)?;
@@ -244,6 +236,23 @@ pub fn emit(
         fs::write(manifest_output, serde_json::to_vec_pretty(&manifest)?)?;
     }
     Ok(())
+}
+
+fn internal_classes(expected_abi: u8) -> Result<Vec<ClassFile<'static>>> {
+    Ok(vec![
+        native_class(expected_abi)?,
+        native_state_class()?,
+        native_cleaner_class()?,
+        native_probe_class()?,
+        native_invocation_handler_class()?,
+        native_load_future_class()?,
+        native_load_callback_class()?,
+        native_loader_class()?,
+        native_audio_data_format_class()?,
+        native_audio_frame_buffer_factory_class()?,
+        native_event_dispatcher_class()?,
+        native_audio_player_lifecycle_class()?,
+    ])
 }
 
 pub fn emit_reference_slice(reference_jar: &Path, output: &Path) -> Result<()> {
@@ -407,9 +416,10 @@ fn method_key(class: &ClassFile<'_>, method: &Method) -> Result<(String, String)
 fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<'static>> {
     let class_name = class.class_name()?.to_string();
     class.fields.retain(|field| {
-        field
-            .access_flags
-            .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
+        class_name == PLAYER_LIFECYCLE_MANAGER_CLASS
+            || field
+                .access_flags
+                .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
     });
     class.methods.retain(|method| {
         method
@@ -471,6 +481,9 @@ fn replacement_body(
     }
     if class_name == AUDIO_PLAYER_OPTIONS_CLASS {
         return audio_player_options_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == PLAYER_LIFECYCLE_MANAGER_CLASS {
+        return audio_player_lifecycle_replacement(pool, name, descriptor, required_locals);
     }
     if track_enum_constants(class_name).is_some() {
         return track_enum_replacement(pool, class_name, name, descriptor, required_locals);
@@ -574,6 +587,33 @@ fn audio_player_options_replacement(
         _ => unsupported_body(
             pool,
             &format!("Phase 13 does not implement {AUDIO_PLAYER_OPTIONS_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn audio_player_lifecycle_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Ljava/util/concurrent/ScheduledExecutorService;Ljava/util/concurrent/atomic/AtomicLong;)V",
+        ) => audio_player_lifecycle_constructor(pool),
+        ("initialise", "()V") => audio_player_lifecycle_initialise(pool),
+        ("shutdown", "()V") => audio_player_lifecycle_shutdown(pool),
+        ("onEvent", "(Lcom/sedmelluq/discord/lavaplayer/player/event/AudioEvent;)V") => {
+            audio_player_lifecycle_on_event(pool)
+        }
+        ("run", "()V") => audio_player_lifecycle_run(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {PLAYER_LIFECYCLE_MANAGER_CLASS}.{name}{descriptor}"
+            ),
             required_locals,
         ),
     }
@@ -1853,6 +1893,56 @@ fn native_event_dispatcher_class() -> Result<ClassFile<'static>> {
     Ok(class)
 }
 
+fn native_audio_player_lifecycle_class() -> Result<ClassFile<'static>> {
+    let mut class = new_class(
+        PLAYER_LIFECYCLE_HELPER_CLASS,
+        "java/lang/Object",
+        ClassAccessFlags::PUBLIC | ClassAccessFlags::FINAL | ClassAccessFlags::SUPER,
+        &[],
+    )?;
+    let constructor = object_constructor(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PRIVATE,
+        "<init>",
+        "()V",
+        Some(constructor),
+    )?;
+    let initialise = lifecycle_helper_initialise(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+        "initialise",
+        "(Ljava/lang/Runnable;Ljava/util/concurrent/ScheduledExecutorService;Ljava/util/concurrent/atomic/AtomicReference;)V",
+        Some(initialise),
+    )?;
+    let shutdown = lifecycle_helper_shutdown(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+        "shutdown",
+        "(Ljava/util/concurrent/atomic/AtomicReference;)V",
+        Some(shutdown),
+    )?;
+    let on_event = lifecycle_helper_on_event(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+        "onEvent",
+        "(Ljava/util/concurrent/ConcurrentMap;Lcom/sedmelluq/discord/lavaplayer/player/event/AudioEvent;)V",
+        Some(on_event),
+    )?;
+    let run = lifecycle_helper_run(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+        "run",
+        "(Ljava/util/concurrent/ConcurrentMap;Ljava/util/concurrent/atomic/AtomicLong;)V",
+        Some(run),
+    )?;
+    Ok(class)
+}
+
 fn new_class(
     name: &str,
     superclass: &str,
@@ -2204,6 +2294,341 @@ fn object_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
         vec![
             Instruction::Aload_0,
             Instruction::Invokespecial(init),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn audio_player_lifecycle_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(PLAYER_LIFECYCLE_MANAGER_CLASS)?;
+    let active_players = pool.add_field_ref(
+        owner,
+        "activePlayers",
+        "Ljava/util/concurrent/ConcurrentMap;",
+    )?;
+    let scheduler = pool.add_field_ref(
+        owner,
+        "scheduler",
+        "Ljava/util/concurrent/ScheduledExecutorService;",
+    )?;
+    let cleanup_threshold = pool.add_field_ref(
+        owner,
+        "cleanupThreshold",
+        "Ljava/util/concurrent/atomic/AtomicLong;",
+    )?;
+    let scheduled_task = pool.add_field_ref(
+        owner,
+        "scheduledTask",
+        "Ljava/util/concurrent/atomic/AtomicReference;",
+    )?;
+    let concurrent_hash_map = pool.add_class("java/util/concurrent/ConcurrentHashMap")?;
+    let concurrent_hash_map_init = pool.add_method_ref(concurrent_hash_map, "<init>", "()V")?;
+    let atomic_reference = pool.add_class("java/util/concurrent/atomic/AtomicReference")?;
+    let atomic_reference_init = pool.add_method_ref(atomic_reference, "<init>", "()V")?;
+    code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::New(concurrent_hash_map),
+            Instruction::Dup,
+            Instruction::Invokespecial(concurrent_hash_map_init),
+            Instruction::Putfield(active_players),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(scheduler),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(cleanup_threshold),
+            Instruction::Aload_0,
+            Instruction::New(atomic_reference),
+            Instruction::Dup,
+            Instruction::Invokespecial(atomic_reference_init),
+            Instruction::Putfield(scheduled_task),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn audio_player_lifecycle_initialise(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(PLAYER_LIFECYCLE_MANAGER_CLASS)?;
+    let scheduler = pool.add_field_ref(
+        owner,
+        "scheduler",
+        "Ljava/util/concurrent/ScheduledExecutorService;",
+    )?;
+    let scheduled_task = pool.add_field_ref(
+        owner,
+        "scheduledTask",
+        "Ljava/util/concurrent/atomic/AtomicReference;",
+    )?;
+    let helper = pool.add_class(PLAYER_LIFECYCLE_HELPER_CLASS)?;
+    let initialise = pool.add_method_ref(
+        helper,
+        "initialise",
+        "(Ljava/lang/Runnable;Ljava/util/concurrent/ScheduledExecutorService;Ljava/util/concurrent/atomic/AtomicReference;)V",
+    )?;
+    code(
+        pool,
+        3,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_0,
+            Instruction::Getfield(scheduler),
+            Instruction::Aload_0,
+            Instruction::Getfield(scheduled_task),
+            Instruction::Invokestatic(initialise),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn audio_player_lifecycle_shutdown(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(PLAYER_LIFECYCLE_MANAGER_CLASS)?;
+    let scheduled_task = pool.add_field_ref(
+        owner,
+        "scheduledTask",
+        "Ljava/util/concurrent/atomic/AtomicReference;",
+    )?;
+    let helper = pool.add_class(PLAYER_LIFECYCLE_HELPER_CLASS)?;
+    let shutdown = pool.add_method_ref(
+        helper,
+        "shutdown",
+        "(Ljava/util/concurrent/atomic/AtomicReference;)V",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(scheduled_task),
+            Instruction::Invokestatic(shutdown),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn audio_player_lifecycle_on_event(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(PLAYER_LIFECYCLE_MANAGER_CLASS)?;
+    let active_players = pool.add_field_ref(
+        owner,
+        "activePlayers",
+        "Ljava/util/concurrent/ConcurrentMap;",
+    )?;
+    let helper = pool.add_class(PLAYER_LIFECYCLE_HELPER_CLASS)?;
+    let on_event = pool.add_method_ref(
+        helper,
+        "onEvent",
+        "(Ljava/util/concurrent/ConcurrentMap;Lcom/sedmelluq/discord/lavaplayer/player/event/AudioEvent;)V",
+    )?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(active_players),
+            Instruction::Aload_1,
+            Instruction::Invokestatic(on_event),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn audio_player_lifecycle_run(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(PLAYER_LIFECYCLE_MANAGER_CLASS)?;
+    let active_players = pool.add_field_ref(
+        owner,
+        "activePlayers",
+        "Ljava/util/concurrent/ConcurrentMap;",
+    )?;
+    let cleanup_threshold = pool.add_field_ref(
+        owner,
+        "cleanupThreshold",
+        "Ljava/util/concurrent/atomic/AtomicLong;",
+    )?;
+    let helper = pool.add_class(PLAYER_LIFECYCLE_HELPER_CLASS)?;
+    let run = pool.add_method_ref(
+        helper,
+        "run",
+        "(Ljava/util/concurrent/ConcurrentMap;Ljava/util/concurrent/atomic/AtomicLong;)V",
+    )?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(active_players),
+            Instruction::Aload_0,
+            Instruction::Getfield(cleanup_threshold),
+            Instruction::Invokestatic(run),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn lifecycle_helper_initialise(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let scheduler = pool.add_class("java/util/concurrent/ScheduledExecutorService")?;
+    let schedule = pool.add_interface_method_ref(
+        scheduler,
+        "scheduleAtFixedRate",
+        "(Ljava/lang/Runnable;JJLjava/util/concurrent/TimeUnit;)Ljava/util/concurrent/ScheduledFuture;",
+    )?;
+    let time_unit = pool.add_class("java/util/concurrent/TimeUnit")?;
+    let milliseconds =
+        pool.add_field_ref(time_unit, "MILLISECONDS", "Ljava/util/concurrent/TimeUnit;")?;
+    let interval = pool.add_long(10_000)?;
+    let atomic_reference = pool.add_class("java/util/concurrent/atomic/AtomicReference")?;
+    let compare_and_set = pool.add_method_ref(
+        atomic_reference,
+        "compareAndSet",
+        "(Ljava/lang/Object;Ljava/lang/Object;)Z",
+    )?;
+    let scheduled_future = pool.add_class("java/util/concurrent/ScheduledFuture")?;
+    let cancel = pool.add_interface_method_ref(scheduled_future, "cancel", "(Z)Z")?;
+    code(
+        pool,
+        7,
+        4,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Ldc2_w(interval),
+            Instruction::Ldc2_w(interval),
+            Instruction::Getstatic(milliseconds),
+            Instruction::Invokeinterface(schedule, 7),
+            Instruction::Astore_3,
+            Instruction::Aload_2,
+            Instruction::Aconst_null,
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(compare_and_set),
+            Instruction::Ifne(16),
+            Instruction::Aload_3,
+            Instruction::Iconst_0,
+            Instruction::Invokeinterface(cancel, 2),
+            Instruction::Pop,
+            Instruction::Return,
+        ],
+    )
+}
+
+fn lifecycle_helper_shutdown(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let atomic_reference = pool.add_class("java/util/concurrent/atomic/AtomicReference")?;
+    let get_and_set = pool.add_method_ref(
+        atomic_reference,
+        "getAndSet",
+        "(Ljava/lang/Object;)Ljava/lang/Object;",
+    )?;
+    let scheduled_future = pool.add_class("java/util/concurrent/ScheduledFuture")?;
+    let cancel = pool.add_interface_method_ref(scheduled_future, "cancel", "(Z)Z")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aconst_null,
+            Instruction::Invokevirtual(get_and_set),
+            Instruction::Checkcast(scheduled_future),
+            Instruction::Astore_1,
+            Instruction::Aload_1,
+            Instruction::Ifnull(11),
+            Instruction::Aload_1,
+            Instruction::Iconst_0,
+            Instruction::Invokeinterface(cancel, 2),
+            Instruction::Pop,
+            Instruction::Return,
+        ],
+    )
+}
+
+fn lifecycle_helper_on_event(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let start = pool.add_class("com/sedmelluq/discord/lavaplayer/player/event/TrackStartEvent")?;
+    let end = pool.add_class("com/sedmelluq/discord/lavaplayer/player/event/TrackEndEvent")?;
+    let event = pool.add_class("com/sedmelluq/discord/lavaplayer/player/event/AudioEvent")?;
+    let player = pool.add_field_ref(
+        event,
+        "player",
+        "Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;",
+    )?;
+    let map = pool.add_class("java/util/concurrent/ConcurrentMap")?;
+    let put = pool.add_interface_method_ref(
+        map,
+        "put",
+        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+    )?;
+    let remove =
+        pool.add_interface_method_ref(map, "remove", "(Ljava/lang/Object;)Ljava/lang/Object;")?;
+    code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Instanceof(start),
+            Instruction::Ifeq(11),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Getfield(player),
+            Instruction::Aload_1,
+            Instruction::Getfield(player),
+            Instruction::Invokeinterface(put, 3),
+            Instruction::Pop,
+            Instruction::Goto(19),
+            Instruction::Aload_1,
+            Instruction::Instanceof(end),
+            Instruction::Ifeq(19),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Getfield(player),
+            Instruction::Invokeinterface(remove, 2),
+            Instruction::Pop,
+            Instruction::Return,
+        ],
+    )
+}
+
+fn lifecycle_helper_run(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let map = pool.add_class("java/util/concurrent/ConcurrentMap")?;
+    let key_set = pool.add_interface_method_ref(map, "keySet", "()Ljava/util/Set;")?;
+    let set = pool.add_class("java/util/Set")?;
+    let iterator = pool.add_interface_method_ref(set, "iterator", "()Ljava/util/Iterator;")?;
+    let iterator_class = pool.add_class("java/util/Iterator")?;
+    let has_next = pool.add_interface_method_ref(iterator_class, "hasNext", "()Z")?;
+    let next = pool.add_interface_method_ref(iterator_class, "next", "()Ljava/lang/Object;")?;
+    let player = pool.add_class("com/sedmelluq/discord/lavaplayer/player/AudioPlayer")?;
+    let check_cleanup = pool.add_interface_method_ref(player, "checkCleanup", "(J)V")?;
+    let atomic_long = pool.add_class("java/util/concurrent/atomic/AtomicLong")?;
+    let get = pool.add_method_ref(atomic_long, "get", "()J")?;
+    code(
+        pool,
+        3,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokeinterface(key_set, 1),
+            Instruction::Invokeinterface(iterator, 1),
+            Instruction::Astore_2,
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(has_next, 1),
+            Instruction::Ifeq(16),
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(next, 1),
+            Instruction::Checkcast(player),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(get),
+            Instruction::Invokeinterface(check_cleanup, 3),
+            Instruction::Goto(4),
             Instruction::Return,
         ],
     )

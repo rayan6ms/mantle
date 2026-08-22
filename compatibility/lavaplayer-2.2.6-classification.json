@@ -10699,54 +10699,84 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact class and member structure, fixed-rate scheduling, duplicate-initialisation cancellation, restart and idempotent shutdown, event-driven player membership, deduplication, live cleanup thresholds, and null edges are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerLifecycleManager",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Ljava/util/concurrent/ScheduledExecutorService;Ljava/util/concurrent/atomic/AtomicLong;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact class and member structure, fixed-rate scheduling, duplicate-initialisation cancellation, restart and idempotent shutdown, event-driven player membership, deduplication, live cleanup thresholds, and null edges are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerLifecycleManager",
       "symbol_kind": "METHOD",
       "member_name": "initialise",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact class and member structure, fixed-rate scheduling, duplicate-initialisation cancellation, restart and idempotent shutdown, event-driven player membership, deduplication, live cleanup thresholds, and null edges are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerLifecycleManager",
       "symbol_kind": "METHOD",
       "member_name": "shutdown",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact class and member structure, fixed-rate scheduling, duplicate-initialisation cancellation, restart and idempotent shutdown, event-driven player membership, deduplication, live cleanup thresholds, and null edges are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerLifecycleManager",
       "symbol_kind": "METHOD",
       "member_name": "onEvent",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/event/AudioEvent;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact class and member structure, fixed-rate scheduling, duplicate-initialisation cancellation, restart and idempotent shutdown, event-driven player membership, deduplication, live cleanup thresholds, and null edges are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerLifecycleManager",
       "symbol_kind": "METHOD",
       "member_name": "run",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact class and member structure, fixed-rate scheduling, duplicate-initialisation cancellation, restart and idempotent shutdown, event-driven player membership, deduplication, live cleanup thresholds, and null edges are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager",

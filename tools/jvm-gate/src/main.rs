@@ -68,6 +68,9 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-track-state-listener-consumer" => Some(TRACK_STATE_LISTENER_CONSUMER),
         "write-audio-output-hook-consumer" => Some(AUDIO_OUTPUT_HOOK_CONSUMER),
         "write-audio-load-result-handler-consumer" => Some(AUDIO_LOAD_RESULT_HANDLER_CONSUMER),
+        "write-audio-player-lifecycle-manager-consumer" => {
+            Some(AUDIO_PLAYER_LIFECYCLE_MANAGER_CONSUMER)
+        }
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -2546,6 +2549,238 @@ public final class GateAudioLoadResultHandler {
         && Arrays.equals(method.getParameterTypes(), parameters)
         && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0,
         "method metadata " + method.getName());
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_PLAYER_LIFECYCLE_MANAGER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerLifecycleManager;
+import com.sedmelluq.discord.lavaplayer.player.event.AudioEvent;
+import com.sedmelluq.discord.lavaplayer.player.event.AudioEventListener;
+import com.sedmelluq.discord.lavaplayer.player.event.PlayerPauseEvent;
+import com.sedmelluq.discord.lavaplayer.player.event.TrackEndEvent;
+import com.sedmelluq.discord.lavaplayer.player.event.TrackStartEvent;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackEndReason;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+
+public final class GateAudioPlayerLifecycleManager {
+  public static void main(String[] args) throws Exception {
+    SchedulerHandler schedulerCalls = new SchedulerHandler();
+    ScheduledExecutorService scheduler = proxy(ScheduledExecutorService.class, schedulerCalls);
+    AtomicLong cleanupThreshold = new AtomicLong(37L);
+    AudioPlayerLifecycleManager manager =
+        new AudioPlayerLifecycleManager(scheduler, cleanupThreshold);
+    schedulerCalls.expectedRunnable = manager;
+
+    manager.shutdown();
+    check(schedulerCalls.tasks.isEmpty(), "shutdown before initialise");
+    manager.initialise();
+    manager.initialise();
+    check(schedulerCalls.tasks.size() == 2, "initialise scheduling count");
+    check(schedulerCalls.tasks.get(0).cancelValues.isEmpty(), "stored task not cancelled");
+    check(schedulerCalls.tasks.get(1).cancelValues.equals(Arrays.asList(false)),
+        "duplicate task cancelled without interrupt");
+
+    PlayerHandler firstCalls = new PlayerHandler();
+    PlayerHandler secondCalls = new PlayerHandler();
+    AudioPlayer first = proxy(AudioPlayer.class, firstCalls);
+    AudioPlayer second = proxy(AudioPlayer.class, secondCalls);
+    AudioTrack track = proxy(AudioTrack.class, new DefaultHandler());
+
+    manager.onEvent(null);
+    manager.onEvent(new PlayerPauseEvent(first));
+    manager.run();
+    check(firstCalls.thresholds.isEmpty() && secondCalls.thresholds.isEmpty(),
+        "unrelated event ignored");
+
+    manager.onEvent(new TrackStartEvent(first, track));
+    manager.onEvent(new TrackStartEvent(second, track));
+    manager.onEvent(new TrackStartEvent(first, track));
+    manager.run();
+    check(firstCalls.thresholds.equals(Arrays.asList(37L))
+        && secondCalls.thresholds.equals(Arrays.asList(37L)), "start and deduplicate");
+
+    cleanupThreshold.set(Long.MIN_VALUE);
+    manager.run();
+    check(firstCalls.thresholds.equals(Arrays.asList(37L, Long.MIN_VALUE))
+        && secondCalls.thresholds.equals(Arrays.asList(37L, Long.MIN_VALUE)),
+        "live threshold");
+
+    manager.onEvent(new TrackEndEvent(first, track, AudioTrackEndReason.FINISHED));
+    manager.run();
+    check(firstCalls.thresholds.size() == 2 && secondCalls.thresholds.size() == 3
+        && secondCalls.thresholds.get(2) == Long.MIN_VALUE, "end removes one player");
+    manager.onEvent(new PlayerPauseEvent(second));
+    manager.onEvent(new TrackEndEvent(second, track, AudioTrackEndReason.STOPPED));
+    manager.run();
+    check(secondCalls.thresholds.size() == 3, "end removes final player");
+    expectNullPlayerFailure(manager, track);
+
+    manager.shutdown();
+    manager.shutdown();
+    check(schedulerCalls.tasks.get(0).cancelValues.equals(Arrays.asList(false)),
+        "stored task cancelled exactly once");
+    manager.initialise();
+    manager.shutdown();
+    check(schedulerCalls.tasks.size() == 3
+        && schedulerCalls.tasks.get(2).cancelValues.equals(Arrays.asList(false)),
+        "restart after shutdown");
+
+    checkReflection();
+    System.out.println(
+        "schedule=fixed-rate,duplicate-cancel,restart;"
+        + "players=start,end,deduplicate,live-threshold,null-event,null-player;"
+        + "shutdown=idempotent;reflection=class,5-fields,4-methods,1-constructor");
+  }
+
+  private static void expectNullPlayerFailure(
+      AudioPlayerLifecycleManager manager, AudioTrack track) {
+    try {
+      manager.onEvent(new TrackStartEvent(null, track));
+      throw new AssertionError("null player accepted");
+    } catch (NullPointerException expected) {
+      // ConcurrentHashMap rejects the null player used as both key and value.
+    }
+  }
+
+  private static void checkReflection() throws Exception {
+    Class<AudioPlayerLifecycleManager> type = AudioPlayerLifecycleManager.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(),
+            new Class<?>[] { Runnable.class, AudioEventListener.class })
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0,
+        "class structure");
+    check(type.getDeclaredFields().length == 5 && type.getDeclaredMethods().length == 4
+        && type.getDeclaredConstructors().length == 1, "member counts");
+    checkField(type, "CHECK_INTERVAL", long.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL, "long");
+    Field interval = type.getDeclaredField("CHECK_INTERVAL");
+    interval.setAccessible(true);
+    check(interval.getLong(null) == 10_000L, "check interval constant");
+    checkField(type, "activePlayers", ConcurrentMap.class, Modifier.PRIVATE | Modifier.FINAL,
+        "java.util.concurrent.ConcurrentMap<com.sedmelluq.discord.lavaplayer.player.AudioPlayer, "
+        + "com.sedmelluq.discord.lavaplayer.player.AudioPlayer>");
+    checkField(type, "scheduler", ScheduledExecutorService.class,
+        Modifier.PRIVATE | Modifier.FINAL, "java.util.concurrent.ScheduledExecutorService");
+    checkField(type, "cleanupThreshold", AtomicLong.class, Modifier.PRIVATE | Modifier.FINAL,
+        "java.util.concurrent.atomic.AtomicLong");
+    checkField(type, "scheduledTask", AtomicReference.class, Modifier.PRIVATE | Modifier.FINAL,
+        "java.util.concurrent.atomic.AtomicReference<java.util.concurrent.ScheduledFuture<?>>");
+
+    Constructor<AudioPlayerLifecycleManager> constructor =
+        type.getDeclaredConstructor(ScheduledExecutorService.class, AtomicLong.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0
+        && constructor.getTypeParameters().length == 0, "constructor metadata");
+    checkMethod(type.getDeclaredMethod("initialise"), new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("shutdown"), new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("onEvent", AudioEvent.class),
+        new Class<?>[] { AudioEvent.class });
+    checkMethod(type.getDeclaredMethod("run"), new Class<?>[0]);
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> fieldType, int modifiers,
+      String genericType) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getModifiers() == modifiers
+        && field.getGenericType().getTypeName().equals(genericType)
+        && !field.isSynthetic() && field.getDeclaredAnnotations().length == 0,
+        "field metadata " + name);
+  }
+
+  private static void checkMethod(Method method, Class<?>[] parameters) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == void.class
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && !method.isBridge() && !method.isSynthetic() && !method.isDefault()
+        && !method.isVarArgs(), "method metadata " + method.getName());
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type, InvocationHandler handler) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] { type }, handler);
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == char.class) return '\0';
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0.0F;
+    if (type == double.class) return 0.0D;
+    throw new AssertionError("unknown primitive " + type);
+  }
+
+  private static class DefaultHandler implements InvocationHandler {
+    public Object invoke(Object proxy, Method method, Object[] arguments) {
+      if (method.getName().equals("hashCode")) return System.identityHashCode(proxy);
+      if (method.getName().equals("equals")) return proxy == arguments[0];
+      return defaultValue(method.getReturnType());
+    }
+  }
+
+  private static final class PlayerHandler extends DefaultHandler {
+    final List<Long> thresholds = new ArrayList<>();
+
+    public Object invoke(Object proxy, Method method, Object[] arguments) {
+      if (method.getName().equals("checkCleanup")) {
+        thresholds.add((Long) arguments[0]);
+        return null;
+      }
+      return super.invoke(proxy, method, arguments);
+    }
+  }
+
+  private static final class SchedulerHandler extends DefaultHandler {
+    final List<TaskHandler> tasks = new ArrayList<>();
+    Runnable expectedRunnable;
+
+    public Object invoke(Object proxy, Method method, Object[] arguments) {
+      if (method.getName().equals("scheduleAtFixedRate")) {
+        check(arguments[0] == expectedRunnable && arguments[1].equals(10_000L)
+            && arguments[2].equals(10_000L) && arguments[3] == TimeUnit.MILLISECONDS,
+            "fixed-rate arguments");
+        TaskHandler task = new TaskHandler();
+        tasks.add(task);
+        return GateAudioPlayerLifecycleManager.proxy(ScheduledFuture.class, task);
+      }
+      return super.invoke(proxy, method, arguments);
+    }
+  }
+
+  private static final class TaskHandler extends DefaultHandler {
+    final List<Boolean> cancelValues = new ArrayList<>();
+
+    public Object invoke(Object proxy, Method method, Object[] arguments) {
+      if (method.getName().equals("cancel")) {
+        cancelValues.add((Boolean) arguments[0]);
+        return true;
+      }
+      return super.invoke(proxy, method, arguments);
+    }
   }
 
   private static void check(boolean condition, String message) {
