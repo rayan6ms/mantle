@@ -81,6 +81,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
             Some(DEFAULT_AUDIO_PLAYER_MANAGER_CONSUMER)
         }
         "write-internal-audio-track-consumer" => Some(INTERNAL_AUDIO_TRACK_CONSUMER),
+        "write-audio-track-executor-consumer" => Some(AUDIO_TRACK_EXECUTOR_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -4207,6 +4208,167 @@ public final class GateDefaultAudioPlayerManager {
     java.lang.reflect.InvocationHandler actual = handler == null
         ? (instance, method, arguments) -> defaultValue(method.getReturnType()) : handler;
     return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] { type }, actual);
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_TRACK_EXECUTOR_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackState;
+import com.sedmelluq.discord.lavaplayer.track.TrackMarker;
+import com.sedmelluq.discord.lavaplayer.track.TrackStateListener;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameProvider;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioTrackExecutor;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+public final class GateAudioTrackExecutor {
+  public static void main(String[] args) throws Exception {
+    AudioFrameBuffer buffer = proxy(AudioFrameBuffer.class, (instance, method, arguments) ->
+        defaultValue(method.getReturnType()));
+    TrackStateListener listener = proxy(TrackStateListener.class, (instance, method, arguments) ->
+        defaultValue(method.getReturnType()));
+    TrackMarker marker = new TrackMarker(123456789L, state -> { });
+    List<String> calls = new ArrayList<>();
+    int[] positionReads = { 0 };
+    int[] stateReads = { 0 };
+    int[] failureReads = { 0 };
+
+    AudioTrackExecutor executor = proxy(AudioTrackExecutor.class, (instance, method, arguments) -> {
+      switch (method.getName()) {
+        case "getAudioBuffer":
+          calls.add("buffer");
+          return buffer;
+        case "execute":
+          calls.add(arguments[0] == listener ? "execute-listener" : "execute-null");
+          return null;
+        case "stop":
+          calls.add("stop");
+          return null;
+        case "getPosition":
+          calls.add(positionReads[0]++ == 0 ? "position-min" : "position-max");
+          return positionReads[0] == 1 ? Long.MIN_VALUE : Long.MAX_VALUE;
+        case "setPosition":
+          calls.add(((Long) arguments[0]) == Long.MIN_VALUE ? "set-min" : "set-max");
+          return null;
+        case "getState":
+          calls.add(stateReads[0]++ == 0 ? "state-seeking" : "state-null");
+          return stateReads[0] == 1 ? AudioTrackState.SEEKING : null;
+        case "setMarker":
+        case "addMarker":
+        case "removeMarker":
+          calls.add(method.getName() + (arguments[0] == marker ? "-marker" : "-null"));
+          return null;
+        case "failedBeforeLoad":
+          calls.add(failureReads[0]++ == 0 ? "failed-true" : "failed-false");
+          return failureReads[0] == 1;
+        default:
+          return defaultValue(method.getReturnType());
+      }
+    });
+
+    check(executor.getAudioBuffer() == buffer, "audio buffer identity");
+    executor.execute(listener);
+    executor.execute(null);
+    executor.stop();
+    check(executor.getPosition() == Long.MIN_VALUE, "minimum position width");
+    check(executor.getPosition() == Long.MAX_VALUE, "maximum position width");
+    executor.setPosition(Long.MIN_VALUE);
+    executor.setPosition(Long.MAX_VALUE);
+    check(executor.getState() == AudioTrackState.SEEKING, "state identity");
+    check(executor.getState() == null, "nullable state");
+    executor.setMarker(marker);
+    executor.setMarker(null);
+    executor.addMarker(marker);
+    executor.addMarker(null);
+    executor.removeMarker(marker);
+    executor.removeMarker(null);
+    check(executor.failedBeforeLoad(), "failed true result");
+    check(!executor.failedBeforeLoad(), "failed false result");
+    check(executor instanceof AudioFrameProvider, "provider inheritance");
+    check(calls.equals(Arrays.asList(
+        "buffer", "execute-listener", "execute-null", "stop", "position-min", "position-max",
+        "set-min", "set-max", "state-seeking", "state-null", "setMarker-marker",
+        "setMarker-null", "addMarker-marker", "addMarker-null", "removeMarker-marker",
+        "removeMarker-null", "failed-true", "failed-false")), "dispatch order");
+
+    checkReflection();
+    System.out.println(
+        "dispatch=buffer,execute,stop,position,state,markers,failed;"
+        + "edges=nulls,long-min-max,true-false,identity;"
+        + "reflection=interface,AudioFrameProvider,0-fields,10-methods,0-constructors");
+  }
+
+  private static void checkReflection() throws Exception {
+    Class<AudioTrackExecutor> type = AudioTrackExecutor.class;
+    int modifiers = type.getModifiers();
+    check(Modifier.isPublic(modifiers) && Modifier.isInterface(modifiers)
+        && Modifier.isAbstract(modifiers) && !Modifier.isFinal(modifiers)
+        && type.getSuperclass() == null && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0, "interface structure");
+    check(Arrays.equals(type.getInterfaces(), new Class<?>[] { AudioFrameProvider.class }),
+        "direct interface");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredMethods().length == 10
+        && type.getDeclaredConstructors().length == 0, "member counts");
+
+    checkAbstract(type.getDeclaredMethod("getAudioBuffer"), AudioFrameBuffer.class,
+        new Class<?>[0]);
+    checkAbstract(type.getDeclaredMethod("execute", TrackStateListener.class), void.class,
+        new Class<?>[] { TrackStateListener.class });
+    checkAbstract(type.getDeclaredMethod("stop"), void.class, new Class<?>[0]);
+    checkAbstract(type.getDeclaredMethod("getPosition"), long.class, new Class<?>[0]);
+    checkAbstract(type.getDeclaredMethod("setPosition", long.class), void.class,
+        new Class<?>[] { long.class });
+    checkAbstract(type.getDeclaredMethod("getState"), AudioTrackState.class, new Class<?>[0]);
+    checkAbstract(type.getDeclaredMethod("setMarker", TrackMarker.class), void.class,
+        new Class<?>[] { TrackMarker.class });
+    checkAbstract(type.getDeclaredMethod("addMarker", TrackMarker.class), void.class,
+        new Class<?>[] { TrackMarker.class });
+    checkAbstract(type.getDeclaredMethod("removeMarker", TrackMarker.class), void.class,
+        new Class<?>[] { TrackMarker.class });
+    checkAbstract(type.getDeclaredMethod("failedBeforeLoad"), boolean.class, new Class<?>[0]);
+  }
+
+  private static void checkAbstract(Method method, Class<?> returnType,
+      Class<?>[] parameterTypes) {
+    int modifiers = method.getModifiers();
+    check(Modifier.isPublic(modifiers) && Modifier.isAbstract(modifiers)
+        && !Modifier.isStatic(modifiers) && !Modifier.isFinal(modifiers)
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic(),
+        method.getName() + " modifiers");
+    check(method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameterTypes)
+        && method.getExceptionTypes().length == 0
+        && method.getTypeParameters().length == 0
+        && method.getDeclaredAnnotations().length == 0,
+        method.getName() + " metadata");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type, InvocationHandler handler) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] { type }, handler);
   }
 
   private static Object defaultValue(Class<?> type) {

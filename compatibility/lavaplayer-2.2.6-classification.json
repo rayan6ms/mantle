@@ -25167,99 +25167,132 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure, AudioFrameProvider inheritance, all abstract dispatch paths, identity and null propagation, full-width positions, boolean outcomes, and reflection metadata are covered by the Phase 13 audio-track-executor slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "getAudioBuffer",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBuffer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure, AudioFrameProvider inheritance, all abstract dispatch paths, identity and null propagation, full-width positions, boolean outcomes, and reflection metadata are covered by the Phase 13 audio-track-executor slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "execute",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/TrackStateListener;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure, AudioFrameProvider inheritance, all abstract dispatch paths, identity and null propagation, full-width positions, boolean outcomes, and reflection metadata are covered by the Phase 13 audio-track-executor slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "stop",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure, AudioFrameProvider inheritance, all abstract dispatch paths, identity and null propagation, full-width positions, boolean outcomes, and reflection metadata are covered by the Phase 13 audio-track-executor slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "getPosition",
       "descriptor": "()J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure, AudioFrameProvider inheritance, all abstract dispatch paths, identity and null propagation, full-width positions, boolean outcomes, and reflection metadata are covered by the Phase 13 audio-track-executor slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "setPosition",
       "descriptor": "(J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure, AudioFrameProvider inheritance, all abstract dispatch paths, identity and null propagation, full-width positions, boolean outcomes, and reflection metadata are covered by the Phase 13 audio-track-executor slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "getState",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackState;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure, AudioFrameProvider inheritance, all abstract dispatch paths, identity and null propagation, full-width positions, boolean outcomes, and reflection metadata are covered by the Phase 13 audio-track-executor slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "setMarker",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure, AudioFrameProvider inheritance, all abstract dispatch paths, identity and null propagation, full-width positions, boolean outcomes, and reflection metadata are covered by the Phase 13 audio-track-executor slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "addMarker",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure, AudioFrameProvider inheritance, all abstract dispatch paths, identity and null propagation, full-width positions, boolean outcomes, and reflection metadata are covered by the Phase 13 audio-track-executor slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "removeMarker",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure, AudioFrameProvider inheritance, all abstract dispatch paths, identity and null propagation, full-width positions, boolean outcomes, and reflection metadata are covered by the Phase 13 audio-track-executor slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "failedBeforeLoad",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure, AudioFrameProvider inheritance, all abstract dispatch paths, identity and null propagation, full-width positions, boolean outcomes, and reflection metadata are covered by the Phase 13 audio-track-executor slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame",
