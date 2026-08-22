@@ -125,6 +125,8 @@ const DEFAULT_SOUND_CLOUD_DATA_READER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/DefaultSoundCloudDataReader";
 const DEFAULT_SOUND_CLOUD_FORMAT_HANDLER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/DefaultSoundCloudFormatHandler";
+const DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/soundcloud/DefaultSoundCloudPlaylistLoader";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -166,6 +168,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     DEFAULT_SOUND_CLOUD_DATA_LOADER_CLASS,
     DEFAULT_SOUND_CLOUD_DATA_READER_CLASS,
     DEFAULT_SOUND_CLOUD_FORMAT_HANDLER_CLASS,
+    DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -527,6 +530,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | NICO_AUDIO_TRACK_CLASS
                 | DEFAULT_SOUND_CLOUD_DATA_READER_CLASS
                 | DEFAULT_SOUND_CLOUD_FORMAT_HANDLER_CLASS
+                | DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS
         ) || field
             .access_flags
             .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
@@ -544,6 +548,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | DEFAULT_SOUND_CLOUD_DATA_LOADER_CLASS
                 | DEFAULT_SOUND_CLOUD_DATA_READER_CLASS
                 | DEFAULT_SOUND_CLOUD_FORMAT_HANDLER_CLASS
+                | DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS
         ) || method
             .access_flags
             .intersects(MethodAccessFlags::PUBLIC | MethodAccessFlags::PROTECTED)
@@ -638,6 +643,14 @@ fn replacement_body(
     }
     if class_name == DEFAULT_SOUND_CLOUD_FORMAT_HANDLER_CLASS {
         return default_sound_cloud_format_handler_replacement(
+            pool,
+            name,
+            descriptor,
+            required_locals,
+        );
+    }
+    if class_name == DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS {
+        return default_sound_cloud_playlist_loader_replacement(
             pool,
             name,
             descriptor,
@@ -4486,6 +4499,1159 @@ fn default_sound_cloud_format_handler_clinit(
         vec![
             Instruction::Invokestatic(values),
             Instruction::Putstatic(types),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn default_sound_cloud_playlist_loader_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataLoader;Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataReader;Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudFormatHandler;)V",
+        ) => default_sound_cloud_playlist_loader_constructor(pool),
+        (
+            "load",
+            "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;Ljava/util/function/Function;)Lcom/sedmelluq/discord/lavaplayer/track/AudioPlaylist;",
+        ) => default_sound_cloud_playlist_loader_load(pool),
+        (
+            "loadFromSet",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;Ljava/lang/String;Ljava/util/function/Function;)Lcom/sedmelluq/discord/lavaplayer/track/AudioPlaylist;",
+        ) => default_sound_cloud_playlist_loader_load_from_set(pool),
+        (
+            "loadPlaylistTracks",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Ljava/util/function/Function;)Ljava/util/List;",
+        ) => default_sound_cloud_playlist_loader_tracks(pool),
+        ("buildTrackListUrl", "(Ljava/util/List;)Ljava/net/URI;") => {
+            default_sound_cloud_playlist_loader_track_url(pool)
+        }
+        ("sortPlaylistTracks", "(Ljava/util/List;Ljava/util/List;)V") => {
+            default_sound_cloud_playlist_loader_sort(pool)
+        }
+        (
+            "lambda$sortPlaylistTracks$0",
+            "(Ljava/util/Map;Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)I",
+        ) => default_sound_cloud_playlist_loader_sort_key(pool),
+        ("<clinit>", "()V") => default_sound_cloud_playlist_loader_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn default_sound_cloud_playlist_loader_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS)?;
+    let data_loader = pool.add_field_ref(
+        owner,
+        "dataLoader",
+        "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataLoader;",
+    )?;
+    let data_reader = pool.add_field_ref(
+        owner,
+        "dataReader",
+        "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataReader;",
+    )?;
+    let format_handler = pool.add_field_ref(
+        owner,
+        "formatHandler",
+        "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudFormatHandler;",
+    )?;
+    code(
+        pool,
+        2,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(data_loader),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(data_reader),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Putfield(format_handler),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn default_sound_cloud_playlist_loader_load(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS)?;
+    let helper =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudHelper")?;
+    let non_mobile = pool.add_method_ref(
+        helper,
+        "nonMobileUrl",
+        "(Ljava/lang/String;)Ljava/lang/String;",
+    )?;
+    let pattern = pool.add_class("java/util/regex/Pattern")?;
+    let playlist_pattern =
+        pool.add_field_ref(owner, "playlistUrlPattern", "Ljava/util/regex/Pattern;")?;
+    let matcher = pool.add_method_ref(
+        pattern,
+        "matcher",
+        "(Ljava/lang/CharSequence;)Ljava/util/regex/Matcher;",
+    )?;
+    let matcher_class = pool.add_class("java/util/regex/Matcher")?;
+    let matcher_matches = pool.add_method_ref(matcher_class, "matches", "()Z")?;
+    let load_from_set = pool.add_method_ref(
+        owner,
+        "loadFromSet",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;Ljava/lang/String;Ljava/util/function/Function;)Lcom/sedmelluq/discord/lavaplayer/track/AudioPlaylist;",
+    )?;
+    let string = pool.add_class("java/lang/String")?;
+    let mut body = code(
+        pool,
+        4,
+        5,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Invokestatic(non_mobile),
+            Instruction::Astore(4),
+            Instruction::Getstatic(playlist_pattern),
+            Instruction::Aload(4),
+            Instruction::Invokevirtual(matcher),
+            Instruction::Invokevirtual(matcher_matches),
+            Instruction::Ifeq(14),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Aload(4),
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(load_from_set),
+            Instruction::Areturn,
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::AppendFrame {
+            frame_type: 252,
+            offset_delta: 14,
+            locals: vec![VerificationType::Object {
+                cpool_index: string,
+            }],
+        }],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn default_sound_cloud_playlist_loader_load_from_set(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS)?;
+    let manager =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager")?;
+    let get_interface = pool.add_interface_method_ref(
+        manager,
+        "getInterface",
+        "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;",
+    )?;
+    let http = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpInterface")?;
+    let close = pool.add_method_ref(http, "close", "()V")?;
+    let loader =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataLoader")?;
+    let data_loader = pool.add_field_ref(
+        owner,
+        "dataLoader",
+        "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataLoader;",
+    )?;
+    let load = pool.add_interface_method_ref(
+        loader,
+        "load",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let json_get = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let text_method = pool.add_method_ref(json, "text", "()Ljava/lang/String;")?;
+    let kind = pool.add_string("kind")?;
+    let reader =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataReader")?;
+    let data_reader = pool.add_field_ref(
+        owner,
+        "dataReader",
+        "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataReader;",
+    )?;
+    let find_playlist = pool.add_interface_method_ref(
+        reader,
+        "findPlaylistData",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let playlist_name = pool.add_interface_method_ref(
+        reader,
+        "readPlaylistName",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/lang/String;",
+    )?;
+    let basic_playlist =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/BasicAudioPlaylist")?;
+    let basic_init = pool.add_method_ref(
+        basic_playlist,
+        "<init>",
+        "(Ljava/lang/String;Ljava/util/List;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Z)V",
+    )?;
+    let playlist = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioPlaylist")?;
+    let function = pool.add_class("java/util/function/Function")?;
+    let string = pool.add_class("java/lang/String")?;
+    let load_tracks = pool.add_method_ref(
+        owner,
+        "loadPlaylistTracks",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Ljava/util/function/Function;)Ljava/util/List;",
+    )?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let add_suppressed =
+        pool.add_method_ref(throwable, "addSuppressed", "(Ljava/lang/Throwable;)V")?;
+    let io_error = pool.add_class("java/io/IOException")?;
+    let friendly = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/FriendlyException")?;
+    let severity =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity")?;
+    let suspicious = pool.add_field_ref(
+        severity,
+        "SUSPICIOUS",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity;",
+    )?;
+    let friendly_init = pool.add_method_ref(
+        friendly,
+        "<init>",
+        "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity;Ljava/lang/Throwable;)V",
+    )?;
+    let diagnostic = pool.add_string("Loading playlist from SoundCloud failed.")?;
+    let mut body = code_with_exceptions(
+        pool,
+        7,
+        9,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(get_interface, 1),
+            Instruction::Astore(4),
+            Instruction::Aload_0,
+            Instruction::Getfield(data_loader),
+            Instruction::Aload(4),
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(load, 3),
+            Instruction::Astore(5),
+            Instruction::Aload(5),
+            Instruction::Ldc_w(kind),
+            Instruction::Invokevirtual(json_get),
+            Instruction::Invokevirtual(text_method),
+            Instruction::Astore(6),
+            Instruction::Aload_0,
+            Instruction::Getfield(data_reader),
+            Instruction::Aload(5),
+            Instruction::Aload(6),
+            Instruction::Invokeinterface(find_playlist, 3),
+            Instruction::Astore(7),
+            Instruction::New(basic_playlist),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(data_reader),
+            Instruction::Aload(7),
+            Instruction::Invokeinterface(playlist_name, 2),
+            Instruction::Aload_0,
+            Instruction::Aload(4),
+            Instruction::Aload(7),
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(load_tracks),
+            Instruction::Aconst_null,
+            Instruction::Iconst_0,
+            Instruction::Invokespecial(basic_init),
+            Instruction::Astore(8),
+            Instruction::Aload(4),
+            Instruction::Ifnull(39),
+            Instruction::Aload(4),
+            Instruction::Invokevirtual(close),
+            Instruction::Aload(8),
+            Instruction::Areturn,
+            Instruction::Astore(5),
+            Instruction::Aload(4),
+            Instruction::Ifnull(51),
+            Instruction::Aload(4),
+            Instruction::Invokevirtual(close),
+            Instruction::Goto(51),
+            Instruction::Astore(6),
+            Instruction::Aload(5),
+            Instruction::Aload(6),
+            Instruction::Invokevirtual(add_suppressed),
+            Instruction::Aload(5),
+            Instruction::Athrow,
+            Instruction::Astore(4),
+            Instruction::New(friendly),
+            Instruction::Dup,
+            Instruction::Ldc_w(diagnostic),
+            Instruction::Getstatic(suspicious),
+            Instruction::Aload(4),
+            Instruction::Invokespecial(friendly_init),
+            Instruction::Athrow,
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 3..35,
+                handler_pc: 41,
+                catch_type: throwable,
+            },
+            ExceptionTableEntry {
+                range_pc: 44..46,
+                handler_pc: 47,
+                catch_type: throwable,
+            },
+            ExceptionTableEntry {
+                range_pc: 0..39,
+                handler_pc: 53,
+                catch_type: io_error,
+            },
+            ExceptionTableEntry {
+                range_pc: 41..53,
+                handler_pc: 53,
+                catch_type: io_error,
+            },
+        ],
+    )?;
+    let owner_type = VerificationType::Object { cpool_index: owner };
+    let manager_type = VerificationType::Object {
+        cpool_index: manager,
+    };
+    let string_type = VerificationType::Object {
+        cpool_index: string,
+    };
+    let function_type = VerificationType::Object {
+        cpool_index: function,
+    };
+    let http_type = VerificationType::Object { cpool_index: http };
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 39,
+                locals: vec![
+                    owner_type.clone(),
+                    manager_type.clone(),
+                    string_type.clone(),
+                    function_type.clone(),
+                    http_type.clone(),
+                    VerificationType::Object { cpool_index: json },
+                    string_type.clone(),
+                    VerificationType::Object { cpool_index: json },
+                    VerificationType::Object {
+                        cpool_index: playlist,
+                    },
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 1,
+                locals: vec![
+                    owner_type.clone(),
+                    manager_type.clone(),
+                    string_type.clone(),
+                    function_type.clone(),
+                    http_type.clone(),
+                ],
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 5,
+                locals: vec![
+                    owner_type.clone(),
+                    manager_type.clone(),
+                    string_type.clone(),
+                    function_type.clone(),
+                    http_type,
+                    VerificationType::Object {
+                        cpool_index: throwable,
+                    },
+                ],
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+            StackFrame::SameFrame { frame_type: 3 },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 1,
+                locals: vec![owner_type, manager_type, string_type, function_type],
+                stack: vec![VerificationType::Object {
+                    cpool_index: io_error,
+                }],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn default_sound_cloud_playlist_loader_tracks(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS)?;
+    let reader =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataReader")?;
+    let data_reader = pool.add_field_ref(
+        owner,
+        "dataReader",
+        "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataReader;",
+    )?;
+    let playlist_identifier = pool.add_interface_method_ref(
+        reader,
+        "readPlaylistIdentifier",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/lang/String;",
+    )?;
+    let playlist_tracks = pool.add_interface_method_ref(
+        reader,
+        "readPlaylistTracks",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/util/List;",
+    )?;
+    let list = pool.add_class("java/util/List")?;
+    let stream_method =
+        pool.add_interface_method_ref(list, "stream", "()Ljava/util/stream/Stream;")?;
+    let list_size = pool.add_interface_method_ref(list, "size", "()I")?;
+    let sub_list = pool.add_interface_method_ref(list, "subList", "(II)Ljava/util/List;")?;
+    let add_all = pool.add_interface_method_ref(list, "addAll", "(Ljava/util/Collection;)Z")?;
+    let iterator_method =
+        pool.add_interface_method_ref(list, "iterator", "()Ljava/util/Iterator;")?;
+    let list_add = pool.add_interface_method_ref(list, "add", "(Ljava/lang/Object;)Z")?;
+    let objects = pool.add_class("java/util/Objects")?;
+    let require_non_null = pool.add_method_ref(
+        objects,
+        "requireNonNull",
+        "(Ljava/lang/Object;)Ljava/lang/Object;",
+    )?;
+    let track_id_function = pool.add_invoke_dynamic(
+        0,
+        "apply",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataReader;)Ljava/util/function/Function;",
+    )?;
+    let stream = pool.add_class("java/util/stream/Stream")?;
+    let stream_map = pool.add_interface_method_ref(
+        stream,
+        "map",
+        "(Ljava/util/function/Function;)Ljava/util/stream/Stream;",
+    )?;
+    let collect = pool.add_interface_method_ref(
+        stream,
+        "collect",
+        "(Ljava/util/stream/Collector;)Ljava/lang/Object;",
+    )?;
+    let collectors = pool.add_class("java/util/stream/Collectors")?;
+    let to_list = pool.add_method_ref(collectors, "toList", "()Ljava/util/stream/Collector;")?;
+    let array_list = pool.add_class("java/util/ArrayList")?;
+    let array_list_init = pool.add_method_ref(array_list, "<init>", "()V")?;
+    let math = pool.add_class("java/lang/Math")?;
+    let min = pool.add_method_ref(math, "min", "(II)I")?;
+    let http_get = pool.add_class("org/apache/http/client/methods/HttpGet")?;
+    let http_get_init = pool.add_method_ref(http_get, "<init>", "(Ljava/net/URI;)V")?;
+    let build_url = pool.add_method_ref(
+        owner,
+        "buildTrackListUrl",
+        "(Ljava/util/List;)Ljava/net/URI;",
+    )?;
+    let http = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpInterface")?;
+    let execute = pool.add_method_ref(
+        http,
+        "execute",
+        "(Lorg/apache/http/client/methods/HttpUriRequest;)Lorg/apache/http/client/methods/CloseableHttpResponse;",
+    )?;
+    let response = pool.add_class("org/apache/http/client/methods/CloseableHttpResponse")?;
+    let get_entity =
+        pool.add_interface_method_ref(response, "getEntity", "()Lorg/apache/http/HttpEntity;")?;
+    let response_close = pool.add_interface_method_ref(response, "close", "()V")?;
+    let client_tools =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpClientTools")?;
+    let assert_success = pool.add_method_ref(
+        client_tools,
+        "assertSuccessWithContent",
+        "(Lorg/apache/http/HttpResponse;Ljava/lang/String;)V",
+    )?;
+    let response_context = pool.add_string("track list response")?;
+    let entity = pool.add_class("org/apache/http/HttpEntity")?;
+    let content = pool.add_interface_method_ref(entity, "getContent", "()Ljava/io/InputStream;")?;
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let parse = pool.add_method_ref(
+        json,
+        "parse",
+        "(Ljava/io/InputStream;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let values = pool.add_method_ref(json, "values", "()Ljava/util/List;")?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let add_suppressed =
+        pool.add_method_ref(throwable, "addSuppressed", "(Ljava/lang/Throwable;)V")?;
+    let sort_tracks = pool.add_method_ref(
+        owner,
+        "sortPlaylistTracks",
+        "(Ljava/util/List;Ljava/util/List;)V",
+    )?;
+    let iterator = pool.add_class("java/util/Iterator")?;
+    let has_next = pool.add_interface_method_ref(iterator, "hasNext", "()Z")?;
+    let next = pool.add_interface_method_ref(iterator, "next", "()Ljava/lang/Object;")?;
+    let blocked = pool.add_interface_method_ref(
+        reader,
+        "isTrackBlocked",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Z",
+    )?;
+    let formats = pool.add_interface_method_ref(
+        reader,
+        "readTrackFormats",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/util/List;",
+    )?;
+    let read_info = pool.add_interface_method_ref(
+        reader,
+        "readTrackInfo",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let handler = pool
+        .add_class("com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudFormatHandler")?;
+    let format_handler = pool.add_field_ref(
+        owner,
+        "formatHandler",
+        "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudFormatHandler;",
+    )?;
+    let choose = pool.add_interface_method_ref(
+        handler,
+        "chooseBestFormat",
+        "(Ljava/util/List;)Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudTrackFormat;",
+    )?;
+    let identifier = pool.add_interface_method_ref(
+        handler,
+        "buildFormatIdentifier",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudTrackFormat;)Ljava/lang/String;",
+    )?;
+    let function = pool.add_class("java/util/function/Function")?;
+    let apply =
+        pool.add_interface_method_ref(function, "apply", "(Ljava/lang/Object;)Ljava/lang/Object;")?;
+    let audio_track = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrack")?;
+    let exception = pool.add_class("java/lang/Exception")?;
+    let logger = pool.add_class("org/slf4j/Logger")?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let error_log = pool.add_interface_method_ref(
+        logger,
+        "error",
+        "(Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;)V",
+    )?;
+    let debug_log = pool.add_interface_method_ref(
+        logger,
+        "debug",
+        "(Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;)V",
+    )?;
+    let track_error = pool.add_string("In soundcloud playlist {}, failed to load track")?;
+    let blocked_message = pool.add_string(
+        "In soundcloud playlist {}, {} tracks were omitted because they are blocked.",
+    )?;
+    let integer = pool.add_class("java/lang/Integer")?;
+    let value_of = pool.add_method_ref(integer, "valueOf", "(I)Ljava/lang/Integer;")?;
+
+    let mut body = code_with_exceptions(
+        pool,
+        8,
+        14,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(data_reader),
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(playlist_identifier, 2),
+            Instruction::Astore(4),
+            Instruction::Aload_0,
+            Instruction::Getfield(data_reader),
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(playlist_tracks, 2),
+            Instruction::Invokeinterface(stream_method, 1),
+            Instruction::Aload_0,
+            Instruction::Getfield(data_reader),
+            Instruction::Dup,
+            Instruction::Invokestatic(require_non_null),
+            Instruction::Pop,
+            Instruction::Invokedynamic(track_id_function),
+            Instruction::Invokeinterface(stream_map, 2),
+            Instruction::Invokestatic(to_list),
+            Instruction::Invokeinterface(collect, 2),
+            Instruction::Checkcast(list),
+            Instruction::Astore(5),
+            Instruction::Aload(5),
+            Instruction::Invokeinterface(list_size, 1),
+            Instruction::Istore(6),
+            Instruction::New(array_list),
+            Instruction::Dup,
+            Instruction::Invokespecial(array_list_init),
+            Instruction::Astore(7),
+            Instruction::Iconst_0,
+            Instruction::Istore(8),
+            Instruction::Iload(8),
+            Instruction::Iload(6),
+            Instruction::If_icmpge(85),
+            Instruction::Iload(8),
+            Instruction::Bipush(50),
+            Instruction::Iadd,
+            Instruction::Iload(6),
+            Instruction::Invokestatic(min),
+            Instruction::Istore(9),
+            Instruction::Aload(5),
+            Instruction::Iload(8),
+            Instruction::Iload(9),
+            Instruction::Invokeinterface(sub_list, 3),
+            Instruction::Astore(10),
+            Instruction::Aload_1,
+            Instruction::New(http_get),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Aload(10),
+            Instruction::Invokevirtual(build_url),
+            Instruction::Invokespecial(http_get_init),
+            Instruction::Invokevirtual(execute),
+            Instruction::Astore(11),
+            Instruction::Aload(11),
+            Instruction::Ldc_w(response_context),
+            Instruction::Invokestatic(assert_success),
+            Instruction::Aload(11),
+            Instruction::Invokeinterface(get_entity, 1),
+            Instruction::Invokeinterface(content, 1),
+            Instruction::Invokestatic(parse),
+            Instruction::Astore(12),
+            Instruction::Aload(7),
+            Instruction::Aload(12),
+            Instruction::Invokevirtual(values),
+            Instruction::Invokeinterface(add_all, 2),
+            Instruction::Pop,
+            Instruction::Aload(11),
+            Instruction::Ifnull(83),
+            Instruction::Aload(11),
+            Instruction::Invokeinterface(response_close, 1),
+            Instruction::Goto(83),
+            Instruction::Astore(12),
+            Instruction::Aload(11),
+            Instruction::Ifnull(81),
+            Instruction::Aload(11),
+            Instruction::Invokeinterface(response_close, 1),
+            Instruction::Goto(81),
+            Instruction::Astore(13),
+            Instruction::Aload(12),
+            Instruction::Aload(13),
+            Instruction::Invokevirtual(add_suppressed),
+            Instruction::Aload(12),
+            Instruction::Athrow,
+            Instruction::Iinc(8, 50),
+            Instruction::Goto(30),
+            Instruction::Aload_0,
+            Instruction::Aload(7),
+            Instruction::Aload(5),
+            Instruction::Invokevirtual(sort_tracks),
+            Instruction::Iconst_0,
+            Instruction::Istore(8),
+            Instruction::New(array_list),
+            Instruction::Dup,
+            Instruction::Invokespecial(array_list_init),
+            Instruction::Astore(9),
+            Instruction::Aload(7),
+            Instruction::Invokeinterface(iterator_method, 1),
+            Instruction::Astore(10),
+            Instruction::Aload(10),
+            Instruction::Invokeinterface(has_next, 1),
+            Instruction::Ifeq(140),
+            Instruction::Aload(10),
+            Instruction::Invokeinterface(next, 1),
+            Instruction::Checkcast(json),
+            Instruction::Astore(11),
+            Instruction::Aload_0,
+            Instruction::Getfield(data_reader),
+            Instruction::Aload(11),
+            Instruction::Invokeinterface(blocked, 2),
+            Instruction::Ifeq(112),
+            Instruction::Iinc(8, 1),
+            Instruction::Goto(139),
+            Instruction::Aload(9),
+            Instruction::Aload_3,
+            Instruction::Aload_0,
+            Instruction::Getfield(data_reader),
+            Instruction::Aload(11),
+            Instruction::Aload_0,
+            Instruction::Getfield(format_handler),
+            Instruction::Aload_0,
+            Instruction::Getfield(format_handler),
+            Instruction::Aload_0,
+            Instruction::Getfield(data_reader),
+            Instruction::Aload(11),
+            Instruction::Invokeinterface(formats, 2),
+            Instruction::Invokeinterface(choose, 2),
+            Instruction::Invokeinterface(identifier, 2),
+            Instruction::Invokeinterface(read_info, 3),
+            Instruction::Invokeinterface(apply, 2),
+            Instruction::Checkcast(audio_track),
+            Instruction::Invokeinterface(list_add, 2),
+            Instruction::Pop,
+            Instruction::Goto(139),
+            Instruction::Astore(12),
+            Instruction::Getstatic(log),
+            Instruction::Ldc_w(track_error),
+            Instruction::Aload(4),
+            Instruction::Aload(12),
+            Instruction::Invokeinterface(error_log, 4),
+            Instruction::Goto(98),
+            Instruction::Iload(8),
+            Instruction::Ifle(148),
+            Instruction::Getstatic(log),
+            Instruction::Ldc_w(blocked_message),
+            Instruction::Aload(4),
+            Instruction::Iload(8),
+            Instruction::Invokestatic(value_of),
+            Instruction::Invokeinterface(debug_log, 4),
+            Instruction::Aload(9),
+            Instruction::Areturn,
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 53..66,
+                handler_pc: 71,
+                catch_type: throwable,
+            },
+            ExceptionTableEntry {
+                range_pc: 74..76,
+                handler_pc: 77,
+                catch_type: throwable,
+            },
+            ExceptionTableEntry {
+                range_pc: 112..132,
+                handler_pc: 133,
+                catch_type: exception,
+            },
+        ],
+    )?;
+
+    let owner_type = VerificationType::Object { cpool_index: owner };
+    let http_type = VerificationType::Object { cpool_index: http };
+    let json_type = VerificationType::Object { cpool_index: json };
+    let function_type = VerificationType::Object {
+        cpool_index: function,
+    };
+    let string = pool.add_class("java/lang/String")?;
+    let string_type = VerificationType::Object {
+        cpool_index: string,
+    };
+    let list_type = VerificationType::Object { cpool_index: list };
+    let response_type = VerificationType::Object {
+        cpool_index: response,
+    };
+    let iterator_type = VerificationType::Object {
+        cpool_index: iterator,
+    };
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 30,
+                locals: vec![
+                    owner_type.clone(),
+                    http_type.clone(),
+                    json_type.clone(),
+                    function_type.clone(),
+                    string_type.clone(),
+                    list_type.clone(),
+                    VerificationType::Integer,
+                    list_type.clone(),
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 40,
+                locals: vec![
+                    owner_type.clone(),
+                    http_type.clone(),
+                    json_type.clone(),
+                    function_type.clone(),
+                    string_type.clone(),
+                    list_type.clone(),
+                    VerificationType::Integer,
+                    list_type.clone(),
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                    list_type.clone(),
+                    response_type.clone(),
+                ],
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 5,
+                locals: vec![
+                    owner_type.clone(),
+                    http_type.clone(),
+                    json_type.clone(),
+                    function_type.clone(),
+                    string_type.clone(),
+                    list_type.clone(),
+                    VerificationType::Integer,
+                    list_type.clone(),
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                    list_type.clone(),
+                    response_type,
+                    VerificationType::Object {
+                        cpool_index: throwable,
+                    },
+                ],
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+            StackFrame::SameFrame { frame_type: 3 },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 1,
+                locals: vec![
+                    owner_type.clone(),
+                    http_type.clone(),
+                    json_type.clone(),
+                    function_type.clone(),
+                    string_type.clone(),
+                    list_type.clone(),
+                    VerificationType::Integer,
+                    list_type.clone(),
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: 1,
+            },
+            StackFrame::AppendFrame {
+                frame_type: 254,
+                offset_delta: 12,
+                locals: vec![VerificationType::Integer, list_type.clone(), iterator_type],
+            },
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: 13,
+                locals: vec![json_type],
+            },
+            StackFrame::SameLocals1StackItemFrame {
+                frame_type: 84,
+                stack: vec![VerificationType::Object {
+                    cpool_index: exception,
+                }],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: 5,
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: 0,
+            },
+            StackFrame::SameFrame { frame_type: 7 },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn default_sound_cloud_playlist_loader_track_url(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS)?;
+    let joiner = pool.add_class("java/util/StringJoiner")?;
+    let joiner_init = pool.add_method_ref(joiner, "<init>", "(Ljava/lang/CharSequence;)V")?;
+    let joiner_add = pool.add_method_ref(
+        joiner,
+        "add",
+        "(Ljava/lang/CharSequence;)Ljava/util/StringJoiner;",
+    )?;
+    let joiner_string = pool.add_method_ref(joiner, "toString", "()Ljava/lang/String;")?;
+    let comma = pool.add_string(",")?;
+    let list = pool.add_class("java/util/List")?;
+    let iterator_method =
+        pool.add_interface_method_ref(list, "iterator", "()Ljava/util/Iterator;")?;
+    let iterator = pool.add_class("java/util/Iterator")?;
+    let has_next = pool.add_interface_method_ref(iterator, "hasNext", "()Z")?;
+    let next = pool.add_interface_method_ref(iterator, "next", "()Ljava/lang/Object;")?;
+    let string = pool.add_class("java/lang/String")?;
+    let builder = pool.add_class("org/apache/http/client/utils/URIBuilder")?;
+    let builder_init = pool.add_method_ref(builder, "<init>", "(Ljava/lang/String;)V")?;
+    let add_parameter = pool.add_method_ref(
+        builder,
+        "addParameter",
+        "(Ljava/lang/String;Ljava/lang/String;)Lorg/apache/http/client/utils/URIBuilder;",
+    )?;
+    let build = pool.add_method_ref(builder, "build", "()Ljava/net/URI;")?;
+    let endpoint = pool.add_string("https://api-v2.soundcloud.com/tracks")?;
+    let ids = pool.add_string("ids")?;
+    let syntax = pool.add_class("java/net/URISyntaxException")?;
+    let runtime = pool.add_class("java/lang/RuntimeException")?;
+    let runtime_init = pool.add_method_ref(runtime, "<init>", "(Ljava/lang/Throwable;)V")?;
+    let mut body = code_with_exceptions(
+        pool,
+        3,
+        5,
+        vec![
+            Instruction::New(joiner),
+            Instruction::Dup,
+            Instruction::Ldc_w(comma),
+            Instruction::Invokespecial(joiner_init),
+            Instruction::Astore_2,
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(iterator_method, 1),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(has_next, 1),
+            Instruction::Ifeq(20),
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(next, 1),
+            Instruction::Checkcast(string),
+            Instruction::Astore(4),
+            Instruction::Aload_2,
+            Instruction::Aload(4),
+            Instruction::Invokevirtual(joiner_add),
+            Instruction::Pop,
+            Instruction::Goto(8),
+            Instruction::New(builder),
+            Instruction::Dup,
+            Instruction::Ldc_w(endpoint),
+            Instruction::Invokespecial(builder_init),
+            Instruction::Ldc_w(ids),
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(joiner_string),
+            Instruction::Invokevirtual(add_parameter),
+            Instruction::Invokevirtual(build),
+            Instruction::Areturn,
+            Instruction::Astore_2,
+            Instruction::New(runtime),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Invokespecial(runtime_init),
+            Instruction::Athrow,
+        ],
+        vec![ExceptionTableEntry {
+            range_pc: 0..30,
+            handler_pc: 30,
+            catch_type: syntax,
+        }],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 253,
+                offset_delta: 8,
+                locals: vec![
+                    VerificationType::Object {
+                        cpool_index: joiner,
+                    },
+                    VerificationType::Object {
+                        cpool_index: iterator,
+                    },
+                ],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: 11,
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 9,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object { cpool_index: list },
+                ],
+                stack: vec![VerificationType::Object {
+                    cpool_index: syntax,
+                }],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn default_sound_cloud_playlist_loader_sort(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let map = pool.add_class("java/util/Map")?;
+    let hash_map = pool.add_class("java/util/HashMap")?;
+    let hash_map_init = pool.add_method_ref(hash_map, "<init>", "()V")?;
+    let list = pool.add_class("java/util/List")?;
+    let size = pool.add_interface_method_ref(list, "size", "()I")?;
+    let get = pool.add_interface_method_ref(list, "get", "(I)Ljava/lang/Object;")?;
+    let sort = pool.add_interface_method_ref(list, "sort", "(Ljava/util/Comparator;)V")?;
+    let string = pool.add_class("java/lang/String")?;
+    let integer = pool.add_class("java/lang/Integer")?;
+    let value_of = pool.add_method_ref(integer, "valueOf", "(I)Ljava/lang/Integer;")?;
+    let put = pool.add_interface_method_ref(
+        map,
+        "put",
+        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+    )?;
+    let comparator = pool.add_class("java/util/Comparator")?;
+    let comparing = pool.add_interface_method_ref(
+        comparator,
+        "comparingInt",
+        "(Ljava/util/function/ToIntFunction;)Ljava/util/Comparator;",
+    )?;
+    let sort_key = pool.add_invoke_dynamic(
+        1,
+        "applyAsInt",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/DefaultSoundCloudPlaylistLoader;Ljava/util/Map;)Ljava/util/function/ToIntFunction;",
+    )?;
+    let mut body = code(
+        pool,
+        3,
+        5,
+        vec![
+            Instruction::New(hash_map),
+            Instruction::Dup,
+            Instruction::Invokespecial(hash_map_init),
+            Instruction::Astore_3,
+            Instruction::Iconst_0,
+            Instruction::Istore(4),
+            Instruction::Iload(4),
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(size, 1),
+            Instruction::If_icmpge(21),
+            Instruction::Aload_3,
+            Instruction::Aload_2,
+            Instruction::Iload(4),
+            Instruction::Invokeinterface(get, 2),
+            Instruction::Checkcast(string),
+            Instruction::Iload(4),
+            Instruction::Invokestatic(value_of),
+            Instruction::Invokeinterface(put, 3),
+            Instruction::Pop,
+            Instruction::Iinc(4, 1),
+            Instruction::Goto(6),
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Invokedynamic(sort_key),
+            Instruction::Invokestatic(comparing),
+            Instruction::Invokeinterface(sort, 2),
+            Instruction::Return,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 253,
+                offset_delta: 6,
+                locals: vec![
+                    VerificationType::Object { cpool_index: map },
+                    VerificationType::Integer,
+                ],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: 14,
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn default_sound_cloud_playlist_loader_sort_key(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS)?;
+    let data_reader = pool.add_field_ref(
+        owner,
+        "dataReader",
+        "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataReader;",
+    )?;
+    let reader =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataReader")?;
+    let read_id = pool.add_interface_method_ref(
+        reader,
+        "readTrackId",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/lang/String;",
+    )?;
+    let integer = pool.add_class("java/lang/Integer")?;
+    let value_of = pool.add_method_ref(integer, "valueOf", "(I)Ljava/lang/Integer;")?;
+    let int_value = pool.add_method_ref(integer, "intValue", "()I")?;
+    let integer_max = pool.add_integer(i32::MAX)?;
+    let map = pool.add_class("java/util/Map")?;
+    let get_default = pool.add_interface_method_ref(
+        map,
+        "getOrDefault",
+        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+    )?;
+    code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(data_reader),
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(read_id, 2),
+            Instruction::Ldc_w(integer_max),
+            Instruction::Invokestatic(value_of),
+            Instruction::Invokeinterface(get_default, 3),
+            Instruction::Checkcast(integer),
+            Instruction::Invokevirtual(int_value),
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+fn default_sound_cloud_playlist_loader_clinit(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS)?;
+    let logger_factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        logger_factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let regex = pool.add_string(
+        "^(?:http://|https://|)(?:www\\.|)(?:m\\.|)soundcloud\\.com/([a-zA-Z0-9-_:]+)/sets/([a-zA-Z0-9-_:]+)/?([a-zA-Z0-9-_:]+)?(?:\\?.*|)$",
+    )?;
+    let pattern = pool.add_class("java/util/regex/Pattern")?;
+    let compile = pool.add_method_ref(
+        pattern,
+        "compile",
+        "(Ljava/lang/String;)Ljava/util/regex/Pattern;",
+    )?;
+    let playlist_pattern =
+        pool.add_field_ref(owner, "playlistUrlPattern", "Ljava/util/regex/Pattern;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Ldc_w(regex),
+            Instruction::Invokestatic(compile),
+            Instruction::Putstatic(playlist_pattern),
             Instruction::Return,
         ],
     )

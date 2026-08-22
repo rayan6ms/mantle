@@ -605,9 +605,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[0].completed_slices[].symbols] | add) == .cohorts[0].classified_symbols and
   (.cohorts[0].classified_symbols + .cohorts[0].remaining_symbols) == .cohorts[0].symbols and
   .cohorts[1].status == "IN_PROGRESS" and
-  .cohorts[1].classified_symbols == 94 and
-  .cohorts[1].remaining_symbols == 604 and
-  (.cohorts[1].completed_slices | length) == 12 and
+  .cohorts[1].classified_symbols == 106 and
+  .cohorts[1].remaining_symbols == 592 and
+  (.cohorts[1].completed_slices | length) == 13 and
   .cohorts[1].completed_slices[0] == {
     id: "audio-source-manager-interface-contracts",
     classes: 1,
@@ -770,11 +770,24 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "tools/jvm-gate/src/main.rs"
     ]
   } and
+  .cohorts[1].completed_slices[12] == {
+    id: "default-sound-cloud-playlist-loader-contracts",
+    classes: 1,
+    fields: 5,
+    methods: 6,
+    symbols: 12,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
   ([.cohorts[1].completed_slices[].symbols] | add) == .cohorts[1].classified_symbols and
   (.cohorts[1].classified_symbols + .cohorts[1].remaining_symbols) == .cohorts[1].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 629 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 641 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 616 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 628 and
   ([$classifications.symbols[] |
     select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 8 and
   ([$classifications.symbols[] |
@@ -846,7 +859,8 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.source.nico.NicoAudioTrack",
         "com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudDataLoader",
         "com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudDataReader",
-        "com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudFormatHandler"
+        "com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudFormatHandler",
+        "com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudPlaylistLoader"
       ][]; . == $symbol.binary_name)) and
     (if $symbol.binary_name ==
         "com.sedmelluq.discord.lavaplayer.source.nico.HeartbeatingHttpStream"
@@ -870,7 +884,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "default-sound-cloud-playlist-loader-contracts" and
+  .phase_entry.next_slice == "default-sound-cloud-track-format-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 ' "$PLAN" >/dev/null
@@ -878,7 +892,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '78 reference classes / 658 symbols' \
+  '79 reference classes / 670 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -888,4 +902,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 629 classified symbols and 2,133 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 641 classified symbols and 2,121 unassessed symbols.\n'

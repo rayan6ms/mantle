@@ -22,7 +22,7 @@ cargo run --locked -q -p mantle-jvm-gate -- emit \
 cargo run --locked -q -p mantle-jvm-gate -- verify-structure \
   --reference-jar "$REFERENCE_JAR" --candidate-jar "$JAR"
 
-for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame audio-frame-provider-tools audio-processing-context audio-player-options decoded-track-holder track-state-listener audio-output-hook audio-load-result-handler functional-result-handler audio-player-lifecycle-manager audio-player-interface audio-player-manager-interface default-audio-player default-audio-player-manager internal-audio-track audio-track-executor local-audio-track-executor-callback local-audio-track-executor track-marker-tracker base-audio-track primordial-audio-track-executor delegated-audio-track audio-track-info-builder abstract-audio-frame-buffer allocating-audio-frame-buffer non-allocating-audio-frame-buffer audio-source-manager-interface audio-source-managers probing-audio-source-manager local-audio-source-manager local-audio-track local-seekable-input-stream heartbeating-http-stream nico-audio-source-manager nico-audio-track default-sound-cloud-data-loader default-sound-cloud-data-reader default-sound-cloud-format-handler; do
+for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame audio-frame-provider-tools audio-processing-context audio-player-options decoded-track-holder track-state-listener audio-output-hook audio-load-result-handler functional-result-handler audio-player-lifecycle-manager audio-player-interface audio-player-manager-interface default-audio-player default-audio-player-manager internal-audio-track audio-track-executor local-audio-track-executor-callback local-audio-track-executor track-marker-tracker base-audio-track primordial-audio-track-executor delegated-audio-track audio-track-info-builder abstract-audio-frame-buffer allocating-audio-frame-buffer non-allocating-audio-frame-buffer audio-source-manager-interface audio-source-managers probing-audio-source-manager local-audio-source-manager local-audio-track local-seekable-input-stream heartbeating-http-stream nico-audio-source-manager nico-audio-track default-sound-cloud-data-loader default-sound-cloud-data-reader default-sound-cloud-format-handler default-sound-cloud-playlist-loader; do
   case "$consumer" in
     smoke) consumer_class='Smoke' ;;
     probe) consumer_class='Probe' ;;
@@ -76,6 +76,7 @@ for consumer in smoke probe integration classloader event track-value track-enum
     default-sound-cloud-data-loader) consumer_class='DefaultSoundCloudDataLoader' ;;
     default-sound-cloud-data-reader) consumer_class='DefaultSoundCloudDataReader' ;;
     default-sound-cloud-format-handler) consumer_class='DefaultSoundCloudFormatHandler' ;;
+    default-sound-cloud-playlist-loader) consumer_class='DefaultSoundCloudPlaylistLoader' ;;
   esac
   cargo run --locked -q -p mantle-jvm-gate -- "write-$consumer-consumer" \
     --output "$WORK/Gate${consumer_class}.java"
@@ -139,7 +140,8 @@ done < <(find "$(dirname "$REFERENCE_JAR")/dependencies" -maxdepth 1 -type f -na
 readonly REFERENCE_PROVIDER_TOOLS_CLASSPATH="$reference_provider_tools_classpath"
 
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
-  "$WORK/GateDefaultSoundCloudDataLoader.java"
+  "$WORK/GateDefaultSoundCloudDataLoader.java" \
+  "$WORK/GateDefaultSoundCloudPlaylistLoader.java"
 
 readonly GATE_CLASSPATH="$classes_argument$classpath_separator$jar_argument"
 java -Xverify:all \
@@ -675,6 +677,19 @@ cmp "$WORK/default-sound-cloud-format-handler-reference.txt" \
 grep --fixed-strings \
   'public-concrete,1-field,1-constructor,4-exported-methods;opus-hls-priority,mp3-hls,progressive-mp3,exact-mime,stable-order,identifier-prefixes,unknown-fallback,m3u-factories,mp3-lookup,error-quirks' \
   "$WORK/default-sound-cloud-format-handler-candidate.txt" >/dev/null
+# A_EXACT preserves current v2 set loading, batching, ordering, and omission behavior.
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateDefaultSoundCloudPlaylistLoader reference \
+  >"$WORK/default-sound-cloud-playlist-loader-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateDefaultSoundCloudPlaylistLoader candidate \
+  >"$WORK/default-sound-cloud-playlist-loader-candidate.txt"
+cmp "$WORK/default-sound-cloud-playlist-loader-reference.txt" \
+  "$WORK/default-sound-cloud-playlist-loader-candidate.txt"
+grep --fixed-strings \
+  'public-concrete,5-exported-fields,1-constructor,5-exported-methods;url-regex,mobile-normalization,dependency-capture,track-url-encoding,stable-sort,v2-batches-of-50,response-close,playlist-order,blocked-omit,bad-track-omit,factory-metadata,http-interface-close,friendly-io-wrap,suppressed-close,generics' \
+  "$WORK/default-sound-cloud-playlist-loader-candidate.txt" >/dev/null
 java -Xverify:all -cp "$GATE_CLASSPATH" GateSmoke "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateIntegration "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" callbacks
