@@ -602,8 +602,8 @@
       "objective": "Expand source SPI, built-in manager shells, class lookup, and serialization-visible types.",
       "exit_evidence": "Source SPI extension tests, source lookup tests, per-symbol ledger entries, and Revapi diff.",
       "status": "IN_PROGRESS",
-      "classified_symbols": 174,
-      "remaining_symbols": 524,
+      "classified_symbols": 181,
+      "remaining_symbols": 517,
       "completed_slices": [
         {
           "id": "audio-source-manager-interface-contracts",
@@ -899,6 +899,21 @@
             "tools/jvm-gate/src/main.rs",
             "docs/architecture/ADR-0015-bounded-soundcloud-source.md"
           ]
+        },
+        {
+          "id": "sound-cloud-http-context-filter-contracts",
+          "classes": 1,
+          "fields": 0,
+          "methods": 6,
+          "symbols": 7,
+          "classification": "A_EXACT/C_SEMANTIC",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "crates/mantle-media/tests/phase12_soundcloud.rs",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs",
+            "docs/architecture/ADR-0015-bounded-soundcloud-source.md"
+          ]
         }
       ]
     },
@@ -1020,7 +1035,7 @@
   "phase_entry": {
     "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
     "first_execution_cohort": "core-player-track",
-    "next_slice": "sound-cloud-http-context-filter-contracts",
+    "next_slice": "sound-cloud-m3u-audio-track-contracts",
     "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
   }
 }

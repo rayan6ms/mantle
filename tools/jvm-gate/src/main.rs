@@ -152,6 +152,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-sound-cloud-data-reader-consumer" => Some(SOUND_CLOUD_DATA_READER_CONSUMER),
         "write-sound-cloud-format-handler-consumer" => Some(SOUND_CLOUD_FORMAT_HANDLER_CONSUMER),
         "write-sound-cloud-helper-consumer" => Some(SOUND_CLOUD_HELPER_CONSUMER),
+        "write-sound-cloud-http-context-filter-consumer" => {
+            Some(SOUND_CLOUD_HTTP_CONTEXT_FILTER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -9632,6 +9635,270 @@ public final class GateSoundCloudHelper {
           if (method.getReturnType() == int.class) return 0;
           return null;
         }));
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const SOUND_CLOUD_HTTP_CONTEXT_FILTER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudClientIdTracker;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudHttpContextFilter;
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter;
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextRetryCounter;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.net.URI;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.http.HttpResponse;
+import org.apache.http.ProtocolVersion;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.protocol.HttpClientContext;
+import org.apache.http.message.BasicHttpResponse;
+
+public final class GateSoundCloudHttpContextFilter {
+  private static final String USER_AGENT =
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+      + "Chrome/76.0.3809.100 Safari/537.36";
+  private static final String INJECTION_DISABLED =
+      "Legacy SoundCloud HTTP credential injection is unsupported; "
+      + "use Mantle's bounded native source.";
+
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1 && (args[0].equals("reference") || args[0].equals("candidate")),
+        "expected disposition");
+    reflectionContract();
+    commonContract();
+    if (args[0].equals("reference")) {
+      referenceServiceContract();
+      System.out.println("common=public-concrete,2-fields,1-constructor,5-callbacks,"
+          + "no-op-lifecycle,false-exception,user-agent,retry-counter,cdn-pass-through,reflection;"
+          + "service=legacy-global-client-id-injection,substring-cdn-bypass,401-refresh");
+    } else {
+      candidateServiceContract();
+      System.out.println("common=public-concrete,2-fields,1-constructor,5-callbacks,"
+          + "no-op-lifecycle,false-exception,user-agent,retry-counter,cdn-pass-through,reflection;"
+          + "service=bounded-native-control-plane,strict-cdn-pass-through,"
+          + "no-client-id-injection,no-refresh");
+    }
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<SoundCloudHttpContextFilter> type = SoundCloudHttpContextFilter.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {HttpContextFilter.class})
+        && type.getAnnotations().length == 0, "class metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredMethods().length == 5,
+        "member counts");
+    checkField(type, "retryCounter", HttpContextRetryCounter.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "clientIdTracker", SoundCloudClientIdTracker.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    Constructor<?> constructor = type.getDeclaredConstructor(SoundCloudClientIdTracker.class);
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC, "constructor metadata");
+    checkMethod(type, "onContextOpen", void.class,
+        new Class<?>[] {HttpClientContext.class});
+    checkMethod(type, "onContextClose", void.class,
+        new Class<?>[] {HttpClientContext.class});
+    checkMethod(type, "onRequest", void.class,
+        new Class<?>[] {HttpClientContext.class, HttpUriRequest.class, boolean.class});
+    checkMethod(type, "onRequestResponse", boolean.class,
+        new Class<?>[] {HttpClientContext.class, HttpUriRequest.class, HttpResponse.class});
+    checkMethod(type, "onRequestException", boolean.class,
+        new Class<?>[] {HttpClientContext.class, HttpUriRequest.class, Throwable.class});
+  }
+
+  private static void commonContract() throws Exception {
+    Fixture fixture = fixture();
+    check(field("clientIdTracker").get(fixture.filter) == fixture.tracker,
+        "constructor dependency identity");
+    fixture.filter.onContextOpen(null);
+    fixture.filter.onContextClose(null);
+    check(!fixture.filter.onRequestException(null, null, new Throwable("fixture")),
+        "exception callback");
+
+    HttpClientContext rawContext = HttpClientContext.create();
+    rawContext.setAttribute("sc-raw", true);
+    HttpGet raw = new HttpGet("https://example.com/raw");
+    fixture.filter.onRequest(rawContext, raw, false);
+    check(USER_AGENT.equals(raw.getFirstHeader("user-agent").getValue())
+        && raw.getURI().equals(URI.create("https://example.com/raw")), "raw context bypass");
+
+    HttpClientContext cdnContext = HttpClientContext.create();
+    HttpGet cdn = new HttpGet("https://cf-media.sndcdn.com/fixture?token=1");
+    fixture.filter.onRequest(cdnContext, cdn, false);
+    check(USER_AGENT.equals(cdn.getFirstHeader("user-agent").getValue())
+        && cdn.getURI().equals(URI.create("https://cf-media.sndcdn.com/fixture?token=1")),
+        "CDN pass-through");
+    fixture.filter.onRequest(cdnContext, cdn, true);
+    check(!fixture.filter.onRequestResponse(cdnContext, cdn, response(401)),
+        "bounded retry count");
+  }
+
+  private static void referenceServiceContract() throws Exception {
+    Fixture fixture = fixture();
+    setTrackerState(fixture.tracker, "frozen-id", System.currentTimeMillis());
+
+    HttpClientContext apiContext = HttpClientContext.create();
+    HttpGet api = new HttpGet("https://api-v2.soundcloud.com/resolve?url=fixture&client_id=old");
+    fixture.filter.onRequest(apiContext, api, false);
+    check(api.getURI().toString().contains("client_id=frozen-id")
+        && !api.getURI().toString().contains("client_id=old"), "legacy API injection");
+    check(fixture.filter.onRequestResponse(apiContext, api, response(401)),
+        "legacy 401 refresh");
+
+    HttpGet offOrigin = new HttpGet("https://example.com/control?x=1");
+    fixture.filter.onRequest(HttpClientContext.create(), offOrigin, false);
+    check(offOrigin.getURI().toString().contains("client_id=frozen-id"),
+        "legacy off-origin injection");
+
+    HttpGet deceptive = new HttpGet("https://evil-sndcdn.com/fixture");
+    fixture.filter.onRequest(HttpClientContext.create(), deceptive, false);
+    check(deceptive.getURI().equals(URI.create("https://evil-sndcdn.com/fixture")),
+        "legacy substring CDN bypass");
+    check(fixture.acquisitions.get() == 0, "reference fixture stays offline");
+  }
+
+  private static void candidateServiceContract() throws Exception {
+    AtomicInteger acquisitions = new AtomicInteger();
+    CountingTracker tracker = new CountingTracker(manager(acquisitions));
+    SoundCloudHttpContextFilter filter = new SoundCloudHttpContextFilter(tracker);
+
+    HttpGet cdn = new HttpGet("https://cf-media.sndcdn.com/fixture");
+    filter.onRequest(HttpClientContext.create(), cdn, false);
+    check(cdn.getURI().equals(URI.create("https://cf-media.sndcdn.com/fixture")),
+        "strict CDN pass-through");
+
+    for (String uri : new String[] {
+        "https://api-v2.soundcloud.com/resolve?url=fixture",
+        "https://example.com/control?x=1",
+        "https://evil-sndcdn.com/fixture",
+        "http://cf-media.sndcdn.com/fixture",
+        "https://user@cf-media.sndcdn.com/fixture",
+        "https://cf-media.sndcdn.com:8443/fixture"
+    }) {
+      HttpGet request = new HttpGet(uri);
+      UnsupportedOperationException error = expect(UnsupportedOperationException.class,
+          () -> filter.onRequest(HttpClientContext.create(), request, false));
+      check(INJECTION_DISABLED.equals(error.getMessage())
+          && request.getURI().equals(URI.create(uri))
+          && (request.getURI().getQuery() == null
+              || !request.getURI().getQuery().contains("client_id")),
+          "bounded origin policy " + uri);
+    }
+    check(!filter.onRequestResponse(
+        HttpClientContext.create(), new HttpGet("https://api-v2.soundcloud.com/resolve"),
+        response(401)), "candidate never refreshes on 401");
+    check(tracker.reads == 0 && tracker.updates == 0 && acquisitions.get() == 0,
+        "candidate never accesses credentials or HTTP");
+  }
+
+  private static Fixture fixture() {
+    AtomicInteger acquisitions = new AtomicInteger();
+    SoundCloudClientIdTracker tracker = new SoundCloudClientIdTracker(manager(acquisitions));
+    return new Fixture(tracker, new SoundCloudHttpContextFilter(tracker), acquisitions);
+  }
+
+  private static HttpInterfaceManager manager(AtomicInteger acquisitions) {
+    return (HttpInterfaceManager) java.lang.reflect.Proxy.newProxyInstance(
+        GateSoundCloudHttpContextFilter.class.getClassLoader(),
+        new Class<?>[] {HttpInterfaceManager.class}, (proxy, method, args) -> {
+          if (method.getName().equals("getInterface")) acquisitions.incrementAndGet();
+          if (method.getName().equals("toString")) return "manager-proxy";
+          if (method.getReturnType() == boolean.class) return false;
+          if (method.getReturnType() == int.class) return 0;
+          if (method.getReturnType() == long.class) return 0L;
+          return null;
+        });
+  }
+
+  private static HttpResponse response(int status) {
+    return new BasicHttpResponse(new ProtocolVersion("HTTP", 1, 1), status, "fixture");
+  }
+
+  private static void setTrackerState(SoundCloudClientIdTracker tracker, String clientId,
+                                      long updateTime) throws Exception {
+    field("clientId").set(tracker, clientId);
+    field("lastClientIdUpdate").setLong(tracker, updateTime);
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+                                  Class<?>[] parameters) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getGenericReturnType() == returnType
+        && method.getModifiers() == Modifier.PUBLIC
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs(), name + " metadata");
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> type, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == type && field.getGenericType() == type
+        && field.getModifiers() == modifiers && !field.isSynthetic(), name + " metadata");
+  }
+
+  private static Field field(String name) throws Exception {
+    Class<?> owner = name.equals("clientIdTracker") || name.equals("retryCounter")
+        ? SoundCloudHttpContextFilter.class : SoundCloudClientIdTracker.class;
+    Field field = owner.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private static final class Fixture {
+    final SoundCloudClientIdTracker tracker;
+    final SoundCloudHttpContextFilter filter;
+    final AtomicInteger acquisitions;
+
+    Fixture(SoundCloudClientIdTracker tracker, SoundCloudHttpContextFilter filter,
+            AtomicInteger acquisitions) {
+      this.tracker = tracker;
+      this.filter = filter;
+      this.acquisitions = acquisitions;
+    }
+  }
+
+  private static final class CountingTracker extends SoundCloudClientIdTracker {
+    int reads;
+    int updates;
+
+    CountingTracker(HttpInterfaceManager manager) {
+      super(manager);
+    }
+
+    @Override
+    public String getClientId() {
+      reads++;
+      return "unexpected-read";
+    }
+
+    @Override
+    public void updateClientId() {
+      updates++;
+    }
   }
 
   private interface Operation { void run() throws Exception; }

@@ -145,6 +145,8 @@ const SOUND_CLOUD_FORMAT_HANDLER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudFormatHandler";
 const SOUND_CLOUD_HELPER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudHelper";
+const SOUND_CLOUD_HTTP_CONTEXT_FILTER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudHttpContextFilter";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -196,6 +198,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     SOUND_CLOUD_DATA_READER_CLASS,
     SOUND_CLOUD_FORMAT_HANDLER_CLASS,
     SOUND_CLOUD_HELPER_CLASS,
+    SOUND_CLOUD_HTTP_CONTEXT_FILTER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -563,6 +566,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS
                 | SOUND_CLOUD_AUDIO_TRACK_CLASS
                 | SOUND_CLOUD_CLIENT_ID_TRACKER_CLASS
+                | SOUND_CLOUD_HTTP_CONTEXT_FILTER_CLASS
         ) || field
             .access_flags
             .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
@@ -584,6 +588,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | SOUND_CLOUD_AUDIO_SOURCE_MANAGER_CLASS
                 | SOUND_CLOUD_AUDIO_TRACK_CLASS
                 | SOUND_CLOUD_CLIENT_ID_TRACKER_CLASS
+                | SOUND_CLOUD_HTTP_CONTEXT_FILTER_CLASS
         ) || method
             .access_flags
             .intersects(MethodAccessFlags::PUBLIC | MethodAccessFlags::PROTECTED)
@@ -716,6 +721,14 @@ fn replacement_body(
     }
     if class_name == SOUND_CLOUD_HELPER_CLASS {
         return sound_cloud_helper_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == SOUND_CLOUD_HTTP_CONTEXT_FILTER_CLASS {
+        return sound_cloud_http_context_filter_replacement(
+            pool,
+            name,
+            descriptor,
+            required_locals,
+        );
     }
     if class_name == SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS {
         return sound_cloud_audio_source_manager_builder_replacement(
@@ -3497,6 +3510,269 @@ fn sound_cloud_helper_non_mobile_url(pool: &mut ConstantPool<'static>) -> Result
         vec![StackFrame::SameFrame { frame_type: 10 }],
     )?;
     Ok(body)
+}
+
+fn sound_cloud_http_context_filter_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudClientIdTracker;)V",
+        ) => sound_cloud_http_context_filter_constructor(pool),
+        (
+            "onContextOpen" | "onContextClose",
+            "(Lorg/apache/http/client/protocol/HttpClientContext;)V",
+        ) => void_return(pool, required_locals),
+        (
+            "onRequest",
+            "(Lorg/apache/http/client/protocol/HttpClientContext;Lorg/apache/http/client/methods/HttpUriRequest;Z)V",
+        ) => sound_cloud_http_context_filter_request(pool),
+        (
+            "onRequestResponse",
+            "(Lorg/apache/http/client/protocol/HttpClientContext;Lorg/apache/http/client/methods/HttpUriRequest;Lorg/apache/http/HttpResponse;)Z",
+        )
+        | (
+            "onRequestException",
+            "(Lorg/apache/http/client/protocol/HttpClientContext;Lorg/apache/http/client/methods/HttpUriRequest;Ljava/lang/Throwable;)Z",
+        ) => boolean_return(pool, false, required_locals),
+        ("<clinit>", "()V") => sound_cloud_http_context_filter_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {SOUND_CLOUD_HTTP_CONTEXT_FILTER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn sound_cloud_http_context_filter_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(SOUND_CLOUD_HTTP_CONTEXT_FILTER_CLASS)?;
+    let tracker = pool.add_field_ref(
+        owner,
+        "clientIdTracker",
+        "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudClientIdTracker;",
+    )?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(tracker),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn sound_cloud_http_context_filter_request(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(SOUND_CLOUD_HTTP_CONTEXT_FILTER_CLASS)?;
+    let tracker_class = pool.add_class(SOUND_CLOUD_CLIENT_ID_TRACKER_CLASS)?;
+    let tracker = pool.add_field_ref(
+        owner,
+        "clientIdTracker",
+        "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudClientIdTracker;",
+    )?;
+    let is_fetch = pool.add_method_ref(
+        tracker_class,
+        "isIdFetchContext",
+        "(Lorg/apache/http/client/protocol/HttpClientContext;)Z",
+    )?;
+    let retry_class =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/http/HttpContextRetryCounter")?;
+    let retry = pool.add_field_ref(
+        owner,
+        "retryCounter",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/http/HttpContextRetryCounter;",
+    )?;
+    let handle_update = pool.add_method_ref(
+        retry_class,
+        "handleUpdate",
+        "(Lorg/apache/http/client/protocol/HttpClientContext;Z)V",
+    )?;
+    let request = pool.add_class("org/apache/http/client/methods/HttpUriRequest")?;
+    let set_header = pool.add_interface_method_ref(
+        request,
+        "setHeader",
+        "(Ljava/lang/String;Ljava/lang/String;)V",
+    )?;
+    let get_uri = pool.add_interface_method_ref(request, "getURI", "()Ljava/net/URI;")?;
+    let uri = pool.add_class("java/net/URI")?;
+    let get_scheme = pool.add_method_ref(uri, "getScheme", "()Ljava/lang/String;")?;
+    let get_user_info = pool.add_method_ref(uri, "getRawUserInfo", "()Ljava/lang/String;")?;
+    let get_port = pool.add_method_ref(uri, "getPort", "()I")?;
+    let get_host = pool.add_method_ref(uri, "getHost", "()Ljava/lang/String;")?;
+    let string = pool.add_class("java/lang/String")?;
+    let equals = pool.add_method_ref(string, "equals", "(Ljava/lang/Object;)Z")?;
+    let ends_with = pool.add_method_ref(string, "endsWith", "(Ljava/lang/String;)Z")?;
+    let unsupported = pool.add_class("java/lang/UnsupportedOperationException")?;
+    let unsupported_init = pool.add_method_ref(unsupported, "<init>", "(Ljava/lang/String;)V")?;
+    let header = pool.add_string("user-agent")?;
+    let user_agent = pool.add_string(
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36",
+    )?;
+    let https = pool.add_string("https")?;
+    let cdn_suffix = pool.add_string(".sndcdn.com")?;
+    let disabled = pool.add_string(
+        "Legacy SoundCloud HTTP credential injection is unsupported; use Mantle's bounded native source.",
+    )?;
+    sound_cloud_http_context_filter_request_body(
+        pool,
+        &SoundCloudHttpFilterRequestPool {
+            tracker,
+            is_fetch,
+            retry,
+            handle_update,
+            set_header,
+            get_uri,
+            uri,
+            get_scheme,
+            equals,
+            get_user_info,
+            get_port,
+            get_host,
+            ends_with,
+            unsupported,
+            unsupported_init,
+            header,
+            user_agent,
+            https,
+            cdn_suffix,
+            disabled,
+        },
+    )
+}
+
+struct SoundCloudHttpFilterRequestPool {
+    tracker: u16,
+    is_fetch: u16,
+    retry: u16,
+    handle_update: u16,
+    set_header: u16,
+    get_uri: u16,
+    uri: u16,
+    get_scheme: u16,
+    equals: u16,
+    get_user_info: u16,
+    get_port: u16,
+    get_host: u16,
+    ends_with: u16,
+    unsupported: u16,
+    unsupported_init: u16,
+    header: u16,
+    user_agent: u16,
+    https: u16,
+    cdn_suffix: u16,
+    disabled: u16,
+}
+
+fn sound_cloud_http_context_filter_request_body(
+    pool: &mut ConstantPool<'static>,
+    refs: &SoundCloudHttpFilterRequestPool,
+) -> Result<Attribute> {
+    let mut body = code(
+        pool,
+        3,
+        6,
+        vec![
+            Instruction::Aload_2,
+            Instruction::Ldc_w(refs.header),
+            Instruction::Ldc_w(refs.user_agent),
+            Instruction::Invokeinterface(refs.set_header, 3),
+            Instruction::Getstatic(refs.retry),
+            Instruction::Aload_1,
+            Instruction::Iload_3,
+            Instruction::Invokevirtual(refs.handle_update),
+            Instruction::Aload_0,
+            Instruction::Getfield(refs.tracker),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(refs.is_fetch),
+            Instruction::Ifeq(14),
+            Instruction::Return,
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(refs.get_uri, 1),
+            Instruction::Astore(4),
+            Instruction::Ldc_w(refs.https),
+            Instruction::Aload(4),
+            Instruction::Invokevirtual(refs.get_scheme),
+            Instruction::Invokevirtual(refs.equals),
+            Instruction::Ifeq(39),
+            Instruction::Aload(4),
+            Instruction::Invokevirtual(refs.get_user_info),
+            Instruction::Ifnonnull(39),
+            Instruction::Aload(4),
+            Instruction::Invokevirtual(refs.get_port),
+            Instruction::Iconst_m1,
+            Instruction::If_icmpne(39),
+            Instruction::Aload(4),
+            Instruction::Invokevirtual(refs.get_host),
+            Instruction::Astore(5),
+            Instruction::Aload(5),
+            Instruction::Ifnull(39),
+            Instruction::Aload(5),
+            Instruction::Ldc_w(refs.cdn_suffix),
+            Instruction::Invokevirtual(refs.ends_with),
+            Instruction::Ifeq(39),
+            Instruction::Return,
+            Instruction::New(refs.unsupported),
+            Instruction::Dup,
+            Instruction::Ldc_w(refs.disabled),
+            Instruction::Invokespecial(refs.unsupported_init),
+            Instruction::Athrow,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::SameFrame { frame_type: 14 },
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: 24,
+                locals: vec![VerificationType::Object {
+                    cpool_index: refs.uri,
+                }],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn sound_cloud_http_context_filter_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(SOUND_CLOUD_HTTP_CONTEXT_FILTER_CLASS)?;
+    let retry_class =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/http/HttpContextRetryCounter")?;
+    let retry_init = pool.add_method_ref(retry_class, "<init>", "(Ljava/lang/String;)V")?;
+    let retry = pool.add_field_ref(
+        owner,
+        "retryCounter",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/http/HttpContextRetryCounter;",
+    )?;
+    let attribute = pool.add_string("sc-id-retry")?;
+    code(
+        pool,
+        3,
+        0,
+        vec![
+            Instruction::New(retry_class),
+            Instruction::Dup,
+            Instruction::Ldc_w(attribute),
+            Instruction::Invokespecial(retry_init),
+            Instruction::Putstatic(retry),
+            Instruction::Return,
+        ],
+    )
 }
 
 fn sound_cloud_client_id_tracker_replacement(
