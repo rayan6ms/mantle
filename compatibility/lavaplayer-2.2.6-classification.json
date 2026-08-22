@@ -14623,171 +14623,228 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Structural comparison and reference-differential execution preserve the public concrete manager shell, exact interfaces, private implementation shape, and exported behavior.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "createDefault",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential execution preserves fresh default collaborator construction, search and preview defaults, and dependency wiring.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "builder",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager$Builder;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential execution preserves fresh builder allocation and exact nested-builder return type.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(ZLcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataReader;Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataLoader;Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudFormatHandler;Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudPlaylistLoader;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential construction preserves collaborator identity, search configuration, HTTP setup, and the legacy false preview-filter default.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(ZLcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataReader;Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataLoader;Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudFormatHandler;Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudPlaylistLoader;Z)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential construction preserves all collaborator references, both boolean policies, HTTP-manager creation, client-ID tracking, and context-filter installation.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getFormatHandler",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudFormatHandler;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential execution preserves direct format-handler identity.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getSourceName",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential execution preserves the exact soundcloud source name.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "loadItem",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential execution preserves mobile and short-link normalization, single-track precedence, playlist and likes fallback, and optional search routing.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "isTrackEncodable",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential execution preserves the unconditional true result, including null and foreign tracks.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "encodeTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Ljava/io/DataOutput;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential execution preserves the empty source-detail encoding behavior.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "decodeTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential execution preserves track-info identity, manager ownership, and ignored source-detail input.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "shutdown",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential execution preserves the no-op lifecycle behavior.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getClientId",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential execution preserves client-ID tracker delegation and returned identity.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getHttpInterface",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential execution preserves HTTP-interface-manager delegation and returned identity.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "configureRequests",
       "descriptor": "(Ljava/util/function/Function;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential execution preserves request-configurator identity, manager delegation, and exact generic metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "configureBuilder",
       "descriptor": "(Ljava/util/function/Consumer;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential execution preserves builder-configurator identity, manager delegation, and exact generic metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "loadTrack",
       "descriptor": "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential execution preserves default preview-filter honoring and two-argument loader delegation.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "loadTrack",
       "descriptor": "(Ljava/lang/String;Z)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential execution preserves the data-loader/reader pipeline, preview policy, missing-track failure, deterministic cleanup, and suspicious IO wrapping with suppressed close failures.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "loadFromTrackData",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential execution preserves format selection, identifier construction, metadata reading, and manager-owned track creation.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager$Builder",

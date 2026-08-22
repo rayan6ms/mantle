@@ -128,6 +128,9 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-default-sound-cloud-track-format-consumer" => {
             Some(DEFAULT_SOUND_CLOUD_TRACK_FORMAT_CONSUMER)
         }
+        "write-sound-cloud-audio-source-manager-consumer" => {
+            Some(SOUND_CLOUD_AUDIO_SOURCE_MANAGER_CONSUMER)
+        }
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -9556,6 +9559,501 @@ public final class GateDefaultSoundCloudTrackFormat {
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }
+}
+"#;
+
+const SOUND_CLOUD_AUDIO_SOURCE_MANAGER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudDataLoader;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudDataReader;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudFormatHandler;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudPlaylistLoader;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioTrack;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudClientIdTracker;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudDataLoader;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudDataReader;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudFormatHandler;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudPlaylistLoader;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudTrackFormat;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpConfigurable;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager;
+import com.sedmelluq.discord.lavaplayer.track.AudioItem;
+import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.net.URI;
+import java.util.ArrayDeque;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.regex.Pattern;
+import org.apache.http.ProtocolVersion;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.protocol.HttpClientContext;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.message.BasicStatusLine;
+
+public final class GateSoundCloudAudioSourceManager {
+  private static final String MOBILE_REGEX =
+      "^(?:http://|https://|)soundcloud\\.app\\.goo\\.gl/([a-zA-Z0-9-_]+)/?(?:\\?.*|)$";
+  private static final String TRACK_REGEX = "^(?:http://|https://|)(?:www\\.|)(?:m\\.|)"
+      + "soundcloud\\.com/([a-zA-Z0-9-_]+)/([a-zA-Z0-9-_]+)/?(?:\\?.*|)$";
+  private static final String SHORT_REGEX =
+      "^https://on.soundcloud\\.com/[a-zA-Z0-9-_]+/?(?:\\?.*|)$";
+  private static final String UNLISTED_REGEX = "^(?:http://|https://|)(?:www\\.|)(?:m\\.|)"
+      + "soundcloud\\.com/([a-zA-Z0-9-_]+)/([a-zA-Z0-9-_]+)/s-"
+      + "([a-zA-Z0-9-_]+)(?:\\?.*|)$";
+  private static final String LIKED_REGEX = "^(?:http://|https://|)(?:www\\.|)(?:m\\.|)"
+      + "soundcloud\\.com/([a-zA-Z0-9-_]+)/likes/?(?:\\?.*|)$";
+  private static final String SEARCH_REGEX =
+      "scsearch\\[([0-9]{1,9}),([0-9]{1,9})\\]:\\s*(.*)\\s*";
+  private static final AudioTrackInfo INFO =
+      new AudioTrackInfo("title", "author", 123L, "format-id", false, "https://track");
+  private static final SoundCloudTrackFormat FORMAT = proxy(SoundCloudTrackFormat.class);
+
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1 && (args[0].equals("reference") || args[0].equals("candidate")),
+        "expected disposition");
+    reflectionContract();
+    constructionAndHttpContract();
+    serializationContract();
+    routingContract();
+    trackLoadingContract();
+    searchAndLikesContract();
+    System.out.println("public-concrete,27-fields,2-constructors,16-exported-methods;"
+        + "defaults,builder,dependency-capture,http-config,source-name,always-encodable,"
+        + "empty-encode,decode-owner,track-routing,playlist-fallback,load-pipeline,preview-filter,"
+        + "search-range-cap,liked-tracks,blocked-omit,resource-close,friendly-failures,generics");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<SoundCloudAudioSourceManager> type = SoundCloudAudioSourceManager.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(),
+            new Class<?>[] {AudioSourceManager.class, HttpConfigurable.class}), "class metadata");
+    check(type.getDeclaredFields().length == 27 && type.getDeclaredMethods().length == 29,
+        "declared shape");
+    check(type.getDeclaredConstructors().length == 2, "constructor count");
+    for (Field field : type.getDeclaredFields()) {
+      check(field.getModifiers() == (field.getName().endsWith("Pattern")
+          || field.getName().equals("DEFAULT_SEARCH_RESULTS")
+          || field.getName().equals("MAXIMUM_SEARCH_RESULTS")
+          || field.getName().endsWith("REGEX") || field.getName().startsWith("SEARCH_")
+          || field.getName().equals("FULL_TRACK_UNAVAILABLE_MARKER")
+          ? Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL
+          : Modifier.PRIVATE | Modifier.FINAL), "field modifiers " + field.getName());
+    }
+    check(intField("DEFAULT_SEARCH_RESULTS") == 10 && intField("MAXIMUM_SEARCH_RESULTS") == 200,
+        "search constants");
+    check(stringField("MOBILE_URL_REGEX").equals(MOBILE_REGEX)
+        && stringField("TRACK_URL_REGEX").equals(TRACK_REGEX)
+        && stringField("SHORT_TRACK_URL_REGEX").equals(SHORT_REGEX)
+        && stringField("UNLISTED_URL_REGEX").equals(UNLISTED_REGEX)
+        && stringField("LIKED_URL_REGEX").equals(LIKED_REGEX)
+        && stringField("SEARCH_REGEX").equals(SEARCH_REGEX)
+        && stringField("SEARCH_PREFIX").equals("scsearch")
+        && stringField("SEARCH_PREFIX_DEFAULT").equals("scsearch:")
+        && stringField("FULL_TRACK_UNAVAILABLE_MARKER").equals("SUB_HIGH_TIER"),
+        "string constants");
+    check(pattern("mobileUrlPattern").pattern().equals(MOBILE_REGEX)
+        && pattern("trackUrlPattern").pattern().equals(TRACK_REGEX)
+        && pattern("shortTrackUrlPattern").pattern().equals(SHORT_REGEX)
+        && pattern("unlistedUrlPattern").pattern().equals(UNLISTED_REGEX)
+        && pattern("likedUrlPattern").pattern().equals(LIKED_REGEX)
+        && pattern("searchPattern").pattern().equals(SEARCH_REGEX), "compiled patterns");
+    Method configureRequests = type.getDeclaredMethod("configureRequests", Function.class);
+    Method configureBuilder = type.getDeclaredMethod("configureBuilder", Consumer.class);
+    check(configureRequests.getGenericParameterTypes()[0].getTypeName().equals(
+        "java.util.function.Function<org.apache.http.client.config.RequestConfig, "
+            + "org.apache.http.client.config.RequestConfig>"), "request generic");
+    check(configureBuilder.getGenericParameterTypes()[0].getTypeName().equals(
+        "java.util.function.Consumer<org.apache.http.impl.client.HttpClientBuilder>"),
+        "builder generic");
+  }
+
+  private static void constructionAndHttpContract() throws Exception {
+    ReaderHandler readerState = new ReaderHandler();
+    SoundCloudDataReader reader = readerState.proxy();
+    SoundCloudDataLoader loader = (http, url) -> JsonBrowser.NULL_BROWSER;
+    SoundCloudFormatHandler handler = formatHandler();
+    SoundCloudPlaylistLoader playlists = (url, manager, factory) -> null;
+    SoundCloudAudioSourceManager manager =
+        new SoundCloudAudioSourceManager(true, reader, loader, handler, playlists, true);
+    check(field("dataReader").get(manager) == reader && field("dataLoader").get(manager) == loader
+        && field("formatHandler").get(manager) == handler
+        && field("playlistLoader").get(manager) == playlists
+        && field("allowSearch").getBoolean(manager)
+        && field("filterOutPreviewTracks").getBoolean(manager), "dependency capture");
+    check(manager.getFormatHandler() == handler && manager.getSourceName().equals("soundcloud"),
+        "basic getters");
+    check(field("httpInterfaceManager").get(manager) != null
+        && field("clientIdTracker").get(manager) != null, "http collaborators");
+    SoundCloudAudioSourceManager legacy =
+        new SoundCloudAudioSourceManager(false, reader, loader, handler, playlists);
+    check(!field("allowSearch").getBoolean(legacy)
+        && !field("filterOutPreviewTracks").getBoolean(legacy), "legacy constructor defaults");
+
+    SoundCloudAudioSourceManager defaults = SoundCloudAudioSourceManager.createDefault();
+    check(field("dataReader").get(defaults) instanceof DefaultSoundCloudDataReader
+        && field("dataLoader").get(defaults) instanceof DefaultSoundCloudDataLoader
+        && field("formatHandler").get(defaults) instanceof DefaultSoundCloudFormatHandler
+        && field("playlistLoader").get(defaults) instanceof DefaultSoundCloudPlaylistLoader
+        && field("allowSearch").getBoolean(defaults)
+        && !field("filterOutPreviewTracks").getBoolean(defaults), "default factory");
+    check(SoundCloudAudioSourceManager.builder() != SoundCloudAudioSourceManager.builder(),
+        "fresh builders");
+
+    RecordingHttpInterface http = new RecordingHttpInterface();
+    ManagerHandler managerState = injectManager(manager, http);
+    Function<RequestConfig, RequestConfig> requestConfig = value -> value;
+    Consumer<HttpClientBuilder> builderConfig = value -> { };
+    manager.configureRequests(requestConfig);
+    manager.configureBuilder(builderConfig);
+    check(manager.getHttpInterface() == http && managerState.requestConfig == requestConfig
+        && managerState.builderConfig == builderConfig, "http delegation");
+    manager.shutdown();
+    check(managerState.closes == 0, "shutdown no-op");
+    SoundCloudClientIdTracker tracker =
+        (SoundCloudClientIdTracker) field("clientIdTracker").get(manager);
+    Field clientId = SoundCloudClientIdTracker.class.getDeclaredField("clientId");
+    clientId.setAccessible(true);
+    clientId.set(tracker, "fixture-client-id");
+    check(manager.getClientId().equals("fixture-client-id"), "client ID delegation");
+  }
+
+  private static void serializationContract() throws Exception {
+    SoundCloudAudioSourceManager manager = manager(false, new ReaderHandler(), false, null);
+    AudioTrack arbitrary = proxy(AudioTrack.class);
+    check(manager.isTrackEncodable(null) && manager.isTrackEncodable(arbitrary),
+        "always encodable");
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    manager.encodeTrack(arbitrary, new DataOutputStream(bytes));
+    check(bytes.size() == 0, "empty encoding");
+    AudioTrack decoded = manager.decodeTrack(INFO,
+        new DataInputStream(new ByteArrayInputStream(new byte[] {1, 2, 3})));
+    check(decoded instanceof SoundCloudAudioTrack && decoded.getInfo() == INFO
+        && decoded.getSourceManager() == manager, "decode owner");
+    ExposedManager exposed = new ExposedManager(false, new ReaderHandler(), false, null);
+    AudioTrack built = exposed.from(JsonBrowser.parse("{\"id\":\"44\"}"));
+    check(built instanceof SoundCloudAudioTrack && built.getSourceManager() == exposed
+        && built.getInfo() == INFO, "track data build");
+  }
+
+  private static void routingContract() throws Exception {
+    AtomicInteger playlistCalls = new AtomicInteger();
+    AtomicReference<String> playlistUrl = new AtomicReference<>();
+    AudioPlaylist playlist = proxy(AudioPlaylist.class);
+    SoundCloudPlaylistLoader playlists = (url, manager, factory) -> {
+      playlistCalls.incrementAndGet();
+      playlistUrl.set(url);
+      check(factory.apply(INFO).getSourceManager() instanceof SoundCloudAudioSourceManager,
+          "playlist factory");
+      return playlist;
+    };
+    RoutingManager manager = new RoutingManager(false, playlists);
+    AudioTrack direct = manager.track;
+    check(manager.loadItem(null, new AudioReference(
+        "https://m.soundcloud.com/user/song?x=1", null)) == direct
+        && manager.loadedUrl.equals("https://soundcloud.com/user/song?x=1")
+        && manager.loadFlags, "direct mobile track");
+    check(manager.loadItem(null, new AudioReference(
+        "https://soundcloud.com/user/song/s-secret", null)) == direct
+        && manager.loadedUrl.equals("https://soundcloud.com/user/song/s-secret"),
+        "unlisted track");
+    check(playlistCalls.get() == 0, "single-track precedence");
+    check(manager.loadItem(null, new AudioReference("not-a-track", null)) == playlist
+        && playlistCalls.get() == 1 && playlistUrl.get().equals("not-a-track"),
+        "playlist fallback");
+    RoutingManager disabled = new RoutingManager(false, (url, http, factory) -> null);
+    check(disabled.loadItem(null, new AudioReference("scsearch: query", null)) == null,
+        "disabled search");
+  }
+
+  private static void trackLoadingContract() throws Exception {
+    ReaderHandler state = new ReaderHandler();
+    state.trackData = JsonBrowser.parse("{\"id\":\"11\"}");
+    AtomicReference<String> loadedUrl = new AtomicReference<>();
+    SoundCloudDataLoader loader = (http, url) -> {
+      loadedUrl.set(url);
+      return JsonBrowser.parse("{\"kind\":\"track\"}");
+    };
+    SoundCloudAudioSourceManager manager = manager(false, state, false, loader);
+    RecordingHttpInterface http = new RecordingHttpInterface();
+    injectManager(manager, http);
+    AudioTrack loaded = manager.loadTrack("https://soundcloud.com/u/t");
+    check(loaded instanceof SoundCloudAudioTrack && loaded.getInfo() == INFO
+        && loadedUrl.get().equals("https://soundcloud.com/u/t") && http.closes == 1,
+        "track pipeline and close");
+
+    state.trackData = JsonBrowser.parse("{\"monetization_model\":\"SUB_HIGH_TIER\"}");
+    SoundCloudAudioSourceManager filtered = manager(true, state, true, loader);
+    RecordingHttpInterface filteredHttp = new RecordingHttpInterface();
+    injectManager(filtered, filteredHttp);
+    check(filtered.loadTrack("preview", true) == null && filteredHttp.closes == 1,
+        "preview filter");
+    RecordingHttpInterface allowedHttp = new RecordingHttpInterface();
+    injectManager(filtered, allowedHttp);
+    check(filtered.loadTrack("preview", false) instanceof SoundCloudAudioTrack
+        && allowedHttp.closes == 1, "preview bypass");
+
+    state.trackData = null;
+    RecordingHttpInterface missingHttp = new RecordingHttpInterface();
+    injectManager(manager, missingHttp);
+    FriendlyException common = expect(FriendlyException.class,
+        () -> manager.loadTrack("missing"));
+    check(common.severity == FriendlyException.Severity.COMMON
+        && common.getMessage().equals("This track is not available")
+        && missingHttp.closes == 1, "missing track failure");
+
+    SoundCloudDataLoader failingLoader = (value, url) -> { throw new IOException("load-sentinel"); };
+    SoundCloudAudioSourceManager failing = manager(false, state, false, failingLoader);
+    RecordingHttpInterface failingHttp = new RecordingHttpInterface();
+    failingHttp.closeFailure = new IOException("close-sentinel");
+    injectManager(failing, failingHttp);
+    FriendlyException suspicious = expect(FriendlyException.class,
+        () -> failing.loadTrack("failure"));
+    check(suspicious.severity == FriendlyException.Severity.SUSPICIOUS
+        && suspicious.getCause() instanceof IOException
+        && suspicious.getCause().getSuppressed().length == 1, "IO wrapping and suppression");
+  }
+
+  private static void searchAndLikesContract() throws Exception {
+    ReaderHandler state = new ReaderHandler();
+    SoundCloudAudioSourceManager search = manager(true, state, true, null);
+    RecordingHttpInterface searchHttp = new RecordingHttpInterface();
+    searchHttp.responses.add(response(200, "{\"collection\":["
+        + "{\"id\":\"1\",\"monetization_model\":\"SUB_HIGH_TIER\"},"
+        + "{\"id\":\"2\"}]}", searchHttp.responseCloses));
+    injectManager(search, searchHttp);
+    AudioItem searchItem = search.loadItem(null, new AudioReference("scsearch[3,999]:hello", null));
+    check(searchItem instanceof AudioPlaylist, "search playlist type");
+    AudioPlaylist searchPlaylist = (AudioPlaylist) searchItem;
+    check(searchPlaylist.isSearchResult() && searchPlaylist.getTracks().size() == 1,
+        "search filtering");
+    check(searchPlaylist.getName().equals("Search results for: hello"), "search name");
+    check(searchHttp.uris.get(0).toString().equals(
+        "https://api-v2.soundcloud.com/search/tracks?q=hello&offset=3&limit=200"), "search URI");
+    check(searchHttp.closes == 1 && searchHttp.responseCloses.get() == 1,
+        "search resource close");
+
+    SoundCloudAudioSourceManager likes = manager(false, state, true, null);
+    RecordingHttpInterface likedHttp = new RecordingHttpInterface();
+    likedHttp.responses.add(response(200,
+        "prefix {\"urn\":\"soundcloud:users:42\",\"username\":\"Alice\"} suffix",
+        likedHttp.responseCloses));
+    likedHttp.responses.add(response(200, "{\"collection\":["
+        + "{\"track\":{\"id\":\"3\"}},"
+        + "{\"track\":{\"id\":\"4\",\"blocked\":\"yes\"}},"
+        + "{\"track\":{\"id\":\"5\",\"monetization_model\":\"SUB_HIGH_TIER\"}}]}",
+        likedHttp.responseCloses));
+    injectManager(likes, likedHttp);
+    AudioItem likedItem = likes.loadItem(null,
+        new AudioReference("https://soundcloud.com/alice/likes", null));
+    check(likedItem instanceof AudioPlaylist, "liked playlist type");
+    AudioPlaylist likedPlaylist = (AudioPlaylist) likedItem;
+    check(likedPlaylist.getName().equals("Liked by Alice"), "liked playlist name");
+    check(likedPlaylist.getTracks().size() == 1, "liked omissions");
+    check(likedHttp.uris.get(0).toString().equals("https://soundcloud.com/alice/likes"),
+        "liked page URI");
+    check(likedHttp.uris.get(1).toString().equals(
+        "https://api-v2.soundcloud.com/users/42/likes?limit=200&offset=0"),
+        "liked API URI");
+    check(likedHttp.closes == 1 && likedHttp.responseCloses.get() == 2,
+        "liked resource close");
+  }
+
+  private static SoundCloudAudioSourceManager manager(
+      boolean allowSearch, ReaderHandler state, boolean filter, SoundCloudDataLoader loader) {
+    SoundCloudDataLoader actualLoader = loader == null
+        ? (http, url) -> JsonBrowser.NULL_BROWSER : loader;
+    return new SoundCloudAudioSourceManager(allowSearch, state.proxy(), actualLoader,
+        formatHandler(), (url, http, factory) -> null, filter);
+  }
+
+  private static SoundCloudFormatHandler formatHandler() {
+    return (SoundCloudFormatHandler) Proxy.newProxyInstance(
+        SoundCloudFormatHandler.class.getClassLoader(),
+        new Class<?>[] {SoundCloudFormatHandler.class}, (instance, method, arguments) -> {
+          if (method.getName().equals("chooseBestFormat")) return FORMAT;
+          if (method.getName().equals("buildFormatIdentifier")) return "format-id";
+          return defaultValue(method.getReturnType());
+        });
+  }
+
+  private static ManagerHandler injectManager(
+      SoundCloudAudioSourceManager manager, RecordingHttpInterface http) throws Exception {
+    ManagerHandler state = new ManagerHandler(http);
+    field("httpInterfaceManager").set(manager, state.proxy());
+    return state;
+  }
+
+  private static CloseableHttpResponse response(
+      int status, String body, AtomicInteger closes) {
+    return (CloseableHttpResponse) Proxy.newProxyInstance(
+        CloseableHttpResponse.class.getClassLoader(),
+        new Class<?>[] {CloseableHttpResponse.class}, (instance, method, arguments) -> {
+          if (method.getName().equals("getStatusLine")) {
+            return new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), status, "fixture");
+          }
+          if (method.getName().equals("getEntity")) {
+            return new StringEntity(body, ContentType.APPLICATION_JSON);
+          }
+          if (method.getName().equals("close")) { closes.incrementAndGet(); return null; }
+          return defaultValue(method.getReturnType());
+        });
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = SoundCloudAudioSourceManager.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+  private static int intField(String name) throws Exception { return field(name).getInt(null); }
+  private static String stringField(String name) throws Exception {
+    return (String) field(name).get(null);
+  }
+  private static Pattern pattern(String name) throws Exception {
+    return (Pattern) field(name).get(null);
+  }
+
+  private static final class ReaderHandler implements InvocationHandler {
+    private JsonBrowser trackData = JsonBrowser.NULL_BROWSER;
+    private SoundCloudDataReader proxy() {
+      return (SoundCloudDataReader) Proxy.newProxyInstance(
+          SoundCloudDataReader.class.getClassLoader(), new Class<?>[] {SoundCloudDataReader.class},
+          this);
+    }
+    public Object invoke(Object instance, Method method, Object[] arguments) {
+      if (method.getName().equals("findTrackData")) return trackData;
+      if (method.getName().equals("readTrackFormats")) return Collections.singletonList(FORMAT);
+      if (method.getName().equals("readTrackInfo")) return INFO;
+      if (method.getName().equals("isTrackBlocked")) {
+        return "yes".equals(((JsonBrowser) arguments[0]).get("blocked").text());
+      }
+      return defaultValue(method.getReturnType());
+    }
+  }
+
+  private static final class ManagerHandler implements InvocationHandler {
+    private final HttpInterface http;
+    private Object requestConfig;
+    private Object builderConfig;
+    private int closes;
+    private ManagerHandler(HttpInterface http) { this.http = http; }
+    private HttpInterfaceManager proxy() {
+      return (HttpInterfaceManager) Proxy.newProxyInstance(HttpInterfaceManager.class.getClassLoader(),
+          new Class<?>[] {HttpInterfaceManager.class}, this);
+    }
+    public Object invoke(Object instance, Method method, Object[] arguments) {
+      if (method.getName().equals("getInterface")) return http;
+      if (method.getName().equals("configureRequests")) requestConfig = arguments[0];
+      if (method.getName().equals("configureBuilder")) builderConfig = arguments[0];
+      if (method.getName().equals("close")) closes++;
+      return defaultValue(method.getReturnType());
+    }
+  }
+
+  private static final class RecordingHttpInterface extends HttpInterface {
+    private final Queue<CloseableHttpResponse> responses = new ArrayDeque<>();
+    private final List<URI> uris = new java.util.ArrayList<>();
+    private final AtomicInteger responseCloses = new AtomicInteger();
+    private int closes;
+    private IOException closeFailure;
+    private RecordingHttpInterface() { super(null, HttpClientContext.create(), false, null); }
+    public CloseableHttpResponse execute(HttpUriRequest request) throws IOException {
+      uris.add(request.getURI());
+      if (responses.isEmpty()) throw new IOException("no fixture response");
+      return responses.remove();
+    }
+    public void close() throws IOException {
+      closes++;
+      if (closeFailure != null) throw closeFailure;
+    }
+  }
+
+  private static class ExposedManager extends SoundCloudAudioSourceManager {
+    private ExposedManager(
+        boolean allowSearch, ReaderHandler state, boolean filter, SoundCloudDataLoader loader) {
+      super(allowSearch, state.proxy(), loader == null
+          ? (http, url) -> JsonBrowser.NULL_BROWSER : loader,
+          formatHandler(), (url, http, factory) -> null, filter);
+    }
+    private AudioTrack from(JsonBrowser data) { return loadFromTrackData(data); }
+  }
+
+  private static final class RoutingManager extends SoundCloudAudioSourceManager {
+    private final AudioTrack track = proxy(AudioTrack.class);
+    private String loadedUrl;
+    private boolean loadFlags;
+    private RoutingManager(boolean search, SoundCloudPlaylistLoader playlists) {
+      super(search, new ReaderHandler().proxy(), (http, url) -> JsonBrowser.NULL_BROWSER,
+          formatHandler(), playlists);
+    }
+    public AudioTrack loadTrack(String url, boolean checkPreview) {
+      loadedUrl = url;
+      loadFlags = checkPreview;
+      return track;
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type},
+        (instance, method, arguments) -> defaultValue(method.getReturnType()));
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0F;
+    if (type == double.class) return 0D;
+    if (type == char.class) return (char) 0;
+    return null;
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw error;
+      return type.cast(error);
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+  private interface Operation { void run() throws Exception; }
 }
 "#;
 
