@@ -86,6 +86,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
             Some(LOCAL_AUDIO_TRACK_EXECUTOR_CALLBACK_CONSUMER)
         }
         "write-local-audio-track-executor-consumer" => Some(LOCAL_AUDIO_TRACK_EXECUTOR_CONSUMER),
+        "write-track-marker-tracker-consumer" => Some(TRACK_MARKER_TRACKER_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -4685,6 +4686,220 @@ public final class GateLocalAudioTrackExecutor {
     if (type == double.class) return 0.0d;
     if (type == char.class) return (char) 0;
     return null;
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const TRACK_MARKER_TRACKER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.track.TrackMarker;
+import com.sedmelluq.discord.lavaplayer.track.TrackMarkerHandler.MarkerState;
+import com.sedmelluq.discord.lavaplayer.track.TrackMarkerTracker;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+public final class GateTrackMarkerTracker {
+  public static void main(String[] args) throws Exception {
+    emptyAndViews();
+    addRemoveAndClear();
+    setAndTrigger();
+    playbackAndSeek();
+    reentrancyAndFailures();
+    concurrentAdds();
+    reflection();
+    System.out.println(
+        "empty=remove-null;views=live,distinct,unmodifiable,generic;"
+        + "add=null,late-boundary,ordered,duplicates;remove=identity,deprecated-no-callback;"
+        + "set=overwritten,removed,late;trigger=ordered,null,reentrant-clear;"
+        + "checks=reached,bypassed,threshold,exception-after-remove;"
+        + "concurrency=copy-on-write;reflection=class,1-field,1-constructor,9-public-methods");
+  }
+
+  private static void emptyAndViews() {
+    TrackMarkerTracker tracker = new TrackMarkerTracker();
+    check(tracker.remove() == null, "empty deprecated remove");
+    List<TrackMarker> first = tracker.getMarkers();
+    List<TrackMarker> second = tracker.getMarkers();
+    check(first.isEmpty() && first != second, "distinct empty views");
+    TrackMarker marker = marker(10, new ArrayList<>());
+    tracker.add(marker, 0);
+    check(first.size() == 1 && first.get(0) == marker, "live view");
+    try {
+      first.clear();
+      throw new AssertionError("view was mutable");
+    } catch (UnsupportedOperationException expected) {
+      check(tracker.getMarkers().size() == 1, "unmodifiable view retained data");
+    }
+  }
+
+  private static void addRemoveAndClear() {
+    TrackMarkerTracker tracker = new TrackMarkerTracker();
+    List<String> events = new ArrayList<>();
+    tracker.add(null, 0);
+    TrackMarker late = namedMarker("late", 5, events);
+    tracker.add(late, 5);
+    check(events.equals(Arrays.asList("late:LATE")) && tracker.getMarkers().isEmpty(),
+        "boundary marker is late");
+
+    TrackMarker first = namedMarker("first", 30, events);
+    TrackMarker duplicate = namedMarker("duplicate", 40, events);
+    tracker.add(first, 0);
+    tracker.add(duplicate, 0);
+    tracker.add(duplicate, 0);
+    check(tracker.getMarkers().equals(Arrays.asList(first, duplicate, duplicate)),
+        "insertion and duplicate order");
+    tracker.remove(namedMarker("unknown", 40, events));
+    check(events.size() == 1 && tracker.getMarkers().size() == 3, "identity removal");
+    tracker.remove(duplicate);
+    check(events.equals(Arrays.asList("late:LATE", "duplicate:REMOVED"))
+        && tracker.getMarkers().equals(Arrays.asList(first, duplicate)),
+        "single duplicate removal");
+    check(tracker.remove() == first && events.size() == 2
+        && tracker.getMarkers().equals(Arrays.asList(duplicate)),
+        "deprecated remove has no callback");
+    tracker.clear();
+    check(tracker.getMarkers().isEmpty() && events.size() == 2, "clear has no callback");
+  }
+
+  private static void setAndTrigger() {
+    TrackMarkerTracker tracker = new TrackMarkerTracker();
+    List<String> events = new ArrayList<>();
+    tracker.add(namedMarker("one", 30, events), 0);
+    tracker.add(namedMarker("two", 40, events), 0);
+    tracker.set(namedMarker("late", 20, events), 20);
+    check(events.equals(Arrays.asList("one:OVERWRITTEN", "two:OVERWRITTEN", "late:LATE"))
+        && tracker.getMarkers().isEmpty(), "set overwrite then late");
+    TrackMarker future = namedMarker("future", 80, events);
+    tracker.set(future, 20);
+    check(tracker.getMarkers().equals(Arrays.asList(future)), "future set retained");
+    tracker.set(null, 20);
+    check(events.get(events.size() - 1).equals("future:REMOVED")
+        && tracker.getMarkers().isEmpty(), "set null removes");
+    tracker.add(namedMarker("null-state", 90, events), 0);
+    tracker.trigger(null);
+    check(events.get(events.size() - 1).equals("null-state:null")
+        && tracker.getMarkers().isEmpty(), "null trigger state");
+  }
+
+  private static void playbackAndSeek() {
+    TrackMarkerTracker tracker = new TrackMarkerTracker();
+    List<String> events = new ArrayList<>();
+    TrackMarker high = namedMarker("high", 100, events);
+    TrackMarker low = namedMarker("low", 20, events);
+    TrackMarker edge = namedMarker("edge", 50, events);
+    tracker.add(high, 0);
+    tracker.add(low, 0);
+    tracker.add(edge, 0);
+    tracker.checkPlaybackTimecode(50);
+    check(events.equals(Arrays.asList("low:REACHED", "edge:REACHED"))
+        && tracker.getMarkers().equals(Arrays.asList(high)), "playback threshold and order");
+    tracker.checkSeekTimecode(99);
+    check(events.size() == 2 && tracker.getMarkers().equals(Arrays.asList(high)),
+        "seek below threshold");
+    tracker.checkSeekTimecode(100);
+    check(events.get(2).equals("high:BYPASSED") && tracker.getMarkers().isEmpty(),
+        "seek boundary");
+  }
+
+  private static void reentrancyAndFailures() {
+    TrackMarkerTracker tracker = new TrackMarkerTracker();
+    List<String> events = new ArrayList<>();
+    TrackMarker added = namedMarker("added", 200, events);
+    tracker.add(new TrackMarker(20, state -> {
+      events.add("outer:" + String.valueOf(state));
+      tracker.add(added, 0);
+    }), 0);
+    tracker.trigger(MarkerState.ENDED);
+    check(events.equals(Arrays.asList("outer:ENDED")) && tracker.getMarkers().isEmpty(),
+        "trigger snapshot and final clear");
+
+    RuntimeException triggerFailure = new RuntimeException("trigger-sentinel");
+    TrackMarker failing = new TrackMarker(20, state -> { throw triggerFailure; });
+    TrackMarker later = namedMarker("later", 30, events);
+    tracker.add(failing, 0);
+    tracker.add(later, 0);
+    try {
+      tracker.trigger(MarkerState.STOPPED);
+      throw new AssertionError("trigger failure swallowed");
+    } catch (RuntimeException error) {
+      check(error == triggerFailure && tracker.getMarkers().equals(Arrays.asList(failing, later)),
+          "trigger failure identity and retained list");
+    }
+    tracker.clear();
+
+    RuntimeException checkFailure = new RuntimeException("check-sentinel");
+    TrackMarker reached = new TrackMarker(20, state -> { throw checkFailure; });
+    tracker.add(reached, 0);
+    tracker.add(later, 0);
+    try {
+      tracker.checkPlaybackTimecode(30);
+      throw new AssertionError("check failure swallowed");
+    } catch (RuntimeException error) {
+      check(error == checkFailure && tracker.getMarkers().equals(Arrays.asList(later)),
+          "check removes before callback");
+    }
+  }
+
+  private static void concurrentAdds() throws Exception {
+    TrackMarkerTracker tracker = new TrackMarkerTracker();
+    Thread[] threads = new Thread[4];
+    for (int thread = 0; thread < threads.length; thread++) {
+      final int offset = thread * 100;
+      threads[thread] = new Thread(() -> {
+        for (int index = 0; index < 100; index++) {
+          tracker.add(new TrackMarker(1000 + offset + index, state -> { }), 0);
+        }
+      });
+      threads[thread].start();
+    }
+    for (Thread thread : threads) thread.join();
+    check(tracker.getMarkers().size() == 400, "concurrent add count");
+    tracker.trigger(MarkerState.ENDED);
+    check(tracker.getMarkers().isEmpty(), "concurrent collection clear");
+  }
+
+  private static void reflection() throws Exception {
+    Class<TrackMarkerTracker> type = TrackMarkerTracker.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == Object.class && type.getInterfaces().length == 0,
+        "class metadata");
+    Field[] fields = type.getDeclaredFields();
+    check(fields.length == 1 && fields[0].getName().equals("markerList")
+        && fields[0].getType() == List.class
+        && Modifier.isPrivate(fields[0].getModifiers())
+        && Modifier.isFinal(fields[0].getModifiers()), "field metadata");
+    ParameterizedType fieldType = (ParameterizedType) fields[0].getGenericType();
+    check(fieldType.getActualTypeArguments()[0] == TrackMarker.class, "field generic type");
+    Constructor<?>[] constructors = type.getDeclaredConstructors();
+    check(constructors.length == 1 && Modifier.isPublic(constructors[0].getModifiers())
+        && constructors[0].getParameterCount() == 0, "constructor metadata");
+    int publicDeclared = 0;
+    for (Method method : type.getDeclaredMethods()) {
+      if (Modifier.isPublic(method.getModifiers())) publicDeclared++;
+    }
+    check(publicDeclared == 9, "public method count");
+    check(type.getDeclaredMethod("remove").isAnnotationPresent(Deprecated.class),
+        "deprecated remove annotation");
+    ParameterizedType returnType = (ParameterizedType)
+        type.getDeclaredMethod("getMarkers").getGenericReturnType();
+    check(returnType.getActualTypeArguments()[0] == TrackMarker.class, "return generic type");
+  }
+
+  private static TrackMarker marker(long timecode, List<MarkerState> events) {
+    return new TrackMarker(timecode, events::add);
+  }
+
+  private static TrackMarker namedMarker(String name, long timecode, List<String> events) {
+    return new TrackMarker(timecode, state -> events.add(name + ":" + String.valueOf(state)));
   }
 
   private static void check(boolean condition, String message) {

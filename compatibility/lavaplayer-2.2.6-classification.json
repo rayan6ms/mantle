@@ -23854,99 +23854,143 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal marker storage, ordering, duplicate, late, overwrite, removal, playback, seek, callback-failure, reentrancy, concurrency, deprecated API, and reflection behavior are covered by the Phase 13 track-marker-tracker-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.TrackMarkerTracker",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal marker storage, ordering, duplicate, late, overwrite, removal, playback, seek, callback-failure, reentrancy, concurrency, deprecated API, and reflection behavior are covered by the Phase 13 track-marker-tracker-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.TrackMarkerTracker",
       "symbol_kind": "METHOD",
       "member_name": "set",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal marker storage, ordering, duplicate, late, overwrite, removal, playback, seek, callback-failure, reentrancy, concurrency, deprecated API, and reflection behavior are covered by the Phase 13 track-marker-tracker-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.TrackMarkerTracker",
       "symbol_kind": "METHOD",
       "member_name": "add",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal marker storage, ordering, duplicate, late, overwrite, removal, playback, seek, callback-failure, reentrancy, concurrency, deprecated API, and reflection behavior are covered by the Phase 13 track-marker-tracker-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.TrackMarkerTracker",
       "symbol_kind": "METHOD",
       "member_name": "remove",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal marker storage, ordering, duplicate, late, overwrite, removal, playback, seek, callback-failure, reentrancy, concurrency, deprecated API, and reflection behavior are covered by the Phase 13 track-marker-tracker-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.TrackMarkerTracker",
       "symbol_kind": "METHOD",
       "member_name": "remove",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal marker storage, ordering, duplicate, late, overwrite, removal, playback, seek, callback-failure, reentrancy, concurrency, deprecated API, and reflection behavior are covered by the Phase 13 track-marker-tracker-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.TrackMarkerTracker",
       "symbol_kind": "METHOD",
       "member_name": "getMarkers",
       "descriptor": "()Ljava/util/List;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal marker storage, ordering, duplicate, late, overwrite, removal, playback, seek, callback-failure, reentrancy, concurrency, deprecated API, and reflection behavior are covered by the Phase 13 track-marker-tracker-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.TrackMarkerTracker",
       "symbol_kind": "METHOD",
       "member_name": "clear",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal marker storage, ordering, duplicate, late, overwrite, removal, playback, seek, callback-failure, reentrancy, concurrency, deprecated API, and reflection behavior are covered by the Phase 13 track-marker-tracker-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.TrackMarkerTracker",
       "symbol_kind": "METHOD",
       "member_name": "trigger",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal marker storage, ordering, duplicate, late, overwrite, removal, playback, seek, callback-failure, reentrancy, concurrency, deprecated API, and reflection behavior are covered by the Phase 13 track-marker-tracker-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.TrackMarkerTracker",
       "symbol_kind": "METHOD",
       "member_name": "checkPlaybackTimecode",
       "descriptor": "(J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal marker storage, ordering, duplicate, late, overwrite, removal, playback, seek, callback-failure, reentrancy, concurrency, deprecated API, and reflection behavior are covered by the Phase 13 track-marker-tracker-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.TrackMarkerTracker",
       "symbol_kind": "METHOD",
       "member_name": "checkSeekTimecode",
       "descriptor": "(J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal marker storage, ordering, duplicate, late, overwrite, removal, playback, seek, callback-failure, reentrancy, concurrency, deprecated API, and reflection behavior are covered by the Phase 13 track-marker-tracker-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.TrackStateListener",

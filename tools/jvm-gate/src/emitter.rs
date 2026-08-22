@@ -33,6 +33,7 @@ const DEFAULT_PLAYER_HELPER_CLASS: &str = "dev/mantle/internal/NativeDefaultAudi
 const MANAGER_HELPER_CLASS: &str = "dev/mantle/internal/NativeDefaultAudioPlayerManager";
 const MANAGER_EXECUTOR_TASK_CLASS: &str = "dev/mantle/internal/NativeTrackExecutorTask";
 const LOCAL_TRACK_EXECUTOR_HELPER_CLASS: &str = "dev/mantle/internal/NativeLocalAudioTrackExecutor";
+const TRACK_MARKER_TRACKER_HELPER_CLASS: &str = "dev/mantle/internal/NativeTrackMarkerTracker";
 const MANAGER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayerManager";
 const DEFAULT_PLAYER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayer";
 const AUDIO_PLAYER_MANAGER_CLASS: &str =
@@ -68,6 +69,8 @@ const MARKER_STATE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState";
 const TRACK_STATE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/AudioTrackState";
 const TRACK_END_REASON_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/AudioTrackEndReason";
+const TRACK_MARKER_TRACKER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/track/TrackMarkerTracker";
 const FRIENDLY_EXCEPTION_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/FriendlyException";
 const FRIENDLY_EXCEPTION_SEVERITY_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity";
@@ -131,6 +134,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     DECODED_TRACK_HOLDER_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoProvider",
     "com/sedmelluq/discord/lavaplayer/track/TrackMarker",
+    TRACK_MARKER_TRACKER_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler",
     "com/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState",
     "com/sedmelluq/discord/lavaplayer/track/TrackStateListener",
@@ -284,6 +288,7 @@ fn internal_classes(expected_abi: u8) -> Result<Vec<ClassFile<'static>>> {
         native_default_audio_player_manager_class()?,
         native_track_executor_task_class()?,
         native_local_audio_track_executor_class()?,
+        native_track_marker_tracker_class()?,
     ])
 }
 
@@ -450,7 +455,9 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
     class.fields.retain(|field| {
         matches!(
             class_name.as_str(),
-            PLAYER_LIFECYCLE_MANAGER_CLASS | FUNCTIONAL_RESULT_HANDLER_CLASS
+            PLAYER_LIFECYCLE_MANAGER_CLASS
+                | FUNCTIONAL_RESULT_HANDLER_CLASS
+                | TRACK_MARKER_TRACKER_CLASS
         ) || field
             .access_flags
             .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
@@ -533,6 +540,9 @@ fn replacement_body(
     }
     if class_name == LOCAL_TRACK_EXECUTOR_CLASS {
         return local_audio_track_executor_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == TRACK_MARKER_TRACKER_CLASS {
+        return track_marker_tracker_replacement(pool, name, descriptor, required_locals);
     }
     if track_enum_constants(class_name).is_some() {
         return track_enum_replacement(pool, class_name, name, descriptor, required_locals);
@@ -1056,6 +1066,70 @@ fn local_audio_track_executor_replacement(
         }
     };
     local_audio_track_executor_delegate(pool, name, descriptor, loads, result, required_locals)
+}
+
+fn track_marker_tracker_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    if name == "<init>" && descriptor == "()V" {
+        return track_marker_tracker_constructor(pool);
+    }
+    let (helper_descriptor, loads, result) = match (name, descriptor) {
+        ("set" | "add", "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;J)V") => (
+            "(Ljava/util/List;Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;J)V",
+            vec![Instruction::Aload_1, Instruction::Lload_2],
+            Instruction::Return,
+        ),
+        ("remove", "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V") => (
+            "(Ljava/util/List;Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V",
+            vec![Instruction::Aload_1],
+            Instruction::Return,
+        ),
+        ("remove", "()Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;") => (
+            "(Ljava/util/List;)Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;",
+            vec![],
+            Instruction::Areturn,
+        ),
+        ("getMarkers", "()Ljava/util/List;") => (
+            "(Ljava/util/List;)Ljava/util/List;",
+            vec![],
+            Instruction::Areturn,
+        ),
+        ("clear", "()V") => ("(Ljava/util/List;)V", vec![], Instruction::Return),
+        (
+            "trigger",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState;)V",
+        ) => (
+            "(Ljava/util/List;Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState;)V",
+            vec![Instruction::Aload_1],
+            Instruction::Return,
+        ),
+        ("checkPlaybackTimecode" | "checkSeekTimecode", "(J)V") => (
+            "(Ljava/util/List;J)V",
+            vec![Instruction::Lload_1],
+            Instruction::Return,
+        ),
+        _ => {
+            return unsupported_body(
+                pool,
+                &format!(
+                    "Phase 13 does not implement {TRACK_MARKER_TRACKER_CLASS}.{name}{descriptor}"
+                ),
+                required_locals,
+            );
+        }
+    };
+    let owner = pool.add_class(TRACK_MARKER_TRACKER_CLASS)?;
+    let markers = pool.add_field_ref(owner, "markerList", "Ljava/util/List;")?;
+    let helper = pool.add_class(TRACK_MARKER_TRACKER_HELPER_CLASS)?;
+    let method = pool.add_method_ref(helper, name, helper_descriptor)?;
+    let mut instructions = vec![Instruction::Aload_0, Instruction::Getfield(markers)];
+    instructions.extend(loads);
+    instructions.extend([Instruction::Invokestatic(method), result]);
+    code(pool, 4, required_locals, instructions)
 }
 
 fn terminator_frame_replacement(
@@ -3047,6 +3121,445 @@ fn native_local_audio_track_executor_class() -> Result<ClassFile<'static>> {
         add_method(&mut class, flags, name, descriptor, Some(body))?;
     }
     Ok(class)
+}
+
+fn native_track_marker_tracker_class() -> Result<ClassFile<'static>> {
+    let mut class = new_class(
+        TRACK_MARKER_TRACKER_HELPER_CLASS,
+        "java/lang/Object",
+        ClassAccessFlags::PUBLIC | ClassAccessFlags::FINAL | ClassAccessFlags::SUPER,
+        &[],
+    )?;
+    let constructor = object_constructor(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PRIVATE,
+        "<init>",
+        "()V",
+        Some(constructor),
+    )?;
+    let methods: &[(&str, &str, MethodEmitter)] = &[
+        (
+            "set",
+            "(Ljava/util/List;Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;J)V",
+            track_marker_tracker_set,
+        ),
+        (
+            "add",
+            "(Ljava/util/List;Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;J)V",
+            track_marker_tracker_add,
+        ),
+        (
+            "remove",
+            "(Ljava/util/List;Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V",
+            track_marker_tracker_remove_marker,
+        ),
+        (
+            "remove",
+            "(Ljava/util/List;)Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;",
+            track_marker_tracker_remove_first,
+        ),
+        (
+            "getMarkers",
+            "(Ljava/util/List;)Ljava/util/List;",
+            track_marker_tracker_get_markers,
+        ),
+        ("clear", "(Ljava/util/List;)V", track_marker_tracker_clear),
+        (
+            "trigger",
+            "(Ljava/util/List;Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState;)V",
+            track_marker_tracker_trigger,
+        ),
+        (
+            "checkPlaybackTimecode",
+            "(Ljava/util/List;J)V",
+            track_marker_tracker_check_playback,
+        ),
+        (
+            "checkSeekTimecode",
+            "(Ljava/util/List;J)V",
+            track_marker_tracker_check_seek,
+        ),
+    ];
+    for (name, descriptor, body) in methods {
+        let body = body(&mut class.constant_pool)?;
+        add_method(
+            &mut class,
+            MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+            name,
+            descriptor,
+            Some(body),
+        )?;
+    }
+    let check = track_marker_tracker_check(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PRIVATE | MethodAccessFlags::STATIC,
+        "check",
+        "(Ljava/util/List;JLcom/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState;)V",
+        Some(check),
+    )?;
+    Ok(class)
+}
+
+fn track_marker_tracker_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(TRACK_MARKER_TRACKER_CLASS)?;
+    let markers = pool.add_field_ref(owner, "markerList", "Ljava/util/List;")?;
+    let list = pool.add_class("java/util/concurrent/CopyOnWriteArrayList")?;
+    let list_init = pool.add_method_ref(list, "<init>", "()V")?;
+    code(
+        pool,
+        3,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::New(list),
+            Instruction::Dup,
+            Instruction::Invokespecial(list_init),
+            Instruction::Putfield(markers),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn track_marker_tracker_set(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let helper = pool.add_class(TRACK_MARKER_TRACKER_HELPER_CLASS)?;
+    let trigger = pool.add_method_ref(
+        helper,
+        "trigger",
+        "(Ljava/util/List;Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState;)V",
+    )?;
+    let add = pool.add_method_ref(
+        helper,
+        "add",
+        "(Ljava/util/List;Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;J)V",
+    )?;
+    let state = pool.add_class(MARKER_STATE_CLASS)?;
+    let removed = pool.add_field_ref(
+        state,
+        "REMOVED",
+        "Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState;",
+    )?;
+    let overwritten = pool.add_field_ref(
+        state,
+        "OVERWRITTEN",
+        "Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState;",
+    )?;
+    code(
+        pool,
+        4,
+        4,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Ifnonnull(6),
+            Instruction::Aload_0,
+            Instruction::Getstatic(removed),
+            Instruction::Invokestatic(trigger),
+            Instruction::Return,
+            Instruction::Aload_0,
+            Instruction::Getstatic(overwritten),
+            Instruction::Invokestatic(trigger),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Lload_2,
+            Instruction::Invokestatic(add),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn track_marker_tracker_add(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let marker = pool.add_class("com/sedmelluq/discord/lavaplayer/track/TrackMarker")?;
+    let timecode = pool.add_field_ref(marker, "timecode", "J")?;
+    let handler = pool.add_field_ref(
+        marker,
+        "handler",
+        "Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler;",
+    )?;
+    let state = pool.add_class(MARKER_STATE_CLASS)?;
+    let late = pool.add_field_ref(
+        state,
+        "LATE",
+        "Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState;",
+    )?;
+    let handler_type =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler")?;
+    let handle = pool.add_interface_method_ref(
+        handler_type,
+        "handle",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState;)V",
+    )?;
+    let list = pool.add_class("java/util/List")?;
+    let add = pool.add_interface_method_ref(list, "add", "(Ljava/lang/Object;)Z")?;
+    code(
+        pool,
+        4,
+        4,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Ifnonnull(3),
+            Instruction::Return,
+            Instruction::Lload_2,
+            Instruction::Aload_1,
+            Instruction::Getfield(timecode),
+            Instruction::Lcmp,
+            Instruction::Iflt(13),
+            Instruction::Aload_1,
+            Instruction::Getfield(handler),
+            Instruction::Getstatic(late),
+            Instruction::Invokeinterface(handle, 2),
+            Instruction::Return,
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(add, 2),
+            Instruction::Pop,
+            Instruction::Return,
+        ],
+    )
+}
+
+fn track_marker_tracker_remove_marker(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let marker = pool.add_class("com/sedmelluq/discord/lavaplayer/track/TrackMarker")?;
+    let handler = pool.add_field_ref(
+        marker,
+        "handler",
+        "Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler;",
+    )?;
+    let state = pool.add_class(MARKER_STATE_CLASS)?;
+    let removed = pool.add_field_ref(
+        state,
+        "REMOVED",
+        "Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState;",
+    )?;
+    let handler_type =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler")?;
+    let handle = pool.add_interface_method_ref(
+        handler_type,
+        "handle",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState;)V",
+    )?;
+    let list = pool.add_class("java/util/List")?;
+    let remove = pool.add_interface_method_ref(list, "remove", "(Ljava/lang/Object;)Z")?;
+    code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(remove, 2),
+            Instruction::Ifeq(8),
+            Instruction::Aload_1,
+            Instruction::Getfield(handler),
+            Instruction::Getstatic(removed),
+            Instruction::Invokeinterface(handle, 2),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn track_marker_tracker_remove_first(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let list = pool.add_class("java/util/List")?;
+    let empty = pool.add_interface_method_ref(list, "isEmpty", "()Z")?;
+    let remove = pool.add_interface_method_ref(list, "remove", "(I)Ljava/lang/Object;")?;
+    let marker = pool.add_class("com/sedmelluq/discord/lavaplayer/track/TrackMarker")?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokeinterface(empty, 1),
+            Instruction::Ifeq(5),
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+            Instruction::Aload_0,
+            Instruction::Iconst_0,
+            Instruction::Invokeinterface(remove, 2),
+            Instruction::Checkcast(marker),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn track_marker_tracker_get_markers(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let collections = pool.add_class("java/util/Collections")?;
+    let unmodifiable = pool.add_method_ref(
+        collections,
+        "unmodifiableList",
+        "(Ljava/util/List;)Ljava/util/List;",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokestatic(unmodifiable),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn track_marker_tracker_clear(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let list = pool.add_class("java/util/List")?;
+    let clear = pool.add_interface_method_ref(list, "clear", "()V")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokeinterface(clear, 1),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn track_marker_tracker_trigger(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let list = pool.add_class("java/util/List")?;
+    let to_array = pool.add_interface_method_ref(list, "toArray", "()[Ljava/lang/Object;")?;
+    let clear = pool.add_interface_method_ref(list, "clear", "()V")?;
+    let marker = pool.add_class("com/sedmelluq/discord/lavaplayer/track/TrackMarker")?;
+    let handler = pool.add_field_ref(
+        marker,
+        "handler",
+        "Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler;",
+    )?;
+    let handler_type =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler")?;
+    let handle = pool.add_interface_method_ref(
+        handler_type,
+        "handle",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState;)V",
+    )?;
+    code(
+        pool,
+        3,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokeinterface(to_array, 1),
+            Instruction::Astore_2,
+            Instruction::Iconst_0,
+            Instruction::Istore_3,
+            Instruction::Iload_3,
+            Instruction::Aload_2,
+            Instruction::Arraylength,
+            Instruction::If_icmpge(18),
+            Instruction::Aload_2,
+            Instruction::Iload_3,
+            Instruction::Aaload,
+            Instruction::Checkcast(marker),
+            Instruction::Getfield(handler),
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(handle, 2),
+            Instruction::Iinc(3, 1),
+            Instruction::Goto(5),
+            Instruction::Aload_0,
+            Instruction::Invokeinterface(clear, 1),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn track_marker_tracker_check_playback(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    track_marker_tracker_check_state(pool, "REACHED")
+}
+
+fn track_marker_tracker_check_seek(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    track_marker_tracker_check_state(pool, "BYPASSED")
+}
+
+fn track_marker_tracker_check_state(
+    pool: &mut ConstantPool<'static>,
+    state_name: &str,
+) -> Result<Attribute> {
+    let state = pool.add_class(MARKER_STATE_CLASS)?;
+    let value = pool.add_field_ref(
+        state,
+        state_name,
+        "Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState;",
+    )?;
+    let helper = pool.add_class(TRACK_MARKER_TRACKER_HELPER_CLASS)?;
+    let check = pool.add_method_ref(
+        helper,
+        "check",
+        "(Ljava/util/List;JLcom/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState;)V",
+    )?;
+    code(
+        pool,
+        4,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Lload_1,
+            Instruction::Getstatic(value),
+            Instruction::Invokestatic(check),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn track_marker_tracker_check(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let list = pool.add_class("java/util/List")?;
+    let to_array = pool.add_interface_method_ref(list, "toArray", "()[Ljava/lang/Object;")?;
+    let remove = pool.add_interface_method_ref(list, "remove", "(Ljava/lang/Object;)Z")?;
+    let marker = pool.add_class("com/sedmelluq/discord/lavaplayer/track/TrackMarker")?;
+    let timecode = pool.add_field_ref(marker, "timecode", "J")?;
+    let handler = pool.add_field_ref(
+        marker,
+        "handler",
+        "Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler;",
+    )?;
+    let handler_type =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler")?;
+    let handle = pool.add_interface_method_ref(
+        handler_type,
+        "handle",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState;)V",
+    )?;
+    code(
+        pool,
+        4,
+        7,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokeinterface(to_array, 1),
+            Instruction::Astore(4),
+            Instruction::Iconst_0,
+            Instruction::Istore(5),
+            Instruction::Iload(5),
+            Instruction::Aload(4),
+            Instruction::Arraylength,
+            Instruction::If_icmpge(29),
+            Instruction::Aload(4),
+            Instruction::Iload(5),
+            Instruction::Aaload,
+            Instruction::Checkcast(marker),
+            Instruction::Astore(6),
+            Instruction::Lload_1,
+            Instruction::Aload(6),
+            Instruction::Getfield(timecode),
+            Instruction::Lcmp,
+            Instruction::Iflt(27),
+            Instruction::Aload_0,
+            Instruction::Aload(6),
+            Instruction::Invokeinterface(remove, 2),
+            Instruction::Ifeq(27),
+            Instruction::Aload(6),
+            Instruction::Getfield(handler),
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(handle, 2),
+            Instruction::Iinc(5, 1),
+            Instruction::Goto(5),
+            Instruction::Return,
+        ],
+    )
 }
 
 fn local_executor_field(
