@@ -108,6 +108,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
             Some(PROBING_AUDIO_SOURCE_MANAGER_CONSUMER)
         }
         "write-local-audio-source-manager-consumer" => Some(LOCAL_AUDIO_SOURCE_MANAGER_CONSUMER),
+        "write-local-audio-track-consumer" => Some(LOCAL_AUDIO_TRACK_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -8012,6 +8013,314 @@ public final class GateLocalAudioSourceManager {
     AudioTrack create(AudioTrackInfo info, MediaContainerDescriptor descriptor) {
       return super.createTrack(info, descriptor);
     }
+  }
+
+  private static void expect(Class<? extends Throwable> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
+  }
+
+  private static void expectIdentity(Throwable expected, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("failure was swallowed");
+    } catch (Throwable error) {
+      check(error == expected, "failure identity");
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const LOCAL_AUDIO_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDescriptor;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerHints;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerProbe;
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.local.LocalAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.local.LocalAudioTrack;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.DelegatedAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.InternalAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioTrackExecutor;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+
+public final class GateLocalAudioTrack {
+  public static void main(String[] args) throws Exception {
+    structureAndConstruction();
+    cloningAndIdentity();
+    processing();
+    processingFailures();
+    System.out.println(
+        "construction=info,file,descriptor,source,nulls;"
+        + "clone=fresh,info,descriptor,source;"
+        + "process=factory,stream,assign,delegate,close;"
+        + "failures=factory,cast,delegate,close;"
+        + "reflection=public-concrete,3-private-final-fields,1-constructor,4-methods");
+  }
+
+  private static void structureAndConstruction() throws Exception {
+    Path path = Files.createTempFile("mantle-local-track-", ".bin");
+    AudioTrackInfo info = info(path);
+    MediaContainerProbe probe = new ProbeState(null).proxy();
+    MediaContainerDescriptor descriptor = new MediaContainerDescriptor(probe, "settings");
+    LocalAudioSourceManager source = new LocalAudioSourceManager();
+    LocalAudioTrack track = new LocalAudioTrack(info, descriptor, source);
+    check(track.getInfo() == info && track.getContainerTrackFactory() == descriptor
+        && track.getSourceManager() == source, "constructor identities");
+
+    Class<LocalAudioTrack> type = LocalAudioTrack.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == DelegatedAudioTrack.class
+        && type.getInterfaces().length == 0, "class metadata");
+    Field[] fields = type.getDeclaredFields();
+    check(fields.length == 3, "field count");
+    checkField(type.getDeclaredField("file"), File.class);
+    checkField(type.getDeclaredField("containerTrackFactory"), MediaContainerDescriptor.class);
+    checkField(type.getDeclaredField("sourceManager"), LocalAudioSourceManager.class);
+    Field file = type.getDeclaredField("file");
+    file.setAccessible(true);
+    check(file.get(track).equals(path.toFile()), "captured file");
+
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        AudioTrackInfo.class, MediaContainerDescriptor.class, LocalAudioSourceManager.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isVarArgs()
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    check(type.getDeclaredConstructors().length == 1 && type.getDeclaredMethods().length == 4,
+        "member counts");
+    checkMethod(type.getDeclaredMethod("getContainerTrackFactory"),
+        MediaContainerDescriptor.class, Modifier.PUBLIC, false);
+    checkMethod(type.getDeclaredMethod("process", LocalAudioTrackExecutor.class),
+        void.class, Modifier.PUBLIC, true);
+    checkMethod(type.getDeclaredMethod("makeShallowClone"),
+        AudioTrack.class, Modifier.PROTECTED, false);
+    checkMethod(type.getDeclaredMethod("getSourceManager"),
+        AudioSourceManager.class, Modifier.PUBLIC, false);
+
+    LocalAudioTrack nullable = new LocalAudioTrack(info, null, null);
+    check(nullable.getContainerTrackFactory() == null && nullable.getSourceManager() == null,
+        "nullable collaborators");
+    expect(NullPointerException.class, () -> new LocalAudioTrack(null, descriptor, source));
+    Files.delete(path);
+  }
+
+  private static void cloningAndIdentity() throws Exception {
+    Path path = Files.createTempFile("mantle-local-clone-", ".bin");
+    AudioTrackInfo info = info(path);
+    MediaContainerDescriptor descriptor =
+        new MediaContainerDescriptor(new ProbeState(null).proxy(), "clone-settings");
+    LocalAudioSourceManager source = new LocalAudioSourceManager();
+    ExposedTrack original = new ExposedTrack(info, descriptor, source);
+    LocalAudioTrack clone = (LocalAudioTrack) original.shallow();
+    check(clone != original && clone.getClass() == LocalAudioTrack.class
+        && clone.getInfo() == info && clone.getContainerTrackFactory() == descriptor
+        && clone.getSourceManager() == source, "shallow clone identities");
+    Field file = LocalAudioTrack.class.getDeclaredField("file");
+    file.setAccessible(true);
+    check(file.get(clone).equals(path.toFile()) && file.get(clone) != file.get(original),
+        "clone file value and identity");
+    Files.delete(path);
+  }
+
+  private static void processing() throws Exception {
+    Path path = Files.createTempFile("mantle-local-process-", ".bin");
+    Files.write(path, new byte[] { 42, 43, 44 });
+    AudioTrackInfo info = info(path);
+    InternalState internal = new InternalState(info);
+    ProbeState probe = new ProbeState(internal.proxy());
+    LocalAudioTrack track = new LocalAudioTrack(info,
+        new MediaContainerDescriptor(probe.proxy(), "process-settings"),
+        new LocalAudioSourceManager());
+    track.process(null);
+    check(probe.parameters.equals("process-settings") && probe.info == info
+        && probe.firstByte == 42 && probe.creates == 1, "factory dispatch");
+    check(internal.assigns == 1 && internal.processes == 1
+        && internal.executor == null && !internal.noInterrupt, "delegate dispatch");
+    expect(IOException.class, () -> probe.stream.seek(3));
+    Files.delete(path);
+  }
+
+  private static void processingFailures() throws Exception {
+    Path path = Files.createTempFile("mantle-local-fail-", ".bin");
+    Files.write(path, new byte[] { 7, 8, 9 });
+    AudioTrackInfo info = info(path);
+
+    AssertionError factoryFailure = new AssertionError("factory-sentinel");
+    ProbeState failingProbe = new ProbeState(null);
+    failingProbe.failure = factoryFailure;
+    LocalAudioTrack failingFactory = new LocalAudioTrack(info,
+        new MediaContainerDescriptor(failingProbe.proxy(), "factory-failure"),
+        new LocalAudioSourceManager());
+    expectIdentity(factoryFailure, () -> failingFactory.process(null));
+    expect(IOException.class, () -> failingProbe.stream.seek(3));
+
+    ProbeState wrongType = new ProbeState(proxy(AudioTrack.class));
+    LocalAudioTrack badCast = new LocalAudioTrack(info,
+        new MediaContainerDescriptor(wrongType.proxy(), "bad-cast"),
+        new LocalAudioSourceManager());
+    expect(ClassCastException.class, () -> badCast.process(null));
+    expect(IOException.class, () -> wrongType.stream.seek(3));
+
+    Exception delegateFailure = new Exception("delegate-sentinel");
+    InternalState internal = new InternalState(info);
+    internal.processFailure = delegateFailure;
+    ProbeState delegateProbe = new ProbeState(internal.proxy());
+    LocalAudioTrack failingDelegate = new LocalAudioTrack(info,
+        new MediaContainerDescriptor(delegateProbe.proxy(), "delegate-failure"),
+        new LocalAudioSourceManager());
+    expectIdentity(delegateFailure, () -> failingDelegate.process(null));
+    check(internal.assigns == 1 && internal.processes == 1, "delegate failure dispatch");
+    expect(IOException.class, () -> delegateProbe.stream.seek(3));
+
+    AudioTrackInfo missing = new AudioTrackInfo(
+        "title", "author", 3L, path.resolveSibling("missing-local-track").toString(),
+        false, null);
+    LocalAudioTrack missingTrack = new LocalAudioTrack(missing,
+        new MediaContainerDescriptor(new ProbeState(null).proxy(), "missing"),
+        new LocalAudioSourceManager());
+    expect(RuntimeException.class, () -> missingTrack.process(null));
+    Files.delete(path);
+  }
+
+  private static AudioTrackInfo info(Path path) {
+    return new AudioTrackInfo(
+        "title", "author", 3L, path.toString(), false, path.toUri().toString());
+  }
+
+  private static void checkField(Field field, Class<?> type) {
+    check(field.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && field.getType() == type && !field.isSynthetic(), field + " metadata");
+  }
+
+  private static void checkMethod(
+      Method method, Class<?> returnType, int modifiers, boolean throwsException) {
+    check(method.getModifiers() == modifiers && method.getReturnType() == returnType
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs()
+        && Arrays.equals(method.getExceptionTypes(), throwsException
+            ? new Class<?>[] { Exception.class } : new Class<?>[0]), method + " metadata");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] { type },
+        (instance, method, arguments) -> {
+          if (method.getName().equals("toString")) return type.getSimpleName() + "Proxy";
+          if (method.getName().equals("hashCode")) return System.identityHashCode(instance);
+          if (method.getName().equals("equals")) return instance == arguments[0];
+          return defaultValue(method.getReturnType());
+        });
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
+  }
+
+  private static final class ProbeState {
+    final AudioTrack result;
+    String parameters;
+    AudioTrackInfo info;
+    SeekableInputStream stream;
+    int firstByte;
+    int creates;
+    AssertionError failure;
+
+    ProbeState(AudioTrack result) { this.result = result; }
+
+    MediaContainerProbe proxy() {
+      return (MediaContainerProbe) Proxy.newProxyInstance(
+          MediaContainerProbe.class.getClassLoader(), new Class<?>[] { MediaContainerProbe.class },
+          (instance, method, arguments) -> {
+            switch (method.getName()) {
+              case "getName": return "local-track-probe";
+              case "matchesHints": return false;
+              case "createTrack":
+                creates++;
+                parameters = (String) arguments[0];
+                info = (AudioTrackInfo) arguments[1];
+                stream = (SeekableInputStream) arguments[2];
+                firstByte = stream.read();
+                if (failure != null) throw failure;
+                return result;
+              case "toString": return "LocalTrackProbe";
+              case "hashCode": return System.identityHashCode(instance);
+              case "equals": return instance == arguments[0];
+              default: return null;
+            }
+          });
+    }
+  }
+
+  private static final class InternalState {
+    final AudioTrackInfo info;
+    int assigns;
+    int processes;
+    AudioTrackExecutor executor;
+    boolean noInterrupt;
+    Exception processFailure;
+
+    InternalState(AudioTrackInfo info) { this.info = info; }
+
+    InternalAudioTrack proxy() {
+      return (InternalAudioTrack) Proxy.newProxyInstance(
+          InternalAudioTrack.class.getClassLoader(), new Class<?>[] { InternalAudioTrack.class },
+          (instance, method, arguments) -> {
+            switch (method.getName()) {
+              case "assignExecutor":
+                assigns++;
+                executor = (AudioTrackExecutor) arguments[0];
+                noInterrupt = (Boolean) arguments[1];
+                return null;
+              case "process":
+                processes++;
+                if (processFailure != null) throw processFailure;
+                return null;
+              case "getInfo": return info;
+              case "toString": return "InternalTrackProxy";
+              case "hashCode": return System.identityHashCode(instance);
+              case "equals": return instance == arguments[0];
+              default: return defaultValue(method.getReturnType());
+            }
+          });
+    }
+  }
+
+  private static final class ExposedTrack extends LocalAudioTrack {
+    ExposedTrack(AudioTrackInfo info, MediaContainerDescriptor descriptor,
+                 LocalAudioSourceManager source) {
+      super(info, descriptor, source);
+    }
+    AudioTrack shallow() { return super.makeShallowClone(); }
   }
 
   private static void expect(Class<? extends Throwable> type, Operation operation) {

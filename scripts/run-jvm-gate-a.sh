@@ -22,7 +22,7 @@ cargo run --locked -q -p mantle-jvm-gate -- emit \
 cargo run --locked -q -p mantle-jvm-gate -- verify-structure \
   --reference-jar "$REFERENCE_JAR" --candidate-jar "$JAR"
 
-for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame audio-frame-provider-tools audio-processing-context audio-player-options decoded-track-holder track-state-listener audio-output-hook audio-load-result-handler functional-result-handler audio-player-lifecycle-manager audio-player-interface audio-player-manager-interface default-audio-player default-audio-player-manager internal-audio-track audio-track-executor local-audio-track-executor-callback local-audio-track-executor track-marker-tracker base-audio-track primordial-audio-track-executor delegated-audio-track audio-track-info-builder abstract-audio-frame-buffer allocating-audio-frame-buffer non-allocating-audio-frame-buffer audio-source-manager-interface audio-source-managers probing-audio-source-manager local-audio-source-manager; do
+for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame audio-frame-provider-tools audio-processing-context audio-player-options decoded-track-holder track-state-listener audio-output-hook audio-load-result-handler functional-result-handler audio-player-lifecycle-manager audio-player-interface audio-player-manager-interface default-audio-player default-audio-player-manager internal-audio-track audio-track-executor local-audio-track-executor-callback local-audio-track-executor track-marker-tracker base-audio-track primordial-audio-track-executor delegated-audio-track audio-track-info-builder abstract-audio-frame-buffer allocating-audio-frame-buffer non-allocating-audio-frame-buffer audio-source-manager-interface audio-source-managers probing-audio-source-manager local-audio-source-manager local-audio-track; do
   case "$consumer" in
     smoke) consumer_class='Smoke' ;;
     probe) consumer_class='Probe' ;;
@@ -68,6 +68,7 @@ for consumer in smoke probe integration classloader event track-value track-enum
     audio-source-managers) consumer_class='AudioSourceManagers' ;;
     probing-audio-source-manager) consumer_class='ProbingAudioSourceManager' ;;
     local-audio-source-manager) consumer_class='LocalAudioSourceManager' ;;
+    local-audio-track) consumer_class='LocalAudioTrack' ;;
   esac
   cargo run --locked -q -p mantle-jvm-gate -- "write-$consumer-consumer" \
     --output "$WORK/Gate${consumer_class}.java"
@@ -94,7 +95,8 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateAbstractAudioFrameBuffer.java" "$WORK/GateAllocatingAudioFrameBuffer.java" \
   "$WORK/GateNonAllocatingAudioFrameBuffer.java" \
   "$WORK/GateAudioSourceManagerInterface.java" "$WORK/GateAudioSourceManagers.java" \
-  "$WORK/GateProbingAudioSourceManager.java" "$WORK/GateLocalAudioSourceManager.java"
+  "$WORK/GateProbingAudioSourceManager.java" "$WORK/GateLocalAudioSourceManager.java" \
+  "$WORK/GateLocalAudioTrack.java"
 javac --release 11 -d "$CLASSES" "$WORK/GateClassloader.java"
 
 case "$(uname -s)" in
@@ -559,6 +561,16 @@ cmp "$WORK/local-audio-source-manager-reference.txt" \
 grep --fixed-strings \
   'load=missing,directory,eligible,extension,closed,nulls;' \
   "$WORK/local-audio-source-manager-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateLocalAudioTrack \
+  >"$WORK/local-audio-track-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateLocalAudioTrack >"$WORK/local-audio-track-candidate.txt"
+cmp "$WORK/local-audio-track-reference.txt" "$WORK/local-audio-track-candidate.txt"
+grep --fixed-strings \
+  'process=factory,stream,assign,delegate,close;' \
+  "$WORK/local-audio-track-candidate.txt" >/dev/null
 java -Xverify:all -cp "$GATE_CLASSPATH" GateSmoke "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateIntegration "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" callbacks

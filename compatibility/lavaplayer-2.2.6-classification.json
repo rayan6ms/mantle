@@ -13648,54 +13648,72 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported concrete-class metadata and reference-equal private identity layout, constructor capture, descriptor/source identity, shallow cloning, delegated processing, deterministic stream cleanup, and failure propagation are covered by the Phase 13 local-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.local.LocalAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor;Lcom/sedmelluq/discord/lavaplayer/source/local/LocalAudioSourceManager;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported concrete-class metadata and reference-equal private identity layout, constructor capture, descriptor/source identity, shallow cloning, delegated processing, deterministic stream cleanup, and failure propagation are covered by the Phase 13 local-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.local.LocalAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "getContainerTrackFactory",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported concrete-class metadata and reference-equal private identity layout, constructor capture, descriptor/source identity, shallow cloning, delegated processing, deterministic stream cleanup, and failure propagation are covered by the Phase 13 local-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.local.LocalAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported concrete-class metadata and reference-equal private identity layout, constructor capture, descriptor/source identity, shallow cloning, delegated processing, deterministic stream cleanup, and failure propagation are covered by the Phase 13 local-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.local.LocalAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "makeShallowClone",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported concrete-class metadata and reference-equal private identity layout, constructor capture, descriptor/source identity, shallow cloning, delegated processing, deterministic stream cleanup, and failure propagation are covered by the Phase 13 local-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.local.LocalAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "getSourceManager",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported concrete-class metadata and reference-equal private identity layout, constructor capture, descriptor/source identity, shallow cloning, delegated processing, deterministic stream cleanup, and failure propagation are covered by the Phase 13 local-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.local.LocalSeekableInputStream",
