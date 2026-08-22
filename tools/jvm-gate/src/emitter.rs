@@ -149,6 +149,8 @@ const SOUND_CLOUD_HTTP_CONTEXT_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudHttpContextFilter";
 const SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudM3uAudioTrack";
+const SOUND_CLOUD_M3U_INFO_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudM3uInfo";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -202,6 +204,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     SOUND_CLOUD_HELPER_CLASS,
     SOUND_CLOUD_HTTP_CONTEXT_FILTER_CLASS,
     SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS,
+    SOUND_CLOUD_M3U_INFO_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -737,6 +740,9 @@ fn replacement_body(
     }
     if class_name == SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS {
         return sound_cloud_m3u_audio_track_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == SOUND_CLOUD_M3U_INFO_CLASS {
+        return sound_cloud_m3u_info_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS {
         return sound_cloud_audio_source_manager_builder_replacement(
@@ -3899,6 +3905,53 @@ fn sound_cloud_m3u_audio_track_clinit(pool: &mut ConstantPool<'static>) -> Resul
             Instruction::Putstatic(log),
             Instruction::Ldc2_w(interval_value),
             Instruction::Putstatic(interval),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn sound_cloud_m3u_info_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudSegmentDecoder$Factory;)V",
+        ) => sound_cloud_m3u_info_constructor(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {SOUND_CLOUD_M3U_INFO_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn sound_cloud_m3u_info_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(SOUND_CLOUD_M3U_INFO_CLASS)?;
+    let lookup_url = pool.add_field_ref(owner, "lookupUrl", "Ljava/lang/String;")?;
+    let decoder_factory = pool.add_field_ref(
+        owner,
+        "decoderFactory",
+        "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudSegmentDecoder$Factory;",
+    )?;
+    code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(lookup_url),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(decoder_factory),
             Instruction::Return,
         ],
     )

@@ -156,6 +156,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
             Some(SOUND_CLOUD_HTTP_CONTEXT_FILTER_CONSUMER)
         }
         "write-sound-cloud-m3u-audio-track-consumer" => Some(SOUND_CLOUD_M3U_AUDIO_TRACK_CONSUMER),
+        "write-sound-cloud-m3u-info-consumer" => Some(SOUND_CLOUD_M3U_INFO_CONSUMER),
         _ => None,
     }
 }
@@ -10079,6 +10080,65 @@ public final class GateSoundCloudM3uAudioTrack {
   }
 
   private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const SOUND_CLOUD_M3U_INFO_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudM3uInfo;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudSegmentDecoder;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+
+public final class GateSoundCloudM3uInfo {
+  public static void main(String[] args) throws Exception {
+    reflectionContract();
+    behaviorContract();
+    System.out.println(
+        "public-concrete,2-fields,1-constructor,0-methods;identity,nulls,reflection");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<SoundCloudM3uInfo> type = SoundCloudM3uInfo.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getAnnotations().length == 0,
+        "class metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredMethods().length == 0,
+        "member counts");
+    checkField(type, "lookupUrl", String.class);
+    checkField(type, "decoderFactory", SoundCloudSegmentDecoder.Factory.class);
+
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        String.class, SoundCloudSegmentDecoder.Factory.class);
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getAnnotations().length == 0,
+        "constructor metadata");
+  }
+
+  private static void behaviorContract() {
+    String lookupUrl = new String("https://media/fixture");
+    SoundCloudSegmentDecoder.Factory decoderFactory = supplier -> null;
+    SoundCloudM3uInfo info = new SoundCloudM3uInfo(lookupUrl, decoderFactory);
+    check(info.lookupUrl == lookupUrl && info.decoderFactory == decoderFactory,
+        "argument identity");
+
+    SoundCloudM3uInfo nulls = new SoundCloudM3uInfo(null, null);
+    check(nulls.lookupUrl == null && nulls.decoderFactory == null, "null capture");
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> type) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == type && field.getGenericType() == type
+        && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && !field.isSynthetic() && field.getAnnotations().length == 0,
+        name + " metadata");
+  }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
