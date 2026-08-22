@@ -163,6 +163,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-sound-cloud-opus-segment-decoder-consumer" => {
             Some(SOUND_CLOUD_OPUS_SEGMENT_DECODER_CONSUMER)
         }
+        "write-sound-cloud-playlist-loader-consumer" => Some(SOUND_CLOUD_PLAYLIST_LOADER_CONSUMER),
         _ => None,
     }
 }
@@ -9091,6 +9092,122 @@ public final class GateSoundCloudDataLoader {
   private static <T> T proxy(Class<T> type) {
     return type.cast(Proxy.newProxyInstance(
         GateSoundCloudDataLoader.class.getClassLoader(), new Class<?>[] {type},
+        (proxy, method, args) -> {
+          if (method.getName().equals("toString")) return "proxy";
+          if (method.getReturnType() == boolean.class) return false;
+          if (method.getReturnType() == int.class) return 0;
+          if (method.getReturnType() == long.class) return 0L;
+          return null;
+        }));
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const SOUND_CLOUD_PLAYLIST_LOADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudPlaylistLoader;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager;
+import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import java.util.function.Function;
+
+public final class GateSoundCloudPlaylistLoader {
+  public static void main(String[] args) throws Exception {
+    dispatchContract();
+    nullContract();
+    failureContract();
+    reflectionContract();
+    System.out.println(
+        "public-abstract-interface,0-fields,0-constructors,1-method;"
+        + "dispatch,argument-identity,return-identity,nulls,unchecked,"
+        + "generic-function-parameter,reflection");
+  }
+
+  private static void dispatchContract() {
+    String identifier = new String("fixture");
+    HttpInterfaceManager manager = proxy(HttpInterfaceManager.class);
+    AudioPlaylist playlist = proxy(AudioPlaylist.class);
+    Function<AudioTrackInfo, AudioTrack> factory = info -> proxy(AudioTrack.class);
+    Object[] observed = new Object[3];
+    int[] calls = new int[1];
+    SoundCloudPlaylistLoader loader = (actualIdentifier, actualManager, actualFactory) -> {
+      observed[0] = actualIdentifier;
+      observed[1] = actualManager;
+      observed[2] = actualFactory;
+      calls[0]++;
+      return playlist;
+    };
+    check(loader.load(identifier, manager, factory) == playlist
+        && observed[0] == identifier && observed[1] == manager && observed[2] == factory
+        && calls[0] == 1, "ordinary dispatch identity");
+  }
+
+  private static void nullContract() {
+    Object[] observed = new Object[3];
+    SoundCloudPlaylistLoader loader = (identifier, manager, factory) -> {
+      observed[0] = identifier;
+      observed[1] = manager;
+      observed[2] = factory;
+      return null;
+    };
+    check(loader.load(null, null, null) == null
+        && observed[0] == null && observed[1] == null && observed[2] == null,
+        "null dispatch and return");
+  }
+
+  private static void failureContract() {
+    RuntimeException failure = new RuntimeException("playlist-loader-sentinel");
+    SoundCloudPlaylistLoader loader = (identifier, manager, factory) -> { throw failure; };
+    try {
+      loader.load(null, null, null);
+      throw new AssertionError("expected failure");
+    } catch (RuntimeException error) {
+      check(error == failure, "unchecked failure identity");
+    }
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<SoundCloudPlaylistLoader> type = SoundCloudPlaylistLoader.class;
+    check(type.isInterface() && Modifier.isPublic(type.getModifiers())
+        && Modifier.isAbstract(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == null && type.getInterfaces().length == 0
+        && type.getTypeParameters().length == 0 && type.getAnnotations().length == 0,
+        "interface metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 1, "member counts");
+    Method method = type.getDeclaredMethod(
+        "load", String.class, HttpInterfaceManager.class, Function.class);
+    check(method.getReturnType() == AudioPlaylist.class
+        && method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && Arrays.equals(method.getParameterTypes(),
+            new Class<?>[] {String.class, HttpInterfaceManager.class, Function.class})
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && method.getGenericReturnType() == AudioPlaylist.class
+        && method.getGenericParameterTypes()[0] == String.class
+        && method.getGenericParameterTypes()[1] == HttpInterfaceManager.class
+        && method.getGenericParameterTypes()[2] instanceof ParameterizedType
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), "method metadata");
+    ParameterizedType factoryType =
+        (ParameterizedType) method.getGenericParameterTypes()[2];
+    check(factoryType.getRawType() == Function.class
+        && Arrays.equals(factoryType.getActualTypeArguments(),
+            new Object[] {AudioTrackInfo.class, AudioTrack.class}),
+        "generic factory metadata");
+  }
+
+  private static <T> T proxy(Class<T> type) {
+    return type.cast(Proxy.newProxyInstance(
+        GateSoundCloudPlaylistLoader.class.getClassLoader(), new Class<?>[] {type},
         (proxy, method, args) -> {
           if (method.getName().equals("toString")) return "proxy";
           if (method.getReturnType() == boolean.class) return false;

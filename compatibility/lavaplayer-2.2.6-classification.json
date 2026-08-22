@@ -15767,18 +15767,26 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated shell and reference-differential oracle preserve the exact public abstract interface shape, empty member surface apart from load, and caller-defined dispatch contract.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudPlaylistLoader",
       "symbol_kind": "METHOD",
       "member_name": "load",
       "descriptor": "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;Ljava/util/function/Function;)Lcom/sedmelluq/discord/lavaplayer/track/AudioPlaylist;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential execution preserves nullable argument identity, playlist return identity, unchecked failure identity, the erased descriptor, and Function<AudioTrackInfo, AudioTrack> generic metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudSegmentDecoder",
