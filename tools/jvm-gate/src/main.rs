@@ -131,6 +131,9 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-sound-cloud-audio-source-manager-consumer" => {
             Some(SOUND_CLOUD_AUDIO_SOURCE_MANAGER_CONSUMER)
         }
+        "write-sound-cloud-audio-source-manager-builder-consumer" => {
+            Some(SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CONSUMER)
+        }
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -10054,6 +10057,217 @@ public final class GateSoundCloudAudioSourceManager {
     if (!condition) throw new AssertionError(message);
   }
   private interface Operation { void run() throws Exception; }
+}
+"#;
+
+const SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudDataLoader;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudDataReader;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudFormatHandler;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudPlaylistLoader;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudDataLoader;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudDataReader;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudFormatHandler;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudPlaylistLoader;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudTrackFormat;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+
+public final class GateSoundCloudAudioSourceManagerBuilder {
+  private static final String OWNER =
+      "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager";
+
+  public static void main(String[] args) throws Exception {
+    reflectionContract();
+    defaultsAndFluentSetters();
+    defaultBuildContract();
+    explicitAndFactoryBuildContract();
+    System.out.println("public-static,7-fields,1-constructor,8-methods;"
+        + "defaults,self-return,null-reset,fresh-defaults,explicit-capture,playlist-precedence,"
+        + "factory-order,factory-null-fallback,policy-forwarding");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<?> type = SoundCloudAudioSourceManager.Builder.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && type.getSuperclass() == Object.class && type.getInterfaces().length == 0,
+        "class metadata");
+    check(type.getEnclosingClass() == SoundCloudAudioSourceManager.class
+        && type.getDeclaredFields().length == 7 && type.getDeclaredMethods().length == 8
+        && type.getDeclaredConstructors().length == 1, "declared shape");
+    checkField(type, "allowSearch", boolean.class);
+    checkField(type, "dataReader", SoundCloudDataReader.class);
+    checkField(type, "dataLoader", SoundCloudDataLoader.class);
+    checkField(type, "formatHandler", SoundCloudFormatHandler.class);
+    checkField(type, "playlistLoader", SoundCloudPlaylistLoader.class);
+    checkField(type, "playlistLoaderFactory", Class.forName(OWNER + "$Builder$PlaylistLoaderFactory"));
+    checkField(type, "filterOutPreviewTracks", boolean.class);
+    check(type.getDeclaredConstructor().getModifiers() == Modifier.PUBLIC, "constructor metadata");
+    for (Method method : type.getDeclaredMethods()) {
+      check(method.getModifiers() == Modifier.PUBLIC && !method.isBridge()
+          && !method.isSynthetic() && !method.isVarArgs()
+          && method.getExceptionTypes().length == 0, "method metadata " + method.getName());
+    }
+  }
+
+  private static void defaultsAndFluentSetters() throws Exception {
+    SoundCloudAudioSourceManager.Builder builder = new SoundCloudAudioSourceManager.Builder();
+    check(field("allowSearch").getBoolean(builder)
+        && !field("filterOutPreviewTracks").getBoolean(builder)
+        && field("dataReader").get(builder) == null && field("dataLoader").get(builder) == null
+        && field("formatHandler").get(builder) == null
+        && field("playlistLoader").get(builder) == null
+        && field("playlistLoaderFactory").get(builder) == null, "builder defaults");
+
+    SoundCloudDataReader reader = proxy(SoundCloudDataReader.class);
+    SoundCloudDataLoader loader = (http, url) -> JsonBrowser.NULL_BROWSER;
+    SoundCloudFormatHandler format = proxy(SoundCloudFormatHandler.class);
+    SoundCloudPlaylistLoader playlist = (url, manager, factory) -> null;
+    check(builder.withAllowSearch(false) == builder && builder.withDataReader(reader) == builder
+        && builder.withDataLoader(loader) == builder && builder.withFormatHandler(format) == builder
+        && builder.withPlaylistLoader(playlist) == builder
+        && builder.withFilterOutPreviewTracks(true) == builder, "fluent identity");
+    check(!field("allowSearch").getBoolean(builder)
+        && field("filterOutPreviewTracks").getBoolean(builder)
+        && field("dataReader").get(builder) == reader && field("dataLoader").get(builder) == loader
+        && field("formatHandler").get(builder) == format
+        && field("playlistLoader").get(builder) == playlist, "setter capture");
+    check(builder.withDataReader(null) == builder && builder.withDataLoader(null) == builder
+        && builder.withFormatHandler(null) == builder && builder.withPlaylistLoader(null) == builder,
+        "null reset identity");
+  }
+
+  private static void defaultBuildContract() throws Exception {
+    SoundCloudAudioSourceManager.Builder builder = SoundCloudAudioSourceManager.builder();
+    SoundCloudAudioSourceManager first = builder.build();
+    SoundCloudAudioSourceManager second = builder.build();
+    check(managerField("allowSearch").getBoolean(first)
+        && !managerField("filterOutPreviewTracks").getBoolean(first), "default policies");
+    check(managerField("dataReader").get(first) instanceof DefaultSoundCloudDataReader
+        && managerField("dataLoader").get(first) instanceof DefaultSoundCloudDataLoader
+        && managerField("formatHandler").get(first) instanceof DefaultSoundCloudFormatHandler
+        && managerField("playlistLoader").get(first) instanceof DefaultSoundCloudPlaylistLoader,
+        "default collaborators");
+    for (String name : Arrays.asList("dataReader", "dataLoader", "formatHandler", "playlistLoader")) {
+      check(managerField(name).get(first) != managerField(name).get(second), "fresh " + name);
+    }
+  }
+
+  private static void explicitAndFactoryBuildContract() throws Exception {
+    SoundCloudDataReader reader = proxy(SoundCloudDataReader.class);
+    SoundCloudDataLoader loader = (http, url) -> JsonBrowser.NULL_BROWSER;
+    SoundCloudFormatHandler format = proxy(SoundCloudFormatHandler.class);
+    SoundCloudPlaylistLoader playlist = (url, manager, factory) -> proxy(AudioPlaylist.class);
+    AtomicInteger factoryCalls = new AtomicInteger();
+    AtomicReference<Object[]> factoryArguments = new AtomicReference<>();
+    Object factory = factory((instance, method, arguments) -> {
+      factoryCalls.incrementAndGet();
+      factoryArguments.set(arguments);
+      return playlist;
+    });
+
+    SoundCloudAudioSourceManager.Builder explicit = new SoundCloudAudioSourceManager.Builder()
+        .withAllowSearch(false).withDataReader(reader).withDataLoader(loader)
+        .withFormatHandler(format).withPlaylistLoader(playlist)
+        .withFilterOutPreviewTracks(true);
+    setFactory(explicit, factory);
+    SoundCloudAudioSourceManager direct = explicit.build();
+    check(factoryCalls.get() == 0 && managerField("dataReader").get(direct) == reader
+        && managerField("dataLoader").get(direct) == loader
+        && managerField("formatHandler").get(direct) == format
+        && managerField("playlistLoader").get(direct) == playlist
+        && !managerField("allowSearch").getBoolean(direct)
+        && managerField("filterOutPreviewTracks").getBoolean(direct), "explicit precedence");
+
+    SoundCloudAudioSourceManager.Builder factoryBuilder = new SoundCloudAudioSourceManager.Builder()
+        .withDataReader(reader).withDataLoader(loader).withFormatHandler(format);
+    setFactory(factoryBuilder, factory);
+    SoundCloudAudioSourceManager made = factoryBuilder.build();
+    Object[] arguments = factoryArguments.get();
+    check(factoryCalls.get() == 1 && arguments.length == 3 && arguments[0] == reader
+        && arguments[1] == loader && arguments[2] == format
+        && managerField("playlistLoader").get(made) == playlist, "factory order and result");
+
+    Object nullFactory = factory((instance, method, argumentsValue) -> null);
+    SoundCloudAudioSourceManager.Builder fallbackBuilder = new SoundCloudAudioSourceManager.Builder()
+        .withDataReader(reader).withDataLoader(loader).withFormatHandler(format);
+    setFactory(fallbackBuilder, nullFactory);
+    SoundCloudAudioSourceManager fallback = fallbackBuilder.build();
+    Object fallbackPlaylist = managerField("playlistLoader").get(fallback);
+    check(fallbackPlaylist instanceof DefaultSoundCloudPlaylistLoader
+        && objectField(fallbackPlaylist, "dataReader") == reader
+        && objectField(fallbackPlaylist, "dataLoader") == loader
+        && objectField(fallbackPlaylist, "formatHandler") == format, "factory null fallback");
+  }
+
+  private static Object factory(java.lang.reflect.InvocationHandler handler) throws Exception {
+    Class<?> type = Class.forName(OWNER + "$Builder$PlaylistLoaderFactory");
+    return Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type}, handler);
+  }
+
+  private static void setFactory(SoundCloudAudioSourceManager.Builder builder, Object factory)
+      throws Exception {
+    Class<?> type = Class.forName(OWNER + "$Builder$PlaylistLoaderFactory");
+    Method method = SoundCloudAudioSourceManager.Builder.class
+        .getDeclaredMethod("withPlaylistLoaderFactory", type);
+    check(method.invoke(builder, factory) == builder, "factory fluent identity");
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = SoundCloudAudioSourceManager.Builder.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static Field managerField(String name) throws Exception {
+    Field field = SoundCloudAudioSourceManager.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static Object objectField(Object owner, String name) throws Exception {
+    Field field = owner.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(owner);
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> type) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == type && field.getModifiers() == Modifier.PRIVATE,
+        "field metadata " + name);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type},
+        (instance, method, arguments) -> defaultValue(method.getReturnType()));
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0F;
+    if (type == double.class) return 0D;
+    if (type == char.class) return (char) 0;
+    return null;
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
 }
 "#;
 

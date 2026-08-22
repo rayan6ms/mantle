@@ -131,6 +131,8 @@ const DEFAULT_SOUND_CLOUD_TRACK_FORMAT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/DefaultSoundCloudTrackFormat";
 const SOUND_CLOUD_AUDIO_SOURCE_MANAGER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager";
+const SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager$Builder";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -175,6 +177,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS,
     DEFAULT_SOUND_CLOUD_TRACK_FORMAT_CLASS,
     SOUND_CLOUD_AUDIO_SOURCE_MANAGER_CLASS,
+    SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -539,6 +542,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS
                 | DEFAULT_SOUND_CLOUD_TRACK_FORMAT_CLASS
                 | SOUND_CLOUD_AUDIO_SOURCE_MANAGER_CLASS
+                | SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS
         ) || field
             .access_flags
             .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
@@ -676,6 +680,14 @@ fn replacement_body(
     }
     if class_name == SOUND_CLOUD_AUDIO_SOURCE_MANAGER_CLASS {
         return sound_cloud_audio_source_manager_replacement(
+            pool,
+            name,
+            descriptor,
+            required_locals,
+        );
+    }
+    if class_name == SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS {
+        return sound_cloud_audio_source_manager_builder_replacement(
             pool,
             name,
             descriptor,
@@ -8177,6 +8189,334 @@ fn sound_cloud_audio_source_manager_clinit(pool: &mut ConstantPool<'static>) -> 
     }
     instructions.push(Instruction::Return);
     code(pool, 1, 0, instructions)
+}
+
+fn sound_cloud_audio_source_manager_builder_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => sound_cloud_audio_source_manager_builder_constructor(pool),
+        (
+            "withAllowSearch",
+            "(Z)Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager$Builder;",
+        ) => sound_cloud_audio_source_manager_builder_fluent_setter(pool, "allowSearch", "Z", true),
+        (
+            "withDataReader",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataReader;)Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager$Builder;",
+        ) => sound_cloud_audio_source_manager_builder_fluent_setter(
+            pool,
+            "dataReader",
+            "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataReader;",
+            false,
+        ),
+        (
+            "withDataLoader",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataLoader;)Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager$Builder;",
+        ) => sound_cloud_audio_source_manager_builder_fluent_setter(
+            pool,
+            "dataLoader",
+            "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataLoader;",
+            false,
+        ),
+        (
+            "withFormatHandler",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudFormatHandler;)Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager$Builder;",
+        ) => sound_cloud_audio_source_manager_builder_fluent_setter(
+            pool,
+            "formatHandler",
+            "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudFormatHandler;",
+            false,
+        ),
+        (
+            "withPlaylistLoader",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudPlaylistLoader;)Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager$Builder;",
+        ) => sound_cloud_audio_source_manager_builder_fluent_setter(
+            pool,
+            "playlistLoader",
+            "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudPlaylistLoader;",
+            false,
+        ),
+        (
+            "withPlaylistLoaderFactory",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager$Builder$PlaylistLoaderFactory;)Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager$Builder;",
+        ) => sound_cloud_audio_source_manager_builder_fluent_setter(
+            pool,
+            "playlistLoaderFactory",
+            "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager$Builder$PlaylistLoaderFactory;",
+            false,
+        ),
+        (
+            "withFilterOutPreviewTracks",
+            "(Z)Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager$Builder;",
+        ) => sound_cloud_audio_source_manager_builder_fluent_setter(
+            pool,
+            "filterOutPreviewTracks",
+            "Z",
+            true,
+        ),
+        (
+            "build",
+            "()Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager;",
+        ) => sound_cloud_audio_source_manager_builder_build(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn sound_cloud_audio_source_manager_builder_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS)?;
+    let allow_search = pool.add_field_ref(owner, "allowSearch", "Z")?;
+    let filter = pool.add_field_ref(owner, "filterOutPreviewTracks", "Z")?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Iconst_1,
+            Instruction::Putfield(allow_search),
+            Instruction::Aload_0,
+            Instruction::Iconst_0,
+            Instruction::Putfield(filter),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn sound_cloud_audio_source_manager_builder_fluent_setter(
+    pool: &mut ConstantPool<'static>,
+    field_name: &str,
+    descriptor: &str,
+    primitive: bool,
+) -> Result<Attribute> {
+    let owner = pool.add_class(SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS)?;
+    let field = pool.add_field_ref(owner, field_name, descriptor)?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            if primitive {
+                Instruction::Iload_1
+            } else {
+                Instruction::Aload_1
+            },
+            Instruction::Putfield(field),
+            Instruction::Aload_0,
+            Instruction::Areturn,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn sound_cloud_audio_source_manager_builder_build(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS)?;
+    let reader =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataReader")?;
+    let reader_field = pool.add_field_ref(
+        owner,
+        "dataReader",
+        "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataReader;",
+    )?;
+    let default_reader = pool.add_class(DEFAULT_SOUND_CLOUD_DATA_READER_CLASS)?;
+    let default_reader_init = pool.add_method_ref(default_reader, "<init>", "()V")?;
+    let loader =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataLoader")?;
+    let loader_field = pool.add_field_ref(
+        owner,
+        "dataLoader",
+        "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataLoader;",
+    )?;
+    let default_loader = pool.add_class(DEFAULT_SOUND_CLOUD_DATA_LOADER_CLASS)?;
+    let default_loader_init = pool.add_method_ref(default_loader, "<init>", "()V")?;
+    let format = pool
+        .add_class("com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudFormatHandler")?;
+    let format_field = pool.add_field_ref(
+        owner,
+        "formatHandler",
+        "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudFormatHandler;",
+    )?;
+    let default_format = pool.add_class(DEFAULT_SOUND_CLOUD_FORMAT_HANDLER_CLASS)?;
+    let default_format_init = pool.add_method_ref(default_format, "<init>", "()V")?;
+    let playlist = pool
+        .add_class("com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudPlaylistLoader")?;
+    let playlist_field = pool.add_field_ref(
+        owner,
+        "playlistLoader",
+        "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudPlaylistLoader;",
+    )?;
+    let factory = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager$Builder$PlaylistLoaderFactory",
+    )?;
+    let factory_field = pool.add_field_ref(
+        owner,
+        "playlistLoaderFactory",
+        "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager$Builder$PlaylistLoaderFactory;",
+    )?;
+    let factory_create = pool.add_interface_method_ref(
+        factory,
+        "create",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataReader;Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataLoader;Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudFormatHandler;)Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudPlaylistLoader;",
+    )?;
+    let default_playlist = pool.add_class(DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS)?;
+    let default_playlist_init = pool.add_method_ref(
+        default_playlist,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataLoader;Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataReader;Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudFormatHandler;)V",
+    )?;
+    let manager = pool.add_class(SOUND_CLOUD_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let manager_init = pool.add_method_ref(
+        manager,
+        "<init>",
+        "(ZLcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataReader;Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudDataLoader;Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudFormatHandler;Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudPlaylistLoader;Z)V",
+    )?;
+    let allow_search = pool.add_field_ref(owner, "allowSearch", "Z")?;
+    let filter = pool.add_field_ref(owner, "filterOutPreviewTracks", "Z")?;
+    let mut body = code(
+        pool,
+        8,
+        6,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(reader_field),
+            Instruction::Astore_1,
+            Instruction::Aload_1,
+            Instruction::Ifnonnull(9),
+            Instruction::New(default_reader),
+            Instruction::Dup,
+            Instruction::Invokespecial(default_reader_init),
+            Instruction::Astore_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(loader_field),
+            Instruction::Astore_2,
+            Instruction::Aload_2,
+            Instruction::Ifnonnull(18),
+            Instruction::New(default_loader),
+            Instruction::Dup,
+            Instruction::Invokespecial(default_loader_init),
+            Instruction::Astore_2,
+            Instruction::Aload_0,
+            Instruction::Getfield(format_field),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Ifnonnull(27),
+            Instruction::New(default_format),
+            Instruction::Dup,
+            Instruction::Invokespecial(default_format_init),
+            Instruction::Astore_3,
+            Instruction::Aload_0,
+            Instruction::Getfield(playlist_field),
+            Instruction::Astore(4),
+            Instruction::Aload(4),
+            Instruction::Ifnonnull(52),
+            Instruction::Aload_0,
+            Instruction::Getfield(factory_field),
+            Instruction::Astore(5),
+            Instruction::Aload(5),
+            Instruction::Ifnull(43),
+            Instruction::Aload(5),
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(factory_create, 4),
+            Instruction::Astore(4),
+            Instruction::Aload(4),
+            Instruction::Ifnonnull(52),
+            Instruction::New(default_playlist),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Aload_1,
+            Instruction::Aload_3,
+            Instruction::Invokespecial(default_playlist_init),
+            Instruction::Astore(4),
+            Instruction::New(manager),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(allow_search),
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Aload_3,
+            Instruction::Aload(4),
+            Instruction::Aload_0,
+            Instruction::Getfield(filter),
+            Instruction::Invokespecial(manager_init),
+            Instruction::Areturn,
+        ],
+    )?;
+    let owner_type = VerificationType::Object { cpool_index: owner };
+    let reader_type = VerificationType::Object {
+        cpool_index: reader,
+    };
+    let loader_type = VerificationType::Object {
+        cpool_index: loader,
+    };
+    let format_type = VerificationType::Object {
+        cpool_index: format,
+    };
+    let playlist_type = VerificationType::Object {
+        cpool_index: playlist,
+    };
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: 9,
+                locals: vec![reader_type.clone()],
+            },
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: 8,
+                locals: vec![loader_type.clone()],
+            },
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: 8,
+                locals: vec![format_type.clone()],
+            },
+            StackFrame::AppendFrame {
+                frame_type: 253,
+                offset_delta: 15,
+                locals: vec![
+                    playlist_type.clone(),
+                    VerificationType::Object {
+                        cpool_index: factory,
+                    },
+                ],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 8,
+                locals: vec![
+                    owner_type,
+                    reader_type,
+                    loader_type,
+                    format_type,
+                    playlist_type,
+                ],
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
 }
 
 fn audio_player_manager_replacement(
