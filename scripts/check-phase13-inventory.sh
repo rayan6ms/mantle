@@ -112,9 +112,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       .assessment == "UNASSESSED" and (has("classification") | not)
     end) and
   .cohorts[0].status == "IN_PROGRESS" and
-  .cohorts[0].classified_symbols == 258 and
-  .cohorts[0].remaining_symbols == 277 and
-  (.cohorts[0].completed_slices | length) == 19 and
+  .cohorts[0].classified_symbols == 263 and
+  .cohorts[0].remaining_symbols == 272 and
+  (.cohorts[0].completed_slices | length) == 20 and
   .cohorts[0].completed_slices[0] == {
     id: "player-events",
     classes: 9,
@@ -357,14 +357,27 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "tools/jvm-gate/src/main.rs"
     ]
   } and
+  .cohorts[0].completed_slices[19] == {
+    id: "audio-load-result-handler-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 4,
+    symbols: 5,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
   ([.cohorts[0].completed_slices[].symbols] | add) == .cohorts[0].classified_symbols and
   (.cohorts[0].classified_symbols + .cohorts[0].remaining_symbols) == .cohorts[0].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 258 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 263 and
   all($classifications.symbols[] | select(.assessment == "CLASSIFIED");
     . as $symbol |
     (($symbol.binary_name | contains(".player.event.")) or
       any([
         "com.sedmelluq.discord.lavaplayer.track.AudioReference",
+        "com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler",
         "com.sedmelluq.discord.lavaplayer.player.hook.AudioOutputHook",
         "com.sedmelluq.discord.lavaplayer.player.hook.AudioOutputHookFactory",
         "com.sedmelluq.discord.lavaplayer.track.AudioItem",
@@ -400,7 +413,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
     .classification == "A_EXACT" and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "audio-load-result-handler-contracts" and
+  .phase_entry.next_slice == "audio-player-lifecycle-manager-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 ' "$PLAN" >/dev/null
@@ -416,4 +429,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 258 classified core-player-track symbols and 2,504 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 263 classified core-player-track symbols and 2,499 unassessed symbols.\n'

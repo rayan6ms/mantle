@@ -67,6 +67,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-decoded-track-holder-consumer" => Some(DECODED_TRACK_HOLDER_CONSUMER),
         "write-track-state-listener-consumer" => Some(TRACK_STATE_LISTENER_CONSUMER),
         "write-audio-output-hook-consumer" => Some(AUDIO_OUTPUT_HOOK_CONSUMER),
+        "write-audio-load-result-handler-consumer" => Some(AUDIO_LOAD_RESULT_HANDLER_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -2443,6 +2444,105 @@ public final class GateAudioOutputHook {
     check(Modifier.isPublic(method.getModifiers()) && Modifier.isAbstract(method.getModifiers())
         && !Modifier.isStatic(method.getModifiers()) && !method.isDefault()
         && !method.isBridge() && !method.isSynthetic() && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0,
+        "method metadata " + method.getName());
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_LOAD_RESULT_HANDLER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+
+public final class GateAudioLoadResultHandler {
+  public static void main(String[] args) throws Exception {
+    AudioTrack track = proxy(AudioTrack.class);
+    AudioPlaylist playlist = proxy(AudioPlaylist.class);
+    FriendlyException exception = allocate(FriendlyException.class);
+    StringBuilder calls = new StringBuilder();
+    AudioLoadResultHandler handler = new AudioLoadResultHandler() {
+      private int trackCalls;
+      private int playlistCalls;
+      private int failureCalls;
+
+      public void trackLoaded(AudioTrack value) {
+        check(value == (trackCalls++ == 0 ? track : null), "track value");
+        calls.append(value == null ? "track-null," : "track,");
+      }
+      public void playlistLoaded(AudioPlaylist value) {
+        check(value == (playlistCalls++ == 0 ? playlist : null), "playlist value");
+        calls.append(value == null ? "playlist-null," : "playlist,");
+      }
+      public void noMatches() {
+        calls.append("none,");
+      }
+      public void loadFailed(FriendlyException value) {
+        check(value == (failureCalls++ == 0 ? exception : null), "failure value");
+        calls.append(value == null ? "failed-null" : "failed,");
+      }
+    };
+    handler.trackLoaded(track);
+    handler.playlistLoaded(playlist);
+    handler.noMatches();
+    handler.loadFailed(exception);
+    handler.trackLoaded(null);
+    handler.playlistLoaded(null);
+    handler.loadFailed(null);
+    check(calls.toString().equals(
+        "track,playlist,none,failed,track-null,playlist-null,failed-null"),
+        "callback order");
+
+    Class<AudioLoadResultHandler> type = AudioLoadResultHandler.class;
+    int modifiers = type.getModifiers();
+    check(Modifier.isPublic(modifiers) && Modifier.isInterface(modifiers)
+        && Modifier.isAbstract(modifiers) && !Modifier.isFinal(modifiers)
+        && type.getSuperclass() == null && type.getInterfaces().length == 0,
+        "interface structure");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredMethods().length == 4
+        && type.getDeclaredConstructors().length == 0, "member counts");
+    checkMethod(type.getDeclaredMethod("trackLoaded", AudioTrack.class),
+        new Class<?>[] { AudioTrack.class });
+    checkMethod(type.getDeclaredMethod("playlistLoaded", AudioPlaylist.class),
+        new Class<?>[] { AudioPlaylist.class });
+    checkMethod(type.getDeclaredMethod("noMatches"), new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("loadFailed", FriendlyException.class),
+        new Class<?>[] { FriendlyException.class });
+
+    System.out.println(
+        "dispatch=track,playlist,none,failed,nulls,ordered;"
+        + "reflection=interface,0-fields,4-methods,0-constructors");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] { type },
+        (instance, method, arguments) -> null);
+  }
+
+  private static <T> T allocate(Class<T> type) throws Exception {
+    Class<?> unsafeType = Class.forName("sun.misc.Unsafe");
+    Field singleton = unsafeType.getDeclaredField("theUnsafe");
+    singleton.setAccessible(true);
+    Object unsafe = singleton.get(null);
+    return type.cast(unsafeType.getMethod("allocateInstance", Class.class).invoke(unsafe, type));
+  }
+
+  private static void checkMethod(Method method, Class<?>[] parameters) {
+    check(Modifier.isPublic(method.getModifiers()) && Modifier.isAbstract(method.getModifiers())
+        && !Modifier.isStatic(method.getModifiers()) && !method.isDefault()
+        && !method.isBridge() && !method.isSynthetic() && method.getReturnType() == void.class
         && Arrays.equals(method.getParameterTypes(), parameters)
         && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0,
         "method metadata " + method.getName());
