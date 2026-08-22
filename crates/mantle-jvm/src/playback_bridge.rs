@@ -9,8 +9,9 @@ use mantle_audio::{
     PcmOpusEncoder, PcmResampler, ResamplingQuality, VolumeLevel,
 };
 use mantle_media::{
-    MediaCancellation, MediaLimits, NicoNicoPlaybackSession, NicoNicoSourceManager,
-    NicoNicoSourceOptions, NicoNicoSourceTrack,
+    HttpRangeOptions, MediaCancellation, MediaInfo, MediaLimits, NicoNicoPlaybackSession,
+    NicoNicoSourceManager, NicoNicoSourceOptions, NicoNicoSourceTrack, SoundCloudAuthentication,
+    SoundCloudPlaybackSession, SoundCloudSourceManager, SoundCloudSourceOptions,
 };
 
 const TRANSCODE_INPUT_CHUNK_FRAMES: usize = 1_024;
@@ -41,8 +42,60 @@ pub(crate) fn process_nico_track(
         .map_err(|_| failure("current NicoNico playback discovery failed"))?
         .ok_or_else(|| failure("current NicoNico track is unavailable"))?;
 
+    process_playback_session(env, executor, session, &cancellation)
+}
+
+pub(crate) fn process_sound_cloud_track(
+    env: &mut Env<'_>,
+    track: &JObject<'_>,
+    executor: &JObject<'_>,
+) -> jni::errors::Result<()> {
+    let client_id = system_property(env, "dev.mantle.soundcloud.clientId")?
+        .ok_or_else(|| failure("SoundCloud playback requires dev.mantle.soundcloud.clientId"))?;
+    let oauth_token = system_property(env, "dev.mantle.soundcloud.oauthToken")?;
+    let authentication = SoundCloudAuthentication::with_oauth(client_id, oauth_token)
+        .map_err(|_| failure("invalid explicit SoundCloud credentials"))?;
+    let manager = SoundCloudSourceManager::new(SoundCloudSourceOptions::default(), authentication)
+        .map_err(|_| failure("could not create current SoundCloud playback source"))?;
+    let java_info = env
+        .get_field(
+            track,
+            jni_str!("trackInfo"),
+            jni_sig!("Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;"),
+        )?
+        .l()?;
+    let info = crate::track_info_from_java(env, &java_info)?;
+    let uri = info
+        .uri
+        .as_deref()
+        .ok_or_else(|| failure("SoundCloud track requires a source URI"))?;
+    let limits = MediaLimits::default();
+    let cancellation = MediaCancellation::new();
+    let source_track = manager
+        .load_track_metadata(uri, &cancellation)
+        .map_err(|_| failure("current SoundCloud playback discovery failed"))?
+        .ok_or_else(|| failure("current SoundCloud track is unavailable"))?;
+    let session = manager
+        .open_track_playback(
+            &source_track,
+            HttpRangeOptions::default(),
+            limits,
+            cancellation.clone(),
+        )
+        .map_err(|_| failure("current SoundCloud playback handoff failed"))?
+        .ok_or_else(|| failure("current SoundCloud track has no compatible playback"))?;
+
+    process_playback_session(env, executor, session, &cancellation)
+}
+
+fn process_playback_session<S: PcmPlaybackSession>(
+    env: &mut Env<'_>,
+    executor: &JObject<'_>,
+    session: S,
+    cancellation: &MediaCancellation,
+) -> jni::errors::Result<()> {
     if executor.is_null() {
-        return Err(failure("NicoNico playback requires a local track executor"));
+        return Err(failure("native playback requires a local track executor"));
     }
     let buffer = env
         .call_method(
@@ -53,7 +106,7 @@ pub(crate) fn process_nico_track(
         )?
         .l()?;
     if buffer.is_null() {
-        return Err(failure("NicoNico playback requires an audio frame buffer"));
+        return Err(failure("native playback requires an audio frame buffer"));
     }
     let context = env
         .call_method(
@@ -65,14 +118,14 @@ pub(crate) fn process_nico_track(
         .l()?;
     let format = validate_output_format(env, &context)?;
     let volume = player_volume(env, &context)?;
-    let mut transcoder = NicoPcmTranscoder::new(session, limits)?;
+    let mut transcoder = PcmTranscoder::new(session, MediaLimits::default())?;
     let mut encoded = EncodedFrameSlot::new();
 
     while transcoder.read_frame(&mut encoded, volume)? {
         env.with_local_frame(4, |env| {
             if current_thread_interrupted(env)? {
                 cancellation.cancel();
-                return Err(failure("current NicoNico playback was cancelled"));
+                return Err(failure("current native playback was cancelled"));
             }
             let data = JObject::from(env.byte_array_from_slice(encoded.data())?);
             let timecode = encoded
@@ -80,7 +133,7 @@ pub(crate) fn process_nico_track(
                 .unwrap_or_else(|| transcoder.last_frame_timecode())
                 .as_millis();
             let timecode = i64::try_from(timecode)
-                .map_err(|_| failure("NicoNico frame timecode exceeds the JVM range"))?;
+                .map_err(|_| failure("native frame timecode exceeds the JVM range"))?;
             let frame = env.new_object(
                 jni_str!("com/sedmelluq/discord/lavaplayer/track/playback/ImmutableAudioFrame"),
                 jni_sig!("(J[BILcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V"),
@@ -103,13 +156,30 @@ pub(crate) fn process_nico_track(
     Ok(())
 }
 
+fn system_property(env: &mut Env<'_>, key: &str) -> jni::errors::Result<Option<String>> {
+    let key = JObject::from(env.new_string(key)?);
+    let value = env
+        .call_static_method(
+            jni_str!("java/lang/System"),
+            jni_str!("getProperty"),
+            jni_sig!("(Ljava/lang/String;)Ljava/lang/String;"),
+            &[JValue::Object(&key)],
+        )?
+        .l()?;
+    if value.is_null() {
+        Ok(None)
+    } else {
+        Ok(Some(JString::cast_local(env, value)?.try_to_string(env)?))
+    }
+}
+
 fn validate_output_format<'local>(
     env: &mut Env<'local>,
     context: &JObject<'local>,
 ) -> jni::errors::Result<JObject<'local>> {
     if context.is_null() {
         return Err(failure(
-            "NicoNico playback requires an audio processing context",
+            "native playback requires an audio processing context",
         ));
     }
     let format = env
@@ -120,7 +190,7 @@ fn validate_output_format<'local>(
         )?
         .l()?;
     if format.is_null() {
-        return Err(failure("NicoNico playback requires an output format"));
+        return Err(failure("native playback requires an output format"));
     }
     let codec = env
         .call_method(
@@ -147,7 +217,7 @@ fn validate_output_format<'local>(
             != i32::try_from(mantle_audio::COMPATIBLE_SAMPLES_PER_CHANNEL).unwrap_or(i32::MAX)
     {
         return Err(failure(
-            "current NicoNico playback requires 48 kHz stereo 20 ms Opus output",
+            "current native playback requires 48 kHz stereo 20 ms Opus output",
         ));
     }
     Ok(format)
@@ -190,8 +260,35 @@ fn current_thread_interrupted(env: &mut Env<'_>) -> jni::errors::Result<bool> {
         .z()
 }
 
-struct NicoPcmTranscoder {
-    session: NicoNicoPlaybackSession,
+trait PcmPlaybackSession {
+    fn info(&self) -> &MediaInfo;
+    fn read_pcm(&mut self, output: &mut PcmFrame) -> jni::errors::Result<bool>;
+}
+
+impl PcmPlaybackSession for NicoNicoPlaybackSession {
+    fn info(&self) -> &MediaInfo {
+        self.info()
+    }
+
+    fn read_pcm(&mut self, output: &mut PcmFrame) -> jni::errors::Result<bool> {
+        self.read_pcm(output)
+            .map_err(|_| failure("NicoNico media decoding failed"))
+    }
+}
+
+impl PcmPlaybackSession for SoundCloudPlaybackSession {
+    fn info(&self) -> &MediaInfo {
+        self.info()
+    }
+
+    fn read_pcm(&mut self, output: &mut PcmFrame) -> jni::errors::Result<bool> {
+        self.read_pcm(output)
+            .map_err(|_| failure("SoundCloud media decoding failed"))
+    }
+}
+
+struct PcmTranscoder<S> {
+    session: S,
     source_format: PcmFormat,
     decoded: PcmFrame,
     decoded_offset: usize,
@@ -208,10 +305,10 @@ struct NicoPcmTranscoder {
     frames_encoded: u64,
 }
 
-impl NicoPcmTranscoder {
-    fn new(session: NicoNicoPlaybackSession, limits: MediaLimits) -> jni::errors::Result<Self> {
+impl<S: PcmPlaybackSession> PcmTranscoder<S> {
+    fn new(session: S, limits: MediaLimits) -> jni::errors::Result<Self> {
         let source_format = PcmFormat::new(session.info().sample_rate, session.info().channels)
-            .map_err(|_| failure("NicoNico returned an incompatible PCM format"))?;
+            .map_err(|_| failure("native playback returned an incompatible PCM format"))?;
         let resampler = (source_format.sample_rate() != COMPATIBLE_SAMPLE_RATE)
             .then(|| {
                 PcmResampler::new(
@@ -224,7 +321,7 @@ impl NicoPcmTranscoder {
                 )
             })
             .transpose()
-            .map_err(|_| failure("could not create the NicoNico resampler"))?;
+            .map_err(|_| failure("could not create the native playback resampler"))?;
         Ok(Self {
             session,
             source_format,
@@ -237,7 +334,7 @@ impl NicoPcmTranscoder {
             assembled_len: 0,
             encoder_input: PcmFrame::with_capacity(COMPATIBLE_PCM_SAMPLES),
             encoder: PcmOpusEncoder::new(OpusEncodingQuality::MAXIMUM)
-                .map_err(|_| failure("could not create the NicoNico Opus encoder"))?,
+                .map_err(|_| failure("could not create the native playback Opus encoder"))?,
             input_eof: false,
             timestamp_initialized: false,
             base_timestamp: None,
@@ -258,34 +355,26 @@ impl NicoPcmTranscoder {
                 if self.input_eof {
                     break;
                 }
-                if self
-                    .session
-                    .read_pcm(&mut self.decoded)
-                    .map_err(|_| failure("NicoNico media decoding failed"))?
-                {
+                if self.session.read_pcm(&mut self.decoded)? {
                     self.validate_decoded_format()?;
                     self.resampler
                         .as_mut()
                         .expect("resampler path")
                         .push(&self.decoded)
-                        .map_err(|_| failure("NicoNico resampling failed"))?;
+                        .map_err(|_| failure("native playback resampling failed"))?;
                 } else {
                     self.input_eof = true;
                     self.resampler
                         .as_mut()
                         .expect("resampler path")
                         .finish()
-                        .map_err(|_| failure("NicoNico resampler finalization failed"))?;
+                        .map_err(|_| failure("native playback resampler finalization failed"))?;
                 }
             } else if !self.append_decoded()? {
                 if self.input_eof {
                     break;
                 }
-                if self
-                    .session
-                    .read_pcm(&mut self.decoded)
-                    .map_err(|_| failure("NicoNico media decoding failed"))?
-                {
+                if self.session.read_pcm(&mut self.decoded)? {
                     self.validate_decoded_format()?;
                     self.decoded_offset = 0;
                 } else {
@@ -306,13 +395,13 @@ impl NicoPcmTranscoder {
             )
         });
         let output_format = PcmFormat::new(COMPATIBLE_SAMPLE_RATE, COMPATIBLE_CHANNELS)
-            .map_err(|_| failure("could not create the NicoNico output format"))?;
+            .map_err(|_| failure("could not create the native playback output format"))?;
         self.encoder_input
             .copy_from_interleaved(&self.assembled, output_format, timestamp)
-            .map_err(|_| failure("could not assemble the NicoNico Opus frame"))?;
+            .map_err(|_| failure("could not assemble the native playback Opus frame"))?;
         self.encoder
             .encode(&self.encoder_input, output, volume)
-            .map_err(|_| failure("NicoNico Opus encoding failed"))?;
+            .map_err(|_| failure("native playback Opus encoding failed"))?;
         self.assembled_len = 0;
         self.frames_encoded = self.frames_encoded.saturating_add(1);
         Ok(true)
@@ -349,7 +438,7 @@ impl NicoPcmTranscoder {
                 .as_mut()
                 .expect("resampler path")
                 .read(&mut self.resampled)
-                .map_err(|_| failure("NicoNico resampling failed"))?
+                .map_err(|_| failure("native playback resampling failed"))?
             {
                 return Ok(false);
             }
@@ -373,7 +462,9 @@ impl NicoPcmTranscoder {
         if self.decoded.format() == Some(self.source_format) {
             Ok(())
         } else {
-            Err(failure("NicoNico changed PCM format during playback"))
+            Err(failure(
+                "native playback changed PCM format during playback",
+            ))
         }
     }
 }

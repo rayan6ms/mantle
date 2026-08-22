@@ -133,6 +133,8 @@ const SOUND_CLOUD_AUDIO_SOURCE_MANAGER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager";
 const SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager$Builder";
+const SOUND_CLOUD_AUDIO_TRACK_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioTrack";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -178,6 +180,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     DEFAULT_SOUND_CLOUD_TRACK_FORMAT_CLASS,
     SOUND_CLOUD_AUDIO_SOURCE_MANAGER_CLASS,
     SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS,
+    SOUND_CLOUD_AUDIO_TRACK_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -543,6 +546,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | DEFAULT_SOUND_CLOUD_TRACK_FORMAT_CLASS
                 | SOUND_CLOUD_AUDIO_SOURCE_MANAGER_CLASS
                 | SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS
+                | SOUND_CLOUD_AUDIO_TRACK_CLASS
         ) || field
             .access_flags
             .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
@@ -562,6 +566,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | DEFAULT_SOUND_CLOUD_FORMAT_HANDLER_CLASS
                 | DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS
                 | SOUND_CLOUD_AUDIO_SOURCE_MANAGER_CLASS
+                | SOUND_CLOUD_AUDIO_TRACK_CLASS
         ) || method
             .access_flags
             .intersects(MethodAccessFlags::PUBLIC | MethodAccessFlags::PROTECTED)
@@ -685,6 +690,9 @@ fn replacement_body(
             descriptor,
             required_locals,
         );
+    }
+    if class_name == SOUND_CLOUD_AUDIO_TRACK_CLASS {
+        return sound_cloud_audio_track_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS {
         return sound_cloud_audio_source_manager_builder_replacement(
@@ -3239,6 +3247,153 @@ fn nico_audio_track_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute
             Instruction::Putstatic(log),
             Instruction::Ldc_w(action_value),
             Instruction::Putstatic(action),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn sound_cloud_audio_track_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager;)V",
+        ) => sound_cloud_audio_track_constructor(pool),
+        (
+            "process",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+        ) => sound_cloud_audio_track_process(pool),
+        ("makeShallowClone", "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;") => {
+            sound_cloud_audio_track_shallow_clone(pool)
+        }
+        ("getSourceManager", "()Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;") => {
+            object_getter(
+                pool,
+                SOUND_CLOUD_AUDIO_TRACK_CLASS,
+                "sourceManager",
+                "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager;",
+            )
+        }
+        ("<clinit>", "()V") => sound_cloud_audio_track_clinit(pool),
+        ("playFromIdentifier" | "loadFromMp3Url", _) => unsupported_body(
+            pool,
+            "Legacy SoundCloud web-client playback is unsupported; configure explicit Mantle SoundCloud credentials.",
+            required_locals,
+        ),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {SOUND_CLOUD_AUDIO_TRACK_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn sound_cloud_audio_track_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let parent = pool.add_class(DELEGATED_AUDIO_TRACK_CLASS)?;
+    let parent_init = pool.add_method_ref(
+        parent,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V",
+    )?;
+    let owner = pool.add_class(SOUND_CLOUD_AUDIO_TRACK_CLASS)?;
+    let source = pool.add_field_ref(
+        owner,
+        "sourceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager;",
+    )?;
+    code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(parent_init),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(source),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn sound_cloud_audio_track_process(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let native = pool.add_class(NATIVE_CLASS)?;
+    let process = pool.add_method_ref(
+        native,
+        "processSoundCloudTrack",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+    )?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokestatic(process),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn sound_cloud_audio_track_shallow_clone(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(SOUND_CLOUD_AUDIO_TRACK_CLASS)?;
+    let track_info = pool.add_field_ref(
+        owner,
+        "trackInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let source = pool.add_field_ref(
+        owner,
+        "sourceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager;",
+    )?;
+    let init = pool.add_method_ref(
+        owner,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager;)V",
+    )?;
+    code(
+        pool,
+        4,
+        1,
+        vec![
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(track_info),
+            Instruction::Aload_0,
+            Instruction::Getfield(source),
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn sound_cloud_audio_track_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(SOUND_CLOUD_AUDIO_TRACK_CLASS)?;
+    let factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
             Instruction::Return,
         ],
     )
@@ -14123,6 +14278,7 @@ fn add_basic_playlist_state(class: &mut ClassFile<'static>) -> Result<()> {
     Ok(())
 }
 
+#[allow(clippy::too_many_lines)]
 fn native_class(expected_abi: u8) -> Result<ClassFile<'static>> {
     let mut class = new_class(
         NATIVE_CLASS,
@@ -14184,6 +14340,10 @@ fn native_class(expected_abi: u8) -> Result<ClassFile<'static>> {
         (
             "processNicoTrack",
             "(Lcom/sedmelluq/discord/lavaplayer/source/nico/NicoAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+        ),
+        (
+            "processSoundCloudTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
         ),
         (
             "loadItemReference",

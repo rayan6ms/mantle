@@ -134,6 +134,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-sound-cloud-audio-source-manager-builder-consumer" => {
             Some(SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CONSUMER)
         }
+        "write-sound-cloud-audio-track-consumer" => Some(SOUND_CLOUD_AUDIO_TRACK_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -8604,6 +8605,151 @@ public final class GateNicoAudioTrack {
   }
 
   private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const SOUND_CLOUD_AUDIO_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioTrack;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudM3uInfo;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.DelegatedAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateSoundCloudAudioTrack {
+  public static void main(String[] args) throws Exception {
+    check(args.length >= 1 && args.length <= 2, "expected disposition and optional native path");
+    boolean reference = args[0].equals("reference");
+    check(reference || args[0].equals("candidate"), "unknown disposition");
+    check(reference == (args.length == 1), "candidate requires native path");
+    reflectionContract();
+    commonBehavior();
+    if (!reference) currentDisposition(args[1]);
+    System.out.println(
+        "common=public-concrete,2-fields,1-constructor,3-exported-methods,"
+        + "capture,source-identity,shallow-clone;service="
+        + (reference ? "legacy-web-client-http" : "current-native-explicit-credentials,no-client-scrape"));
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<SoundCloudAudioTrack> type = SoundCloudAudioTrack.class;
+    check(type.getModifiers() == Modifier.PUBLIC
+        && type.getSuperclass() == DelegatedAudioTrack.class
+        && type.getInterfaces().length == 0, "class metadata");
+    check(type.getDeclaredFields().length == 2, "field count");
+    checkField(type, "log", Class.forName("org.slf4j.Logger"),
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "sourceManager", SoundCloudAudioSourceManager.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        AudioTrackInfo.class, SoundCloudAudioSourceManager.class);
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC, "constructor metadata");
+    check(type.getDeclaredMethods().length == 5, "method count");
+    long exported = Arrays.stream(type.getDeclaredMethods())
+        .filter(method -> Modifier.isPublic(method.getModifiers())
+            || Modifier.isProtected(method.getModifiers()))
+        .count();
+    check(exported == 3L, "exported method count");
+    checkMethod(type.getDeclaredMethod("process", LocalAudioTrackExecutor.class),
+        void.class, Modifier.PUBLIC, Exception.class);
+    checkMethod(type.getDeclaredMethod("playFromIdentifier", HttpInterface.class, String.class,
+        boolean.class, LocalAudioTrackExecutor.class), void.class, Modifier.PRIVATE, Exception.class);
+    checkMethod(type.getDeclaredMethod("loadFromMp3Url", LocalAudioTrackExecutor.class,
+        HttpInterface.class, String.class), void.class, Modifier.PRIVATE, Exception.class);
+    checkMethod(type.getDeclaredMethod("makeShallowClone"),
+        AudioTrack.class, Modifier.PROTECTED);
+    checkMethod(type.getDeclaredMethod("getSourceManager"),
+        AudioSourceManager.class, Modifier.PUBLIC);
+  }
+
+  private static void commonBehavior() throws Exception {
+    AudioTrackInfo info = new AudioTrackInfo(
+        "title", "author", 1234L, "O:123", false,
+        "https://soundcloud.com/fixture/song", "art", null);
+    SoundCloudAudioSourceManager source = SoundCloudAudioSourceManager.createDefault();
+    ExposedTrack track = new ExposedTrack(info, source);
+    check(track.getInfo() == info && track.getSourceManager() == source, "captured identity");
+    check(field("sourceManager").get(track) == source && field("log").get(null) != null,
+        "constructor and static state");
+    AudioTrack clone = track.shallowClone();
+    check(clone instanceof SoundCloudAudioTrack && clone != track && clone.getInfo() == info
+        && clone.getSourceManager() == source, "shallow clone identity");
+    source.shutdown();
+  }
+
+  private static void currentDisposition(String nativeLibrary) throws Exception {
+    Class.forName("dev.mantle.internal.NativeLoader")
+        .getMethod("load", String.class).invoke(null, nativeLibrary);
+    Class<?> nativeType = Class.forName("dev.mantle.internal.MantleNative");
+    Method process = nativeType.getDeclaredMethod(
+        "processSoundCloudTrack", SoundCloudAudioTrack.class, LocalAudioTrackExecutor.class);
+    check(Modifier.isPublic(process.getModifiers()) && Modifier.isStatic(process.getModifiers())
+        && Modifier.isNative(process.getModifiers()), "current native route");
+    System.clearProperty("dev.mantle.soundcloud.clientId");
+    System.clearProperty("dev.mantle.soundcloud.oauthToken");
+    AudioTrackInfo info = new AudioTrackInfo(
+        "title", "author", 1234L, "O:123", false,
+        "https://soundcloud.com/fixture/song", null, null);
+    SoundCloudAudioSourceManager source = SoundCloudAudioSourceManager.createDefault();
+    RuntimeException error = expect(RuntimeException.class,
+        () -> new SoundCloudAudioTrack(info, source).process(null));
+    check(error.getMessage().contains("dev.mantle.soundcloud.clientId"),
+        "missing explicit credential failure");
+    source.shutdown();
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = SoundCloudAudioTrack.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static void checkField(Class<?> type, String name, Class<?> fieldType, int modifiers)
+      throws Exception {
+    Field field = type.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getModifiers() == modifiers
+        && !field.isSynthetic(), field + " metadata");
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, int modifiers,
+                                  Class<?>... exceptions) {
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isBridge() && !method.isSynthetic(), method + " metadata");
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static final class ExposedTrack extends SoundCloudAudioTrack {
+    ExposedTrack(AudioTrackInfo info, SoundCloudAudioSourceManager source) {
+      super(info, source);
+    }
+    AudioTrack shallowClone() { return makeShallowClone(); }
+  }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
