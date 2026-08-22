@@ -104,6 +104,9 @@ fn consumer_source(command: &str) -> Option<&'static str> {
             Some(AUDIO_SOURCE_MANAGER_INTERFACE_CONSUMER)
         }
         "write-audio-source-managers-consumer" => Some(AUDIO_SOURCE_MANAGERS_CONSUMER),
+        "write-probing-audio-source-manager-consumer" => {
+            Some(PROBING_AUDIO_SOURCE_MANAGER_CONSUMER)
+        }
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -7435,6 +7438,318 @@ public final class GateAudioSourceManagers {
         }
       }
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const PROBING_AUDIO_SOURCE_MANAGER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDescriptor;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerHints;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerProbe;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerRegistry;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.ProbingAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException.Severity;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioItem;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInput;
+import java.io.DataInputStream;
+import java.io.DataOutput;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import java.util.Collections;
+
+public final class GateProbingAudioSourceManager {
+  public static void main(String[] args) throws Exception {
+    constructorAndReflection();
+    loadResults();
+    factoryEncoding();
+    factoryDecoding();
+    System.out.println(
+        "load=null,reference,unknown,unsupported,supported,identity;"
+        + "encode=name,null-name,null-empty-nested-parameters,modified-utf,io-prefix;"
+        + "decode=known,empty,nested,unknown,first-probe,io-prefix;"
+        + "reflection=public-abstract,2-fields,1-protected-constructor,4-protected-methods");
+  }
+
+  private static void constructorAndReflection() throws Exception {
+    MediaContainerRegistry registry = new MediaContainerRegistry(Collections.emptyList());
+    TestManager manager = new TestManager(registry);
+    check(manager.registry() == registry, "registry identity");
+    check(new TestManager(null).registry() == null, "null registry retained");
+
+    Class<ProbingAudioSourceManager> type = ProbingAudioSourceManager.class;
+    check(Modifier.isPublic(type.getModifiers()) && Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers()) && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] { AudioSourceManager.class }),
+        "class metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 4, "member counts");
+
+    Field separator = type.getDeclaredField("PARAMETERS_SEPARATOR");
+    separator.setAccessible(true);
+    check(separator.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && separator.getType() == char.class && separator.getChar(null) == '|',
+        "separator metadata");
+    Field containerRegistry = type.getDeclaredField("containerRegistry");
+    check(containerRegistry.getModifiers() == (Modifier.PROTECTED | Modifier.FINAL)
+        && containerRegistry.getType() == MediaContainerRegistry.class,
+        "registry field metadata");
+
+    Constructor<?> constructor = type.getDeclaredConstructor(MediaContainerRegistry.class);
+    check(constructor.getModifiers() == Modifier.PROTECTED && !constructor.isVarArgs()
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    checkMethod(type.getDeclaredMethod(
+        "handleLoadResult", MediaContainerDetectionResult.class), AudioItem.class, false, false);
+    checkMethod(type.getDeclaredMethod(
+        "createTrack", AudioTrackInfo.class, MediaContainerDescriptor.class),
+        AudioTrack.class, true, false);
+    checkMethod(type.getDeclaredMethod(
+        "encodeTrackFactory", MediaContainerDescriptor.class, DataOutput.class),
+        void.class, false, true);
+    checkMethod(type.getDeclaredMethod("decodeTrackFactory", DataInput.class),
+        MediaContainerDescriptor.class, false, true);
+  }
+
+  private static void checkMethod(
+      Method method, Class<?> returnType, boolean isAbstract, boolean throwsIo) {
+    int modifiers = Modifier.PROTECTED | (isAbstract ? Modifier.ABSTRACT : 0);
+    check(method.getModifiers() == modifiers && method.getReturnType() == returnType
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs()
+        && Arrays.equals(method.getExceptionTypes(),
+            throwsIo ? new Class<?>[] { IOException.class } : new Class<?>[0]),
+        method + " metadata");
+  }
+
+  private static void loadResults() {
+    MediaContainerProbe probe = probe("known", new int[1]);
+    MediaContainerRegistry registry = new MediaContainerRegistry(Arrays.asList(probe));
+    AudioTrack track = proxy(AudioTrack.class);
+    TestManager manager = new TestManager(registry);
+    manager.trackResult = track;
+
+    check(manager.handle(null) == null && manager.creates == 0, "null result");
+    AudioReference reference = new AudioReference("ref-id", "ref-container");
+    check(manager.handle(MediaContainerDetectionResult.refer(probe, reference)) == reference
+        && manager.creates == 0, "reference identity");
+
+    FriendlyException unknown = expectFriendly(
+        () -> manager.handle(MediaContainerDetectionResult.unknownFormat()));
+    check(unknown.getMessage().equals("Unknown file format.")
+        && unknown.severity == Severity.COMMON && unknown.getCause() == null
+        && manager.creates == 0, "unknown format failure");
+
+    String reason = new String("unsupported-sentinel");
+    FriendlyException unsupported = expectFriendly(
+        () -> manager.handle(MediaContainerDetectionResult.unsupportedFormat(probe, reason)));
+    check(unsupported.getMessage() == reason && unsupported.severity == Severity.COMMON
+        && unsupported.getCause() == null && manager.creates == 0,
+        "unsupported failure");
+
+    AudioTrackInfo info = new AudioTrackInfo(
+        "title", "author", 42L, "identifier", false, "https://example.invalid");
+    check(manager.handle(MediaContainerDetectionResult.supportedFormat(probe, "settings", info))
+        == track && manager.creates == 1 && manager.createdInfo == info
+        && manager.createdDescriptor.probe == probe
+        && manager.createdDescriptor.parameters.equals("settings"), "supported dispatch");
+
+    RuntimeException failure = new RuntimeException("create-sentinel");
+    manager.createFailure = failure;
+    expectIdentity(failure, () -> manager.handle(
+        MediaContainerDetectionResult.supportedFormat(probe, null, info)));
+    check(manager.creates == 2 && manager.createdInfo == info
+        && manager.createdDescriptor.parameters == null, "create failure prefix");
+  }
+
+  private static void factoryEncoding() throws Exception {
+    MediaContainerRegistry registry = new MediaContainerRegistry(Collections.emptyList());
+    TestManager manager = new TestManager(registry);
+    checkEncoded(manager, "known", null, "known");
+    checkEncoded(manager, "known", "", "known|");
+    checkEncoded(manager, "known", "a|b", "known|a|b");
+    checkEncoded(manager, null, "value", "null|value");
+    checkEncoded(manager, "žluťoučký", "水|😀", "žluťoučký|水|😀");
+
+    int[] calls = new int[1];
+    MediaContainerDescriptor descriptor = new MediaContainerDescriptor(probe("known", calls), "p");
+    IOException failure = new IOException("write-sentinel");
+    DataOutput output = (DataOutput) Proxy.newProxyInstance(
+        DataOutput.class.getClassLoader(), new Class<?>[] { DataOutput.class },
+        (instance, method, arguments) -> {
+          if (method.getName().equals("writeUTF")) throw failure;
+          return null;
+        });
+    expectIdentity(failure, () -> manager.encode(descriptor, output));
+    check(calls[0] == 1, "write failure prefix");
+
+    expect(NullPointerException.class, () -> manager.encode(null, output));
+    expect(NullPointerException.class,
+        () -> manager.encode(new MediaContainerDescriptor(null, null), output));
+    int[] nullOutputCalls = new int[1];
+    expect(NullPointerException.class, () -> manager.encode(
+        new MediaContainerDescriptor(probe("known", nullOutputCalls), "p"), null));
+    check(nullOutputCalls[0] == 1, "null output failure prefix");
+  }
+
+  private static void checkEncoded(
+      TestManager manager, String name, String parameters, String expected) throws Exception {
+    int[] calls = new int[1];
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    manager.encode(new MediaContainerDescriptor(probe(name, calls), parameters),
+        new DataOutputStream(bytes));
+    String actual = new DataInputStream(new ByteArrayInputStream(bytes.toByteArray())).readUTF();
+    check(actual.equals(expected) && calls[0] == 1, "encoded " + expected);
+  }
+
+  private static void factoryDecoding() throws Exception {
+    int[] firstCalls = new int[1];
+    MediaContainerProbe first = probe("known", firstCalls);
+    MediaContainerProbe duplicate = probe("known", new int[1]);
+    MediaContainerProbe empty = probe("", new int[1]);
+    TestManager manager = new TestManager(
+        new MediaContainerRegistry(Arrays.asList(first, duplicate, empty)));
+
+    MediaContainerDescriptor plain = manager.decode(input("known"));
+    check(plain.probe == first && plain.parameters == null, "plain decode");
+    MediaContainerDescriptor emptyParameters = manager.decode(input("known|"));
+    check(emptyParameters.probe == first && emptyParameters.parameters.equals(""),
+        "empty parameters");
+    MediaContainerDescriptor nested = manager.decode(input("known|a|b"));
+    check(nested.probe == first && nested.parameters.equals("a|b"), "first separator");
+    MediaContainerDescriptor emptyName = manager.decode(input("|value"));
+    check(emptyName.probe == empty && emptyName.parameters.equals("value"), "empty name");
+    check(manager.decode(input("missing|value")) == null, "unknown probe");
+    check(firstCalls[0] >= 4, "registry lookup dispatch");
+
+    IOException failure = new IOException("read-sentinel");
+    DataInput failing = (DataInput) Proxy.newProxyInstance(
+        DataInput.class.getClassLoader(), new Class<?>[] { DataInput.class },
+        (instance, method, arguments) -> {
+          if (method.getName().equals("readUTF")) throw failure;
+          return null;
+        });
+    expectIdentity(failure, () -> manager.decode(failing));
+    expect(NullPointerException.class, () -> manager.decode(null));
+    expect(NullPointerException.class, () -> new TestManager(null).decode(input("known")));
+  }
+
+  private static DataInput input(String value) throws IOException {
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    new DataOutputStream(bytes).writeUTF(value);
+    return new DataInputStream(new ByteArrayInputStream(bytes.toByteArray()));
+  }
+
+  private static MediaContainerProbe probe(String name, int[] calls) {
+    return (MediaContainerProbe) Proxy.newProxyInstance(
+        MediaContainerProbe.class.getClassLoader(), new Class<?>[] { MediaContainerProbe.class },
+        (instance, method, arguments) -> {
+          if (method.getName().equals("getName")) {
+            calls[0]++;
+            return name;
+          }
+          if (method.getName().equals("toString")) return "Probe(" + name + ")";
+          if (method.getName().equals("hashCode")) return System.identityHashCode(instance);
+          if (method.getName().equals("equals")) return instance == arguments[0];
+          if (method.getReturnType() == boolean.class) return false;
+          return null;
+        });
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] { type },
+        (instance, method, arguments) -> {
+          if (method.getName().equals("toString")) return type.getSimpleName() + "Proxy";
+          if (method.getName().equals("hashCode")) return System.identityHashCode(instance);
+          if (method.getName().equals("equals")) return instance == arguments[0];
+          Class<?> result = method.getReturnType();
+          if (result == boolean.class) return false;
+          if (result == int.class) return 0;
+          if (result == long.class) return 0L;
+          return null;
+        });
+  }
+
+  private static FriendlyException expectFriendly(Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected FriendlyException");
+    } catch (FriendlyException error) {
+      return error;
+    } catch (Throwable error) {
+      throw new AssertionError("wrong exception", error);
+    }
+  }
+
+  private static void expect(Class<? extends Throwable> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
+  }
+
+  private static void expectIdentity(Throwable expected, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("failure was swallowed");
+    } catch (Throwable error) {
+      check(error == expected, "failure identity");
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static final class TestManager extends ProbingAudioSourceManager {
+    AudioTrack trackResult;
+    AudioTrackInfo createdInfo;
+    MediaContainerDescriptor createdDescriptor;
+    RuntimeException createFailure;
+    int creates;
+
+    TestManager(MediaContainerRegistry registry) { super(registry); }
+    MediaContainerRegistry registry() { return containerRegistry; }
+    AudioItem handle(MediaContainerDetectionResult result) { return handleLoadResult(result); }
+    void encode(MediaContainerDescriptor descriptor, DataOutput output) throws IOException {
+      encodeTrackFactory(descriptor, output);
+    }
+    MediaContainerDescriptor decode(DataInput input) throws IOException {
+      return decodeTrackFactory(input);
+    }
+
+    protected AudioTrack createTrack(AudioTrackInfo info, MediaContainerDescriptor descriptor) {
+      creates++;
+      createdInfo = info;
+      createdDescriptor = descriptor;
+      if (createFailure != null) throw createFailure;
+      return trackResult;
+    }
+
+    public String getSourceName() { return "test"; }
+    public AudioItem loadItem(AudioPlayerManager manager, AudioReference reference) { return null; }
+    public boolean isTrackEncodable(AudioTrack track) { return false; }
+    public void encodeTrack(AudioTrack track, DataOutput output) { }
+    public AudioTrack decodeTrack(AudioTrackInfo info, DataInput input) { return null; }
+    public void shutdown() { }
   }
 
   private static void check(boolean condition, String message) {

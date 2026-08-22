@@ -12769,63 +12769,84 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported abstract-class metadata and reference-equal registry retention, detection-result mapping, track-factory dispatch, modified-UTF encoding, first-separator decoding, checked IOException, and failure-prefix behavior are covered by the Phase 13 probing-audio-source-manager-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.ProbingAudioSourceManager",
       "symbol_kind": "FIELD",
       "member_name": "containerRegistry",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported abstract-class metadata and reference-equal registry retention, detection-result mapping, track-factory dispatch, modified-UTF encoding, first-separator decoding, checked IOException, and failure-prefix behavior are covered by the Phase 13 probing-audio-source-manager-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.ProbingAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported abstract-class metadata and reference-equal registry retention, detection-result mapping, track-factory dispatch, modified-UTF encoding, first-separator decoding, checked IOException, and failure-prefix behavior are covered by the Phase 13 probing-audio-source-manager-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.ProbingAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "handleLoadResult",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported abstract-class metadata and reference-equal registry retention, detection-result mapping, track-factory dispatch, modified-UTF encoding, first-separator decoding, checked IOException, and failure-prefix behavior are covered by the Phase 13 probing-audio-source-manager-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.ProbingAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "createTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported abstract-class metadata and reference-equal registry retention, detection-result mapping, track-factory dispatch, modified-UTF encoding, first-separator decoding, checked IOException, and failure-prefix behavior are covered by the Phase 13 probing-audio-source-manager-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.ProbingAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "encodeTrackFactory",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor;Ljava/io/DataOutput;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported abstract-class metadata and reference-equal registry retention, detection-result mapping, track-factory dispatch, modified-UTF encoding, first-separator decoding, checked IOException, and failure-prefix behavior are covered by the Phase 13 probing-audio-source-manager-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.ProbingAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "decodeTrackFactory",
       "descriptor": "(Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported abstract-class metadata and reference-equal registry retention, detection-result mapping, track-factory dispatch, modified-UTF encoding, first-separator decoding, checked IOException, and failure-prefix behavior are covered by the Phase 13 probing-audio-source-manager-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.bandcamp.BandcampAudioSourceManager",
