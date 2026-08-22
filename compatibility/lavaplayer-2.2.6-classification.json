@@ -23182,252 +23182,364 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "FIELD",
       "member_name": "trackInfo",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "FIELD",
       "member_name": "accurateDuration",
       "descriptor": "Ljava/util/concurrent/atomic/AtomicLong;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "assignExecutor",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;Z)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "getActiveExecutor",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "stop",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "getState",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackState;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "getIdentifier",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "isSeekable",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "getPosition",
       "descriptor": "()J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "setPosition",
       "descriptor": "(J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "setMarker",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "addMarker",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "removeMarker",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "provide",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "provide",
       "descriptor": "(JLjava/util/concurrent/TimeUnit;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "provide",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "provide",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;JLjava/util/concurrent/TimeUnit;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "getInfo",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "getDuration",
       "descriptor": "()J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "makeClone",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "getSourceManager",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "createLocalExecutor",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "setUserData",
       "descriptor": "(Ljava/lang/Object;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "getUserData",
       "descriptor": "()Ljava/lang/Object;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "getUserData",
       "descriptor": "(Ljava/lang/Class;)Ljava/lang/Object;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "makeShallowClone",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal metadata, primordial state, single-assignment, executor forwarding, stop handoff, duration, user-data, cloning, failure-order, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 base-audio-track-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.BasicAudioPlaylist",

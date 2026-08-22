@@ -112,9 +112,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       .assessment == "UNASSESSED" and (has("classification") | not)
     end) and
   .cohorts[0].status == "IN_PROGRESS" and
-  .cohorts[0].classified_symbols == 422 and
-  .cohorts[0].remaining_symbols == 113 and
-  (.cohorts[0].completed_slices | length) == 31 and
+  .cohorts[0].classified_symbols == 450 and
+  .cohorts[0].remaining_symbols == 85 and
+  (.cohorts[0].completed_slices | length) == 32 and
   .cohorts[0].completed_slices[0] == {
     id: "player-events",
     classes: 9,
@@ -511,9 +511,22 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "tools/jvm-gate/src/main.rs"
     ]
   } and
+  .cohorts[0].completed_slices[31] == {
+    id: "base-audio-track-contracts",
+    classes: 1,
+    fields: 2,
+    methods: 25,
+    symbols: 28,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
   ([.cohorts[0].completed_slices[].symbols] | add) == .cohorts[0].classified_symbols and
   (.cohorts[0].classified_symbols + .cohorts[0].remaining_symbols) == .cohorts[0].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 422 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 450 and
   all($classifications.symbols[] | select(.assessment == "CLASSIFIED");
     . as $symbol |
     (($symbol.binary_name | contains(".player.event.")) or
@@ -536,6 +549,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.track.AudioTrackEndReason",
         "com.sedmelluq.discord.lavaplayer.track.AudioTrackState",
         "com.sedmelluq.discord.lavaplayer.track.BasicAudioPlaylist",
+        "com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack",
         "com.sedmelluq.discord.lavaplayer.track.DecodedTrackHolder",
         "com.sedmelluq.discord.lavaplayer.track.TrackMarker",
         "com.sedmelluq.discord.lavaplayer.track.TrackMarkerHandler",
@@ -567,7 +581,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
     .classification == "A_EXACT" and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "base-audio-track-contracts" and
+  .phase_entry.next_slice == "primordial-audio-track-executor-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 ' "$PLAN" >/dev/null
@@ -575,7 +589,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '60 reference classes / 458 symbols' \
+  '62 reference classes / 503 symbols' \
   'core-player-track' \
   'Phase 12'; do
   grep --fixed-strings "$required" "$DOCUMENT" >/dev/null
@@ -583,4 +597,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 422 classified core-player-track symbols and 2,340 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 450 classified core-player-track symbols and 2,312 unassessed symbols.\n'

@@ -34,6 +34,7 @@ const MANAGER_HELPER_CLASS: &str = "dev/mantle/internal/NativeDefaultAudioPlayer
 const MANAGER_EXECUTOR_TASK_CLASS: &str = "dev/mantle/internal/NativeTrackExecutorTask";
 const LOCAL_TRACK_EXECUTOR_HELPER_CLASS: &str = "dev/mantle/internal/NativeLocalAudioTrackExecutor";
 const TRACK_MARKER_TRACKER_HELPER_CLASS: &str = "dev/mantle/internal/NativeTrackMarkerTracker";
+const BASE_AUDIO_TRACK_HELPER_CLASS: &str = "dev/mantle/internal/NativeBaseAudioTrack";
 const MANAGER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayerManager";
 const DEFAULT_PLAYER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayer";
 const AUDIO_PLAYER_MANAGER_CLASS: &str =
@@ -71,6 +72,7 @@ const TRACK_STATE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/AudioTra
 const TRACK_END_REASON_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/AudioTrackEndReason";
 const TRACK_MARKER_TRACKER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/TrackMarkerTracker";
+const BASE_AUDIO_TRACK_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/BaseAudioTrack";
 const FRIENDLY_EXCEPTION_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/FriendlyException";
 const FRIENDLY_EXCEPTION_SEVERITY_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity";
@@ -82,6 +84,8 @@ const MUTABLE_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame";
 const LOCAL_TRACK_EXECUTOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor";
+const PRIMORDIAL_TRACK_EXECUTOR_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/track/playback/PrimordialAudioTrackExecutor";
 const LOCAL_TRACK_READ_EXECUTOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor$ReadExecutor";
 const LOCAL_TRACK_SEEK_EXECUTOR_CLASS: &str =
@@ -127,6 +131,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/track/AudioPlaylist",
     BASIC_PLAYLIST_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/AudioTrack",
+    BASE_AUDIO_TRACK_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/InternalAudioTrack",
     "com/sedmelluq/discord/lavaplayer/track/AudioTrackEndReason",
     "com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo",
@@ -143,6 +148,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     AUDIO_FRAME_PROVIDER_TOOLS_CLASS,
     AUDIO_PROCESSING_CONTEXT_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor",
+    PRIMORDIAL_TRACK_EXECUTOR_CLASS,
     AUDIO_FRAME_CONSUMER_CLASS,
     AUDIO_FRAME_BUFFER_CLASS,
     AUDIO_FRAME_BUFFER_FACTORY_CLASS,
@@ -289,6 +295,7 @@ fn internal_classes(expected_abi: u8) -> Result<Vec<ClassFile<'static>>> {
         native_track_executor_task_class()?,
         native_local_audio_track_executor_class()?,
         native_track_marker_tracker_class()?,
+        native_base_audio_track_class()?,
     ])
 }
 
@@ -458,6 +465,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             PLAYER_LIFECYCLE_MANAGER_CLASS
                 | FUNCTIONAL_RESULT_HANDLER_CLASS
                 | TRACK_MARKER_TRACKER_CLASS
+                | BASE_AUDIO_TRACK_CLASS
         ) || field
             .access_flags
             .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
@@ -543,6 +551,12 @@ fn replacement_body(
     }
     if class_name == TRACK_MARKER_TRACKER_CLASS {
         return track_marker_tracker_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == BASE_AUDIO_TRACK_CLASS {
+        return base_audio_track_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == PRIMORDIAL_TRACK_EXECUTOR_CLASS {
+        return primordial_track_executor_replacement(pool, name, descriptor, required_locals);
     }
     if track_enum_constants(class_name).is_some() {
         return track_enum_replacement(pool, class_name, name, descriptor, required_locals);
@@ -1066,6 +1080,551 @@ fn local_audio_track_executor_replacement(
         }
     };
     local_audio_track_executor_delegate(pool, name, descriptor, loads, result, required_locals)
+}
+
+fn base_audio_track_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V") => {
+            base_audio_track_constructor(pool)
+        }
+        (
+            "assignExecutor",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;Z)V",
+        ) => base_audio_track_assign_executor(pool),
+        (
+            "getActiveExecutor",
+            "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;",
+        ) => base_audio_track_get_active_executor(pool),
+        ("stop", "()V") => base_audio_track_stop(pool),
+        ("getIdentifier", "()Ljava/lang/String;") => base_audio_track_get_identifier(pool),
+        ("isSeekable", "()Z") => base_audio_track_is_seekable(pool),
+        ("getInfo", "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;") => object_getter(
+            pool,
+            BASE_AUDIO_TRACK_CLASS,
+            "trackInfo",
+            "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+        ),
+        ("getDuration", "()J") => base_audio_track_get_duration(pool),
+        ("makeClone", "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;") => {
+            base_audio_track_make_clone(pool)
+        }
+        ("getSourceManager", "()Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;")
+        | (
+            "createLocalExecutor",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;",
+        ) => null_return(pool, required_locals),
+        ("setUserData", "(Ljava/lang/Object;)V") => object_setter(
+            pool,
+            BASE_AUDIO_TRACK_CLASS,
+            "userData",
+            "Ljava/lang/Object;",
+        ),
+        ("getUserData", "()Ljava/lang/Object;") => object_getter(
+            pool,
+            BASE_AUDIO_TRACK_CLASS,
+            "userData",
+            "Ljava/lang/Object;",
+        ),
+        ("getUserData", "(Ljava/lang/Class;)Ljava/lang/Object;") => {
+            base_audio_track_get_typed_user_data(pool)
+        }
+        ("makeShallowClone", "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;") => {
+            unsupported_without_message(pool, required_locals)
+        }
+        _ => base_audio_track_executor_delegate(pool, name, descriptor, required_locals),
+    }
+}
+
+fn base_audio_track_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(BASE_AUDIO_TRACK_CLASS)?;
+    let initial = pool.add_field_ref(
+        owner,
+        "initialExecutor",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/PrimordialAudioTrackExecutor;",
+    )?;
+    let assigned = pool.add_field_ref(
+        owner,
+        "executorAssigned",
+        "Ljava/util/concurrent/atomic/AtomicBoolean;",
+    )?;
+    let active = pool.add_field_ref(
+        owner,
+        "activeExecutor",
+        "Ljava/util/concurrent/atomic/AtomicReference;",
+    )?;
+    let info = pool.add_field_ref(
+        owner,
+        "trackInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let duration = pool.add_field_ref(
+        owner,
+        "accurateDuration",
+        "Ljava/util/concurrent/atomic/AtomicLong;",
+    )?;
+    let primordial = pool.add_class(PRIMORDIAL_TRACK_EXECUTOR_CLASS)?;
+    let primordial_init = pool.add_method_ref(
+        primordial,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V",
+    )?;
+    let atomic_boolean = pool.add_class("java/util/concurrent/atomic/AtomicBoolean")?;
+    let boolean_init = pool.add_method_ref(atomic_boolean, "<init>", "()V")?;
+    let atomic_reference = pool.add_class("java/util/concurrent/atomic/AtomicReference")?;
+    let reference_init = pool.add_method_ref(atomic_reference, "<init>", "()V")?;
+    let atomic_long = pool.add_class("java/util/concurrent/atomic/AtomicLong")?;
+    let long_init = pool.add_method_ref(atomic_long, "<init>", "()V")?;
+    code(
+        pool,
+        4,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::New(primordial),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(primordial_init),
+            Instruction::Putfield(initial),
+            Instruction::Aload_0,
+            Instruction::New(atomic_boolean),
+            Instruction::Dup,
+            Instruction::Invokespecial(boolean_init),
+            Instruction::Putfield(assigned),
+            Instruction::Aload_0,
+            Instruction::New(atomic_reference),
+            Instruction::Dup,
+            Instruction::Invokespecial(reference_init),
+            Instruction::Putfield(active),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(info),
+            Instruction::Aload_0,
+            Instruction::New(atomic_long),
+            Instruction::Dup,
+            Instruction::Invokespecial(long_init),
+            Instruction::Putfield(duration),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn base_audio_track_assign_executor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BASE_AUDIO_TRACK_CLASS)?;
+    let initial = pool.add_field_ref(
+        owner,
+        "initialExecutor",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/PrimordialAudioTrackExecutor;",
+    )?;
+    let assigned = pool.add_field_ref(
+        owner,
+        "executorAssigned",
+        "Ljava/util/concurrent/atomic/AtomicBoolean;",
+    )?;
+    let active = pool.add_field_ref(
+        owner,
+        "activeExecutor",
+        "Ljava/util/concurrent/atomic/AtomicReference;",
+    )?;
+    let helper = pool.add_class(BASE_AUDIO_TRACK_HELPER_CLASS)?;
+    let assign = pool.add_method_ref(
+        helper,
+        "assign",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/PrimordialAudioTrackExecutor;Ljava/util/concurrent/atomic/AtomicBoolean;Ljava/util/concurrent/atomic/AtomicReference;Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;Z)V",
+    )?;
+    code(
+        pool,
+        5,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(initial),
+            Instruction::Aload_0,
+            Instruction::Getfield(assigned),
+            Instruction::Aload_0,
+            Instruction::Getfield(active),
+            Instruction::Aload_1,
+            Instruction::Iload_2,
+            Instruction::Invokestatic(assign),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn base_audio_track_get_active_executor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BASE_AUDIO_TRACK_CLASS)?;
+    let initial = pool.add_field_ref(
+        owner,
+        "initialExecutor",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/PrimordialAudioTrackExecutor;",
+    )?;
+    let active = pool.add_field_ref(
+        owner,
+        "activeExecutor",
+        "Ljava/util/concurrent/atomic/AtomicReference;",
+    )?;
+    let helper = pool.add_class(BASE_AUDIO_TRACK_HELPER_CLASS)?;
+    let get = pool.add_method_ref(
+        helper,
+        "active",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/PrimordialAudioTrackExecutor;Ljava/util/concurrent/atomic/AtomicReference;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;",
+    )?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(initial),
+            Instruction::Aload_0,
+            Instruction::Getfield(active),
+            Instruction::Invokestatic(get),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn base_audio_track_stop(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BASE_AUDIO_TRACK_CLASS)?;
+    let initial = pool.add_field_ref(
+        owner,
+        "initialExecutor",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/PrimordialAudioTrackExecutor;",
+    )?;
+    let active = pool.add_field_ref(
+        owner,
+        "activeExecutor",
+        "Ljava/util/concurrent/atomic/AtomicReference;",
+    )?;
+    let helper = pool.add_class(BASE_AUDIO_TRACK_HELPER_CLASS)?;
+    let stop = pool.add_method_ref(
+        helper,
+        "stopActive",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/PrimordialAudioTrackExecutor;Ljava/util/concurrent/atomic/AtomicReference;)V",
+    )?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(initial),
+            Instruction::Aload_0,
+            Instruction::Getfield(active),
+            Instruction::Invokestatic(stop),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn base_audio_track_get_identifier(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BASE_AUDIO_TRACK_CLASS)?;
+    let info = pool.add_field_ref(
+        owner,
+        "trackInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let info_type = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo")?;
+    let identifier = pool.add_field_ref(info_type, "identifier", "Ljava/lang/String;")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(info),
+            Instruction::Getfield(identifier),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn base_audio_track_is_seekable(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BASE_AUDIO_TRACK_CLASS)?;
+    let info = pool.add_field_ref(
+        owner,
+        "trackInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let helper = pool.add_class(BASE_AUDIO_TRACK_HELPER_CLASS)?;
+    let seekable = pool.add_method_ref(
+        helper,
+        "isSeekable",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)Z",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(info),
+            Instruction::Invokestatic(seekable),
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+fn base_audio_track_get_duration(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BASE_AUDIO_TRACK_CLASS)?;
+    let duration = pool.add_field_ref(
+        owner,
+        "accurateDuration",
+        "Ljava/util/concurrent/atomic/AtomicLong;",
+    )?;
+    let info = pool.add_field_ref(
+        owner,
+        "trackInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let helper = pool.add_class(BASE_AUDIO_TRACK_HELPER_CLASS)?;
+    let get = pool.add_method_ref(
+        helper,
+        "duration",
+        "(Ljava/util/concurrent/atomic/AtomicLong;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)J",
+    )?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(duration),
+            Instruction::Aload_0,
+            Instruction::Getfield(info),
+            Instruction::Invokestatic(get),
+            Instruction::Lreturn,
+        ],
+    )
+}
+
+fn base_audio_track_make_clone(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BASE_AUDIO_TRACK_CLASS)?;
+    let shallow = pool.add_method_ref(
+        owner,
+        "makeShallowClone",
+        "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+    )?;
+    let user_data = pool.add_field_ref(owner, "userData", "Ljava/lang/Object;")?;
+    let helper = pool.add_class(BASE_AUDIO_TRACK_HELPER_CLASS)?;
+    let clone = pool.add_method_ref(
+        helper,
+        "finishClone",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Ljava/lang/Object;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+    )?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(shallow),
+            Instruction::Aload_0,
+            Instruction::Getfield(user_data),
+            Instruction::Invokestatic(clone),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn base_audio_track_get_typed_user_data(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BASE_AUDIO_TRACK_CLASS)?;
+    let user_data = pool.add_field_ref(owner, "userData", "Ljava/lang/Object;")?;
+    let helper = pool.add_class(BASE_AUDIO_TRACK_HELPER_CLASS)?;
+    let typed = pool.add_method_ref(
+        helper,
+        "typedUserData",
+        "(Ljava/lang/Object;Ljava/lang/Class;)Ljava/lang/Object;",
+    )?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(user_data),
+            Instruction::Aload_1,
+            Instruction::Invokestatic(typed),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn base_audio_track_executor_delegate(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    let (loads, result, count) = match (name, descriptor) {
+        ("getState", "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackState;")
+        | ("provide", "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;") => {
+            (vec![], Instruction::Areturn, 1)
+        }
+        ("getPosition", "()J") => (vec![], Instruction::Lreturn, 1),
+        ("setPosition", "(J)V") => (vec![Instruction::Lload_1], Instruction::Return, 3),
+        (
+            "setMarker" | "addMarker" | "removeMarker",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V",
+        ) => (vec![Instruction::Aload_1], Instruction::Return, 2),
+        (
+            "provide",
+            "(JLjava/util/concurrent/TimeUnit;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;",
+        ) => (
+            vec![Instruction::Lload_1, Instruction::Aload_3],
+            Instruction::Areturn,
+            4,
+        ),
+        ("provide", "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;)Z") => {
+            (vec![Instruction::Aload_1], Instruction::Ireturn, 2)
+        }
+        (
+            "provide",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;JLjava/util/concurrent/TimeUnit;)Z",
+        ) => (
+            vec![
+                Instruction::Aload_1,
+                Instruction::Lload_2,
+                Instruction::Aload(4),
+            ],
+            Instruction::Ireturn,
+            5,
+        ),
+        _ => {
+            return unsupported_body(
+                pool,
+                &format!("Phase 13 does not implement {BASE_AUDIO_TRACK_CLASS}.{name}{descriptor}"),
+                required_locals,
+            );
+        }
+    };
+    let owner = pool.add_class(BASE_AUDIO_TRACK_CLASS)?;
+    let active = pool.add_method_ref(
+        owner,
+        "getActiveExecutor",
+        "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;",
+    )?;
+    let executor =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor")?;
+    let method = pool.add_interface_method_ref(executor, name, descriptor)?;
+    let mut instructions = vec![Instruction::Aload_0, Instruction::Invokevirtual(active)];
+    instructions.extend(loads);
+    instructions.extend([Instruction::Invokeinterface(method, count), result]);
+    code(pool, 5, required_locals, instructions)
+}
+
+fn primordial_track_executor_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    if name == "<init>"
+        && descriptor == "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V"
+    {
+        return primordial_track_executor_constructor(pool);
+    }
+    let (loads, result) = match (name, descriptor) {
+        (
+            "getAudioBuffer",
+            "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBuffer;",
+        )
+        | ("getState", "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackState;")
+        | ("provide", "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;") => {
+            (vec![], Instruction::Areturn)
+        }
+        ("stop", "()V") => (vec![], Instruction::Return),
+        ("getPosition", "()J") => (vec![], Instruction::Lreturn),
+        ("failedBeforeLoad", "()Z") => (vec![], Instruction::Ireturn),
+        ("setPosition", "(J)V") => (vec![Instruction::Lload_1], Instruction::Return),
+        ("execute", "(Lcom/sedmelluq/discord/lavaplayer/track/TrackStateListener;)V")
+        | (
+            "setMarker" | "addMarker" | "removeMarker",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V",
+        )
+        | (
+            "applyStateToExecutor",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;)V",
+        ) => (vec![Instruction::Aload_1], Instruction::Return),
+        (
+            "provide",
+            "(JLjava/util/concurrent/TimeUnit;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;",
+        ) => (
+            vec![Instruction::Lload_1, Instruction::Aload_3],
+            Instruction::Areturn,
+        ),
+        ("provide", "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;)Z") => {
+            (vec![Instruction::Aload_1], Instruction::Ireturn)
+        }
+        (
+            "provide",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;JLjava/util/concurrent/TimeUnit;)Z",
+        ) => (
+            vec![
+                Instruction::Aload_1,
+                Instruction::Lload_2,
+                Instruction::Aload(4),
+            ],
+            Instruction::Ireturn,
+        ),
+        _ => {
+            return unsupported_body(
+                pool,
+                &format!(
+                    "Phase 13 does not implement {PRIMORDIAL_TRACK_EXECUTOR_CLASS}.{name}{descriptor}"
+                ),
+                required_locals,
+            );
+        }
+    };
+    let owner = pool.add_class(PRIMORDIAL_TRACK_EXECUTOR_CLASS)?;
+    let state = pool.add_field_ref(
+        owner,
+        "mantleState",
+        "Ldev/mantle/internal/NativeBaseAudioTrack;",
+    )?;
+    let helper = pool.add_class(BASE_AUDIO_TRACK_HELPER_CLASS)?;
+    let method = pool.add_method_ref(helper, name, descriptor)?;
+    let mut instructions = vec![Instruction::Aload_0, Instruction::Getfield(state)];
+    instructions.extend(loads);
+    instructions.extend([Instruction::Invokevirtual(method), result]);
+    code(pool, 5, required_locals, instructions)
+}
+
+fn primordial_track_executor_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(PRIMORDIAL_TRACK_EXECUTOR_CLASS)?;
+    let state = pool.add_field_ref(
+        owner,
+        "mantleState",
+        "Ldev/mantle/internal/NativeBaseAudioTrack;",
+    )?;
+    let helper = pool.add_class(BASE_AUDIO_TRACK_HELPER_CLASS)?;
+    let helper_init = pool.add_method_ref(helper, "<init>", "()V")?;
+    code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::New(helper),
+            Instruction::Dup,
+            Instruction::Invokespecial(helper_init),
+            Instruction::Putfield(state),
+            Instruction::Return,
+        ],
+    )
 }
 
 fn track_marker_tracker_replacement(
@@ -1907,6 +2466,14 @@ fn add_reference_implementation_state(
             FieldAccessFlags::PRIVATE | FieldAccessFlags::FINAL,
             "mantleState",
             "Ldev/mantle/internal/NativeLocalAudioTrackExecutor;",
+        )?;
+    }
+    if class_name == PRIMORDIAL_TRACK_EXECUTOR_CLASS {
+        add_field(
+            class,
+            FieldAccessFlags::PRIVATE | FieldAccessFlags::FINAL,
+            "mantleState",
+            "Ldev/mantle/internal/NativeBaseAudioTrack;",
         )?;
     }
     if class_name == BASIC_PLAYLIST_CLASS {
@@ -3121,6 +3688,577 @@ fn native_local_audio_track_executor_class() -> Result<ClassFile<'static>> {
         add_method(&mut class, flags, name, descriptor, Some(body))?;
     }
     Ok(class)
+}
+
+#[allow(clippy::too_many_lines)]
+fn native_base_audio_track_class() -> Result<ClassFile<'static>> {
+    let mut class = new_class(
+        BASE_AUDIO_TRACK_HELPER_CLASS,
+        "java/lang/Object",
+        ClassAccessFlags::PUBLIC | ClassAccessFlags::FINAL | ClassAccessFlags::SUPER,
+        &["com/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor"],
+    )?;
+    add_field(
+        &mut class,
+        FieldAccessFlags::PRIVATE | FieldAccessFlags::FINAL,
+        "markerTracker",
+        "Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerTracker;",
+    )?;
+    add_field(
+        &mut class,
+        FieldAccessFlags::PRIVATE | FieldAccessFlags::VOLATILE,
+        "position",
+        "J",
+    )?;
+    let methods: &[(&str, &str, MethodEmitter)] = &[
+        ("<init>", "()V", base_helper_constructor),
+        (
+            "getAudioBuffer",
+            "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBuffer;",
+            base_helper_get_audio_buffer,
+        ),
+        (
+            "execute",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/TrackStateListener;)V",
+            base_helper_execute,
+        ),
+        ("stop", "()V", base_helper_stop),
+        ("getPosition", "()J", base_helper_get_position),
+        ("setPosition", "(J)V", base_helper_set_position),
+        (
+            "getState",
+            "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackState;",
+            base_helper_get_state,
+        ),
+        (
+            "setMarker",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V",
+            base_helper_set_marker,
+        ),
+        (
+            "addMarker",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V",
+            base_helper_add_marker,
+        ),
+        (
+            "removeMarker",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V",
+            base_helper_remove_marker,
+        ),
+        ("failedBeforeLoad", "()Z", base_helper_failed_before_load),
+        (
+            "provide",
+            "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;",
+            base_helper_provide,
+        ),
+        (
+            "provide",
+            "(JLjava/util/concurrent/TimeUnit;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;",
+            base_helper_provide_timed,
+        ),
+        (
+            "provide",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;)Z",
+            base_helper_provide_mutable,
+        ),
+        (
+            "provide",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;JLjava/util/concurrent/TimeUnit;)Z",
+            base_helper_provide_mutable_timed,
+        ),
+        (
+            "applyStateToExecutor",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;)V",
+            base_helper_apply_state,
+        ),
+    ];
+    for (name, descriptor, body) in methods {
+        let body = body(&mut class.constant_pool)?;
+        add_method(
+            &mut class,
+            MethodAccessFlags::PUBLIC,
+            name,
+            descriptor,
+            Some(body),
+        )?;
+    }
+    let static_methods: &[(&str, &str, MethodEmitter)] = &[
+        (
+            "assign",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/PrimordialAudioTrackExecutor;Ljava/util/concurrent/atomic/AtomicBoolean;Ljava/util/concurrent/atomic/AtomicReference;Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;Z)V",
+            base_helper_assign,
+        ),
+        (
+            "active",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/PrimordialAudioTrackExecutor;Ljava/util/concurrent/atomic/AtomicReference;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;",
+            base_helper_active,
+        ),
+        (
+            "stopActive",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/PrimordialAudioTrackExecutor;Ljava/util/concurrent/atomic/AtomicReference;)V",
+            base_helper_stop_active,
+        ),
+        (
+            "isSeekable",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)Z",
+            base_helper_is_seekable,
+        ),
+        (
+            "duration",
+            "(Ljava/util/concurrent/atomic/AtomicLong;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)J",
+            base_helper_duration,
+        ),
+        (
+            "finishClone",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Ljava/lang/Object;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+            base_helper_finish_clone,
+        ),
+        (
+            "typedUserData",
+            "(Ljava/lang/Object;Ljava/lang/Class;)Ljava/lang/Object;",
+            base_helper_typed_user_data,
+        ),
+    ];
+    for (name, descriptor, body) in static_methods {
+        let body = body(&mut class.constant_pool)?;
+        add_method(
+            &mut class,
+            MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+            name,
+            descriptor,
+            Some(body),
+        )?;
+    }
+    Ok(class)
+}
+
+fn base_helper_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(BASE_AUDIO_TRACK_HELPER_CLASS)?;
+    let markers = pool.add_field_ref(
+        owner,
+        "markerTracker",
+        "Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerTracker;",
+    )?;
+    let tracker = pool.add_class(TRACK_MARKER_TRACKER_CLASS)?;
+    let tracker_init = pool.add_method_ref(tracker, "<init>", "()V")?;
+    code(
+        pool,
+        3,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::New(tracker),
+            Instruction::Dup,
+            Instruction::Invokespecial(tracker_init),
+            Instruction::Putfield(markers),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn base_helper_get_audio_buffer(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    null_return(pool, 1)
+}
+
+fn base_helper_execute(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    unsupported_without_message(pool, 2)
+}
+
+fn base_helper_stop(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    void_return(pool, 1)
+}
+
+fn base_helper_get_position(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    long_getter(pool, BASE_AUDIO_TRACK_HELPER_CLASS, "position")
+}
+
+fn base_helper_set_position(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BASE_AUDIO_TRACK_HELPER_CLASS)?;
+    let position = pool.add_field_ref(owner, "position", "J")?;
+    let markers = pool.add_field_ref(
+        owner,
+        "markerTracker",
+        "Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerTracker;",
+    )?;
+    let tracker = pool.add_class(TRACK_MARKER_TRACKER_CLASS)?;
+    let check = pool.add_method_ref(tracker, "checkSeekTimecode", "(J)V")?;
+    code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Lload_1,
+            Instruction::Putfield(position),
+            Instruction::Aload_0,
+            Instruction::Getfield(markers),
+            Instruction::Lload_1,
+            Instruction::Invokevirtual(check),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn base_helper_get_state(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let state = pool.add_class(TRACK_STATE_CLASS)?;
+    let inactive = pool.add_field_ref(
+        state,
+        "INACTIVE",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackState;",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![Instruction::Getstatic(inactive), Instruction::Areturn],
+    )
+}
+
+fn base_helper_marker_delegate(pool: &mut ConstantPool<'static>, name: &str) -> Result<Attribute> {
+    let owner = pool.add_class(BASE_AUDIO_TRACK_HELPER_CLASS)?;
+    let markers = pool.add_field_ref(
+        owner,
+        "markerTracker",
+        "Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerTracker;",
+    )?;
+    let tracker = pool.add_class(TRACK_MARKER_TRACKER_CLASS)?;
+    let descriptor = "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V";
+    let method = pool.add_method_ref(tracker, name, descriptor)?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(markers),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(method),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn base_helper_marker_with_position(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+) -> Result<Attribute> {
+    let owner = pool.add_class(BASE_AUDIO_TRACK_HELPER_CLASS)?;
+    let markers = pool.add_field_ref(
+        owner,
+        "markerTracker",
+        "Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerTracker;",
+    )?;
+    let position = pool.add_field_ref(owner, "position", "J")?;
+    let tracker = pool.add_class(TRACK_MARKER_TRACKER_CLASS)?;
+    let method = pool.add_method_ref(
+        tracker,
+        name,
+        "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;J)V",
+    )?;
+    code(
+        pool,
+        4,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(markers),
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(position),
+            Instruction::Invokevirtual(method),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn base_helper_set_marker(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    base_helper_marker_with_position(pool, "set")
+}
+
+fn base_helper_add_marker(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    base_helper_marker_with_position(pool, "add")
+}
+
+fn base_helper_remove_marker(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    base_helper_marker_delegate(pool, "remove")
+}
+
+fn base_helper_failed_before_load(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    boolean_return(pool, false, 1)
+}
+
+fn base_helper_provide(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    null_return(pool, 1)
+}
+
+fn base_helper_provide_timed(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    null_return(pool, 4)
+}
+
+fn base_helper_provide_mutable(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    boolean_return(pool, false, 2)
+}
+
+fn base_helper_provide_mutable_timed(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    boolean_return(pool, false, 5)
+}
+
+fn base_helper_apply_state(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BASE_AUDIO_TRACK_HELPER_CLASS)?;
+    let position = pool.add_field_ref(owner, "position", "J")?;
+    let markers = pool.add_field_ref(
+        owner,
+        "markerTracker",
+        "Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerTracker;",
+    )?;
+    let executor =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor")?;
+    let set_position = pool.add_interface_method_ref(executor, "setPosition", "(J)V")?;
+    let add_marker = pool.add_interface_method_ref(
+        executor,
+        "addMarker",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V",
+    )?;
+    let tracker = pool.add_class(TRACK_MARKER_TRACKER_CLASS)?;
+    let get_markers = pool.add_method_ref(tracker, "getMarkers", "()Ljava/util/List;")?;
+    let clear = pool.add_method_ref(tracker, "clear", "()V")?;
+    let list = pool.add_class("java/util/List")?;
+    let to_array = pool.add_interface_method_ref(list, "toArray", "()[Ljava/lang/Object;")?;
+    let marker = pool.add_class("com/sedmelluq/discord/lavaplayer/track/TrackMarker")?;
+    code(
+        pool,
+        4,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(position),
+            Instruction::Lconst_0,
+            Instruction::Lcmp,
+            Instruction::Ifeq(9),
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(position),
+            Instruction::Invokeinterface(set_position, 3),
+            Instruction::Aload_0,
+            Instruction::Getfield(markers),
+            Instruction::Invokevirtual(get_markers),
+            Instruction::Invokeinterface(to_array, 1),
+            Instruction::Astore_2,
+            Instruction::Iconst_0,
+            Instruction::Istore_3,
+            Instruction::Iload_3,
+            Instruction::Aload_2,
+            Instruction::Arraylength,
+            Instruction::If_icmpge(28),
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Iload_3,
+            Instruction::Aaload,
+            Instruction::Checkcast(marker),
+            Instruction::Invokeinterface(add_marker, 2),
+            Instruction::Iinc(3, 1),
+            Instruction::Goto(16),
+            Instruction::Aload_0,
+            Instruction::Getfield(markers),
+            Instruction::Invokevirtual(clear),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn base_helper_assign(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let atomic_boolean = pool.add_class("java/util/concurrent/atomic/AtomicBoolean")?;
+    let compare = pool.add_method_ref(atomic_boolean, "compareAndSet", "(ZZ)Z")?;
+    let atomic_reference = pool.add_class("java/util/concurrent/atomic/AtomicReference")?;
+    let set = pool.add_method_ref(atomic_reference, "set", "(Ljava/lang/Object;)V")?;
+    let helper = pool.add_class(PRIMORDIAL_TRACK_EXECUTOR_CLASS)?;
+    let apply = pool.add_method_ref(
+        helper,
+        "applyStateToExecutor",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;)V",
+    )?;
+    let exception = pool.add_class("java/lang/IllegalStateException")?;
+    let init = pool.add_method_ref(exception, "<init>", "(Ljava/lang/String;)V")?;
+    let message =
+        pool.add_string("Cannot play the same instance of a track twice, use track.makeClone().")?;
+    code(
+        pool,
+        3,
+        5,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Iconst_0,
+            Instruction::Iconst_1,
+            Instruction::Invokevirtual(compare),
+            Instruction::Ifne(10),
+            Instruction::New(exception),
+            Instruction::Dup,
+            Instruction::Ldc_w(message),
+            Instruction::Invokespecial(init),
+            Instruction::Athrow,
+            Instruction::Iload(4),
+            Instruction::Ifeq(15),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(apply),
+            Instruction::Aload_2,
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(set),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn base_helper_active(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let atomic = pool.add_class("java/util/concurrent/atomic/AtomicReference")?;
+    let get = pool.add_method_ref(atomic, "get", "()Ljava/lang/Object;")?;
+    let executor =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor")?;
+    code(
+        pool,
+        1,
+        3,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(get),
+            Instruction::Checkcast(executor),
+            Instruction::Astore_2,
+            Instruction::Aload_2,
+            Instruction::Ifnull(8),
+            Instruction::Aload_2,
+            Instruction::Areturn,
+            Instruction::Aload_0,
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn base_helper_stop_active(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let atomic = pool.add_class("java/util/concurrent/atomic/AtomicReference")?;
+    let swap = pool.add_method_ref(
+        atomic,
+        "getAndSet",
+        "(Ljava/lang/Object;)Ljava/lang/Object;",
+    )?;
+    let executor =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor")?;
+    let position = pool.add_interface_method_ref(executor, "getPosition", "()J")?;
+    let stop = pool.add_interface_method_ref(executor, "stop", "()V")?;
+    let helper = pool.add_class(PRIMORDIAL_TRACK_EXECUTOR_CLASS)?;
+    let set_position = pool.add_method_ref(helper, "setPosition", "(J)V")?;
+    code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Aconst_null,
+            Instruction::Invokevirtual(swap),
+            Instruction::Checkcast(executor),
+            Instruction::Astore_2,
+            Instruction::Aload_2,
+            Instruction::Ifnonnull(8),
+            Instruction::Return,
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(position, 1),
+            Instruction::Invokevirtual(set_position),
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(stop, 1),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn base_helper_is_seekable(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let info = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo")?;
+    let stream = pool.add_field_ref(info, "isStream", "Z")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(stream),
+            Instruction::Ifne(5),
+            Instruction::Iconst_1,
+            Instruction::Ireturn,
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+fn base_helper_duration(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let atomic = pool.add_class("java/util/concurrent/atomic/AtomicLong")?;
+    let get = pool.add_method_ref(atomic, "get", "()J")?;
+    let info = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo")?;
+    let length = pool.add_field_ref(info, "length", "J")?;
+    code(
+        pool,
+        4,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(get),
+            Instruction::Lstore_2,
+            Instruction::Lload_2,
+            Instruction::Lconst_0,
+            Instruction::Lcmp,
+            Instruction::Ifne(10),
+            Instruction::Aload_1,
+            Instruction::Getfield(length),
+            Instruction::Lreturn,
+            Instruction::Lload_2,
+            Instruction::Lreturn,
+        ],
+    )
+}
+
+fn base_helper_finish_clone(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let track = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrack")?;
+    let set = pool.add_interface_method_ref(track, "setUserData", "(Ljava/lang/Object;)V")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(set, 2),
+            Instruction::Aload_0,
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn base_helper_typed_user_data(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let get_class = pool.add_method_ref(object, "getClass", "()Ljava/lang/Class;")?;
+    let class = pool.add_class("java/lang/Class")?;
+    let assignable = pool.add_method_ref(class, "isAssignableFrom", "(Ljava/lang/Class;)Z")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Ifnull(9),
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(get_class),
+            Instruction::Invokevirtual(assignable),
+            Instruction::Ifeq(9),
+            Instruction::Aload_0,
+            Instruction::Areturn,
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+        ],
+    )
 }
 
 fn native_track_marker_tracker_class() -> Result<ClassFile<'static>> {

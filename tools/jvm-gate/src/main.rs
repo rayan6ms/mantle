@@ -87,6 +87,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-local-audio-track-executor-consumer" => Some(LOCAL_AUDIO_TRACK_EXECUTOR_CONSUMER),
         "write-track-marker-tracker-consumer" => Some(TRACK_MARKER_TRACKER_CONSUMER),
+        "write-base-audio-track-consumer" => Some(BASE_AUDIO_TRACK_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -4682,6 +4683,455 @@ public final class GateLocalAudioTrackExecutor {
     if (type == short.class) return (short) 0;
     if (type == int.class) return 0;
     if (type == long.class) return 0L;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const BASE_AUDIO_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackState;
+import com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.TrackMarker;
+import com.sedmelluq.discord.lavaplayer.track.TrackMarkerHandler.MarkerState;
+import com.sedmelluq.discord.lavaplayer.track.TrackStateListener;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioTrackExecutor;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.PrimordialAudioTrackExecutor;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+
+public final class GateBaseAudioTrack {
+  public static void main(String[] args) throws Exception {
+    constructorAndMetadata();
+    primordialState();
+    assignmentAndForwarding();
+    stopAndFailureEdges();
+    durationAndUserData();
+    cloningAndDefaults();
+    concurrentAssignment();
+    reflection();
+    System.out.println(
+        "constructor=identity,null,primordial;metadata=identifier,seekable,duration;"
+        + "primordial=position,markers,empty-provider;assignment=once,apply,skip,null,poison;"
+        + "forwarding=state,position,markers,frames,exceptions;stop=handoff,failure-order;"
+        + "userdata=volatile,typed,null-class;clone=shallow,user-data,defaults;"
+        + "concurrency=single-winner;reflection=abstract,6-fields,1-constructor,23-public-methods");
+  }
+
+  private static void constructorAndMetadata() {
+    AudioTrackInfo info = info(false, 123L, "identifier");
+    TestTrack track = new TestTrack(info);
+    check(track.getInfo() == info && track.exposedInfo() == info, "track info identity");
+    check(track.getIdentifier() == info.identifier && track.isSeekable(), "metadata forwarding");
+    check(track.getDuration() == 123L && track.exposedDuration() == 0L, "initial duration");
+    check(track.getSourceManager() == null && track.createLocalExecutor(null) == null,
+        "default factories");
+    AudioTrackExecutor initial = track.getActiveExecutor();
+    check(initial instanceof PrimordialAudioTrackExecutor
+        && initial == track.getActiveExecutor() && initial.getState() == AudioTrackState.INACTIVE,
+        "primordial executor identity");
+
+    TestTrack stream = new TestTrack(info(true, Long.MAX_VALUE, "stream"));
+    check(!stream.isSeekable() && stream.getDuration() == Long.MAX_VALUE, "stream metadata");
+    TestTrack nullable = new TestTrack(null);
+    check(nullable.getInfo() == null, "null info accepted");
+    try {
+      nullable.getIdentifier();
+      throw new AssertionError("null identifier did not fail");
+    } catch (NullPointerException expected) { }
+  }
+
+  private static void primordialState() throws Exception {
+    TestTrack track = new TestTrack(info(false, 100, "primordial"));
+    AudioTrackExecutor initial = track.getActiveExecutor();
+    check(initial.getAudioBuffer() == null && !initial.failedBeforeLoad()
+        && initial.provide() == null && initial.provide(3, null) == null,
+        "empty primordial provider");
+    MutableAudioFrame mutable = new MutableAudioFrame();
+    check(!initial.provide(mutable) && !initial.provide(mutable, 4, null),
+        "empty primordial mutable provider");
+    try {
+      initial.execute(null);
+      throw new AssertionError("primordial execute did not fail");
+    } catch (UnsupportedOperationException error) {
+      check(error.getMessage() == null, "primordial execute message");
+    }
+
+    List<String> events = new ArrayList<>();
+    TrackMarker late = marker("late", 5, events);
+    track.setPosition(5);
+    track.addMarker(late);
+    check(events.equals(Arrays.asList("late:LATE")), "primordial late marker");
+    TrackMarker first = marker("first", 20, events);
+    TrackMarker second = marker("second", 30, events);
+    track.addMarker(first);
+    track.addMarker(second);
+    track.removeMarker(first);
+    track.setMarker(marker("third", 40, events));
+    check(events.equals(Arrays.asList("late:LATE", "first:REMOVED", "second:OVERWRITTEN")),
+        "primordial marker states");
+    track.setPosition(40);
+    check(events.get(events.size() - 1).equals("third:BYPASSED") && track.getPosition() == 40,
+        "primordial seek marker");
+  }
+
+  private static void assignmentAndForwarding() throws Exception {
+    TestTrack track = new TestTrack(info(false, 100, "assigned"));
+    List<String> markers = new ArrayList<>();
+    TrackMarker first = marker("first", 60, markers);
+    TrackMarker second = marker("second", 70, markers);
+    track.setPosition(40);
+    track.addMarker(first);
+    track.addMarker(second);
+    ExecutorFixture fixture = new ExecutorFixture();
+    fixture.position = 51;
+    fixture.state = AudioTrackState.PLAYING;
+    fixture.frame = frame(12);
+    fixture.mutableResult = true;
+    fixture.timedMutableResult = false;
+    track.assignExecutor(fixture.executor, true);
+    check(track.getActiveExecutor() == fixture.executor
+        && fixture.calls.equals(Arrays.asList("setPosition:40", "addMarker:first", "addMarker:second")),
+        "primordial state application");
+    fixture.calls.clear();
+    fixture.position = 51;
+    check(track.getState() == AudioTrackState.PLAYING && track.getPosition() == 51,
+        "state and position forwarding");
+    track.setPosition(Long.MIN_VALUE);
+    track.setMarker(first);
+    track.addMarker(second);
+    track.removeMarker(first);
+    check(track.provide() == fixture.frame && track.provide(9, TimeUnit.NANOSECONDS) == fixture.frame,
+        "frame forwarding");
+    MutableAudioFrame mutable = new MutableAudioFrame();
+    check(track.provide(mutable) && !track.provide(mutable, 11, TimeUnit.MICROSECONDS),
+        "mutable forwarding");
+    check(fixture.calls.equals(Arrays.asList("getState", "getPosition", "setPosition:" + Long.MIN_VALUE,
+        "setMarker:first", "addMarker:second", "removeMarker:first", "provide",
+        "provideTimed:9:NANOSECONDS", "provideMutable", "provideMutableTimed:11:MICROSECONDS")),
+        "forwarding order and arguments");
+
+    TimeoutException timeout = new TimeoutException("timeout-sentinel");
+    fixture.failure = timeout;
+    try {
+      track.provide(1, TimeUnit.SECONDS);
+      throw new AssertionError("timed failure swallowed");
+    } catch (TimeoutException error) {
+      check(error == timeout, "timed failure identity");
+    }
+    try {
+      track.assignExecutor(fixture.executor, false);
+      throw new AssertionError("second assignment accepted");
+    } catch (IllegalStateException error) {
+      check(error.getMessage().equals(
+          "Cannot play the same instance of a track twice, use track.makeClone()."),
+          "second assignment message");
+    }
+
+    TestTrack skipped = new TestTrack(info(false, 100, "skip"));
+    skipped.setPosition(55);
+    skipped.addMarker(marker("retained", 90, markers));
+    ExecutorFixture skippedFixture = new ExecutorFixture();
+    skipped.assignExecutor(skippedFixture.executor, false);
+    check(skippedFixture.calls.isEmpty(), "apply false skips primordial state");
+
+    TestTrack nullTrack = new TestTrack(info(false, 100, "null"));
+    nullTrack.assignExecutor(null, false);
+    check(nullTrack.getActiveExecutor() instanceof PrimordialAudioTrackExecutor,
+        "null assignment leaves primordial active");
+    try {
+      nullTrack.assignExecutor(fixture.executor, false);
+      throw new AssertionError("null assignment did not consume instance");
+    } catch (IllegalStateException expected) { }
+
+    TestTrack poisoned = new TestTrack(info(false, 100, "poison"));
+    poisoned.setPosition(1);
+    try {
+      poisoned.assignExecutor(null, true);
+      throw new AssertionError("null state application did not fail");
+    } catch (NullPointerException expected) { }
+    try {
+      poisoned.assignExecutor(fixture.executor, false);
+      throw new AssertionError("failed assignment did not consume instance");
+    } catch (IllegalStateException expected) { }
+  }
+
+  private static void stopAndFailureEdges() {
+    TestTrack track = new TestTrack(info(false, 100, "stop"));
+    ExecutorFixture fixture = new ExecutorFixture();
+    fixture.position = 88;
+    track.assignExecutor(fixture.executor, false);
+    track.stop();
+    check(fixture.stops == 1 && track.getActiveExecutor() instanceof PrimordialAudioTrackExecutor
+        && track.getPosition() == 88, "stop position handoff");
+    track.stop();
+    check(fixture.stops == 1, "repeated stop no-op");
+    try {
+      track.assignExecutor(fixture.executor, false);
+      throw new AssertionError("stop allowed reassignment");
+    } catch (IllegalStateException expected) { }
+
+    RuntimeException positionFailure = new RuntimeException("position-sentinel");
+    TestTrack failing = new TestTrack(info(false, 100, "failing"));
+    ExecutorFixture badPosition = new ExecutorFixture();
+    badPosition.positionFailure = positionFailure;
+    failing.assignExecutor(badPosition.executor, false);
+    try {
+      failing.stop();
+      throw new AssertionError("position failure swallowed");
+    } catch (RuntimeException error) {
+      check(error == positionFailure && badPosition.stops == 0
+          && failing.getActiveExecutor() instanceof PrimordialAudioTrackExecutor,
+          "active cleared before position failure");
+    }
+
+    RuntimeException stopFailure = new RuntimeException("stop-sentinel");
+    TestTrack badStopTrack = new TestTrack(info(false, 100, "bad-stop"));
+    ExecutorFixture badStop = new ExecutorFixture();
+    badStop.position = 77;
+    badStop.stopFailure = stopFailure;
+    badStopTrack.assignExecutor(badStop.executor, false);
+    try {
+      badStopTrack.stop();
+      throw new AssertionError("stop failure swallowed");
+    } catch (RuntimeException error) {
+      check(error == stopFailure && badStopTrack.getPosition() == 77,
+          "position copied before stop failure");
+    }
+  }
+
+  private static void durationAndUserData() {
+    TestTrack track = new TestTrack(info(false, 123, "data"));
+    track.setAccurateDuration(456);
+    check(track.getDuration() == 456, "accurate duration");
+    track.setAccurateDuration(-7);
+    check(track.getDuration() == -7, "negative accurate duration");
+    track.setAccurateDuration(0);
+    check(track.getDuration() == 123, "zero duration fallback");
+    check(track.getUserData() == null && track.getUserData(String.class) == null,
+        "default user data");
+    String data = new String("payload");
+    track.setUserData(data);
+    check(track.getUserData() == data && track.getUserData(String.class) == data
+        && track.getUserData(Object.class) == data && track.getUserData(Integer.class) == null,
+        "typed user data");
+    try {
+      track.getUserData(null);
+      throw new AssertionError("null class with data did not fail");
+    } catch (NullPointerException expected) { }
+    track.setUserData(null);
+    check(track.getUserData(null) == null, "null class short circuit");
+  }
+
+  private static void cloningAndDefaults() {
+    AudioTrackInfo info = info(false, 100, "clone");
+    TestTrack track = new TestTrack(info);
+    Object data = new Object();
+    track.setUserData(data);
+    AudioTrack clone = track.makeClone();
+    check(clone != track && clone.getInfo() == info && clone.getUserData() == data
+        && clone.getState() == AudioTrackState.INACTIVE, "shallow clone and user data");
+    try {
+      new NoCloneTrack(info).makeClone();
+      throw new AssertionError("default shallow clone did not fail");
+    } catch (UnsupportedOperationException error) {
+      check(error.getMessage() == null, "default clone failure message");
+    }
+    try {
+      new NullCloneTrack(info).makeClone();
+      throw new AssertionError("null shallow clone did not fail");
+    } catch (NullPointerException expected) { }
+  }
+
+  private static void concurrentAssignment() throws Exception {
+    TestTrack track = new TestTrack(info(false, 100, "concurrent"));
+    ExecutorFixture fixture = new ExecutorFixture();
+    AtomicInteger successes = new AtomicInteger();
+    AtomicInteger failures = new AtomicInteger();
+    Thread[] threads = new Thread[8];
+    for (int index = 0; index < threads.length; index++) {
+      threads[index] = new Thread(() -> {
+        try {
+          track.assignExecutor(fixture.executor, false);
+          successes.incrementAndGet();
+        } catch (IllegalStateException expected) {
+          failures.incrementAndGet();
+        }
+      });
+      threads[index].start();
+    }
+    for (Thread thread : threads) thread.join();
+    check(successes.get() == 1 && failures.get() == 7
+        && track.getActiveExecutor() == fixture.executor, "single assignment winner");
+  }
+
+  private static void reflection() throws Exception {
+    Class<BaseAudioTrack> type = BaseAudioTrack.class;
+    check(Modifier.isPublic(type.getModifiers()) && Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers()) && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {
+          com.sedmelluq.discord.lavaplayer.track.InternalAudioTrack.class
+        }), "class metadata");
+    Field[] fields = type.getDeclaredFields();
+    check(fields.length == 6, "declared field count");
+    checkField(type, "trackInfo", AudioTrackInfo.class, Modifier.PROTECTED | Modifier.FINAL);
+    checkField(type, "accurateDuration", AtomicLong.class, Modifier.PROTECTED | Modifier.FINAL);
+    checkField(type, "initialExecutor", PrimordialAudioTrackExecutor.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "executorAssigned", java.util.concurrent.atomic.AtomicBoolean.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    Field active = checkField(type, "activeExecutor",
+        java.util.concurrent.atomic.AtomicReference.class, Modifier.PRIVATE | Modifier.FINAL);
+    ParameterizedType activeType = (ParameterizedType) active.getGenericType();
+    check(activeType.getActualTypeArguments()[0] == AudioTrackExecutor.class,
+        "active executor generic type");
+    checkField(type, "userData", Object.class, Modifier.PRIVATE | Modifier.VOLATILE);
+    Constructor<?>[] constructors = type.getDeclaredConstructors();
+    check(constructors.length == 1 && Modifier.isPublic(constructors[0].getModifiers())
+        && Arrays.equals(constructors[0].getParameterTypes(), new Class<?>[] { AudioTrackInfo.class }),
+        "constructor metadata");
+    int publicDeclared = 0;
+    for (Method method : type.getDeclaredMethods()) {
+      if (Modifier.isPublic(method.getModifiers())) publicDeclared++;
+    }
+    check(publicDeclared == 23, "public method count");
+    Method shallow = type.getDeclaredMethod("makeShallowClone");
+    check(Modifier.isProtected(shallow.getModifiers()) && !Modifier.isAbstract(shallow.getModifiers()),
+        "shallow clone metadata");
+    Method typed = type.getDeclaredMethod("getUserData", Class.class);
+    check(typed.getTypeParameters().length == 1
+        && typed.getGenericReturnType() == typed.getTypeParameters()[0], "typed user metadata");
+    check(Arrays.equals(type.getDeclaredMethod("provide", long.class, TimeUnit.class)
+        .getExceptionTypes(), new Class<?>[] { TimeoutException.class, InterruptedException.class }),
+        "timed exception metadata");
+  }
+
+  private static Field checkField(Class<?> type, String name, Class<?> fieldType, int modifiers)
+      throws Exception {
+    Field field = type.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getModifiers() == modifiers,
+        name + " field metadata");
+    return field;
+  }
+
+  private static AudioTrackInfo info(boolean stream, long length, String identifier) {
+    return new AudioTrackInfo(
+        "title", "author", length, identifier, stream, "uri", "art", "isrc");
+  }
+
+  private static TrackMarker marker(String name, long timecode, List<String> events) {
+    return new TrackMarker(timecode, state -> events.add(name + ":" + state.name()));
+  }
+
+  private static AudioFrame frame(long timecode) {
+    return (AudioFrame) Proxy.newProxyInstance(AudioFrame.class.getClassLoader(),
+        new Class<?>[] { AudioFrame.class }, (instance, method, arguments) -> {
+          if (method.getName().equals("getTimecode")) return timecode;
+          return defaultValue(method.getReturnType());
+        });
+  }
+
+  private static class TestTrack extends BaseAudioTrack {
+    TestTrack(AudioTrackInfo info) { super(info); }
+    protected AudioTrack makeShallowClone() { return new TestTrack(trackInfo); }
+    public void process(LocalAudioTrackExecutor executor) { }
+    AudioTrackInfo exposedInfo() { return trackInfo; }
+    long exposedDuration() { return accurateDuration.get(); }
+    void setAccurateDuration(long value) { accurateDuration.set(value); }
+  }
+
+  private static final class NoCloneTrack extends BaseAudioTrack {
+    NoCloneTrack(AudioTrackInfo info) { super(info); }
+    public void process(LocalAudioTrackExecutor executor) { }
+  }
+
+  private static final class NullCloneTrack extends BaseAudioTrack {
+    NullCloneTrack(AudioTrackInfo info) { super(info); }
+    protected AudioTrack makeShallowClone() { return null; }
+    public void process(LocalAudioTrackExecutor executor) { }
+  }
+
+  private static final class ExecutorFixture {
+    final List<String> calls = new ArrayList<>();
+    final AudioTrackExecutor executor;
+    long position;
+    AudioTrackState state = AudioTrackState.INACTIVE;
+    AudioFrame frame;
+    boolean mutableResult;
+    boolean timedMutableResult;
+    int stops;
+    Throwable failure;
+    RuntimeException positionFailure;
+    RuntimeException stopFailure;
+
+    ExecutorFixture() {
+      executor = (AudioTrackExecutor) Proxy.newProxyInstance(
+          AudioTrackExecutor.class.getClassLoader(), new Class<?>[] { AudioTrackExecutor.class },
+          (instance, method, arguments) -> {
+            String name = method.getName();
+            if (name.equals("getState")) { calls.add("getState"); return state; }
+            if (name.equals("getPosition")) {
+              calls.add("getPosition");
+              if (positionFailure != null) throw positionFailure;
+              return position;
+            }
+            if (name.equals("setPosition")) {
+              position = (Long) arguments[0]; calls.add("setPosition:" + position); return null;
+            }
+            if (name.equals("setMarker") || name.equals("addMarker") || name.equals("removeMarker")) {
+              TrackMarker marker = (TrackMarker) arguments[0];
+              String markerName = marker == null ? "null" : marker.timecode == 60 ? "first" : "second";
+              calls.add(name + ":" + markerName); return null;
+            }
+            if (name.equals("stop")) {
+              stops++; if (stopFailure != null) throw stopFailure; return null;
+            }
+            if (name.equals("provide")) {
+              if (failure != null) throw failure;
+              if (arguments == null) { calls.add("provide"); return frame; }
+              if (arguments.length == 1) { calls.add("provideMutable"); return mutableResult; }
+              if (arguments.length == 2) {
+                calls.add("provideTimed:" + arguments[0] + ":" + arguments[1]); return frame;
+              }
+              calls.add("provideMutableTimed:" + arguments[1] + ":" + arguments[2]);
+              return timedMutableResult;
+            }
+            return defaultValue(method.getReturnType());
+          });
+    }
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == long.class) return 0L;
+    if (type == int.class) return 0;
+    if (type == short.class) return (short) 0;
+    if (type == byte.class) return (byte) 0;
     if (type == float.class) return 0.0f;
     if (type == double.class) return 0.0d;
     if (type == char.class) return (char) 0;
