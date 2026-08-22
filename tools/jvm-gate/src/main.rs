@@ -91,6 +91,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-primordial-audio-track-executor-consumer" => {
             Some(PRIMORDIAL_AUDIO_TRACK_EXECUTOR_CONSUMER)
         }
+        "write-delegated-audio-track-consumer" => Some(DELEGATED_AUDIO_TRACK_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -5373,6 +5374,324 @@ public final class GatePrimordialAudioTrackExecutor {
 
   private static TrackMarker marker(String name, long timecode, List<String> events) {
     return new TrackMarker(timecode, state -> events.add(name + ":" + state.name()));
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == long.class) return 0L;
+    if (type == int.class) return 0;
+    if (type == short.class) return (short) 0;
+    if (type == byte.class) return (byte) 0;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const DELEGATED_AUDIO_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.DelegatedAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.InternalAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+
+public final class GateDelegatedAudioTrack {
+  public static void main(String[] args) throws Exception {
+    constructorAndFallback();
+    installationAndForwarding();
+    failuresAndReset();
+    monitorSemantics();
+    reflection();
+    System.out.println(
+        "constructor=identity,null;fallback=duration,accurate,position;"
+        + "delegate=publish,assign-before-process,position,duration,failures,reset;"
+        + "monitor=fallback-blocks,delegate-fast-path,process-synchronized;"
+        + "reflection=abstract,private-field,1-constructor,4-exported-methods,exception");
+  }
+
+  private static void constructorAndFallback() {
+    AudioTrackInfo info = info(123L, "fallback");
+    TestTrack track = new TestTrack(info);
+    check(track.getInfo() == info && track.getDuration() == 123L && track.getPosition() == 0L,
+        "constructor and fallback identity");
+    track.setAccurateDuration(456L);
+    check(track.getDuration() == 456L, "accurate duration fallback");
+    track.setAccurateDuration(0L);
+    track.setPosition(Long.MIN_VALUE);
+    check(track.getPosition() == Long.MIN_VALUE, "primordial position fallback");
+    TestTrack nullInfo = new TestTrack(null);
+    check(nullInfo.getInfo() == null && nullInfo.getPosition() == 0L, "null info construction");
+    try {
+      nullInfo.getDuration();
+      throw new AssertionError("null info duration succeeded");
+    } catch (NullPointerException expected) { }
+  }
+
+  private static void installationAndForwarding() throws Exception {
+    TestTrack track = new TestTrack(info(100L, "delegate"));
+    track.setPosition(42L);
+    DelegateFixture fixture = new DelegateFixture(track, 9L, 700L);
+    track.install(fixture.delegate, null);
+    check(fixture.calls.equals(Arrays.asList(
+        "assign:null:false", "published:9", "process:null")),
+        "delegate publication and call order");
+    check(track.getPosition() == 9L && track.getDuration() == 700L,
+        "delegate getters");
+    track.setPosition(Long.MAX_VALUE);
+    check(fixture.position == Long.MAX_VALUE
+        && fixture.calls.get(fixture.calls.size() - 1).equals("setPosition:" + Long.MAX_VALUE),
+        "delegate full-width position");
+
+    RuntimeException positionFailure = new RuntimeException("set-sentinel");
+    fixture.positionFailure = positionFailure;
+    try {
+      track.setPosition(1L);
+      throw new AssertionError("position failure swallowed");
+    } catch (RuntimeException error) {
+      check(error == positionFailure, "position failure identity");
+    }
+    RuntimeException durationFailure = new RuntimeException("duration-sentinel");
+    fixture.durationFailure = durationFailure;
+    try {
+      track.getDuration();
+      throw new AssertionError("duration failure swallowed");
+    } catch (RuntimeException error) {
+      check(error == durationFailure, "duration failure identity");
+    }
+  }
+
+  private static void failuresAndReset() throws Exception {
+    TestTrack assignTrack = new TestTrack(info(200L, "assign-failure"));
+    RuntimeException assignFailure = new RuntimeException("assign-sentinel");
+    DelegateFixture assign = new DelegateFixture(assignTrack, 31L, 810L);
+    assign.assignFailure = assignFailure;
+    try {
+      assignTrack.install(assign.delegate, null);
+      throw new AssertionError("assign failure swallowed");
+    } catch (RuntimeException error) {
+      check(error == assignFailure && assignTrack.getPosition() == 31L
+          && !assign.calls.contains("process:null"), "assign failure retains delegate");
+    }
+
+    TestTrack processTrack = new TestTrack(info(300L, "process-failure"));
+    Exception processFailure = new Exception("process-sentinel");
+    DelegateFixture process = new DelegateFixture(processTrack, 41L, 910L);
+    process.processFailure = processFailure;
+    try {
+      processTrack.install(process.delegate, null);
+      throw new AssertionError("process failure swallowed");
+    } catch (Exception error) {
+      check(error == processFailure && processTrack.getDuration() == 910L,
+          "process exception identity and retained delegate");
+    }
+
+    TestTrack reset = new TestTrack(info(444L, "reset"));
+    reset.setPosition(52L);
+    DelegateFixture installed = new DelegateFixture(reset, 61L, 1010L);
+    reset.install(installed.delegate, null);
+    try {
+      reset.install(null, null);
+      throw new AssertionError("null delegate succeeded");
+    } catch (NullPointerException expected) { }
+    check(reset.getPosition() == 52L && reset.getDuration() == 444L,
+        "null delegate restores base fallback");
+  }
+
+  private static void monitorSemantics() throws Exception {
+    TestTrack fallback = new TestTrack(info(555L, "monitor-fallback"));
+    MonitorHolder holder = new MonitorHolder(fallback);
+    holder.start();
+    AtomicLong fallbackValue = new AtomicLong(Long.MIN_VALUE);
+    Thread fallbackReader = new Thread(() -> fallbackValue.set(fallback.getDuration()));
+    fallbackReader.start();
+    awaitBlocked(fallbackReader, "fallback reader did not acquire track monitor");
+    holder.release();
+    fallbackReader.join(2000L);
+    check(!fallbackReader.isAlive() && fallbackValue.get() == 555L,
+        "fallback monitor release");
+
+    TestTrack delegated = new TestTrack(info(1L, "monitor-delegate"));
+    DelegateFixture fixture = new DelegateFixture(delegated, 2L, 777L);
+    delegated.install(fixture.delegate, null);
+    MonitorHolder fastHolder = new MonitorHolder(delegated);
+    fastHolder.start();
+    AtomicLong fastValue = new AtomicLong(Long.MIN_VALUE);
+    Thread fastReader = new Thread(() -> fastValue.set(delegated.getDuration()));
+    fastReader.start();
+    fastReader.join(2000L);
+    check(!fastReader.isAlive() && fastValue.get() == 777L,
+        "delegate fast path took track monitor");
+    fastHolder.release();
+
+    TestTrack process = new TestTrack(info(1L, "monitor-process"));
+    DelegateFixture processFixture = new DelegateFixture(process, 3L, 4L);
+    MonitorHolder processHolder = new MonitorHolder(process);
+    processHolder.start();
+    List<Throwable> failures = new ArrayList<>();
+    Thread installer = new Thread(() -> {
+      try {
+        process.install(processFixture.delegate, null);
+      } catch (Throwable error) {
+        failures.add(error);
+      }
+    });
+    installer.start();
+    awaitBlocked(installer, "processDelegate was not synchronized on track");
+    processHolder.release();
+    installer.join(2000L);
+    check(!installer.isAlive() && failures.isEmpty(), "synchronized install completion");
+  }
+
+  private static void reflection() throws Exception {
+    Class<DelegatedAudioTrack> type = DelegatedAudioTrack.class;
+    check(Modifier.isPublic(type.getModifiers()) && Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers()) && type.getSuperclass()
+        == com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack.class
+        && type.getInterfaces().length == 0, "class metadata");
+    Field delegate = type.getDeclaredField("delegate");
+    check(type.getDeclaredFields().length == 1 && delegate.getType() == InternalAudioTrack.class
+        && delegate.getModifiers() == Modifier.PRIVATE, "delegate field metadata");
+    Constructor<?>[] constructors = type.getDeclaredConstructors();
+    check(constructors.length == 1 && Modifier.isPublic(constructors[0].getModifiers())
+        && Arrays.equals(constructors[0].getParameterTypes(), new Class<?>[] { AudioTrackInfo.class })
+        && constructors[0].getExceptionTypes().length == 0, "constructor metadata");
+    int exportedMethods = 0;
+    for (Method method : type.getDeclaredMethods()) {
+      if (Modifier.isPublic(method.getModifiers()) || Modifier.isProtected(method.getModifiers())) {
+        exportedMethods++;
+      }
+    }
+    check(exportedMethods == 4, "exported method count");
+    Method process = type.getDeclaredMethod("processDelegate", InternalAudioTrack.class,
+        LocalAudioTrackExecutor.class);
+    check(Modifier.isProtected(process.getModifiers())
+        && Modifier.isSynchronized(process.getModifiers()) && !Modifier.isAbstract(process.getModifiers())
+        && Arrays.equals(process.getExceptionTypes(), new Class<?>[] { Exception.class }),
+        "process metadata");
+    for (String name : Arrays.asList("setPosition", "getDuration", "getPosition")) {
+      Method method = name.equals("setPosition")
+          ? type.getDeclaredMethod(name, long.class) : type.getDeclaredMethod(name);
+      check(Modifier.isPublic(method.getModifiers())
+          && !Modifier.isSynchronized(method.getModifiers()), name + " metadata");
+    }
+  }
+
+  private static void awaitBlocked(Thread thread, String message) throws Exception {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2L);
+    while (thread.getState() != Thread.State.BLOCKED && System.nanoTime() < deadline) {
+      Thread.yield();
+    }
+    check(thread.getState() == Thread.State.BLOCKED, message);
+  }
+
+  private static AudioTrackInfo info(long length, String identifier) {
+    return new AudioTrackInfo("title", "author", length, identifier, false,
+        "uri", "art", "isrc");
+  }
+
+  private static final class TestTrack extends DelegatedAudioTrack {
+    TestTrack(AudioTrackInfo info) { super(info); }
+    public void process(LocalAudioTrackExecutor executor) { }
+    protected AudioTrack makeShallowClone() { return new TestTrack(trackInfo); }
+    void install(InternalAudioTrack delegate, LocalAudioTrackExecutor executor) throws Exception {
+      processDelegate(delegate, executor);
+    }
+    void setAccurateDuration(long value) { accurateDuration.set(value); }
+  }
+
+  private static final class DelegateFixture {
+    final TestTrack owner;
+    final InternalAudioTrack delegate;
+    final List<String> calls = new ArrayList<>();
+    long position;
+    long duration;
+    RuntimeException assignFailure;
+    Exception processFailure;
+    RuntimeException positionFailure;
+    RuntimeException durationFailure;
+
+    DelegateFixture(TestTrack owner, long position, long duration) {
+      this.owner = owner;
+      this.position = position;
+      this.duration = duration;
+      this.delegate = (InternalAudioTrack) Proxy.newProxyInstance(
+          InternalAudioTrack.class.getClassLoader(), new Class<?>[] { InternalAudioTrack.class },
+          (instance, method, arguments) -> {
+            switch (method.getName()) {
+              case "assignExecutor":
+                calls.add("assign:" + arguments[0] + ":" + arguments[1]);
+                calls.add("published:" + owner.getPosition());
+                if (assignFailure != null) throw assignFailure;
+                return null;
+              case "process":
+                calls.add("process:" + arguments[0]);
+                if (processFailure != null) throw processFailure;
+                return null;
+              case "setPosition":
+                this.position = (Long) arguments[0];
+                calls.add("setPosition:" + this.position);
+                if (positionFailure != null) throw positionFailure;
+                return null;
+              case "getPosition":
+                return this.position;
+              case "getDuration":
+                if (durationFailure != null) throw durationFailure;
+                return duration;
+              default:
+                return defaultValue(method.getReturnType());
+            }
+          });
+    }
+  }
+
+  private static final class MonitorHolder {
+    final Object monitor;
+    final CountDownLatch locked = new CountDownLatch(1);
+    final CountDownLatch release = new CountDownLatch(1);
+    final Thread thread;
+
+    MonitorHolder(Object monitor) {
+      this.monitor = monitor;
+      this.thread = new Thread(() -> {
+        synchronized (this.monitor) {
+          locked.countDown();
+          try {
+            release.await();
+          } catch (InterruptedException error) {
+            throw new RuntimeException(error);
+          }
+        }
+      });
+    }
+
+    void start() throws Exception {
+      thread.start();
+      check(locked.await(2L, TimeUnit.SECONDS), "monitor holder did not lock");
+    }
+
+    void release() throws Exception {
+      release.countDown();
+      thread.join(2000L);
+      check(!thread.isAlive(), "monitor holder did not exit");
+    }
   }
 
   private static Object defaultValue(Class<?> type) {

@@ -73,6 +73,8 @@ const TRACK_END_REASON_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/Aud
 const TRACK_MARKER_TRACKER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/TrackMarkerTracker";
 const BASE_AUDIO_TRACK_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/BaseAudioTrack";
+const DELEGATED_AUDIO_TRACK_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/track/DelegatedAudioTrack";
 const FRIENDLY_EXCEPTION_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/FriendlyException";
 const FRIENDLY_EXCEPTION_SEVERITY_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity";
@@ -132,6 +134,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     BASIC_PLAYLIST_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/AudioTrack",
     BASE_AUDIO_TRACK_CLASS,
+    DELEGATED_AUDIO_TRACK_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/InternalAudioTrack",
     "com/sedmelluq/discord/lavaplayer/track/AudioTrackEndReason",
     "com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo",
@@ -466,6 +469,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | FUNCTIONAL_RESULT_HANDLER_CLASS
                 | TRACK_MARKER_TRACKER_CLASS
                 | BASE_AUDIO_TRACK_CLASS
+                | DELEGATED_AUDIO_TRACK_CLASS
         ) || field
             .access_flags
             .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
@@ -554,6 +558,9 @@ fn replacement_body(
     }
     if class_name == BASE_AUDIO_TRACK_CLASS {
         return base_audio_track_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == DELEGATED_AUDIO_TRACK_CLASS {
+        return delegated_audio_track_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PRIMORDIAL_TRACK_EXECUTOR_CLASS {
         return primordial_track_executor_replacement(pool, name, descriptor, required_locals);
@@ -1632,6 +1639,159 @@ fn primordial_track_executor_constructor(pool: &mut ConstantPool<'static>) -> Re
     )
 }
 
+fn delegated_audio_track_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    Ok(match (name, descriptor) {
+        ("<init>", "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V") => {
+            delegated_audio_track_constructor(pool)?
+        }
+        (
+            "processDelegate",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/InternalAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+        ) => delegated_audio_track_process(pool)?,
+        ("setPosition", "(J)V") => delegated_audio_track_set_position(pool)?,
+        ("getDuration", "()J") => delegated_audio_track_get_long(pool, "getDuration")?,
+        ("getPosition", "()J") => delegated_audio_track_get_long(pool, "getPosition")?,
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {DELEGATED_AUDIO_TRACK_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        )?,
+    })
+}
+
+fn delegated_audio_track_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let parent = pool.add_class(BASE_AUDIO_TRACK_CLASS)?;
+    let init = pool.add_method_ref(
+        parent,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V",
+    )?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(init),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn delegated_audio_track_process(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(DELEGATED_AUDIO_TRACK_CLASS)?;
+    let delegate = pool.add_field_ref(
+        owner,
+        "delegate",
+        "Lcom/sedmelluq/discord/lavaplayer/track/InternalAudioTrack;",
+    )?;
+    let internal = pool.add_class("com/sedmelluq/discord/lavaplayer/track/InternalAudioTrack")?;
+    let assign = pool.add_interface_method_ref(
+        internal,
+        "assignExecutor",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;Z)V",
+    )?;
+    let process = pool.add_interface_method_ref(
+        internal,
+        "process",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+    )?;
+    code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(delegate),
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Iconst_0,
+            Instruction::Invokeinterface(assign, 3),
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(process, 2),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn delegated_audio_track_set_position(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(DELEGATED_AUDIO_TRACK_CLASS)?;
+    let delegate = pool.add_field_ref(
+        owner,
+        "delegate",
+        "Lcom/sedmelluq/discord/lavaplayer/track/InternalAudioTrack;",
+    )?;
+    let internal = pool.add_class("com/sedmelluq/discord/lavaplayer/track/InternalAudioTrack")?;
+    let set_position = pool.add_interface_method_ref(internal, "setPosition", "(J)V")?;
+    let fallback = pool.add_method_ref(owner, "mantleSetPositionFallback", "(J)V")?;
+    let mut body = code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(delegate),
+            Instruction::Ifnull(8),
+            Instruction::Aload_0,
+            Instruction::Getfield(delegate),
+            Instruction::Lload_1,
+            Instruction::Invokeinterface(set_position, 3),
+            Instruction::Return,
+            Instruction::Aload_0,
+            Instruction::Lload_1,
+            Instruction::Invokespecial(fallback),
+            Instruction::Return,
+        ],
+    )?;
+    add_same_frame(pool, &mut body, 8)?;
+    Ok(body)
+}
+
+fn delegated_audio_track_get_long(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+) -> Result<Attribute> {
+    let owner = pool.add_class(DELEGATED_AUDIO_TRACK_CLASS)?;
+    let delegate = pool.add_field_ref(
+        owner,
+        "delegate",
+        "Lcom/sedmelluq/discord/lavaplayer/track/InternalAudioTrack;",
+    )?;
+    let internal = pool.add_class("com/sedmelluq/discord/lavaplayer/track/InternalAudioTrack")?;
+    let get = pool.add_interface_method_ref(internal, name, "()J")?;
+    let fallback_name = format!("mantle{name}Fallback");
+    let fallback = pool.add_method_ref(owner, fallback_name.as_str(), "()J")?;
+    let mut body = code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(delegate),
+            Instruction::Ifnull(7),
+            Instruction::Aload_0,
+            Instruction::Getfield(delegate),
+            Instruction::Invokeinterface(get, 1),
+            Instruction::Lreturn,
+            Instruction::Aload_0,
+            Instruction::Invokespecial(fallback),
+            Instruction::Lreturn,
+        ],
+    )?;
+    add_same_frame(pool, &mut body, 7)?;
+    Ok(body)
+}
+
 fn track_marker_tracker_replacement(
     pool: &mut ConstantPool<'static>,
     name: &str,
@@ -2481,6 +2641,9 @@ fn add_reference_implementation_state(
             "Ldev/mantle/internal/NativeBaseAudioTrack;",
         )?;
     }
+    if class_name == DELEGATED_AUDIO_TRACK_CLASS {
+        add_delegated_audio_track_state(class)?;
+    }
     if class_name == BASIC_PLAYLIST_CLASS {
         add_basic_playlist_state(class)?;
     }
@@ -2568,6 +2731,99 @@ fn add_track_enum_state(class: &mut ClassFile<'static>, class_name: &str) -> Res
         "()V",
         Some(initializer),
     )
+}
+
+fn add_delegated_audio_track_state(class: &mut ClassFile<'static>) -> Result<()> {
+    let set_position = delegated_audio_track_set_position_fallback(&mut class.constant_pool)?;
+    add_method(
+        class,
+        MethodAccessFlags::PRIVATE | MethodAccessFlags::SYNCHRONIZED,
+        "mantleSetPositionFallback",
+        "(J)V",
+        Some(set_position),
+    )?;
+    for name in ["getDuration", "getPosition"] {
+        let body = delegated_audio_track_get_long_fallback(&mut class.constant_pool, name)?;
+        add_method(
+            class,
+            MethodAccessFlags::PRIVATE | MethodAccessFlags::SYNCHRONIZED,
+            &format!("mantle{name}Fallback"),
+            "()J",
+            Some(body),
+        )?;
+    }
+    Ok(())
+}
+
+fn delegated_audio_track_set_position_fallback(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(DELEGATED_AUDIO_TRACK_CLASS)?;
+    let delegate = pool.add_field_ref(
+        owner,
+        "delegate",
+        "Lcom/sedmelluq/discord/lavaplayer/track/InternalAudioTrack;",
+    )?;
+    let internal = pool.add_class("com/sedmelluq/discord/lavaplayer/track/InternalAudioTrack")?;
+    let set_position = pool.add_interface_method_ref(internal, "setPosition", "(J)V")?;
+    let parent = pool.add_class(BASE_AUDIO_TRACK_CLASS)?;
+    let fallback = pool.add_method_ref(parent, "setPosition", "(J)V")?;
+    let mut body = code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(delegate),
+            Instruction::Ifnull(8),
+            Instruction::Aload_0,
+            Instruction::Getfield(delegate),
+            Instruction::Lload_1,
+            Instruction::Invokeinterface(set_position, 3),
+            Instruction::Return,
+            Instruction::Aload_0,
+            Instruction::Lload_1,
+            Instruction::Invokespecial(fallback),
+            Instruction::Return,
+        ],
+    )?;
+    add_same_frame(pool, &mut body, 8)?;
+    Ok(body)
+}
+
+fn delegated_audio_track_get_long_fallback(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+) -> Result<Attribute> {
+    let owner = pool.add_class(DELEGATED_AUDIO_TRACK_CLASS)?;
+    let delegate = pool.add_field_ref(
+        owner,
+        "delegate",
+        "Lcom/sedmelluq/discord/lavaplayer/track/InternalAudioTrack;",
+    )?;
+    let internal = pool.add_class("com/sedmelluq/discord/lavaplayer/track/InternalAudioTrack")?;
+    let get = pool.add_interface_method_ref(internal, name, "()J")?;
+    let parent = pool.add_class(BASE_AUDIO_TRACK_CLASS)?;
+    let fallback = pool.add_method_ref(parent, name, "()J")?;
+    let mut body = code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(delegate),
+            Instruction::Ifnull(7),
+            Instruction::Aload_0,
+            Instruction::Getfield(delegate),
+            Instruction::Invokeinterface(get, 1),
+            Instruction::Lreturn,
+            Instruction::Aload_0,
+            Instruction::Invokespecial(fallback),
+            Instruction::Lreturn,
+        ],
+    )?;
+    add_same_frame(pool, &mut body, 7)?;
+    Ok(body)
 }
 
 fn track_enum_initializer(
