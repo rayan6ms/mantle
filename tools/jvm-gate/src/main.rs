@@ -139,6 +139,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
             Some(SOUND_CLOUD_CLIENT_ID_TRACKER_CONSUMER)
         }
         "write-sound-cloud-data-loader-consumer" => Some(SOUND_CLOUD_DATA_LOADER_CONSUMER),
+        "write-sound-cloud-data-reader-consumer" => Some(SOUND_CLOUD_DATA_READER_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -9078,6 +9079,211 @@ public final class GateSoundCloudDataLoader {
           if (method.getReturnType() == long.class) return 0L;
           return null;
         }));
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const SOUND_CLOUD_DATA_READER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudDataReader;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudTrackFormat;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateSoundCloudDataReader {
+  public static void main(String[] args) throws Exception {
+    dispatchContract();
+    nullContract();
+    failureContract();
+    reflectionContract();
+    System.out.println(
+        "public-abstract-interface,0-fields,0-constructors,9-methods;"
+        + "dispatch,argument-identity,return-identity,boolean,nulls,unchecked,"
+        + "generic-signatures,reflection");
+  }
+
+  private static void dispatchContract() throws Exception {
+    JsonBrowser track = JsonBrowser.parse("{\"kind\":\"track\"}");
+    JsonBrowser foundTrack = JsonBrowser.parse("{\"id\":1}");
+    JsonBrowser playlist = JsonBrowser.parse("{\"kind\":\"playlist\"}");
+    String identifier = new String("identifier");
+    String trackId = new String("track-id");
+    String playlistName = new String("playlist-name");
+    String playlistId = new String("playlist-id");
+    AudioTrackInfo info = new AudioTrackInfo("title", "author", 1L, "id", false, "uri");
+    List<SoundCloudTrackFormat> formats = Collections.singletonList(proxy(SoundCloudTrackFormat.class));
+    List<JsonBrowser> tracks = Arrays.asList(track, foundTrack);
+    RecordingReader state = new RecordingReader(
+        foundTrack, trackId, true, info, formats, playlist, playlistName, playlistId, tracks);
+    SoundCloudDataReader reader = state.proxy();
+
+    check(reader.findTrackData(track) == foundTrack, "findTrackData return identity");
+    state.checkCall("findTrackData", track);
+    check(reader.readTrackId(track) == trackId, "readTrackId return identity");
+    state.checkCall("readTrackId", track);
+    check(reader.isTrackBlocked(track), "isTrackBlocked value");
+    state.checkCall("isTrackBlocked", track);
+    check(reader.readTrackInfo(track, identifier) == info, "readTrackInfo return identity");
+    state.checkCall("readTrackInfo", track, identifier);
+    check(reader.readTrackFormats(track) == formats, "readTrackFormats return identity");
+    state.checkCall("readTrackFormats", track);
+    check(reader.findPlaylistData(track, identifier) == playlist,
+        "findPlaylistData return identity");
+    state.checkCall("findPlaylistData", track, identifier);
+    check(reader.readPlaylistName(playlist) == playlistName,
+        "readPlaylistName return identity");
+    state.checkCall("readPlaylistName", playlist);
+    check(reader.readPlaylistIdentifier(playlist) == playlistId,
+        "readPlaylistIdentifier return identity");
+    state.checkCall("readPlaylistIdentifier", playlist);
+    check(reader.readPlaylistTracks(playlist) == tracks,
+        "readPlaylistTracks return identity");
+    state.checkCall("readPlaylistTracks", playlist);
+    check(state.calls == 9, "dispatch count");
+  }
+
+  private static void nullContract() {
+    RecordingReader state = new RecordingReader(
+        null, null, false, null, null, null, null, null, null);
+    SoundCloudDataReader reader = state.proxy();
+    check(reader.findTrackData(null) == null, "null track data");
+    check(reader.readTrackId(null) == null, "null track ID");
+    check(!reader.isTrackBlocked(null), "false blocked value");
+    check(reader.readTrackInfo(null, null) == null, "null track info");
+    check(reader.readTrackFormats(null) == null, "null formats");
+    check(reader.findPlaylistData(null, null) == null, "null playlist data");
+    check(reader.readPlaylistName(null) == null, "null playlist name");
+    check(reader.readPlaylistIdentifier(null) == null, "null playlist ID");
+    check(reader.readPlaylistTracks(null) == null, "null playlist tracks");
+    check(state.calls == 9, "null dispatch count");
+  }
+
+  private static void failureContract() {
+    RuntimeException failure = new RuntimeException("reader-sentinel");
+    SoundCloudDataReader reader = (SoundCloudDataReader) Proxy.newProxyInstance(
+        SoundCloudDataReader.class.getClassLoader(), new Class<?>[] {SoundCloudDataReader.class},
+        (proxy, method, args) -> { throw failure; });
+    try {
+      reader.readTrackId(null);
+      throw new AssertionError("expected failure");
+    } catch (RuntimeException error) {
+      check(error == failure, "unchecked failure identity");
+    }
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<SoundCloudDataReader> type = SoundCloudDataReader.class;
+    check(type.isInterface() && Modifier.isPublic(type.getModifiers())
+        && Modifier.isAbstract(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == null && type.getInterfaces().length == 0
+        && type.getTypeParameters().length == 0 && type.getAnnotations().length == 0,
+        "interface metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 9, "member counts");
+    checkMethod(type, "findTrackData", JsonBrowser.class,
+        new Class<?>[] {JsonBrowser.class}, null);
+    checkMethod(type, "readTrackId", String.class,
+        new Class<?>[] {JsonBrowser.class}, null);
+    checkMethod(type, "isTrackBlocked", boolean.class,
+        new Class<?>[] {JsonBrowser.class}, null);
+    checkMethod(type, "readTrackInfo", AudioTrackInfo.class,
+        new Class<?>[] {JsonBrowser.class, String.class}, null);
+    checkMethod(type, "readTrackFormats", List.class,
+        new Class<?>[] {JsonBrowser.class}, SoundCloudTrackFormat.class);
+    checkMethod(type, "findPlaylistData", JsonBrowser.class,
+        new Class<?>[] {JsonBrowser.class, String.class}, null);
+    checkMethod(type, "readPlaylistName", String.class,
+        new Class<?>[] {JsonBrowser.class}, null);
+    checkMethod(type, "readPlaylistIdentifier", String.class,
+        new Class<?>[] {JsonBrowser.class}, null);
+    checkMethod(type, "readPlaylistTracks", List.class,
+        new Class<?>[] {JsonBrowser.class}, JsonBrowser.class);
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+                                  Class<?>[] parameters, Class<?> genericElement) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType
+        && method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), name + " metadata");
+    if (genericElement == null) {
+      check(method.getGenericReturnType() == returnType, name + " raw return metadata");
+    } else {
+      check(method.getGenericReturnType() instanceof ParameterizedType,
+          name + " parameterized return");
+      ParameterizedType genericReturn = (ParameterizedType) method.getGenericReturnType();
+      check(genericReturn.getRawType() == List.class
+          && Arrays.equals(genericReturn.getActualTypeArguments(), new Object[] {genericElement}),
+          name + " generic return metadata");
+    }
+  }
+
+  private static final class RecordingReader implements InvocationHandler {
+    private final Object[] returns;
+    private String methodName;
+    private Object[] arguments;
+    private int calls;
+
+    RecordingReader(JsonBrowser foundTrack, String trackId, boolean blocked, AudioTrackInfo info,
+                    List<SoundCloudTrackFormat> formats, JsonBrowser playlist,
+                    String playlistName, String playlistId, List<JsonBrowser> tracks) {
+      returns = new Object[] {
+          foundTrack, trackId, blocked, info, formats, playlist, playlistName, playlistId, tracks
+      };
+    }
+
+    SoundCloudDataReader proxy() {
+      return (SoundCloudDataReader) Proxy.newProxyInstance(
+          SoundCloudDataReader.class.getClassLoader(), new Class<?>[] {SoundCloudDataReader.class},
+          this);
+    }
+
+    @Override
+    public Object invoke(Object proxy, Method method, Object[] args) {
+      methodName = method.getName();
+      arguments = args;
+      calls++;
+      switch (methodName) {
+        case "findTrackData": return returns[0];
+        case "readTrackId": return returns[1];
+        case "isTrackBlocked": return returns[2];
+        case "readTrackInfo": return returns[3];
+        case "readTrackFormats": return returns[4];
+        case "findPlaylistData": return returns[5];
+        case "readPlaylistName": return returns[6];
+        case "readPlaylistIdentifier": return returns[7];
+        case "readPlaylistTracks": return returns[8];
+        default: throw new AssertionError("unexpected method: " + method);
+      }
+    }
+
+    void checkCall(String expectedMethod, Object... expectedArguments) {
+      check(expectedMethod.equals(methodName) && arguments.length == expectedArguments.length,
+          expectedMethod + " dispatch");
+      for (int index = 0; index < arguments.length; index++) {
+        check(arguments[index] == expectedArguments[index], expectedMethod + " argument identity");
+      }
+    }
+  }
+
+  private static <T> T proxy(Class<T> type) {
+    return type.cast(Proxy.newProxyInstance(
+        GateSoundCloudDataReader.class.getClassLoader(), new Class<?>[] {type},
+        (proxy, method, args) -> null));
   }
 
   private static void check(boolean condition, String message) {

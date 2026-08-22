@@ -15129,90 +15129,130 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The exact caller-defined nine-method reader SPI, argument and return identity, primitive boolean and nullable dispatch, unchecked failure identity, generic list signatures, and reflection metadata are covered by the Phase 13 sound-cloud-data-reader-contracts oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudDataReader",
       "symbol_kind": "METHOD",
       "member_name": "findTrackData",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The exact caller-defined nine-method reader SPI, argument and return identity, primitive boolean and nullable dispatch, unchecked failure identity, generic list signatures, and reflection metadata are covered by the Phase 13 sound-cloud-data-reader-contracts oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudDataReader",
       "symbol_kind": "METHOD",
       "member_name": "readTrackId",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The exact caller-defined nine-method reader SPI, argument and return identity, primitive boolean and nullable dispatch, unchecked failure identity, generic list signatures, and reflection metadata are covered by the Phase 13 sound-cloud-data-reader-contracts oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudDataReader",
       "symbol_kind": "METHOD",
       "member_name": "isTrackBlocked",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The exact caller-defined nine-method reader SPI, argument and return identity, primitive boolean and nullable dispatch, unchecked failure identity, generic list signatures, and reflection metadata are covered by the Phase 13 sound-cloud-data-reader-contracts oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudDataReader",
       "symbol_kind": "METHOD",
       "member_name": "readTrackInfo",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The exact caller-defined nine-method reader SPI, argument and return identity, primitive boolean and nullable dispatch, unchecked failure identity, generic list signatures, and reflection metadata are covered by the Phase 13 sound-cloud-data-reader-contracts oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudDataReader",
       "symbol_kind": "METHOD",
       "member_name": "readTrackFormats",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/util/List;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The exact caller-defined nine-method reader SPI, argument and return identity, primitive boolean and nullable dispatch, unchecked failure identity, generic list signatures, and reflection metadata are covered by the Phase 13 sound-cloud-data-reader-contracts oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudDataReader",
       "symbol_kind": "METHOD",
       "member_name": "findPlaylistData",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The exact caller-defined nine-method reader SPI, argument and return identity, primitive boolean and nullable dispatch, unchecked failure identity, generic list signatures, and reflection metadata are covered by the Phase 13 sound-cloud-data-reader-contracts oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudDataReader",
       "symbol_kind": "METHOD",
       "member_name": "readPlaylistName",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The exact caller-defined nine-method reader SPI, argument and return identity, primitive boolean and nullable dispatch, unchecked failure identity, generic list signatures, and reflection metadata are covered by the Phase 13 sound-cloud-data-reader-contracts oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudDataReader",
       "symbol_kind": "METHOD",
       "member_name": "readPlaylistIdentifier",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The exact caller-defined nine-method reader SPI, argument and return identity, primitive boolean and nullable dispatch, unchecked failure identity, generic list signatures, and reflection metadata are covered by the Phase 13 sound-cloud-data-reader-contracts oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudDataReader",
       "symbol_kind": "METHOD",
       "member_name": "readPlaylistTracks",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/util/List;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The exact caller-defined nine-method reader SPI, argument and return identity, primitive boolean and nullable dispatch, unchecked failure identity, generic list signatures, and reflection metadata are covered by the Phase 13 sound-cloud-data-reader-contracts oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudFormatHandler",
