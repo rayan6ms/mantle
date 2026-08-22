@@ -35,6 +35,7 @@ const MANAGER_EXECUTOR_TASK_CLASS: &str = "dev/mantle/internal/NativeTrackExecut
 const LOCAL_TRACK_EXECUTOR_HELPER_CLASS: &str = "dev/mantle/internal/NativeLocalAudioTrackExecutor";
 const TRACK_MARKER_TRACKER_HELPER_CLASS: &str = "dev/mantle/internal/NativeTrackMarkerTracker";
 const BASE_AUDIO_TRACK_HELPER_CLASS: &str = "dev/mantle/internal/NativeBaseAudioTrack";
+const TRACK_INFO_BUILDER_HELPER_CLASS: &str = "dev/mantle/internal/NativeAudioTrackInfoBuilder";
 const MANAGER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayerManager";
 const DEFAULT_PLAYER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayer";
 const AUDIO_PLAYER_MANAGER_CLASS: &str =
@@ -75,6 +76,8 @@ const TRACK_MARKER_TRACKER_CLASS: &str =
 const BASE_AUDIO_TRACK_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/BaseAudioTrack";
 const DELEGATED_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/DelegatedAudioTrack";
+const TRACK_INFO_BUILDER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder";
 const FRIENDLY_EXCEPTION_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/FriendlyException";
 const FRIENDLY_EXCEPTION_SEVERITY_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity";
@@ -141,6 +144,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/track/AudioTrackState",
     DECODED_TRACK_HOLDER_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoProvider",
+    TRACK_INFO_BUILDER_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/TrackMarker",
     TRACK_MARKER_TRACKER_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler",
@@ -299,6 +303,7 @@ fn internal_classes(expected_abi: u8) -> Result<Vec<ClassFile<'static>>> {
         native_local_audio_track_executor_class()?,
         native_track_marker_tracker_class()?,
         native_base_audio_track_class()?,
+        native_audio_track_info_builder_class()?,
     ])
 }
 
@@ -470,14 +475,16 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | TRACK_MARKER_TRACKER_CLASS
                 | BASE_AUDIO_TRACK_CLASS
                 | DELEGATED_AUDIO_TRACK_CLASS
+                | TRACK_INFO_BUILDER_CLASS
         ) || field
             .access_flags
             .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
     });
     class.methods.retain(|method| {
-        method
-            .access_flags
-            .intersects(MethodAccessFlags::PUBLIC | MethodAccessFlags::PROTECTED)
+        class_name == TRACK_INFO_BUILDER_CLASS
+            || method
+                .access_flags
+                .intersects(MethodAccessFlags::PUBLIC | MethodAccessFlags::PROTECTED)
     });
 
     let pool = &mut class.constant_pool;
@@ -561,6 +568,9 @@ fn replacement_body(
     }
     if class_name == DELEGATED_AUDIO_TRACK_CLASS {
         return delegated_audio_track_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == TRACK_INFO_BUILDER_CLASS {
+        return audio_track_info_builder_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PRIMORDIAL_TRACK_EXECUTOR_CLASS {
         return primordial_track_executor_replacement(pool, name, descriptor, required_locals);
@@ -1790,6 +1800,225 @@ fn delegated_audio_track_get_long(
     )?;
     add_same_frame(pool, &mut body, 7)?;
     Ok(body)
+}
+
+fn audio_track_info_builder_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    Ok(match (name, descriptor) {
+        ("<init>", "()V") => audio_track_info_builder_constructor(pool)?,
+        (
+            "getTitle" | "getAuthor" | "getIdentifier" | "getUri" | "getArtworkUrl" | "getISRC",
+            "()Ljava/lang/String;",
+        ) => object_getter(
+            pool,
+            TRACK_INFO_BUILDER_CLASS,
+            builder_field_name(name)?,
+            "Ljava/lang/String;",
+        )?,
+        ("getLength", "()Ljava/lang/Long;") => {
+            object_getter(pool, TRACK_INFO_BUILDER_CLASS, "length", "Ljava/lang/Long;")?
+        }
+        (
+            "setTitle" | "setAuthor" | "setIdentifier" | "setUri" | "setArtworkUrl" | "setISRC",
+            "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
+        ) => {
+            audio_track_info_builder_setter(pool, builder_field_name(name)?, "Ljava/lang/String;")?
+        }
+        (
+            "setLength",
+            "(Ljava/lang/Long;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
+        ) => audio_track_info_builder_setter(pool, "length", "Ljava/lang/Long;")?,
+        (
+            "setIsStream",
+            "(Ljava/lang/Boolean;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
+        ) => audio_track_info_builder_stream_setter(pool)?,
+        (
+            "apply",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoProvider;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
+        ) => audio_track_info_builder_apply(pool)?,
+        ("build", "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;") => {
+            audio_track_info_builder_build(pool)?
+        }
+        (
+            "create",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
+        ) => audio_track_info_builder_create(pool)?,
+        ("empty", "()Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;") => {
+            audio_track_info_builder_empty(pool)?
+        }
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {TRACK_INFO_BUILDER_CLASS}.{name}{descriptor}"),
+            required_locals,
+        )?,
+    })
+}
+
+fn builder_field_name(method_name: &str) -> Result<&'static str> {
+    Ok(match method_name {
+        "getTitle" | "setTitle" => "title",
+        "getAuthor" | "setAuthor" => "author",
+        "getIdentifier" | "setIdentifier" => "identifier",
+        "getUri" | "setUri" => "uri",
+        "getArtworkUrl" | "setArtworkUrl" => "artworkUrl",
+        "getISRC" | "setISRC" => "isrc",
+        _ => return Err(format!("unknown audio track info builder method {method_name}").into()),
+    })
+}
+
+fn audio_track_info_builder_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let init = pool.add_method_ref(object, "<init>", "()V")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(init),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn audio_track_info_builder_setter(
+    pool: &mut ConstantPool<'static>,
+    field_name: &str,
+    descriptor: &str,
+) -> Result<Attribute> {
+    let owner = pool.add_class(TRACK_INFO_BUILDER_CLASS)?;
+    let field = pool.add_field_ref(owner, field_name, descriptor)?;
+    let helper = pool.add_class(TRACK_INFO_BUILDER_HELPER_CLASS)?;
+    let select = pool.add_method_ref(
+        helper,
+        "select",
+        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+    )?;
+    let field_type = if descriptor == "Ljava/lang/Long;" {
+        pool.add_class("java/lang/Long")?
+    } else {
+        pool.add_class("java/lang/String")?
+    };
+    code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Invokestatic(select),
+            Instruction::Checkcast(field_type),
+            Instruction::Putfield(field),
+            Instruction::Aload_0,
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn audio_track_info_builder_stream_setter(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(TRACK_INFO_BUILDER_CLASS)?;
+    let field = pool.add_field_ref(owner, "isStream", "Ljava/lang/Boolean;")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(field),
+            Instruction::Aload_0,
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn audio_track_info_builder_apply(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let helper = pool.add_class(TRACK_INFO_BUILDER_HELPER_CLASS)?;
+    let apply = pool.add_method_ref(
+        helper,
+        "apply",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoProvider;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
+    )?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokestatic(apply),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn audio_track_info_builder_build(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(TRACK_INFO_BUILDER_CLASS)?;
+    let helper = pool.add_class(TRACK_INFO_BUILDER_HELPER_CLASS)?;
+    let build = pool.add_method_ref(
+        helper,
+        "build",
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let fields = [
+        ("title", "Ljava/lang/String;"),
+        ("author", "Ljava/lang/String;"),
+        ("length", "Ljava/lang/Long;"),
+        ("identifier", "Ljava/lang/String;"),
+        ("isStream", "Ljava/lang/Boolean;"),
+        ("uri", "Ljava/lang/String;"),
+        ("artworkUrl", "Ljava/lang/String;"),
+        ("isrc", "Ljava/lang/String;"),
+    ];
+    let mut instructions = Vec::with_capacity(18);
+    for (name, descriptor) in fields {
+        let field = pool.add_field_ref(owner, name, descriptor)?;
+        instructions.extend([Instruction::Aload_0, Instruction::Getfield(field)]);
+    }
+    instructions.extend([Instruction::Invokestatic(build), Instruction::Areturn]);
+    code(pool, 8, 1, instructions)
+}
+
+fn audio_track_info_builder_create(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let helper = pool.add_class(TRACK_INFO_BUILDER_HELPER_CLASS)?;
+    let create = pool.add_method_ref(
+        helper,
+        "create",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
+    )?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokestatic(create),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn audio_track_info_builder_empty(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(TRACK_INFO_BUILDER_CLASS)?;
+    let init = pool.add_method_ref(owner, "<init>", "()V")?;
+    code(
+        pool,
+        2,
+        0,
+        vec![
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
 }
 
 fn track_marker_tracker_replacement(
@@ -4115,6 +4344,317 @@ fn native_base_audio_track_class() -> Result<ClassFile<'static>> {
         )?;
     }
     Ok(class)
+}
+
+fn native_audio_track_info_builder_class() -> Result<ClassFile<'static>> {
+    let mut class = new_class(
+        TRACK_INFO_BUILDER_HELPER_CLASS,
+        "java/lang/Object",
+        ClassAccessFlags::PUBLIC | ClassAccessFlags::FINAL | ClassAccessFlags::SUPER,
+        &[],
+    )?;
+    let methods: &[(&str, &str, MethodEmitter)] = &[
+        (
+            "select",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+            track_info_builder_helper_select,
+        ),
+        (
+            "apply",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoProvider;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
+            track_info_builder_helper_apply,
+        ),
+        (
+            "length",
+            "(Ljava/lang/Long;)J",
+            track_info_builder_helper_length,
+        ),
+        (
+            "stream",
+            "(Ljava/lang/Boolean;J)Z",
+            track_info_builder_helper_stream,
+        ),
+        (
+            "build",
+            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+            track_info_builder_helper_build,
+        ),
+        (
+            "create",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
+            track_info_builder_helper_create,
+        ),
+    ];
+    for (name, descriptor, body) in methods {
+        let body = body(&mut class.constant_pool)?;
+        add_method(
+            &mut class,
+            MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+            name,
+            descriptor,
+            Some(body),
+        )?;
+    }
+    Ok(class)
+}
+
+fn track_info_builder_helper_select(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    code(
+        pool,
+        1,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Ifnonnull(4),
+            Instruction::Aload_1,
+            Instruction::Areturn,
+            Instruction::Aload_0,
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn track_info_builder_helper_apply(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let builder = pool.add_class(TRACK_INFO_BUILDER_CLASS)?;
+    let provider =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoProvider")?;
+    let methods = [
+        (
+            "getTitle",
+            "()Ljava/lang/String;",
+            "setTitle",
+            "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
+        ),
+        (
+            "getAuthor",
+            "()Ljava/lang/String;",
+            "setAuthor",
+            "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
+        ),
+        (
+            "getLength",
+            "()Ljava/lang/Long;",
+            "setLength",
+            "(Ljava/lang/Long;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
+        ),
+        (
+            "getIdentifier",
+            "()Ljava/lang/String;",
+            "setIdentifier",
+            "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
+        ),
+        (
+            "getUri",
+            "()Ljava/lang/String;",
+            "setUri",
+            "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
+        ),
+        (
+            "getArtworkUrl",
+            "()Ljava/lang/String;",
+            "setArtworkUrl",
+            "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
+        ),
+        (
+            "getISRC",
+            "()Ljava/lang/String;",
+            "setISRC",
+            "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
+        ),
+    ];
+    let mut instructions = vec![
+        Instruction::Aload_1,
+        Instruction::Ifnonnull(4),
+        Instruction::Aload_0,
+        Instruction::Areturn,
+    ];
+    for (getter_name, getter_descriptor, setter_name, setter_descriptor) in methods {
+        let getter = pool.add_interface_method_ref(provider, getter_name, getter_descriptor)?;
+        let setter = pool.add_method_ref(builder, setter_name, setter_descriptor)?;
+        instructions.extend([
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(getter, 1),
+            Instruction::Invokevirtual(setter),
+            Instruction::Pop,
+        ]);
+    }
+    instructions.extend([Instruction::Aload_0, Instruction::Areturn]);
+    code(pool, 2, 2, instructions)
+}
+
+fn track_info_builder_helper_length(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let unknown = pool.add_long(i64::MAX)?;
+    let long = pool.add_class("java/lang/Long")?;
+    let long_value = pool.add_method_ref(long, "longValue", "()J")?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Ifnonnull(4),
+            Instruction::Ldc2_w(unknown),
+            Instruction::Lreturn,
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(long_value),
+            Instruction::Lreturn,
+        ],
+    )
+}
+
+fn track_info_builder_helper_stream(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let unknown = pool.add_long(i64::MAX)?;
+    let boolean = pool.add_class("java/lang/Boolean")?;
+    let boolean_value = pool.add_method_ref(boolean, "booleanValue", "()Z")?;
+    code(
+        pool,
+        4,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Ifnonnull(10),
+            Instruction::Lload_1,
+            Instruction::Ldc2_w(unknown),
+            Instruction::Lcmp,
+            Instruction::Ifne(8),
+            Instruction::Iconst_1,
+            Instruction::Ireturn,
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(boolean_value),
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+fn track_info_builder_helper_build(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(TRACK_INFO_BUILDER_HELPER_CLASS)?;
+    let length = pool.add_method_ref(owner, "length", "(Ljava/lang/Long;)J")?;
+    let stream = pool.add_method_ref(owner, "stream", "(Ljava/lang/Boolean;J)Z")?;
+    let info = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo")?;
+    let init = pool.add_method_ref(
+        info,
+        "<init>",
+        "(Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+    )?;
+    code(
+        pool,
+        11,
+        10,
+        vec![
+            Instruction::Aload_2,
+            Instruction::Invokestatic(length),
+            Instruction::Lstore(8),
+            Instruction::New(info),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Lload(8),
+            Instruction::Aload_3,
+            Instruction::Aload(4),
+            Instruction::Lload(8),
+            Instruction::Invokestatic(stream),
+            Instruction::Aload(5),
+            Instruction::Aload(6),
+            Instruction::Aload(7),
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn track_info_builder_helper_create(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let builder = pool.add_class(TRACK_INFO_BUILDER_CLASS)?;
+    let empty = pool.add_method_ref(
+        builder,
+        "empty",
+        "()Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
+    )?;
+    let builder_return = "Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;";
+    let set_author = pool.add_method_ref(
+        builder,
+        "setAuthor",
+        &format!("(Ljava/lang/String;){builder_return}"),
+    )?;
+    let set_title = pool.add_method_ref(
+        builder,
+        "setTitle",
+        &format!("(Ljava/lang/String;){builder_return}"),
+    )?;
+    let set_length = pool.add_method_ref(
+        builder,
+        "setLength",
+        &format!("(Ljava/lang/Long;){builder_return}"),
+    )?;
+    let apply = pool.add_method_ref(
+        builder,
+        "apply",
+        &format!(
+            "(Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoProvider;){builder_return}"
+        ),
+    )?;
+    let long = pool.add_class("java/lang/Long")?;
+    let value_of = pool.add_method_ref(long, "valueOf", "(J)Ljava/lang/Long;")?;
+    let unknown = pool.add_long(i64::MAX)?;
+    let stream = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream")?;
+    let providers = pool.add_method_ref(stream, "getTrackInfoProviders", "()Ljava/util/List;")?;
+    let list = pool.add_class("java/util/List")?;
+    let iterator = pool.add_interface_method_ref(list, "iterator", "()Ljava/util/Iterator;")?;
+    let iterator_class = pool.add_class("java/util/Iterator")?;
+    let has_next = pool.add_interface_method_ref(iterator_class, "hasNext", "()Z")?;
+    let next = pool.add_interface_method_ref(iterator_class, "next", "()Ljava/lang/Object;")?;
+    let provider =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoProvider")?;
+    let unknown_artist = pool.add_string("Unknown artist")?;
+    let unknown_title = pool.add_string("Unknown title")?;
+    code(
+        pool,
+        3,
+        4,
+        vec![
+            Instruction::Invokestatic(empty),
+            Instruction::Astore_2,
+            Instruction::Aload_2,
+            Instruction::Ldc_w(unknown_artist),
+            Instruction::Invokevirtual(set_author),
+            Instruction::Pop,
+            Instruction::Aload_2,
+            Instruction::Ldc_w(unknown_title),
+            Instruction::Invokevirtual(set_title),
+            Instruction::Pop,
+            Instruction::Aload_2,
+            Instruction::Ldc2_w(unknown),
+            Instruction::Invokestatic(value_of),
+            Instruction::Invokevirtual(set_length),
+            Instruction::Pop,
+            Instruction::Aload_2,
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(apply),
+            Instruction::Pop,
+            Instruction::Aload_1,
+            Instruction::Ifnonnull(23),
+            Instruction::Aload_2,
+            Instruction::Areturn,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(providers),
+            Instruction::Invokeinterface(iterator, 1),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(has_next, 1),
+            Instruction::Ifeq(37),
+            Instruction::Aload_2,
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(next, 1),
+            Instruction::Checkcast(provider),
+            Instruction::Invokevirtual(apply),
+            Instruction::Pop,
+            Instruction::Goto(27),
+            Instruction::Aload_2,
+            Instruction::Areturn,
+        ],
+    )
 }
 
 fn base_helper_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {

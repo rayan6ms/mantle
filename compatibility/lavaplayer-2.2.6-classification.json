@@ -24172,180 +24172,260 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact structure and reference-equal empty/default inference, fluent setter, null-retention and stream-reset, ordered and partial provider application, reference/stream creation, snapshot build, failure, and reflection behavior are covered by the Phase 13 audio-track-info-builder-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "getTitle",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact structure and reference-equal empty/default inference, fluent setter, null-retention and stream-reset, ordered and partial provider application, reference/stream creation, snapshot build, failure, and reflection behavior are covered by the Phase 13 audio-track-info-builder-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "getAuthor",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact structure and reference-equal empty/default inference, fluent setter, null-retention and stream-reset, ordered and partial provider application, reference/stream creation, snapshot build, failure, and reflection behavior are covered by the Phase 13 audio-track-info-builder-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "getLength",
       "descriptor": "()Ljava/lang/Long;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact structure and reference-equal empty/default inference, fluent setter, null-retention and stream-reset, ordered and partial provider application, reference/stream creation, snapshot build, failure, and reflection behavior are covered by the Phase 13 audio-track-info-builder-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "getIdentifier",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact structure and reference-equal empty/default inference, fluent setter, null-retention and stream-reset, ordered and partial provider application, reference/stream creation, snapshot build, failure, and reflection behavior are covered by the Phase 13 audio-track-info-builder-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "getUri",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact structure and reference-equal empty/default inference, fluent setter, null-retention and stream-reset, ordered and partial provider application, reference/stream creation, snapshot build, failure, and reflection behavior are covered by the Phase 13 audio-track-info-builder-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "getArtworkUrl",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact structure and reference-equal empty/default inference, fluent setter, null-retention and stream-reset, ordered and partial provider application, reference/stream creation, snapshot build, failure, and reflection behavior are covered by the Phase 13 audio-track-info-builder-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "getISRC",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact structure and reference-equal empty/default inference, fluent setter, null-retention and stream-reset, ordered and partial provider application, reference/stream creation, snapshot build, failure, and reflection behavior are covered by the Phase 13 audio-track-info-builder-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "setTitle",
       "descriptor": "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact structure and reference-equal empty/default inference, fluent setter, null-retention and stream-reset, ordered and partial provider application, reference/stream creation, snapshot build, failure, and reflection behavior are covered by the Phase 13 audio-track-info-builder-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "setAuthor",
       "descriptor": "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact structure and reference-equal empty/default inference, fluent setter, null-retention and stream-reset, ordered and partial provider application, reference/stream creation, snapshot build, failure, and reflection behavior are covered by the Phase 13 audio-track-info-builder-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "setLength",
       "descriptor": "(Ljava/lang/Long;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact structure and reference-equal empty/default inference, fluent setter, null-retention and stream-reset, ordered and partial provider application, reference/stream creation, snapshot build, failure, and reflection behavior are covered by the Phase 13 audio-track-info-builder-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "setIdentifier",
       "descriptor": "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact structure and reference-equal empty/default inference, fluent setter, null-retention and stream-reset, ordered and partial provider application, reference/stream creation, snapshot build, failure, and reflection behavior are covered by the Phase 13 audio-track-info-builder-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "setUri",
       "descriptor": "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact structure and reference-equal empty/default inference, fluent setter, null-retention and stream-reset, ordered and partial provider application, reference/stream creation, snapshot build, failure, and reflection behavior are covered by the Phase 13 audio-track-info-builder-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "setArtworkUrl",
       "descriptor": "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact structure and reference-equal empty/default inference, fluent setter, null-retention and stream-reset, ordered and partial provider application, reference/stream creation, snapshot build, failure, and reflection behavior are covered by the Phase 13 audio-track-info-builder-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "setIsStream",
       "descriptor": "(Ljava/lang/Boolean;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact structure and reference-equal empty/default inference, fluent setter, null-retention and stream-reset, ordered and partial provider application, reference/stream creation, snapshot build, failure, and reflection behavior are covered by the Phase 13 audio-track-info-builder-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "setISRC",
       "descriptor": "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact structure and reference-equal empty/default inference, fluent setter, null-retention and stream-reset, ordered and partial provider application, reference/stream creation, snapshot build, failure, and reflection behavior are covered by the Phase 13 audio-track-info-builder-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "apply",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoProvider;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact structure and reference-equal empty/default inference, fluent setter, null-retention and stream-reset, ordered and partial provider application, reference/stream creation, snapshot build, failure, and reflection behavior are covered by the Phase 13 audio-track-info-builder-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "build",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact structure and reference-equal empty/default inference, fluent setter, null-retention and stream-reset, ordered and partial provider application, reference/stream creation, snapshot build, failure, and reflection behavior are covered by the Phase 13 audio-track-info-builder-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "create",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact structure and reference-equal empty/default inference, fluent setter, null-retention and stream-reset, ordered and partial provider application, reference/stream creation, snapshot build, failure, and reflection behavior are covered by the Phase 13 audio-track-info-builder-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "empty",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact structure and reference-equal empty/default inference, fluent setter, null-retention and stream-reset, ordered and partial provider application, reference/stream creation, snapshot build, failure, and reflection behavior are covered by the Phase 13 audio-track-info-builder-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider",

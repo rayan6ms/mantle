@@ -92,6 +92,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
             Some(PRIMORDIAL_AUDIO_TRACK_EXECUTOR_CONSUMER)
         }
         "write-delegated-audio-track-consumer" => Some(DELEGATED_AUDIO_TRACK_CONSUMER),
+        "write-audio-track-info-builder-consumer" => Some(AUDIO_TRACK_INFO_BUILDER_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -5705,6 +5706,242 @@ public final class GateDelegatedAudioTrack {
     if (type == double.class) return 0.0d;
     if (type == char.class) return (char) 0;
     return null;
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_TRACK_INFO_BUILDER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoBuilder;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+public final class GateAudioTrackInfoBuilder {
+  public static void main(String[] args) throws Exception {
+    emptyAndSetters();
+    buildsAndInference();
+    applyOrderingAndFailures();
+    createAndProviders();
+    reflection();
+    System.out.println(
+        "empty=nulls,distinct;setters=fluent,null-retain,stream-reset;"
+        + "build=unknown,finite,explicit-stream,snapshot;"
+        + "apply=null,ordered,partial-failure,no-stream;"
+        + "create=defaults,reference,providers,null-list,failure;"
+        + "reflection=class,10-fields,1-private-constructor,19-methods");
+  }
+
+  private static void emptyAndSetters() {
+    AudioTrackInfoBuilder first = AudioTrackInfoBuilder.empty();
+    AudioTrackInfoBuilder second = AudioTrackInfoBuilder.empty();
+    check(first != second && first.getTitle() == null && first.getAuthor() == null
+        && first.getLength() == null && first.getIdentifier() == null && first.getUri() == null
+        && first.getArtworkUrl() == null && first.getISRC() == null, "empty builder state");
+    check(first.setTitle("title") == first && first.setAuthor("author") == first
+        && first.setLength(-7L) == first && first.setIdentifier("id") == first
+        && first.setUri("uri") == first && first.setArtworkUrl("art") == first
+        && first.setISRC("isrc") == first && first.setIsStream(Boolean.TRUE) == first,
+        "fluent setters");
+    first.setTitle(null).setAuthor(null).setLength(null).setIdentifier(null).setUri(null)
+        .setArtworkUrl(null).setISRC(null);
+    check(first.getTitle().equals("title") && first.getAuthor().equals("author")
+        && first.getLength().equals(-7L) && first.getIdentifier().equals("id")
+        && first.getUri().equals("uri") && first.getArtworkUrl().equals("art")
+        && first.getISRC().equals("isrc"), "null setters retain values");
+    first.setIsStream(null);
+    check(!first.build().isStream, "null stream setter resets inference");
+  }
+
+  private static void buildsAndInference() {
+    AudioTrackInfo unknown = AudioTrackInfoBuilder.empty().build();
+    check(unknown.title == null && unknown.author == null && unknown.length == Long.MAX_VALUE
+        && unknown.identifier == null && unknown.isStream && unknown.uri == null
+        && unknown.artworkUrl == null && unknown.isrc == null, "empty build defaults");
+    AudioTrackInfo finite = AudioTrackInfoBuilder.empty().setLength(0L).build();
+    check(finite.length == 0L && !finite.isStream, "finite inference");
+    AudioTrackInfo negative = AudioTrackInfoBuilder.empty().setLength(Long.MIN_VALUE).build();
+    check(!negative.isStream && negative.length == Long.MIN_VALUE, "negative length");
+    AudioTrackInfo forcedStream = AudioTrackInfoBuilder.empty().setLength(12L)
+        .setIsStream(Boolean.TRUE).build();
+    AudioTrackInfo forcedFinite = AudioTrackInfoBuilder.empty().setLength(Long.MAX_VALUE)
+        .setIsStream(Boolean.FALSE).build();
+    check(forcedStream.isStream && !forcedFinite.isStream, "explicit stream overrides");
+
+    AudioTrackInfoBuilder builder = AudioTrackInfoBuilder.empty().setTitle("before").setLength(1L);
+    AudioTrackInfo before = builder.build();
+    AudioTrackInfo again = builder.build();
+    builder.setTitle("after").setLength(2L);
+    check(before != again && before.title.equals("before") && before.length == 1L
+        && builder.build().title.equals("after"), "fresh immutable snapshots");
+  }
+
+  private static void applyOrderingAndFailures() {
+    AudioTrackInfoBuilder builder = AudioTrackInfoBuilder.empty().setTitle("old-title")
+        .setAuthor("old-author").setLength(1L).setIdentifier("old-id").setUri("old-uri")
+        .setArtworkUrl("old-art").setISRC("old-isrc").setIsStream(Boolean.TRUE);
+    check(builder.apply(null) == builder, "null provider identity");
+    List<String> calls = new ArrayList<>();
+    AudioTrackInfoProvider provider = provider(calls,
+        "new-title", null, 5L, "new-id", "new-uri", null, "new-isrc", null, null);
+    check(builder.apply(provider) == builder
+        && calls.equals(Arrays.asList("title", "author", "length", "identifier", "uri",
+            "artwork", "isrc")), "provider getter order");
+    check(builder.getTitle().equals("new-title") && builder.getAuthor().equals("old-author")
+        && builder.getLength().equals(5L) && builder.getIdentifier().equals("new-id")
+        && builder.getUri().equals("new-uri") && builder.getArtworkUrl().equals("old-art")
+        && builder.getISRC().equals("new-isrc") && builder.build().isStream,
+        "provider values and stream omission");
+
+    RuntimeException failure = new RuntimeException("uri-sentinel");
+    List<String> failedCalls = new ArrayList<>();
+    AudioTrackInfoProvider failing = provider(failedCalls,
+        "partial-title", "partial-author", 9L, "partial-id", "unused-uri", "unused-art",
+        "unused-isrc", "uri", failure);
+    try {
+      builder.apply(failing);
+      throw new AssertionError("provider failure swallowed");
+    } catch (RuntimeException error) {
+      check(error == failure && failedCalls.equals(Arrays.asList(
+          "title", "author", "length", "identifier", "uri")), "partial failure order");
+    }
+    check(builder.getTitle().equals("partial-title") && builder.getAuthor().equals("partial-author")
+        && builder.getLength().equals(9L) && builder.getIdentifier().equals("partial-id")
+        && builder.getUri().equals("new-uri") && builder.getArtworkUrl().equals("old-art")
+        && builder.getISRC().equals("new-isrc"), "partial application retained prefix");
+  }
+
+  private static void createAndProviders() {
+    AudioTrackInfo defaults = AudioTrackInfoBuilder.create(null, null).build();
+    check(defaults.title.equals("Unknown title") && defaults.author.equals("Unknown artist")
+        && defaults.length == Long.MAX_VALUE && defaults.isStream, "create defaults");
+    AudioReference reference = new AudioReference("reference-id", "reference-title");
+    AudioTrackInfo referenced = AudioTrackInfoBuilder.create(reference, null).build();
+    check(referenced.title.equals("reference-title")
+        && referenced.author.equals("Unknown artist") && referenced.identifier.equals("reference-id")
+        && referenced.length == Long.MAX_VALUE, "reference overlay");
+
+    AudioTrackInfoProvider first = provider(new ArrayList<>(), "stream-title", null, 33L,
+        null, "stream-uri", null, null, null, null);
+    AudioTrackInfoProvider second = provider(new ArrayList<>(), null, "stream-author", null,
+        "stream-id", null, "stream-art", "stream-isrc", null, null);
+    TestStream stream = new TestStream(Arrays.asList(first, null, second));
+    AudioTrackInfo combined = AudioTrackInfoBuilder.create(reference, stream).build();
+    check(combined.title.equals("stream-title") && combined.author.equals("stream-author")
+        && combined.length == 33L && combined.identifier.equals("stream-id")
+        && combined.uri.equals("stream-uri") && combined.artworkUrl.equals("stream-art")
+        && combined.isrc.equals("stream-isrc") && !combined.isStream,
+        "ordered stream provider overlays");
+
+    try {
+      AudioTrackInfoBuilder.create(null,
+          new TestStream((List<AudioTrackInfoProvider>) null));
+      throw new AssertionError("null provider list succeeded");
+    } catch (NullPointerException expected) { }
+    RuntimeException failure = new RuntimeException("providers-sentinel");
+    try {
+      AudioTrackInfoBuilder.create(null, new TestStream(failure));
+      throw new AssertionError("provider list failure swallowed");
+    } catch (RuntimeException error) {
+      check(error == failure, "provider list failure identity");
+    }
+  }
+
+  private static void reflection() throws Exception {
+    Class<AudioTrackInfoBuilder> type = AudioTrackInfoBuilder.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] { AudioTrackInfoProvider.class }),
+        "class metadata");
+    check(type.getFields().length == 0 && type.getDeclaredFields().length == 10,
+        "field counts");
+    checkField(type, "UNKNOWN_TITLE", String.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "UNKNOWN_ARTIST", String.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    for (String name : Arrays.asList("title", "author", "identifier", "uri", "artworkUrl", "isrc")) {
+      checkField(type, name, String.class, Modifier.PRIVATE);
+    }
+    checkField(type, "length", Long.class, Modifier.PRIVATE);
+    checkField(type, "isStream", Boolean.class, Modifier.PRIVATE);
+    Constructor<?>[] constructors = type.getDeclaredConstructors();
+    check(constructors.length == 1 && Modifier.isPrivate(constructors[0].getModifiers())
+        && constructors[0].getParameterCount() == 0, "private constructor");
+    Method[] methods = type.getDeclaredMethods();
+    check(methods.length == 19, "declared method count");
+    for (Method method : methods) check(Modifier.isPublic(method.getModifiers()), "method visibility");
+    check(Modifier.isStatic(type.getDeclaredMethod("empty").getModifiers())
+        && Modifier.isStatic(type.getDeclaredMethod("create", AudioReference.class,
+            SeekableInputStream.class).getModifiers()), "static factories");
+  }
+
+  private static void checkField(Class<?> type, String name, Class<?> fieldType, int modifiers)
+      throws Exception {
+    Field field = type.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getModifiers() == modifiers,
+        name + " field metadata");
+  }
+
+  private static AudioTrackInfoProvider provider(List<String> calls, String title, String author,
+      Long length, String identifier, String uri, String artwork, String isrc,
+      String failingGetter, RuntimeException failure) {
+    return (AudioTrackInfoProvider) Proxy.newProxyInstance(AudioTrackInfoProvider.class.getClassLoader(),
+        new Class<?>[] { AudioTrackInfoProvider.class }, (instance, method, arguments) -> {
+          String key;
+          switch (method.getName()) {
+            case "getTitle": key = "title"; break;
+            case "getAuthor": key = "author"; break;
+            case "getLength": key = "length"; break;
+            case "getIdentifier": key = "identifier"; break;
+            case "getUri": key = "uri"; break;
+            case "getArtworkUrl": key = "artwork"; break;
+            case "getISRC": key = "isrc"; break;
+            default: return null;
+          }
+          calls.add(key);
+          if (key.equals(failingGetter)) throw failure;
+          switch (key) {
+            case "title": return title;
+            case "author": return author;
+            case "length": return length;
+            case "identifier": return identifier;
+            case "uri": return uri;
+            case "artwork": return artwork;
+            default: return isrc;
+          }
+        });
+  }
+
+  private static final class TestStream extends SeekableInputStream {
+    final List<AudioTrackInfoProvider> providers;
+    final RuntimeException failure;
+    TestStream(List<AudioTrackInfoProvider> providers) {
+      super(0L, 0L); this.providers = providers; this.failure = null;
+    }
+    TestStream(RuntimeException failure) {
+      super(0L, 0L); this.providers = null; this.failure = failure;
+    }
+    public int read() { return -1; }
+    public long getPosition() { return 0L; }
+    protected void seekHard(long position) throws IOException { }
+    public boolean canSeekHard() { return true; }
+    public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      if (failure != null) throw failure;
+      return providers;
+    }
   }
 
   private static void check(boolean condition, String message) {
