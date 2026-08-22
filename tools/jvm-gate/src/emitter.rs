@@ -73,6 +73,12 @@ const IMMUTABLE_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/ImmutableAudioFrame";
 const MUTABLE_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame";
+const LOCAL_TRACK_EXECUTOR_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor";
+const LOCAL_TRACK_READ_EXECUTOR_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor$ReadExecutor";
+const LOCAL_TRACK_SEEK_EXECUTOR_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor$SeekExecutor";
 const REFERENCE_MUTABLE_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/ReferenceMutableAudioFrame";
 const EVENT_ADAPTER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/event/AudioEventAdapter";
@@ -135,7 +141,9 @@ const REFERENCE_CLASSES: &[&str] = &[
     TERMINATOR_FRAME_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/playback/AbstractMutableAudioFrame",
     "com/sedmelluq/discord/lavaplayer/track/playback/ImmutableAudioFrame",
-    "com/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor",
+    LOCAL_TRACK_EXECUTOR_CLASS,
+    LOCAL_TRACK_READ_EXECUTOR_CLASS,
+    LOCAL_TRACK_SEEK_EXECUTOR_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame",
     REFERENCE_MUTABLE_FRAME_CLASS,
 ];

@@ -82,6 +82,9 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-internal-audio-track-consumer" => Some(INTERNAL_AUDIO_TRACK_CONSUMER),
         "write-audio-track-executor-consumer" => Some(AUDIO_TRACK_EXECUTOR_CONSUMER),
+        "write-local-audio-track-executor-callback-consumer" => {
+            Some(LOCAL_AUDIO_TRACK_EXECUTOR_CALLBACK_CONSUMER)
+        }
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -4221,6 +4224,104 @@ public final class GateDefaultAudioPlayerManager {
     if (type == double.class) return 0.0d;
     if (type == char.class) return (char) 0;
     return null;
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const LOCAL_AUDIO_TRACK_EXECUTOR_CALLBACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor.ReadExecutor;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor.SeekExecutor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+public final class GateLocalAudioTrackExecutorCallbacks {
+  public static void main(String[] args) throws Exception {
+    List<String> calls = new ArrayList<>();
+    Exception readFailure = new Exception("read-sentinel");
+    Exception seekFailure = new Exception("seek-sentinel");
+    int[] reads = { 0 };
+    int[] seeks = { 0 };
+
+    ReadExecutor read = () -> {
+      calls.add(reads[0]++ == 0 ? "read-ok" : "read-fail");
+      if (reads[0] == 2) throw readFailure;
+    };
+    SeekExecutor seek = position -> {
+      if (seeks[0] == 0) {
+        check(position == Long.MIN_VALUE, "minimum seek width");
+        calls.add("seek-min");
+      } else if (seeks[0] == 1) {
+        check(position == Long.MAX_VALUE, "maximum seek width");
+        calls.add("seek-max");
+      } else {
+        calls.add("seek-fail");
+        throw seekFailure;
+      }
+      seeks[0]++;
+    };
+
+    read.performRead();
+    try {
+      read.performRead();
+      throw new AssertionError("read exception was swallowed");
+    } catch (Exception error) {
+      check(error == readFailure, "read exception identity");
+    }
+    seek.performSeek(Long.MIN_VALUE);
+    seek.performSeek(Long.MAX_VALUE);
+    try {
+      seek.performSeek(0L);
+      throw new AssertionError("seek exception was swallowed");
+    } catch (Exception error) {
+      check(error == seekFailure, "seek exception identity");
+    }
+    check(calls.equals(Arrays.asList(
+        "read-ok", "read-fail", "seek-min", "seek-max", "seek-fail")),
+        "dispatch order");
+
+    checkCallback(ReadExecutor.class, "performRead", new Class<?>[0]);
+    checkCallback(SeekExecutor.class, "performSeek", new Class<?>[] { long.class });
+    System.out.println(
+        "dispatch=read-ok,read-fail,seek-min,seek-max,seek-fail;"
+        + "exceptions=identity;nesting=LocalAudioTrackExecutor,public-static;"
+        + "reflection=2-interfaces,0-fields,1-method-each,throws-Exception");
+  }
+
+  private static void checkCallback(Class<?> type, String name, Class<?>[] parameters)
+      throws Exception {
+    int modifiers = type.getModifiers();
+    check(Modifier.isPublic(modifiers) && Modifier.isStatic(modifiers)
+        && Modifier.isInterface(modifiers) && Modifier.isAbstract(modifiers)
+        && !Modifier.isFinal(modifiers) && type.getSuperclass() == null
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        type.getSimpleName() + " structure");
+    check(type.getDeclaringClass() == LocalAudioTrackExecutor.class
+        && type.getEnclosingClass() == LocalAudioTrackExecutor.class,
+        type.getSimpleName() + " nesting");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredMethods().length == 1
+        && type.getDeclaredConstructors().length == 0,
+        type.getSimpleName() + " member counts");
+
+    Method method = type.getDeclaredMethod(name, parameters);
+    int methodModifiers = method.getModifiers();
+    check(Modifier.isPublic(methodModifiers) && Modifier.isAbstract(methodModifiers)
+        && !Modifier.isStatic(methodModifiers) && !Modifier.isFinal(methodModifiers)
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
+        && method.getReturnType() == void.class
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), new Class<?>[] { Exception.class })
+        && method.getTypeParameters().length == 0
+        && method.getDeclaredAnnotations().length == 0,
+        name + " metadata");
   }
 
   private static void check(boolean condition, String message) {

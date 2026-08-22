@@ -25644,36 +25644,48 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact nested-interface structure, callback dispatch, full-width seek values, checked exception propagation, and reflection metadata are covered by the Phase 13 local-audio-track-executor callback slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor$ReadExecutor",
       "symbol_kind": "METHOD",
       "member_name": "performRead",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact nested-interface structure, callback dispatch, full-width seek values, checked exception propagation, and reflection metadata are covered by the Phase 13 local-audio-track-executor callback slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor$SeekExecutor",
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact nested-interface structure, callback dispatch, full-width seek values, checked exception propagation, and reflection metadata are covered by the Phase 13 local-audio-track-executor callback slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor$SeekExecutor",
       "symbol_kind": "METHOD",
       "member_name": "performSeek",
       "descriptor": "(J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact nested-interface structure, callback dispatch, full-width seek values, checked exception propagation, and reflection metadata are covered by the Phase 13 local-audio-track-executor callback slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame",

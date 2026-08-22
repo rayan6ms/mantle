@@ -95,8 +95,8 @@
       "methods": 405,
       "symbols": 535,
       "status": "IN_PROGRESS",
-      "classified_symbols": 386,
-      "remaining_symbols": 149,
+      "classified_symbols": 390,
+      "remaining_symbols": 145,
       "completed_slices": [
         {
           "id": "player-events",
@@ -448,6 +448,19 @@
           "fields": 0,
           "methods": 10,
           "symbols": 11,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
+        },
+        {
+          "id": "local-audio-track-executor-callback-contracts",
+          "classes": 2,
+          "fields": 0,
+          "methods": 2,
+          "symbols": 4,
           "classification": "A_EXACT",
           "evidence": [
             "scripts/run-jvm-gate-a.sh",
