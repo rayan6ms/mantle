@@ -95,8 +95,8 @@
       "methods": 405,
       "symbols": 535,
       "status": "IN_PROGRESS",
-      "classified_symbols": 493,
-      "remaining_symbols": 42,
+      "classified_symbols": 509,
+      "remaining_symbols": 26,
       "completed_slices": [
         {
           "id": "player-events",
@@ -545,6 +545,19 @@
             "tools/jvm-gate/src/emitter.rs",
             "tools/jvm-gate/src/main.rs"
           ]
+        },
+        {
+          "id": "abstract-audio-frame-buffer-contracts",
+          "classes": 1,
+          "fields": 7,
+          "methods": 8,
+          "symbols": 16,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
         }
       ],
       "objective": "Complete the player, event, track, marker, and frame contract around the proven Gate A slice.",
@@ -681,7 +694,7 @@
   "phase_entry": {
     "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
     "first_execution_cohort": "core-player-track",
-    "next_slice": "abstract-audio-frame-buffer-contracts",
+    "next_slice": "allocating-audio-frame-buffer-contracts",
     "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
   }
 }

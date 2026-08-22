@@ -93,6 +93,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-delegated-audio-track-consumer" => Some(DELEGATED_AUDIO_TRACK_CONSUMER),
         "write-audio-track-info-builder-consumer" => Some(AUDIO_TRACK_INFO_BUILDER_CONSUMER),
+        "write-abstract-audio-frame-buffer-consumer" => Some(ABSTRACT_AUDIO_FRAME_BUFFER_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -5942,6 +5943,330 @@ public final class GateAudioTrackInfoBuilder {
       if (failure != null) throw failure;
       return providers;
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const ABSTRACT_AUDIO_FRAME_BUFFER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkDecoder;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkEncoder;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import com.sedmelluq.discord.lavaplayer.track.playback.AbstractAudioFrameBuffer;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameRebuilder;
+import com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+public final class GateAbstractAudioFrameBuffer {
+  public static void main(String[] args) throws Exception {
+    constructionAndFlags();
+    terminationAndClearOrdering();
+    failureRetentionAndMonitorRelease();
+    waitLoopInterruptionAndMonitorBlocking();
+    reflection();
+    System.out.println(
+        "constructor=format,null,unique-monitor,zero-flags;"
+        + "flags=clear-cancels-terminate,lock,received;"
+        + "terminate=ordered-clear,signal,terminated-skip;"
+        + "failures=clear-prefix,signal-prefix,monitor-release;"
+        + "wait=loop,notify,interrupt,monitor-blocking;"
+        + "reflection=public-abstract,7-fields,1-protected-constructor,7-methods");
+  }
+
+  private static void constructionAndFlags() {
+    AudioDataFormat format = new TestFormat();
+    ProbeBuffer first = new ProbeBuffer(format);
+    ProbeBuffer second = new ProbeBuffer(null);
+    check(first.formatValue() == format && second.formatValue() == null
+        && first.monitor() != second.monitor()
+        && first.monitor().getClass() == Object.class, "constructor identities");
+    check(!first.lockedValue() && !first.receivedValue() && !first.terminatedValue()
+        && !first.terminateOnEmptyValue() && !first.hasClearOnInsert()
+        && !first.hasReceivedFrames(), "constructor flags");
+    first.lockBuffer();
+    first.setReceived(true);
+    check(first.lockedValue() && first.hasReceivedFrames(), "volatile flag access");
+    first.setReceived(false);
+    check(!first.hasReceivedFrames(), "received frame reset visibility");
+  }
+
+  private static void terminationAndClearOrdering() {
+    ProbeBuffer buffer = new ProbeBuffer(null);
+    buffer.setTerminateOnEmpty();
+    check(buffer.terminateOnEmptyValue() && buffer.signals == 1 && buffer.clears == 0
+        && buffer.signalHeldMonitor, "initial termination request");
+
+    buffer.setClearOnInsert();
+    check(buffer.hasClearOnInsert() && !buffer.terminateOnEmptyValue(),
+        "clear request cancels termination");
+    buffer.setTerminateOnEmpty();
+    check(!buffer.hasClearOnInsert() && buffer.terminateOnEmptyValue()
+        && buffer.clears == 1 && buffer.signals == 2
+        && buffer.clearHeldMonitor && buffer.signalHeldMonitor,
+        "clear then termination ordering");
+
+    buffer.reset(false, false, true);
+    int previousSignals = buffer.signals;
+    buffer.setClearOnInsert();
+    buffer.setTerminateOnEmpty();
+    check(buffer.clears == 2 && !buffer.hasClearOnInsert()
+        && !buffer.terminateOnEmptyValue() && buffer.signals == previousSignals,
+        "already terminated still consumes clear without signal");
+  }
+
+  private static void failureRetentionAndMonitorRelease() throws Exception {
+    ProbeBuffer clearFailure = new ProbeBuffer(null);
+    RuntimeException clearSentinel = new RuntimeException("clear-sentinel");
+    clearFailure.setClearOnInsert();
+    clearFailure.clearFailure = clearSentinel;
+    expectIdentity(clearSentinel, clearFailure::setTerminateOnEmpty);
+    check(clearFailure.hasClearOnInsert() && !clearFailure.terminateOnEmptyValue()
+        && clearFailure.clears == 1 && clearFailure.signals == 0
+        && clearFailure.clearHeldMonitor, "clear failure retained prefix");
+    assertMonitorAvailable(clearFailure.monitor(), "clear failure monitor release");
+
+    ProbeBuffer signalFailure = new ProbeBuffer(null);
+    RuntimeException signalSentinel = new RuntimeException("signal-sentinel");
+    signalFailure.signalFailure = signalSentinel;
+    expectIdentity(signalSentinel, signalFailure::setTerminateOnEmpty);
+    check(signalFailure.terminateOnEmptyValue() && signalFailure.signals == 1
+        && signalFailure.signalHeldMonitor, "signal failure retained prefix");
+    assertMonitorAvailable(signalFailure.monitor(), "signal failure monitor release");
+  }
+
+  private static void waitLoopInterruptionAndMonitorBlocking() throws Exception {
+    ProbeBuffer waiting = new ProbeBuffer(null);
+    AtomicBoolean returned = new AtomicBoolean();
+    AtomicBoolean failed = new AtomicBoolean();
+    Thread waiter = daemon(() -> {
+      try {
+        waiting.waitForTermination();
+        returned.set(true);
+      } catch (InterruptedException error) {
+        failed.set(true);
+      }
+    });
+    waiter.start();
+    awaitState(waiter, Thread.State.WAITING, "initial termination wait");
+    waiting.pokeAndObserveBlocked(waiter);
+    awaitState(waiter, Thread.State.WAITING, "spurious notification loop");
+    check(!returned.get() && !failed.get(), "spurious notification did not return");
+    waiting.finish();
+    join(waiter, "terminated waiter");
+    check(returned.get() && !failed.get(), "termination releases waiter");
+    waiting.waitForTermination();
+
+    ProbeBuffer interrupted = new ProbeBuffer(null);
+    AtomicBoolean interruptedThrown = new AtomicBoolean();
+    AtomicBoolean interruptStatus = new AtomicBoolean(true);
+    Thread interruptedWaiter = daemon(() -> {
+      try {
+        interrupted.waitForTermination();
+      } catch (InterruptedException error) {
+        interruptedThrown.set(true);
+        interruptStatus.set(Thread.currentThread().isInterrupted());
+      }
+    });
+    interruptedWaiter.start();
+    awaitState(interruptedWaiter, Thread.State.WAITING, "interrupt wait");
+    interruptedWaiter.interrupt();
+    join(interruptedWaiter, "interrupted waiter");
+    check(interruptedThrown.get() && !interruptStatus.get(), "interrupt propagation");
+    assertMonitorAvailable(interrupted.monitor(), "interrupted wait monitor release");
+
+    ProbeBuffer blocked = new ProbeBuffer(null);
+    AtomicBoolean entered = new AtomicBoolean();
+    AtomicBoolean completed = new AtomicBoolean();
+    Thread setter;
+    synchronized (blocked.monitor()) {
+      setter = daemon(() -> {
+        entered.set(true);
+        blocked.setClearOnInsert();
+        completed.set(true);
+      });
+      setter.start();
+      awaitTrue(entered, "setter start");
+      awaitState(setter, Thread.State.BLOCKED, "setter monitor block");
+      check(!completed.get(), "setter completed while monitor held");
+    }
+    join(setter, "unblocked setter");
+    check(completed.get() && blocked.hasClearOnInsert(), "setter after monitor release");
+  }
+
+  private static void reflection() throws Exception {
+    Class<AbstractAudioFrameBuffer> type = AbstractAudioFrameBuffer.class;
+    check(Modifier.isPublic(type.getModifiers()) && Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers()) && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] { AudioFrameBuffer.class }),
+        "class metadata");
+    check(type.getDeclaredFields().length == 7 && type.getFields().length == 0,
+        "field counts");
+    checkField(type, "format", AudioDataFormat.class, Modifier.PROTECTED | Modifier.FINAL);
+    checkField(type, "synchronizer", Object.class, Modifier.PROTECTED | Modifier.FINAL);
+    checkField(type, "locked", boolean.class, Modifier.PROTECTED | Modifier.VOLATILE);
+    checkField(type, "receivedFrames", boolean.class, Modifier.PROTECTED | Modifier.VOLATILE);
+    checkField(type, "terminated", boolean.class, Modifier.PROTECTED);
+    checkField(type, "terminateOnEmpty", boolean.class, Modifier.PROTECTED);
+    checkField(type, "clearOnInsert", boolean.class, Modifier.PROTECTED);
+
+    Constructor<?>[] constructors = type.getDeclaredConstructors();
+    check(constructors.length == 1 && constructors[0].getModifiers() == Modifier.PROTECTED
+        && Arrays.equals(constructors[0].getParameterTypes(),
+            new Class<?>[] { AudioDataFormat.class }), "constructor metadata");
+    Method[] methods = type.getDeclaredMethods();
+    check(methods.length == 7, "declared method count");
+    Method wait = type.getDeclaredMethod("waitForTermination");
+    check(wait.getModifiers() == Modifier.PUBLIC
+        && Arrays.equals(wait.getExceptionTypes(), new Class<?>[] { InterruptedException.class }),
+        "wait metadata");
+    for (String name : Arrays.asList("setTerminateOnEmpty", "setClearOnInsert", "lockBuffer")) {
+      Method method = type.getDeclaredMethod(name);
+      check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == void.class
+          && method.getExceptionTypes().length == 0, name + " metadata");
+    }
+    for (String name : Arrays.asList("hasClearOnInsert", "hasReceivedFrames")) {
+      Method method = type.getDeclaredMethod(name);
+      check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == boolean.class
+          && method.getExceptionTypes().length == 0, name + " metadata");
+    }
+    Method signal = type.getDeclaredMethod("signalWaiters");
+    check(signal.getModifiers() == (Modifier.PROTECTED | Modifier.ABSTRACT)
+        && signal.getReturnType() == void.class && signal.getExceptionTypes().length == 0,
+        "signal metadata");
+  }
+
+  private static void checkField(Class<?> type, String name, Class<?> fieldType, int modifiers)
+      throws Exception {
+    Field field = type.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getModifiers() == modifiers,
+        name + " field metadata");
+  }
+
+  private static void expectIdentity(RuntimeException expected, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("failure was swallowed");
+    } catch (RuntimeException error) {
+      check(error == expected, "failure identity");
+    }
+  }
+
+  private static void assertMonitorAvailable(Object monitor, String message) throws Exception {
+    AtomicBoolean acquired = new AtomicBoolean();
+    Thread thread = daemon(() -> {
+      synchronized (monitor) {
+        acquired.set(true);
+      }
+    });
+    thread.start();
+    join(thread, message);
+    check(acquired.get(), message);
+  }
+
+  private static Thread daemon(Runnable operation) {
+    Thread thread = new Thread(operation);
+    thread.setDaemon(true);
+    return thread;
+  }
+
+  private static void awaitTrue(AtomicBoolean value, String message) throws Exception {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2L);
+    while (!value.get() && System.nanoTime() < deadline) Thread.sleep(1L);
+    check(value.get(), message);
+  }
+
+  private static void awaitState(Thread thread, Thread.State state, String message)
+      throws Exception {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2L);
+    while (thread.getState() != state && System.nanoTime() < deadline) Thread.sleep(1L);
+    check(thread.getState() == state, message + ": " + thread.getState());
+  }
+
+  private static void join(Thread thread, String message) throws Exception {
+    thread.join(2_000L);
+    check(!thread.isAlive(), message);
+  }
+
+  private interface Operation { void run(); }
+
+  private static final class ProbeBuffer extends AbstractAudioFrameBuffer {
+    int clears;
+    int signals;
+    boolean clearHeldMonitor;
+    boolean signalHeldMonitor;
+    RuntimeException clearFailure;
+    RuntimeException signalFailure;
+
+    ProbeBuffer(AudioDataFormat format) { super(format); }
+    AudioDataFormat formatValue() { return format; }
+    Object monitor() { return synchronizer; }
+    boolean lockedValue() { return locked; }
+    boolean receivedValue() { return receivedFrames; }
+    boolean terminatedValue() { return terminated; }
+    boolean terminateOnEmptyValue() { return terminateOnEmpty; }
+    void setReceived(boolean value) { receivedFrames = value; }
+    void reset(boolean terminate, boolean clear, boolean ended) {
+      terminateOnEmpty = terminate;
+      clearOnInsert = clear;
+      terminated = ended;
+    }
+    void pokeAndObserveBlocked(Thread waiter) throws Exception {
+      synchronized (synchronizer) {
+        synchronizer.notifyAll();
+        awaitState(waiter, Thread.State.BLOCKED, "notified waiter monitor reacquisition");
+      }
+    }
+    void finish() {
+      synchronized (synchronizer) {
+        terminated = true;
+        synchronizer.notifyAll();
+      }
+    }
+
+    public int getRemainingCapacity() { return 0; }
+    public int getFullCapacity() { return 0; }
+    public AudioFrame provide() { return null; }
+    public AudioFrame provide(long timeout, TimeUnit unit) throws TimeoutException,
+        InterruptedException { return null; }
+    public boolean provide(MutableAudioFrame frame) { return false; }
+    public boolean provide(MutableAudioFrame frame, long timeout, TimeUnit unit)
+        throws TimeoutException, InterruptedException { return false; }
+    public void consume(AudioFrame frame) throws InterruptedException { }
+    public void clear() {
+      clears++;
+      clearHeldMonitor = Thread.holdsLock(synchronizer);
+      if (clearFailure != null) throw clearFailure;
+    }
+    public void rebuild(AudioFrameRebuilder rebuilder) { }
+    public Long getLastInputTimecode() { return null; }
+    protected void signalWaiters() {
+      signals++;
+      signalHeldMonitor = Thread.holdsLock(synchronizer);
+      if (signalFailure != null) throw signalFailure;
+    }
+  }
+
+  private static final class TestFormat extends AudioDataFormat {
+    TestFormat() { super(1, 1, 1); }
+    public String codecName() { return "test"; }
+    public byte[] silenceBytes() { return new byte[0]; }
+    public int expectedChunkSize() { return 0; }
+    public int maximumChunkSize() { return 0; }
+    public AudioChunkDecoder createDecoder() { return null; }
+    public AudioChunkEncoder createEncoder(AudioConfiguration configuration) { return null; }
   }
 
   private static void check(boolean condition, String message) {

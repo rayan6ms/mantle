@@ -78,6 +78,8 @@ const DELEGATED_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/DelegatedAudioTrack";
 const TRACK_INFO_BUILDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder";
+const ABSTRACT_AUDIO_FRAME_BUFFER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/track/playback/AbstractAudioFrameBuffer";
 const FRIENDLY_EXCEPTION_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/FriendlyException";
 const FRIENDLY_EXCEPTION_SEVERITY_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity";
@@ -158,6 +160,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     PRIMORDIAL_TRACK_EXECUTOR_CLASS,
     AUDIO_FRAME_CONSUMER_CLASS,
     AUDIO_FRAME_BUFFER_CLASS,
+    ABSTRACT_AUDIO_FRAME_BUFFER_CLASS,
     AUDIO_FRAME_BUFFER_FACTORY_CLASS,
     AUDIO_FRAME_REBUILDER_CLASS,
     TERMINATOR_FRAME_CLASS,
@@ -517,6 +520,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
     Ok(class)
 }
 
+#[allow(clippy::too_many_lines)]
 fn replacement_body(
     pool: &mut ConstantPool<'static>,
     class_name: &str,
@@ -571,6 +575,9 @@ fn replacement_body(
     }
     if class_name == TRACK_INFO_BUILDER_CLASS {
         return audio_track_info_builder_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == ABSTRACT_AUDIO_FRAME_BUFFER_CLASS {
+        return abstract_audio_frame_buffer_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PRIMORDIAL_TRACK_EXECUTOR_CLASS {
         return primordial_track_executor_replacement(pool, name, descriptor, required_locals);
@@ -2019,6 +2026,353 @@ fn audio_track_info_builder_empty(pool: &mut ConstantPool<'static>) -> Result<At
             Instruction::Areturn,
         ],
     )
+}
+
+fn abstract_audio_frame_buffer_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V") => {
+            abstract_audio_frame_buffer_constructor(pool)
+        }
+        ("waitForTermination", "()V") => abstract_audio_frame_buffer_wait(pool),
+        ("setTerminateOnEmpty", "()V") => abstract_audio_frame_buffer_terminate_on_empty(pool),
+        ("setClearOnInsert", "()V") => abstract_audio_frame_buffer_clear_on_insert(pool),
+        ("hasClearOnInsert", "()Z") => {
+            bool_getter(pool, ABSTRACT_AUDIO_FRAME_BUFFER_CLASS, "clearOnInsert")
+        }
+        ("lockBuffer", "()V") => abstract_audio_frame_buffer_lock(pool),
+        ("hasReceivedFrames", "()Z") => {
+            bool_getter(pool, ABSTRACT_AUDIO_FRAME_BUFFER_CLASS, "receivedFrames")
+        }
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {ABSTRACT_AUDIO_FRAME_BUFFER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn abstract_audio_frame_buffer_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(ABSTRACT_AUDIO_FRAME_BUFFER_CLASS)?;
+    let format = pool.add_field_ref(
+        owner,
+        "format",
+        "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let synchronizer = pool.add_field_ref(owner, "synchronizer", "Ljava/lang/Object;")?;
+    let locked = pool.add_field_ref(owner, "locked", "Z")?;
+    let received_frames = pool.add_field_ref(owner, "receivedFrames", "Z")?;
+    let terminated = pool.add_field_ref(owner, "terminated", "Z")?;
+    let terminate_on_empty = pool.add_field_ref(owner, "terminateOnEmpty", "Z")?;
+    let clear_on_insert = pool.add_field_ref(owner, "clearOnInsert", "Z")?;
+    code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(format),
+            Instruction::Aload_0,
+            Instruction::New(object),
+            Instruction::Dup,
+            Instruction::Invokespecial(object_init),
+            Instruction::Putfield(synchronizer),
+            Instruction::Aload_0,
+            Instruction::Iconst_0,
+            Instruction::Putfield(locked),
+            Instruction::Aload_0,
+            Instruction::Iconst_0,
+            Instruction::Putfield(received_frames),
+            Instruction::Aload_0,
+            Instruction::Iconst_0,
+            Instruction::Putfield(terminated),
+            Instruction::Aload_0,
+            Instruction::Iconst_0,
+            Instruction::Putfield(terminate_on_empty),
+            Instruction::Aload_0,
+            Instruction::Iconst_0,
+            Instruction::Putfield(clear_on_insert),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn abstract_audio_frame_buffer_wait(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(ABSTRACT_AUDIO_FRAME_BUFFER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let synchronizer = pool.add_field_ref(owner, "synchronizer", "Ljava/lang/Object;")?;
+    let terminated = pool.add_field_ref(owner, "terminated", "Z")?;
+    let wait = pool.add_method_ref(object, "wait", "()V")?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let mut body = code_with_exceptions(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(synchronizer),
+            Instruction::Dup,
+            Instruction::Astore_1,
+            Instruction::Monitorenter,
+            Instruction::Aload_0,
+            Instruction::Getfield(terminated),
+            Instruction::Ifne(12),
+            Instruction::Aload_0,
+            Instruction::Getfield(synchronizer),
+            Instruction::Invokevirtual(wait),
+            Instruction::Goto(5),
+            Instruction::Aload_1,
+            Instruction::Monitorexit,
+            Instruction::Goto(20),
+            Instruction::Astore_2,
+            Instruction::Aload_1,
+            Instruction::Monitorexit,
+            Instruction::Aload_2,
+            Instruction::Athrow,
+            Instruction::Return,
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 5..14,
+                handler_pc: 15,
+                catch_type: 0,
+            },
+            ExceptionTableEntry {
+                range_pc: 15..18,
+                handler_pc: 15,
+                catch_type: 0,
+            },
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: 5,
+                locals: vec![VerificationType::Object {
+                    cpool_index: object,
+                }],
+            },
+            StackFrame::SameFrame { frame_type: 6 },
+            StackFrame::SameLocals1StackItemFrame {
+                frame_type: 66,
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: 4,
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn abstract_audio_frame_buffer_terminate_on_empty(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(ABSTRACT_AUDIO_FRAME_BUFFER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let synchronizer = pool.add_field_ref(owner, "synchronizer", "Ljava/lang/Object;")?;
+    let clear_on_insert = pool.add_field_ref(owner, "clearOnInsert", "Z")?;
+    let terminated = pool.add_field_ref(owner, "terminated", "Z")?;
+    let terminate_on_empty = pool.add_field_ref(owner, "terminateOnEmpty", "Z")?;
+    let clear = pool.add_method_ref(owner, "clear", "()V")?;
+    let signal_waiters = pool.add_method_ref(owner, "signalWaiters", "()V")?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let mut body = code_with_exceptions(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(synchronizer),
+            Instruction::Dup,
+            Instruction::Astore_1,
+            Instruction::Monitorenter,
+            Instruction::Aload_0,
+            Instruction::Getfield(clear_on_insert),
+            Instruction::Ifeq(13),
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(clear),
+            Instruction::Aload_0,
+            Instruction::Iconst_0,
+            Instruction::Putfield(clear_on_insert),
+            Instruction::Aload_0,
+            Instruction::Getfield(terminated),
+            Instruction::Ifne(21),
+            Instruction::Aload_0,
+            Instruction::Iconst_1,
+            Instruction::Putfield(terminate_on_empty),
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(signal_waiters),
+            Instruction::Aload_1,
+            Instruction::Monitorexit,
+            Instruction::Goto(29),
+            Instruction::Astore_2,
+            Instruction::Aload_1,
+            Instruction::Monitorexit,
+            Instruction::Aload_2,
+            Instruction::Athrow,
+            Instruction::Return,
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 5..23,
+                handler_pc: 24,
+                catch_type: 0,
+            },
+            ExceptionTableEntry {
+                range_pc: 24..27,
+                handler_pc: 24,
+                catch_type: 0,
+            },
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: 13,
+                locals: vec![VerificationType::Object {
+                    cpool_index: object,
+                }],
+            },
+            StackFrame::SameFrame { frame_type: 7 },
+            StackFrame::SameLocals1StackItemFrame {
+                frame_type: 66,
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: 4,
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn abstract_audio_frame_buffer_clear_on_insert(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(ABSTRACT_AUDIO_FRAME_BUFFER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let synchronizer = pool.add_field_ref(owner, "synchronizer", "Ljava/lang/Object;")?;
+    let clear_on_insert = pool.add_field_ref(owner, "clearOnInsert", "Z")?;
+    let terminate_on_empty = pool.add_field_ref(owner, "terminateOnEmpty", "Z")?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let mut body = code_with_exceptions(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(synchronizer),
+            Instruction::Dup,
+            Instruction::Astore_1,
+            Instruction::Monitorenter,
+            Instruction::Aload_0,
+            Instruction::Iconst_1,
+            Instruction::Putfield(clear_on_insert),
+            Instruction::Aload_0,
+            Instruction::Iconst_0,
+            Instruction::Putfield(terminate_on_empty),
+            Instruction::Aload_1,
+            Instruction::Monitorexit,
+            Instruction::Goto(19),
+            Instruction::Astore_2,
+            Instruction::Aload_1,
+            Instruction::Monitorexit,
+            Instruction::Aload_2,
+            Instruction::Athrow,
+            Instruction::Return,
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 5..13,
+                handler_pc: 14,
+                catch_type: 0,
+            },
+            ExceptionTableEntry {
+                range_pc: 14..17,
+                handler_pc: 14,
+                catch_type: 0,
+            },
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 14,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: object,
+                    },
+                ],
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: 4,
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn abstract_audio_frame_buffer_lock(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(ABSTRACT_AUDIO_FRAME_BUFFER_CLASS)?;
+    let locked = pool.add_field_ref(owner, "locked", "Z")?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Iconst_1,
+            Instruction::Putfield(locked),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn add_stack_map_table(
+    pool: &mut ConstantPool<'static>,
+    body: &mut Attribute,
+    frames: Vec<StackFrame>,
+) -> Result<()> {
+    let Attribute::Code { attributes, .. } = body else {
+        return Err("expected generated code attribute".into());
+    };
+    attributes.push(Attribute::StackMapTable {
+        name_index: pool.add_utf8("StackMapTable")?,
+        frames,
+    });
+    Ok(())
 }
 
 fn track_marker_tracker_replacement(

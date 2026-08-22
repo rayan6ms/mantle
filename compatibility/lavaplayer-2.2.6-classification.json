@@ -24528,144 +24528,192 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, synchronized state transitions, wait-loop and interruption behavior, failure-prefix retention, volatile flags, and reflection metadata are covered by the Phase 13 abstract-audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractAudioFrameBuffer",
       "symbol_kind": "FIELD",
       "member_name": "format",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, synchronized state transitions, wait-loop and interruption behavior, failure-prefix retention, volatile flags, and reflection metadata are covered by the Phase 13 abstract-audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractAudioFrameBuffer",
       "symbol_kind": "FIELD",
       "member_name": "synchronizer",
       "descriptor": "Ljava/lang/Object;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, synchronized state transitions, wait-loop and interruption behavior, failure-prefix retention, volatile flags, and reflection metadata are covered by the Phase 13 abstract-audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractAudioFrameBuffer",
       "symbol_kind": "FIELD",
       "member_name": "locked",
       "descriptor": "Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, synchronized state transitions, wait-loop and interruption behavior, failure-prefix retention, volatile flags, and reflection metadata are covered by the Phase 13 abstract-audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractAudioFrameBuffer",
       "symbol_kind": "FIELD",
       "member_name": "receivedFrames",
       "descriptor": "Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, synchronized state transitions, wait-loop and interruption behavior, failure-prefix retention, volatile flags, and reflection metadata are covered by the Phase 13 abstract-audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractAudioFrameBuffer",
       "symbol_kind": "FIELD",
       "member_name": "terminated",
       "descriptor": "Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, synchronized state transitions, wait-loop and interruption behavior, failure-prefix retention, volatile flags, and reflection metadata are covered by the Phase 13 abstract-audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractAudioFrameBuffer",
       "symbol_kind": "FIELD",
       "member_name": "terminateOnEmpty",
       "descriptor": "Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, synchronized state transitions, wait-loop and interruption behavior, failure-prefix retention, volatile flags, and reflection metadata are covered by the Phase 13 abstract-audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractAudioFrameBuffer",
       "symbol_kind": "FIELD",
       "member_name": "clearOnInsert",
       "descriptor": "Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, synchronized state transitions, wait-loop and interruption behavior, failure-prefix retention, volatile flags, and reflection metadata are covered by the Phase 13 abstract-audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractAudioFrameBuffer",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, synchronized state transitions, wait-loop and interruption behavior, failure-prefix retention, volatile flags, and reflection metadata are covered by the Phase 13 abstract-audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractAudioFrameBuffer",
       "symbol_kind": "METHOD",
       "member_name": "waitForTermination",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, synchronized state transitions, wait-loop and interruption behavior, failure-prefix retention, volatile flags, and reflection metadata are covered by the Phase 13 abstract-audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractAudioFrameBuffer",
       "symbol_kind": "METHOD",
       "member_name": "setTerminateOnEmpty",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, synchronized state transitions, wait-loop and interruption behavior, failure-prefix retention, volatile flags, and reflection metadata are covered by the Phase 13 abstract-audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractAudioFrameBuffer",
       "symbol_kind": "METHOD",
       "member_name": "setClearOnInsert",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, synchronized state transitions, wait-loop and interruption behavior, failure-prefix retention, volatile flags, and reflection metadata are covered by the Phase 13 abstract-audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractAudioFrameBuffer",
       "symbol_kind": "METHOD",
       "member_name": "hasClearOnInsert",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, synchronized state transitions, wait-loop and interruption behavior, failure-prefix retention, volatile flags, and reflection metadata are covered by the Phase 13 abstract-audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractAudioFrameBuffer",
       "symbol_kind": "METHOD",
       "member_name": "lockBuffer",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, synchronized state transitions, wait-loop and interruption behavior, failure-prefix retention, volatile flags, and reflection metadata are covered by the Phase 13 abstract-audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractAudioFrameBuffer",
       "symbol_kind": "METHOD",
       "member_name": "hasReceivedFrames",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, synchronized state transitions, wait-loop and interruption behavior, failure-prefix retention, volatile flags, and reflection metadata are covered by the Phase 13 abstract-audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractAudioFrameBuffer",
       "symbol_kind": "METHOD",
       "member_name": "signalWaiters",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure, synchronized state transitions, wait-loop and interruption behavior, failure-prefix retention, volatile flags, and reflection metadata are covered by the Phase 13 abstract-audio-frame-buffer-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.AbstractMutableAudioFrame",
