@@ -31,6 +31,8 @@ const PLAYER_LIFECYCLE_HELPER_CLASS: &str = "dev/mantle/internal/NativeAudioPlay
 const MANAGER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayerManager";
 const PLAYER_LIFECYCLE_MANAGER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/AudioPlayerLifecycleManager";
+const FUNCTIONAL_RESULT_HANDLER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/player/FunctionalResultHandler";
 const AUDIO_REFERENCE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/AudioReference";
 const DECODED_TRACK_HOLDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/DecodedTrackHolder";
@@ -75,6 +77,7 @@ const TRACK_STUCK_EVENT_CLASS: &str =
 const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/player/AudioLoadResultHandler",
     PLAYER_LIFECYCLE_MANAGER_CLASS,
+    FUNCTIONAL_RESULT_HANDLER_CLASS,
     CONFIGURATION_CLASS,
     RESAMPLING_CLASS,
     AUDIO_PLAYER_OPTIONS_CLASS,
@@ -416,10 +419,12 @@ fn method_key(class: &ClassFile<'_>, method: &Method) -> Result<(String, String)
 fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<'static>> {
     let class_name = class.class_name()?.to_string();
     class.fields.retain(|field| {
-        class_name == PLAYER_LIFECYCLE_MANAGER_CLASS
-            || field
-                .access_flags
-                .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
+        matches!(
+            class_name.as_str(),
+            PLAYER_LIFECYCLE_MANAGER_CLASS | FUNCTIONAL_RESULT_HANDLER_CLASS
+        ) || field
+            .access_flags
+            .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
     });
     class.methods.retain(|method| {
         method
@@ -484,6 +489,9 @@ fn replacement_body(
     }
     if class_name == PLAYER_LIFECYCLE_MANAGER_CLASS {
         return audio_player_lifecycle_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == FUNCTIONAL_RESULT_HANDLER_CLASS {
+        return functional_result_handler_replacement(pool, name, descriptor, required_locals);
     }
     if track_enum_constants(class_name).is_some() {
         return track_enum_replacement(pool, class_name, name, descriptor, required_locals);
@@ -613,6 +621,49 @@ fn audio_player_lifecycle_replacement(
             pool,
             &format!(
                 "Phase 13 does not implement {PLAYER_LIFECYCLE_MANAGER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn functional_result_handler_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Ljava/util/function/Consumer;Ljava/util/function/Consumer;Ljava/lang/Runnable;Ljava/util/function/Consumer;)V",
+        ) => functional_result_handler_constructor(pool),
+        ("trackLoaded", "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)V") => {
+            functional_result_handler_consumer(
+                pool,
+                "trackConsumer",
+                "Ljava/util/function/Consumer;",
+            )
+        }
+        ("playlistLoaded", "(Lcom/sedmelluq/discord/lavaplayer/track/AudioPlaylist;)V") => {
+            functional_result_handler_consumer(
+                pool,
+                "playlistConsumer",
+                "Ljava/util/function/Consumer;",
+            )
+        }
+        ("noMatches", "()V") => functional_result_handler_runnable(pool),
+        ("loadFailed", "(Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException;)V") => {
+            functional_result_handler_consumer(
+                pool,
+                "exceptionConsumer",
+                "Ljava/util/function/Consumer;",
+            )
+        }
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {FUNCTIONAL_RESULT_HANDLER_CLASS}.{name}{descriptor}"
             ),
             required_locals,
         ),
@@ -2297,6 +2348,108 @@ fn object_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
             Instruction::Return,
         ],
     )
+}
+
+fn functional_result_handler_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(FUNCTIONAL_RESULT_HANDLER_CLASS)?;
+    let track_consumer =
+        pool.add_field_ref(owner, "trackConsumer", "Ljava/util/function/Consumer;")?;
+    let playlist_consumer =
+        pool.add_field_ref(owner, "playlistConsumer", "Ljava/util/function/Consumer;")?;
+    let empty_result_handler =
+        pool.add_field_ref(owner, "emptyResultHandler", "Ljava/lang/Runnable;")?;
+    let exception_consumer =
+        pool.add_field_ref(owner, "exceptionConsumer", "Ljava/util/function/Consumer;")?;
+    code(
+        pool,
+        2,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(track_consumer),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(playlist_consumer),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Putfield(empty_result_handler),
+            Instruction::Aload_0,
+            Instruction::Aload(4),
+            Instruction::Putfield(exception_consumer),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn functional_result_handler_consumer(
+    pool: &mut ConstantPool<'static>,
+    field_name: &str,
+    field_descriptor: &str,
+) -> Result<Attribute> {
+    let owner = pool.add_class(FUNCTIONAL_RESULT_HANDLER_CLASS)?;
+    let field = pool.add_field_ref(owner, field_name, field_descriptor)?;
+    let consumer = pool.add_class("java/util/function/Consumer")?;
+    let accept = pool.add_interface_method_ref(consumer, "accept", "(Ljava/lang/Object;)V")?;
+    let mut body = code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Ifnull(7),
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(accept, 2),
+            Instruction::Return,
+        ],
+    )?;
+    add_same_frame(pool, &mut body, 7)?;
+    Ok(body)
+}
+
+fn functional_result_handler_runnable(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FUNCTIONAL_RESULT_HANDLER_CLASS)?;
+    let field = pool.add_field_ref(owner, "emptyResultHandler", "Ljava/lang/Runnable;")?;
+    let runnable = pool.add_class("java/lang/Runnable")?;
+    let run = pool.add_interface_method_ref(runnable, "run", "()V")?;
+    let mut body = code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Ifnull(6),
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Invokeinterface(run, 1),
+            Instruction::Return,
+        ],
+    )?;
+    add_same_frame(pool, &mut body, 6)?;
+    Ok(body)
+}
+
+fn add_same_frame(
+    pool: &mut ConstantPool<'static>,
+    body: &mut Attribute,
+    frame_type: u8,
+) -> Result<()> {
+    let Attribute::Code { attributes, .. } = body else {
+        return Err("expected generated code attribute".into());
+    };
+    attributes.push(Attribute::StackMapTable {
+        name_index: pool.add_utf8("StackMapTable")?,
+        frames: vec![StackFrame::SameFrame { frame_type }],
+    });
+    Ok(())
 }
 
 fn audio_player_lifecycle_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {

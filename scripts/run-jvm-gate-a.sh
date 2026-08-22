@@ -22,7 +22,7 @@ cargo run --locked -q -p mantle-jvm-gate -- emit \
 cargo run --locked -q -p mantle-jvm-gate -- verify-structure \
   --reference-jar "$REFERENCE_JAR" --candidate-jar "$JAR"
 
-for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame audio-frame-provider-tools audio-processing-context audio-player-options decoded-track-holder track-state-listener audio-output-hook audio-load-result-handler audio-player-lifecycle-manager; do
+for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame audio-frame-provider-tools audio-processing-context audio-player-options decoded-track-holder track-state-listener audio-output-hook audio-load-result-handler functional-result-handler audio-player-lifecycle-manager; do
   case "$consumer" in
     smoke) consumer_class='Smoke' ;;
     probe) consumer_class='Probe' ;;
@@ -46,6 +46,7 @@ for consumer in smoke probe integration classloader event track-value track-enum
     track-state-listener) consumer_class='TrackStateListener' ;;
     audio-output-hook) consumer_class='AudioOutputHook' ;;
     audio-load-result-handler) consumer_class='AudioLoadResultHandler' ;;
+    functional-result-handler) consumer_class='FunctionalResultHandler' ;;
     audio-player-lifecycle-manager) consumer_class='AudioPlayerLifecycleManager' ;;
   esac
   cargo run --locked -q -p mantle-jvm-gate -- "write-$consumer-consumer" \
@@ -62,7 +63,8 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateAudioFrameProviderTools.java" "$WORK/GateAudioProcessingContext.java" \
   "$WORK/GateAudioPlayerOptions.java" "$WORK/GateDecodedTrackHolder.java" \
   "$WORK/GateTrackStateListener.java" "$WORK/GateAudioOutputHook.java" \
-  "$WORK/GateAudioLoadResultHandler.java" "$WORK/GateAudioPlayerLifecycleManager.java"
+  "$WORK/GateAudioLoadResultHandler.java" "$WORK/GateFunctionalResultHandler.java" \
+  "$WORK/GateAudioPlayerLifecycleManager.java"
 javac --release 11 -d "$CLASSES" "$WORK/GateClassloader.java"
 
 case "$(uname -s)" in
@@ -283,6 +285,17 @@ cmp "$WORK/audio-load-result-handler-reference.txt" \
 grep --fixed-strings \
   'dispatch=track,playlist,none,failed,nulls,ordered;' \
   "$WORK/audio-load-result-handler-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$classes_argument$classpath_separator$reference_argument" GateFunctionalResultHandler \
+  >"$WORK/functional-result-handler-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$reference_argument" GateFunctionalResultHandler \
+  >"$WORK/functional-result-handler-candidate.txt"
+cmp "$WORK/functional-result-handler-reference.txt" \
+  "$WORK/functional-result-handler-candidate.txt"
+grep --fixed-strings \
+  'callbacks=nullable,exceptions-propagated;' \
+  "$WORK/functional-result-handler-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$classes_argument$classpath_separator$reference_argument" GateAudioPlayerLifecycleManager \
   >"$WORK/audio-player-lifecycle-manager-reference.txt"

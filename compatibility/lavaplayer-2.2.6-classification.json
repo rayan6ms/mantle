@@ -11573,54 +11573,84 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact class, private generic field, constructor, and method structure, ordered callback routing, payload identity including null values, null callback suppression, and unchanged exception propagation are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.FunctionalResultHandler",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Ljava/util/function/Consumer;Ljava/util/function/Consumer;Ljava/lang/Runnable;Ljava/util/function/Consumer;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact class, private generic field, constructor, and method structure, ordered callback routing, payload identity including null values, null callback suppression, and unchanged exception propagation are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.FunctionalResultHandler",
       "symbol_kind": "METHOD",
       "member_name": "trackLoaded",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact class, private generic field, constructor, and method structure, ordered callback routing, payload identity including null values, null callback suppression, and unchanged exception propagation are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.FunctionalResultHandler",
       "symbol_kind": "METHOD",
       "member_name": "playlistLoaded",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioPlaylist;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact class, private generic field, constructor, and method structure, ordered callback routing, payload identity including null values, null callback suppression, and unchanged exception propagation are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.FunctionalResultHandler",
       "symbol_kind": "METHOD",
       "member_name": "noMatches",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact class, private generic field, constructor, and method structure, ordered callback routing, payload identity including null values, null callback suppression, and unchanged exception propagation are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.FunctionalResultHandler",
       "symbol_kind": "METHOD",
       "member_name": "loadFailed",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact class, private generic field, constructor, and method structure, ordered callback routing, payload identity including null values, null callback suppression, and unchanged exception propagation are covered by the Phase 13 JVM oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.player.event.AudioEvent",

@@ -68,6 +68,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-track-state-listener-consumer" => Some(TRACK_STATE_LISTENER_CONSUMER),
         "write-audio-output-hook-consumer" => Some(AUDIO_OUTPUT_HOOK_CONSUMER),
         "write-audio-load-result-handler-consumer" => Some(AUDIO_LOAD_RESULT_HANDLER_CONSUMER),
+        "write-functional-result-handler-consumer" => Some(FUNCTIONAL_RESULT_HANDLER_CONSUMER),
         "write-audio-player-lifecycle-manager-consumer" => {
             Some(AUDIO_PLAYER_LIFECYCLE_MANAGER_CONSUMER)
         }
@@ -2549,6 +2550,173 @@ public final class GateAudioLoadResultHandler {
         && Arrays.equals(method.getParameterTypes(), parameters)
         && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0,
         "method metadata " + method.getName());
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const FUNCTIONAL_RESULT_HANDLER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler;
+import com.sedmelluq.discord.lavaplayer.player.FunctionalResultHandler;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Consumer;
+
+public final class GateFunctionalResultHandler {
+  public static void main(String[] args) throws Exception {
+    AudioTrack track = proxy(AudioTrack.class);
+    AudioPlaylist playlist = proxy(AudioPlaylist.class);
+    FriendlyException exception = allocate(FriendlyException.class);
+    List<String> calls = new ArrayList<>();
+
+    FunctionalResultHandler handler = new FunctionalResultHandler(
+        value -> {
+          check(value == track || value == null, "track identity");
+          calls.add(value == null ? "track-null" : "track");
+        },
+        value -> {
+          check(value == playlist || value == null, "playlist identity");
+          calls.add(value == null ? "playlist-null" : "playlist");
+        },
+        () -> calls.add("none"),
+        value -> {
+          check(value == exception || value == null, "exception identity");
+          calls.add(value == null ? "failed-null" : "failed");
+        });
+    handler.trackLoaded(track);
+    handler.playlistLoaded(playlist);
+    handler.noMatches();
+    handler.loadFailed(exception);
+    handler.trackLoaded(null);
+    handler.playlistLoaded(null);
+    handler.loadFailed(null);
+    check(calls.equals(Arrays.asList(
+        "track", "playlist", "none", "failed", "track-null", "playlist-null", "failed-null")),
+        "callback order");
+
+    FunctionalResultHandler empty = new FunctionalResultHandler(null, null, null, null);
+    empty.trackLoaded(track);
+    empty.trackLoaded(null);
+    empty.playlistLoaded(playlist);
+    empty.playlistLoaded(null);
+    empty.noMatches();
+    empty.loadFailed(exception);
+    empty.loadFailed(null);
+    check(calls.size() == 7, "null callbacks skipped");
+
+    RuntimeException sentinel = new RuntimeException("sentinel");
+    expectSame(sentinel,
+        () -> new FunctionalResultHandler(value -> { throw sentinel; }, null, null, null)
+            .trackLoaded(track));
+    expectSame(sentinel,
+        () -> new FunctionalResultHandler(null, value -> { throw sentinel; }, null, null)
+            .playlistLoaded(playlist));
+    expectSame(sentinel,
+        () -> new FunctionalResultHandler(null, null, () -> { throw sentinel; }, null)
+            .noMatches());
+    expectSame(sentinel,
+        () -> new FunctionalResultHandler(null, null, null, value -> { throw sentinel; })
+            .loadFailed(exception));
+
+    checkReflection();
+    System.out.println(
+        "dispatch=track,playlist,none,failed,nulls,ordered;"
+        + "callbacks=nullable,exceptions-propagated;"
+        + "reflection=class,4-fields,4-methods,1-constructor");
+  }
+
+  private static void checkReflection() throws Exception {
+    Class<FunctionalResultHandler> type = FunctionalResultHandler.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] { AudioLoadResultHandler.class })
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0,
+        "class structure");
+    check(type.getDeclaredFields().length == 4 && type.getDeclaredMethods().length == 4
+        && type.getDeclaredConstructors().length == 1, "member counts");
+    checkField(type, "trackConsumer", Consumer.class,
+        "java.util.function.Consumer<com.sedmelluq.discord.lavaplayer.track.AudioTrack>");
+    checkField(type, "playlistConsumer", Consumer.class,
+        "java.util.function.Consumer<com.sedmelluq.discord.lavaplayer.track.AudioPlaylist>");
+    checkField(type, "emptyResultHandler", Runnable.class, "java.lang.Runnable");
+    checkField(type, "exceptionConsumer", Consumer.class,
+        "java.util.function.Consumer<com.sedmelluq.discord.lavaplayer.tools.FriendlyException>");
+
+    Constructor<FunctionalResultHandler> constructor = type.getDeclaredConstructor(
+        Consumer.class, Consumer.class, Runnable.class, Consumer.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0
+        && constructor.getTypeParameters().length == 0, "constructor metadata");
+    Type[] genericParameters = constructor.getGenericParameterTypes();
+    check(genericParameters.length == 4
+        && genericParameters[0].getTypeName().equals(
+            "java.util.function.Consumer<com.sedmelluq.discord.lavaplayer.track.AudioTrack>")
+        && genericParameters[1].getTypeName().equals(
+            "java.util.function.Consumer<com.sedmelluq.discord.lavaplayer.track.AudioPlaylist>")
+        && genericParameters[2].getTypeName().equals("java.lang.Runnable")
+        && genericParameters[3].getTypeName().equals(
+            "java.util.function.Consumer<com.sedmelluq.discord.lavaplayer.tools.FriendlyException>"),
+        "constructor generic parameters");
+    checkMethod(type.getDeclaredMethod("trackLoaded", AudioTrack.class),
+        new Class<?>[] { AudioTrack.class });
+    checkMethod(type.getDeclaredMethod("playlistLoaded", AudioPlaylist.class),
+        new Class<?>[] { AudioPlaylist.class });
+    checkMethod(type.getDeclaredMethod("noMatches"), new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("loadFailed", FriendlyException.class),
+        new Class<?>[] { FriendlyException.class });
+  }
+
+  private static void checkField(
+      Class<?> owner, String name, Class<?> fieldType, String genericType) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == fieldType
+        && field.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && field.getGenericType().getTypeName().equals(genericType)
+        && !field.isSynthetic() && field.getDeclaredAnnotations().length == 0,
+        "field metadata " + name);
+  }
+
+  private static void checkMethod(Method method, Class<?>[] parameters) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == void.class
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && !method.isBridge() && !method.isSynthetic() && !method.isDefault()
+        && !method.isVarArgs(), "method metadata " + method.getName());
+  }
+
+  private static void expectSame(RuntimeException sentinel, Runnable invocation) {
+    try {
+      invocation.run();
+      throw new AssertionError("callback exception swallowed");
+    } catch (RuntimeException actual) {
+      check(actual == sentinel, "callback exception identity");
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] { type },
+        (instance, method, arguments) -> null);
+  }
+
+  private static <T> T allocate(Class<T> type) throws Exception {
+    Class<?> unsafeType = Class.forName("sun.misc.Unsafe");
+    Field singleton = unsafeType.getDeclaredField("theUnsafe");
+    singleton.setAccessible(true);
+    Object unsafe = singleton.get(null);
+    return type.cast(unsafeType.getMethod("allocateInstance", Class.class).invoke(unsafe, type));
   }
 
   private static void check(boolean condition, String message) {
