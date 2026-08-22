@@ -164,6 +164,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
             Some(SOUND_CLOUD_OPUS_SEGMENT_DECODER_CONSUMER)
         }
         "write-sound-cloud-playlist-loader-consumer" => Some(SOUND_CLOUD_PLAYLIST_LOADER_CONSUMER),
+        "write-sound-cloud-segment-decoder-consumer" => Some(SOUND_CLOUD_SEGMENT_DECODER_CONSUMER),
         _ => None,
     }
 }
@@ -9216,6 +9217,181 @@ public final class GateSoundCloudPlaylistLoader {
           return null;
         }));
   }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const SOUND_CLOUD_SEGMENT_DECODER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerOptions;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudSegmentDecoder;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+
+public final class GateSoundCloudSegmentDecoder {
+  public static void main(String[] args) throws Exception {
+    dispatchContract();
+    failureContract();
+    reflectionContract();
+    System.out.println(
+        "public-abstract-interface,autocloseable,0-fields,0-constructors,3-methods;"
+        + "ordered-dispatch,boolean,longs,context-identity,nulls,checked-failures,reflection");
+  }
+
+  private static void dispatchContract() throws Exception {
+    AudioConfiguration configuration = new AudioConfiguration();
+    AudioFrameBuffer buffer = proxy(AudioFrameBuffer.class);
+    AudioPlayerOptions options = new AudioPlayerOptions();
+    AudioDataFormat format = configuration.getOutputFormat();
+    AudioProcessingContext context =
+        new AudioProcessingContext(configuration, buffer, options, format);
+    RecordingDecoder decoder = new RecordingDecoder();
+    decoder.prepareStream(true);
+    decoder.prepareStream(false);
+    decoder.resetStream();
+    decoder.playStream(context, Long.MIN_VALUE, Long.MAX_VALUE);
+    check(decoder.context == context && decoder.startPosition == Long.MIN_VALUE
+        && decoder.desiredPosition == Long.MAX_VALUE, "play argument identity");
+    decoder.playStream(null, -1L, 0L);
+    check(decoder.context == null && decoder.startPosition == -1L
+        && decoder.desiredPosition == 0L, "null play context");
+    decoder.close();
+    check(decoder.events.toString().equals("prepare:true;prepare:false;reset;play;play;close;"),
+        "ordered dispatch");
+  }
+
+  private static void failureContract() throws Exception {
+    IOException prepareFailure = new IOException("prepare-sentinel");
+    RecordingDecoder prepareDecoder = new RecordingDecoder();
+    prepareDecoder.failure = prepareFailure;
+    check(capture(() -> prepareDecoder.prepareStream(true)) == prepareFailure,
+        "prepare IOException identity");
+
+    IOException resetFailure = new IOException("reset-sentinel");
+    RecordingDecoder resetDecoder = new RecordingDecoder();
+    resetDecoder.failure = resetFailure;
+    check(capture(resetDecoder::resetStream) == resetFailure, "reset IOException identity");
+
+    InterruptedException interrupted = new InterruptedException("play-interrupted");
+    RecordingDecoder interruptedDecoder = new RecordingDecoder();
+    interruptedDecoder.failure = interrupted;
+    check(capture(() -> interruptedDecoder.playStream(null, 0L, 0L)) == interrupted,
+        "play interruption identity");
+
+    IOException playFailure = new IOException("play-io-sentinel");
+    RecordingDecoder ioDecoder = new RecordingDecoder();
+    ioDecoder.failure = playFailure;
+    check(capture(() -> ioDecoder.playStream(null, 0L, 0L)) == playFailure,
+        "play IOException identity");
+
+    Exception closeFailure = new Exception("close-sentinel");
+    RecordingDecoder closeDecoder = new RecordingDecoder();
+    closeDecoder.failure = closeFailure;
+    check(capture(closeDecoder::close) == closeFailure, "inherited close failure identity");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<SoundCloudSegmentDecoder> type = SoundCloudSegmentDecoder.class;
+    check(type.isInterface() && Modifier.isPublic(type.getModifiers())
+        && Modifier.isAbstract(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == null
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {AutoCloseable.class})
+        && type.getTypeParameters().length == 0 && type.getAnnotations().length == 0,
+        "interface metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 3 && type.getMethods().length == 4,
+        "member counts");
+    checkMethod(type, "prepareStream", new Class<?>[] {boolean.class},
+        new Class<?>[] {IOException.class});
+    checkMethod(type, "resetStream", new Class<?>[0], new Class<?>[] {IOException.class});
+    checkMethod(type, "playStream",
+        new Class<?>[] {AudioProcessingContext.class, long.class, long.class},
+        new Class<?>[] {InterruptedException.class, IOException.class});
+    Method close = type.getMethod("close");
+    check(close.getDeclaringClass() == AutoCloseable.class
+        && Arrays.equals(close.getExceptionTypes(), new Class<?>[] {Exception.class}),
+        "inherited close metadata");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?>[] parameters,
+                                  Class<?>[] exceptions) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == void.class
+        && method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.getTypeParameters().length == 0 && !method.isDefault()
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs(),
+        name + " metadata");
+  }
+
+  private static Throwable capture(Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected failure");
+    } catch (Throwable error) {
+      return error;
+    }
+  }
+
+  private static <T> T proxy(Class<T> type) {
+    return type.cast(Proxy.newProxyInstance(
+        GateSoundCloudSegmentDecoder.class.getClassLoader(), new Class<?>[] {type},
+        (proxy, method, args) -> {
+          if (method.getReturnType() == boolean.class) return false;
+          if (method.getReturnType() == int.class) return 0;
+          if (method.getReturnType() == long.class) return 0L;
+          return null;
+        }));
+  }
+
+  private static final class RecordingDecoder implements SoundCloudSegmentDecoder {
+    private final StringBuilder events = new StringBuilder();
+    private Throwable failure;
+    private AudioProcessingContext context;
+    private long startPosition;
+    private long desiredPosition;
+
+    @Override
+    public void prepareStream(boolean beginning) throws IOException {
+      if (failure != null) throw (IOException) failure;
+      events.append("prepare:").append(beginning).append(';');
+    }
+
+    @Override
+    public void resetStream() throws IOException {
+      if (failure != null) throw (IOException) failure;
+      events.append("reset;");
+    }
+
+    @Override
+    public void playStream(AudioProcessingContext actualContext, long actualStartPosition,
+                           long actualDesiredPosition) throws InterruptedException, IOException {
+      if (failure instanceof InterruptedException) throw (InterruptedException) failure;
+      if (failure != null) throw (IOException) failure;
+      context = actualContext;
+      startPosition = actualStartPosition;
+      desiredPosition = actualDesiredPosition;
+      events.append("play;");
+    }
+
+    @Override
+    public void close() throws Exception {
+      if (failure != null) throw (Exception) failure;
+      events.append("close;");
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

@@ -15793,36 +15793,52 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated shell and reference-differential oracle preserve the exact public abstract interface, sole AutoCloseable parent, empty field/constructor surface, and three declared methods.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudSegmentDecoder",
       "symbol_kind": "METHOD",
       "member_name": "prepareStream",
       "descriptor": "(Z)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential dispatch preserves both boolean values, the public abstract descriptor, and checked IOException identity.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudSegmentDecoder",
       "symbol_kind": "METHOD",
       "member_name": "resetStream",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential dispatch preserves the public abstract no-argument reset contract and checked IOException identity.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudSegmentDecoder",
       "symbol_kind": "METHOD",
       "member_name": "playStream",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;JJ)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential dispatch preserves context identity including null, full-width long arguments, and checked InterruptedException then IOException metadata and failure identity.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudSegmentDecoder$Factory",
