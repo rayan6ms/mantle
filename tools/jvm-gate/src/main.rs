@@ -76,6 +76,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-audio-player-manager-interface-consumer" => {
             Some(AUDIO_PLAYER_MANAGER_INTERFACE_CONSUMER)
         }
+        "write-default-audio-player-consumer" => Some(DEFAULT_AUDIO_PLAYER_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -3598,6 +3599,320 @@ public final class GateAudioPlayerManagerInterface {
       check(reference != null, prefix + " reference null");
       return prefix + ":" + reference.identifier + ":" + reference.title;
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const DEFAULT_AUDIO_PLAYER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.PcmFilterFactory;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerOptions;
+import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayer;
+import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager;
+import com.sedmelluq.discord.lavaplayer.player.event.AudioEvent;
+import com.sedmelluq.discord.lavaplayer.player.event.AudioEventListener;
+import com.sedmelluq.discord.lavaplayer.player.event.PlayerPauseEvent;
+import com.sedmelluq.discord.lavaplayer.player.event.PlayerResumeEvent;
+import com.sedmelluq.discord.lavaplayer.player.event.TrackEndEvent;
+import com.sedmelluq.discord.lavaplayer.player.event.TrackExceptionEvent;
+import com.sedmelluq.discord.lavaplayer.player.event.TrackStartEvent;
+import com.sedmelluq.discord.lavaplayer.player.event.TrackStuckEvent;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.InternalAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.TrackStateListener;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioTrackExecutor;
+import com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.TerminatorAudioFrame;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+public final class GateDefaultAudioPlayer {
+  public static void main(String[] args) throws Exception {
+    TestManager manager = allocate(TestManager.class);
+    manager.configuration = new AudioConfiguration();
+    manager.thresholdNanos = -1L;
+    DefaultAudioPlayer player = new DefaultAudioPlayer(manager);
+    check(player.getPlayingTrack() == null && player.getVolume() == 100 && !player.isPaused(),
+        "constructor defaults");
+
+    List<String> events = new ArrayList<>();
+    AudioEventListener recorder = event -> events.add(eventName(player, event));
+    AudioEventListener throwing = event -> { throw new IllegalStateException("listener"); };
+    AudioEventListener duplicate = event -> events.add("duplicate");
+    player.addListener(throwing);
+    player.addListener(recorder);
+    player.addListener(duplicate);
+    player.addListener(duplicate);
+    player.removeListener(duplicate);
+    player.setPaused(true);
+    player.setPaused(true);
+    player.setPaused(false);
+    player.setPaused(false);
+    check(events.equals(Arrays.asList("pause", "resume")), "pause event transitions");
+    check(!player.isPaused(), "resume state");
+
+    PcmFilterFactory filter = proxy(PcmFilterFactory.class, null);
+    player.setVolume(Integer.MIN_VALUE);
+    check(player.getVolume() == 0, "volume lower clamp");
+    player.setVolume(Integer.MAX_VALUE);
+    check(player.getVolume() == 1000, "volume upper clamp");
+    player.setVolume(321);
+    player.setFilterFactory(filter);
+    player.setFrameBufferDuration(-1000);
+
+    TrackHandler firstCalls = new TrackHandler("first");
+    TrackHandler secondCalls = new TrackHandler("second");
+    InternalAudioTrack first = track(firstCalls);
+    InternalAudioTrack second = track(secondCalls);
+    try {
+      player.startTrack(proxy(AudioTrack.class, null), false);
+      throw new AssertionError("non-internal track accepted");
+    } catch (ClassCastException expected) {
+      check(player.getPlayingTrack() == null, "invalid track mutated state");
+    }
+
+    check(player.startTrack(first, false), "first start");
+    check(player.getPlayingTrack() == first && manager.executions == 1
+        && manager.lastTrack == first && manager.lastOptions.volumeLevel.get() == 321
+        && manager.lastOptions.filterFactory.get() == filter
+        && manager.lastOptions.frameBufferDuration.get().equals(200), "first execution state");
+    player.setFrameBufferDuration(null);
+    check(!player.startTrack(second, true) && player.getPlayingTrack() == first
+        && manager.executions == 1, "no-interrupt rejection");
+    check(player.startTrack(second, false) && firstCalls.stops == 1
+        && manager.executions == 2 && manager.lastOptions.frameBufferDuration.get() == null,
+        "replacement");
+
+    AudioFrame shadowFrame = frame(false);
+    firstCalls.immediate = shadowFrame;
+    secondCalls.immediate = null;
+    check(player.provide() == shadowFrame, "shadow frame");
+    AudioFrame timedFrame = frame(false);
+    secondCalls.timed = timedFrame;
+    check(player.provide(Long.MAX_VALUE, TimeUnit.DAYS) == timedFrame
+        && secondCalls.lastTimeout == Long.MAX_VALUE && secondCalls.lastUnit == TimeUnit.DAYS,
+        "timed frame");
+    MutableAudioFrame mutable = new MutableAudioFrame();
+    secondCalls.mutableImmediate = true;
+    check(player.provide(mutable), "mutable frame");
+    secondCalls.mutableTimed = true;
+    check(player.provide(mutable, Long.MIN_VALUE, TimeUnit.NANOSECONDS),
+        "negative-timeout mutable frame");
+
+    player.stopTrack();
+    check(player.getPlayingTrack() == null && secondCalls.stops == 1, "stop");
+    player.playTrack(first);
+    player.destroy();
+    check(firstCalls.stops == 2, "destroy");
+    player.playTrack(second);
+    player.checkCleanup(Long.MIN_VALUE);
+    check(secondCalls.stops == 2 && player.getPlayingTrack() == null, "cleanup");
+
+    FriendlyException failure = allocate(FriendlyException.class);
+    player.onTrackException(first, failure);
+    player.onTrackStuck(first, Long.MAX_VALUE);
+    player.playTrack(first);
+    firstCalls.immediate = null;
+    check(player.provide() == null, "stuck provide");
+    check(player.provide() == null, "stuck event once");
+    player.stopTrack();
+
+    check(events.equals(Arrays.asList(
+        "pause", "resume", "start:first", "end:first:REPLACED", "start:second",
+        "stuck:second:0", "end:second:STOPPED", "start:first", "end:first:STOPPED", "start:second",
+        "end:second:CLEANUP", "exception:first", "stuck:first:" + Long.MAX_VALUE,
+        "start:first", "stuck:first:0", "end:first:STOPPED")), "event order: " + events);
+
+    List<String> terminalReasons = new ArrayList<>();
+    DefaultAudioPlayer terminalPlayer = new DefaultAudioPlayer(manager);
+    terminalPlayer.addListener(event -> {
+      if (event instanceof TrackEndEvent) {
+        terminalReasons.add(((TrackEndEvent) event).endReason.name());
+      }
+    });
+    TrackHandler finishedCalls = new TrackHandler("finished");
+    finishedCalls.immediate = TerminatorAudioFrame.INSTANCE;
+    InternalAudioTrack finished = track(finishedCalls);
+    terminalPlayer.playTrack(finished);
+    check(terminalPlayer.provide() == null && terminalPlayer.getPlayingTrack() == null
+        && finishedCalls.stops == 1, "finished terminator");
+    TrackHandler failedCalls = new TrackHandler("failed");
+    failedCalls.failedBeforeLoad = true;
+    failedCalls.immediate = TerminatorAudioFrame.INSTANCE;
+    InternalAudioTrack failed = track(failedCalls);
+    terminalPlayer.playTrack(failed);
+    check(terminalPlayer.provide() == null && terminalPlayer.getPlayingTrack() == null
+        && failedCalls.stops == 1 && terminalReasons.equals(Arrays.asList("FINISHED", "LOAD_FAILED")),
+        "failed terminator: " + terminalReasons);
+
+    DefaultAudioPlayer nullManager = new DefaultAudioPlayer(null);
+    check(nullManager.getVolume() == 100 && nullManager.getPlayingTrack() == null,
+        "nullable manager construction");
+    check(!nullManager.startTrack(null, false), "null track stop");
+    checkReflection();
+    System.out.println(
+        "state=defaults,clamps,pause,replace,stop,destroy,cleanup;"
+        + "frames=shadow,timed,mutable,stuck;events=ordered,isolated,identity;"
+        + "reflection=class,0-fields,21-methods,1-constructor");
+  }
+
+  private static String eventName(DefaultAudioPlayer player, AudioEvent event) {
+    check(event.player == player, "event player identity");
+    if (event instanceof PlayerPauseEvent) return "pause";
+    if (event instanceof PlayerResumeEvent) return "resume";
+    if (event instanceof TrackStartEvent) {
+      return "start:" + ((TrackHandler) Proxy.getInvocationHandler(((TrackStartEvent) event).track)).name;
+    }
+    if (event instanceof TrackEndEvent) {
+      TrackEndEvent value = (TrackEndEvent) event;
+      return "end:" + ((TrackHandler) Proxy.getInvocationHandler(value.track)).name
+          + ":" + value.endReason;
+    }
+    if (event instanceof TrackExceptionEvent) {
+      TrackExceptionEvent value = (TrackExceptionEvent) event;
+      check(value.exception != null, "exception identity");
+      return "exception:" + ((TrackHandler) Proxy.getInvocationHandler(value.track)).name;
+    }
+    if (event instanceof TrackStuckEvent) {
+      TrackStuckEvent value = (TrackStuckEvent) event;
+      check(value.stackTrace == null, "stuck stack trace");
+      return "stuck:" + ((TrackHandler) Proxy.getInvocationHandler(value.track)).name
+          + ":" + value.thresholdMs;
+    }
+    throw new AssertionError("unexpected event " + event);
+  }
+
+  private static void checkReflection() throws Exception {
+    Class<DefaultAudioPlayer> type = DefaultAudioPlayer.class;
+    int modifiers = type.getModifiers();
+    check(Modifier.isPublic(modifiers) && !Modifier.isAbstract(modifiers)
+        && !Modifier.isFinal(modifiers) && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {
+            com.sedmelluq.discord.lavaplayer.player.AudioPlayer.class,
+            TrackStateListener.class }) && type.getFields().length == 0
+        && Arrays.stream(type.getDeclaredMethods()).filter(method -> Modifier.isPublic(
+            method.getModifiers())).count() == 20 && type.getDeclaredConstructors().length == 1,
+        "class structure: " + Modifier.toString(modifiers) + ",fields=" + type.getFields().length
+            + ",methods=" + Arrays.stream(type.getDeclaredMethods()).filter(method ->
+                Modifier.isPublic(method.getModifiers())).count() + ",constructors="
+            + type.getDeclaredConstructors().length + ",interfaces="
+            + Arrays.toString(type.getInterfaces()));
+    Method timed = type.getDeclaredMethod("provide", long.class, TimeUnit.class);
+    Method mutableTimed = type.getDeclaredMethod(
+        "provide", MutableAudioFrame.class, long.class, TimeUnit.class);
+    check(Arrays.equals(timed.getExceptionTypes(), new Class<?>[] {
+        TimeoutException.class, InterruptedException.class })
+        && Arrays.equals(mutableTimed.getExceptionTypes(), new Class<?>[] {
+            TimeoutException.class, InterruptedException.class }), "checked exceptions");
+    for (Method method : type.getDeclaredMethods()) {
+      if (!Modifier.isPublic(method.getModifiers())) continue;
+      check(Modifier.isPublic(method.getModifiers()) && !Modifier.isStatic(method.getModifiers())
+          && !Modifier.isAbstract(method.getModifiers()), "method modifiers " + method);
+    }
+  }
+
+  private static InternalAudioTrack track(TrackHandler handler) {
+    handler.executor = proxy(AudioTrackExecutor.class,
+        (instance, method, arguments) -> method.getName().equals("failedBeforeLoad")
+            ? handler.failedBeforeLoad
+            : defaultValue(method.getReturnType()));
+    return proxy(InternalAudioTrack.class, handler);
+  }
+
+  private static AudioFrame frame(boolean terminator) {
+    return proxy(AudioFrame.class, (instance, method, arguments) ->
+        method.getName().equals("isTerminator") ? terminator : defaultValue(method.getReturnType()));
+  }
+
+  private static final class TrackHandler implements java.lang.reflect.InvocationHandler {
+    final String name;
+    AudioFrame immediate;
+    AudioFrame timed;
+    boolean mutableImmediate;
+    boolean mutableTimed;
+    long lastTimeout;
+    TimeUnit lastUnit;
+    int stops;
+    AudioTrackExecutor executor;
+    boolean failedBeforeLoad;
+
+    TrackHandler(String name) { this.name = name; }
+
+    public Object invoke(Object instance, Method method, Object[] arguments) {
+      if (method.getName().equals("stop")) { stops++; return null; }
+      if (method.getName().equals("getActiveExecutor")) return executor;
+      if (method.getName().equals("provide")) {
+        int count = arguments == null ? 0 : arguments.length;
+        if (count == 0) return immediate;
+        if (arguments[0] instanceof MutableAudioFrame) {
+          if (count == 1) return mutableImmediate;
+          lastTimeout = (Long) arguments[1]; lastUnit = (TimeUnit) arguments[2];
+          return mutableTimed;
+        }
+        lastTimeout = (Long) arguments[0]; lastUnit = (TimeUnit) arguments[1];
+        return timed;
+      }
+      if (method.getName().equals("toString")) return name;
+      return defaultValue(method.getReturnType());
+    }
+  }
+
+  public static class TestManager extends DefaultAudioPlayerManager {
+    AudioConfiguration configuration;
+    long thresholdNanos;
+    int executions;
+    InternalAudioTrack lastTrack;
+    AudioPlayerOptions lastOptions;
+
+    public AudioConfiguration getConfiguration() { return configuration; }
+    public long getTrackStuckThresholdNanos() { return thresholdNanos; }
+    public void executeTrack(TrackStateListener listener, InternalAudioTrack track,
+        AudioConfiguration configuration, AudioPlayerOptions options) {
+      check(listener instanceof DefaultAudioPlayer && configuration == this.configuration,
+          "execute identities");
+      executions++; lastTrack = track; lastOptions = options;
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type, java.lang.reflect.InvocationHandler handler) {
+    java.lang.reflect.InvocationHandler actual = handler == null
+        ? (instance, method, arguments) -> defaultValue(method.getReturnType()) : handler;
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] { type }, actual);
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
+  }
+
+  private static <T> T allocate(Class<T> type) throws Exception {
+    Class<?> unsafeType = Class.forName("sun.misc.Unsafe");
+    Field singleton = unsafeType.getDeclaredField("theUnsafe");
+    singleton.setAccessible(true);
+    Object unsafe = singleton.get(null);
+    return type.cast(unsafeType.getMethod("allocateInstance", Class.class).invoke(unsafe, type));
   }
 
   private static void check(boolean condition, String message) {
