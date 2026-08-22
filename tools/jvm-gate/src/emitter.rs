@@ -118,6 +118,7 @@ const HEARTBEATING_HTTP_STREAM_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/nico/HeartbeatingHttpStream";
 const NICO_AUDIO_SOURCE_MANAGER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/nico/NicoAudioSourceManager";
+const NICO_AUDIO_TRACK_CLASS: &str = "com/sedmelluq/discord/lavaplayer/source/nico/NicoAudioTrack";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -155,6 +156,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     LOCAL_SEEKABLE_INPUT_STREAM_CLASS,
     HEARTBEATING_HTTP_STREAM_CLASS,
     NICO_AUDIO_SOURCE_MANAGER_CLASS,
+    NICO_AUDIO_TRACK_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -513,6 +515,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | LOCAL_SEEKABLE_INPUT_STREAM_CLASS
                 | HEARTBEATING_HTTP_STREAM_CLASS
                 | NICO_AUDIO_SOURCE_MANAGER_CLASS
+                | NICO_AUDIO_TRACK_CLASS
         ) || field
             .access_flags
             .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
@@ -526,6 +529,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | LOCAL_SEEKABLE_INPUT_STREAM_CLASS
                 | HEARTBEATING_HTTP_STREAM_CLASS
                 | NICO_AUDIO_SOURCE_MANAGER_CLASS
+                | NICO_AUDIO_TRACK_CLASS
         ) || method
             .access_flags
             .intersects(MethodAccessFlags::PUBLIC | MethodAccessFlags::PROTECTED)
@@ -598,6 +602,9 @@ fn replacement_body(
     }
     if class_name == NICO_AUDIO_SOURCE_MANAGER_CLASS {
         return nico_audio_source_manager_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == NICO_AUDIO_TRACK_CLASS {
+        return nico_audio_track_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == AUDIO_REFERENCE_CLASS {
         return audio_reference_replacement(pool, name, descriptor, required_locals);
@@ -2993,6 +3000,157 @@ fn nico_audio_source_manager_clinit(pool: &mut ConstantPool<'static>) -> Result<
             Instruction::Ldc_w(regex),
             Instruction::Invokestatic(compile),
             Instruction::Putstatic(field),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn nico_audio_track_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/nico/NicoAudioSourceManager;)V",
+        ) => nico_audio_track_constructor(pool),
+        (
+            "process",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+        ) => nico_audio_track_process(pool),
+        ("makeShallowClone", "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;") => {
+            nico_audio_track_shallow_clone(pool)
+        }
+        ("getSourceManager", "()Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;") => {
+            object_getter(
+                pool,
+                NICO_AUDIO_TRACK_CLASS,
+                "sourceManager",
+                "Lcom/sedmelluq/discord/lavaplayer/source/nico/NicoAudioSourceManager;",
+            )
+        }
+        ("<clinit>", "()V") => nico_audio_track_clinit(pool),
+        ("loadVideoApi" | "loadVideoMainPage" | "loadPlaybackUrl" | "processJSON", _) => {
+            unsupported_body(
+                pool,
+                "Legacy NicoNico DMC playback discovery is unsupported.",
+                required_locals,
+            )
+        }
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {NICO_AUDIO_TRACK_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn nico_audio_track_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let parent = pool.add_class(DELEGATED_AUDIO_TRACK_CLASS)?;
+    let parent_init = pool.add_method_ref(
+        parent,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V",
+    )?;
+    let owner = pool.add_class(NICO_AUDIO_TRACK_CLASS)?;
+    let source = pool.add_field_ref(
+        owner,
+        "sourceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/source/nico/NicoAudioSourceManager;",
+    )?;
+    code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(parent_init),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(source),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn nico_audio_track_process(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let native = pool.add_class(NATIVE_CLASS)?;
+    let process = pool.add_method_ref(
+        native,
+        "processNicoTrack",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/nico/NicoAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+    )?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokestatic(process),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn nico_audio_track_shallow_clone(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(NICO_AUDIO_TRACK_CLASS)?;
+    let track_info = pool.add_field_ref(
+        owner,
+        "trackInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let source = pool.add_field_ref(
+        owner,
+        "sourceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/source/nico/NicoAudioSourceManager;",
+    )?;
+    let init = pool.add_method_ref(
+        owner,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/nico/NicoAudioSourceManager;)V",
+    )?;
+    code(
+        pool,
+        4,
+        1,
+        vec![
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(track_info),
+            Instruction::Aload_0,
+            Instruction::Getfield(source),
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn nico_audio_track_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(NICO_AUDIO_TRACK_CLASS)?;
+    let factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let action = pool.add_field_ref(owner, "actionTrackId", "Ljava/lang/String;")?;
+    let action_value = pool.add_string("S1G2fKdzOl_1702504390263")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Ldc_w(action_value),
+            Instruction::Putstatic(action),
             Instruction::Return,
         ],
     )
@@ -8659,6 +8817,10 @@ fn native_class(expected_abi: u8) -> Result<ClassFile<'static>> {
         (
             "loadNicoItem",
             "(Lcom/sedmelluq/discord/lavaplayer/source/nico/NicoAudioSourceManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+        ),
+        (
+            "processNicoTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/nico/NicoAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
         ),
         (
             "loadItemReference",

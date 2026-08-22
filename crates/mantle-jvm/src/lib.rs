@@ -1,5 +1,6 @@
 mod load_bridge;
 mod ordering_key;
+mod playback_bridge;
 mod proxy;
 mod registry;
 
@@ -577,6 +578,18 @@ pub extern "system" fn Java_dev_mantle_internal_MantleNative_loadNicoItem<'local
 
 #[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
 #[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_mantle_internal_MantleNative_processNicoTrack<'local>(
+    mut env: EnvUnowned<'local>,
+    _class: JClass<'local>,
+    track: JObject<'local>,
+    executor: JObject<'local>,
+) {
+    env.with_env(|env| playback_bridge::process_nico_track(env, &track, &executor))
+        .resolve::<ThrowRuntimeExAndDefault>();
+}
+
+#[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_dev_mantle_internal_MantleNative_cancelLoad<'local>(
     mut env: EnvUnowned<'local>,
     _class: JClass<'local>,
@@ -699,7 +712,7 @@ pub extern "system" fn Java_dev_mantle_internal_MantleNative_decodeTrackDetails<
     .resolve::<ThrowRuntimeExAndDefault>()
 }
 
-fn track_info_from_java(
+pub(crate) fn track_info_from_java(
     env: &mut jni::Env<'_>,
     info: &JObject<'_>,
 ) -> jni::errors::Result<TrackInfo> {

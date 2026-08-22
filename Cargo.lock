@@ -481,6 +481,7 @@ name = "mantle-jvm"
 version = "0.0.0"
 dependencies = [
  "jni",
+ "mantle-audio",
  "mantle-core",
  "mantle-media",
 ]

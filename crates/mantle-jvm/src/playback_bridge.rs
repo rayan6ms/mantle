@@ -1,0 +1,477 @@
+use std::time::Duration;
+
+use jni::Env;
+use jni::objects::{JObject, JString, JValue};
+use jni::{jni_sig, jni_str};
+use mantle_audio::{
+    COMPATIBLE_CHANNELS, COMPATIBLE_FRAME_DURATION, COMPATIBLE_PCM_SAMPLES, COMPATIBLE_SAMPLE_RATE,
+    EncodedFrameSlot, MAX_RESAMPLER_BUFFERED_FRAMES, OpusEncodingQuality, PcmFormat, PcmFrame,
+    PcmOpusEncoder, PcmResampler, ResamplingQuality, VolumeLevel,
+};
+use mantle_media::{
+    MediaCancellation, MediaLimits, NicoNicoPlaybackSession, NicoNicoSourceManager,
+    NicoNicoSourceOptions, NicoNicoSourceTrack,
+};
+
+const TRANSCODE_INPUT_CHUNK_FRAMES: usize = 1_024;
+
+pub(crate) fn process_nico_track(
+    env: &mut Env<'_>,
+    track: &JObject<'_>,
+    executor: &JObject<'_>,
+) -> jni::errors::Result<()> {
+    let java_info = env
+        .get_field(
+            track,
+            jni_str!("trackInfo"),
+            jni_sig!("Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;"),
+        )?
+        .l()?;
+    let info = crate::track_info_from_java(env, &java_info)?;
+    let source_track = NicoNicoSourceTrack {
+        info,
+        playback_available: true,
+    };
+    let limits = MediaLimits::default();
+    let cancellation = MediaCancellation::new();
+    let manager = NicoNicoSourceManager::new(NicoNicoSourceOptions::default())
+        .map_err(|_| failure("could not create current NicoNico playback source"))?;
+    let session = manager
+        .open_track_playback(&source_track, limits, cancellation.clone())
+        .map_err(|_| failure("current NicoNico playback discovery failed"))?
+        .ok_or_else(|| failure("current NicoNico track is unavailable"))?;
+
+    if executor.is_null() {
+        return Err(failure("NicoNico playback requires a local track executor"));
+    }
+    let buffer = env
+        .call_method(
+            executor,
+            jni_str!("getAudioBuffer"),
+            jni_sig!("()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBuffer;"),
+            &[],
+        )?
+        .l()?;
+    if buffer.is_null() {
+        return Err(failure("NicoNico playback requires an audio frame buffer"));
+    }
+    let context = env
+        .call_method(
+            executor,
+            jni_str!("getProcessingContext"),
+            jni_sig!("()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;"),
+            &[],
+        )?
+        .l()?;
+    let format = validate_output_format(env, &context)?;
+    let volume = player_volume(env, &context)?;
+    let mut transcoder = NicoPcmTranscoder::new(session, limits)?;
+    let mut encoded = EncodedFrameSlot::new();
+
+    while transcoder.read_frame(&mut encoded, volume)? {
+        env.with_local_frame(4, |env| {
+            if current_thread_interrupted(env)? {
+                cancellation.cancel();
+                return Err(failure("current NicoNico playback was cancelled"));
+            }
+            let data = JObject::from(env.byte_array_from_slice(encoded.data())?);
+            let timecode = encoded
+                .timestamp()
+                .unwrap_or_else(|| transcoder.last_frame_timecode())
+                .as_millis();
+            let timecode = i64::try_from(timecode)
+                .map_err(|_| failure("NicoNico frame timecode exceeds the JVM range"))?;
+            let frame = env.new_object(
+                jni_str!("com/sedmelluq/discord/lavaplayer/track/playback/ImmutableAudioFrame"),
+                jni_sig!("(J[BILcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V"),
+                &[
+                    JValue::Long(timecode),
+                    JValue::Object(&data),
+                    JValue::Int(i32::from(encoded.volume().get())),
+                    JValue::Object(&format),
+                ],
+            )?;
+            let _ = env.call_method(
+                &buffer,
+                jni_str!("consume"),
+                jni_sig!("(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;)V"),
+                &[JValue::Object(&frame)],
+            )?;
+            Ok(())
+        })?;
+    }
+    Ok(())
+}
+
+fn validate_output_format<'local>(
+    env: &mut Env<'local>,
+    context: &JObject<'local>,
+) -> jni::errors::Result<JObject<'local>> {
+    if context.is_null() {
+        return Err(failure(
+            "NicoNico playback requires an audio processing context",
+        ));
+    }
+    let format = env
+        .get_field(
+            context,
+            jni_str!("outputFormat"),
+            jni_sig!("Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;"),
+        )?
+        .l()?;
+    if format.is_null() {
+        return Err(failure("NicoNico playback requires an output format"));
+    }
+    let codec = env
+        .call_method(
+            &format,
+            jni_str!("codecName"),
+            jni_sig!("()Ljava/lang/String;"),
+            &[],
+        )?
+        .l()?;
+    let codec = JString::cast_local(env, codec)?.try_to_string(env)?;
+    let channels = env
+        .get_field(&format, jni_str!("channelCount"), jni_sig!("I"))?
+        .i()?;
+    let sample_rate = env
+        .get_field(&format, jni_str!("sampleRate"), jni_sig!("I"))?
+        .i()?;
+    let chunk_samples = env
+        .get_field(&format, jni_str!("chunkSampleCount"), jni_sig!("I"))?
+        .i()?;
+    if codec != "OPUS"
+        || channels != i32::from(COMPATIBLE_CHANNELS)
+        || sample_rate != i32::try_from(COMPATIBLE_SAMPLE_RATE).unwrap_or(i32::MAX)
+        || chunk_samples
+            != i32::try_from(mantle_audio::COMPATIBLE_SAMPLES_PER_CHANNEL).unwrap_or(i32::MAX)
+    {
+        return Err(failure(
+            "current NicoNico playback requires 48 kHz stereo 20 ms Opus output",
+        ));
+    }
+    Ok(format)
+}
+
+fn player_volume(env: &mut Env<'_>, context: &JObject<'_>) -> jni::errors::Result<VolumeLevel> {
+    let options = env
+        .get_field(
+            context,
+            jni_str!("playerOptions"),
+            jni_sig!("Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerOptions;"),
+        )?
+        .l()?;
+    if options.is_null() {
+        return Ok(VolumeLevel::NORMAL);
+    }
+    let volume = env
+        .get_field(
+            &options,
+            jni_str!("volumeLevel"),
+            jni_sig!("Ljava/util/concurrent/atomic/AtomicInteger;"),
+        )?
+        .l()?;
+    let value = env
+        .call_method(&volume, jni_str!("get"), jni_sig!("()I"), &[])?
+        .i()?;
+    Ok(VolumeLevel::new(value))
+}
+
+fn current_thread_interrupted(env: &mut Env<'_>) -> jni::errors::Result<bool> {
+    let thread = env
+        .call_static_method(
+            jni_str!("java/lang/Thread"),
+            jni_str!("currentThread"),
+            jni_sig!("()Ljava/lang/Thread;"),
+            &[],
+        )?
+        .l()?;
+    env.call_method(&thread, jni_str!("isInterrupted"), jni_sig!("()Z"), &[])?
+        .z()
+}
+
+struct NicoPcmTranscoder {
+    session: NicoNicoPlaybackSession,
+    source_format: PcmFormat,
+    decoded: PcmFrame,
+    decoded_offset: usize,
+    resampler: Option<PcmResampler>,
+    resampled: PcmFrame,
+    resampled_offset: usize,
+    assembled: [f32; COMPATIBLE_PCM_SAMPLES],
+    assembled_len: usize,
+    encoder_input: PcmFrame,
+    encoder: PcmOpusEncoder,
+    input_eof: bool,
+    timestamp_initialized: bool,
+    base_timestamp: Option<Duration>,
+    frames_encoded: u64,
+}
+
+impl NicoPcmTranscoder {
+    fn new(session: NicoNicoPlaybackSession, limits: MediaLimits) -> jni::errors::Result<Self> {
+        let source_format = PcmFormat::new(session.info().sample_rate, session.info().channels)
+            .map_err(|_| failure("NicoNico returned an incompatible PCM format"))?;
+        let resampler = (source_format.sample_rate() != COMPATIBLE_SAMPLE_RATE)
+            .then(|| {
+                PcmResampler::new(
+                    source_format,
+                    COMPATIBLE_SAMPLE_RATE,
+                    ResamplingQuality::Medium,
+                    TRANSCODE_INPUT_CHUNK_FRAMES,
+                    mantle_audio::COMPATIBLE_SAMPLES_PER_CHANNEL,
+                    MAX_RESAMPLER_BUFFERED_FRAMES,
+                )
+            })
+            .transpose()
+            .map_err(|_| failure("could not create the NicoNico resampler"))?;
+        Ok(Self {
+            session,
+            source_format,
+            decoded: PcmFrame::with_capacity(limits.max_pcm_samples_per_frame),
+            decoded_offset: 0,
+            resampler,
+            resampled: PcmFrame::with_capacity(COMPATIBLE_PCM_SAMPLES),
+            resampled_offset: 0,
+            assembled: [0.0; COMPATIBLE_PCM_SAMPLES],
+            assembled_len: 0,
+            encoder_input: PcmFrame::with_capacity(COMPATIBLE_PCM_SAMPLES),
+            encoder: PcmOpusEncoder::new(OpusEncodingQuality::MAXIMUM)
+                .map_err(|_| failure("could not create the NicoNico Opus encoder"))?,
+            input_eof: false,
+            timestamp_initialized: false,
+            base_timestamp: None,
+            frames_encoded: 0,
+        })
+    }
+
+    fn read_frame(
+        &mut self,
+        output: &mut EncodedFrameSlot,
+        volume: VolumeLevel,
+    ) -> jni::errors::Result<bool> {
+        while self.assembled_len < COMPATIBLE_PCM_SAMPLES {
+            if self.resampler.is_some() {
+                if self.append_resampled()? {
+                    continue;
+                }
+                if self.input_eof {
+                    break;
+                }
+                if self
+                    .session
+                    .read_pcm(&mut self.decoded)
+                    .map_err(|_| failure("NicoNico media decoding failed"))?
+                {
+                    self.validate_decoded_format()?;
+                    self.resampler
+                        .as_mut()
+                        .expect("resampler path")
+                        .push(&self.decoded)
+                        .map_err(|_| failure("NicoNico resampling failed"))?;
+                } else {
+                    self.input_eof = true;
+                    self.resampler
+                        .as_mut()
+                        .expect("resampler path")
+                        .finish()
+                        .map_err(|_| failure("NicoNico resampler finalization failed"))?;
+                }
+            } else if !self.append_decoded()? {
+                if self.input_eof {
+                    break;
+                }
+                if self
+                    .session
+                    .read_pcm(&mut self.decoded)
+                    .map_err(|_| failure("NicoNico media decoding failed"))?
+                {
+                    self.validate_decoded_format()?;
+                    self.decoded_offset = 0;
+                } else {
+                    self.input_eof = true;
+                }
+            }
+        }
+
+        if self.assembled_len == 0 {
+            output.clear();
+            return Ok(false);
+        }
+        self.assembled[self.assembled_len..].fill(0.0);
+        let timestamp = self.base_timestamp.map(|base| {
+            base.saturating_add(
+                COMPATIBLE_FRAME_DURATION
+                    .saturating_mul(u32::try_from(self.frames_encoded).unwrap_or(u32::MAX)),
+            )
+        });
+        let output_format = PcmFormat::new(COMPATIBLE_SAMPLE_RATE, COMPATIBLE_CHANNELS)
+            .map_err(|_| failure("could not create the NicoNico output format"))?;
+        self.encoder_input
+            .copy_from_interleaved(&self.assembled, output_format, timestamp)
+            .map_err(|_| failure("could not assemble the NicoNico Opus frame"))?;
+        self.encoder
+            .encode(&self.encoder_input, output, volume)
+            .map_err(|_| failure("NicoNico Opus encoding failed"))?;
+        self.assembled_len = 0;
+        self.frames_encoded = self.frames_encoded.saturating_add(1);
+        Ok(true)
+    }
+
+    fn last_frame_timecode(&self) -> Duration {
+        COMPATIBLE_FRAME_DURATION.saturating_mul(
+            u32::try_from(self.frames_encoded.saturating_sub(1)).unwrap_or(u32::MAX),
+        )
+    }
+
+    fn append_decoded(&mut self) -> jni::errors::Result<bool> {
+        if self.decoded_offset >= self.decoded.samples().len() {
+            return Ok(false);
+        }
+        if !self.timestamp_initialized {
+            self.base_timestamp = self.decoded.timestamp();
+            self.timestamp_initialized = true;
+        }
+        append_interleaved(
+            self.decoded.samples(),
+            self.source_format.channels(),
+            &mut self.decoded_offset,
+            &mut self.assembled,
+            &mut self.assembled_len,
+        )?;
+        Ok(true)
+    }
+
+    fn append_resampled(&mut self) -> jni::errors::Result<bool> {
+        if self.resampled_offset >= self.resampled.samples().len() {
+            if !self
+                .resampler
+                .as_mut()
+                .expect("resampler path")
+                .read(&mut self.resampled)
+                .map_err(|_| failure("NicoNico resampling failed"))?
+            {
+                return Ok(false);
+            }
+            self.resampled_offset = 0;
+        }
+        if !self.timestamp_initialized {
+            self.base_timestamp = self.resampled.timestamp();
+            self.timestamp_initialized = true;
+        }
+        append_interleaved(
+            self.resampled.samples(),
+            self.source_format.channels(),
+            &mut self.resampled_offset,
+            &mut self.assembled,
+            &mut self.assembled_len,
+        )?;
+        Ok(true)
+    }
+
+    fn validate_decoded_format(&self) -> jni::errors::Result<()> {
+        if self.decoded.format() == Some(self.source_format) {
+            Ok(())
+        } else {
+            Err(failure("NicoNico changed PCM format during playback"))
+        }
+    }
+}
+
+fn append_interleaved(
+    input: &[f32],
+    channels: u16,
+    input_offset: &mut usize,
+    output: &mut [f32; COMPATIBLE_PCM_SAMPLES],
+    output_len: &mut usize,
+) -> jni::errors::Result<()> {
+    let channels = usize::from(channels);
+    if channels == 0
+        || *input_offset > input.len()
+        || !input.len().is_multiple_of(channels)
+        || !input_offset.is_multiple_of(channels)
+    {
+        return Err(failure("NicoNico returned invalid interleaved PCM"));
+    }
+    let available_frames = (input.len() - *input_offset) / channels;
+    let output_frames = (COMPATIBLE_PCM_SAMPLES - *output_len) / usize::from(COMPATIBLE_CHANNELS);
+    let frames = available_frames.min(output_frames);
+    match channels {
+        1 => {
+            for sample in &input[*input_offset..*input_offset + frames] {
+                output[*output_len] = *sample;
+                output[*output_len + 1] = *sample;
+                *output_len += 2;
+            }
+            *input_offset += frames;
+        }
+        2 => {
+            let samples = frames * 2;
+            output[*output_len..*output_len + samples]
+                .copy_from_slice(&input[*input_offset..*input_offset + samples]);
+            *output_len += samples;
+            *input_offset += samples;
+        }
+        _ => return Err(failure("NicoNico returned unsupported PCM channels")),
+    }
+    Ok(())
+}
+
+const fn failure(message: &'static str) -> jni::errors::Error {
+    jni::errors::Error::NullPtr(message)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::append_interleaved;
+    use mantle_audio::COMPATIBLE_PCM_SAMPLES;
+
+    #[test]
+    fn appends_stereo_and_expands_mono_without_crossing_frame_bounds() {
+        let mut output = [0.0; COMPATIBLE_PCM_SAMPLES];
+        let mut output_len = 0;
+        let mut stereo_offset = 0;
+        append_interleaved(
+            &[0.1, 0.2, 0.3, 0.4],
+            2,
+            &mut stereo_offset,
+            &mut output,
+            &mut output_len,
+        )
+        .unwrap();
+        assert_eq!(stereo_offset, 4);
+        assert_eq!(output_len, 4);
+        assert_eq!(&output[..4], &[0.1, 0.2, 0.3, 0.4]);
+
+        let mut mono_offset = 0;
+        append_interleaved(
+            &[0.5, 0.6],
+            1,
+            &mut mono_offset,
+            &mut output,
+            &mut output_len,
+        )
+        .unwrap();
+        assert_eq!(mono_offset, 2);
+        assert_eq!(output_len, 8);
+        assert_eq!(&output[4..8], &[0.5, 0.5, 0.6, 0.6]);
+    }
+
+    #[test]
+    fn rejects_misaligned_or_unsupported_pcm() {
+        let mut output = [0.0; COMPATIBLE_PCM_SAMPLES];
+        let mut output_len = 0;
+        let mut offset = 0;
+        assert!(append_interleaved(&[0.1], 2, &mut offset, &mut output, &mut output_len).is_err());
+        assert!(
+            append_interleaved(
+                &[0.1, 0.2, 0.3],
+                3,
+                &mut offset,
+                &mut output,
+                &mut output_len
+            )
+            .is_err()
+        );
+    }
+}

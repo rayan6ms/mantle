@@ -112,6 +112,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-local-seekable-input-stream-consumer" => Some(LOCAL_SEEKABLE_INPUT_STREAM_CONSUMER),
         "write-heartbeating-http-stream-consumer" => Some(HEARTBEATING_HTTP_STREAM_CONSUMER),
         "write-nico-audio-source-manager-consumer" => Some(NICO_AUDIO_SOURCE_MANAGER_CONSUMER),
+        "write-nico-audio-track-consumer" => Some(NICO_AUDIO_TRACK_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -8418,6 +8419,167 @@ public final class GateNicoAudioSourceManager {
       if (!type.isInstance(cause)) throw new AssertionError("wrong exception", cause);
       return type.cast(cause);
     }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const NICO_AUDIO_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.nico.NicoAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.nico.NicoAudioTrack;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.DelegatedAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateNicoAudioTrack {
+  public static void main(String[] args) throws Exception {
+    check(args.length >= 1 && args.length <= 2, "expected disposition and optional native path");
+    boolean reference = args[0].equals("reference");
+    check(reference || args[0].equals("candidate"), "unknown disposition");
+    check(reference == (args.length == 1), "candidate requires native path");
+    reflectionContract();
+    commonBehavior();
+    if (!reference) currentDisposition(args[1]);
+    System.out.println(
+        "common=public-concrete,6-fields,1-constructor,3-exported-methods,"
+        + "capture,source-identity,shallow-clone;service="
+        + (reference ? "legacy-dmc-mpeg" : "current-native-cmaf-opus,no-legacy-dmc"));
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<NicoAudioTrack> type = NicoAudioTrack.class;
+    check(type.getModifiers() == Modifier.PUBLIC
+        && type.getSuperclass() == DelegatedAudioTrack.class
+        && type.getInterfaces().length == 0, "class metadata");
+    check(type.getDeclaredFields().length == 6, "field count");
+    checkField(type, "log", Class.forName("org.slf4j.Logger"),
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "actionTrackId", String.class, Modifier.PRIVATE | Modifier.STATIC);
+    checkField(type, "sourceManager", NicoAudioSourceManager.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "heartbeatUrl", String.class, Modifier.PRIVATE);
+    checkField(type, "heartbeatIntervalMs", int.class, Modifier.PRIVATE);
+    checkField(type, "initialHeartbeatPayload", String.class, Modifier.PRIVATE);
+
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        AudioTrackInfo.class, NicoAudioSourceManager.class);
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC, "constructor metadata");
+    check(type.getDeclaredMethods().length == 7, "method count");
+    long exported = Arrays.stream(type.getDeclaredMethods())
+        .filter(method -> Modifier.isPublic(method.getModifiers())
+            || Modifier.isProtected(method.getModifiers()))
+        .count();
+    check(exported == 3L, "exported method count");
+    checkMethod(type.getDeclaredMethod("process", LocalAudioTrackExecutor.class),
+        void.class, Modifier.PUBLIC, Exception.class);
+    checkMethod(type.getDeclaredMethod("loadVideoApi", HttpInterface.class),
+        JsonBrowser.class, Modifier.PRIVATE, IOException.class);
+    checkMethod(type.getDeclaredMethod("loadVideoMainPage", HttpInterface.class),
+        JsonBrowser.class, Modifier.PRIVATE, IOException.class);
+    checkMethod(type.getDeclaredMethod("loadPlaybackUrl", HttpInterface.class),
+        String.class, Modifier.PRIVATE, IOException.class);
+    checkMethod(type.getDeclaredMethod("processJSON", JsonBrowser.class),
+        Class.forName("org.json.JSONObject"), Modifier.PRIVATE);
+    checkMethod(type.getDeclaredMethod("makeShallowClone"),
+        AudioTrack.class, Modifier.PROTECTED);
+    checkMethod(type.getDeclaredMethod("getSourceManager"),
+        AudioSourceManager.class, Modifier.PUBLIC);
+  }
+
+  private static void commonBehavior() throws Exception {
+    AudioTrackInfo info = new AudioTrackInfo(
+        "title", "author", 1234L, "sm9", false,
+        "https://www.nicovideo.jp/watch/sm9", "art", null);
+    NicoAudioSourceManager source = new NicoAudioSourceManager();
+    ExposedTrack track = new ExposedTrack(info, source);
+    check(track.getInfo() == info && track.getSourceManager() == source, "captured identity");
+    check(field("sourceManager").get(track) == source
+        && field("heartbeatUrl").get(track) == null
+        && field("heartbeatIntervalMs").getInt(track) == 0
+        && field("initialHeartbeatPayload").get(track) == null, "constructor state");
+    check(field("log").get(null) != null
+        && field("actionTrackId").get(null).equals("S1G2fKdzOl_1702504390263"),
+        "static state");
+    AudioTrack clone = track.shallowClone();
+    check(clone instanceof NicoAudioTrack && clone != track && clone.getInfo() == info
+        && clone.getSourceManager() == source, "shallow clone identity");
+    check(field("heartbeatUrl").get(clone) == null
+        && field("heartbeatIntervalMs").getInt(clone) == 0
+        && field("initialHeartbeatPayload").get(clone) == null, "shallow clone state");
+    source.shutdown();
+  }
+
+  private static void currentDisposition(String nativeLibrary) throws Exception {
+    Class.forName("dev.mantle.internal.NativeLoader")
+        .getMethod("load", String.class).invoke(null, nativeLibrary);
+    Class<?> nativeType = Class.forName("dev.mantle.internal.MantleNative");
+    Method process = nativeType.getDeclaredMethod(
+        "processNicoTrack", NicoAudioTrack.class, LocalAudioTrackExecutor.class);
+    check(Modifier.isPublic(process.getModifiers()) && Modifier.isStatic(process.getModifiers())
+        && Modifier.isNative(process.getModifiers()), "current native route");
+    AudioTrackInfo invalid = new AudioTrackInfo(
+        "title", "author", 1234L, "XX123", false,
+        "https://www.nicovideo.jp/watch/XX123", null, null);
+    NicoAudioSourceManager source = new NicoAudioSourceManager();
+    NicoAudioTrack track = new NicoAudioTrack(invalid, source);
+    expect(RuntimeException.class, () -> track.process(null));
+    check(field("heartbeatUrl").get(track) == null
+        && field("heartbeatIntervalMs").getInt(track) == 0
+        && field("initialHeartbeatPayload").get(track) == null,
+        "legacy DMC state remains unused");
+    source.shutdown();
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = NicoAudioTrack.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static void checkField(Class<?> type, String name, Class<?> fieldType, int modifiers)
+      throws Exception {
+    Field field = type.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getModifiers() == modifiers
+        && !field.isSynthetic(), field + " metadata");
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, int modifiers,
+                                  Class<?>... exceptions) {
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs()
+        && Arrays.equals(method.getExceptionTypes(), exceptions), method + " metadata");
+  }
+
+  private static <T extends Throwable> T expect(
+      Class<T> type, Operation operation) throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private static final class ExposedTrack extends NicoAudioTrack {
+    ExposedTrack(AudioTrackInfo info, NicoAudioSourceManager source) { super(info, source); }
+    AudioTrack shallowClone() { return super.makeShallowClone(); }
   }
 
   private interface Operation { void run() throws Exception; }
