@@ -85,6 +85,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-local-audio-track-executor-callback-consumer" => {
             Some(LOCAL_AUDIO_TRACK_EXECUTOR_CALLBACK_CONSUMER)
         }
+        "write-local-audio-track-executor-consumer" => Some(LOCAL_AUDIO_TRACK_EXECUTOR_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -4322,6 +4323,368 @@ public final class GateLocalAudioTrackExecutorCallbacks {
         && method.getTypeParameters().length == 0
         && method.getDeclaredAnnotations().length == 0,
         name + " metadata");
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const LOCAL_AUDIO_TRACK_EXECUTOR_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerOptions;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackState;
+import com.sedmelluq.discord.lavaplayer.track.InternalAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.TrackMarker;
+import com.sedmelluq.discord.lavaplayer.track.TrackMarkerHandler.MarkerState;
+import com.sedmelluq.discord.lavaplayer.track.TrackStateListener;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+public final class GateLocalAudioTrackExecutor {
+  public static void main(String[] args) throws Exception {
+    constructorAndPosition();
+    markersAndFrames();
+    processingLoops();
+    executionLifecycle();
+    forwardingFailures();
+    reflection();
+    System.out.println(
+        "constructor=context,buffer,factory,disposed;position=seekable,clamp,ghosting;"
+        + "markers=late,removed,overwritten,reached,bypassed,ended,stopped;"
+        + "processing=read,internal-seek,external-seek,wait,decode-failure;"
+        + "frames=immediate,timed,mutable,timed-mutable-bug,terminator;"
+        + "execution=loading,finished,failure,stop,stack;reflection=class,1-constructor,19-methods");
+  }
+
+  private static void constructorAndPosition() throws Exception {
+    Fixture fixed = new Fixture(false, false, null);
+    check(fixed.executor.getAudioBuffer() == fixed.buffer, "buffer identity");
+    AudioProcessingContext context = fixed.executor.getProcessingContext();
+    check(context.configuration == fixed.configuration && context.frameBuffer == fixed.buffer
+        && context.playerOptions == fixed.options && context.outputFormat == fixed.format,
+        "processing context identity");
+    check(fixed.factoryDuration == 731 && fixed.factoryFormat == fixed.format
+        && fixed.disposed != null && !fixed.disposed.get(), "factory arguments");
+    check(fixed.executor.getState() == AudioTrackState.INACTIVE
+        && fixed.executor.getPosition() == 0L && fixed.executor.getStackTrace() == null,
+        "initial state");
+    fixed.executor.setPosition(44L);
+    check(fixed.executor.getPosition() == 0L && fixed.clears == 0,
+        "non-seekable position ignored");
+
+    Fixture seekable = new Fixture(true, false, null);
+    seekable.executor.setPosition(-5L);
+    check(seekable.executor.getPosition() == 0L && seekable.clears == 1,
+        "negative seek clamp");
+    seekable.executor.setPosition(Long.MAX_VALUE);
+    check(seekable.executor.getPosition() == Long.MAX_VALUE && seekable.clears == 2,
+        "full-width queued seek");
+
+    Fixture ghost = new Fixture(true, true, null);
+    ghost.executor.setPosition(88L);
+    check(ghost.executor.getPosition() == 88L && ghost.clears == 0,
+        "ghost seek preserves buffer");
+  }
+
+  private static void markersAndFrames() throws Exception {
+    Fixture fixture = new Fixture(true, false, null);
+    List<MarkerState> states = new ArrayList<>();
+    TrackMarker reached = new TrackMarker(40L, states::add);
+    fixture.executor.addMarker(reached);
+    fixture.nextFrame = frame(41L, false);
+    check(fixture.executor.provide() == fixture.nextFrame
+        && fixture.executor.getPosition() == 41L
+        && states.equals(Arrays.asList(MarkerState.REACHED)), "reached marker");
+
+    fixture.executor.addMarker(new TrackMarker(40L, states::add));
+    check(states.get(states.size() - 1) == MarkerState.LATE, "late marker");
+    TrackMarker removed = new TrackMarker(90L, states::add);
+    fixture.executor.addMarker(removed);
+    fixture.executor.removeMarker(removed);
+    check(states.get(states.size() - 1) == MarkerState.REMOVED, "removed marker");
+    fixture.executor.addMarker(new TrackMarker(100L, states::add));
+    fixture.executor.setMarker(new TrackMarker(110L, states::add));
+    check(states.get(states.size() - 1) == MarkerState.OVERWRITTEN, "overwritten marker");
+    fixture.executor.setMarker(null);
+    check(states.get(states.size() - 1) == MarkerState.REMOVED, "set null marker");
+
+    fixture.nextFrame = frame(77L, false);
+    check(fixture.executor.provide(9L, TimeUnit.MICROSECONDS) == fixture.nextFrame
+        && fixture.timedTimeout == 9L && fixture.timedUnit == TimeUnit.MICROSECONDS,
+        "timed frame forwarding");
+    MutableAudioFrame mutable = new MutableAudioFrame();
+    mutable.setTimecode(81L);
+    fixture.mutableResult = true;
+    check(fixture.executor.provide(mutable) && fixture.executor.getPosition() == 81L,
+        "mutable frame forwarding");
+    fixture.mutableResult = false;
+    check(!fixture.executor.provide(mutable), "mutable false forwarding");
+    fixture.timedMutableResult = false;
+    check(fixture.executor.provide(mutable, 13L, TimeUnit.NANOSECONDS),
+        "timed mutable compatibility return");
+    long before = fixture.executor.getPosition();
+    fixture.nextFrame = frame(999L, true);
+    fixture.executor.provide();
+    check(fixture.executor.getPosition() == before, "terminator does not advance");
+  }
+
+  private static void processingLoops() throws Exception {
+    Fixture internal = new Fixture(true, true, null);
+    List<String> calls = new ArrayList<>();
+    internal.executor.addMarker(new TrackMarker(25L, state -> calls.add(state.name())));
+    internal.executor.setPosition(30L);
+    internal.executor.executeProcessingLoop(() -> calls.add("read"),
+        position -> calls.add("seek-" + position), false);
+    check(calls.equals(Arrays.asList("BYPASSED", "seek-30", "read"))
+        && internal.clearOnInsert && internal.executor.getState() == AudioTrackState.PLAYING,
+        "internal seek processing");
+
+    Fixture external = new Fixture(true, false, null);
+    external.executor.setPosition(52L);
+    int[] reads = { 0 };
+    external.executor.executeProcessingLoop(() -> reads[0]++, null, false);
+    check(reads[0] == 0, "external seek defers read");
+    List<Long> seeks = new ArrayList<>();
+    external.executor.executeProcessingLoop(() -> reads[0]++, seeks::add, false);
+    check(reads[0] == 2 && seeks.equals(Arrays.asList(52L)), "external seek resumes loop");
+
+    Fixture waiting = new Fixture(false, false, null);
+    waiting.executor.executeProcessingLoop(() -> { }, null);
+    check(waiting.terminates == 1 && waiting.waits == 1, "default wait on end");
+
+    Fixture stopping = new Fixture(false, false, null);
+    List<MarkerState> stopped = new ArrayList<>();
+    stopping.executor.addMarker(new TrackMarker(100L, stopped::add));
+    stopping.executor.stop();
+    Thread.currentThread().interrupt();
+    stopping.executor.executeProcessingLoop(() -> {
+      throw new AssertionError("stopped loop performed a read");
+    }, null, false);
+    check(stopped.equals(Arrays.asList(MarkerState.STOPPED))
+        && !Thread.currentThread().isInterrupted(), "stopped processing marker");
+
+    Fixture decode = new Fixture(false, false, null);
+    Exception failure = new Exception("decode-sentinel");
+    try {
+      decode.executor.executeProcessingLoop(() -> { throw failure; }, null, false);
+      throw new AssertionError("decode failure was swallowed");
+    } catch (FriendlyException error) {
+      check(error.severity == FriendlyException.Severity.FAULT
+          && error.getCause() == failure
+          && error.getMessage().equals("Something went wrong when decoding the track."),
+          "decode failure wrapping");
+    }
+  }
+
+  private static void executionLifecycle() throws Exception {
+    List<MarkerState> markerStates = new ArrayList<>();
+    Fixture success = new Fixture(false, false, executor -> {
+      check(executor.getState() == AudioTrackState.LOADING, "loading during process");
+      check(executor.getStackTrace() != null, "active stack trace");
+    });
+    success.executor.addMarker(new TrackMarker(100L, markerStates::add));
+    success.executor.execute(success.listener);
+    check(success.processes == 1 && success.executor.getState() == AudioTrackState.FINISHED
+        && success.executor.getStackTrace() == null
+        && markerStates.equals(Arrays.asList(MarkerState.ENDED)), "successful execution");
+
+    RuntimeException cause = new RuntimeException("play-sentinel");
+    Fixture failed = new Fixture(false, false, executor -> { throw cause; });
+    failed.executor.execute(failed.listener);
+    check(failed.failure != null && failed.failure.severity == FriendlyException.Severity.FAULT
+        && failed.failure.getCause() == cause
+        && failed.failure.getMessage().equals("Something broke when playing the track.")
+        && failed.executor.failedBeforeLoad() && failed.terminates == 1
+        && failed.executor.getState() == AudioTrackState.FINISHED, "failed execution");
+    failed.received = true;
+    check(!failed.executor.failedBeforeLoad(), "failure after frames");
+
+    Fixture stopped = new Fixture(false, false, null);
+    stopped.executor.addMarker(new TrackMarker(10L, markerStates::add));
+    stopped.executor.stop();
+    check(stopped.disposed.get(), "stop disposes");
+    stopped.executor.execute(stopped.listener);
+    check(stopped.processes == 0 && stopped.executor.getState() == AudioTrackState.INACTIVE,
+        "disposed executor does not start");
+  }
+
+  private static void forwardingFailures() throws Exception {
+    Fixture fixture = new Fixture(false, false, null);
+    InterruptedException wait = new InterruptedException("wait-sentinel");
+    fixture.waitFailure = wait;
+    try {
+      fixture.executor.waitOnEnd();
+      throw new AssertionError("wait interruption swallowed");
+    } catch (InterruptedException error) {
+      check(error == wait && fixture.terminates == 1, "wait exception identity");
+    }
+    TimeoutException timeout = new TimeoutException("timeout-sentinel");
+    fixture.timedFailure = timeout;
+    try {
+      fixture.executor.provide(1L, TimeUnit.SECONDS);
+      throw new AssertionError("timeout swallowed");
+    } catch (TimeoutException error) {
+      check(error == timeout, "timeout identity");
+    }
+  }
+
+  private static void reflection() throws Exception {
+    Class<LocalAudioTrackExecutor> type = LocalAudioTrackExecutor.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {
+          com.sedmelluq.discord.lavaplayer.track.playback.AudioTrackExecutor.class
+        }), "class structure");
+    Constructor<?> constructor = type.getDeclaredConstructor(InternalAudioTrack.class,
+        AudioConfiguration.class, AudioPlayerOptions.class, boolean.class, int.class);
+    check(Modifier.isPublic(constructor.getModifiers())
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    int publicDeclared = 0;
+    for (Method method : type.getDeclaredMethods()) {
+      if (Modifier.isPublic(method.getModifiers())) publicDeclared++;
+    }
+    check(publicDeclared == 19, "public method count");
+    check(Arrays.equals(type.getDeclaredMethod("waitOnEnd").getExceptionTypes(),
+        new Class<?>[] { InterruptedException.class }), "wait exception metadata");
+    check(Arrays.equals(type.getDeclaredMethod("provide", long.class, TimeUnit.class)
+        .getExceptionTypes(), new Class<?>[] { TimeoutException.class, InterruptedException.class }),
+        "timed provide exception metadata");
+  }
+
+  private interface Processor {
+    void run(LocalAudioTrackExecutor executor) throws Exception;
+  }
+
+  private static final class Fixture {
+    final AudioConfiguration configuration = new AudioConfiguration();
+    final AudioPlayerOptions options = new AudioPlayerOptions();
+    final AudioDataFormat format = configuration.getOutputFormat();
+    final boolean seekable;
+    final Processor processor;
+    final AudioFrameBuffer buffer;
+    final InternalAudioTrack track;
+    final LocalAudioTrackExecutor executor;
+    final TrackStateListener listener;
+    AtomicBoolean disposed;
+    int factoryDuration;
+    AudioDataFormat factoryFormat;
+    int clears;
+    int terminates;
+    int waits;
+    int processes;
+    boolean clearOnInsert;
+    boolean received;
+    boolean mutableResult;
+    boolean timedMutableResult;
+    long timedTimeout;
+    TimeUnit timedUnit;
+    AudioFrame nextFrame;
+    InterruptedException waitFailure;
+    TimeoutException timedFailure;
+    FriendlyException failure;
+
+    Fixture(boolean seekable, boolean ghosting, Processor processor) {
+      this.seekable = seekable;
+      this.processor = processor;
+      this.buffer = proxy(AudioFrameBuffer.class, (instance, method, arguments) -> {
+        switch (method.getName()) {
+          case "provide":
+            if (arguments == null) return nextFrame;
+            if (arguments.length == 1) return mutableResult;
+            if (arguments.length == 2) {
+              timedTimeout = (Long) arguments[0]; timedUnit = (TimeUnit) arguments[1];
+              if (timedFailure != null) throw timedFailure;
+              return nextFrame;
+            }
+            timedTimeout = (Long) arguments[1]; timedUnit = (TimeUnit) arguments[2];
+            if (timedFailure != null) throw timedFailure;
+            return timedMutableResult;
+          case "clear": clears++; clearOnInsert = false; return null;
+          case "setClearOnInsert": clearOnInsert = true; return null;
+          case "hasClearOnInsert": return clearOnInsert;
+          case "setTerminateOnEmpty": terminates++; return null;
+          case "waitForTermination":
+            waits++; if (waitFailure != null) throw waitFailure; return null;
+          case "hasReceivedFrames": return received;
+          default: return defaultValue(method.getReturnType());
+        }
+      });
+      configuration.setFrameBufferFactory((duration, dataFormat, disposedOf) -> {
+        factoryDuration = duration; factoryFormat = dataFormat; disposed = disposedOf;
+        return buffer;
+      });
+      AudioTrackInfo info = new AudioTrackInfo(
+          "title", "author", 1000L, "id", false, "uri", "art", "isrc");
+      this.track = proxy(InternalAudioTrack.class, (instance, method, arguments) -> {
+        switch (method.getName()) {
+          case "isSeekable": return this.seekable;
+          case "getInfo": return info;
+          case "getIdentifier": return "id";
+          case "process":
+            processes++;
+            check(arguments[0] instanceof LocalAudioTrackExecutor,
+                "process executor type");
+            if (this.processor != null) {
+              this.processor.run((LocalAudioTrackExecutor) arguments[0]);
+            }
+            return null;
+          default: return defaultValue(method.getReturnType());
+        }
+      });
+      this.listener = new TrackStateListener() {
+        public void onTrackException(com.sedmelluq.discord.lavaplayer.track.AudioTrack item,
+            FriendlyException error) {
+          check(item == track, "failure track identity"); failure = error;
+        }
+        public void onTrackStuck(com.sedmelluq.discord.lavaplayer.track.AudioTrack item,
+            long thresholdMs) { }
+      };
+      this.executor = new LocalAudioTrackExecutor(
+          track, configuration, options, ghosting, 731);
+    }
+  }
+
+  private static AudioFrame frame(long timecode, boolean terminator) {
+    return proxy(AudioFrame.class, (instance, method, arguments) -> {
+      if (method.getName().equals("getTimecode")) return timecode;
+      if (method.getName().equals("isTerminator")) return terminator;
+      return defaultValue(method.getReturnType());
+    });
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type, java.lang.reflect.InvocationHandler handler) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] { type }, handler);
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
   }
 
   private static void check(boolean condition, String message) {

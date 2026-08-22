@@ -22,7 +22,7 @@ cargo run --locked -q -p mantle-jvm-gate -- emit \
 cargo run --locked -q -p mantle-jvm-gate -- verify-structure \
   --reference-jar "$REFERENCE_JAR" --candidate-jar "$JAR"
 
-for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame audio-frame-provider-tools audio-processing-context audio-player-options decoded-track-holder track-state-listener audio-output-hook audio-load-result-handler functional-result-handler audio-player-lifecycle-manager audio-player-interface audio-player-manager-interface default-audio-player default-audio-player-manager internal-audio-track audio-track-executor local-audio-track-executor-callback; do
+for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame audio-frame-provider-tools audio-processing-context audio-player-options decoded-track-holder track-state-listener audio-output-hook audio-load-result-handler functional-result-handler audio-player-lifecycle-manager audio-player-interface audio-player-manager-interface default-audio-player default-audio-player-manager internal-audio-track audio-track-executor local-audio-track-executor-callback local-audio-track-executor; do
   case "$consumer" in
     smoke) consumer_class='Smoke' ;;
     probe) consumer_class='Probe' ;;
@@ -55,6 +55,7 @@ for consumer in smoke probe integration classloader event track-value track-enum
     internal-audio-track) consumer_class='InternalAudioTrack' ;;
     audio-track-executor) consumer_class='AudioTrackExecutor' ;;
     local-audio-track-executor-callback) consumer_class='LocalAudioTrackExecutorCallbacks' ;;
+    local-audio-track-executor) consumer_class='LocalAudioTrackExecutor' ;;
   esac
   cargo run --locked -q -p mantle-jvm-gate -- "write-$consumer-consumer" \
     --output "$WORK/Gate${consumer_class}.java"
@@ -74,7 +75,8 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateAudioPlayerLifecycleManager.java" "$WORK/GateAudioPlayerInterface.java" \
   "$WORK/GateAudioPlayerManagerInterface.java" "$WORK/GateDefaultAudioPlayer.java" \
   "$WORK/GateDefaultAudioPlayerManager.java" "$WORK/GateInternalAudioTrack.java" \
-  "$WORK/GateAudioTrackExecutor.java" "$WORK/GateLocalAudioTrackExecutorCallbacks.java"
+  "$WORK/GateAudioTrackExecutor.java" "$WORK/GateLocalAudioTrackExecutorCallbacks.java" \
+  "$WORK/GateLocalAudioTrackExecutor.java"
 javac --release 11 -d "$CLASSES" "$WORK/GateClassloader.java"
 
 case "$(uname -s)" in
@@ -395,6 +397,18 @@ cmp "$WORK/local-audio-track-executor-callback-reference.txt" \
 grep --fixed-strings \
   'dispatch=read-ok,read-fail,seek-min,seek-max,seek-fail;' \
   "$WORK/local-audio-track-executor-callback-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateLocalAudioTrackExecutor \
+  >"$WORK/local-audio-track-executor-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateLocalAudioTrackExecutor \
+  >"$WORK/local-audio-track-executor-candidate.txt"
+cmp "$WORK/local-audio-track-executor-reference.txt" \
+  "$WORK/local-audio-track-executor-candidate.txt"
+grep --fixed-strings \
+  'constructor=context,buffer,factory,disposed;position=seekable,clamp,ghosting;' \
+  "$WORK/local-audio-track-executor-candidate.txt" >/dev/null
 java -Xverify:all -cp "$GATE_CLASSPATH" GateSmoke "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateIntegration "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" callbacks

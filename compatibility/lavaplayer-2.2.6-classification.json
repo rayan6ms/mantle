@@ -25455,189 +25455,252 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal constructor, position, seek, marker, processing-loop, frame-provider, lifecycle, failure, interruption, and reflection behavior are covered by the Phase 13 local-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/InternalAudioTrack;Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerOptions;ZI)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal constructor, position, seek, marker, processing-loop, frame-provider, lifecycle, failure, interruption, and reflection behavior are covered by the Phase 13 local-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "getProcessingContext",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal constructor, position, seek, marker, processing-loop, frame-provider, lifecycle, failure, interruption, and reflection behavior are covered by the Phase 13 local-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "getStackTrace",
       "descriptor": "()[Ljava/lang/StackTraceElement;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal constructor, position, seek, marker, processing-loop, frame-provider, lifecycle, failure, interruption, and reflection behavior are covered by the Phase 13 local-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "getAudioBuffer",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBuffer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal constructor, position, seek, marker, processing-loop, frame-provider, lifecycle, failure, interruption, and reflection behavior are covered by the Phase 13 local-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "execute",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/TrackStateListener;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal constructor, position, seek, marker, processing-loop, frame-provider, lifecycle, failure, interruption, and reflection behavior are covered by the Phase 13 local-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "stop",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal constructor, position, seek, marker, processing-loop, frame-provider, lifecycle, failure, interruption, and reflection behavior are covered by the Phase 13 local-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "waitOnEnd",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal constructor, position, seek, marker, processing-loop, frame-provider, lifecycle, failure, interruption, and reflection behavior are covered by the Phase 13 local-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "getPosition",
       "descriptor": "()J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal constructor, position, seek, marker, processing-loop, frame-provider, lifecycle, failure, interruption, and reflection behavior are covered by the Phase 13 local-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "setPosition",
       "descriptor": "(J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal constructor, position, seek, marker, processing-loop, frame-provider, lifecycle, failure, interruption, and reflection behavior are covered by the Phase 13 local-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "getState",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackState;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal constructor, position, seek, marker, processing-loop, frame-provider, lifecycle, failure, interruption, and reflection behavior are covered by the Phase 13 local-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "setMarker",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal constructor, position, seek, marker, processing-loop, frame-provider, lifecycle, failure, interruption, and reflection behavior are covered by the Phase 13 local-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "addMarker",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal constructor, position, seek, marker, processing-loop, frame-provider, lifecycle, failure, interruption, and reflection behavior are covered by the Phase 13 local-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "removeMarker",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal constructor, position, seek, marker, processing-loop, frame-provider, lifecycle, failure, interruption, and reflection behavior are covered by the Phase 13 local-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "failedBeforeLoad",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal constructor, position, seek, marker, processing-loop, frame-provider, lifecycle, failure, interruption, and reflection behavior are covered by the Phase 13 local-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "executeProcessingLoop",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor$ReadExecutor;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor$SeekExecutor;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal constructor, position, seek, marker, processing-loop, frame-provider, lifecycle, failure, interruption, and reflection behavior are covered by the Phase 13 local-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "executeProcessingLoop",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor$ReadExecutor;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor$SeekExecutor;Z)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal constructor, position, seek, marker, processing-loop, frame-provider, lifecycle, failure, interruption, and reflection behavior are covered by the Phase 13 local-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "provide",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal constructor, position, seek, marker, processing-loop, frame-provider, lifecycle, failure, interruption, and reflection behavior are covered by the Phase 13 local-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "provide",
       "descriptor": "(JLjava/util/concurrent/TimeUnit;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal constructor, position, seek, marker, processing-loop, frame-provider, lifecycle, failure, interruption, and reflection behavior are covered by the Phase 13 local-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "provide",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal constructor, position, seek, marker, processing-loop, frame-provider, lifecycle, failure, interruption, and reflection behavior are covered by the Phase 13 local-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "provide",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;JLjava/util/concurrent/TimeUnit;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact exported structure and reference-equal constructor, position, seek, marker, processing-loop, frame-provider, lifecycle, failure, interruption, and reflection behavior are covered by the Phase 13 local-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor$ReadExecutor",
