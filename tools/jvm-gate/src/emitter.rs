@@ -82,6 +82,8 @@ const ABSTRACT_AUDIO_FRAME_BUFFER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AbstractAudioFrameBuffer";
 const ALLOCATING_AUDIO_FRAME_BUFFER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AllocatingAudioFrameBuffer";
+const NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/track/playback/NonAllocatingAudioFrameBuffer";
 const FRIENDLY_EXCEPTION_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/FriendlyException";
 const FRIENDLY_EXCEPTION_SEVERITY_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity";
@@ -164,6 +166,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     AUDIO_FRAME_BUFFER_CLASS,
     ABSTRACT_AUDIO_FRAME_BUFFER_CLASS,
     ALLOCATING_AUDIO_FRAME_BUFFER_CLASS,
+    NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS,
     AUDIO_FRAME_BUFFER_FACTORY_CLASS,
     AUDIO_FRAME_REBUILDER_CLASS,
     TERMINATOR_FRAME_CLASS,
@@ -483,6 +486,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | DELEGATED_AUDIO_TRACK_CLASS
                 | TRACK_INFO_BUILDER_CLASS
                 | ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
+                | NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
         ) || field
             .access_flags
             .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
@@ -490,7 +494,9 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
     class.methods.retain(|method| {
         matches!(
             class_name.as_str(),
-            TRACK_INFO_BUILDER_CLASS | ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
+            TRACK_INFO_BUILDER_CLASS
+                | ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
+                | NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
         ) || method
             .access_flags
             .intersects(MethodAccessFlags::PUBLIC | MethodAccessFlags::PROTECTED)
@@ -588,6 +594,14 @@ fn replacement_body(
     if class_name == ALLOCATING_AUDIO_FRAME_BUFFER_CLASS {
         return allocating_audio_frame_buffer_replacement(pool, name, descriptor, required_locals);
     }
+    if class_name == NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS {
+        return non_allocating_audio_frame_buffer_replacement(
+            pool,
+            name,
+            descriptor,
+            required_locals,
+        );
+    }
     if class_name == PRIMORDIAL_TRACK_EXECUTOR_CLASS {
         return primordial_track_executor_replacement(pool, name, descriptor, required_locals);
     }
@@ -628,6 +642,9 @@ fn replacement_body(
         ) => track_info_short_constructor(pool)?,
         ("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat", "<init>", "(III)V") => {
             audio_data_format_constructor(pool)?
+        }
+        ("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat", "frameDuration", "()J") => {
+            audio_data_format_frame_duration(pool)?
         }
         (
             "com/sedmelluq/discord/lavaplayer/track/TrackMarker",
@@ -3325,6 +3342,1828 @@ fn allocating_audio_frame_buffer_clinit(pool: &mut ConstantPool<'static>) -> Res
             Instruction::Return,
         ],
     )
+}
+
+fn non_allocating_audio_frame_buffer_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(ILcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;Ljava/util/concurrent/atomic/AtomicBoolean;)V",
+        ) => non_allocating_constructor(pool),
+        ("getRemainingCapacity", "()I") => non_allocating_remaining(pool),
+        ("getFullCapacity", "()I") => int_getter(
+            pool,
+            NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS,
+            "worstCaseFrameCount",
+        ),
+        ("consume", "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;)V") => {
+            non_allocating_consume(pool)
+        }
+        ("provide", "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;") => {
+            non_allocating_provide(pool, false)
+        }
+        (
+            "provide",
+            "(JLjava/util/concurrent/TimeUnit;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;",
+        ) => non_allocating_provide(pool, true),
+        ("provide", "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;)Z") => {
+            non_allocating_provide_mutable(pool)
+        }
+        (
+            "provide",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;JLjava/util/concurrent/TimeUnit;)Z",
+        ) => non_allocating_provide_mutable_timed(pool),
+        ("popFrame", "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;)V") => {
+            non_allocating_pop_frame(pool)
+        }
+        (
+            "popPendingTerminator",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;)V",
+        ) => non_allocating_pop_terminator(pool),
+        ("clear", "()V") => non_allocating_clear(pool),
+        ("rebuild", "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameRebuilder;)V") => {
+            non_allocating_rebuild(pool)
+        }
+        ("getLastInputTimecode", "()Ljava/lang/Long;") => non_allocating_last_timecode(pool),
+        ("attemptStore", "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;)Z") => {
+            non_allocating_attempt_store(pool)
+        }
+        ("wrappedFrameIndex", "(I)I") => non_allocating_wrapped_index(pool),
+        ("store", "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;III)V") => {
+            non_allocating_store(pool)
+        }
+        (
+            "getBridgeFrame",
+            "()Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;",
+        ) => non_allocating_bridge_frame(pool),
+        ("unwrapBridgeFrame", "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;") => {
+            non_allocating_unwrap_bridge(pool)
+        }
+        (
+            "createFrames",
+            "(ILcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)[Lcom/sedmelluq/discord/lavaplayer/track/playback/ReferenceMutableAudioFrame;",
+        ) => non_allocating_create_frames(pool),
+        (
+            "createSilentFrame",
+            "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)Lcom/sedmelluq/discord/lavaplayer/track/playback/ReferenceMutableAudioFrame;",
+        ) => non_allocating_create_silent_frame(pool),
+        ("signalWaiters", "()V") => non_allocating_signal(pool),
+        ("<clinit>", "()V") => non_allocating_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn non_allocating_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS)?;
+    let parent = pool.add_class(ABSTRACT_AUDIO_FRAME_BUFFER_CLASS)?;
+    let parent_init = pool.add_method_ref(
+        parent,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V",
+    )?;
+    let format_class = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let frame_duration = pool.add_method_ref(format_class, "frameDuration", "()J")?;
+    let expected = pool.add_method_ref(format_class, "expectedChunkSize", "()I")?;
+    let maximum = pool.add_method_ref(format_class, "maximumChunkSize", "()I")?;
+    let create_frames = pool.add_method_ref(
+        owner,
+        "createFrames",
+        "(ILcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)[Lcom/sedmelluq/discord/lavaplayer/track/playback/ReferenceMutableAudioFrame;",
+    )?;
+    let create_silent = pool.add_method_ref(
+        owner,
+        "createSilentFrame",
+        "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)Lcom/sedmelluq/discord/lavaplayer/track/playback/ReferenceMutableAudioFrame;",
+    )?;
+    let frames = pool.add_field_ref(
+        owner,
+        "frames",
+        "[Lcom/sedmelluq/discord/lavaplayer/track/playback/ReferenceMutableAudioFrame;",
+    )?;
+    let silent = pool.add_field_ref(
+        owner,
+        "silentFrame",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/ReferenceMutableAudioFrame;",
+    )?;
+    let frame_buffer = pool.add_field_ref(owner, "frameBuffer", "[B")?;
+    let worst = pool.add_field_ref(owner, "worstCaseFrameCount", "I")?;
+    let stopping = pool.add_field_ref(
+        owner,
+        "stopping",
+        "Ljava/util/concurrent/atomic/AtomicBoolean;",
+    )?;
+    code(
+        pool,
+        4,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Invokespecial(parent_init),
+            Instruction::Iload_1,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(frame_duration),
+            Instruction::L2i,
+            Instruction::Idiv,
+            Instruction::Iconst_1,
+            Instruction::Iadd,
+            Instruction::Istore(4),
+            Instruction::Aload_0,
+            Instruction::Iload(4),
+            Instruction::Aload_2,
+            Instruction::Invokestatic(create_frames),
+            Instruction::Putfield(frames),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Invokestatic(create_silent),
+            Instruction::Putfield(silent),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(expected),
+            Instruction::Iload(4),
+            Instruction::Imul,
+            Instruction::Newarray(ArrayType::Byte),
+            Instruction::Putfield(frame_buffer),
+            Instruction::Aload_0,
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_buffer),
+            Instruction::Arraylength,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(maximum),
+            Instruction::Idiv,
+            Instruction::Putfield(worst),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Putfield(stopping),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn non_allocating_wrapped_index(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS)?;
+    let frames = pool.add_field_ref(
+        owner,
+        "frames",
+        "[Lcom/sedmelluq/discord/lavaplayer/track/playback/ReferenceMutableAudioFrame;",
+    )?;
+    let mut body = code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(frames),
+            Instruction::Arraylength,
+            Instruction::Istore_2,
+            Instruction::Iload_1,
+            Instruction::Iload_2,
+            Instruction::If_icmplt(11),
+            Instruction::Iload_1,
+            Instruction::Iload_2,
+            Instruction::Isub,
+            Instruction::Ireturn,
+            Instruction::Iload_1,
+            Instruction::Ireturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::AppendFrame {
+            frame_type: 252,
+            offset_delta: 11,
+            locals: vec![VerificationType::Integer],
+        }],
+    )?;
+    Ok(body)
+}
+
+fn non_allocating_store(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS)?;
+    let frame_class =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/playback/AudioFrame")?;
+    let reference = pool.add_class(REFERENCE_MUTABLE_FRAME_CLASS)?;
+    let frames = pool.add_field_ref(
+        owner,
+        "frames",
+        "[Lcom/sedmelluq/discord/lavaplayer/track/playback/ReferenceMutableAudioFrame;",
+    )?;
+    let frame_buffer = pool.add_field_ref(owner, "frameBuffer", "[B")?;
+    let frame_count = pool.add_field_ref(owner, "frameCount", "I")?;
+    let get_timecode = pool.add_interface_method_ref(frame_class, "getTimecode", "()J")?;
+    let get_volume = pool.add_interface_method_ref(frame_class, "getVolume", "()I")?;
+    let get_data = pool.add_interface_method_ref(frame_class, "getData", "([BI)V")?;
+    let set_timecode = pool.add_method_ref(reference, "setTimecode", "(J)V")?;
+    let set_volume = pool.add_method_ref(reference, "setVolume", "(I)V")?;
+    let set_reference = pool.add_method_ref(reference, "setDataReference", "([BII)V")?;
+    code(
+        pool,
+        4,
+        6,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(frames),
+            Instruction::Iload_2,
+            Instruction::Aaload,
+            Instruction::Astore(5),
+            Instruction::Aload(5),
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(get_timecode, 1),
+            Instruction::Invokevirtual(set_timecode),
+            Instruction::Aload(5),
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(get_volume, 1),
+            Instruction::Invokevirtual(set_volume),
+            Instruction::Aload(5),
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_buffer),
+            Instruction::Iload_3,
+            Instruction::Iload(4),
+            Instruction::Invokevirtual(set_reference),
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_buffer),
+            Instruction::Iload_3,
+            Instruction::Invokeinterface(get_data, 3),
+            Instruction::Aload_0,
+            Instruction::Dup,
+            Instruction::Getfield(frame_count),
+            Instruction::Iconst_1,
+            Instruction::Iadd,
+            Instruction::Putfield(frame_count),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn non_allocating_create_frames(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let reference = pool.add_class(REFERENCE_MUTABLE_FRAME_CLASS)?;
+    let init = pool.add_method_ref(reference, "<init>", "()V")?;
+    let set_format = pool.add_method_ref(
+        reference,
+        "setFormat",
+        "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V",
+    )?;
+    let array_type = pool.add_class(
+        "[Lcom/sedmelluq/discord/lavaplayer/track/playback/ReferenceMutableAudioFrame;",
+    )?;
+    let mut body = code(
+        pool,
+        4,
+        4,
+        vec![
+            Instruction::Iload_0,
+            Instruction::Anewarray(reference),
+            Instruction::Astore_2,
+            Instruction::Iconst_0,
+            Instruction::Istore_3,
+            Instruction::Iload_3,
+            Instruction::Aload_2,
+            Instruction::Arraylength,
+            Instruction::If_icmpge(22),
+            Instruction::Aload_2,
+            Instruction::Iload_3,
+            Instruction::New(reference),
+            Instruction::Dup,
+            Instruction::Invokespecial(init),
+            Instruction::Aastore,
+            Instruction::Aload_2,
+            Instruction::Iload_3,
+            Instruction::Aaload,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(set_format),
+            Instruction::Iinc(3, 1),
+            Instruction::Goto(5),
+            Instruction::Aload_2,
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 253,
+                offset_delta: 5,
+                locals: vec![
+                    VerificationType::Object {
+                        cpool_index: array_type,
+                    },
+                    VerificationType::Integer,
+                ],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: 16,
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn non_allocating_create_silent_frame(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let format_class = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let reference = pool.add_class(REFERENCE_MUTABLE_FRAME_CLASS)?;
+    let init = pool.add_method_ref(reference, "<init>", "()V")?;
+    let set_format = pool.add_method_ref(
+        reference,
+        "setFormat",
+        "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V",
+    )?;
+    let silence = pool.add_method_ref(format_class, "silenceBytes", "()[B")?;
+    let set_reference = pool.add_method_ref(reference, "setDataReference", "([BII)V")?;
+    let set_volume = pool.add_method_ref(reference, "setVolume", "(I)V")?;
+    code(
+        pool,
+        4,
+        2,
+        vec![
+            Instruction::New(reference),
+            Instruction::Dup,
+            Instruction::Invokespecial(init),
+            Instruction::Astore_1,
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(set_format),
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(silence),
+            Instruction::Iconst_0,
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(silence),
+            Instruction::Arraylength,
+            Instruction::Invokevirtual(set_reference),
+            Instruction::Aload_1,
+            Instruction::Iconst_0,
+            Instruction::Invokevirtual(set_volume),
+            Instruction::Aload_1,
+            Instruction::Areturn,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn non_allocating_attempt_store(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS)?;
+    let audio_frame =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/playback/AudioFrame")?;
+    let frames = pool.add_field_ref(
+        owner,
+        "frames",
+        "[Lcom/sedmelluq/discord/lavaplayer/track/playback/ReferenceMutableAudioFrame;",
+    )?;
+    let frame_buffer = pool.add_field_ref(owner, "frameBuffer", "[B")?;
+    let first = pool.add_field_ref(owner, "firstFrame", "I")?;
+    let count = pool.add_field_ref(owner, "frameCount", "I")?;
+    let get_length = pool.add_interface_method_ref(audio_frame, "getDataLength", "()I")?;
+    let wrapped = pool.add_method_ref(owner, "wrappedFrameIndex", "(I)I")?;
+    let reference = pool.add_class(REFERENCE_MUTABLE_FRAME_CLASS)?;
+    let get_offset = pool.add_method_ref(reference, "getFrameOffset", "()I")?;
+    let get_end = pool.add_method_ref(reference, "getFrameEndOffset", "()I")?;
+    let store = pool.add_method_ref(
+        owner,
+        "store",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;III)V",
+    )?;
+    let illegal = pool.add_class("java/lang/IllegalArgumentException")?;
+    let message = pool.add_string("Frame is too big for buffer.")?;
+    let illegal_init = pool.add_method_ref(illegal, "<init>", "(Ljava/lang/String;)V")?;
+    let mut body = code(
+        pool,
+        5,
+        8,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(count),
+            Instruction::Aload_0,
+            Instruction::Getfield(frames),
+            Instruction::Arraylength,
+            Instruction::If_icmplt(8),
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(get_length, 1),
+            Instruction::Istore_2,
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_buffer),
+            Instruction::Arraylength,
+            Instruction::Istore_3,
+            Instruction::Aload_0,
+            Instruction::Getfield(count),
+            Instruction::Ifne(36),
+            Instruction::Aload_0,
+            Instruction::Iconst_0,
+            Instruction::Putfield(first),
+            Instruction::Iload_2,
+            Instruction::Iload_3,
+            Instruction::If_icmple(29),
+            Instruction::New(illegal),
+            Instruction::Dup,
+            Instruction::Ldc_w(message),
+            Instruction::Invokespecial(illegal_init),
+            Instruction::Athrow,
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Iconst_0,
+            Instruction::Iconst_0,
+            Instruction::Iload_2,
+            Instruction::Invokevirtual(store),
+            Instruction::Goto(106),
+            Instruction::Aload_0,
+            Instruction::Aload_0,
+            Instruction::Getfield(first),
+            Instruction::Aload_0,
+            Instruction::Getfield(count),
+            Instruction::Iadd,
+            Instruction::Iconst_1,
+            Instruction::Isub,
+            Instruction::Invokevirtual(wrapped),
+            Instruction::Istore(4),
+            Instruction::Aload_0,
+            Instruction::Iload(4),
+            Instruction::Iconst_1,
+            Instruction::Iadd,
+            Instruction::Invokevirtual(wrapped),
+            Instruction::Istore(5),
+            Instruction::Aload_0,
+            Instruction::Getfield(frames),
+            Instruction::Aload_0,
+            Instruction::Getfield(first),
+            Instruction::Aaload,
+            Instruction::Invokevirtual(get_offset),
+            Instruction::Istore(6),
+            Instruction::Aload_0,
+            Instruction::Getfield(frames),
+            Instruction::Iload(4),
+            Instruction::Aaload,
+            Instruction::Invokevirtual(get_end),
+            Instruction::Istore(7),
+            Instruction::Iload(6),
+            Instruction::Iload(7),
+            Instruction::If_icmpge(92),
+            Instruction::Iload(7),
+            Instruction::Iload_2,
+            Instruction::Iadd,
+            Instruction::Iload_3,
+            Instruction::If_icmpgt(80),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Iload(5),
+            Instruction::Iload(7),
+            Instruction::Iload_2,
+            Instruction::Invokevirtual(store),
+            Instruction::Goto(106),
+            Instruction::Iload(6),
+            Instruction::Iload_2,
+            Instruction::If_icmplt(90),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Iload(5),
+            Instruction::Iconst_0,
+            Instruction::Iload_2,
+            Instruction::Invokevirtual(store),
+            Instruction::Goto(106),
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+            Instruction::Iload(7),
+            Instruction::Iload_2,
+            Instruction::Iadd,
+            Instruction::Iload(6),
+            Instruction::If_icmpgt(104),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Iload(5),
+            Instruction::Iload(7),
+            Instruction::Iload_2,
+            Instruction::Invokevirtual(store),
+            Instruction::Goto(106),
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+            Instruction::Iconst_1,
+            Instruction::Ireturn,
+        ],
+    )?;
+    let short_locals = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Object {
+            cpool_index: audio_frame,
+        },
+    ];
+    let base_locals = vec![
+        short_locals[0].clone(),
+        short_locals[1].clone(),
+        VerificationType::Integer,
+        VerificationType::Integer,
+    ];
+    let mut full_locals = base_locals.clone();
+    full_locals.extend(std::iter::repeat_n(VerificationType::Integer, 4));
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 8,
+                locals: short_locals,
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 20,
+                locals: base_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 6,
+                locals: base_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 43,
+                locals: full_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 9,
+                locals: full_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 1,
+                locals: full_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 11,
+                locals: full_locals,
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 1,
+                locals: base_locals,
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn non_allocating_pop_terminator(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let parent = pool.add_class(ABSTRACT_AUDIO_FRAME_BUFFER_CLASS)?;
+    let terminate = pool.add_field_ref(parent, "terminateOnEmpty", "Z")?;
+    let terminated = pool.add_field_ref(parent, "terminated", "Z")?;
+    let mutable = pool.add_class(MUTABLE_FRAME_CLASS)?;
+    let set_terminator = pool.add_method_ref(mutable, "setTerminator", "(Z)V")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Iconst_0,
+            Instruction::Putfield(terminate),
+            Instruction::Aload_0,
+            Instruction::Iconst_1,
+            Instruction::Putfield(terminated),
+            Instruction::Aload_1,
+            Instruction::Iconst_1,
+            Instruction::Invokevirtual(set_terminator),
+            Instruction::Return,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn non_allocating_pop_frame(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS)?;
+    let reference = pool.add_class(REFERENCE_MUTABLE_FRAME_CLASS)?;
+    let mutable = pool.add_class(MUTABLE_FRAME_CLASS)?;
+    let frames = pool.add_field_ref(
+        owner,
+        "frames",
+        "[Lcom/sedmelluq/discord/lavaplayer/track/playback/ReferenceMutableAudioFrame;",
+    )?;
+    let silent = pool.add_field_ref(
+        owner,
+        "silentFrame",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/ReferenceMutableAudioFrame;",
+    )?;
+    let first = pool.add_field_ref(owner, "firstFrame", "I")?;
+    let count = pool.add_field_ref(owner, "frameCount", "I")?;
+    let get_volume = pool.add_method_ref(reference, "getVolume", "()I")?;
+    let get_timecode = pool.add_method_ref(reference, "getTimecode", "()J")?;
+    let set_timecode_ref = pool.add_method_ref(reference, "setTimecode", "(J)V")?;
+    let get_buffer = pool.add_method_ref(reference, "getFrameBuffer", "()[B")?;
+    let get_offset = pool.add_method_ref(reference, "getFrameOffset", "()I")?;
+    let get_length = pool.add_method_ref(reference, "getDataLength", "()I")?;
+    let get_format = pool.add_method_ref(
+        reference,
+        "getFormat",
+        "()Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let set_timecode = pool.add_method_ref(mutable, "setTimecode", "(J)V")?;
+    let set_volume = pool.add_method_ref(mutable, "setVolume", "(I)V")?;
+    let set_terminator = pool.add_method_ref(mutable, "setTerminator", "(Z)V")?;
+    let store = pool.add_method_ref(mutable, "store", "([BII)V")?;
+    let set_format = pool.add_method_ref(
+        mutable,
+        "setFormat",
+        "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V",
+    )?;
+    let wrapped = pool.add_method_ref(owner, "wrappedFrameIndex", "(I)I")?;
+    let mut body = code(
+        pool,
+        4,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(frames),
+            Instruction::Aload_0,
+            Instruction::Getfield(first),
+            Instruction::Aaload,
+            Instruction::Astore_2,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(get_volume),
+            Instruction::Ifne(17),
+            Instruction::Aload_0,
+            Instruction::Getfield(silent),
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(get_timecode),
+            Instruction::Invokevirtual(set_timecode_ref),
+            Instruction::Aload_0,
+            Instruction::Getfield(silent),
+            Instruction::Astore_2,
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(get_timecode),
+            Instruction::Invokevirtual(set_timecode),
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(get_volume),
+            Instruction::Invokevirtual(set_volume),
+            Instruction::Aload_1,
+            Instruction::Iconst_0,
+            Instruction::Invokevirtual(set_terminator),
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(get_buffer),
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(get_offset),
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(get_length),
+            Instruction::Invokevirtual(store),
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(get_format),
+            Instruction::Invokevirtual(set_format),
+            Instruction::Aload_0,
+            Instruction::Aload_0,
+            Instruction::Aload_0,
+            Instruction::Getfield(first),
+            Instruction::Iconst_1,
+            Instruction::Iadd,
+            Instruction::Invokevirtual(wrapped),
+            Instruction::Putfield(first),
+            Instruction::Aload_0,
+            Instruction::Dup,
+            Instruction::Getfield(count),
+            Instruction::Iconst_1,
+            Instruction::Isub,
+            Instruction::Putfield(count),
+            Instruction::Return,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::AppendFrame {
+            frame_type: 252,
+            offset_delta: 17,
+            locals: vec![VerificationType::Object {
+                cpool_index: reference,
+            }],
+        }],
+    )?;
+    Ok(body)
+}
+
+fn non_allocating_bridge_frame(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS)?;
+    let parent = pool.add_class(ABSTRACT_AUDIO_FRAME_BUFFER_CLASS)?;
+    let mutable = pool.add_class(MUTABLE_FRAME_CLASS)?;
+    let mutable_init = pool.add_method_ref(mutable, "<init>", "()V")?;
+    let bridge = pool.add_field_ref(
+        owner,
+        "bridgeFrame",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;",
+    )?;
+    let format = pool.add_field_ref(
+        parent,
+        "format",
+        "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let format_class = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let maximum = pool.add_method_ref(format_class, "maximumChunkSize", "()I")?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let allocate = pool.add_method_ref(byte_buffer, "allocate", "(I)Ljava/nio/ByteBuffer;")?;
+    let set_buffer = pool.add_method_ref(mutable, "setBuffer", "(Ljava/nio/ByteBuffer;)V")?;
+    let mut body = code(
+        pool,
+        3,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(bridge),
+            Instruction::Ifnonnull(15),
+            Instruction::Aload_0,
+            Instruction::New(mutable),
+            Instruction::Dup,
+            Instruction::Invokespecial(mutable_init),
+            Instruction::Putfield(bridge),
+            Instruction::Aload_0,
+            Instruction::Getfield(bridge),
+            Instruction::Aload_0,
+            Instruction::Getfield(format),
+            Instruction::Invokevirtual(maximum),
+            Instruction::Invokestatic(allocate),
+            Instruction::Invokevirtual(set_buffer),
+            Instruction::Aload_0,
+            Instruction::Getfield(bridge),
+            Instruction::Areturn,
+        ],
+    )?;
+    add_same_frame(pool, &mut body, 15)?;
+    Ok(body)
+}
+
+fn non_allocating_unwrap_bridge(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS)?;
+    let mutable = pool.add_class(MUTABLE_FRAME_CLASS)?;
+    let bridge = pool.add_field_ref(
+        owner,
+        "bridgeFrame",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;",
+    )?;
+    let is_terminator = pool.add_method_ref(mutable, "isTerminator", "()Z")?;
+    let terminator = pool.add_class(TERMINATOR_FRAME_CLASS)?;
+    let instance = pool.add_field_ref(
+        terminator,
+        "INSTANCE",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/TerminatorAudioFrame;",
+    )?;
+    let immutable = pool.add_class(IMMUTABLE_FRAME_CLASS)?;
+    let get_timecode = pool.add_method_ref(mutable, "getTimecode", "()J")?;
+    let get_data = pool.add_method_ref(mutable, "getData", "()[B")?;
+    let get_volume = pool.add_method_ref(mutable, "getVolume", "()I")?;
+    let get_format = pool.add_method_ref(
+        mutable,
+        "getFormat",
+        "()Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let init = pool.add_method_ref(
+        immutable,
+        "<init>",
+        "(J[BILcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V",
+    )?;
+    let mut body = code(
+        pool,
+        8,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(bridge),
+            Instruction::Invokevirtual(is_terminator),
+            Instruction::Ifeq(6),
+            Instruction::Getstatic(instance),
+            Instruction::Areturn,
+            Instruction::New(immutable),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(bridge),
+            Instruction::Invokevirtual(get_timecode),
+            Instruction::Aload_0,
+            Instruction::Getfield(bridge),
+            Instruction::Invokevirtual(get_data),
+            Instruction::Aload_0,
+            Instruction::Getfield(bridge),
+            Instruction::Invokevirtual(get_volume),
+            Instruction::Aload_0,
+            Instruction::Getfield(bridge),
+            Instruction::Invokevirtual(get_format),
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )?;
+    add_same_frame(pool, &mut body, 6)?;
+    Ok(body)
+}
+
+fn non_allocating_rebuild(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS)?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let logger = pool.add_class("org/slf4j/Logger")?;
+    let debug = pool.add_interface_method_ref(logger, "debug", "(Ljava/lang/String;)V")?;
+    let message =
+        pool.add_string("Frame rebuild not supported on non-allocating frame buffer yet.")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Getstatic(log),
+            Instruction::Ldc_w(message),
+            Instruction::Invokeinterface(debug, 2),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn non_allocating_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS)?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn non_allocating_remaining(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS)?;
+    let parent = pool.add_class(ABSTRACT_AUDIO_FRAME_BUFFER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let synchronizer = pool.add_field_ref(parent, "synchronizer", "Ljava/lang/Object;")?;
+    let count = pool.add_field_ref(owner, "frameCount", "I")?;
+    let worst = pool.add_field_ref(owner, "worstCaseFrameCount", "I")?;
+    let first = pool.add_field_ref(owner, "firstFrame", "I")?;
+    let frames = pool.add_field_ref(
+        owner,
+        "frames",
+        "[Lcom/sedmelluq/discord/lavaplayer/track/playback/ReferenceMutableAudioFrame;",
+    )?;
+    let frame_buffer = pool.add_field_ref(owner, "frameBuffer", "[B")?;
+    let format = pool.add_field_ref(
+        parent,
+        "format",
+        "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let wrapped = pool.add_method_ref(owner, "wrappedFrameIndex", "(I)I")?;
+    let reference = pool.add_class(REFERENCE_MUTABLE_FRAME_CLASS)?;
+    let get_offset = pool.add_method_ref(reference, "getFrameOffset", "()I")?;
+    let get_end = pool.add_method_ref(reference, "getFrameEndOffset", "()I")?;
+    let format_class = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let maximum = pool.add_method_ref(format_class, "maximumChunkSize", "()I")?;
+    let mut body = code_with_exceptions(
+        pool,
+        3,
+        8,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(synchronizer),
+            Instruction::Dup,
+            Instruction::Astore_1,
+            Instruction::Monitorenter,
+            Instruction::Aload_0,
+            Instruction::Getfield(count),
+            Instruction::Ifne(13),
+            Instruction::Aload_0,
+            Instruction::Getfield(worst),
+            Instruction::Aload_1,
+            Instruction::Monitorexit,
+            Instruction::Ireturn,
+            Instruction::Aload_0,
+            Instruction::Aload_0,
+            Instruction::Getfield(first),
+            Instruction::Aload_0,
+            Instruction::Getfield(count),
+            Instruction::Iadd,
+            Instruction::Iconst_1,
+            Instruction::Isub,
+            Instruction::Invokevirtual(wrapped),
+            Instruction::Istore_2,
+            Instruction::Aload_0,
+            Instruction::Getfield(frames),
+            Instruction::Aload_0,
+            Instruction::Getfield(first),
+            Instruction::Aaload,
+            Instruction::Invokevirtual(get_offset),
+            Instruction::Istore_3,
+            Instruction::Aload_0,
+            Instruction::Getfield(frames),
+            Instruction::Iload_2,
+            Instruction::Aaload,
+            Instruction::Invokevirtual(get_end),
+            Instruction::Istore(4),
+            Instruction::Aload_0,
+            Instruction::Getfield(format),
+            Instruction::Invokevirtual(maximum),
+            Instruction::Istore(5),
+            Instruction::Iload_3,
+            Instruction::Iload(4),
+            Instruction::If_icmpge(56),
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_buffer),
+            Instruction::Arraylength,
+            Instruction::Iload(4),
+            Instruction::Isub,
+            Instruction::Iload(5),
+            Instruction::Idiv,
+            Instruction::Iload_3,
+            Instruction::Iload(5),
+            Instruction::Idiv,
+            Instruction::Iadd,
+            Instruction::Istore(6),
+            Instruction::Goto(62),
+            Instruction::Iload_3,
+            Instruction::Iload(4),
+            Instruction::Isub,
+            Instruction::Iload(5),
+            Instruction::Idiv,
+            Instruction::Istore(6),
+            Instruction::Aload_1,
+            Instruction::Monitorexit,
+            Instruction::Iload(6),
+            Instruction::Ireturn,
+            Instruction::Astore(7),
+            Instruction::Aload_1,
+            Instruction::Monitorexit,
+            Instruction::Aload(7),
+            Instruction::Athrow,
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 5..64,
+                handler_pc: 66,
+                catch_type: 0,
+            },
+            ExceptionTableEntry {
+                range_pc: 66..69,
+                handler_pc: 66,
+                catch_type: 0,
+            },
+        ],
+    )?;
+    let owner_local = VerificationType::Object { cpool_index: owner };
+    let object_local = VerificationType::Object {
+        cpool_index: object,
+    };
+    let mut four_ints = vec![owner_local.clone(), object_local.clone()];
+    four_ints.extend(std::iter::repeat_n(VerificationType::Integer, 4));
+    let mut five_ints = four_ints.clone();
+    five_ints.push(VerificationType::Integer);
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 13,
+                locals: vec![owner_local.clone(), object_local.clone()],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 42,
+                locals: four_ints,
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 5,
+                locals: five_ints,
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 3,
+                locals: vec![owner_local, object_local],
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn non_allocating_clear(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS)?;
+    let parent = pool.add_class(ABSTRACT_AUDIO_FRAME_BUFFER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let synchronizer = pool.add_field_ref(parent, "synchronizer", "Ljava/lang/Object;")?;
+    let count = pool.add_field_ref(owner, "frameCount", "I")?;
+    let mut body = code_with_exceptions(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(synchronizer),
+            Instruction::Dup,
+            Instruction::Astore_1,
+            Instruction::Monitorenter,
+            Instruction::Aload_0,
+            Instruction::Iconst_0,
+            Instruction::Putfield(count),
+            Instruction::Aload_1,
+            Instruction::Monitorexit,
+            Instruction::Goto(16),
+            Instruction::Astore_2,
+            Instruction::Aload_1,
+            Instruction::Monitorexit,
+            Instruction::Aload_2,
+            Instruction::Athrow,
+            Instruction::Return,
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 5..10,
+                handler_pc: 11,
+                catch_type: 0,
+            },
+            ExceptionTableEntry {
+                range_pc: 11..14,
+                handler_pc: 11,
+                catch_type: 0,
+            },
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 11,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: object,
+                    },
+                ],
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: 4,
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn non_allocating_signal(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS)?;
+    let parent = pool.add_class(ABSTRACT_AUDIO_FRAME_BUFFER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let synchronizer = pool.add_field_ref(parent, "synchronizer", "Ljava/lang/Object;")?;
+    let notify = pool.add_method_ref(object, "notifyAll", "()V")?;
+    let mut body = code_with_exceptions(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(synchronizer),
+            Instruction::Dup,
+            Instruction::Astore_1,
+            Instruction::Monitorenter,
+            Instruction::Aload_0,
+            Instruction::Getfield(synchronizer),
+            Instruction::Invokevirtual(notify),
+            Instruction::Aload_1,
+            Instruction::Monitorexit,
+            Instruction::Goto(16),
+            Instruction::Astore_2,
+            Instruction::Aload_1,
+            Instruction::Monitorexit,
+            Instruction::Aload_2,
+            Instruction::Athrow,
+            Instruction::Return,
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 5..10,
+                handler_pc: 11,
+                catch_type: 0,
+            },
+            ExceptionTableEntry {
+                range_pc: 11..14,
+                handler_pc: 11,
+                catch_type: 0,
+            },
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 11,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: object,
+                    },
+                ],
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: 4,
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn non_allocating_last_timecode(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS)?;
+    let parent = pool.add_class(ABSTRACT_AUDIO_FRAME_BUFFER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let long_class = pool.add_class("java/lang/Long")?;
+    let synchronizer = pool.add_field_ref(parent, "synchronizer", "Ljava/lang/Object;")?;
+    let clear_on_insert = pool.add_field_ref(parent, "clearOnInsert", "Z")?;
+    let count = pool.add_field_ref(owner, "frameCount", "I")?;
+    let first = pool.add_field_ref(owner, "firstFrame", "I")?;
+    let frames = pool.add_field_ref(
+        owner,
+        "frames",
+        "[Lcom/sedmelluq/discord/lavaplayer/track/playback/ReferenceMutableAudioFrame;",
+    )?;
+    let wrapped = pool.add_method_ref(owner, "wrappedFrameIndex", "(I)I")?;
+    let reference = pool.add_class(REFERENCE_MUTABLE_FRAME_CLASS)?;
+    let get_timecode = pool.add_method_ref(reference, "getTimecode", "()J")?;
+    let value_of = pool.add_method_ref(long_class, "valueOf", "(J)Ljava/lang/Long;")?;
+    let mut body = code_with_exceptions(
+        pool,
+        4,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(synchronizer),
+            Instruction::Dup,
+            Instruction::Astore_1,
+            Instruction::Monitorenter,
+            Instruction::Aconst_null,
+            Instruction::Astore_2,
+            Instruction::Aload_0,
+            Instruction::Getfield(clear_on_insert),
+            Instruction::Ifne(29),
+            Instruction::Aload_0,
+            Instruction::Getfield(count),
+            Instruction::Ifle(29),
+            Instruction::Aload_0,
+            Instruction::Getfield(frames),
+            Instruction::Aload_0,
+            Instruction::Aload_0,
+            Instruction::Getfield(first),
+            Instruction::Aload_0,
+            Instruction::Getfield(count),
+            Instruction::Iadd,
+            Instruction::Iconst_1,
+            Instruction::Isub,
+            Instruction::Invokevirtual(wrapped),
+            Instruction::Aaload,
+            Instruction::Invokevirtual(get_timecode),
+            Instruction::Invokestatic(value_of),
+            Instruction::Astore_2,
+            Instruction::Nop,
+            Instruction::Aload_1,
+            Instruction::Monitorexit,
+            Instruction::Aload_2,
+            Instruction::Areturn,
+            Instruction::Astore_3,
+            Instruction::Aload_1,
+            Instruction::Monitorexit,
+            Instruction::Aload_3,
+            Instruction::Athrow,
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 7..31,
+                handler_pc: 33,
+                catch_type: 0,
+            },
+            ExceptionTableEntry {
+                range_pc: 33..36,
+                handler_pc: 33,
+                catch_type: 0,
+            },
+        ],
+    )?;
+    let locals = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Object {
+            cpool_index: object,
+        },
+        VerificationType::Object {
+            cpool_index: long_class,
+        },
+    ];
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 29,
+                locals: locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 3,
+                locals,
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn non_allocating_provide_mutable(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS)?;
+    let parent = pool.add_class(ABSTRACT_AUDIO_FRAME_BUFFER_CLASS)?;
+    let mutable = pool.add_class(MUTABLE_FRAME_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let synchronizer = pool.add_field_ref(parent, "synchronizer", "Ljava/lang/Object;")?;
+    let terminate = pool.add_field_ref(parent, "terminateOnEmpty", "Z")?;
+    let count = pool.add_field_ref(owner, "frameCount", "I")?;
+    let pop = pool.add_method_ref(
+        owner,
+        "popFrame",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;)V",
+    )?;
+    let pop_terminator = pool.add_method_ref(
+        owner,
+        "popPendingTerminator",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;)V",
+    )?;
+    let notify = pool.add_method_ref(object, "notifyAll", "()V")?;
+    let mut body = code_with_exceptions(
+        pool,
+        2,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(synchronizer),
+            Instruction::Dup,
+            Instruction::Astore_2,
+            Instruction::Monitorenter,
+            Instruction::Iconst_0,
+            Instruction::Istore_3,
+            Instruction::Aload_0,
+            Instruction::Getfield(count),
+            Instruction::Ifne(22),
+            Instruction::Aload_0,
+            Instruction::Getfield(terminate),
+            Instruction::Ifeq(30),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(pop_terminator),
+            Instruction::Aload_0,
+            Instruction::Getfield(synchronizer),
+            Instruction::Invokevirtual(notify),
+            Instruction::Iconst_1,
+            Instruction::Istore_3,
+            Instruction::Goto(30),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(pop),
+            Instruction::Aload_0,
+            Instruction::Getfield(synchronizer),
+            Instruction::Invokevirtual(notify),
+            Instruction::Iconst_1,
+            Instruction::Istore_3,
+            Instruction::Aload_2,
+            Instruction::Monitorexit,
+            Instruction::Iload_3,
+            Instruction::Ireturn,
+            Instruction::Astore(4),
+            Instruction::Aload_2,
+            Instruction::Monitorexit,
+            Instruction::Aload(4),
+            Instruction::Athrow,
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 7..32,
+                handler_pc: 34,
+                catch_type: 0,
+            },
+            ExceptionTableEntry {
+                range_pc: 34..37,
+                handler_pc: 34,
+                catch_type: 0,
+            },
+        ],
+    )?;
+    let locals = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Object {
+            cpool_index: mutable,
+        },
+        VerificationType::Object {
+            cpool_index: object,
+        },
+        VerificationType::Integer,
+    ];
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 22,
+                locals: locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 7,
+                locals: locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 3,
+                locals,
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn non_allocating_provide_mutable_timed(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS)?;
+    let parent = pool.add_class(ABSTRACT_AUDIO_FRAME_BUFFER_CLASS)?;
+    let mutable = pool.add_class(MUTABLE_FRAME_CLASS)?;
+    let time_unit = pool.add_class("java/util/concurrent/TimeUnit")?;
+    let object = pool.add_class("java/lang/Object")?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let timeout = pool.add_class("java/util/concurrent/TimeoutException")?;
+    let timeout_init = pool.add_method_ref(timeout, "<init>", "()V")?;
+    let system = pool.add_class("java/lang/System")?;
+    let nano_time = pool.add_method_ref(system, "nanoTime", "()J")?;
+    let to_millis = pool.add_method_ref(time_unit, "toMillis", "(J)J")?;
+    let synchronizer = pool.add_field_ref(parent, "synchronizer", "Ljava/lang/Object;")?;
+    let terminate = pool.add_field_ref(parent, "terminateOnEmpty", "Z")?;
+    let count = pool.add_field_ref(owner, "frameCount", "I")?;
+    let pop = pool.add_method_ref(
+        owner,
+        "popFrame",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;)V",
+    )?;
+    let pop_terminator = pool.add_method_ref(
+        owner,
+        "popPendingTerminator",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;)V",
+    )?;
+    let wait = pool.add_method_ref(object, "wait", "(J)V")?;
+    let notify = pool.add_method_ref(object, "notifyAll", "()V")?;
+    let mut body = code_with_exceptions(
+        pool,
+        5,
+        12,
+        vec![
+            Instruction::Invokestatic(nano_time),
+            Instruction::Lstore(5),
+            Instruction::Lload(5),
+            Instruction::Aload(4),
+            Instruction::Lload_2,
+            Instruction::Invokevirtual(to_millis),
+            Instruction::Ladd,
+            Instruction::Lstore(7),
+            Instruction::Aload_0,
+            Instruction::Getfield(synchronizer),
+            Instruction::Dup,
+            Instruction::Astore(9),
+            Instruction::Monitorenter,
+            Instruction::Iconst_0,
+            Instruction::Istore(10),
+            Instruction::Aload_0,
+            Instruction::Getfield(count),
+            Instruction::Ifne(46),
+            Instruction::Aload_0,
+            Instruction::Getfield(terminate),
+            Instruction::Ifeq(30),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(pop_terminator),
+            Instruction::Aload_0,
+            Instruction::Getfield(synchronizer),
+            Instruction::Invokevirtual(notify),
+            Instruction::Iconst_1,
+            Instruction::Istore(10),
+            Instruction::Goto(54),
+            Instruction::Aload_0,
+            Instruction::Getfield(synchronizer),
+            Instruction::Lload(7),
+            Instruction::Lload(5),
+            Instruction::Lsub,
+            Instruction::Invokevirtual(wait),
+            Instruction::Invokestatic(nano_time),
+            Instruction::Lstore(5),
+            Instruction::Lload(5),
+            Instruction::Lload(7),
+            Instruction::Lcmp,
+            Instruction::Iflt(15),
+            Instruction::New(timeout),
+            Instruction::Dup,
+            Instruction::Invokespecial(timeout_init),
+            Instruction::Athrow,
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(pop),
+            Instruction::Aload_0,
+            Instruction::Getfield(synchronizer),
+            Instruction::Invokevirtual(notify),
+            Instruction::Iconst_1,
+            Instruction::Istore(10),
+            Instruction::Aload(9),
+            Instruction::Monitorexit,
+            Instruction::Iload(10),
+            Instruction::Ireturn,
+            Instruction::Astore(11),
+            Instruction::Aload(9),
+            Instruction::Monitorexit,
+            Instruction::Aload(11),
+            Instruction::Athrow,
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 15..56,
+                handler_pc: 58,
+                catch_type: 0,
+            },
+            ExceptionTableEntry {
+                range_pc: 58..61,
+                handler_pc: 58,
+                catch_type: 0,
+            },
+        ],
+    )?;
+    let locals = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Object {
+            cpool_index: mutable,
+        },
+        VerificationType::Long,
+        VerificationType::Object {
+            cpool_index: time_unit,
+        },
+        VerificationType::Long,
+        VerificationType::Long,
+        VerificationType::Object {
+            cpool_index: object,
+        },
+        VerificationType::Integer,
+    ];
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 15,
+                locals: locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 14,
+                locals: locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 15,
+                locals: locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 7,
+                locals: locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 3,
+                locals,
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn non_allocating_provide(pool: &mut ConstantPool<'static>, timed: bool) -> Result<Attribute> {
+    let owner = pool.add_class(NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS)?;
+    let parent = pool.add_class(ABSTRACT_AUDIO_FRAME_BUFFER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let audio_frame =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/playback/AudioFrame")?;
+    let synchronizer = pool.add_field_ref(parent, "synchronizer", "Ljava/lang/Object;")?;
+    let bridge = pool.add_method_ref(
+        owner,
+        "getBridgeFrame",
+        "()Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;",
+    )?;
+    let unwrap = pool.add_method_ref(
+        owner,
+        "unwrapBridgeFrame",
+        "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;",
+    )?;
+    let (monitor_local, result_local, throwable_local, mut invoke) = if timed {
+        (4, 5, 6, vec![Instruction::Lload_1, Instruction::Aload_3])
+    } else {
+        (1, 2, 3, vec![])
+    };
+    let descriptor = if timed {
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;JLjava/util/concurrent/TimeUnit;)Z"
+    } else {
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;)Z"
+    };
+    let provide = pool.add_method_ref(owner, "provide", descriptor)?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Getfield(synchronizer),
+        Instruction::Dup,
+        Instruction::Astore(monitor_local),
+        Instruction::Monitorenter,
+        Instruction::Aconst_null,
+        Instruction::Astore(result_local),
+        Instruction::Aload_0,
+        Instruction::Aload_0,
+        Instruction::Invokevirtual(bridge),
+    ];
+    instructions.append(&mut invoke);
+    let conditional_index = instructions.len();
+    instructions.push(Instruction::Invokevirtual(provide));
+    instructions.push(Instruction::Ifeq(0));
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Invokevirtual(unwrap),
+        Instruction::Astore(result_local),
+    ]);
+    let exit_index = instructions.len();
+    instructions.extend([
+        Instruction::Aload(monitor_local),
+        Instruction::Monitorexit,
+        Instruction::Aload(result_local),
+        Instruction::Areturn,
+    ]);
+    let handler_index = instructions.len();
+    instructions.extend([
+        Instruction::Astore(throwable_local),
+        Instruction::Aload(monitor_local),
+        Instruction::Monitorexit,
+        Instruction::Aload(throwable_local),
+        Instruction::Athrow,
+    ]);
+    let exit_pc = u16::try_from(exit_index)?;
+    let exit_end_pc = u16::try_from(exit_index + 2)?;
+    let handler_pc = u16::try_from(handler_index)?;
+    let handler_end_pc = u16::try_from(handler_index + 3)?;
+    let handler_delta = u16::try_from(handler_index - exit_index - 1)?;
+    instructions[conditional_index + 1] = Instruction::Ifeq(exit_pc);
+    let mut body = code_with_exceptions(
+        pool,
+        if timed { 5 } else { 2 },
+        u16::from(throwable_local + 1),
+        instructions,
+        vec![
+            ExceptionTableEntry {
+                range_pc: 7..exit_end_pc,
+                handler_pc,
+                catch_type: 0,
+            },
+            ExceptionTableEntry {
+                range_pc: handler_pc..handler_end_pc,
+                handler_pc,
+                catch_type: 0,
+            },
+        ],
+    )?;
+    let mut locals = vec![VerificationType::Object { cpool_index: owner }];
+    if timed {
+        let time_unit = pool.add_class("java/util/concurrent/TimeUnit")?;
+        locals.extend([
+            VerificationType::Long,
+            VerificationType::Object {
+                cpool_index: time_unit,
+            },
+        ]);
+    }
+    locals.extend([
+        VerificationType::Object {
+            cpool_index: object,
+        },
+        VerificationType::Object {
+            cpool_index: audio_frame,
+        },
+    ]);
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: exit_pc,
+                locals: locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: handler_delta,
+                locals,
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn non_allocating_consume(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS)?;
+    let parent = pool.add_class(ABSTRACT_AUDIO_FRAME_BUFFER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let atomic = pool.add_class("java/util/concurrent/atomic/AtomicBoolean")?;
+    let get = pool.add_method_ref(atomic, "get", "()Z")?;
+    let interrupted = pool.add_class("java/lang/InterruptedException")?;
+    let interrupted_init = pool.add_method_ref(interrupted, "<init>", "()V")?;
+    let stopping = pool.add_field_ref(
+        owner,
+        "stopping",
+        "Ljava/util/concurrent/atomic/AtomicBoolean;",
+    )?;
+    let synchronizer = pool.add_field_ref(parent, "synchronizer", "Ljava/lang/Object;")?;
+    let locked = pool.add_field_ref(parent, "locked", "Z")?;
+    let received = pool.add_field_ref(parent, "receivedFrames", "Z")?;
+    let clear_on_insert = pool.add_field_ref(parent, "clearOnInsert", "Z")?;
+    let clear = pool.add_method_ref(owner, "clear", "()V")?;
+    let attempt = pool.add_method_ref(
+        owner,
+        "attemptStore",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;)Z",
+    )?;
+    let wait = pool.add_method_ref(object, "wait", "()V")?;
+    let notify = pool.add_method_ref(object, "notifyAll", "()V")?;
+    let mut body = code_with_exceptions(
+        pool,
+        3,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(stopping),
+            Instruction::Ifnull(11),
+            Instruction::Aload_0,
+            Instruction::Getfield(stopping),
+            Instruction::Invokevirtual(get),
+            Instruction::Ifeq(11),
+            Instruction::New(interrupted),
+            Instruction::Dup,
+            Instruction::Invokespecial(interrupted_init),
+            Instruction::Athrow,
+            Instruction::Aload_0,
+            Instruction::Getfield(synchronizer),
+            Instruction::Dup,
+            Instruction::Astore_2,
+            Instruction::Monitorenter,
+            Instruction::Aload_0,
+            Instruction::Getfield(locked),
+            Instruction::Ifne(41),
+            Instruction::Aload_0,
+            Instruction::Iconst_1,
+            Instruction::Putfield(received),
+            Instruction::Aload_0,
+            Instruction::Getfield(clear_on_insert),
+            Instruction::Ifeq(30),
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(clear),
+            Instruction::Aload_0,
+            Instruction::Iconst_0,
+            Instruction::Putfield(clear_on_insert),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(attempt),
+            Instruction::Ifne(38),
+            Instruction::Aload_0,
+            Instruction::Getfield(synchronizer),
+            Instruction::Invokevirtual(wait),
+            Instruction::Goto(30),
+            Instruction::Aload_0,
+            Instruction::Getfield(synchronizer),
+            Instruction::Invokevirtual(notify),
+            Instruction::Aload_2,
+            Instruction::Monitorexit,
+            Instruction::Goto(49),
+            Instruction::Astore_3,
+            Instruction::Aload_2,
+            Instruction::Monitorexit,
+            Instruction::Aload_3,
+            Instruction::Athrow,
+            Instruction::Return,
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 16..43,
+                handler_pc: 44,
+                catch_type: 0,
+            },
+            ExceptionTableEntry {
+                range_pc: 44..47,
+                handler_pc: 44,
+                catch_type: 0,
+            },
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::SameFrame { frame_type: 11 },
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: 18,
+                locals: vec![VerificationType::Object {
+                    cpool_index: object,
+                }],
+            },
+            StackFrame::SameFrame { frame_type: 7 },
+            StackFrame::SameFrame { frame_type: 2 },
+            StackFrame::SameLocals1StackItemFrame {
+                frame_type: 66,
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: 4,
+            },
+        ],
+    )?;
+    Ok(body)
 }
 
 fn track_marker_tracker_replacement(
@@ -13538,6 +15377,30 @@ fn audio_data_format_constructor(pool: &mut ConstantPool<'static>) -> Result<Att
             Instruction::Iload_3,
             Instruction::Putfield(chunk_samples),
             Instruction::Return,
+        ],
+    )
+}
+
+fn audio_data_format_frame_duration(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let sample_rate = pool.add_field_ref(owner, "sampleRate", "I")?;
+    let chunk_samples = pool.add_field_ref(owner, "chunkSampleCount", "I")?;
+    let thousand = pool.add_long(1_000)?;
+    code(
+        pool,
+        4,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(chunk_samples),
+            Instruction::I2l,
+            Instruction::Ldc2_w(thousand),
+            Instruction::Lmul,
+            Instruction::Aload_0,
+            Instruction::Getfield(sample_rate),
+            Instruction::I2l,
+            Instruction::Ldiv,
+            Instruction::Lreturn,
         ],
     )
 }
