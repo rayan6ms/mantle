@@ -138,6 +138,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-sound-cloud-client-id-tracker-consumer" => {
             Some(SOUND_CLOUD_CLIENT_ID_TRACKER_CONSUMER)
         }
+        "write-sound-cloud-data-loader-consumer" => Some(SOUND_CLOUD_DATA_LOADER_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -8985,6 +8986,99 @@ public final class GateSoundCloudClientIdTracker {
   }
 
   private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const SOUND_CLOUD_DATA_LOADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudDataLoader;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import org.apache.http.client.protocol.HttpClientContext;
+
+public final class GateSoundCloudDataLoader {
+  public static void main(String[] args) throws Exception {
+    dispatchContract();
+    failureContract();
+    reflectionContract();
+    System.out.println(
+        "public-abstract-interface,0-fields,0-constructors,1-method;"
+        + "dispatch,argument-identity,return-identity,nulls,checked-io,reflection");
+  }
+
+  private static void dispatchContract() throws Exception {
+    HttpInterface http = new HttpInterface(
+        null, HttpClientContext.create(), false, proxy(HttpContextFilter.class));
+    String url = new String("https://api-v2.soundcloud.com/resolve?url=fixture");
+    JsonBrowser result = JsonBrowser.parse("{\"kind\":\"track\"}");
+    Object[] observed = new Object[2];
+    int[] calls = new int[1];
+    SoundCloudDataLoader loader = (actualHttp, actualUrl) -> {
+      observed[0] = actualHttp;
+      observed[1] = actualUrl;
+      calls[0]++;
+      return result;
+    };
+    check(loader.load(http, url) == result && observed[0] == http && observed[1] == url
+        && calls[0] == 1, "ordinary dispatch identity");
+    check(loader.load(null, null) == result && observed[0] == null && observed[1] == null
+        && calls[0] == 2, "null dispatch identity");
+
+    SoundCloudDataLoader nullLoader = (actualHttp, actualUrl) -> null;
+    check(nullLoader.load(http, url) == null, "null return");
+  }
+
+  private static void failureContract() throws Exception {
+    IOException failure = new IOException("load-sentinel");
+    SoundCloudDataLoader loader = (http, url) -> { throw failure; };
+    try {
+      loader.load(null, "fixture");
+      throw new AssertionError("expected IOException");
+    } catch (IOException error) {
+      check(error == failure, "checked failure identity");
+    }
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<SoundCloudDataLoader> type = SoundCloudDataLoader.class;
+    check(type.isInterface() && Modifier.isPublic(type.getModifiers())
+        && Modifier.isAbstract(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == null && type.getInterfaces().length == 0
+        && type.getAnnotations().length == 0, "interface metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 1, "member counts");
+    Method method = type.getDeclaredMethod("load", HttpInterface.class, String.class);
+    check(method.getReturnType() == JsonBrowser.class
+        && method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && Arrays.equals(method.getExceptionTypes(), new Class<?>[] {IOException.class})
+        && method.getTypeParameters().length == 0
+        && method.getGenericReturnType() == JsonBrowser.class
+        && Arrays.equals(method.getGenericParameterTypes(),
+            new Object[] {HttpInterface.class, String.class})
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), "method metadata");
+  }
+
+  private static <T> T proxy(Class<T> type) {
+    return type.cast(Proxy.newProxyInstance(
+        GateSoundCloudDataLoader.class.getClassLoader(), new Class<?>[] {type},
+        (proxy, method, args) -> {
+          if (method.getName().equals("toString")) return "proxy";
+          if (method.getReturnType() == boolean.class) return false;
+          if (method.getReturnType() == int.class) return 0;
+          if (method.getReturnType() == long.class) return 0L;
+          return null;
+        }));
+  }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
