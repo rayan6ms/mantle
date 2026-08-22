@@ -109,6 +109,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-local-audio-source-manager-consumer" => Some(LOCAL_AUDIO_SOURCE_MANAGER_CONSUMER),
         "write-local-audio-track-consumer" => Some(LOCAL_AUDIO_TRACK_CONSUMER),
+        "write-local-seekable-input-stream-consumer" => Some(LOCAL_SEEKABLE_INPUT_STREAM_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -8031,6 +8032,208 @@ public final class GateLocalAudioSourceManager {
     } catch (Throwable error) {
       check(error == expected, "failure identity");
     }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const LOCAL_SEEKABLE_INPUT_STREAM_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.local.LocalSeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.tools.io.ExtendedBufferedInputStream;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateLocalSeekableInputStream {
+  public static void main(String[] args) throws Exception {
+    reflectionContract();
+    constructionAndReading();
+    seekingAndReset();
+    failuresAndClose();
+    System.out.println(
+        "construction=length,zero-position,5-fields;"
+        + "reads=single,bulk,skip,available,eof-quirk;"
+        + "seek=hard,buffer-discard,beyond-eof,negative;"
+        + "lifecycle=reset,close,missing,null;"
+        + "reflection=public-concrete,1-constructor,11-methods");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<LocalSeekableInputStream> type = LocalSeekableInputStream.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == SeekableInputStream.class
+        && type.getInterfaces().length == 0, "class metadata");
+
+    Field[] fields = type.getDeclaredFields();
+    check(fields.length == 5, "field count");
+    checkFieldName(type.getDeclaredField("log"), "org.slf4j.Logger",
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type.getDeclaredField("inputStream"), FileInputStream.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type.getDeclaredField("channel"), FileChannel.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type.getDeclaredField("bufferedStream"), ExtendedBufferedInputStream.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type.getDeclaredField("position"), long.class, Modifier.PRIVATE);
+
+    Constructor<?> constructor = type.getDeclaredConstructor(File.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isVarArgs()
+        && constructor.getExceptionTypes().length == 0
+        && type.getDeclaredConstructors().length == 1, "constructor metadata");
+    check(type.getDeclaredMethods().length == 11, "method count");
+    checkMethod(type.getDeclaredMethod("read"), int.class, Modifier.PUBLIC, true);
+    checkMethod(type.getDeclaredMethod("read", byte[].class, int.class, int.class),
+        int.class, Modifier.PUBLIC, true);
+    checkMethod(type.getDeclaredMethod("skip", long.class),
+        long.class, Modifier.PUBLIC, true);
+    checkMethod(type.getDeclaredMethod("available"), int.class, Modifier.PUBLIC, true);
+    checkMethod(type.getDeclaredMethod("reset"), void.class,
+        Modifier.PUBLIC | Modifier.SYNCHRONIZED, true);
+    checkMethod(type.getDeclaredMethod("markSupported"),
+        boolean.class, Modifier.PUBLIC, false);
+    checkMethod(type.getDeclaredMethod("close"), void.class, Modifier.PUBLIC, true);
+    checkMethod(type.getDeclaredMethod("getPosition"), long.class, Modifier.PUBLIC, false);
+    checkMethod(type.getDeclaredMethod("canSeekHard"), boolean.class, Modifier.PUBLIC, false);
+    Method providers = type.getDeclaredMethod("getTrackInfoProviders");
+    checkMethod(providers, List.class, Modifier.PUBLIC, false);
+    check(providers.getGenericReturnType().getTypeName().equals(
+        "java.util.List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider>"),
+        "provider signature");
+    checkMethod(type.getDeclaredMethod("seekHard", long.class),
+        void.class, Modifier.PROTECTED, true);
+
+    Field log = type.getDeclaredField("log");
+    log.setAccessible(true);
+    check(log.get(null) != null, "logger initialized");
+  }
+
+  private static void constructionAndReading() throws Exception {
+    Path path = Files.createTempFile("mantle-local-stream-read-", ".bin");
+    Files.write(path, new byte[] { 10, 20, 30, 40, 50 });
+    LocalSeekableInputStream stream = new LocalSeekableInputStream(path.toFile());
+    check(stream.getContentLength() == 5L && stream.getMaxSkipDistance() == 0L
+        && stream.getPosition() == 0L && stream.canSeekHard() && !stream.markSupported(),
+        "initial stream state");
+    check(stream.available() == 5, "initial available");
+
+    Field inputField = LocalSeekableInputStream.class.getDeclaredField("inputStream");
+    Field channelField = LocalSeekableInputStream.class.getDeclaredField("channel");
+    Field bufferedField = LocalSeekableInputStream.class.getDeclaredField("bufferedStream");
+    inputField.setAccessible(true);
+    channelField.setAccessible(true);
+    bufferedField.setAccessible(true);
+    FileInputStream input = (FileInputStream) inputField.get(stream);
+    check(channelField.get(stream) == input.getChannel()
+        && bufferedField.get(stream) instanceof ExtendedBufferedInputStream,
+        "captured stream identities");
+
+    check(stream.read() == 10 && stream.getPosition() == 1L && stream.available() == 4,
+        "single read");
+    byte[] bytes = new byte[] { -1, -1, -1, -1 };
+    check(stream.read(bytes, 1, 2) == 2
+        && Arrays.equals(bytes, new byte[] { -1, 20, 30, -1 })
+        && stream.getPosition() == 3L && stream.available() == 2, "bulk read");
+    check(stream.skip(1L) == 1L && stream.getPosition() == 4L
+        && stream.read() == 50 && stream.getPosition() == 5L, "skip and final byte");
+    check(stream.read() == -1 && stream.getPosition() == 5L, "single eof position");
+    check(stream.read(new byte[2], 0, 2) == -1 && stream.getPosition() == 4L,
+        "bulk eof position quirk");
+    check(stream.read(new byte[0], 0, 0) == 0 && stream.getPosition() == 4L,
+        "zero-length read");
+    check(stream.getTrackInfoProviders().isEmpty()
+        && stream.getTrackInfoProviders()
+            == Collections.<AudioTrackInfoProvider>emptyList(), "empty providers");
+    stream.close();
+    Files.delete(path);
+  }
+
+  private static void seekingAndReset() throws Exception {
+    Path path = Files.createTempFile("mantle-local-stream-seek-", ".bin");
+    Files.write(path, new byte[] { 1, 2, 3, 4, 5, 6 });
+    ExposedStream stream = new ExposedStream(path.toFile());
+    check(stream.read() == 1 && stream.read() == 2, "prime buffer");
+    stream.hardSeek(4L);
+    check(stream.getPosition() == 4L && stream.read() == 5,
+        "hard seek discards buffered bytes");
+    stream.seek(1L);
+    check(stream.getPosition() == 1L && stream.read() == 2, "public hard seek");
+    stream.seek(9L);
+    check(stream.getPosition() == 9L && stream.read() == -1
+        && stream.getPosition() == 9L, "seek beyond eof");
+    expect(IllegalArgumentException.class, () -> stream.hardSeek(-1L));
+    check(stream.getPosition() == 9L, "failed seek preserves logical position");
+    IOException reset = expect(IOException.class, stream::reset);
+    check(reset.getMessage().equals("mark/reset not supported"), "reset message");
+    stream.close();
+    Files.delete(path);
+  }
+
+  private static void failuresAndClose() throws Exception {
+    Path path = Files.createTempFile("mantle-local-stream-close-", ".bin");
+    Files.write(path, new byte[] { 7, 8 });
+    LocalSeekableInputStream stream = new LocalSeekableInputStream(path.toFile());
+    stream.close();
+    stream.close();
+    expect(IOException.class, stream::read);
+    expect(IOException.class, () -> stream.seek(1L));
+    Files.delete(path);
+
+    Path missing = path.resolveSibling("missing-local-stream-" + System.nanoTime());
+    RuntimeException missingError = expect(
+        RuntimeException.class, () -> new LocalSeekableInputStream(missing.toFile()));
+    check(missingError.getCause() instanceof FileNotFoundException, "missing cause");
+    expect(NullPointerException.class, () -> new LocalSeekableInputStream(null));
+  }
+
+  private static void checkField(Field field, Class<?> type, int modifiers) {
+    check(field.getModifiers() == modifiers && field.getType() == type && !field.isSynthetic(),
+        field + " metadata");
+  }
+
+  private static void checkFieldName(Field field, String type, int modifiers) {
+    check(field.getModifiers() == modifiers && field.getType().getName().equals(type)
+        && !field.isSynthetic(), field + " metadata");
+  }
+
+  private static void checkMethod(
+      Method method, Class<?> returnType, int modifiers, boolean throwsIo) {
+    check(method.getModifiers() == modifiers && method.getReturnType() == returnType
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs()
+        && Arrays.equals(method.getExceptionTypes(), throwsIo
+            ? new Class<?>[] { IOException.class } : new Class<?>[0]), method + " metadata");
+  }
+
+  private static <T extends Throwable> T expect(
+      Class<T> type, Operation operation) throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private static final class ExposedStream extends LocalSeekableInputStream {
+    ExposedStream(File file) { super(file); }
+    void hardSeek(long position) throws IOException { super.seekHard(position); }
   }
 
   private interface Operation { void run() throws Exception; }

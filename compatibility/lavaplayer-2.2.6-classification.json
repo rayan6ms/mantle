@@ -13720,117 +13720,156 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact metadata and reference-equal file construction, private stream state, position accounting, seeking, reset, close, provider view, and failures are covered by the Phase 13 local-seekable-input-stream-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.local.LocalSeekableInputStream",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Ljava/io/File;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact metadata and reference-equal file construction, private stream state, position accounting, seeking, reset, close, provider view, and failures are covered by the Phase 13 local-seekable-input-stream-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.local.LocalSeekableInputStream",
       "symbol_kind": "METHOD",
       "member_name": "read",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact metadata and reference-equal file construction, private stream state, position accounting, seeking, reset, close, provider view, and failures are covered by the Phase 13 local-seekable-input-stream-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.local.LocalSeekableInputStream",
       "symbol_kind": "METHOD",
       "member_name": "read",
       "descriptor": "([BII)I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact metadata and reference-equal file construction, private stream state, position accounting, seeking, reset, close, provider view, and failures are covered by the Phase 13 local-seekable-input-stream-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.local.LocalSeekableInputStream",
       "symbol_kind": "METHOD",
       "member_name": "skip",
       "descriptor": "(J)J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact metadata and reference-equal file construction, private stream state, position accounting, seeking, reset, close, provider view, and failures are covered by the Phase 13 local-seekable-input-stream-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.local.LocalSeekableInputStream",
       "symbol_kind": "METHOD",
       "member_name": "available",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact metadata and reference-equal file construction, private stream state, position accounting, seeking, reset, close, provider view, and failures are covered by the Phase 13 local-seekable-input-stream-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.local.LocalSeekableInputStream",
       "symbol_kind": "METHOD",
       "member_name": "reset",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact metadata and reference-equal file construction, private stream state, position accounting, seeking, reset, close, provider view, and failures are covered by the Phase 13 local-seekable-input-stream-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.local.LocalSeekableInputStream",
       "symbol_kind": "METHOD",
       "member_name": "markSupported",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact metadata and reference-equal file construction, private stream state, position accounting, seeking, reset, close, provider view, and failures are covered by the Phase 13 local-seekable-input-stream-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.local.LocalSeekableInputStream",
       "symbol_kind": "METHOD",
       "member_name": "close",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact metadata and reference-equal file construction, private stream state, position accounting, seeking, reset, close, provider view, and failures are covered by the Phase 13 local-seekable-input-stream-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.local.LocalSeekableInputStream",
       "symbol_kind": "METHOD",
       "member_name": "getPosition",
       "descriptor": "()J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact metadata and reference-equal file construction, private stream state, position accounting, seeking, reset, close, provider view, and failures are covered by the Phase 13 local-seekable-input-stream-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.local.LocalSeekableInputStream",
       "symbol_kind": "METHOD",
       "member_name": "canSeekHard",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact metadata and reference-equal file construction, private stream state, position accounting, seeking, reset, close, provider view, and failures are covered by the Phase 13 local-seekable-input-stream-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.local.LocalSeekableInputStream",
       "symbol_kind": "METHOD",
       "member_name": "getTrackInfoProviders",
       "descriptor": "()Ljava/util/List;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact metadata and reference-equal file construction, private stream state, position accounting, seeking, reset, close, provider view, and failures are covered by the Phase 13 local-seekable-input-stream-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.local.LocalSeekableInputStream",
       "symbol_kind": "METHOD",
       "member_name": "seekHard",
       "descriptor": "(J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact metadata and reference-equal file construction, private stream state, position accounting, seeking, reset, close, provider view, and failures are covered by the Phase 13 local-seekable-input-stream-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.nico.HeartbeatingHttpStream",

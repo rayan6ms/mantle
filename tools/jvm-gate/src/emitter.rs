@@ -112,6 +112,8 @@ const LOCAL_AUDIO_SOURCE_MANAGER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/local/LocalAudioSourceManager";
 const LOCAL_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/local/LocalAudioTrack";
+const LOCAL_SEEKABLE_INPUT_STREAM_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/local/LocalSeekableInputStream";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -146,6 +148,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
     LOCAL_AUDIO_SOURCE_MANAGER_CLASS,
     LOCAL_AUDIO_TRACK_CLASS,
+    LOCAL_SEEKABLE_INPUT_STREAM_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -501,6 +504,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
                 | PROBING_AUDIO_SOURCE_MANAGER_CLASS
                 | LOCAL_AUDIO_TRACK_CLASS
+                | LOCAL_SEEKABLE_INPUT_STREAM_CLASS
         ) || field
             .access_flags
             .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
@@ -511,6 +515,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             TRACK_INFO_BUILDER_CLASS
                 | ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
                 | NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
+                | LOCAL_SEEKABLE_INPUT_STREAM_CLASS
         ) || method
             .access_flags
             .intersects(MethodAccessFlags::PUBLIC | MethodAccessFlags::PROTECTED)
@@ -574,6 +579,9 @@ fn replacement_body(
     }
     if class_name == LOCAL_AUDIO_TRACK_CLASS {
         return local_audio_track_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == LOCAL_SEEKABLE_INPUT_STREAM_CLASS {
+        return local_seekable_input_stream_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == AUDIO_REFERENCE_CLASS {
         return audio_reference_replacement(pool, name, descriptor, required_locals);
@@ -2016,6 +2024,403 @@ fn local_audio_track_shallow_clone(pool: &mut ConstantPool<'static>) -> Result<A
             Instruction::Getfield(source),
             Instruction::Invokespecial(init),
             Instruction::Areturn,
+        ],
+    )
+}
+
+fn local_seekable_input_stream_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(Ljava/io/File;)V") => local_seekable_input_stream_constructor(pool),
+        ("read", "()I") => local_seekable_input_stream_read(pool),
+        ("read", "([BII)I") => local_seekable_input_stream_read_bulk(pool),
+        ("skip", "(J)J") => local_seekable_input_stream_skip(pool),
+        ("available", "()I") => local_seekable_input_stream_available(pool),
+        ("reset", "()V") => local_seekable_input_stream_reset(pool),
+        ("markSupported", "()Z") => boolean_return(pool, false, required_locals),
+        ("close", "()V") => local_seekable_input_stream_close(pool),
+        ("getPosition", "()J") => long_getter(pool, LOCAL_SEEKABLE_INPUT_STREAM_CLASS, "position"),
+        ("canSeekHard", "()Z") => boolean_return(pool, true, required_locals),
+        ("getTrackInfoProviders", "()Ljava/util/List;") => {
+            local_seekable_input_stream_track_info_providers(pool)
+        }
+        ("seekHard", "(J)V") => local_seekable_input_stream_seek_hard(pool),
+        ("<clinit>", "()V") => local_seekable_input_stream_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {LOCAL_SEEKABLE_INPUT_STREAM_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+fn local_seekable_input_stream_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(LOCAL_SEEKABLE_INPUT_STREAM_CLASS)?;
+    let parent = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream")?;
+    let parent_init = pool.add_method_ref(parent, "<init>", "(JJ)V")?;
+    let file = pool.add_class("java/io/File")?;
+    let length = pool.add_method_ref(file, "length", "()J")?;
+    let input = pool.add_class("java/io/FileInputStream")?;
+    let input_init = pool.add_method_ref(input, "<init>", "(Ljava/io/File;)V")?;
+    let input_field = pool.add_field_ref(owner, "inputStream", "Ljava/io/FileInputStream;")?;
+    let buffered =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/ExtendedBufferedInputStream")?;
+    let buffered_init = pool.add_method_ref(buffered, "<init>", "(Ljava/io/InputStream;)V")?;
+    let buffered_field = pool.add_field_ref(
+        owner,
+        "bufferedStream",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/ExtendedBufferedInputStream;",
+    )?;
+    let get_channel =
+        pool.add_method_ref(input, "getChannel", "()Ljava/nio/channels/FileChannel;")?;
+    let channel_field = pool.add_field_ref(owner, "channel", "Ljava/nio/channels/FileChannel;")?;
+    let file_not_found = pool.add_class("java/io/FileNotFoundException")?;
+    let runtime = pool.add_class("java/lang/RuntimeException")?;
+    let runtime_init = pool.add_method_ref(runtime, "<init>", "(Ljava/lang/Throwable;)V")?;
+    let mut body = code_with_exceptions(
+        pool,
+        5,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(length),
+            Instruction::Lconst_0,
+            Instruction::Invokespecial(parent_init),
+            Instruction::Aload_0,
+            Instruction::New(input),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(input_init),
+            Instruction::Putfield(input_field),
+            Instruction::Aload_0,
+            Instruction::New(buffered),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(input_field),
+            Instruction::Invokespecial(buffered_init),
+            Instruction::Putfield(buffered_field),
+            Instruction::Aload_0,
+            Instruction::Aload_0,
+            Instruction::Getfield(input_field),
+            Instruction::Invokevirtual(get_channel),
+            Instruction::Putfield(channel_field),
+            Instruction::Goto(30),
+            Instruction::Astore_2,
+            Instruction::New(runtime),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Invokespecial(runtime_init),
+            Instruction::Athrow,
+            Instruction::Return,
+        ],
+        vec![ExceptionTableEntry {
+            range_pc: 5..23,
+            handler_pc: 24,
+            catch_type: file_not_found,
+        }],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 24,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object { cpool_index: file },
+                ],
+                stack: vec![VerificationType::Object {
+                    cpool_index: file_not_found,
+                }],
+            },
+            StackFrame::SameFrame { frame_type: 5 },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn local_seekable_input_stream_read(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(LOCAL_SEEKABLE_INPUT_STREAM_CLASS)?;
+    let buffered =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/ExtendedBufferedInputStream")?;
+    let buffered_field = pool.add_field_ref(
+        owner,
+        "bufferedStream",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/ExtendedBufferedInputStream;",
+    )?;
+    let read = pool.add_method_ref(buffered, "read", "()I")?;
+    let position = pool.add_field_ref(owner, "position", "J")?;
+    let mut body = code(
+        pool,
+        5,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(buffered_field),
+            Instruction::Invokevirtual(read),
+            Instruction::Istore_1,
+            Instruction::Iload_1,
+            Instruction::Iflt(12),
+            Instruction::Aload_0,
+            Instruction::Dup,
+            Instruction::Getfield(position),
+            Instruction::Lconst_1,
+            Instruction::Ladd,
+            Instruction::Putfield(position),
+            Instruction::Iload_1,
+            Instruction::Ireturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::AppendFrame {
+            frame_type: 252,
+            offset_delta: 12,
+            locals: vec![VerificationType::Integer],
+        }],
+    )?;
+    Ok(body)
+}
+
+fn local_seekable_input_stream_read_bulk(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(LOCAL_SEEKABLE_INPUT_STREAM_CLASS)?;
+    let buffered =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/ExtendedBufferedInputStream")?;
+    let buffered_field = pool.add_field_ref(
+        owner,
+        "bufferedStream",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/ExtendedBufferedInputStream;",
+    )?;
+    let read = pool.add_method_ref(buffered, "read", "([BII)I")?;
+    let position = pool.add_field_ref(owner, "position", "J")?;
+    code(
+        pool,
+        5,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(buffered_field),
+            Instruction::Aload_1,
+            Instruction::Iload_2,
+            Instruction::Iload_3,
+            Instruction::Invokevirtual(read),
+            Instruction::Istore(4),
+            Instruction::Aload_0,
+            Instruction::Dup,
+            Instruction::Getfield(position),
+            Instruction::Iload(4),
+            Instruction::I2l,
+            Instruction::Ladd,
+            Instruction::Putfield(position),
+            Instruction::Iload(4),
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+fn local_seekable_input_stream_skip(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(LOCAL_SEEKABLE_INPUT_STREAM_CLASS)?;
+    let buffered =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/ExtendedBufferedInputStream")?;
+    let buffered_field = pool.add_field_ref(
+        owner,
+        "bufferedStream",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/ExtendedBufferedInputStream;",
+    )?;
+    let skip = pool.add_method_ref(buffered, "skip", "(J)J")?;
+    let position = pool.add_field_ref(owner, "position", "J")?;
+    code(
+        pool,
+        5,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(buffered_field),
+            Instruction::Lload_1,
+            Instruction::Invokevirtual(skip),
+            Instruction::Lstore(3),
+            Instruction::Aload_0,
+            Instruction::Dup,
+            Instruction::Getfield(position),
+            Instruction::Lload(3),
+            Instruction::Ladd,
+            Instruction::Putfield(position),
+            Instruction::Lload(3),
+            Instruction::Lreturn,
+        ],
+    )
+}
+
+fn local_seekable_input_stream_available(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(LOCAL_SEEKABLE_INPUT_STREAM_CLASS)?;
+    let buffered =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/ExtendedBufferedInputStream")?;
+    let buffered_field = pool.add_field_ref(
+        owner,
+        "bufferedStream",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/ExtendedBufferedInputStream;",
+    )?;
+    let available = pool.add_method_ref(buffered, "available", "()I")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(buffered_field),
+            Instruction::Invokevirtual(available),
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+fn local_seekable_input_stream_reset(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let exception = pool.add_class("java/io/IOException")?;
+    let init = pool.add_method_ref(exception, "<init>", "(Ljava/lang/String;)V")?;
+    let message = pool.add_string("mark/reset not supported")?;
+    code(
+        pool,
+        3,
+        1,
+        vec![
+            Instruction::New(exception),
+            Instruction::Dup,
+            Instruction::Ldc_w(message),
+            Instruction::Invokespecial(init),
+            Instruction::Athrow,
+        ],
+    )
+}
+
+fn local_seekable_input_stream_close(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(LOCAL_SEEKABLE_INPUT_STREAM_CLASS)?;
+    let channel = pool.add_class("java/nio/channels/FileChannel")?;
+    let channel_field = pool.add_field_ref(owner, "channel", "Ljava/nio/channels/FileChannel;")?;
+    let close = pool.add_method_ref(channel, "close", "()V")?;
+    let exception = pool.add_class("java/io/IOException")?;
+    let log_field = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let logger = pool.add_class("org/slf4j/Logger")?;
+    let debug = pool.add_interface_method_ref(
+        logger,
+        "debug",
+        "(Ljava/lang/String;Ljava/lang/Throwable;)V",
+    )?;
+    let message = pool.add_string("Failed to close channel")?;
+    let mut body = code_with_exceptions(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(channel_field),
+            Instruction::Invokevirtual(close),
+            Instruction::Goto(9),
+            Instruction::Astore_1,
+            Instruction::Getstatic(log_field),
+            Instruction::Ldc_w(message),
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(debug, 3),
+            Instruction::Return,
+        ],
+        vec![ExceptionTableEntry {
+            range_pc: 0..3,
+            handler_pc: 4,
+            catch_type: exception,
+        }],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::SameLocals1StackItemFrame {
+                frame_type: 68,
+                stack: vec![VerificationType::Object {
+                    cpool_index: exception,
+                }],
+            },
+            StackFrame::SameFrame { frame_type: 4 },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn local_seekable_input_stream_track_info_providers(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let collections = pool.add_class("java/util/Collections")?;
+    let empty_list = pool.add_method_ref(collections, "emptyList", "()Ljava/util/List;")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![Instruction::Invokestatic(empty_list), Instruction::Areturn],
+    )
+}
+
+fn local_seekable_input_stream_seek_hard(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(LOCAL_SEEKABLE_INPUT_STREAM_CLASS)?;
+    let channel = pool.add_class("java/nio/channels/FileChannel")?;
+    let channel_field = pool.add_field_ref(owner, "channel", "Ljava/nio/channels/FileChannel;")?;
+    let set_channel_position =
+        pool.add_method_ref(channel, "position", "(J)Ljava/nio/channels/FileChannel;")?;
+    let position = pool.add_field_ref(owner, "position", "J")?;
+    let buffered =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/ExtendedBufferedInputStream")?;
+    let buffered_field = pool.add_field_ref(
+        owner,
+        "bufferedStream",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/ExtendedBufferedInputStream;",
+    )?;
+    let discard = pool.add_method_ref(buffered, "discardBuffer", "()V")?;
+    code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(channel_field),
+            Instruction::Lload_1,
+            Instruction::Invokevirtual(set_channel_position),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Lload_1,
+            Instruction::Putfield(position),
+            Instruction::Aload_0,
+            Instruction::Getfield(buffered_field),
+            Instruction::Invokevirtual(discard),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn local_seekable_input_stream_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(LOCAL_SEEKABLE_INPUT_STREAM_CLASS)?;
+    let factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
         ],
     )
 }
