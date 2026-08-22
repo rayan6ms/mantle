@@ -602,8 +602,8 @@
       "objective": "Expand source SPI, built-in manager shells, class lookup, and serialization-visible types.",
       "exit_evidence": "Source SPI extension tests, source lookup tests, per-symbol ledger entries, and Revapi diff.",
       "status": "IN_PROGRESS",
-      "classified_symbols": 7,
-      "remaining_symbols": 691,
+      "classified_symbols": 15,
+      "remaining_symbols": 683,
       "completed_slices": [
         {
           "id": "audio-source-manager-interface-contracts",
@@ -614,6 +614,19 @@
           "classification": "A_EXACT",
           "evidence": [
             "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/main.rs"
+          ]
+        },
+        {
+          "id": "audio-source-managers-contracts",
+          "classes": 1,
+          "fields": 0,
+          "methods": 7,
+          "symbols": 8,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
             "tools/jvm-gate/src/main.rs"
           ]
         }
@@ -737,7 +750,7 @@
   "phase_entry": {
     "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
     "first_execution_cohort": "core-player-track",
-    "next_slice": "audio-source-managers-contracts",
+    "next_slice": "probing-audio-source-manager-contracts",
     "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
   }
 }

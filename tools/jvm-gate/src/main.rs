@@ -103,6 +103,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-audio-source-manager-interface-consumer" => {
             Some(AUDIO_SOURCE_MANAGER_INTERFACE_CONSUMER)
         }
+        "write-audio-source-managers-consumer" => Some(AUDIO_SOURCE_MANAGERS_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -7141,6 +7142,299 @@ public final class GateAudioSourceManagerInterface {
     }
 
     public void shutdown() { shutdowns++; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_SOURCE_MANAGERS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerRegistry;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManagers;
+import com.sedmelluq.discord.lavaplayer.source.bandcamp.BandcampAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.beam.BeamAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.getyarn.GetyarnAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.http.HttpAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.local.LocalAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.nico.NicoAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateAudioSourceManagers {
+  private static final List<Class<?>> REMOTE_ORDER = Arrays.asList(
+      YoutubeAudioSourceManager.class,
+      YandexMusicAudioSourceManager.class,
+      SoundCloudAudioSourceManager.class,
+      BandcampAudioSourceManager.class,
+      VimeoAudioSourceManager.class,
+      TwitchStreamAudioSourceManager.class,
+      BeamAudioSourceManager.class,
+      GetyarnAudioSourceManager.class,
+      NicoAudioSourceManager.class,
+      HttpAudioSourceManager.class);
+
+  public static void main(String[] args) throws Exception {
+    constructorAndReflection();
+    remoteOverloads();
+    exclusionsAndFailures();
+    localOverloads();
+    System.out.println(
+        "remote=order,defaults,custom-registry,constructor-options;"
+        + "excluded=exact,empty,all,null,duplicate,failure-prefix;"
+        + "local=default,custom,null-registry;"
+        + "reflection=public-class,0-fields,1-constructor,6-static-methods,2-varargs");
+  }
+
+  private static void constructorAndReflection() throws Exception {
+    Class<AudioSourceManagers> type = AudioSourceManagers.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers()) && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0, "class metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 6, "member counts");
+    Constructor<AudioSourceManagers> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.newInstance().getClass() == type, "public constructor");
+
+    int varargs = 0;
+    for (Method method : type.getDeclaredMethods()) {
+      int expectedModifiers = Modifier.PUBLIC | Modifier.STATIC;
+      if (method.isVarArgs()) expectedModifiers |= 0x80;
+      check(method.getModifiers() == expectedModifiers
+          && method.getReturnType() == void.class && !method.isBridge()
+          && !method.isSynthetic(), method + " metadata");
+      if (method.isVarArgs()) {
+        varargs++;
+        check(method.isAnnotationPresent(SafeVarargs.class)
+            && method.getParameterTypes()[method.getParameterCount() - 1] == Class[].class,
+            method + " varargs metadata");
+      } else {
+        check(!method.isAnnotationPresent(SafeVarargs.class), method + " annotation absence");
+      }
+    }
+    check(varargs == 2, "varargs count");
+  }
+
+  private static void remoteOverloads() throws Exception {
+    RecordingManager defaults = new RecordingManager(-1, null);
+    try {
+      AudioSourceManagers.registerRemoteSources(defaults.proxy);
+      checkOrder(defaults.sources, REMOTE_ORDER, "default order");
+      checkRegistry(defaults.sources.get(9), MediaContainerRegistry.DEFAULT_REGISTRY);
+      checkSearchFlags(defaults.sources);
+    } finally {
+      defaults.shutdown();
+    }
+
+    MediaContainerRegistry custom = new MediaContainerRegistry(Collections.emptyList());
+    RecordingManager explicit = new RecordingManager(-1, null);
+    try {
+      AudioSourceManagers.registerRemoteSources(explicit.proxy, custom);
+      checkOrder(explicit.sources, REMOTE_ORDER, "explicit order");
+      checkRegistry(explicit.sources.get(9), custom);
+      checkSearchFlags(explicit.sources);
+    } finally {
+      explicit.shutdown();
+    }
+
+    RecordingManager empty = new RecordingManager(-1, null);
+    try {
+      AudioSourceManagers.registerRemoteSources(empty.proxy, custom, emptyClasses());
+      checkOrder(empty.sources, REMOTE_ORDER, "empty exclusion order");
+      checkRegistry(empty.sources.get(9), custom);
+    } finally {
+      empty.shutdown();
+    }
+  }
+
+  private static void exclusionsAndFailures() throws Exception {
+    RecordingManager selected = new RecordingManager(-1, null);
+    try {
+      AudioSourceManagers.registerRemoteSources(selected.proxy,
+          YoutubeAudioSourceManager.class,
+          SoundCloudAudioSourceManager.class,
+          HttpAudioSourceManager.class);
+      checkOrder(selected.sources, Arrays.asList(
+          YandexMusicAudioSourceManager.class,
+          BandcampAudioSourceManager.class,
+          VimeoAudioSourceManager.class,
+          TwitchStreamAudioSourceManager.class,
+          BeamAudioSourceManager.class,
+          GetyarnAudioSourceManager.class,
+          NicoAudioSourceManager.class), "selected exclusions");
+    } finally {
+      selected.shutdown();
+    }
+
+    @SuppressWarnings("unchecked")
+    Class<? extends AudioSourceManager>[] all = REMOTE_ORDER.toArray(new Class[0]);
+    AudioSourceManagers.registerRemoteSources(null,
+        new MediaContainerRegistry(Collections.emptyList()), all);
+
+    RecordingManager invalid = new RecordingManager(-1, null);
+    expect(NullPointerException.class,
+        () -> AudioSourceManagers.registerRemoteSources(invalid.proxy,
+            (Class<? extends AudioSourceManager>[]) null));
+    check(invalid.sources.isEmpty(), "null array failure prefix");
+    expect(NullPointerException.class,
+        () -> AudioSourceManagers.registerRemoteSources(invalid.proxy,
+            YoutubeAudioSourceManager.class, null));
+    check(invalid.sources.isEmpty(), "null member failure prefix");
+    expect(IllegalArgumentException.class,
+        () -> AudioSourceManagers.registerRemoteSources(invalid.proxy,
+            YoutubeAudioSourceManager.class, YoutubeAudioSourceManager.class));
+    check(invalid.sources.isEmpty(), "duplicate failure prefix");
+
+    RuntimeException sentinel = new RuntimeException("register-sentinel");
+    RecordingManager failing = new RecordingManager(3, sentinel);
+    try {
+      expectIdentity(sentinel, () -> AudioSourceManagers.registerRemoteSources(failing.proxy));
+      checkOrder(failing.sources, REMOTE_ORDER.subList(0, 4), "callback failure prefix");
+    } finally {
+      failing.shutdown();
+    }
+  }
+
+  private static void localOverloads() throws Exception {
+    RecordingManager defaults = new RecordingManager(-1, null);
+    try {
+      AudioSourceManagers.registerLocalSource(defaults.proxy);
+      checkOrder(defaults.sources, Arrays.asList(LocalAudioSourceManager.class), "local default");
+      checkRegistry(defaults.sources.get(0), MediaContainerRegistry.DEFAULT_REGISTRY);
+    } finally {
+      defaults.shutdown();
+    }
+
+    MediaContainerRegistry custom = new MediaContainerRegistry(Collections.emptyList());
+    RecordingManager explicit = new RecordingManager(-1, null);
+    try {
+      AudioSourceManagers.registerLocalSource(explicit.proxy, custom);
+      checkOrder(explicit.sources, Arrays.asList(LocalAudioSourceManager.class), "local custom");
+      checkRegistry(explicit.sources.get(0), custom);
+    } finally {
+      explicit.shutdown();
+    }
+
+    RecordingManager nullable = new RecordingManager(-1, null);
+    try {
+      AudioSourceManagers.registerLocalSource(nullable.proxy, null);
+      checkOrder(nullable.sources, Arrays.asList(LocalAudioSourceManager.class), "local null");
+      checkRegistry(nullable.sources.get(0), null);
+    } finally {
+      nullable.shutdown();
+    }
+  }
+
+  private static void checkSearchFlags(List<AudioSourceManager> sources) throws Exception {
+    check(readField(sources.get(0), "allowSearch") == Boolean.TRUE,
+        "youtube search enabled");
+    check(readField(sources.get(1), "allowSearch") == Boolean.TRUE,
+        "yandex search enabled");
+  }
+
+  private static void checkRegistry(AudioSourceManager source, MediaContainerRegistry expected)
+      throws Exception {
+    check(readField(source, "containerRegistry") == expected, "registry identity");
+  }
+
+  private static Object readField(Object instance, String name) throws Exception {
+    for (Class<?> type = instance.getClass(); type != null; type = type.getSuperclass()) {
+      try {
+        Field field = type.getDeclaredField(name);
+        field.setAccessible(true);
+        return field.get(instance);
+      } catch (NoSuchFieldException ignored) {
+      }
+    }
+    throw new AssertionError("missing field " + name);
+  }
+
+  private static void checkOrder(
+      List<AudioSourceManager> actual, List<Class<?>> expected, String message) {
+    check(actual.size() == expected.size(), message + " size");
+    for (int index = 0; index < expected.size(); index++) {
+      check(actual.get(index).getClass() == expected.get(index), message + " at " + index);
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Class<? extends AudioSourceManager>[] emptyClasses() {
+    return (Class<? extends AudioSourceManager>[]) new Class<?>[0];
+  }
+
+  private static void expect(Class<? extends Throwable> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
+  }
+
+  private static void expectIdentity(Throwable expected, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("failure was swallowed");
+    } catch (Throwable error) {
+      check(error == expected, "failure identity");
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static final class RecordingManager {
+    final List<AudioSourceManager> sources = new ArrayList<>();
+    final int failAt;
+    final RuntimeException failure;
+    final AudioPlayerManager proxy;
+
+    RecordingManager(int failAt, RuntimeException failure) {
+      this.failAt = failAt;
+      this.failure = failure;
+      proxy = (AudioPlayerManager) Proxy.newProxyInstance(
+          AudioPlayerManager.class.getClassLoader(),
+          new Class<?>[] { AudioPlayerManager.class },
+          (instance, method, arguments) -> {
+            if (method.getName().equals("registerSourceManager")) {
+              sources.add((AudioSourceManager) arguments[0]);
+              if (sources.size() - 1 == this.failAt) throw this.failure;
+              return null;
+            }
+            if (method.getName().equals("toString")) return "RecordingAudioPlayerManager";
+            if (method.getName().equals("hashCode")) return System.identityHashCode(instance);
+            if (method.getName().equals("equals")) return instance == arguments[0];
+            Class<?> result = method.getReturnType();
+            if (result == boolean.class) return false;
+            if (result == int.class) return 0;
+            if (result == long.class) return 0L;
+            return null;
+          });
+    }
+
+    void shutdown() {
+      for (AudioSourceManager source : sources) {
+        try {
+          source.shutdown();
+        } catch (Throwable ignored) {
+        }
+      }
+    }
   }
 
   private static void check(boolean condition, String message) {

@@ -104,6 +104,8 @@ const LOCAL_TRACK_SEEK_EXECUTOR_CLASS: &str =
 const REFERENCE_MUTABLE_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/ReferenceMutableAudioFrame";
 const EVENT_ADAPTER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/event/AudioEventAdapter";
+const AUDIO_SOURCE_MANAGERS_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/AudioSourceManagers";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -134,6 +136,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/filter/PcmFilterFactory",
     "com/sedmelluq/discord/lavaplayer/format/AudioDataFormat",
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
+    AUDIO_SOURCE_MANAGERS_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -549,6 +552,9 @@ fn replacement_body(
     if class_name == AUDIO_PLAYER_MANAGER_CLASS {
         return audio_player_manager_replacement(pool, name, descriptor, required_locals);
     }
+    if class_name == AUDIO_SOURCE_MANAGERS_CLASS {
+        return audio_source_managers_replacement(pool, name, descriptor, required_locals);
+    }
     if class_name == AUDIO_REFERENCE_CLASS {
         return audio_reference_replacement(pool, name, descriptor, required_locals);
     }
@@ -657,6 +663,342 @@ fn replacement_body(
             required_locals,
         )?,
     })
+}
+
+fn audio_source_managers_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        (
+            "registerRemoteSources",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;)V",
+        ) => audio_source_managers_remote_default(pool),
+        (
+            "registerRemoteSources",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;)V",
+        ) => audio_source_managers_remote(pool, false),
+        (
+            "registerRemoteSources",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;[Ljava/lang/Class;)V",
+        ) => audio_source_managers_remote_excluded_default(pool),
+        (
+            "registerRemoteSources",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;[Ljava/lang/Class;)V",
+        ) => audio_source_managers_remote(pool, true),
+        (
+            "registerLocalSource",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;)V",
+        ) => audio_source_managers_local_default(pool),
+        (
+            "registerLocalSource",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;)V",
+        ) => audio_source_managers_local(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {AUDIO_SOURCE_MANAGERS_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn audio_source_managers_remote_default(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let registry =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry")?;
+    let default_registry = pool.add_field_ref(
+        registry,
+        "DEFAULT_REGISTRY",
+        "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;",
+    )?;
+    let owner = pool.add_class(AUDIO_SOURCE_MANAGERS_CLASS)?;
+    let register = pool.add_method_ref(
+        owner,
+        "registerRemoteSources",
+        "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;)V",
+    )?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getstatic(default_registry),
+            Instruction::Invokestatic(register),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn audio_source_managers_remote_excluded_default(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let registry =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry")?;
+    let default_registry = pool.add_field_ref(
+        registry,
+        "DEFAULT_REGISTRY",
+        "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;",
+    )?;
+    let owner = pool.add_class(AUDIO_SOURCE_MANAGERS_CLASS)?;
+    let register = pool.add_method_ref(
+        owner,
+        "registerRemoteSources",
+        "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;[Ljava/lang/Class;)V",
+    )?;
+    code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getstatic(default_registry),
+            Instruction::Aload_1,
+            Instruction::Invokestatic(register),
+            Instruction::Return,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn audio_source_managers_remote(
+    pool: &mut ConstantPool<'static>,
+    with_exclusions: bool,
+) -> Result<Attribute> {
+    const SOURCES: [(&str, &str); 10] = [
+        (
+            "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAudioSourceManager",
+            "youtube",
+        ),
+        (
+            "com/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicAudioSourceManager",
+            "yandex",
+        ),
+        (
+            "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager",
+            "soundcloud",
+        ),
+        (
+            "com/sedmelluq/discord/lavaplayer/source/bandcamp/BandcampAudioSourceManager",
+            "default",
+        ),
+        (
+            "com/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioSourceManager",
+            "default",
+        ),
+        (
+            "com/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamAudioSourceManager",
+            "default",
+        ),
+        (
+            "com/sedmelluq/discord/lavaplayer/source/beam/BeamAudioSourceManager",
+            "default",
+        ),
+        (
+            "com/sedmelluq/discord/lavaplayer/source/getyarn/GetyarnAudioSourceManager",
+            "default",
+        ),
+        (
+            "com/sedmelluq/discord/lavaplayer/source/nico/NicoAudioSourceManager",
+            "default",
+        ),
+        (
+            "com/sedmelluq/discord/lavaplayer/source/http/HttpAudioSourceManager",
+            "registry",
+        ),
+    ];
+
+    let player_manager = pool.add_class(AUDIO_PLAYER_MANAGER_CLASS)?;
+    let register = pool.add_interface_method_ref(
+        player_manager,
+        "registerSourceManager",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;)V",
+    )?;
+    let mut classes = Vec::with_capacity(SOURCES.len());
+    let mut constructors = Vec::with_capacity(SOURCES.len());
+    for (class_name, constructor_kind) in SOURCES {
+        let class = pool.add_class(class_name)?;
+        let constructor = match constructor_kind {
+            "soundcloud" => pool.add_method_ref(
+                class,
+                "createDefault",
+                "()Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioSourceManager;",
+            )?,
+            "youtube" => pool.add_method_ref(
+                class,
+                "<init>",
+                "(ZLjava/lang/String;Ljava/lang/String;)V",
+            )?,
+            "yandex" => pool.add_method_ref(class, "<init>", "(Z)V")?,
+            "registry" => pool.add_method_ref(
+                class,
+                "<init>",
+                "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;)V",
+            )?,
+            _ => pool.add_method_ref(class, "<init>", "()V")?,
+        };
+        classes.push(class);
+        constructors.push((constructor, constructor_kind));
+    }
+
+    let mut instructions = Vec::new();
+    let set_class = pool.add_class("java/util/Set")?;
+    let mut branch_indexes = Vec::new();
+    if with_exclusions {
+        let set_of =
+            pool.add_interface_method_ref(set_class, "of", "([Ljava/lang/Object;)Ljava/util/Set;")?;
+        instructions.extend([
+            Instruction::Aload_2,
+            Instruction::Invokestatic(set_of),
+            Instruction::Astore_3,
+        ]);
+    }
+
+    for (index, (_, constructor_kind)) in SOURCES.iter().enumerate() {
+        let branch_index = if with_exclusions {
+            let contains =
+                pool.add_interface_method_ref(set_class, "contains", "(Ljava/lang/Object;)Z")?;
+            instructions.push(Instruction::Aload_3);
+            instructions.push(Instruction::Ldc_w(classes[index]));
+            instructions.push(Instruction::Invokeinterface(contains, 2));
+            let branch_index = instructions.len();
+            instructions.push(Instruction::Ifne(0));
+            Some(branch_index)
+        } else {
+            None
+        };
+
+        instructions.push(Instruction::Aload_0);
+        match *constructor_kind {
+            "soundcloud" => instructions.push(Instruction::Invokestatic(constructors[index].0)),
+            "youtube" => instructions.extend([
+                Instruction::New(classes[index]),
+                Instruction::Dup,
+                Instruction::Iconst_1,
+                Instruction::Aconst_null,
+                Instruction::Aconst_null,
+                Instruction::Invokespecial(constructors[index].0),
+            ]),
+            "yandex" => instructions.extend([
+                Instruction::New(classes[index]),
+                Instruction::Dup,
+                Instruction::Iconst_1,
+                Instruction::Invokespecial(constructors[index].0),
+            ]),
+            "registry" => instructions.extend([
+                Instruction::New(classes[index]),
+                Instruction::Dup,
+                Instruction::Aload_1,
+                Instruction::Invokespecial(constructors[index].0),
+            ]),
+            _ => instructions.extend([
+                Instruction::New(classes[index]),
+                Instruction::Dup,
+                Instruction::Invokespecial(constructors[index].0),
+            ]),
+        }
+        instructions.push(Instruction::Invokeinterface(register, 2));
+        if let Some(branch_index) = branch_index {
+            let target = u16::try_from(instructions.len())?;
+            instructions[branch_index] = Instruction::Ifne(target);
+            branch_indexes.push(target);
+        }
+    }
+    instructions.push(Instruction::Return);
+
+    let mut body = code(pool, 6, u16::from(with_exclusions) * 2 + 2, instructions)?;
+    if with_exclusions {
+        let expected_targets = [15, 25, 32, 41, 50, 59, 68, 77, 86, 96];
+        if branch_indexes != expected_targets {
+            return Err(
+                format!("unexpected remote-source branch layout: {branch_indexes:?}").into(),
+            );
+        }
+        add_stack_map_table(
+            pool,
+            &mut body,
+            vec![
+                StackFrame::AppendFrame {
+                    frame_type: 252,
+                    offset_delta: 15,
+                    locals: vec![VerificationType::Object {
+                        cpool_index: set_class,
+                    }],
+                },
+                StackFrame::SameFrame { frame_type: 9 },
+                StackFrame::SameFrame { frame_type: 6 },
+                StackFrame::SameFrame { frame_type: 8 },
+                StackFrame::SameFrame { frame_type: 8 },
+                StackFrame::SameFrame { frame_type: 8 },
+                StackFrame::SameFrame { frame_type: 8 },
+                StackFrame::SameFrame { frame_type: 8 },
+                StackFrame::SameFrame { frame_type: 8 },
+                StackFrame::SameFrame { frame_type: 9 },
+            ],
+        )?;
+    }
+    Ok(body)
+}
+
+fn audio_source_managers_local_default(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let registry =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry")?;
+    let default_registry = pool.add_field_ref(
+        registry,
+        "DEFAULT_REGISTRY",
+        "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;",
+    )?;
+    let owner = pool.add_class(AUDIO_SOURCE_MANAGERS_CLASS)?;
+    let register = pool.add_method_ref(
+        owner,
+        "registerLocalSource",
+        "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;)V",
+    )?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getstatic(default_registry),
+            Instruction::Invokestatic(register),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn audio_source_managers_local(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let local =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/source/local/LocalAudioSourceManager")?;
+    let init = pool.add_method_ref(
+        local,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;)V",
+    )?;
+    let player_manager = pool.add_class(AUDIO_PLAYER_MANAGER_CLASS)?;
+    let register = pool.add_interface_method_ref(
+        player_manager,
+        "registerSourceManager",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;)V",
+    )?;
+    code(
+        pool,
+        4,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::New(local),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(init),
+            Instruction::Invokeinterface(register, 2),
+            Instruction::Return,
+        ],
+    )
 }
 
 fn audio_player_manager_replacement(

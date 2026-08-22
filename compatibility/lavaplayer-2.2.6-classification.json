@@ -12673,72 +12673,96 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported utility metadata and reference-equal remote/local registration order, default and custom registry identity, constructor options, exclusion, invalid varargs, and callback failure-prefix behavior are covered by the Phase 13 audio-source-managers-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.AudioSourceManagers",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported utility metadata and reference-equal remote/local registration order, default and custom registry identity, constructor options, exclusion, invalid varargs, and callback failure-prefix behavior are covered by the Phase 13 audio-source-managers-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.AudioSourceManagers",
       "symbol_kind": "METHOD",
       "member_name": "registerRemoteSources",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported utility metadata and reference-equal remote/local registration order, default and custom registry identity, constructor options, exclusion, invalid varargs, and callback failure-prefix behavior are covered by the Phase 13 audio-source-managers-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.AudioSourceManagers",
       "symbol_kind": "METHOD",
       "member_name": "registerRemoteSources",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported utility metadata and reference-equal remote/local registration order, default and custom registry identity, constructor options, exclusion, invalid varargs, and callback failure-prefix behavior are covered by the Phase 13 audio-source-managers-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.AudioSourceManagers",
       "symbol_kind": "METHOD",
       "member_name": "registerRemoteSources",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;[Ljava/lang/Class;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported utility metadata and reference-equal remote/local registration order, default and custom registry identity, constructor options, exclusion, invalid varargs, and callback failure-prefix behavior are covered by the Phase 13 audio-source-managers-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.AudioSourceManagers",
       "symbol_kind": "METHOD",
       "member_name": "registerRemoteSources",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;[Ljava/lang/Class;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported utility metadata and reference-equal remote/local registration order, default and custom registry identity, constructor options, exclusion, invalid varargs, and callback failure-prefix behavior are covered by the Phase 13 audio-source-managers-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.AudioSourceManagers",
       "symbol_kind": "METHOD",
       "member_name": "registerLocalSource",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported utility metadata and reference-equal remote/local registration order, default and custom registry identity, constructor options, exclusion, invalid varargs, and callback failure-prefix behavior are covered by the Phase 13 audio-source-managers-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.AudioSourceManagers",
       "symbol_kind": "METHOD",
       "member_name": "registerLocalSource",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported utility metadata and reference-equal remote/local registration order, default and custom registry identity, constructor options, exclusion, invalid varargs, and callback failure-prefix behavior are covered by the Phase 13 audio-source-managers-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.ProbingAudioSourceManager",
