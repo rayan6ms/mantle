@@ -119,6 +119,9 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-default-sound-cloud-data-reader-consumer" => {
             Some(DEFAULT_SOUND_CLOUD_DATA_READER_CONSUMER)
         }
+        "write-default-sound-cloud-format-handler-consumer" => {
+            Some(DEFAULT_SOUND_CLOUD_FORMAT_HANDLER_CONSUMER)
+        }
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -8917,6 +8920,165 @@ public final class GateDefaultSoundCloudDataReader {
 
   private static final class ExposedReader extends DefaultSoundCloudDataReader {
     JsonBrowser find(JsonBrowser data, String kind) { return super.findEntryOfKind(data, kind); }
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const DEFAULT_SOUND_CLOUD_FORMAT_HANDLER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudFormatHandler;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudTrackFormat;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudFormatHandler;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudM3uInfo;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudMp3SegmentDecoder;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudOpusSegmentDecoder;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudSegmentDecoder;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudTrackFormat;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateDefaultSoundCloudFormatHandler {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1 && (args[0].equals("reference") || args[0].equals("candidate")),
+        "expected disposition");
+    reflectionContract();
+    behaviorContract();
+    System.out.println("public-concrete,1-field,1-constructor,4-exported-methods;"
+        + "opus-hls-priority,mp3-hls,progressive-mp3,exact-mime,stable-order,"
+        + "identifier-prefixes,unknown-fallback,m3u-factories,mp3-lookup,error-quirks");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<DefaultSoundCloudFormatHandler> type = DefaultSoundCloudFormatHandler.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {SoundCloudFormatHandler.class}),
+        "class metadata");
+    check(type.getDeclaredFields().length == 1, "field count");
+    Field types = type.getDeclaredField("TYPES");
+    check(types.getType().isArray()
+        && types.getType().getComponentType().getName().endsWith("$FormatType")
+        && types.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL),
+        "format type table metadata");
+    types.setAccessible(true);
+    check(java.lang.reflect.Array.getLength(types.get(null)) == 3, "format type table values");
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC, "constructor metadata");
+    check(type.getDeclaredMethods().length == 5, "method count");
+    Method choose = checkMethod(type, "chooseBestFormat", SoundCloudTrackFormat.class,
+        Modifier.PUBLIC, new Class<?>[] {List.class});
+    check(choose.getGenericParameterTypes()[0].getTypeName().equals(
+        "java.util.List<com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudTrackFormat>"),
+        "choose generic parameter");
+    checkMethod(type, "buildFormatIdentifier", String.class, Modifier.PUBLIC,
+        new Class<?>[] {SoundCloudTrackFormat.class});
+    checkMethod(type, "getM3uInfo", SoundCloudM3uInfo.class, Modifier.PUBLIC,
+        new Class<?>[] {String.class});
+    checkMethod(type, "getMp3LookupUrl", String.class, Modifier.PUBLIC,
+        new Class<?>[] {String.class});
+    checkMethod(type, "findFormat", SoundCloudTrackFormat.class,
+        Modifier.PRIVATE | Modifier.STATIC,
+        new Class<?>[] {List.class, types.getType().getComponentType()});
+  }
+
+  private static void behaviorContract() throws Exception {
+    DefaultSoundCloudFormatHandler handler = new DefaultSoundCloudFormatHandler();
+    SoundCloudTrackFormat progressive = format("progressive", "audio/mpeg", "progressive");
+    SoundCloudTrackFormat mp3Hls = format("hls", "audio/mpeg", "mp3-hls");
+    SoundCloudTrackFormat opusHls = format("hls", "audio/ogg", "opus-hls");
+    SoundCloudTrackFormat secondOpus = format("hls", "audio/ogg", "second-opus");
+    SoundCloudTrackFormat codecMime = format("hls", "audio/ogg; codecs=opus", "codec-mime");
+    SoundCloudTrackFormat unknown = format("dash", "audio/aac", "unknown");
+
+    check(handler.chooseBestFormat(Arrays.asList(progressive, mp3Hls, opusHls)) == opusHls,
+        "type priority over input order");
+    check(handler.chooseBestFormat(Arrays.asList(secondOpus, opusHls)) == secondOpus,
+        "stable order within type");
+    check(handler.chooseBestFormat(Arrays.asList(progressive, mp3Hls)) == mp3Hls,
+        "MP3 HLS priority");
+    check(handler.chooseBestFormat(Collections.singletonList(progressive)) == progressive,
+        "progressive fallback");
+    RuntimeException unsupported = expect(RuntimeException.class,
+        () -> handler.chooseBestFormat(Arrays.asList(codecMime, unknown)));
+    check("Did not detect any supported formats".equals(unsupported.getMessage()),
+        "unsupported diagnostic");
+    RuntimeException empty = expect(RuntimeException.class,
+        () -> handler.chooseBestFormat(Collections.emptyList()));
+    check("Did not detect any supported formats".equals(empty.getMessage()), "empty diagnostic");
+
+    check("O:https://media/opus-hls".equals(handler.buildFormatIdentifier(opusHls)),
+        "Opus identifier");
+    check("U:https://media/mp3-hls".equals(handler.buildFormatIdentifier(mp3Hls)),
+        "MP3 HLS identifier");
+    check("M:https://media/progressive".equals(handler.buildFormatIdentifier(progressive)),
+        "progressive identifier");
+    check("X:https://media/codec-mime".equals(handler.buildFormatIdentifier(codecMime))
+        && "X:https://media/unknown".equals(handler.buildFormatIdentifier(unknown)),
+        "unknown identifier fallback");
+    check("M:null".equals(handler.buildFormatIdentifier(
+        new DefaultSoundCloudTrackFormat("track", "progressive", "audio/mpeg", null))),
+        "null lookup concatenation");
+
+    checkM3u(handler.getM3uInfo("O:https://media/opus"), "https://media/opus",
+        SoundCloudOpusSegmentDecoder.class);
+    checkM3u(handler.getM3uInfo("U:https://media/mp3"), "https://media/mp3",
+        SoundCloudMp3SegmentDecoder.class);
+    checkM3u(handler.getM3uInfo("O:"), "", SoundCloudOpusSegmentDecoder.class);
+    check(handler.getM3uInfo("o:https://media/opus") == null
+        && handler.getM3uInfo("M:https://media/direct") == null
+        && handler.getM3uInfo("X:https://media/unknown") == null, "M3U rejection");
+
+    check("https://media/direct".equals(handler.getMp3LookupUrl("M:https://media/direct"))
+        && "".equals(handler.getMp3LookupUrl("M:"))
+        && handler.getMp3LookupUrl("m:https://media/direct") == null
+        && handler.getMp3LookupUrl("U:https://media/mp3") == null, "MP3 lookup");
+
+    expect(NullPointerException.class, () -> handler.chooseBestFormat(null));
+    expect(NullPointerException.class, () -> handler.buildFormatIdentifier(null));
+    expect(NullPointerException.class, () -> handler.getM3uInfo(null));
+    expect(NullPointerException.class, () -> handler.getMp3LookupUrl(null));
+  }
+
+  private static SoundCloudTrackFormat format(String protocol, String mimeType, String suffix) {
+    return new DefaultSoundCloudTrackFormat(
+        "track", protocol, mimeType, "https://media/" + suffix);
+  }
+
+  private static void checkM3u(SoundCloudM3uInfo info, String lookupUrl,
+                               Class<?> decoderType) {
+    check(info != null && lookupUrl.equals(info.lookupUrl), "M3U info");
+    SoundCloudSegmentDecoder decoder = info.decoderFactory.create(() -> null);
+    check(decoderType.isInstance(decoder), "M3U decoder factory");
+  }
+
+  private static Method checkMethod(Class<?> type, String name, Class<?> returnType,
+                                    int modifiers, Class<?>[] parameters) throws Exception {
+    Method method = type.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && method.getExceptionTypes().length == 0 && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), method + " metadata");
+    return method;
   }
 
   private static <T extends Throwable> T expect(Class<T> type, Operation operation)

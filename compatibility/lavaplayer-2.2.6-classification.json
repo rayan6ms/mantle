@@ -14335,54 +14335,72 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential execution and structural comparison preserve the public concrete SoundCloud format-handler shell, interface, private format table, helper, and class initialization.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudFormatHandler",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential construction preserves the public no-argument constructor and initialized three-entry format priority table.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudFormatHandler",
       "symbol_kind": "METHOD",
       "member_name": "chooseBestFormat",
       "descriptor": "(Ljava/util/List;)Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudTrackFormat;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential execution preserves Opus-HLS, MP3-HLS, and progressive-MP3 priority, stable order within a type, exact MIME matching, generic metadata, and unsupported-format failures.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudFormatHandler",
       "symbol_kind": "METHOD",
       "member_name": "buildFormatIdentifier",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudTrackFormat;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential execution preserves O:, U:, M:, and unknown X: identifier prefixes, lookup URLs, exact format matching, and null lookup concatenation.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudFormatHandler",
       "symbol_kind": "METHOD",
       "member_name": "getM3uInfo",
       "descriptor": "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudM3uInfo;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential execution preserves case-sensitive O:/U: routing, prefix stripping, null rejection results, and concrete Opus/MP3 segment-decoder factories.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudFormatHandler",
       "symbol_kind": "METHOD",
       "member_name": "getMp3LookupUrl",
       "descriptor": "(Ljava/lang/String;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Reference-differential execution preserves case-sensitive M: recognition, two-character prefix stripping, empty payloads, null rejection results, and null-input failure behavior.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudPlaylistLoader",
