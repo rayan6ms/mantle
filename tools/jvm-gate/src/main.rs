@@ -100,6 +100,9 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-non-allocating-audio-frame-buffer-consumer" => {
             Some(NON_ALLOCATING_AUDIO_FRAME_BUFFER_CONSUMER)
         }
+        "write-audio-source-manager-interface-consumer" => {
+            Some(AUDIO_SOURCE_MANAGER_INTERFACE_CONSUMER)
+        }
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -6949,6 +6952,195 @@ public final class GateNonAllocatingAudioFrameBuffer {
     public int maximumChunkSize() { return 4; }
     public AudioChunkDecoder createDecoder() { return null; }
     public AudioChunkEncoder createEncoder(AudioConfiguration configuration) { return null; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_SOURCE_MANAGER_INTERFACE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.track.AudioItem;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInput;
+import java.io.DataInputStream;
+import java.io.DataOutput;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+
+public final class GateAudioSourceManagerInterface {
+  public static void main(String[] args) throws Exception {
+    callerImplementation();
+    checkedFailures();
+    reflection();
+    System.out.println(
+        "implementation=name,load,encodable,encode,decode,shutdown,identity;"
+        + "exceptions=encode-io,decode-io;"
+        + "reflection=public-abstract-interface,0-fields,0-constructors,6-methods");
+  }
+
+  private static void callerImplementation() throws Exception {
+    AudioPlayerManager manager = proxy(AudioPlayerManager.class);
+    AudioTrack track = proxy(AudioTrack.class);
+    AudioReference reference = new AudioReference("identifier", "container");
+    AudioTrackInfo info = new AudioTrackInfo(
+        "title", "author", 123L, "identifier", false, "https://example.invalid/item");
+    RecordingSource source = new RecordingSource(track);
+
+    check(source.getSourceName().equals("recording")
+        && source.loadItem(manager, reference) == track
+        && source.loadManager == manager && source.loadReference == reference
+        && source.loads == 1, "name and load dispatch");
+    check(source.isTrackEncodable(track) && !source.isTrackEncodable(null)
+        && source.encodableCalls == 2, "encodable dispatch");
+
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    source.encodeTrack(track, new DataOutputStream(bytes));
+    check(source.encodedTrack == track && source.encodes == 1, "encode identity");
+    AudioTrack decoded = source.decodeTrack(
+        info, new DataInputStream(new ByteArrayInputStream(bytes.toByteArray())));
+    check(decoded == track && source.decodedInfo == info && source.decodes == 1
+        && source.decodedCode == 0x12345678 && source.decodedText.equals("source-details"),
+        "encode/decode round trip");
+
+    source.shutdown();
+    source.shutdown();
+    check(source.shutdowns == 2, "shutdown dispatch");
+  }
+
+  private static void checkedFailures() throws Exception {
+    RecordingSource source = new RecordingSource(proxy(AudioTrack.class));
+    IOException encodeFailure = new IOException("encode-sentinel");
+    source.encodeFailure = encodeFailure;
+    expectIdentity(encodeFailure, () -> source.encodeTrack(
+        source.loadedTrack, new DataOutputStream(new ByteArrayOutputStream())));
+    check(source.encodes == 0 && source.encodedTrack == null, "encode failure prefix");
+
+    IOException decodeFailure = new IOException("decode-sentinel");
+    source.decodeFailure = decodeFailure;
+    AudioTrackInfo info = new AudioTrackInfo("t", "a", 1L, "i", false, null);
+    expectIdentity(decodeFailure, () -> source.decodeTrack(
+        info, new DataInputStream(new ByteArrayInputStream(new byte[0]))));
+    check(source.decodes == 0 && source.decodedInfo == null, "decode failure prefix");
+  }
+
+  private static void reflection() throws Exception {
+    Class<AudioSourceManager> type = AudioSourceManager.class;
+    check(type.isInterface() && Modifier.isPublic(type.getModifiers())
+        && Modifier.isAbstract(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == null && type.getInterfaces().length == 0,
+        "interface metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 6, "member counts");
+
+    checkMethod(type.getDeclaredMethod("getSourceName"), String.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod(
+        "loadItem", AudioPlayerManager.class, AudioReference.class),
+        AudioItem.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("isTrackEncodable", AudioTrack.class),
+        boolean.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("encodeTrack", AudioTrack.class, DataOutput.class),
+        void.class, new Class<?>[] { IOException.class });
+    checkMethod(type.getDeclaredMethod("decodeTrack", AudioTrackInfo.class, DataInput.class),
+        AudioTrack.class, new Class<?>[] { IOException.class });
+    checkMethod(type.getDeclaredMethod("shutdown"), void.class, new Class<?>[0]);
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, Class<?>[] exceptions) {
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == returnType
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), method.getName() + " metadata");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] { type },
+        (instance, method, arguments) -> {
+          if (method.getName().equals("toString")) return type.getSimpleName() + "Proxy";
+          if (method.getName().equals("hashCode")) return System.identityHashCode(instance);
+          if (method.getName().equals("equals")) return instance == arguments[0];
+          Class<?> result = method.getReturnType();
+          if (result == boolean.class) return false;
+          if (result == int.class) return 0;
+          if (result == long.class) return 0L;
+          return null;
+        });
+  }
+
+  private static void expectIdentity(IOException expected, IoOperation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("failure was swallowed");
+    } catch (IOException error) {
+      check(error == expected, "IOException identity");
+    }
+  }
+
+  private interface IoOperation { void run() throws IOException; }
+
+  private static final class RecordingSource implements AudioSourceManager {
+    final AudioTrack loadedTrack;
+    AudioPlayerManager loadManager;
+    AudioReference loadReference;
+    AudioTrack encodedTrack;
+    AudioTrackInfo decodedInfo;
+    IOException encodeFailure;
+    IOException decodeFailure;
+    int loads;
+    int encodableCalls;
+    int encodes;
+    int decodes;
+    int shutdowns;
+    int decodedCode;
+    String decodedText;
+
+    RecordingSource(AudioTrack loadedTrack) { this.loadedTrack = loadedTrack; }
+
+    public String getSourceName() { return "recording"; }
+
+    public AudioItem loadItem(AudioPlayerManager manager, AudioReference reference) {
+      loads++;
+      loadManager = manager;
+      loadReference = reference;
+      return loadedTrack;
+    }
+
+    public boolean isTrackEncodable(AudioTrack track) {
+      encodableCalls++;
+      return track == loadedTrack;
+    }
+
+    public void encodeTrack(AudioTrack track, DataOutput output) throws IOException {
+      if (encodeFailure != null) throw encodeFailure;
+      encodedTrack = track;
+      encodes++;
+      output.writeInt(0x12345678);
+      output.writeUTF("source-details");
+    }
+
+    public AudioTrack decodeTrack(AudioTrackInfo info, DataInput input) throws IOException {
+      if (decodeFailure != null) throw decodeFailure;
+      decodedInfo = info;
+      decodes++;
+      decodedCode = input.readInt();
+      decodedText = input.readUTF();
+      return loadedTrack;
+    }
+
+    public void shutdown() { shutdowns++; }
   }
 
   private static void check(boolean condition, String message) {
