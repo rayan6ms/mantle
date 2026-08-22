@@ -155,6 +155,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-sound-cloud-http-context-filter-consumer" => {
             Some(SOUND_CLOUD_HTTP_CONTEXT_FILTER_CONSUMER)
         }
+        "write-sound-cloud-m3u-audio-track-consumer" => Some(SOUND_CLOUD_M3U_AUDIO_TRACK_CONSUMER),
         _ => None,
     }
 }
@@ -9898,6 +9899,182 @@ public final class GateSoundCloudHttpContextFilter {
     @Override
     public void updateClientId() {
       updates++;
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const SOUND_CLOUD_M3U_AUDIO_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudM3uAudioTrack;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudM3uInfo;
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.DelegatedAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.protocol.HttpClientContext;
+
+public final class GateSoundCloudM3uAudioTrack {
+  private static final String HLS_DISABLED =
+      "Legacy SoundCloud HLS segment playback is unsupported; "
+      + "use Mantle's bounded progressive native source.";
+
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1 && (args[0].equals("reference") || args[0].equals("candidate")),
+        "expected disposition");
+    reflectionContract();
+    commonContract();
+    if (args[0].equals("reference")) {
+      referenceServiceContract();
+      System.out.println("common=public-concrete,4-fields,1-constructor,1-exported-method,"
+          + "capture,static-state,checked-exception,reflection;"
+          + "service=legacy-hls-playback-get");
+    } else {
+      candidateServiceContract();
+      System.out.println("common=public-concrete,4-fields,1-constructor,1-exported-method,"
+          + "capture,static-state,checked-exception,reflection;"
+          + "service=bounded-progressive-only,no-http,hls-explicitly-unsupported");
+    }
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<SoundCloudM3uAudioTrack> type = SoundCloudM3uAudioTrack.class;
+    check(type.getModifiers() == Modifier.PUBLIC
+        && type.getSuperclass() == DelegatedAudioTrack.class
+        && type.getInterfaces().length == 0 && type.getAnnotations().length == 0,
+        "class metadata");
+    check(type.getDeclaredFields().length == 4 && type.getDeclaredMethods().length == 9,
+        "private shell counts");
+    checkField(type, "log", Class.forName("org.slf4j.Logger"),
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "SEGMENT_UPDATE_INTERVAL", long.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "httpInterface", HttpInterface.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "m3uInfo", SoundCloudM3uInfo.class, Modifier.PRIVATE | Modifier.FINAL);
+
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        AudioTrackInfo.class, HttpInterface.class, SoundCloudM3uInfo.class);
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC, "constructor metadata");
+    Method process = type.getDeclaredMethod("process", LocalAudioTrackExecutor.class);
+    check(process.getModifiers() == Modifier.PUBLIC && process.getReturnType() == void.class
+        && Arrays.equals(process.getExceptionTypes(), new Class<?>[] {Exception.class})
+        && !process.isBridge() && !process.isSynthetic() && !process.isVarArgs(),
+        "process metadata");
+    long exported = Arrays.stream(type.getDeclaredMethods())
+        .filter(method -> Modifier.isPublic(method.getModifiers())
+            || Modifier.isProtected(method.getModifiers()))
+        .count();
+    check(exported == 1L, "exported method count");
+  }
+
+  private static void commonContract() throws Exception {
+    AudioTrackInfo info = new AudioTrackInfo(
+        "title", "author", 1234L, "O:fixture", false,
+        "https://soundcloud.com/fixture/song", "art", null);
+    RecordingHttpInterface http = new RecordingHttpInterface();
+    SoundCloudM3uInfo m3uInfo = new SoundCloudM3uInfo(
+        "https://api-v2.soundcloud.com/media/fixture", null);
+    SoundCloudM3uAudioTrack track = new SoundCloudM3uAudioTrack(info, http, m3uInfo);
+    check(track.getInfo() == info && field("httpInterface").get(track) == http
+        && field("m3uInfo").get(track) == m3uInfo, "constructor capture");
+    check(field("log").get(null) != null
+        && field("SEGMENT_UPDATE_INTERVAL").getLong(null) == 600_000L,
+        "static state");
+  }
+
+  private static void referenceServiceContract() throws Exception {
+    RecordingHttpInterface http = new RecordingHttpInterface();
+    SoundCloudM3uAudioTrack track = track(http);
+    expect(IOException.class, () -> track.process(null));
+    http.checkRequest("GET", "https://api-v2.soundcloud.com/media/fixture");
+  }
+
+  private static void candidateServiceContract() throws Exception {
+    RecordingHttpInterface http = new RecordingHttpInterface();
+    SoundCloudM3uAudioTrack track = track(http);
+    UnsupportedOperationException error = expect(
+        UnsupportedOperationException.class, () -> track.process(null));
+    check(HLS_DISABLED.equals(error.getMessage()) && http.executes == 0,
+        "bounded progressive-only policy");
+  }
+
+  private static SoundCloudM3uAudioTrack track(RecordingHttpInterface http) {
+    AudioTrackInfo info = new AudioTrackInfo(
+        "title", "author", 1234L, "O:fixture", false,
+        "https://soundcloud.com/fixture/song", null, null);
+    SoundCloudM3uInfo m3uInfo = new SoundCloudM3uInfo(
+        "https://api-v2.soundcloud.com/media/fixture", null);
+    return new SoundCloudM3uAudioTrack(info, http, m3uInfo);
+  }
+
+  private static final class RecordingHttpInterface extends HttpInterface {
+    private HttpUriRequest request;
+    private int executes;
+
+    RecordingHttpInterface() {
+      super(null, HttpClientContext.create(), false, proxy(HttpContextFilter.class));
+    }
+
+    @Override
+    public org.apache.http.client.methods.CloseableHttpResponse execute(HttpUriRequest request)
+        throws IOException {
+      this.request = request;
+      executes++;
+      throw new IOException("network-sentinel");
+    }
+
+    void checkRequest(String method, String uri) {
+      check(executes == 1 && request != null && method.equals(request.getMethod())
+          && uri.equals(request.getURI().toString()), method + " request");
+    }
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = SoundCloudM3uAudioTrack.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> type, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == type && field.getGenericType() == type
+        && field.getModifiers() == modifiers && !field.isSynthetic(), name + " metadata");
+  }
+
+  private static <T> T proxy(Class<T> type) {
+    return type.cast(Proxy.newProxyInstance(
+        GateSoundCloudM3uAudioTrack.class.getClassLoader(), new Class<?>[] {type},
+        (proxy, method, args) -> {
+          if (method.getReturnType() == boolean.class) return false;
+          if (method.getReturnType() == int.class) return 0;
+          return null;
+        }));
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
     }
   }
 

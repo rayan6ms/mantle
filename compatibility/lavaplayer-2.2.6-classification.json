@@ -15506,27 +15506,43 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The exact public DelegatedAudioTrack shell, four private fields, and static state remain, while legacy HLS/M3U segment refresh and decode are replaced by Mantle's explicit progressive-only playback boundary under ADR-0015.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-media/tests/phase12_soundcloud.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0015-bounded-soundcloud-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudM3uAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudM3uInfo;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public construction, inherited track-info identity, HTTP-interface and M3U-info reference capture, static state, and reflection metadata are covered by the Phase 13 sound-cloud-m3u-audio-track-contracts oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudM3uAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The exact public checked-Exception signature remains, while legacy playback-URL lookup and unbounded HLS segment refresh/decode fail before HTTP access because Mantle supports bounded progressive SoundCloud playback and treats HLS-only candidates as explicitly incompatible under ADR-0015.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-media/tests/phase12_soundcloud.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0015-bounded-soundcloud-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudM3uInfo",

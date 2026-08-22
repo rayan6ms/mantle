@@ -147,6 +147,8 @@ const SOUND_CLOUD_HELPER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudHelper";
 const SOUND_CLOUD_HTTP_CONTEXT_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudHttpContextFilter";
+const SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudM3uAudioTrack";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -199,6 +201,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     SOUND_CLOUD_FORMAT_HANDLER_CLASS,
     SOUND_CLOUD_HELPER_CLASS,
     SOUND_CLOUD_HTTP_CONTEXT_FILTER_CLASS,
+    SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -567,6 +570,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | SOUND_CLOUD_AUDIO_TRACK_CLASS
                 | SOUND_CLOUD_CLIENT_ID_TRACKER_CLASS
                 | SOUND_CLOUD_HTTP_CONTEXT_FILTER_CLASS
+                | SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS
         ) || field
             .access_flags
             .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
@@ -589,6 +593,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | SOUND_CLOUD_AUDIO_TRACK_CLASS
                 | SOUND_CLOUD_CLIENT_ID_TRACKER_CLASS
                 | SOUND_CLOUD_HTTP_CONTEXT_FILTER_CLASS
+                | SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS
         ) || method
             .access_flags
             .intersects(MethodAccessFlags::PUBLIC | MethodAccessFlags::PROTECTED)
@@ -729,6 +734,9 @@ fn replacement_body(
             descriptor,
             required_locals,
         );
+    }
+    if class_name == SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS {
+        return sound_cloud_m3u_audio_track_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS {
         return sound_cloud_audio_source_manager_builder_replacement(
@@ -3770,6 +3778,127 @@ fn sound_cloud_http_context_filter_clinit(pool: &mut ConstantPool<'static>) -> R
             Instruction::Ldc_w(attribute),
             Instruction::Invokespecial(retry_init),
             Instruction::Putstatic(retry),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn sound_cloud_m3u_audio_track_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudM3uInfo;)V",
+        ) => sound_cloud_m3u_audio_track_constructor(pool),
+        (
+            "process",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+        )
+        | ("loadSegments", "()Ljava/util/List;")
+        | (
+            "createSegmentTracker",
+            "()Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudM3uAudioTrack$SegmentTracker;",
+        )
+        | ("lambda$process$1" | "lambda$process$0", _) => unsupported_body(
+            pool,
+            "Legacy SoundCloud HLS segment playback is unsupported; use Mantle's bounded progressive native source.",
+            required_locals,
+        ),
+        ("access$000" | "access$100" | "access$200" | "access$300", _) => {
+            sound_cloud_m3u_audio_track_info_access(pool)
+        }
+        ("<clinit>", "()V") => sound_cloud_m3u_audio_track_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn sound_cloud_m3u_audio_track_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let parent = pool.add_class(DELEGATED_AUDIO_TRACK_CLASS)?;
+    let parent_init = pool.add_method_ref(
+        parent,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V",
+    )?;
+    let owner = pool.add_class(SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS)?;
+    let http = pool.add_field_ref(
+        owner,
+        "httpInterface",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;",
+    )?;
+    let m3u_info = pool.add_field_ref(
+        owner,
+        "m3uInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudM3uInfo;",
+    )?;
+    code(
+        pool,
+        2,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(parent_init),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(http),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Putfield(m3u_info),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn sound_cloud_m3u_audio_track_info_access(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS)?;
+    let track_info = pool.add_field_ref(
+        owner,
+        "trackInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(track_info),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn sound_cloud_m3u_audio_track_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS)?;
+    let factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let interval = pool.add_field_ref(owner, "SEGMENT_UPDATE_INTERVAL", "J")?;
+    let interval_value = pool.add_long(600_000)?;
+    code(
+        pool,
+        2,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Ldc2_w(interval_value),
+            Instruction::Putstatic(interval),
             Instruction::Return,
         ],
     )
