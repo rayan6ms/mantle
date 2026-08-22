@@ -127,6 +127,8 @@ const DEFAULT_SOUND_CLOUD_FORMAT_HANDLER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/DefaultSoundCloudFormatHandler";
 const DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/DefaultSoundCloudPlaylistLoader";
+const DEFAULT_SOUND_CLOUD_TRACK_FORMAT_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/soundcloud/DefaultSoundCloudTrackFormat";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -169,6 +171,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     DEFAULT_SOUND_CLOUD_DATA_READER_CLASS,
     DEFAULT_SOUND_CLOUD_FORMAT_HANDLER_CLASS,
     DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS,
+    DEFAULT_SOUND_CLOUD_TRACK_FORMAT_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -531,6 +534,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | DEFAULT_SOUND_CLOUD_DATA_READER_CLASS
                 | DEFAULT_SOUND_CLOUD_FORMAT_HANDLER_CLASS
                 | DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS
+                | DEFAULT_SOUND_CLOUD_TRACK_FORMAT_CLASS
         ) || field
             .access_flags
             .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
@@ -651,6 +655,14 @@ fn replacement_body(
     }
     if class_name == DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS {
         return default_sound_cloud_playlist_loader_replacement(
+            pool,
+            name,
+            descriptor,
+            required_locals,
+        );
+    }
+    if class_name == DEFAULT_SOUND_CLOUD_TRACK_FORMAT_CLASS {
+        return default_sound_cloud_track_format_replacement(
             pool,
             name,
             descriptor,
@@ -5652,6 +5664,85 @@ fn default_sound_cloud_playlist_loader_clinit(
             Instruction::Ldc_w(regex),
             Instruction::Invokestatic(compile),
             Instruction::Putstatic(playlist_pattern),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn default_sound_cloud_track_format_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+        ) => default_sound_cloud_track_format_constructor(pool),
+        ("getTrackId", "()Ljava/lang/String;") => object_getter(
+            pool,
+            DEFAULT_SOUND_CLOUD_TRACK_FORMAT_CLASS,
+            "trackId",
+            "Ljava/lang/String;",
+        ),
+        ("getProtocol", "()Ljava/lang/String;") => object_getter(
+            pool,
+            DEFAULT_SOUND_CLOUD_TRACK_FORMAT_CLASS,
+            "protocol",
+            "Ljava/lang/String;",
+        ),
+        ("getMimeType", "()Ljava/lang/String;") => object_getter(
+            pool,
+            DEFAULT_SOUND_CLOUD_TRACK_FORMAT_CLASS,
+            "mimeType",
+            "Ljava/lang/String;",
+        ),
+        ("getLookupUrl", "()Ljava/lang/String;") => object_getter(
+            pool,
+            DEFAULT_SOUND_CLOUD_TRACK_FORMAT_CLASS,
+            "lookupUrl",
+            "Ljava/lang/String;",
+        ),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {DEFAULT_SOUND_CLOUD_TRACK_FORMAT_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn default_sound_cloud_track_format_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(DEFAULT_SOUND_CLOUD_TRACK_FORMAT_CLASS)?;
+    let track_id = pool.add_field_ref(owner, "trackId", "Ljava/lang/String;")?;
+    let protocol = pool.add_field_ref(owner, "protocol", "Ljava/lang/String;")?;
+    let mime_type = pool.add_field_ref(owner, "mimeType", "Ljava/lang/String;")?;
+    let lookup_url = pool.add_field_ref(owner, "lookupUrl", "Ljava/lang/String;")?;
+    code(
+        pool,
+        2,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(track_id),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(protocol),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Putfield(mime_type),
+            Instruction::Aload_0,
+            Instruction::Aload(4),
+            Instruction::Putfield(lookup_url),
             Instruction::Return,
         ],
     )

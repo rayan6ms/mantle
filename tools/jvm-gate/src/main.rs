@@ -125,6 +125,9 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-default-sound-cloud-playlist-loader-consumer" => {
             Some(DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CONSUMER)
         }
+        "write-default-sound-cloud-track-format-consumer" => {
+            Some(DEFAULT_SOUND_CLOUD_TRACK_FORMAT_CONSUMER)
+        }
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -9453,6 +9456,102 @@ public final class GateDefaultSoundCloudPlaylistLoader {
   }
 
   private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const DEFAULT_SOUND_CLOUD_TRACK_FORMAT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudTrackFormat;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudTrackFormat;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateDefaultSoundCloudTrackFormat {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1 && (args[0].equals("reference") || args[0].equals("candidate")),
+        "expected disposition");
+    reflectionContract();
+    valueContract();
+    System.out.println("public-concrete,4-private-final-fields,1-constructor,4-methods;"
+        + "reference-preserving,null-preserving,no-value-overrides");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<DefaultSoundCloudTrackFormat> type = DefaultSoundCloudTrackFormat.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {SoundCloudTrackFormat.class}),
+        "class metadata");
+    check(type.getDeclaredFields().length == 4, "field count");
+    checkField(type, "trackId");
+    checkField(type, "protocol");
+    checkField(type, "mimeType");
+    checkField(type, "lookupUrl");
+
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        String.class, String.class, String.class, String.class);
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC, "constructor metadata");
+    check(type.getDeclaredMethods().length == 4, "method count");
+    checkMethod(type, "getTrackId");
+    checkMethod(type, "getProtocol");
+    checkMethod(type, "getMimeType");
+    checkMethod(type, "getLookupUrl");
+  }
+
+  private static void valueContract() throws Exception {
+    String trackId = new String("track-id");
+    String protocol = new String("progressive");
+    String mimeType = new String("audio/mpeg");
+    String lookupUrl = new String("https://example.invalid/lookup");
+    DefaultSoundCloudTrackFormat value = new DefaultSoundCloudTrackFormat(
+        trackId, protocol, mimeType, lookupUrl);
+    check(value.getTrackId() == trackId && value.getProtocol() == protocol
+        && value.getMimeType() == mimeType && value.getLookupUrl() == lookupUrl,
+        "constructor references");
+    check(value instanceof SoundCloudTrackFormat, "interface implementation");
+    check(!value.equals(new DefaultSoundCloudTrackFormat(
+        trackId, protocol, mimeType, lookupUrl)), "identity equality");
+    check(value.toString().startsWith(value.getClass().getName() + "@"), "object string");
+
+    DefaultSoundCloudTrackFormat nulls = new DefaultSoundCloudTrackFormat(null, null, null, null);
+    check(nulls.getTrackId() == null && nulls.getProtocol() == null
+        && nulls.getMimeType() == null && nulls.getLookupUrl() == null, "null preservation");
+    for (String fieldName : new String[] {"trackId", "protocol", "mimeType", "lookupUrl"}) {
+      Field field = DefaultSoundCloudTrackFormat.class.getDeclaredField(fieldName);
+      field.setAccessible(true);
+      check(field.get(value) == getterValue(value, fieldName), "field value " + fieldName);
+    }
+  }
+
+  private static Object getterValue(DefaultSoundCloudTrackFormat value, String fieldName) {
+    switch (fieldName) {
+      case "trackId": return value.getTrackId();
+      case "protocol": return value.getProtocol();
+      case "mimeType": return value.getMimeType();
+      case "lookupUrl": return value.getLookupUrl();
+      default: throw new AssertionError(fieldName);
+    }
+  }
+
+  private static void checkField(Class<?> type, String name) throws Exception {
+    Field field = type.getDeclaredField(name);
+    check(field.getType() == String.class
+        && field.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && !field.isSynthetic(), "field metadata " + name);
+  }
+
+  private static void checkMethod(Class<?> type, String name) throws Exception {
+    Method method = type.getDeclaredMethod(name);
+    check(method.getReturnType() == String.class && method.getParameterCount() == 0
+        && method.getModifiers() == Modifier.PUBLIC && !method.isBridge() && !method.isSynthetic(),
+        "method metadata " + name);
+  }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
