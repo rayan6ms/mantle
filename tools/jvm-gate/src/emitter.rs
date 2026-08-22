@@ -121,6 +121,8 @@ const NICO_AUDIO_SOURCE_MANAGER_CLASS: &str =
 const NICO_AUDIO_TRACK_CLASS: &str = "com/sedmelluq/discord/lavaplayer/source/nico/NicoAudioTrack";
 const DEFAULT_SOUND_CLOUD_DATA_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/DefaultSoundCloudDataLoader";
+const DEFAULT_SOUND_CLOUD_DATA_READER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/soundcloud/DefaultSoundCloudDataReader";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -160,6 +162,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     NICO_AUDIO_SOURCE_MANAGER_CLASS,
     NICO_AUDIO_TRACK_CLASS,
     DEFAULT_SOUND_CLOUD_DATA_LOADER_CLASS,
+    DEFAULT_SOUND_CLOUD_DATA_READER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -519,6 +522,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | HEARTBEATING_HTTP_STREAM_CLASS
                 | NICO_AUDIO_SOURCE_MANAGER_CLASS
                 | NICO_AUDIO_TRACK_CLASS
+                | DEFAULT_SOUND_CLOUD_DATA_READER_CLASS
         ) || field
             .access_flags
             .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
@@ -534,6 +538,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | NICO_AUDIO_SOURCE_MANAGER_CLASS
                 | NICO_AUDIO_TRACK_CLASS
                 | DEFAULT_SOUND_CLOUD_DATA_LOADER_CLASS
+                | DEFAULT_SOUND_CLOUD_DATA_READER_CLASS
         ) || method
             .access_flags
             .intersects(MethodAccessFlags::PUBLIC | MethodAccessFlags::PROTECTED)
@@ -612,6 +617,14 @@ fn replacement_body(
     }
     if class_name == DEFAULT_SOUND_CLOUD_DATA_LOADER_CLASS {
         return default_sound_cloud_data_loader_replacement(
+            pool,
+            name,
+            descriptor,
+            required_locals,
+        );
+    }
+    if class_name == DEFAULT_SOUND_CLOUD_DATA_READER_CLASS {
+        return default_sound_cloud_data_reader_replacement(
             pool,
             name,
             descriptor,
@@ -3454,6 +3467,561 @@ fn default_sound_cloud_data_loader_load(pool: &mut ConstantPool<'static>) -> Res
         ],
     )?;
     Ok(body)
+}
+
+fn default_sound_cloud_data_reader_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        (
+            "findTrackData",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+        ) => default_sound_cloud_data_reader_find_track(pool),
+        (
+            "readTrackId",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/lang/String;",
+        ) => sound_cloud_json_safe_text_getter(pool, "id"),
+        ("isTrackBlocked", "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Z") => {
+            default_sound_cloud_data_reader_is_blocked(pool)
+        }
+        (
+            "readTrackInfo",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+        ) => default_sound_cloud_data_reader_track_info(pool),
+        (
+            "readTrackFormats",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/util/List;",
+        ) => default_sound_cloud_data_reader_formats(pool),
+        (
+            "findPlaylistData",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+        ) => default_sound_cloud_data_reader_find_playlist(pool),
+        (
+            "readPlaylistName",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/lang/String;",
+        ) => sound_cloud_json_safe_text_getter(pool, "title"),
+        (
+            "readPlaylistIdentifier",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/lang/String;",
+        ) => sound_cloud_json_safe_text_getter(pool, "permalink"),
+        (
+            "readPlaylistTracks",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/util/List;",
+        ) => default_sound_cloud_data_reader_playlist_tracks(pool),
+        (
+            "findEntryOfKind",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+        ) => default_sound_cloud_data_reader_find_entry(pool),
+        ("<clinit>", "()V") => default_sound_cloud_data_reader_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {DEFAULT_SOUND_CLOUD_DATA_READER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn default_sound_cloud_data_reader_find_track(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_SOUND_CLOUD_DATA_READER_CLASS)?;
+    let find = pool.add_method_ref(
+        owner,
+        "findEntryOfKind",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let track = pool.add_string("track")?;
+    code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Ldc_w(track),
+            Instruction::Invokevirtual(find),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn sound_cloud_json_safe_text_getter(
+    pool: &mut ConstantPool<'static>,
+    key: &str,
+) -> Result<Attribute> {
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let get = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let safe_text = pool.add_method_ref(json, "safeText", "()Ljava/lang/String;")?;
+    let key = pool.add_string(key)?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Ldc_w(key),
+            Instruction::Invokevirtual(get),
+            Instruction::Invokevirtual(safe_text),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn default_sound_cloud_data_reader_is_blocked(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let get = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let safe_text = pool.add_method_ref(json, "safeText", "()Ljava/lang/String;")?;
+    let string = pool.add_class("java/lang/String")?;
+    let equals = pool.add_method_ref(string, "equals", "(Ljava/lang/Object;)Z")?;
+    let blocked = pool.add_string("BLOCK")?;
+    let policy = pool.add_string("policy")?;
+    code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Ldc_w(blocked),
+            Instruction::Aload_1,
+            Instruction::Ldc_w(policy),
+            Instruction::Invokevirtual(get),
+            Instruction::Invokevirtual(safe_text),
+            Instruction::Invokevirtual(equals),
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+fn default_sound_cloud_data_reader_track_info(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let get = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let safe_text = pool.add_method_ref(json, "safeText", "()Ljava/lang/String;")?;
+    let text = pool.add_method_ref(json, "text", "()Ljava/lang/String;")?;
+    let as_type = pool.add_method_ref(json, "as", "(Ljava/lang/Class;)Ljava/lang/Object;")?;
+    let integer = pool.add_class("java/lang/Integer")?;
+    let int_value = pool.add_method_ref(integer, "intValue", "()I")?;
+    let thumbnail_tools =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/ThumbnailTools")?;
+    let thumbnail = pool.add_method_ref(
+        thumbnail_tools,
+        "getSoundCloudThumbnail",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/lang/String;",
+    )?;
+    let info = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo")?;
+    let info_init = pool.add_method_ref(
+        info,
+        "<init>",
+        "(Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+    )?;
+    let title = pool.add_string("title")?;
+    let user = pool.add_string("user")?;
+    let username = pool.add_string("username")?;
+    let duration = pool.add_string("full_duration")?;
+    let permalink_url = pool.add_string("permalink_url")?;
+    let publisher_metadata = pool.add_string("publisher_metadata")?;
+    let isrc = pool.add_string("isrc")?;
+    code(
+        pool,
+        12,
+        3,
+        vec![
+            Instruction::New(info),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Ldc_w(title),
+            Instruction::Invokevirtual(get),
+            Instruction::Invokevirtual(safe_text),
+            Instruction::Aload_1,
+            Instruction::Ldc_w(user),
+            Instruction::Invokevirtual(get),
+            Instruction::Ldc_w(username),
+            Instruction::Invokevirtual(get),
+            Instruction::Invokevirtual(safe_text),
+            Instruction::Aload_1,
+            Instruction::Ldc_w(duration),
+            Instruction::Invokevirtual(get),
+            Instruction::Ldc_w(integer),
+            Instruction::Invokevirtual(as_type),
+            Instruction::Checkcast(integer),
+            Instruction::Invokevirtual(int_value),
+            Instruction::I2l,
+            Instruction::Aload_2,
+            Instruction::Iconst_0,
+            Instruction::Aload_1,
+            Instruction::Ldc_w(permalink_url),
+            Instruction::Invokevirtual(get),
+            Instruction::Invokevirtual(text),
+            Instruction::Aload_1,
+            Instruction::Invokestatic(thumbnail),
+            Instruction::Aload_1,
+            Instruction::Ldc_w(publisher_metadata),
+            Instruction::Invokevirtual(get),
+            Instruction::Ldc_w(isrc),
+            Instruction::Invokevirtual(get),
+            Instruction::Invokevirtual(text),
+            Instruction::Invokespecial(info_init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn default_sound_cloud_data_reader_formats(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_SOUND_CLOUD_DATA_READER_CLASS)?;
+    let array_list = pool.add_class("java/util/ArrayList")?;
+    let array_list_init = pool.add_method_ref(array_list, "<init>", "()V")?;
+    let read_track_id = pool.add_method_ref(
+        owner,
+        "readTrackId",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/lang/String;",
+    )?;
+    let string = pool.add_class("java/lang/String")?;
+    let is_empty = pool.add_method_ref(string, "isEmpty", "()Z")?;
+    let logger = pool.add_class("org/slf4j/Logger")?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let warn = pool.add_interface_method_ref(
+        logger,
+        "warn",
+        "(Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;)V",
+    )?;
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let get = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let safe_text = pool.add_method_ref(json, "safeText", "()Ljava/lang/String;")?;
+    let format_json = pool.add_method_ref(json, "format", "()Ljava/lang/String;")?;
+    let values = pool.add_method_ref(json, "values", "()Ljava/util/List;")?;
+    let list = pool.add_class("java/util/List")?;
+    let iterator_method =
+        pool.add_interface_method_ref(list, "iterator", "()Ljava/util/Iterator;")?;
+    let add = pool.add_interface_method_ref(list, "add", "(Ljava/lang/Object;)Z")?;
+    let iterator = pool.add_class("java/util/Iterator")?;
+    let has_next = pool.add_interface_method_ref(iterator, "hasNext", "()Z")?;
+    let next = pool.add_interface_method_ref(iterator, "next", "()Ljava/lang/Object;")?;
+    let track_format = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/source/soundcloud/DefaultSoundCloudTrackFormat",
+    )?;
+    let track_format_init = pool.add_method_ref(
+        track_format,
+        "<init>",
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+    )?;
+    let missing_track_id = pool.add_string("Track data {} missing track ID: {}.")?;
+    let missing_url = pool.add_string("Transcoding of {} missing url: {}.")?;
+    let missing_format = pool.add_string("Transcoding of {} missing protocol/mimetype: {}.")?;
+    let media = pool.add_string("media")?;
+    let transcodings = pool.add_string("transcodings")?;
+    let format_key = pool.add_string("format")?;
+    let protocol_key = pool.add_string("protocol")?;
+    let mime_type_key = pool.add_string("mime_type")?;
+    let url_key = pool.add_string("url")?;
+
+    let mut body = code(
+        pool,
+        7,
+        10,
+        vec![
+            Instruction::New(array_list),
+            Instruction::Dup,
+            Instruction::Invokespecial(array_list_init),
+            Instruction::Astore_2,
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(read_track_id),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(is_empty),
+            Instruction::Ifeq(17),
+            Instruction::Getstatic(log),
+            Instruction::Ldc_w(missing_track_id),
+            Instruction::Aload_3,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(format_json),
+            Instruction::Invokeinterface(warn, 4),
+            Instruction::Aload_1,
+            Instruction::Ldc_w(media),
+            Instruction::Invokevirtual(get),
+            Instruction::Ldc_w(transcodings),
+            Instruction::Invokevirtual(get),
+            Instruction::Invokevirtual(values),
+            Instruction::Invokeinterface(iterator_method, 1),
+            Instruction::Astore(4),
+            Instruction::Aload(4),
+            Instruction::Invokeinterface(has_next, 1),
+            Instruction::Ifeq(85),
+            Instruction::Aload(4),
+            Instruction::Invokeinterface(next, 1),
+            Instruction::Checkcast(json),
+            Instruction::Astore(5),
+            Instruction::Aload(5),
+            Instruction::Ldc_w(format_key),
+            Instruction::Invokevirtual(get),
+            Instruction::Astore(6),
+            Instruction::Aload(6),
+            Instruction::Ldc_w(protocol_key),
+            Instruction::Invokevirtual(get),
+            Instruction::Invokevirtual(safe_text),
+            Instruction::Astore(7),
+            Instruction::Aload(6),
+            Instruction::Ldc_w(mime_type_key),
+            Instruction::Invokevirtual(get),
+            Instruction::Invokevirtual(safe_text),
+            Instruction::Astore(8),
+            Instruction::Aload(7),
+            Instruction::Invokevirtual(is_empty),
+            Instruction::Ifne(78),
+            Instruction::Aload(8),
+            Instruction::Invokevirtual(is_empty),
+            Instruction::Ifne(78),
+            Instruction::Aload(5),
+            Instruction::Ldc_w(url_key),
+            Instruction::Invokevirtual(get),
+            Instruction::Invokevirtual(safe_text),
+            Instruction::Astore(9),
+            Instruction::Aload(9),
+            Instruction::Invokevirtual(is_empty),
+            Instruction::Ifne(71),
+            Instruction::Aload_2,
+            Instruction::New(track_format),
+            Instruction::Dup,
+            Instruction::Aload_3,
+            Instruction::Aload(7),
+            Instruction::Aload(8),
+            Instruction::Aload(9),
+            Instruction::Invokespecial(track_format_init),
+            Instruction::Invokeinterface(add, 2),
+            Instruction::Pop,
+            Instruction::Goto(77),
+            Instruction::Getstatic(log),
+            Instruction::Ldc_w(missing_url),
+            Instruction::Aload_3,
+            Instruction::Aload(5),
+            Instruction::Invokevirtual(format_json),
+            Instruction::Invokeinterface(warn, 4),
+            Instruction::Goto(84),
+            Instruction::Getstatic(log),
+            Instruction::Ldc_w(missing_format),
+            Instruction::Aload_3,
+            Instruction::Aload(5),
+            Instruction::Invokevirtual(format_json),
+            Instruction::Invokeinterface(warn, 4),
+            Instruction::Goto(25),
+            Instruction::Aload_2,
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 253,
+                offset_delta: 17,
+                locals: vec![
+                    VerificationType::Object { cpool_index: list },
+                    VerificationType::Object {
+                        cpool_index: string,
+                    },
+                ],
+            },
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: 7,
+                locals: vec![VerificationType::Object {
+                    cpool_index: iterator,
+                }],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 45,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object { cpool_index: json },
+                    VerificationType::Object { cpool_index: list },
+                    VerificationType::Object {
+                        cpool_index: string,
+                    },
+                    VerificationType::Object {
+                        cpool_index: iterator,
+                    },
+                    VerificationType::Object { cpool_index: json },
+                    VerificationType::Object { cpool_index: json },
+                    VerificationType::Object {
+                        cpool_index: string,
+                    },
+                    VerificationType::Object {
+                        cpool_index: string,
+                    },
+                    VerificationType::Object {
+                        cpool_index: string,
+                    },
+                ],
+                stack: Vec::new(),
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: 5,
+            },
+            StackFrame::SameFrame { frame_type: 0 },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 5,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object { cpool_index: json },
+                    VerificationType::Object { cpool_index: list },
+                    VerificationType::Object {
+                        cpool_index: string,
+                    },
+                    VerificationType::Object {
+                        cpool_index: iterator,
+                    },
+                ],
+                stack: Vec::new(),
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: 0,
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn default_sound_cloud_data_reader_find_playlist(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_SOUND_CLOUD_DATA_READER_CLASS)?;
+    let find = pool.add_method_ref(
+        owner,
+        "findEntryOfKind",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(find),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn default_sound_cloud_data_reader_playlist_tracks(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let get = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let values = pool.add_method_ref(json, "values", "()Ljava/util/List;")?;
+    let tracks = pool.add_string("tracks")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Ldc_w(tracks),
+            Instruction::Invokevirtual(get),
+            Instruction::Invokevirtual(values),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn default_sound_cloud_data_reader_find_entry(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let is_map = pool.add_method_ref(json, "isMap", "()Z")?;
+    let get = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let text = pool.add_method_ref(json, "text", "()Ljava/lang/String;")?;
+    let string = pool.add_class("java/lang/String")?;
+    let equals = pool.add_method_ref(string, "equals", "(Ljava/lang/Object;)Z")?;
+    let kind = pool.add_string("kind")?;
+    let mut body = code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(is_map),
+            Instruction::Ifeq(12),
+            Instruction::Aload_2,
+            Instruction::Aload_1,
+            Instruction::Ldc_w(kind),
+            Instruction::Invokevirtual(get),
+            Instruction::Invokevirtual(text),
+            Instruction::Invokevirtual(equals),
+            Instruction::Ifeq(12),
+            Instruction::Aload_1,
+            Instruction::Areturn,
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::SameFrame { frame_type: 12 }],
+    )?;
+    Ok(body)
+}
+
+fn default_sound_cloud_data_reader_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_SOUND_CLOUD_DATA_READER_CLASS)?;
+    let logger_factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        logger_factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
 }
 
 fn audio_player_manager_replacement(

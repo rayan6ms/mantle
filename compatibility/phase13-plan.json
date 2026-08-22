@@ -602,8 +602,8 @@
       "objective": "Expand source SPI, built-in manager shells, class lookup, and serialization-visible types.",
       "exit_evidence": "Source SPI extension tests, source lookup tests, per-symbol ledger entries, and Revapi diff.",
       "status": "IN_PROGRESS",
-      "classified_symbols": 76,
-      "remaining_symbols": 622,
+      "classified_symbols": 88,
+      "remaining_symbols": 610,
       "completed_slices": [
         {
           "id": "audio-source-manager-interface-contracts",
@@ -740,6 +740,19 @@
             "tools/jvm-gate/src/emitter.rs",
             "tools/jvm-gate/src/main.rs"
           ]
+        },
+        {
+          "id": "default-sound-cloud-data-reader-contracts",
+          "classes": 1,
+          "fields": 0,
+          "methods": 11,
+          "symbols": 12,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
         }
       ]
     },
@@ -861,7 +874,7 @@
   "phase_entry": {
     "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
     "first_execution_cohort": "core-player-track",
-    "next_slice": "default-sound-cloud-data-reader-contracts",
+    "next_slice": "default-sound-cloud-format-handler-contracts",
     "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
   }
 }

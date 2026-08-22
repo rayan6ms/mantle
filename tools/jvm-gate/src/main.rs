@@ -116,6 +116,9 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-default-sound-cloud-data-loader-consumer" => {
             Some(DEFAULT_SOUND_CLOUD_DATA_LOADER_CONSUMER)
         }
+        "write-default-sound-cloud-data-reader-consumer" => {
+            Some(DEFAULT_SOUND_CLOUD_DATA_READER_CONSUMER)
+        }
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -8734,6 +8737,186 @@ public final class GateDefaultSoundCloudDataLoader {
       check(request != null && "GET".equals(request.getMethod())
           && expectedUri.equals(request.getURI().toASCIIString()), "resolve request");
     }
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const DEFAULT_SOUND_CLOUD_DATA_READER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.DefaultSoundCloudDataReader;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudDataReader;
+import com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudTrackFormat;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.List;
+
+public final class GateDefaultSoundCloudDataReader {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1 && (args[0].equals("reference") || args[0].equals("candidate")),
+        "expected disposition");
+    reflectionContract();
+    behaviorContract();
+    System.out.println("public-concrete,1-field,1-constructor,10-exported-methods;"
+        + "kind-identity,ids,policy,track-info,thumbnail,formats,format-filter-order,"
+        + "playlist-values,missing-quirks,generic-signatures");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<DefaultSoundCloudDataReader> type = DefaultSoundCloudDataReader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {SoundCloudDataReader.class}),
+        "class metadata");
+    check(type.getDeclaredFields().length == 1, "field count");
+    Field log = type.getDeclaredField("log");
+    check(log.getType().getName().equals("org.slf4j.Logger")
+        && log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL),
+        "logger metadata");
+    log.setAccessible(true);
+    check(log.get(null) != null, "logger initialization");
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC, "constructor metadata");
+    check(type.getDeclaredMethods().length == 10, "method count");
+    checkMethod(type, "findTrackData", JsonBrowser.class, Modifier.PUBLIC,
+        new Class<?>[] {JsonBrowser.class});
+    checkMethod(type, "readTrackId", String.class, Modifier.PUBLIC,
+        new Class<?>[] {JsonBrowser.class});
+    checkMethod(type, "isTrackBlocked", boolean.class, Modifier.PUBLIC,
+        new Class<?>[] {JsonBrowser.class});
+    checkMethod(type, "readTrackInfo", AudioTrackInfo.class, Modifier.PUBLIC,
+        new Class<?>[] {JsonBrowser.class, String.class});
+    Method formats = checkMethod(type, "readTrackFormats", List.class, Modifier.PUBLIC,
+        new Class<?>[] {JsonBrowser.class});
+    check(formats.getGenericReturnType().getTypeName().equals(
+        "java.util.List<com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudTrackFormat>"),
+        "format generic return");
+    checkMethod(type, "findPlaylistData", JsonBrowser.class, Modifier.PUBLIC,
+        new Class<?>[] {JsonBrowser.class, String.class});
+    checkMethod(type, "readPlaylistName", String.class, Modifier.PUBLIC,
+        new Class<?>[] {JsonBrowser.class});
+    checkMethod(type, "readPlaylistIdentifier", String.class, Modifier.PUBLIC,
+        new Class<?>[] {JsonBrowser.class});
+    Method tracks = checkMethod(type, "readPlaylistTracks", List.class, Modifier.PUBLIC,
+        new Class<?>[] {JsonBrowser.class});
+    check(tracks.getGenericReturnType().getTypeName().equals(
+        "java.util.List<com.sedmelluq.discord.lavaplayer.tools.JsonBrowser>"),
+        "playlist generic return");
+    checkMethod(type, "findEntryOfKind", JsonBrowser.class, Modifier.PROTECTED,
+        new Class<?>[] {JsonBrowser.class, String.class});
+  }
+
+  private static void behaviorContract() throws Exception {
+    ExposedReader reader = new ExposedReader();
+    JsonBrowser track = JsonBrowser.parse("{"
+        + "\"kind\":\"track\",\"id\":123,\"policy\":\"BLOCK\","
+        + "\"title\":\"Fixture Song\",\"full_duration\":9876,"
+        + "\"permalink_url\":\"https://soundcloud.com/fixture/song\","
+        + "\"artwork_url\":\"https://img.example/art-large.jpg\","
+        + "\"user\":{\"username\":\"Fixture Artist\","
+        + "\"avatar_url\":\"https://img.example/avatar-large.jpg\"},"
+        + "\"publisher_metadata\":{\"isrc\":\"US-ABC-12-34567\"},"
+        + "\"media\":{\"transcodings\":["
+        + "{\"format\":{\"protocol\":\"progressive\",\"mime_type\":\"audio/mpeg\"},"
+        + "\"url\":\"https://api-v2.soundcloud.com/media/one\"},"
+        + "{\"format\":{\"protocol\":\"hls\",\"mime_type\":\"audio/ogg; codecs=opus\"},"
+        + "\"url\":\"https://api-v2.soundcloud.com/media/two\"},"
+        + "{\"format\":{\"protocol\":\"hls\",\"mime_type\":\"audio/mpeg\"}},"
+        + "{\"format\":{\"mime_type\":\"audio/mpeg\"},\"url\":\"ignored\"}"
+        + "]}}"
+    );
+
+    check(reader.findTrackData(track) == track && reader.find(track, "track") == track,
+        "track kind identity");
+    check(reader.findTrackData(JsonBrowser.parse("{\"kind\":\"playlist\"}")) == null
+        && reader.findTrackData(JsonBrowser.NULL_BROWSER) == null, "track kind rejection");
+    check("123".equals(reader.readTrackId(track)), "track ID");
+    check(reader.isTrackBlocked(track)
+        && !reader.isTrackBlocked(JsonBrowser.parse("{\"policy\":\"block\"}"))
+        && !reader.isTrackBlocked(JsonBrowser.parse("{}")), "policy");
+
+    AudioTrackInfo info = reader.readTrackInfo(track, "chosen-id");
+    check("Fixture Song".equals(info.title) && "Fixture Artist".equals(info.author)
+        && info.length == 9876L && "chosen-id".equals(info.identifier) && !info.isStream
+        && "https://soundcloud.com/fixture/song".equals(info.uri)
+        && "https://img.example/art-original.jpg".equals(info.artworkUrl)
+        && "US-ABC-12-34567".equals(info.isrc), "track info");
+    JsonBrowser avatarTrack = JsonBrowser.parse("{"
+        + "\"title\":\"T\",\"full_duration\":1,\"user\":{\"username\":\"A\","
+        + "\"avatar_url\":\"https://img.example/avatar-large.jpg\"}}"
+    );
+    check("https://img.example/avatar-original.jpg".equals(
+        reader.readTrackInfo(avatarTrack, "id").artworkUrl), "avatar fallback");
+    expect(NullPointerException.class,
+        () -> reader.readTrackInfo(JsonBrowser.parse("{}"), "id"));
+
+    List<SoundCloudTrackFormat> formats = reader.readTrackFormats(track);
+    check(formats.size() == 2, "format filtering");
+    checkFormat(formats.get(0), "123", "progressive", "audio/mpeg",
+        "https://api-v2.soundcloud.com/media/one");
+    checkFormat(formats.get(1), "123", "hls", "audio/ogg; codecs=opus",
+        "https://api-v2.soundcloud.com/media/two");
+    List<SoundCloudTrackFormat> emptyFormats = reader.readTrackFormats(JsonBrowser.parse("{}"));
+    check(emptyFormats.isEmpty(), "missing formats");
+    emptyFormats.add(null);
+    check(emptyFormats.size() == 1, "mutable format list");
+
+    JsonBrowser playlist = JsonBrowser.parse("{\"kind\":\"playlist\","
+        + "\"title\":\"Fixture Playlist\",\"permalink\":\"fixture-list\","
+        + "\"tracks\":[{\"id\":1},{\"id\":2}]}"
+    );
+    check(reader.findPlaylistData(playlist, "playlist") == playlist
+        && reader.findPlaylistData(playlist, "system-playlist") == null,
+        "playlist kind identity");
+    check("Fixture Playlist".equals(reader.readPlaylistName(playlist))
+        && "fixture-list".equals(reader.readPlaylistIdentifier(playlist)), "playlist values");
+    List<JsonBrowser> tracks = reader.readPlaylistTracks(playlist);
+    check(tracks.size() == 2 && tracks.get(0).get("id").asLong(-1) == 1L
+        && tracks.get(1).get("id").asLong(-1) == 2L, "playlist tracks");
+    check(reader.readPlaylistTracks(JsonBrowser.parse("{}" )).isEmpty()
+        && "".equals(reader.readPlaylistName(JsonBrowser.parse("{}")))
+        && "".equals(reader.readPlaylistIdentifier(JsonBrowser.parse("{}"))),
+        "missing playlist values");
+  }
+
+  private static void checkFormat(SoundCloudTrackFormat format, String id, String protocol,
+                                  String mimeType, String url) {
+    check(id.equals(format.getTrackId()) && protocol.equals(format.getProtocol())
+        && mimeType.equals(format.getMimeType()) && url.equals(format.getLookupUrl()),
+        "format values");
+  }
+
+  private static Method checkMethod(Class<?> type, String name, Class<?> returnType,
+                                    int modifiers, Class<?>[] parameters) throws Exception {
+    Method method = type.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && method.getExceptionTypes().length == 0 && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), method + " metadata");
+    return method;
+  }
+
+  private static final class ExposedReader extends DefaultSoundCloudDataReader {
+    JsonBrowser find(JsonBrowser data, String kind) { return super.findEntryOfKind(data, kind); }
   }
 
   private static <T extends Throwable> T expect(Class<T> type, Operation operation)
