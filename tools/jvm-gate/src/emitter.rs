@@ -1609,10 +1609,14 @@ fn primordial_track_executor_constructor(pool: &mut ConstantPool<'static>) -> Re
         "Ldev/mantle/internal/NativeBaseAudioTrack;",
     )?;
     let helper = pool.add_class(BASE_AUDIO_TRACK_HELPER_CLASS)?;
-    let helper_init = pool.add_method_ref(helper, "<init>", "()V")?;
+    let helper_init = pool.add_method_ref(
+        helper,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V",
+    )?;
     code(
         pool,
-        3,
+        4,
         2,
         vec![
             Instruction::Aload_0,
@@ -1620,6 +1624,7 @@ fn primordial_track_executor_constructor(pool: &mut ConstantPool<'static>) -> Re
             Instruction::Aload_0,
             Instruction::New(helper),
             Instruction::Dup,
+            Instruction::Aload_1,
             Instruction::Invokespecial(helper_init),
             Instruction::Putfield(state),
             Instruction::Return,
@@ -3701,6 +3706,18 @@ fn native_base_audio_track_class() -> Result<ClassFile<'static>> {
     add_field(
         &mut class,
         FieldAccessFlags::PRIVATE | FieldAccessFlags::FINAL,
+        "trackInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    add_field(
+        &mut class,
+        FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC | FieldAccessFlags::FINAL,
+        "log",
+        "Lorg/slf4j/Logger;",
+    )?;
+    add_field(
+        &mut class,
+        FieldAccessFlags::PRIVATE | FieldAccessFlags::FINAL,
         "markerTracker",
         "Lcom/sedmelluq/discord/lavaplayer/track/TrackMarkerTracker;",
     )?;
@@ -3711,7 +3728,11 @@ fn native_base_audio_track_class() -> Result<ClassFile<'static>> {
         "J",
     )?;
     let methods: &[(&str, &str, MethodEmitter)] = &[
-        ("<init>", "()V", base_helper_constructor),
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V",
+            base_helper_constructor,
+        ),
         (
             "getAudioBuffer",
             "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBuffer;",
@@ -3782,6 +3803,14 @@ fn native_base_audio_track_class() -> Result<ClassFile<'static>> {
             Some(body),
         )?;
     }
+    let initializer = base_helper_clinit(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::STATIC,
+        "<clinit>",
+        "()V",
+        Some(initializer),
+    )?;
     let static_methods: &[(&str, &str, MethodEmitter)] = &[
         (
             "assign",
@@ -3836,6 +3865,11 @@ fn base_helper_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute
     let object = pool.add_class("java/lang/Object")?;
     let object_init = pool.add_method_ref(object, "<init>", "()V")?;
     let owner = pool.add_class(BASE_AUDIO_TRACK_HELPER_CLASS)?;
+    let track_info = pool.add_field_ref(
+        owner,
+        "trackInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
     let markers = pool.add_field_ref(
         owner,
         "markerTracker",
@@ -3846,15 +3880,42 @@ fn base_helper_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute
     code(
         pool,
         3,
-        1,
+        2,
         vec![
             Instruction::Aload_0,
             Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(track_info),
             Instruction::Aload_0,
             Instruction::New(tracker),
             Instruction::Dup,
             Instruction::Invokespecial(tracker_init),
             Instruction::Putfield(markers),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn base_helper_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BASE_AUDIO_TRACK_HELPER_CLASS)?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let logger_factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        logger_factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let logger_owner =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(logger_owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
             Instruction::Return,
         ],
     )
@@ -3869,7 +3930,33 @@ fn base_helper_execute(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
 }
 
 fn base_helper_stop(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
-    void_return(pool, 1)
+    let owner = pool.add_class(BASE_AUDIO_TRACK_HELPER_CLASS)?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let track_info = pool.add_field_ref(
+        owner,
+        "trackInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let info = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo")?;
+    let identifier = pool.add_field_ref(info, "identifier", "Ljava/lang/String;")?;
+    let logger = pool.add_class("org/slf4j/Logger")?;
+    let info_method =
+        pool.add_interface_method_ref(logger, "info", "(Ljava/lang/String;Ljava/lang/Object;)V")?;
+    let message = pool.add_string("Tried to stop track {} which is not playing.")?;
+    code(
+        pool,
+        3,
+        1,
+        vec![
+            Instruction::Getstatic(log),
+            Instruction::Ldc_w(message),
+            Instruction::Aload_0,
+            Instruction::Getfield(track_info),
+            Instruction::Getfield(identifier),
+            Instruction::Invokeinterface(info_method, 3),
+            Instruction::Return,
+        ],
+    )
 }
 
 fn base_helper_get_position(pool: &mut ConstantPool<'static>) -> Result<Attribute> {

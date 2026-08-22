@@ -26124,153 +26124,221 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, stop logging and null-info failure, full-width position, marker outcomes and ordering, state-transfer clearing and failure retention, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 primordial-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.PrimordialAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, stop logging and null-info failure, full-width position, marker outcomes and ordering, state-transfer clearing and failure retention, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 primordial-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.PrimordialAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "getAudioBuffer",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBuffer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, stop logging and null-info failure, full-width position, marker outcomes and ordering, state-transfer clearing and failure retention, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 primordial-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.PrimordialAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "execute",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/TrackStateListener;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, stop logging and null-info failure, full-width position, marker outcomes and ordering, state-transfer clearing and failure retention, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 primordial-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.PrimordialAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "stop",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, stop logging and null-info failure, full-width position, marker outcomes and ordering, state-transfer clearing and failure retention, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 primordial-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.PrimordialAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "getPosition",
       "descriptor": "()J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, stop logging and null-info failure, full-width position, marker outcomes and ordering, state-transfer clearing and failure retention, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 primordial-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.PrimordialAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "setPosition",
       "descriptor": "(J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, stop logging and null-info failure, full-width position, marker outcomes and ordering, state-transfer clearing and failure retention, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 primordial-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.PrimordialAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "getState",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackState;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, stop logging and null-info failure, full-width position, marker outcomes and ordering, state-transfer clearing and failure retention, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 primordial-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.PrimordialAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "setMarker",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, stop logging and null-info failure, full-width position, marker outcomes and ordering, state-transfer clearing and failure retention, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 primordial-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.PrimordialAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "addMarker",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, stop logging and null-info failure, full-width position, marker outcomes and ordering, state-transfer clearing and failure retention, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 primordial-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.PrimordialAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "removeMarker",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/TrackMarker;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, stop logging and null-info failure, full-width position, marker outcomes and ordering, state-transfer clearing and failure retention, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 primordial-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.PrimordialAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "failedBeforeLoad",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, stop logging and null-info failure, full-width position, marker outcomes and ordering, state-transfer clearing and failure retention, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 primordial-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.PrimordialAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "provide",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, stop logging and null-info failure, full-width position, marker outcomes and ordering, state-transfer clearing and failure retention, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 primordial-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.PrimordialAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "provide",
       "descriptor": "(JLjava/util/concurrent/TimeUnit;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, stop logging and null-info failure, full-width position, marker outcomes and ordering, state-transfer clearing and failure retention, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 primordial-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.PrimordialAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "provide",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, stop logging and null-info failure, full-width position, marker outcomes and ordering, state-transfer clearing and failure retention, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 primordial-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.PrimordialAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "provide",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;JLjava/util/concurrent/TimeUnit;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, stop logging and null-info failure, full-width position, marker outcomes and ordering, state-transfer clearing and failure retention, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 primordial-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.PrimordialAudioTrackExecutor",
       "symbol_kind": "METHOD",
       "member_name": "applyStateToExecutor",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioTrackExecutor;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Exact exported structure and reference-equal defaults, stop logging and null-info failure, full-width position, marker outcomes and ordering, state-transfer clearing and failure retention, concurrency, checked-exception, and reflection behavior are covered by the Phase 13 primordial-audio-track-executor-contracts slice.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.track.playback.ReferenceMutableAudioFrame",

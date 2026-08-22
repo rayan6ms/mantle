@@ -88,6 +88,9 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-local-audio-track-executor-consumer" => Some(LOCAL_AUDIO_TRACK_EXECUTOR_CONSUMER),
         "write-track-marker-tracker-consumer" => Some(TRACK_MARKER_TRACKER_CONSUMER),
         "write-base-audio-track-consumer" => Some(BASE_AUDIO_TRACK_CONSUMER),
+        "write-primordial-audio-track-executor-consumer" => {
+            Some(PRIMORDIAL_AUDIO_TRACK_EXECUTOR_CONSUMER)
+        }
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -5123,6 +5126,253 @@ public final class GateBaseAudioTrack {
             return defaultValue(method.getReturnType());
           });
     }
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == long.class) return 0L;
+    if (type == int.class) return 0;
+    if (type == short.class) return (short) 0;
+    if (type == byte.class) return (byte) 0;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const PRIMORDIAL_AUDIO_TRACK_EXECUTOR_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackState;
+import com.sedmelluq.discord.lavaplayer.track.TrackMarker;
+import com.sedmelluq.discord.lavaplayer.track.TrackMarkerHandler.MarkerState;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioTrackExecutor;
+import com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.PrimordialAudioTrackExecutor;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public final class GatePrimordialAudioTrackExecutor {
+  public static void main(String[] args) throws Exception {
+    defaultsAndStop();
+    positionsAndMarkers();
+    stateApplication();
+    applicationFailures();
+    concurrency();
+    reflection();
+    System.out.println(
+        "defaults=buffer,state,position,failed,providers,execute;stop=log,null-info;"
+        + "markers=late,overwrite,remove,seek,duplicates;"
+        + "apply=position,ordered,clear,retry,failure-order,null-target;"
+        + "concurrency=volatile,copy-on-write;reflection=class,1-constructor,15-methods,exceptions");
+  }
+
+  private static void defaultsAndStop() throws Exception {
+    PrimordialAudioTrackExecutor executor = new PrimordialAudioTrackExecutor(info("normal"));
+    check(executor.getAudioBuffer() == null && executor.getState() == AudioTrackState.INACTIVE
+        && executor.getPosition() == 0L && !executor.failedBeforeLoad(), "initial state");
+    check(executor.provide() == null && executor.provide(Long.MIN_VALUE, null) == null
+        && !executor.provide((MutableAudioFrame) null)
+        && !executor.provide(null, Long.MAX_VALUE, null), "empty providers");
+    try {
+      executor.execute(null);
+      throw new AssertionError("execute succeeded");
+    } catch (UnsupportedOperationException error) {
+      check(error.getMessage() == null && error.getCause() == null, "execute failure shape");
+    }
+    executor.setPosition(71L);
+    executor.addMarker(marker("stop", 90L, new ArrayList<>()));
+    executor.stop();
+    check(executor.getPosition() == 71L, "stop mutated state");
+    try {
+      new PrimordialAudioTrackExecutor(null).stop();
+      throw new AssertionError("null info stop succeeded");
+    } catch (NullPointerException expected) { }
+  }
+
+  private static void positionsAndMarkers() {
+    PrimordialAudioTrackExecutor executor = new PrimordialAudioTrackExecutor(info("markers"));
+    List<String> events = new ArrayList<>();
+    executor.setPosition(Long.MIN_VALUE);
+    check(executor.getPosition() == Long.MIN_VALUE, "minimum position");
+    executor.setPosition(20L);
+    executor.addMarker(null);
+    executor.addMarker(marker("late", 20L, events));
+    check(events.equals(Arrays.asList("late:LATE")), "late boundary");
+    TrackMarker first = marker("first", 30L, events);
+    TrackMarker duplicate = marker("duplicate", 40L, events);
+    executor.addMarker(first);
+    executor.addMarker(duplicate);
+    executor.addMarker(duplicate);
+    executor.removeMarker(duplicate);
+    check(events.get(events.size() - 1).equals("duplicate:REMOVED"), "single removal");
+    executor.setMarker(marker("replacement", 50L, events));
+    check(events.subList(2, 4).equals(Arrays.asList(
+        "first:OVERWRITTEN", "duplicate:OVERWRITTEN")), "overwrite order");
+    executor.setPosition(50L);
+    check(events.get(events.size() - 1).equals("replacement:BYPASSED"), "seek bypass");
+    executor.setPosition(Long.MAX_VALUE);
+    check(executor.getPosition() == Long.MAX_VALUE, "maximum position");
+  }
+
+  private static void stateApplication() {
+    PrimordialAudioTrackExecutor source = new PrimordialAudioTrackExecutor(info("apply"));
+    List<String> events = new ArrayList<>();
+    source.setPosition(23L);
+    TrackMarker first = marker("first", 30L, events);
+    TrackMarker second = marker("second", 40L, events);
+    source.addMarker(first);
+    source.addMarker(second);
+    source.addMarker(second);
+    List<String> calls = new ArrayList<>();
+    source.applyStateToExecutor(target(calls, null, null));
+    check(calls.equals(Arrays.asList("position:23", "marker:30", "marker:40", "marker:40")),
+        "state application order");
+    calls.clear();
+    source.applyStateToExecutor(target(calls, null, null));
+    check(calls.equals(Arrays.asList("position:23")), "markers cleared after apply");
+
+    PrimordialAudioTrackExecutor empty = new PrimordialAudioTrackExecutor(info("empty"));
+    empty.applyStateToExecutor(null);
+  }
+
+  private static void applicationFailures() {
+    RuntimeException markerFailure = new RuntimeException("marker-sentinel");
+    PrimordialAudioTrackExecutor markers = new PrimordialAudioTrackExecutor(info("failure"));
+    markers.addMarker(marker("one", 10L, new ArrayList<>()));
+    markers.addMarker(marker("two", 20L, new ArrayList<>()));
+    List<String> failedCalls = new ArrayList<>();
+    try {
+      markers.applyStateToExecutor(target(failedCalls, null, markerFailure));
+      throw new AssertionError("marker failure swallowed");
+    } catch (RuntimeException error) {
+      check(error == markerFailure
+          && failedCalls.equals(Arrays.asList("marker:10", "marker:20")),
+          "marker failure identity and order");
+    }
+    List<String> retryCalls = new ArrayList<>();
+    markers.applyStateToExecutor(target(retryCalls, null, null));
+    check(retryCalls.equals(Arrays.asList("marker:10", "marker:20")),
+        "marker failure retained state");
+
+    RuntimeException positionFailure = new RuntimeException("position-sentinel");
+    PrimordialAudioTrackExecutor positioned = new PrimordialAudioTrackExecutor(info("position"));
+    positioned.setPosition(-7L);
+    positioned.addMarker(marker("retained", 10L, new ArrayList<>()));
+    try {
+      positioned.applyStateToExecutor(target(new ArrayList<>(), positionFailure, null));
+      throw new AssertionError("position failure swallowed");
+    } catch (RuntimeException error) {
+      check(error == positionFailure, "position failure identity");
+    }
+    List<String> recovered = new ArrayList<>();
+    positioned.applyStateToExecutor(target(recovered, null, null));
+    check(recovered.equals(Arrays.asList("position:-7", "marker:10")),
+        "position failure retained markers");
+
+    PrimordialAudioTrackExecutor nullTarget = new PrimordialAudioTrackExecutor(info("null"));
+    nullTarget.addMarker(marker("retained", 12L, new ArrayList<>()));
+    try {
+      nullTarget.applyStateToExecutor(null);
+      throw new AssertionError("null marker target succeeded");
+    } catch (NullPointerException expected) { }
+    List<String> afterNull = new ArrayList<>();
+    nullTarget.applyStateToExecutor(target(afterNull, null, null));
+    check(afterNull.equals(Arrays.asList("marker:12")), "null target retained marker");
+  }
+
+  private static void concurrency() throws Exception {
+    PrimordialAudioTrackExecutor executor = new PrimordialAudioTrackExecutor(info("concurrent"));
+    Thread writer = new Thread(() -> {
+      for (long value = 1; value <= 10000; value++) executor.setPosition(value);
+    });
+    writer.start();
+    writer.join();
+    check(executor.getPosition() == 10000L, "position publication");
+    executor.setPosition(0L);
+    Thread[] adders = new Thread[8];
+    for (int index = 0; index < adders.length; index++) {
+      final int markerIndex = index;
+      adders[index] = new Thread(() -> executor.addMarker(
+          marker("concurrent-" + markerIndex, 100L + markerIndex, new ArrayList<>())));
+      adders[index].start();
+    }
+    for (Thread adder : adders) adder.join();
+    AtomicInteger applied = new AtomicInteger();
+    AudioTrackExecutor target = (AudioTrackExecutor) Proxy.newProxyInstance(
+        AudioTrackExecutor.class.getClassLoader(), new Class<?>[] { AudioTrackExecutor.class },
+        (instance, method, arguments) -> {
+          if (method.getName().equals("addMarker")) applied.incrementAndGet();
+          return defaultValue(method.getReturnType());
+        });
+    executor.applyStateToExecutor(target);
+    check(applied.get() == 8, "concurrent marker adds");
+  }
+
+  private static void reflection() throws Exception {
+    Class<PrimordialAudioTrackExecutor> type = PrimordialAudioTrackExecutor.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] { AudioTrackExecutor.class }),
+        "class metadata");
+    check(type.getFields().length == 0, "exported fields");
+    Constructor<?>[] constructors = type.getDeclaredConstructors();
+    check(constructors.length == 1 && Modifier.isPublic(constructors[0].getModifiers())
+        && Arrays.equals(constructors[0].getParameterTypes(), new Class<?>[] { AudioTrackInfo.class })
+        && constructors[0].getExceptionTypes().length == 0, "constructor metadata");
+    int publicMethods = 0;
+    for (Method method : type.getDeclaredMethods()) {
+      check(Modifier.isPublic(method.getModifiers()) && !Modifier.isStatic(method.getModifiers())
+          && !Modifier.isAbstract(method.getModifiers()), "method modifiers");
+      publicMethods++;
+    }
+    check(publicMethods == 15, "declared method count");
+    check(type.getDeclaredMethod("provide", long.class, TimeUnit.class)
+        .getExceptionTypes().length == 0, "narrow timed frame exceptions");
+    check(Arrays.equals(type.getDeclaredMethod("provide", MutableAudioFrame.class, long.class,
+        TimeUnit.class).getExceptionTypes(),
+        new Class<?>[] { TimeoutException.class, InterruptedException.class }),
+        "timed mutable exceptions");
+  }
+
+  private static AudioTrackExecutor target(List<String> calls, RuntimeException positionFailure,
+      RuntimeException markerFailure) {
+    AtomicInteger markers = new AtomicInteger();
+    return (AudioTrackExecutor) Proxy.newProxyInstance(AudioTrackExecutor.class.getClassLoader(),
+        new Class<?>[] { AudioTrackExecutor.class }, (instance, method, arguments) -> {
+          if (method.getName().equals("setPosition")) {
+            calls.add("position:" + arguments[0]);
+            if (positionFailure != null) throw positionFailure;
+          } else if (method.getName().equals("addMarker")) {
+            TrackMarker marker = (TrackMarker) arguments[0];
+            calls.add("marker:" + marker.timecode);
+            if (markerFailure != null && markers.incrementAndGet() == 2) throw markerFailure;
+          }
+          return defaultValue(method.getReturnType());
+        });
+  }
+
+  private static AudioTrackInfo info(String identifier) {
+    return new AudioTrackInfo("title", "author", 1000L, identifier, false,
+        "uri", "art", "isrc");
+  }
+
+  private static TrackMarker marker(String name, long timecode, List<String> events) {
+    return new TrackMarker(timecode, state -> events.add(name + ":" + state.name()));
   }
 
   private static Object defaultValue(Class<?> type) {
