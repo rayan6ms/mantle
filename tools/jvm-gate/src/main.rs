@@ -94,6 +94,9 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-delegated-audio-track-consumer" => Some(DELEGATED_AUDIO_TRACK_CONSUMER),
         "write-audio-track-info-builder-consumer" => Some(AUDIO_TRACK_INFO_BUILDER_CONSUMER),
         "write-abstract-audio-frame-buffer-consumer" => Some(ABSTRACT_AUDIO_FRAME_BUFFER_CONSUMER),
+        "write-allocating-audio-frame-buffer-consumer" => {
+            Some(ALLOCATING_AUDIO_FRAME_BUFFER_CONSUMER)
+        }
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -6265,6 +6268,402 @@ public final class GateAbstractAudioFrameBuffer {
     public byte[] silenceBytes() { return new byte[0]; }
     public int expectedChunkSize() { return 0; }
     public int maximumChunkSize() { return 0; }
+    public AudioChunkDecoder createDecoder() { return null; }
+    public AudioChunkEncoder createEncoder(AudioConfiguration configuration) { return null; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const ALLOCATING_AUDIO_FRAME_BUFFER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkDecoder;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkEncoder;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import com.sedmelluq.discord.lavaplayer.track.playback.AbstractAudioFrameBuffer;
+import com.sedmelluq.discord.lavaplayer.track.playback.AllocatingAudioFrameBuffer;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameRebuilder;
+import com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.TerminatorAudioFrame;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+
+public final class GateAllocatingAudioFrameBuffer {
+  private static final TestFormat FORMAT = new TestFormat();
+
+  public static void main(String[] args) throws Exception {
+    constructorCapacityAndBasicConsumption();
+    mutableFreezeSilenceAndTimedProvide();
+    terminationWaitAndBackpressure();
+    rebuildClearAndLastTimecode();
+    reflection();
+    System.out.println(
+        "constructor=capacity,format,stopping,private-layout;"
+        + "consume=order,stop,lock,null,clear,freeze,backpressure,interrupt;"
+        + "provide=identity,silence,timed,mutable,terminator;"
+        + "termination=full-queue,pending,wakeup,multiple;"
+        + "rebuild=order,partial-failure,null,clear,last-timecode,monitor;"
+        + "reflection=public-class,4-private-fields,1-constructor,14-methods");
+  }
+
+  private static void constructorCapacityAndBasicConsumption() throws Exception {
+    AtomicBoolean stopping = new AtomicBoolean();
+    ProbeBuffer buffer = new ProbeBuffer(39, FORMAT, stopping);
+    check(buffer.getFullCapacity() == 2 && buffer.getRemainingCapacity() == 2
+        && buffer.formatValue() == FORMAT && field(buffer, "stopping") == stopping,
+        "constructor and capacity");
+    expect(IllegalArgumentException.class, () -> new ProbeBuffer(-20, FORMAT, null));
+
+    AudioFrame first = frame(1L, 10, 1);
+    AudioFrame second = frame(2L, 20, 2);
+    buffer.consume(first);
+    buffer.consume(second);
+    check(buffer.hasReceivedFrames() && buffer.getRemainingCapacity() == 0
+        && buffer.provide() == first && buffer.provide() == second
+        && buffer.provide() == null, "queue order and identity");
+
+    ProbeBuffer stopped = new ProbeBuffer(0, FORMAT, new AtomicBoolean(true));
+    expect(InterruptedException.class, () -> stopped.consume(first));
+    check(!stopped.hasReceivedFrames() && stopped.getRemainingCapacity() == 1,
+        "stopping preflight");
+    ProbeBuffer locked = new ProbeBuffer(0, FORMAT, null);
+    locked.lockBuffer();
+    locked.consume(first);
+    check(!locked.hasReceivedFrames() && locked.getRemainingCapacity() == 1,
+        "locked discard");
+
+    ProbeBuffer nullFrame = new ProbeBuffer(0, FORMAT, null);
+    expect(NullPointerException.class, () -> nullFrame.consume(null));
+    check(nullFrame.hasReceivedFrames() && nullFrame.getRemainingCapacity() == 1,
+        "null failure after received flag");
+  }
+
+  private static void mutableFreezeSilenceAndTimedProvide() throws Exception {
+    ProbeBuffer buffer = new ProbeBuffer(60, FORMAT, null);
+    MutableAudioFrame mutable = new MutableAudioFrame(ByteBuffer.allocate(16));
+    mutable.setTimecode(11L);
+    mutable.setVolume(55);
+    mutable.setFormat(FORMAT);
+    mutable.store(new byte[] { 3, 4, 5 }, 0, 3);
+    buffer.consume(mutable);
+    mutable.setTimecode(99L);
+    mutable.store(new byte[] { 8 }, 0, 1);
+    AudioFrame frozen = buffer.provide();
+    check(frozen != mutable && frozen.getTimecode() == 11L && frozen.getVolume() == 55
+        && Arrays.equals(frozen.getData(), new byte[] { 3, 4, 5 })
+        && frozen.getFormat() == FORMAT, "mutable freeze snapshot");
+
+    AudioFrame silentInput = frame(21L, 0, 7, 7, 7);
+    buffer.consume(silentInput);
+    AudioFrame silent = buffer.provide();
+    check(silent != silentInput && silent.getTimecode() == 21L && silent.getVolume() == 0
+        && silent.getFormat() == FORMAT
+        && Arrays.equals(silent.getData(), FORMAT.silenceBytes()), "silence substitution");
+
+    MutableAudioFrame target = new MutableAudioFrame(ByteBuffer.allocate(16));
+    buffer.consume(frame(31L, 77, 4, 5));
+    check(buffer.provide(target) && target.getTimecode() == 31L && target.getVolume() == 77
+        && Arrays.equals(target.getData(), new byte[] { 4, 5 })
+        && target.getFormat() == FORMAT && !target.isTerminator(), "mutable copy");
+    buffer.consume(frame(32L, 10, 6));
+    check(!buffer.provide((MutableAudioFrame) null) && buffer.provide() == null,
+        "null mutable target still consumes");
+    check(!buffer.provide(target) && !buffer.provide(target, 0L, null)
+        && buffer.provide(0L, null) == null && buffer.provide(-1L, null) == null,
+        "empty and non-positive timed provide");
+    expect(NullPointerException.class, () -> buffer.provide(1L, null));
+
+    AtomicReference<AudioFrame> delivered = new AtomicReference<>();
+    AtomicReference<Throwable> failure = new AtomicReference<>();
+    Thread timed = daemon(() -> {
+      try {
+        delivered.set(buffer.provide(2L, TimeUnit.SECONDS));
+      } catch (Throwable error) {
+        failure.set(error);
+      }
+    });
+    timed.start();
+    awaitState(timed, Thread.State.TIMED_WAITING, "timed provide wait");
+    AudioFrame later = frame(41L, 9, 9);
+    buffer.consume(later);
+    join(timed, "timed delivery");
+    check(failure.get() == null && delivered.get() == later, "timed delivery identity");
+
+    Thread interrupted = daemon(() -> {
+      try {
+        buffer.provide(2L, TimeUnit.SECONDS);
+      } catch (Throwable error) {
+        failure.set(error);
+      }
+    });
+    failure.set(null);
+    interrupted.start();
+    awaitState(interrupted, Thread.State.TIMED_WAITING, "timed interrupt wait");
+    interrupted.interrupt();
+    join(interrupted, "timed interrupt");
+    check(failure.get() instanceof InterruptedException, "timed interrupt propagation");
+  }
+
+  private static void terminationWaitAndBackpressure() throws Exception {
+    ProbeBuffer full = new ProbeBuffer(0, FORMAT, null);
+    AudioFrame ordinary = frame(51L, 10, 1);
+    full.consume(ordinary);
+    full.setTerminateOnEmpty();
+    check(full.provide() == ordinary && !full.terminatedValue(),
+        "full queue defers terminator");
+    check(full.provide() == TerminatorAudioFrame.INSTANCE && full.terminatedValue()
+        && !full.terminateOnEmptyValue(), "pending terminator after drain");
+
+    ProbeBuffer waiting = new ProbeBuffer(20, FORMAT, null);
+    AtomicBoolean waitReturned = new AtomicBoolean();
+    Thread waiter = daemon(() -> {
+      try {
+        waiting.waitForTermination();
+        waitReturned.set(true);
+      } catch (InterruptedException error) {
+        throw new AssertionError(error);
+      }
+    });
+    waiter.start();
+    awaitState(waiter, Thread.State.WAITING, "termination waiter");
+    waiting.setTerminateOnEmpty();
+    check(waiting.provide() == TerminatorAudioFrame.INSTANCE, "queued terminator");
+    join(waiter, "termination notification");
+    check(waitReturned.get() && waiting.terminatedValue(), "termination waiter released");
+
+    ProbeBuffer multiple = new ProbeBuffer(40, FORMAT, null);
+    multiple.setTerminateOnEmpty();
+    multiple.setTerminateOnEmpty();
+    check(multiple.provide() == TerminatorAudioFrame.INSTANCE
+        && multiple.provide() == TerminatorAudioFrame.INSTANCE
+        && multiple.provide() == null, "multiple queued terminators");
+
+    ProbeBuffer blocked = new ProbeBuffer(0, FORMAT, null);
+    AudioFrame first = frame(61L, 10, 1);
+    AudioFrame second = frame(62L, 10, 2);
+    blocked.consume(first);
+    AtomicReference<Throwable> consumeFailure = new AtomicReference<>();
+    Thread producer = daemon(() -> {
+      try {
+        blocked.consume(second);
+      } catch (Throwable error) {
+        consumeFailure.set(error);
+      }
+    });
+    producer.start();
+    awaitState(producer, Thread.State.WAITING, "blocked producer");
+    check(blocked.provide() == first, "backpressure release frame");
+    join(producer, "released producer");
+    check(consumeFailure.get() == null && blocked.provide() == second,
+        "backpressure completion");
+
+    blocked.consume(first);
+    Thread interruptedProducer = daemon(() -> {
+      try {
+        blocked.consume(second);
+      } catch (Throwable error) {
+        consumeFailure.set(error);
+      }
+    });
+    consumeFailure.set(null);
+    interruptedProducer.start();
+    awaitState(interruptedProducer, Thread.State.WAITING, "interruptible producer");
+    interruptedProducer.interrupt();
+    join(interruptedProducer, "interrupted producer");
+    check(consumeFailure.get() instanceof InterruptedException && blocked.provide() == first
+        && blocked.provide() == null, "blocked consume interruption");
+  }
+
+  private static void rebuildClearAndLastTimecode() throws Exception {
+    ProbeBuffer buffer = new ProbeBuffer(80, FORMAT, null);
+    buffer.consume(frame(1L, 10, 1));
+    buffer.consume(frame(2L, 10, 2));
+    buffer.consume(frame(3L, 10, 3));
+    check(buffer.getLastInputTimecode().equals(3L), "last queued timecode");
+    buffer.rebuild(frame -> frameBytes(frame.getTimecode() + 100L, frame.getVolume(),
+        frame.getData()));
+    check(buffer.provide().getTimecode() == 101L && buffer.provide().getTimecode() == 102L
+        && buffer.provide().getTimecode() == 103L, "rebuild order");
+
+    buffer.consume(frame(10L, 10, 1));
+    buffer.consume(frame(20L, 10, 2));
+    RuntimeException sentinel = new RuntimeException("rebuild-sentinel");
+    AtomicBoolean first = new AtomicBoolean(true);
+    expectIdentity(sentinel, () -> buffer.rebuild(frame -> {
+      if (first.getAndSet(false)) return frame(frame.getTimecode() + 1L, 10, 8);
+      throw sentinel;
+    }));
+    check(buffer.getRemainingCapacity() == buffer.getFullCapacity() - 1
+        && buffer.provide().getTimecode() == 11L && buffer.provide() == null,
+        "rebuild partial failure retains prefix only");
+
+    buffer.consume(frame(30L, 10, 3));
+    expect(NullPointerException.class, () -> buffer.rebuild(null));
+    check(buffer.provide() == null, "null rebuilder drains first");
+    buffer.consume(frame(40L, 10, 4));
+    buffer.clear();
+    check(buffer.getRemainingCapacity() == buffer.getFullCapacity()
+        && buffer.getLastInputTimecode() == null, "clear empties queue");
+
+    buffer.consume(frame(50L, 10, 5));
+    buffer.setClearOnInsert();
+    check(buffer.getLastInputTimecode() == null, "clear-on-insert masks last timecode");
+    buffer.consume(frame(60L, 10, 6));
+    check(!buffer.hasClearOnInsert() && buffer.getLastInputTimecode().equals(60L),
+        "clear-on-insert consumed by next frame");
+
+    AtomicReference<Long> observed = new AtomicReference<>();
+    Thread reader;
+    synchronized (buffer.monitor()) {
+      reader = daemon(() -> observed.set(buffer.getLastInputTimecode()));
+      reader.start();
+      awaitState(reader, Thread.State.BLOCKED, "last timecode monitor block");
+    }
+    join(reader, "last timecode monitor release");
+    check(observed.get().equals(60L), "last timecode synchronized read");
+  }
+
+  private static void reflection() throws Exception {
+    Class<AllocatingAudioFrameBuffer> type = AllocatingAudioFrameBuffer.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == AbstractAudioFrameBuffer.class
+        && type.getInterfaces().length == 0, "class metadata");
+    check(type.getDeclaredFields().length == 4 && type.getFields().length == 0,
+        "private field count");
+    checkField(type, "log", Class.forName("org.slf4j.Logger"),
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "fullCapacity", int.class, Modifier.PRIVATE | Modifier.FINAL);
+    Field queue = checkField(type, "audioFrames", java.util.concurrent.ArrayBlockingQueue.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    check(queue.getGenericType() instanceof ParameterizedType
+        && ((ParameterizedType) queue.getGenericType()).getActualTypeArguments()[0]
+            == AudioFrame.class, "queue generic metadata");
+    checkField(type, "stopping", AtomicBoolean.class, Modifier.PRIVATE | Modifier.FINAL);
+    Field log = type.getDeclaredField("log");
+    log.setAccessible(true);
+    check(log.get(null) != null, "logger initialization");
+
+    Constructor<?>[] constructors = type.getDeclaredConstructors();
+    check(constructors.length == 1 && constructors[0].getModifiers() == Modifier.PUBLIC
+        && Arrays.equals(constructors[0].getParameterTypes(), new Class<?>[] {
+            int.class, AudioDataFormat.class, AtomicBoolean.class }), "constructor metadata");
+    check(type.getDeclaredMethods().length == 14, "declared method count");
+    check(type.getDeclaredMethod("passToMutable", AudioFrame.class, MutableAudioFrame.class)
+        .getModifiers() == Modifier.PRIVATE, "private mutable helper");
+    check(type.getDeclaredMethod("fetchPendingTerminator").getModifiers() == Modifier.PRIVATE,
+        "private terminator helper");
+    check(type.getDeclaredMethod("filterFrame", AudioFrame.class).getModifiers()
+        == Modifier.PRIVATE, "private filter helper");
+    Method signal = type.getDeclaredMethod("signalWaiters");
+    check(signal.getModifiers() == Modifier.PROTECTED && signal.getReturnType() == void.class,
+        "signal metadata");
+    Method timed = type.getDeclaredMethod("provide", long.class, TimeUnit.class);
+    Method timedMutable = type.getDeclaredMethod(
+        "provide", MutableAudioFrame.class, long.class, TimeUnit.class);
+    check(Arrays.equals(timed.getExceptionTypes(), new Class<?>[] {
+        TimeoutException.class, InterruptedException.class })
+        && Arrays.equals(timedMutable.getExceptionTypes(), new Class<?>[] {
+            TimeoutException.class, InterruptedException.class }), "timed exceptions");
+    check(Arrays.equals(type.getDeclaredMethod("consume", AudioFrame.class).getExceptionTypes(),
+        new Class<?>[] { InterruptedException.class }), "consume exception");
+  }
+
+  private static Field checkField(Class<?> type, String name, Class<?> fieldType, int modifiers)
+      throws Exception {
+    Field field = type.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getModifiers() == modifiers,
+        name + " field metadata");
+    return field;
+  }
+
+  private static Object field(Object target, String name) throws Exception {
+    Field field = AllocatingAudioFrameBuffer.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
+  }
+
+  private static AudioFrame frame(long timecode, int volume, int... bytes) {
+    byte[] data = new byte[bytes.length];
+    for (int index = 0; index < bytes.length; index++) data[index] = (byte) bytes[index];
+    return new ImmutableAudioFrame(timecode, data, volume, FORMAT);
+  }
+
+  private static AudioFrame frameBytes(long timecode, int volume, byte[] data) {
+    return new ImmutableAudioFrame(timecode, data, volume, FORMAT);
+  }
+
+  private static Thread daemon(Runnable operation) {
+    Thread thread = new Thread(operation);
+    thread.setDaemon(true);
+    return thread;
+  }
+
+  private static void awaitState(Thread thread, Thread.State state, String message)
+      throws Exception {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2L);
+    while (thread.getState() != state && System.nanoTime() < deadline) Thread.sleep(1L);
+    check(thread.getState() == state, message + ": " + thread.getState());
+  }
+
+  private static void join(Thread thread, String message) throws Exception {
+    thread.join(2_000L);
+    check(!thread.isAlive(), message);
+  }
+
+  private static void expect(Class<? extends Throwable> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
+  }
+
+  private static void expectIdentity(RuntimeException expected, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("failure was swallowed");
+    } catch (RuntimeException error) {
+      check(error == expected, "failure identity");
+    } catch (Exception error) {
+      throw new AssertionError("wrong exception", error);
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static final class ProbeBuffer extends AllocatingAudioFrameBuffer {
+    ProbeBuffer(int duration, AudioDataFormat format, AtomicBoolean stopping) {
+      super(duration, format, stopping);
+    }
+    AudioDataFormat formatValue() { return format; }
+    Object monitor() { return synchronizer; }
+    boolean terminatedValue() { return terminated; }
+    boolean terminateOnEmptyValue() { return terminateOnEmpty; }
+  }
+
+  private static final class TestFormat extends AudioDataFormat {
+    private final byte[] silence = new byte[] { 9, 8, 7 };
+    TestFormat() { super(2, 48_000, 960); }
+    public String codecName() { return "test"; }
+    public byte[] silenceBytes() { return silence; }
+    public int expectedChunkSize() { return 3; }
+    public int maximumChunkSize() { return 16; }
     public AudioChunkDecoder createDecoder() { return null; }
     public AudioChunkEncoder createEncoder(AudioConfiguration configuration) { return null; }
   }
