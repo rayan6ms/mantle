@@ -110,6 +110,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-local-audio-source-manager-consumer" => Some(LOCAL_AUDIO_SOURCE_MANAGER_CONSUMER),
         "write-local-audio-track-consumer" => Some(LOCAL_AUDIO_TRACK_CONSUMER),
         "write-local-seekable-input-stream-consumer" => Some(LOCAL_SEEKABLE_INPUT_STREAM_CONSUMER),
+        "write-heartbeating-http-stream-consumer" => Some(HEARTBEATING_HTTP_STREAM_CONSUMER),
         "write-terminator-audio-frame-consumer" => Some(TERMINATOR_AUDIO_FRAME_CONSUMER),
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
@@ -8032,6 +8033,194 @@ public final class GateLocalAudioSourceManager {
     } catch (Throwable error) {
       check(error == expected, "failure identity");
     }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const HEARTBEATING_HTTP_STREAM_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.nico.HeartbeatingHttpStream;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.tools.io.PersistentHttpStream;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.net.URI;
+import java.util.Arrays;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+
+public final class GateHeartbeatingHttpStream {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "expected disposition argument");
+    boolean reference = args[0].equals("reference");
+    check(reference || args[0].equals("candidate"), "unknown disposition");
+    reflectionContract();
+    ExposedStream stream = constructionAndClose(reference);
+    legacyDisposition(stream, reference);
+    System.out.println(
+        "common=public-concrete,6-fields,1-constructor,3-exported-methods,"
+        + "capture,setup-dispatch,cancel,close;legacy="
+        + (reference ? "reference-scheduler,network-attempt"
+            : "retained-shell,no-scheduler,unsupported"));
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<HeartbeatingHttpStream> type = HeartbeatingHttpStream.class;
+    check(type.getModifiers() == Modifier.PUBLIC
+        && type.getSuperclass() == PersistentHttpStream.class
+        && type.getInterfaces().length == 0, "class metadata");
+    check(type.getDeclaredFields().length == 6, "field count");
+    checkFieldName(type.getDeclaredField("log"), "org.slf4j.Logger",
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL, null);
+    checkField(type.getDeclaredField("executor"), ScheduledExecutorService.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL, null);
+    checkField(type.getDeclaredField("heartbeatUrl"), String.class, Modifier.PRIVATE, null);
+    checkField(type.getDeclaredField("heartbeatInterval"), int.class, Modifier.PRIVATE, null);
+    checkField(type.getDeclaredField("heartbeatPayload"), String.class, Modifier.PRIVATE, null);
+    checkField(type.getDeclaredField("heartbeatFuture"), ScheduledFuture.class, Modifier.PRIVATE,
+        "java.util.concurrent.ScheduledFuture<?>");
+
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        HttpInterface.class, URI.class, Long.class, String.class, int.class, String.class);
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isVarArgs(),
+        "constructor metadata");
+    checkMethod(type.getDeclaredMethod("setupHeartbeat"), Modifier.PROTECTED, false);
+    checkMethod(type.getDeclaredMethod("sendHeartbeat"), Modifier.PROTECTED, true);
+    checkMethod(type.getDeclaredMethod("close"), Modifier.PUBLIC, true);
+    long exported = Arrays.stream(type.getDeclaredMethods())
+        .filter(method -> Modifier.isPublic(method.getModifiers())
+            || Modifier.isProtected(method.getModifiers()))
+        .count();
+    check(exported == 3L, "exported method count");
+  }
+
+  private static ExposedStream constructionAndClose(boolean reference) throws Exception {
+    URI content = URI.create("https://content.invalid/audio");
+    String heartbeat = "https://heartbeat.invalid/session";
+    String payload = "{\"session\":\"redacted\"}";
+    ExposedStream stream = new ExposedStream(null, content, 123L, heartbeat, 0, payload);
+    check(stream.setups == 1 && stream.sameInterface(null) && stream.sameContentUrl(content)
+        && stream.getContentLength() == 123L && stream.getPosition() == 0L,
+        "constructor and setup dispatch");
+    check(field("heartbeatUrl").get(stream) == heartbeat
+        && field("heartbeatInterval").getInt(stream) == 0
+        && field("heartbeatPayload").get(stream) == payload
+        && field("heartbeatFuture").get(stream) == null, "legacy state capture");
+
+    Field log = field("log");
+    Field executor = field("executor");
+    check(log.get(null) != null, "logger initialized");
+    check((executor.get(null) != null) == reference, "scheduler disposition");
+
+    int[] cancellations = new int[1];
+    boolean[] interrupt = new boolean[1];
+    ScheduledFuture<?> future = (ScheduledFuture<?>) Proxy.newProxyInstance(
+        ScheduledFuture.class.getClassLoader(), new Class<?>[] { ScheduledFuture.class },
+        (instance, method, arguments) -> {
+          if (method.getName().equals("cancel")) {
+            cancellations[0]++;
+            interrupt[0] = (Boolean) arguments[0];
+            return true;
+          }
+          return defaultValue(method.getReturnType());
+        });
+    field("heartbeatFuture").set(stream, future);
+    stream.close();
+    check(cancellations[0] == 1 && !interrupt[0], "future cancellation");
+    return stream;
+  }
+
+  private static void legacyDisposition(ExposedStream stream, boolean reference) throws Exception {
+    if (reference) {
+      expect(IllegalArgumentException.class, stream::defaultSetup);
+      expect(NullPointerException.class, stream::heartbeat);
+    } else {
+      stream.defaultSetup();
+      IOException error = expect(IOException.class, stream::heartbeat);
+      check(error.getMessage().equals(
+          "Legacy NicoNico DMC heartbeat protocol is unsupported."), "unsupported message");
+      check(field("heartbeatFuture").get(stream) != null, "no scheduler replacement");
+    }
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = HeartbeatingHttpStream.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static void checkField(
+      Field field, Class<?> type, int modifiers, String genericType) {
+    check(field.getModifiers() == modifiers && field.getType() == type && !field.isSynthetic()
+        && (genericType == null || field.getGenericType().getTypeName().equals(genericType)),
+        field + " metadata");
+  }
+
+  private static void checkFieldName(
+      Field field, String type, int modifiers, String genericType) {
+    check(field.getModifiers() == modifiers && field.getType().getName().equals(type)
+        && !field.isSynthetic()
+        && (genericType == null || field.getGenericType().getTypeName().equals(genericType)),
+        field + " metadata");
+  }
+
+  private static void checkMethod(Method method, int modifiers, boolean throwsIo) {
+    check(method.getModifiers() == modifiers && method.getReturnType() == void.class
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs()
+        && Arrays.equals(method.getExceptionTypes(), throwsIo
+            ? new Class<?>[] { IOException.class } : new Class<?>[0]), method + " metadata");
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
+  }
+
+  private static <T extends Throwable> T expect(
+      Class<T> type, Operation operation) throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private static final class ExposedStream extends HeartbeatingHttpStream {
+    int setups;
+
+    ExposedStream(HttpInterface httpInterface, URI contentUrl, Long contentLength,
+                  String heartbeatUrl, int heartbeatInterval, String heartbeatPayload) {
+      super(httpInterface, contentUrl, contentLength, heartbeatUrl, heartbeatInterval,
+          heartbeatPayload);
+    }
+
+    @Override
+    protected void setupHeartbeat() { setups++; }
+    void defaultSetup() { super.setupHeartbeat(); }
+    void heartbeat() throws IOException { super.sendHeartbeat(); }
+    boolean sameInterface(HttpInterface value) { return httpInterface == value; }
+    boolean sameContentUrl(URI value) { return contentUrl == value; }
   }
 
   private interface Operation { void run() throws Exception; }

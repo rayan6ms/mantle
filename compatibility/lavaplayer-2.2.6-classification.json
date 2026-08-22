@@ -13876,45 +13876,65 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The exact class and extension shell is retained, but obsolete NicoNico DMC scheduling and network traffic are deliberately disabled under ADR-0021; the Phase 13 heartbeating-http-stream-contracts oracle covers safe construction, captured state, subclass dispatch, deterministic unsupported sends, cancellation, close, and metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "scripts/check-remote-source-status.sh"
+      ],
+      "classification": "D_LEGACY"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.nico.HeartbeatingHttpStream",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/net/URI;Ljava/lang/Long;Ljava/lang/String;ILjava/lang/String;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The exact class and extension shell is retained, but obsolete NicoNico DMC scheduling and network traffic are deliberately disabled under ADR-0021; the Phase 13 heartbeating-http-stream-contracts oracle covers safe construction, captured state, subclass dispatch, deterministic unsupported sends, cancellation, close, and metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "scripts/check-remote-source-status.sh"
+      ],
+      "classification": "D_LEGACY"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.nico.HeartbeatingHttpStream",
       "symbol_kind": "METHOD",
       "member_name": "setupHeartbeat",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The exact class and extension shell is retained, but obsolete NicoNico DMC scheduling and network traffic are deliberately disabled under ADR-0021; the Phase 13 heartbeating-http-stream-contracts oracle covers safe construction, captured state, subclass dispatch, deterministic unsupported sends, cancellation, close, and metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "scripts/check-remote-source-status.sh"
+      ],
+      "classification": "D_LEGACY"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.nico.HeartbeatingHttpStream",
       "symbol_kind": "METHOD",
       "member_name": "sendHeartbeat",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The exact class and extension shell is retained, but obsolete NicoNico DMC scheduling and network traffic are deliberately disabled under ADR-0021; the Phase 13 heartbeating-http-stream-contracts oracle covers safe construction, captured state, subclass dispatch, deterministic unsupported sends, cancellation, close, and metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "scripts/check-remote-source-status.sh"
+      ],
+      "classification": "D_LEGACY"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.nico.HeartbeatingHttpStream",
       "symbol_kind": "METHOD",
       "member_name": "close",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The exact class and extension shell is retained, but obsolete NicoNico DMC scheduling and network traffic are deliberately disabled under ADR-0021; the Phase 13 heartbeating-http-stream-contracts oracle covers safe construction, captured state, subclass dispatch, deterministic unsupported sends, cancellation, close, and metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "scripts/check-remote-source-status.sh"
+      ],
+      "classification": "D_LEGACY"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.nico.NicoAudioSourceManager",

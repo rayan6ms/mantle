@@ -605,9 +605,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[0].completed_slices[].symbols] | add) == .cohorts[0].classified_symbols and
   (.cohorts[0].classified_symbols + .cohorts[0].remaining_symbols) == .cohorts[0].symbols and
   .cohorts[1].status == "IN_PROGRESS" and
-  .cohorts[1].classified_symbols == 51 and
-  .cohorts[1].remaining_symbols == 647 and
-  (.cohorts[1].completed_slices | length) == 6 and
+  .cohorts[1].classified_symbols == 56 and
+  .cohorts[1].remaining_symbols == 642 and
+  (.cohorts[1].completed_slices | length) == 7 and
   .cohorts[1].completed_slices[0] == {
     id: "audio-source-manager-interface-contracts",
     classes: 1,
@@ -685,9 +685,28 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "tools/jvm-gate/src/main.rs"
     ]
   } and
+  .cohorts[1].completed_slices[6] == {
+    id: "heartbeating-http-stream-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 4,
+    symbols: 5,
+    classification: "D_LEGACY",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "scripts/check-remote-source-status.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs",
+      "docs/architecture/ADR-0021-bounded-current-niconico-source.md"
+    ]
+  } and
   ([.cohorts[1].completed_slices[].symbols] | add) == .cohorts[1].classified_symbols and
   (.cohorts[1].classified_symbols + .cohorts[1].remaining_symbols) == .cohorts[1].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 586 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 591 and
+  ([$classifications.symbols[] |
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 586 and
+  ([$classifications.symbols[] |
+    select(.assessment == "CLASSIFIED" and .classification == "D_LEGACY")] | length) == 5 and
   all($classifications.symbols[] | select(.assessment == "CLASSIFIED");
     . as $symbol |
     (($symbol.binary_name | contains(".player.event.")) or
@@ -749,12 +768,18 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.source.ProbingAudioSourceManager",
         "com.sedmelluq.discord.lavaplayer.source.local.LocalAudioSourceManager",
         "com.sedmelluq.discord.lavaplayer.source.local.LocalAudioTrack",
-        "com.sedmelluq.discord.lavaplayer.source.local.LocalSeekableInputStream"
+        "com.sedmelluq.discord.lavaplayer.source.local.LocalSeekableInputStream",
+        "com.sedmelluq.discord.lavaplayer.source.nico.HeartbeatingHttpStream"
       ][]; . == $symbol.binary_name)) and
-    .classification == "A_EXACT" and
+    (if $symbol.binary_name ==
+        "com.sedmelluq.discord.lavaplayer.source.nico.HeartbeatingHttpStream"
+      then .classification == "D_LEGACY" and
+        (.tests | index("scripts/check-remote-source-status.sh")) != null
+      else .classification == "A_EXACT"
+      end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "heartbeating-http-stream-contracts" and
+  .phase_entry.next_slice == "nico-audio-source-manager-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 ' "$PLAN" >/dev/null
@@ -762,7 +787,8 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '72 reference classes / 615 symbols' \
+  '73 reference classes / 620 symbols' \
+  'D_LEGACY' \
   'core-player-track' \
   'Phase 12'; do
   grep --fixed-strings "$required" "$DOCUMENT" >/dev/null
@@ -770,4 +796,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 586 classified symbols and 2,176 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 591 classified symbols and 2,171 unassessed symbols.\n'

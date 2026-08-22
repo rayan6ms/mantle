@@ -114,6 +114,8 @@ const LOCAL_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/local/LocalAudioTrack";
 const LOCAL_SEEKABLE_INPUT_STREAM_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/local/LocalSeekableInputStream";
+const HEARTBEATING_HTTP_STREAM_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/nico/HeartbeatingHttpStream";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -149,6 +151,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     LOCAL_AUDIO_SOURCE_MANAGER_CLASS,
     LOCAL_AUDIO_TRACK_CLASS,
     LOCAL_SEEKABLE_INPUT_STREAM_CLASS,
+    HEARTBEATING_HTTP_STREAM_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -505,6 +508,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | PROBING_AUDIO_SOURCE_MANAGER_CLASS
                 | LOCAL_AUDIO_TRACK_CLASS
                 | LOCAL_SEEKABLE_INPUT_STREAM_CLASS
+                | HEARTBEATING_HTTP_STREAM_CLASS
         ) || field
             .access_flags
             .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
@@ -516,6 +520,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
                 | NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
                 | LOCAL_SEEKABLE_INPUT_STREAM_CLASS
+                | HEARTBEATING_HTTP_STREAM_CLASS
         ) || method
             .access_flags
             .intersects(MethodAccessFlags::PUBLIC | MethodAccessFlags::PROTECTED)
@@ -582,6 +587,9 @@ fn replacement_body(
     }
     if class_name == LOCAL_SEEKABLE_INPUT_STREAM_CLASS {
         return local_seekable_input_stream_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == HEARTBEATING_HTTP_STREAM_CLASS {
+        return heartbeating_http_stream_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == AUDIO_REFERENCE_CLASS {
         return audio_reference_replacement(pool, name, descriptor, required_locals);
@@ -2405,6 +2413,206 @@ fn local_seekable_input_stream_seek_hard(pool: &mut ConstantPool<'static>) -> Re
 
 fn local_seekable_input_stream_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
     let owner = pool.add_class(LOCAL_SEEKABLE_INPUT_STREAM_CLASS)?;
+    let factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn heartbeating_http_stream_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/net/URI;Ljava/lang/Long;Ljava/lang/String;ILjava/lang/String;)V",
+        ) => heartbeating_http_stream_constructor(pool),
+        ("setupHeartbeat", "()V") => void_return(pool, required_locals),
+        ("sendHeartbeat", "()V") => heartbeating_http_stream_unsupported_send(pool),
+        ("close", "()V") => heartbeating_http_stream_close(pool),
+        ("lambda$setupHeartbeat$0", "()V") => heartbeating_http_stream_legacy_task(pool),
+        ("<clinit>", "()V") => heartbeating_http_stream_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {HEARTBEATING_HTTP_STREAM_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn heartbeating_http_stream_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(HEARTBEATING_HTTP_STREAM_CLASS)?;
+    let parent =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/PersistentHttpStream")?;
+    let parent_init = pool.add_method_ref(
+        parent,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/net/URI;Ljava/lang/Long;)V",
+    )?;
+    let heartbeat_url = pool.add_field_ref(owner, "heartbeatUrl", "Ljava/lang/String;")?;
+    let heartbeat_interval = pool.add_field_ref(owner, "heartbeatInterval", "I")?;
+    let heartbeat_payload = pool.add_field_ref(owner, "heartbeatPayload", "Ljava/lang/String;")?;
+    let setup = pool.add_method_ref(owner, "setupHeartbeat", "()V")?;
+    code(
+        pool,
+        4,
+        7,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Aload_3,
+            Instruction::Invokespecial(parent_init),
+            Instruction::Aload_0,
+            Instruction::Aload(4),
+            Instruction::Putfield(heartbeat_url),
+            Instruction::Aload_0,
+            Instruction::Iload(5),
+            Instruction::Putfield(heartbeat_interval),
+            Instruction::Aload_0,
+            Instruction::Aload(6),
+            Instruction::Putfield(heartbeat_payload),
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(setup),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn heartbeating_http_stream_unsupported_send(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let exception = pool.add_class("java/io/IOException")?;
+    let init = pool.add_method_ref(exception, "<init>", "(Ljava/lang/String;)V")?;
+    let message = pool.add_string("Legacy NicoNico DMC heartbeat protocol is unsupported.")?;
+    code(
+        pool,
+        3,
+        1,
+        vec![
+            Instruction::New(exception),
+            Instruction::Dup,
+            Instruction::Ldc_w(message),
+            Instruction::Invokespecial(init),
+            Instruction::Athrow,
+        ],
+    )
+}
+
+fn heartbeating_http_stream_close(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(HEARTBEATING_HTTP_STREAM_CLASS)?;
+    let future = pool.add_class("java/util/concurrent/ScheduledFuture")?;
+    let heartbeat_future = pool.add_field_ref(
+        owner,
+        "heartbeatFuture",
+        "Ljava/util/concurrent/ScheduledFuture;",
+    )?;
+    let cancel = pool.add_interface_method_ref(future, "cancel", "(Z)Z")?;
+    let parent =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/PersistentHttpStream")?;
+    let parent_close = pool.add_method_ref(parent, "close", "()V")?;
+    let mut body = code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(heartbeat_future),
+            Instruction::Ifnull(8),
+            Instruction::Aload_0,
+            Instruction::Getfield(heartbeat_future),
+            Instruction::Iconst_0,
+            Instruction::Invokeinterface(cancel, 2),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Invokespecial(parent_close),
+            Instruction::Return,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::SameFrame { frame_type: 8 }],
+    )?;
+    Ok(body)
+}
+
+fn heartbeating_http_stream_legacy_task(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(HEARTBEATING_HTTP_STREAM_CLASS)?;
+    let send = pool.add_method_ref(owner, "sendHeartbeat", "()V")?;
+    let close = pool.add_method_ref(owner, "close", "()V")?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let mut body = code_with_exceptions(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(send),
+            Instruction::Goto(8),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(close),
+            Instruction::Goto(8),
+            Instruction::Pop,
+            Instruction::Return,
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 0..2,
+                handler_pc: 3,
+                catch_type: throwable,
+            },
+            ExceptionTableEntry {
+                range_pc: 4..6,
+                handler_pc: 7,
+                catch_type: throwable,
+            },
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::SameLocals1StackItemFrame {
+                frame_type: 67,
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+            StackFrame::SameLocals1StackItemFrame {
+                frame_type: 67,
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+            StackFrame::SameFrame { frame_type: 0 },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn heartbeating_http_stream_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(HEARTBEATING_HTTP_STREAM_CLASS)?;
     let factory = pool.add_class("org/slf4j/LoggerFactory")?;
     let get_logger = pool.add_method_ref(
         factory,
