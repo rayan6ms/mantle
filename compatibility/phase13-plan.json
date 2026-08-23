@@ -602,8 +602,8 @@
       "objective": "Expand source SPI, built-in manager shells, class lookup, and serialization-visible types.",
       "exit_evidence": "Source SPI extension tests, source lookup tests, per-symbol ledger entries, and Revapi diff.",
       "status": "IN_PROGRESS",
-      "classified_symbols": 447,
-      "remaining_symbols": 251,
+      "classified_symbols": 453,
+      "remaining_symbols": 245,
       "completed_slices": [
         {
           "id": "audio-source-manager-interface-contracts",
@@ -1499,6 +1499,22 @@
             "crates/mantle-media/tests/phase12_youtube.rs",
             "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
           ]
+        },
+        {
+          "id": "youtube-audio-track-contracts",
+          "classes": 1,
+          "fields": 0,
+          "methods": 5,
+          "symbols": 6,
+          "classification": "MIXED_A_EXACT_C_SEMANTIC",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "crates/mantle-jvm/src/playback_bridge.rs",
+            "crates/mantle-media/tests/phase12_youtube.rs",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs",
+            "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
+          ]
         }
       ]
     },
@@ -1620,7 +1636,7 @@
   "phase_entry": {
     "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
     "first_execution_cohort": "core-player-track",
-    "next_slice": "youtube-audio-track-contracts",
+    "next_slice": "youtube-cipher-operation-contracts",
     "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
   }
 }

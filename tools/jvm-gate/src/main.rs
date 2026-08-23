@@ -242,6 +242,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-youtube-audio-source-manager-consumer" => {
             Some(YOUTUBE_AUDIO_SOURCE_MANAGER_CONSUMER)
         }
+        "write-youtube-audio-track-consumer" => Some(YOUTUBE_AUDIO_TRACK_CONSUMER),
         _ => None,
     }
 }
@@ -19484,6 +19485,185 @@ public final class GateYoutubeAudioSourceManager {
   }
 
   private interface Operation { void run() throws Exception; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_AUDIO_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioTrack;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.DelegatedAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+public final class GateYoutubeAudioTrack {
+  public static void main(String[] args) throws Exception {
+    check(args.length >= 1 && args.length <= 2,
+        "expected disposition and optional native path");
+    boolean reference = args[0].equals("reference");
+    check(reference || args[0].equals("candidate"), "unknown disposition");
+    check(reference == (args.length == 1), "candidate requires native path");
+    reflectionContract();
+    commonBehavior();
+    if (reference) legacyDisposition(); else currentDisposition(args[1]);
+    System.out.println(
+        "common=public-concrete,delegated-super,2-fields,1-constructor,10-methods,1-nested;"
+        + "construction,track-info,source-identity,seekable,fresh-shallow-clone,reflection;service="
+        + (reference ? "legacy-details-format-signature-http,webm-or-mpeg-delegate"
+            : "current-native-bounded-discovery,finite-or-live-playback,no-legacy-java-decoder"));
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<YoutubeAudioTrack> type = YoutubeAudioTrack.class;
+    check(type.getModifiers() == Modifier.PUBLIC
+        && type.getSuperclass() == DelegatedAudioTrack.class
+        && type.getInterfaces().length == 0 && !type.isSynthetic(), "class metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 10 && type.getDeclaredClasses().length == 1,
+        "private shape");
+    checkField(type, "log", Class.forName("org.slf4j.Logger"),
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "sourceManager", YoutubeAudioSourceManager.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        AudioTrackInfo.class, YoutubeAudioSourceManager.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "constructor metadata");
+    checkMethod(type, "process", void.class, Modifier.PUBLIC,
+        new Class<?>[] {LocalAudioTrackExecutor.class}, Exception.class);
+    checkMethod(type, "isSeekable", boolean.class, Modifier.PUBLIC, new Class<?>[0]);
+    checkMethod(type, "makeShallowClone", AudioTrack.class, Modifier.PROTECTED,
+        new Class<?>[0]);
+    checkMethod(type, "getSourceManager", AudioSourceManager.class, Modifier.PUBLIC,
+        new Class<?>[0]);
+    Set<String> privateNames = Arrays.stream(type.getDeclaredMethods())
+        .filter(method -> Modifier.isPrivate(method.getModifiers()))
+        .map(Method::getName).collect(Collectors.toSet());
+    check(privateNames.equals(Set.of("processStatic", "processStream", "loadBestFormatWithUrl",
+            "isBetterFormat", "findBestSupportedFormat", "lambda$findBestSupportedFormat$0")),
+        "private method names");
+    Method find = type.getDeclaredMethod("findBestSupportedFormat", List.class);
+    check(Modifier.isPrivate(find.getModifiers()) && Modifier.isStatic(find.getModifiers())
+        && find.toGenericString().contains("List<com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackFormat>"),
+        "format selection generic signature");
+
+    Class<?> nested = type.getDeclaredClasses()[0];
+    check(nested.getSimpleName().equals("FormatWithUrl")
+        && nested.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC)
+        && nested.getDeclaringClass() == type && nested.getNestHost() == type
+        && nested.getDeclaredFields().length == 2 && nested.getDeclaredConstructors().length == 1
+        && nested.getDeclaredMethods().length == 0, "nested format shell");
+  }
+
+  private static void commonBehavior() throws Exception {
+    YoutubeAudioSourceManager source = new YoutubeAudioSourceManager();
+    AudioTrackInfo info = new AudioTrackInfo("title", "author", 1234L, "dQw4w9WgXcQ", false,
+        "https://youtu.be/dQw4w9WgXcQ", "art", null);
+    ExposedTrack track = new ExposedTrack(info, source);
+    check(track.getInfo() == info && track.getSourceManager() == source
+        && field("sourceManager").get(track) == source, "captured identity");
+    check(field("log").get(null) != null && track.isSeekable(), "logger and seekability");
+    AudioTrack clone = track.shallowClone();
+    check(clone instanceof YoutubeAudioTrack && clone != track && clone.getInfo() == info
+        && clone.getSourceManager() == source && clone.getPosition() == 0L,
+        "shallow clone identity");
+    source.shutdown();
+  }
+
+  private static void legacyDisposition() throws Exception {
+    RecordingManager source = new RecordingManager();
+    YoutubeAudioTrack track = new YoutubeAudioTrack(new AudioTrackInfo(
+        "title", "author", 1234L, "dQw4w9WgXcQ", false,
+        "https://youtu.be/dQw4w9WgXcQ", null, null), source);
+    RuntimeException failure = expect(RuntimeException.class, () -> track.process(null));
+    check(failure == source.sentinel && source.interfaceCalls == 1,
+        "legacy HTTP-details entry boundary");
+    source.shutdown();
+  }
+
+  private static void currentDisposition(String nativeLibrary) throws Exception {
+    Class.forName("dev.mantle.internal.NativeLoader")
+        .getMethod("load", String.class).invoke(null, nativeLibrary);
+    Class<?> nativeType = Class.forName("dev.mantle.internal.MantleNative");
+    Method process = nativeType.getDeclaredMethod(
+        "processYoutubeTrack", YoutubeAudioTrack.class, LocalAudioTrackExecutor.class);
+    check(Modifier.isPublic(process.getModifiers()) && Modifier.isStatic(process.getModifiers())
+        && Modifier.isNative(process.getModifiers()), "current native route");
+    YoutubeAudioSourceManager source = new YoutubeAudioSourceManager();
+    YoutubeAudioTrack track = new YoutubeAudioTrack(new AudioTrackInfo(
+        "title", "author", 1234L, "dQw4w9WgXcQ", false,
+        "https://youtu.be/dQw4w9WgXcQ", null, null), source);
+    RuntimeException failure = expect(RuntimeException.class, () -> track.process(null));
+    check(failure.getMessage().contains("requires a local track executor"),
+        "native preflight precedes service traffic");
+    source.shutdown();
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = YoutubeAudioTrack.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> fieldType, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getGenericType() == fieldType
+        && field.getModifiers() == modifiers && !field.isSynthetic(), name + " metadata");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+                                  int modifiers, Class<?>[] parameters,
+                                  Class<?>... exceptions) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.getTypeParameters().length == 0 && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), method + " metadata");
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private static final class RecordingManager extends YoutubeAudioSourceManager {
+    final RuntimeException sentinel = new RuntimeException("legacy-youtube-http-sentinel");
+    int interfaceCalls;
+    @Override public HttpInterface getHttpInterface() {
+      interfaceCalls++;
+      throw sentinel;
+    }
+  }
+
+  private static final class ExposedTrack extends YoutubeAudioTrack {
+    ExposedTrack(AudioTrackInfo info, YoutubeAudioSourceManager source) { super(info, source); }
+    AudioTrack shallowClone() { return super.makeShallowClone(); }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }

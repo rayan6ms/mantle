@@ -16,7 +16,10 @@ use mantle_media::{
     TwitchLivePlaybackSession, TwitchSourceManager, TwitchSourceOptions, TwitchSourceTrack,
     VimeoAuthentication, VimeoPlaybackSession, VimeoSourceManager, VimeoSourceOptions,
     VimeoSourceTrack, YandexMusicAuthentication, YandexMusicPlaybackSession,
-    YandexMusicSourceManager, YandexMusicSourceOptions, route_twitch_identifier,
+    YandexMusicSourceManager, YandexMusicSourceOptions, YoutubeAudioSourceManager,
+    YoutubeAuthentication, YoutubeLivePlaybackOptions, YoutubeLivePlaybackPoll,
+    YoutubeLivePlaybackSession, YoutubePlaybackSession, YoutubeSourceOptions,
+    route_twitch_identifier,
 };
 
 const TRANSCODE_INPUT_CHUNK_FRAMES: usize = 1_024;
@@ -208,6 +211,168 @@ pub(crate) fn process_yandex_music_track(
         .ok_or_else(|| failure("current Yandex Music track has no compatible playback"))?;
 
     process_playback_session(env, executor, session, &cancellation)
+}
+
+pub(crate) fn process_youtube_track<'local>(
+    env: &mut Env<'local>,
+    track: &JObject<'local>,
+    executor: &JObject<'local>,
+) -> jni::errors::Result<()> {
+    if executor.is_null() {
+        return Err(failure("native playback requires a local track executor"));
+    }
+    let java_info = env
+        .get_field(
+            track,
+            jni_str!("trackInfo"),
+            jni_sig!("Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;"),
+        )?
+        .l()?;
+    let info = crate::track_info_from_java(env, &java_info)?;
+    let manager = YoutubeAudioSourceManager::new(
+        YoutubeSourceOptions::default(),
+        YoutubeAuthentication::default(),
+    )
+    .map_err(|_| failure("could not create current YouTube playback source"))?;
+    let cancellation = MediaCancellation::new();
+    let formats = manager
+        .discover_playback_formats(&info.identifier, &cancellation)
+        .map_err(|_| failure("current YouTube playback discovery failed"))?;
+    if info.is_stream || formats.selected().content_length().is_none() {
+        let session = manager
+            .open_selected_live_playback(
+                &formats,
+                YoutubeLivePlaybackOptions::default(),
+                cancellation.clone(),
+            )
+            .map_err(|_| failure("current YouTube live playback handoff failed"))?;
+        process_youtube_live_session(env, executor, session, &cancellation)
+    } else {
+        let session = manager
+            .open_selected_playback(
+                &formats,
+                HttpRangeOptions::default(),
+                MediaLimits::default(),
+                cancellation.clone(),
+            )
+            .map_err(|_| failure("current YouTube playback handoff failed"))?;
+        process_youtube_playback_session(env, executor, session, &cancellation)
+    }
+}
+
+fn process_youtube_playback_session<'local>(
+    env: &mut Env<'local>,
+    executor: &JObject<'local>,
+    mut session: YoutubePlaybackSession,
+    cancellation: &MediaCancellation,
+) -> jni::errors::Result<()> {
+    let (buffer, format) = native_output_target(env, executor)?;
+    let started = Instant::now();
+    let mut encoded = EncodedFrameSlot::new();
+    loop {
+        if current_thread_interrupted(env)? {
+            cancellation.cancel();
+            return Err(failure("current native playback was cancelled"));
+        }
+        if !session
+            .read_frame(&mut encoded)
+            .map_err(|_| failure("current YouTube media playback failed"))?
+        {
+            return Ok(());
+        }
+        consume_native_frame(env, &buffer, &format, &encoded, started.elapsed())?;
+    }
+}
+
+fn process_youtube_live_session<'local>(
+    env: &mut Env<'local>,
+    executor: &JObject<'local>,
+    mut session: YoutubeLivePlaybackSession,
+    cancellation: &MediaCancellation,
+) -> jni::errors::Result<()> {
+    let (buffer, format) = native_output_target(env, executor)?;
+    let started = Instant::now();
+    let mut encoded = EncodedFrameSlot::new();
+    loop {
+        if current_thread_interrupted(env)? {
+            cancellation.cancel();
+            return Err(failure("current native playback was cancelled"));
+        }
+        match session
+            .poll_frame(started.elapsed(), &mut encoded)
+            .map_err(|_| failure("current YouTube live playback failed"))?
+        {
+            YoutubeLivePlaybackPoll::Frame => {
+                consume_native_frame(env, &buffer, &format, &encoded, started.elapsed())?;
+            }
+            YoutubeLivePlaybackPoll::WaitUntil(deadline) => {
+                let remaining = deadline.saturating_sub(started.elapsed());
+                if !remaining.is_zero() {
+                    std::thread::park_timeout(remaining.min(Duration::from_millis(10)));
+                }
+            }
+            YoutubeLivePlaybackPoll::Ended | YoutubeLivePlaybackPoll::Exhausted => return Ok(()),
+        }
+    }
+}
+
+fn native_output_target<'local>(
+    env: &mut Env<'local>,
+    executor: &JObject<'local>,
+) -> jni::errors::Result<(JObject<'local>, JObject<'local>)> {
+    let buffer = env
+        .call_method(
+            executor,
+            jni_str!("getAudioBuffer"),
+            jni_sig!("()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBuffer;"),
+            &[],
+        )?
+        .l()?;
+    if buffer.is_null() {
+        return Err(failure("native playback requires an audio frame buffer"));
+    }
+    let context = env
+        .call_method(
+            executor,
+            jni_str!("getProcessingContext"),
+            jni_sig!("()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;"),
+            &[],
+        )?
+        .l()?;
+    let format = validate_output_format(env, &context)?;
+    Ok((buffer, format))
+}
+
+fn consume_native_frame(
+    env: &mut Env<'_>,
+    buffer: &JObject<'_>,
+    format: &JObject<'_>,
+    encoded: &EncodedFrameSlot,
+    fallback_timecode: Duration,
+) -> jni::errors::Result<()> {
+    env.with_local_frame(4, |env| {
+        let data = JObject::from(env.byte_array_from_slice(encoded.data())?);
+        let timecode = encoded.timestamp().unwrap_or(fallback_timecode).as_millis();
+        let timecode = i64::try_from(timecode)
+            .map_err(|_| failure("native frame timecode exceeds the JVM range"))?;
+        let frame = env.new_object(
+            jni_str!("com/sedmelluq/discord/lavaplayer/track/playback/ImmutableAudioFrame"),
+            jni_sig!("(J[BILcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V"),
+            &[
+                JValue::Long(timecode),
+                JValue::Object(&data),
+                JValue::Int(i32::from(encoded.volume().get())),
+                JValue::Object(format),
+            ],
+        )?;
+        let _ = env.call_method(
+            buffer,
+            jni_str!("consume"),
+            jni_sig!("(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;)V"),
+            &[JValue::Object(&frame)],
+        )?;
+        Ok::<(), jni::errors::Error>(())
+    })
 }
 
 fn process_playback_session<S: PcmPlaybackSession>(
