@@ -245,6 +245,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-youtube-audio-track-consumer" => Some(YOUTUBE_AUDIO_TRACK_CONSUMER),
         "write-youtube-cipher-operation-consumer" => Some(YOUTUBE_CIPHER_OPERATION_CONSUMER),
         "write-youtube-client-config-consumer" => Some(YOUTUBE_CLIENT_CONFIG_CONSUMER),
+        "write-youtube-constants-consumer" => Some(YOUTUBE_CONSTANTS_CONSUMER),
         _ => None,
     }
 }
@@ -20019,6 +20020,124 @@ public final class GateYoutubeClientConfig {
     } catch (Throwable error) {
       if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_CONSTANTS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeConstants;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+public final class GateYoutubeConstants {
+  public static void main(String[] args) throws Exception {
+    Class<YoutubeConstants> type = YoutubeConstants.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && !type.isInterface() && !type.isEnum()
+        && !type.isSynthetic(), "class metadata");
+    check(type.getDeclaredMethods().length == 0 && type.getDeclaredClasses().length == 0,
+        "method and nested shape");
+
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getParameterCount() == 0
+        && constructor.getExceptionTypes().length == 0
+        && constructor.getTypeParameters().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
+    Object first = constructor.newInstance();
+    Object second = constructor.newInstance();
+    check(first.getClass() == type && second.getClass() == type && first != second,
+        "construction");
+
+    Map<String, String> expected = new LinkedHashMap<>();
+    expected.put("YOUTUBE_ORIGIN", "https://www.youtube.com");
+    expected.put("YOUTUBE_API_ORIGIN", "https://youtubei.googleapis.com");
+    expected.put("BASE_URL", "https://youtubei.googleapis.com/youtubei/v1");
+    expected.put("INNERTUBE_ANDROID_API_KEY", "AIzaSyA8eiZmM1FaDVjRy-df2KTyQ_vz_yYM39w");
+    expected.put("CLIENT_ANDROID_NAME", "ANDROID");
+    expected.put("CLIENT_ANDROID_VERSION", "18.06.35");
+    expected.put("INNERTUBE_WEB_API_KEY", "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8");
+    expected.put("CLIENT_WEB_NAME", "WEB");
+    expected.put("CLIENT_WEB_VERSION", "2.20220801.00.00");
+    expected.put("INNERTUBE_TV_API_KEY", "AIzaSyD-L7DIyuMgBk-B4DYmjJZ5UG-D6Y-vkMc");
+    expected.put("CLIENT_TVHTML5_NAME", "TVHTML5_SIMPLY_EMBEDDED_PLAYER");
+    expected.put("CLIENT_TVHTML5_VERSION", "2.0");
+    expected.put("CLIENT_SCREEN_EMBED", "EMBED");
+    expected.put("CLIENT_THIRD_PARTY_EMBED", "https://google.com");
+    expected.put("PLAYER_PARAMS", "CgIQBg");
+    expected.put("SEARCH_PARAMS", "EgIQAUICCAE=");
+    expected.put("SEARCH_URL", "https://youtubei.googleapis.com/youtubei/v1/search?key="
+        + "AIzaSyA8eiZmM1FaDVjRy-df2KTyQ_vz_yYM39w");
+    expected.put("PLAYER_URL", "https://youtubei.googleapis.com/youtubei/v1/player");
+    expected.put("BROWSE_URL", "https://youtubei.googleapis.com/youtubei/v1/browse");
+    expected.put("NEXT_URL", "https://youtubei.googleapis.com/youtubei/v1/next");
+    expected.put("VISITOR_ID_URL", "https://youtubei.googleapis.com/youtubei/v1/visitor_id");
+    expected.put("BASE_MUSIC_URL", "https://music.youtube.com/youtubei/v1");
+    expected.put("INNERTUBE_MUSIC_API_KEY", "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30");
+    expected.put("CLIENT_MUSIC_NAME", "WEB_REMIX");
+    expected.put("CLIENT_MUSIC_VERSION", "1.20220727.01.00");
+    expected.put("SEARCH_MUSIC_PARAMS", "Eg-KAQwIARAAGAAgACgAMABqChADEAQQCRAFEAo=");
+    expected.put("MUSIC_SEARCH_URL", "https://music.youtube.com/youtubei/v1/search?key="
+        + "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30");
+    expected.put("TV_AUTH_BASE_URL", "https://www.youtube.com/o/oauth2");
+    expected.put("TV_AUTH_SCOPE",
+        "http://gdata.youtube.com https://www.googleapis.com/auth/youtube-paid-content");
+    expected.put("TV_AUTH_MODEL_NAME", "ytlr::");
+    expected.put("TV_AUTH_CODE_URL", "https://www.youtube.com/o/oauth2/device/code");
+    expected.put("TV_AUTH_CODE_PAYLOAD", "{\"client_id\":\"%s\",\"device_id\":\"%s\","
+        + "\"scope\":\"http://gdata.youtube.com https://www.googleapis.com/auth/"
+        + "youtube-paid-content\",\"model_name\":\"ytlr::\"}");
+    expected.put("TV_AUTH_TOKEN_URL", "https://www.youtube.com/o/oauth2/token");
+    expected.put("TV_AUTH_TOKEN_PAYLOAD", "{\"client_id\":\"%s\",\"client_secret\":\"%s\","
+        + "\"code\":\"%s\",\"grant_type\":\"http://oauth.net/grant_type/device/1.0\"}");
+    expected.put("TV_AUTH_TOKEN_REFRESH_PAYLOAD",
+        "{\"client_id\":\"%s\",\"client_secret\":\"%s\",\"refresh_token\":\"%s\","
+            + "\"grant_type\":\"refresh_token\"}");
+    expected.put("ANDROID_AUTH_URL", "https://android.googleapis.com/auth");
+    expected.put("MASTER_TOKEN_BASE_URL", "https://youtube.minerea.su");
+    expected.put("TOKEN_BASE_PAYLOAD", "{\"email\":\"%s\",\"password\":\"%s\"");
+    expected.put("REFRESH_PART_PAYLOAD", ",\"refresh_token\":\"%s\"");
+    expected.put("CLOSE_TOKEN_BASE_PAYLOAD", "}");
+    expected.put("CHECKIN_ACCOUNT_URL", "https://youtube.minerea.su/checkin");
+    expected.put("LOGIN_ACCOUNT_URL", "https://youtube.minerea.su/login");
+    expected.put("SAVE_ACCOUNT_URL", "https://youtube.minerea.su/tv");
+    expected.put("TOKEN_PAYLOAD", "{\"email\":\"%s\",\"password\":\"%s\"}");
+    expected.put("TOKEN_REFRESH_PAYLOAD",
+        "{\"email\":\"%s\",\"password\":\"%s\",\"refresh_token\":\"%s\"}");
+    expected.put("WATCH_URL_PREFIX", "https://www.youtube.com/watch?v=");
+
+    check(type.getDeclaredFields().length == expected.size(), "field count");
+    for (Map.Entry<String, String> entry : expected.entrySet()) {
+      Field field = type.getDeclaredField(entry.getKey());
+      check(field.getType() == String.class
+          && field.getModifiers() == (Modifier.STATIC | Modifier.FINAL)
+          && !field.isSynthetic(), entry.getKey() + " metadata");
+      field.setAccessible(true);
+      String actual = (String) field.get(null);
+      check(actual.equals(entry.getValue()) && actual == entry.getValue(),
+          entry.getKey() + " value and constant identity");
+    }
+    check(expected.get("SEARCH_URL").startsWith(expected.get("BASE_URL") + "/search?key=")
+        && expected.get("MUSIC_SEARCH_URL")
+            .startsWith(expected.get("BASE_MUSIC_URL") + "/search?key=")
+        && String.format(expected.get("TV_AUTH_CODE_PAYLOAD"), "client", "device")
+            .contains("\"device_id\":\"device\"")
+        && (expected.get("TOKEN_BASE_PAYLOAD")
+            + String.format(expected.get("REFRESH_PART_PAYLOAD"), "refresh")
+            + expected.get("CLOSE_TOKEN_BASE_PAYLOAD"))
+            .contains("\"refresh_token\":\"refresh\""), "constant composition");
+
+    System.out.println("public-object-shell,46-package-constants,1-public-constructor,0-methods;"
+        + "fresh-construction,object-identity,youtube-api,music-api,tv-auth,legacy-auth,"
+        + "payload-composition,constant-identity,reflection");
   }
 
   private static void check(boolean condition, String message) {

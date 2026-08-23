@@ -249,6 +249,8 @@ const YOUTUBE_CLIENT_CONFIG_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig";
 const YOUTUBE_ANDROID_VERSION_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig$AndroidVersion";
+const YOUTUBE_CONSTANTS_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeConstants";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -350,6 +352,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_CIPHER_OPERATION_TYPE_CLASS,
     YOUTUBE_CLIENT_CONFIG_CLASS,
     YOUTUBE_ANDROID_VERSION_CLASS,
+    YOUTUBE_CONSTANTS_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -750,6 +753,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | YOUTUBE_AUDIO_TRACK_CLASS
             | YOUTUBE_CLIENT_CONFIG_CLASS
             | YOUTUBE_ANDROID_VERSION_CLASS
+            | YOUTUBE_CONSTANTS_CLASS
     )
 }
 
@@ -1109,6 +1113,9 @@ fn replacement_body(
     }
     if class_name == YOUTUBE_ANDROID_VERSION_CLASS {
         return youtube_android_version_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == YOUTUBE_CONSTANTS_CLASS {
+        return youtube_constants_replacement(pool, name, descriptor);
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -21912,6 +21919,20 @@ fn youtube_android_version_replacement(
             ),
             required_locals,
         ),
+    }
+}
+
+fn youtube_constants_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        _ => Err(format!(
+            "Phase 13 does not implement {YOUTUBE_CONSTANTS_CLASS}.{name}{descriptor}"
+        )
+        .into()),
     }
 }
 
