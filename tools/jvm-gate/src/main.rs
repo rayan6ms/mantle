@@ -180,6 +180,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-twitch-stream-audio-source-manager-consumer" => {
             Some(TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CONSUMER)
         }
+        "write-twitch-stream-audio-track-consumer" => Some(TWITCH_STREAM_AUDIO_TRACK_CONSUMER),
         _ => None,
     }
 }
@@ -15108,6 +15109,248 @@ public final class GateTwitchStreamAudioSourceManager {
       Throwable cause = error.getCause();
       if (!type.isInstance(cause)) throw new AssertionError("wrong exception", cause);
       return type.cast(cause);
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const TWITCH_STREAM_AUDIO_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.stream.M3uStreamSegmentUrlProvider;
+import com.sedmelluq.discord.lavaplayer.source.stream.MpegTsM3uStreamAudioTrack;
+import com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioTrack;
+import com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamSegmentUrlProvider;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.http.client.protocol.HttpClientContext;
+
+public final class GateTwitchStreamAudioTrack {
+  private static final Object UNSAFE = loadUnsafe();
+
+  public static void main(String[] args) throws Exception {
+    check(args.length >= 1 && args.length <= 2, "expected disposition and optional native path");
+    boolean reference = args[0].equals("reference");
+    check(reference || args[0].equals("candidate"), "unknown disposition");
+    check(reference == (args.length == 1), "candidate requires native path");
+    reflectionContract();
+    commonBehavior();
+    if (!reference) currentDisposition(args[1]);
+    System.out.println(
+        "common=public-concrete,mpeg-super,3-fields,1-constructor,6-exported-methods;"
+        + "construction,channel,provider,http,source-identity,shallow-clone,reflection;service="
+        + (reference ? "legacy-provider-mpeg" :
+            "current-native-bounded-hls,no-legacy-provider-playback"));
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<TwitchStreamAudioTrack> type = TwitchStreamAudioTrack.class;
+    check(type.getModifiers() == Modifier.PUBLIC
+        && type.getSuperclass() == MpegTsM3uStreamAudioTrack.class
+        && type.getInterfaces().length == 0, "class metadata");
+    check(type.getDeclaredFields().length == 3, "field count");
+    checkField(type, "log", Class.forName("org.slf4j.Logger"),
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "sourceManager", TwitchStreamAudioSourceManager.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "segmentUrlProvider", M3uStreamSegmentUrlProvider.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        AudioTrackInfo.class, TwitchStreamAudioSourceManager.class);
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "constructor metadata");
+    check(type.getDeclaredMethods().length == 6, "method count");
+    long exported = Arrays.stream(type.getDeclaredMethods())
+        .filter(method -> Modifier.isPublic(method.getModifiers())
+            || Modifier.isProtected(method.getModifiers()))
+        .count();
+    check(exported == 6L, "exported method count");
+    checkMethod(type, "getChannelName", String.class, Modifier.PUBLIC, new Class<?>[0]);
+    checkMethod(type, "getSegmentUrlProvider", M3uStreamSegmentUrlProvider.class,
+        Modifier.PROTECTED, new Class<?>[0]);
+    checkMethod(type, "getHttpInterface", HttpInterface.class,
+        Modifier.PROTECTED, new Class<?>[0]);
+    checkMethod(type, "process", void.class, Modifier.PUBLIC,
+        new Class<?>[] {LocalAudioTrackExecutor.class}, Exception.class);
+    checkMethod(type, "makeShallowClone", AudioTrack.class,
+        Modifier.PROTECTED, new Class<?>[0]);
+    checkMethod(type, "getSourceManager", AudioSourceManager.class,
+        Modifier.PUBLIC, new Class<?>[0]);
+  }
+
+  private static void commonBehavior() throws Exception {
+    RecordingHttpInterface http = new RecordingHttpInterface();
+    ManagerHandler handler = new ManagerHandler(http);
+    TwitchStreamAudioSourceManager source = fabricatedManager(handler.proxy());
+    AudioTrackInfo info = new AudioTrackInfo("title", "author", Long.MAX_VALUE,
+        "https://www.twitch.tv/MIXED_Channel", true,
+        "https://www.twitch.tv/MIXED_Channel", "art", null);
+    ExposedTrack track = new ExposedTrack(info, source);
+    check(track.getInfo() == info && track.getSourceManager() == source
+        && field("sourceManager").get(track) == source, "captured identity");
+    check(track.getChannelName().equals("mixed_channel"), "channel normalization");
+    M3uStreamSegmentUrlProvider provider = track.provider();
+    check(provider instanceof TwitchStreamSegmentUrlProvider
+        && field("segmentUrlProvider").get(track) == provider, "provider construction");
+    check(track.http() == http && handler.interfaces.get() == 1, "HTTP delegation");
+    AudioTrack clone = track.shallowClone();
+    check(clone instanceof TwitchStreamAudioTrack && clone != track && clone.getInfo() == info
+        && clone.getSourceManager() == source, "shallow clone identity");
+    Object cloneProvider = field("segmentUrlProvider").get(clone);
+    check(cloneProvider != provider && cloneProvider instanceof TwitchStreamSegmentUrlProvider,
+        "fresh shallow-clone provider");
+    check(field("log").get(null) != null, "static logger");
+    source.shutdown();
+    check(handler.closes.get() == 1, "source cleanup");
+  }
+
+  private static void currentDisposition(String nativeLibrary) throws Exception {
+    Class.forName("dev.mantle.internal.NativeLoader")
+        .getMethod("load", String.class).invoke(null, nativeLibrary);
+    Class<?> nativeType = Class.forName("dev.mantle.internal.MantleNative");
+    Method process = nativeType.getDeclaredMethod(
+        "processTwitchTrack", TwitchStreamAudioTrack.class, LocalAudioTrackExecutor.class);
+    check(Modifier.isPublic(process.getModifiers()) && Modifier.isStatic(process.getModifiers())
+        && Modifier.isNative(process.getModifiers()), "current native route");
+    clearProperties();
+    TwitchStreamAudioSourceManager source = new TwitchStreamAudioSourceManager();
+    TwitchStreamAudioTrack track = new TwitchStreamAudioTrack(new AudioTrackInfo(
+        "title", "author", Long.MAX_VALUE, "https://www.twitch.tv/fixture_channel", true,
+        "https://www.twitch.tv/fixture_channel", null, null), source);
+    RuntimeException missing = expect(RuntimeException.class, () -> track.process(null));
+    check(missing.getMessage().contains("dev.mantle.twitch.clientId"),
+        "explicit playback credentials fail before service traffic");
+    source.shutdown();
+    clearProperties();
+  }
+
+  private static TwitchStreamAudioSourceManager fabricatedManager(HttpInterfaceManager http)
+      throws Exception {
+    TwitchStreamAudioSourceManager manager = allocate(TwitchStreamAudioSourceManager.class);
+    Field field = TwitchStreamAudioSourceManager.class.getDeclaredField("httpInterfaceManager");
+    field.setAccessible(true);
+    field.set(manager, http);
+    return manager;
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = TwitchStreamAudioTrack.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static void clearProperties() {
+    System.clearProperty("dev.mantle.twitch.clientId");
+    System.clearProperty("dev.mantle.twitch.accessToken");
+    System.clearProperty("dev.mantle.twitch.deviceId");
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> type, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == type && field.getGenericType() == type
+        && field.getModifiers() == modifiers && !field.isSynthetic(), name + " metadata");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+                                  int modifiers, Class<?>[] parameters,
+                                  Class<?>... exceptions) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.getTypeParameters().length == 0 && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), method + " metadata");
+  }
+
+  private static final class ExposedTrack extends TwitchStreamAudioTrack {
+    ExposedTrack(AudioTrackInfo info, TwitchStreamAudioSourceManager source) {
+      super(info, source);
+    }
+    M3uStreamSegmentUrlProvider provider() { return super.getSegmentUrlProvider(); }
+    HttpInterface http() { return super.getHttpInterface(); }
+    AudioTrack shallowClone() { return super.makeShallowClone(); }
+  }
+
+  private static final class RecordingHttpInterface extends HttpInterface {
+    RecordingHttpInterface() { super(null, HttpClientContext.create(), false, null); }
+  }
+
+  private static final class ManagerHandler implements java.lang.reflect.InvocationHandler {
+    private final HttpInterface http;
+    private final AtomicInteger interfaces = new AtomicInteger();
+    private final AtomicInteger closes = new AtomicInteger();
+    ManagerHandler(HttpInterface http) { this.http = http; }
+    HttpInterfaceManager proxy() {
+      return (HttpInterfaceManager) Proxy.newProxyInstance(
+          HttpInterfaceManager.class.getClassLoader(),
+          new Class<?>[] {HttpInterfaceManager.class}, this);
+    }
+    public Object invoke(Object instance, Method method, Object[] arguments) {
+      if (method.getName().equals("getInterface")) {
+        interfaces.incrementAndGet();
+        return http;
+      }
+      if (method.getName().equals("close")) closes.incrementAndGet();
+      if (method.getName().equals("toString")) return "TwitchTrackManagerFixture";
+      return defaultValue(method.getReturnType());
+    }
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
+  }
+
+  private static <T> T allocate(Class<T> type) throws Exception {
+    return type.cast(UNSAFE.getClass().getMethod("allocateInstance", Class.class)
+        .invoke(UNSAFE, type));
+  }
+
+  private static Object loadUnsafe() {
+    try {
+      Class<?> unsafeType = Class.forName("sun.misc.Unsafe");
+      Field singleton = unsafeType.getDeclaredField("theUnsafe");
+      singleton.setAccessible(true);
+      return singleton.get(null);
+    } catch (Exception error) {
+      throw new AssertionError(error);
+    }
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
     }
   }
 

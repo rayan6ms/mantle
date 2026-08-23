@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use jni::Env;
 use jni::objects::{JObject, JString, JValue};
@@ -12,6 +12,9 @@ use mantle_media::{
     HttpRangeOptions, MediaCancellation, MediaInfo, MediaLimits, NicoNicoPlaybackSession,
     NicoNicoSourceManager, NicoNicoSourceOptions, NicoNicoSourceTrack, SoundCloudAuthentication,
     SoundCloudPlaybackSession, SoundCloudSourceManager, SoundCloudSourceOptions,
+    TwitchAuthentication, TwitchLivePlaybackOptions, TwitchLivePlaybackPoll,
+    TwitchLivePlaybackSession, TwitchSourceManager, TwitchSourceOptions, TwitchSourceTrack,
+    route_twitch_identifier,
 };
 
 const TRANSCODE_INPUT_CHUNK_FRAMES: usize = 1_024;
@@ -88,6 +91,49 @@ pub(crate) fn process_sound_cloud_track(
     process_playback_session(env, executor, session, &cancellation)
 }
 
+pub(crate) fn process_twitch_track(
+    env: &mut Env<'_>,
+    track: &JObject<'_>,
+    executor: &JObject<'_>,
+) -> jni::errors::Result<()> {
+    let java_info = env
+        .get_field(
+            track,
+            jni_str!("trackInfo"),
+            jni_sig!("Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;"),
+        )?
+        .l()?;
+    let info = crate::track_info_from_java(env, &java_info)?;
+    let options = TwitchSourceOptions::default();
+    let route = route_twitch_identifier(&info.identifier, &options)
+        .ok_or_else(|| failure("current Twitch track has an unsupported channel route"))?;
+    let client_id = system_property(env, "dev.mantle.twitch.clientId")?
+        .ok_or_else(|| failure("Twitch playback requires dev.mantle.twitch.clientId"))?;
+    let access_token = system_property(env, "dev.mantle.twitch.accessToken")?
+        .ok_or_else(|| failure("Twitch playback requires dev.mantle.twitch.accessToken"))?;
+    let device_id = system_property(env, "dev.mantle.twitch.deviceId")?;
+    let authentication = TwitchAuthentication::with_device_id(client_id, access_token, device_id)
+        .map_err(|_| failure("invalid explicit Twitch credentials"))?;
+    if executor.is_null() {
+        return Err(failure("native playback requires a local track executor"));
+    }
+    let manager = TwitchSourceManager::new(options, authentication)
+        .map_err(|_| failure("could not create current Twitch playback source"))?;
+    let source_track = TwitchSourceTrack {
+        info,
+        channel: route.channel,
+    };
+    let cancellation = MediaCancellation::new();
+    let session = manager
+        .open_live_playback(
+            &source_track,
+            TwitchLivePlaybackOptions::default(),
+            cancellation.clone(),
+        )
+        .map_err(|_| failure("current Twitch playback discovery failed"))?;
+    process_twitch_live_session(env, executor, session, &cancellation)
+}
+
 fn process_playback_session<S: PcmPlaybackSession>(
     env: &mut Env<'_>,
     executor: &JObject<'_>,
@@ -154,6 +200,84 @@ fn process_playback_session<S: PcmPlaybackSession>(
         })?;
     }
     Ok(())
+}
+
+fn process_twitch_live_session(
+    env: &mut Env<'_>,
+    executor: &JObject<'_>,
+    mut session: TwitchLivePlaybackSession,
+    cancellation: &MediaCancellation,
+) -> jni::errors::Result<()> {
+    if executor.is_null() {
+        return Err(failure("native playback requires a local track executor"));
+    }
+    let buffer = env
+        .call_method(
+            executor,
+            jni_str!("getAudioBuffer"),
+            jni_sig!("()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBuffer;"),
+            &[],
+        )?
+        .l()?;
+    if buffer.is_null() {
+        return Err(failure("native playback requires an audio frame buffer"));
+    }
+    let context = env
+        .call_method(
+            executor,
+            jni_str!("getProcessingContext"),
+            jni_sig!("()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;"),
+            &[],
+        )?
+        .l()?;
+    let format = validate_output_format(env, &context)?;
+    let started = Instant::now();
+    let mut encoded = EncodedFrameSlot::new();
+
+    loop {
+        if current_thread_interrupted(env)? {
+            cancellation.cancel();
+            return Err(failure("current native playback was cancelled"));
+        }
+        match session
+            .poll_frame(started.elapsed(), &mut encoded)
+            .map_err(|_| failure("current Twitch live playback failed"))?
+        {
+            TwitchLivePlaybackPoll::Frame => env.with_local_frame(4, |env| {
+                let data = JObject::from(env.byte_array_from_slice(encoded.data())?);
+                let timecode = encoded
+                    .timestamp()
+                    .unwrap_or_else(|| started.elapsed())
+                    .as_millis();
+                let timecode = i64::try_from(timecode)
+                    .map_err(|_| failure("native frame timecode exceeds the JVM range"))?;
+                let frame = env.new_object(
+                    jni_str!("com/sedmelluq/discord/lavaplayer/track/playback/ImmutableAudioFrame"),
+                    jni_sig!("(J[BILcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V"),
+                    &[
+                        JValue::Long(timecode),
+                        JValue::Object(&data),
+                        JValue::Int(i32::from(encoded.volume().get())),
+                        JValue::Object(&format),
+                    ],
+                )?;
+                let _ = env.call_method(
+                    &buffer,
+                    jni_str!("consume"),
+                    jni_sig!("(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;)V"),
+                    &[JValue::Object(&frame)],
+                )?;
+                Ok::<(), jni::errors::Error>(())
+            })?,
+            TwitchLivePlaybackPoll::WaitUntil(deadline) => {
+                let remaining = deadline.saturating_sub(started.elapsed());
+                if !remaining.is_zero() {
+                    std::thread::park_timeout(remaining.min(Duration::from_millis(10)));
+                }
+            }
+            TwitchLivePlaybackPoll::Ended | TwitchLivePlaybackPoll::Exhausted => return Ok(()),
+        }
+    }
 }
 
 fn system_property(env: &mut Env<'_>, key: &str) -> jni::errors::Result<Option<String>> {

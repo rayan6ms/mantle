@@ -181,6 +181,8 @@ const TWITCH_CONSTANTS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/twitch/TwitchConstants";
 const TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamAudioSourceManager";
+const TWITCH_STREAM_AUDIO_TRACK_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamAudioTrack";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -248,6 +250,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MPEG_TS_M3U_STREAM_AUDIO_TRACK_CLASS,
     TWITCH_CONSTANTS_CLASS,
     TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS,
+    TWITCH_STREAM_AUDIO_TRACK_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -627,6 +630,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | M3U_SEGMENT_URL_PROVIDER_CLASS
                 | TWITCH_CONSTANTS_CLASS
                 | TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS
+                | TWITCH_STREAM_AUDIO_TRACK_CLASS
         ) || field
             .access_flags
             .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
@@ -656,6 +660,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | M3U_CHANNEL_STREAM_INFO_CLASS
                 | M3U_SEGMENT_INFO_CLASS
                 | TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS
+                | TWITCH_STREAM_AUDIO_TRACK_CLASS
         ) || method
             .access_flags
             .intersects(MethodAccessFlags::PUBLIC | MethodAccessFlags::PROTECTED)
@@ -836,6 +841,9 @@ fn replacement_body(
             descriptor,
             required_locals,
         );
+    }
+    if class_name == TWITCH_STREAM_AUDIO_TRACK_CLASS {
+        return twitch_stream_audio_track_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -16529,6 +16537,238 @@ fn twitch_source_manager_clinit(pool: &mut ConstantPool<'static>) -> Result<Attr
     )
 }
 
+fn twitch_stream_audio_track_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamAudioSourceManager;)V",
+        ) => twitch_stream_audio_track_constructor(pool),
+        ("getChannelName", "()Ljava/lang/String;") => twitch_stream_audio_track_channel(pool),
+        (
+            "getSegmentUrlProvider",
+            "()Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider;",
+        ) => object_getter(
+            pool,
+            TWITCH_STREAM_AUDIO_TRACK_CLASS,
+            "segmentUrlProvider",
+            "Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider;",
+        ),
+        ("getHttpInterface", "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;") => {
+            twitch_stream_audio_track_http_interface(pool)
+        }
+        (
+            "process",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+        ) => twitch_stream_audio_track_process(pool),
+        ("makeShallowClone", "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;") => {
+            twitch_stream_audio_track_shallow_clone(pool)
+        }
+        ("getSourceManager", "()Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;") => {
+            object_getter(
+                pool,
+                TWITCH_STREAM_AUDIO_TRACK_CLASS,
+                "sourceManager",
+                "Lcom/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamAudioSourceManager;",
+            )
+        }
+        ("<clinit>", "()V") => twitch_stream_audio_track_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {TWITCH_STREAM_AUDIO_TRACK_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn twitch_stream_audio_track_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let parent = pool.add_class(MPEG_TS_M3U_STREAM_AUDIO_TRACK_CLASS)?;
+    let parent_init = pool.add_method_ref(
+        parent,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V",
+    )?;
+    let owner = pool.add_class(TWITCH_STREAM_AUDIO_TRACK_CLASS)?;
+    let source = pool.add_field_ref(
+        owner,
+        "sourceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamAudioSourceManager;",
+    )?;
+    let segment = pool.add_field_ref(
+        owner,
+        "segmentUrlProvider",
+        "Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider;",
+    )?;
+    let provider = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamSegmentUrlProvider",
+    )?;
+    let provider_init = pool.add_method_ref(
+        provider,
+        "<init>",
+        "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamAudioSourceManager;)V",
+    )?;
+    let channel = pool.add_method_ref(owner, "getChannelName", "()Ljava/lang/String;")?;
+    code(
+        pool,
+        5,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(parent_init),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(source),
+            Instruction::Aload_0,
+            Instruction::New(provider),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(channel),
+            Instruction::Aload_2,
+            Instruction::Invokespecial(provider_init),
+            Instruction::Putfield(segment),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn twitch_stream_audio_track_channel(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(TWITCH_STREAM_AUDIO_TRACK_CLASS)?;
+    let info = pool.add_field_ref(
+        owner,
+        "trackInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let info_class = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo")?;
+    let identifier = pool.add_field_ref(info_class, "identifier", "Ljava/lang/String;")?;
+    let manager = pool.add_class(TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let parse = pool.add_method_ref(
+        manager,
+        "getChannelIdentifierFromUrl",
+        "(Ljava/lang/String;)Ljava/lang/String;",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(info),
+            Instruction::Getfield(identifier),
+            Instruction::Invokestatic(parse),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn twitch_stream_audio_track_http_interface(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(TWITCH_STREAM_AUDIO_TRACK_CLASS)?;
+    let source = pool.add_field_ref(
+        owner,
+        "sourceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamAudioSourceManager;",
+    )?;
+    let manager = pool.add_class(TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let get = pool.add_method_ref(
+        manager,
+        "getHttpInterface",
+        "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(source),
+            Instruction::Invokevirtual(get),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn twitch_stream_audio_track_process(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let native = pool.add_class(NATIVE_CLASS)?;
+    let process = pool.add_method_ref(
+        native,
+        "processTwitchTrack",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+    )?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokestatic(process),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn twitch_stream_audio_track_shallow_clone(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(TWITCH_STREAM_AUDIO_TRACK_CLASS)?;
+    let info = pool.add_field_ref(
+        owner,
+        "trackInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let source = pool.add_field_ref(
+        owner,
+        "sourceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamAudioSourceManager;",
+    )?;
+    let init = pool.add_method_ref(
+        owner,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamAudioSourceManager;)V",
+    )?;
+    code(
+        pool,
+        4,
+        1,
+        vec![
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(info),
+            Instruction::Aload_0,
+            Instruction::Getfield(source),
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn twitch_stream_audio_track_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(TWITCH_STREAM_AUDIO_TRACK_CLASS)?;
+    let factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
 #[allow(clippy::too_many_lines)]
 fn m3u_stream_provider_class() -> Result<ClassFile<'static>> {
     const TRACK_DESCRIPTOR: &str =
@@ -17740,6 +17980,10 @@ fn native_class(expected_abi: u8) -> Result<ClassFile<'static>> {
         (
             "processSoundCloudTrack",
             "(Lcom/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+        ),
+        (
+            "processTwitchTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
         ),
         (
             "loadItemReference",
