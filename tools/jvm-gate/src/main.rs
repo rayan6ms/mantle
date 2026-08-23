@@ -205,6 +205,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-yandex-http-context-filter-consumer" => Some(YANDEX_HTTP_CONTEXT_FILTER_CONSUMER),
         "write-yandex-music-api-loader-consumer" => Some(YANDEX_MUSIC_API_LOADER_CONSUMER),
+        "write-yandex-music-audio-source-manager-consumer" => {
+            Some(YANDEX_MUSIC_AUDIO_SOURCE_MANAGER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -17015,6 +17018,417 @@ public final class GateYandexMusicApiLoader {
     }
   }
 
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YANDEX_MUSIC_AUDIO_SOURCE_MANAGER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioTrack;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicDirectUrlLoader;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicPlaylistLoader;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicSearchResultLoader;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicTrackLoader;
+import com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpConfigurable;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpConfigurable;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager;
+import com.sedmelluq.discord.lavaplayer.track.AudioItem;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.regex.Pattern;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.impl.client.HttpClientBuilder;
+
+public final class GateYandexMusicAudioSourceManager {
+  public static void main(String[] args) throws Exception {
+    check(args.length >= 1 && args.length <= 2, "expected disposition and optional native path");
+    boolean reference = args[0].equals("reference");
+    check(reference || args[0].equals("candidate"), "unknown disposition");
+    check(reference == (args.length == 1), "candidate requires native path");
+    reflectionContract();
+    commonBehavior();
+    if (reference) legacyDisposition();
+    else currentDisposition(args[1]);
+    System.out.println(
+        "common=public-concrete,audio-source-http-configurable,19-fields,3-constructors,"
+        + "17-methods;construction,source-name,empty-details,track-factory,loader-identity,"
+        + "http-config,shutdown,reflection;service="
+        + (reference ? "legacy-loader-routing" :
+            "current-native-bounded-authenticated-routing,no-global-oauth"));
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<YandexMusicAudioSourceManager> type = YandexMusicAudioSourceManager.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(),
+            new Class<?>[] {AudioSourceManager.class, HttpConfigurable.class}), "class metadata");
+    check(type.getDeclaredFields().length == 19 && type.getDeclaredConstructors().length == 3
+        && type.getDeclaredMethods().length == 17, "member counts");
+    for (String name : new String[] {"PROTOCOL_REGEX", "DOMAIN_REGEX", "TRACK_ID_REGEX",
+        "ALBUM_ID_REGEX", "ARTIST_ID_REGEX", "PLAYLIST_ID_REGEX", "USER_REGEX"}) {
+      checkField(type, name, String.class, Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    }
+    for (String name : new String[] {"trackUrlPattern", "shortTrackUrlPattern",
+        "albumUrlPattern", "artistUrlPattern", "playlistUrlPattern"}) {
+      checkField(type, name, Pattern.class, Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    }
+    checkField(type, "allowSearch", boolean.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "httpInterfaceManager", HttpInterfaceManager.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "combinedHttpConfiguration", ExtendedHttpConfigurable.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "trackLoader", YandexMusicTrackLoader.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "playlistLoader", YandexMusicPlaylistLoader.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "directUrlLoader", YandexMusicDirectUrlLoader.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "searchResultLoader", YandexMusicSearchResultLoader.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+
+    checkConstructor(type.getDeclaredConstructor(), new Class<?>[0]);
+    checkConstructor(type.getDeclaredConstructor(boolean.class), new Class<?>[] {boolean.class});
+    checkConstructor(type.getDeclaredConstructor(boolean.class, YandexMusicTrackLoader.class,
+        YandexMusicPlaylistLoader.class, YandexMusicDirectUrlLoader.class,
+        YandexMusicSearchResultLoader.class), new Class<?>[] {boolean.class,
+            YandexMusicTrackLoader.class, YandexMusicPlaylistLoader.class,
+            YandexMusicDirectUrlLoader.class, YandexMusicSearchResultLoader.class});
+    checkMethod(type, "loadItem", AudioItem.class,
+        new Class<?>[] {AudioPlayerManager.class, AudioReference.class});
+    checkMethod(type, "isTrackEncodable", boolean.class, new Class<?>[] {AudioTrack.class});
+    checkMethod(type, "encodeTrack", void.class,
+        new Class<?>[] {AudioTrack.class, DataOutput.class}, java.io.IOException.class);
+    checkMethod(type, "decodeTrack", AudioTrack.class,
+        new Class<?>[] {AudioTrackInfo.class, DataInput.class}, java.io.IOException.class);
+    checkMethod(type, "getTrack", AudioTrack.class, new Class<?>[] {AudioTrackInfo.class});
+    checkMethod(type, "shutdown", void.class, new Class<?>[0]);
+    checkMethod(type, "getDirectUrlLoader", YandexMusicDirectUrlLoader.class, new Class<?>[0]);
+    checkMethod(type, "getHttpInterface", HttpInterface.class, new Class<?>[0]);
+    checkMethod(type, "configureRequests", void.class, new Class<?>[] {Function.class});
+    checkMethod(type, "configureBuilder", void.class, new Class<?>[] {Consumer.class});
+    checkMethod(type, "getHttpConfiguration", ExtendedHttpConfigurable.class, new Class<?>[0]);
+    checkMethod(type, "getMainHttpConfiguration", ExtendedHttpConfigurable.class,
+        new Class<?>[0]);
+    checkMethod(type, "getTrackLHttpConfiguration", ExtendedHttpConfigurable.class,
+        new Class<?>[0]);
+    checkMethod(type, "getPlaylistLHttpConfiguration", ExtendedHttpConfigurable.class,
+        new Class<?>[0]);
+    checkMethod(type, "getDirectUrlLHttpConfiguration", ExtendedHttpConfigurable.class,
+        new Class<?>[0]);
+    checkMethod(type, "getSearchHttpConfiguration", ExtendedHttpConfigurable.class,
+        new Class<?>[0]);
+    checkMethod(type, "getSourceName", String.class, new Class<?>[0]);
+    check(type.getDeclaredMethod("configureRequests", Function.class)
+            .toGenericString().contains("Function<org.apache.http.client.config.RequestConfig,"
+                + " org.apache.http.client.config.RequestConfig>")
+        && type.getDeclaredMethod("configureBuilder", Consumer.class)
+            .toGenericString().contains("Consumer<org.apache.http.impl.client.HttpClientBuilder>"),
+        "generic configuration signatures");
+  }
+
+  private static void commonBehavior() throws Exception {
+    check(field("PROTOCOL_REGEX").get(null).equals("https?://")
+        && field("DOMAIN_REGEX").get(null).equals("music\\.yandex\\.[a-zA-Z]+")
+        && pattern("trackUrlPattern").equals(
+            "^https?://music\\.yandex\\.[a-zA-Z]+/album/([0-9]+)(?:\\?.*|)/track/"
+                + "([0-9]+)(?:\\?.*|)$")
+        && pattern("shortTrackUrlPattern").contains("/track/([0-9]+)")
+        && pattern("albumUrlPattern").contains("/album/([0-9]+)")
+        && pattern("artistUrlPattern").contains("/artist/([0-9]+)")
+        && pattern("playlistUrlPattern").contains("/users/(.+)/playlists/([0-9]+)"),
+        "static routing patterns");
+
+    YandexMusicAudioSourceManager defaults = new YandexMusicAudioSourceManager();
+    check((boolean) field("allowSearch").get(defaults), "default search flag");
+    defaults.shutdown();
+    YandexMusicAudioSourceManager disabled = new YandexMusicAudioSourceManager(false);
+    check(!(boolean) field("allowSearch").get(disabled), "explicit search flag");
+    disabled.shutdown();
+
+    Fixture fixture = new Fixture(true);
+    YandexMusicAudioSourceManager manager = fixture.manager;
+    check(manager.getSourceName().equals("yandex-music") && manager.isTrackEncodable(null),
+        "source identity and encodability");
+    manager.encodeTrack(null, rejectingProxy(DataOutput.class));
+    AudioTrackInfo info = new AudioTrackInfo("title", "author", 1234L, "71663565", false,
+        "https://music.yandex.ru/track/71663565", "art", null);
+    AudioTrack decoded = manager.decodeTrack(info, rejectingProxy(DataInput.class));
+    AudioTrack created = manager.getTrack(info);
+    check(decoded instanceof YandexMusicAudioTrack && created instanceof YandexMusicAudioTrack
+        && decoded != created && decoded.getInfo() == info && created.getInfo() == info
+        && decoded.getSourceManager() == manager && created.getSourceManager() == manager,
+        "empty-detail track reconstruction");
+    check(manager.getDirectUrlLoader() == fixture.direct.proxy
+        && manager.getTrackLHttpConfiguration() == fixture.track.configuration
+        && manager.getPlaylistLHttpConfiguration() == fixture.playlist.configuration
+        && manager.getDirectUrlLHttpConfiguration() == fixture.direct.configuration
+        && manager.getSearchHttpConfiguration() == fixture.search.configuration,
+        "loader and configuration identity");
+    check(fixture.track.configurationCalls == 2 && fixture.playlist.configurationCalls == 2
+        && fixture.direct.configurationCalls == 2 && fixture.search.configurationCalls == 2,
+        "configuration getter dispatch");
+    ExtendedHttpConfigurable combined = manager.getHttpConfiguration();
+    check(combined != null && combined == manager.getHttpConfiguration()
+        && manager.getMainHttpConfiguration() instanceof HttpInterfaceManager
+        && manager.getMainHttpConfiguration() != combined, "combined configuration identity");
+    Function<RequestConfig, RequestConfig> requests = value -> value;
+    Consumer<HttpClientBuilder> builder = value -> {};
+    manager.configureRequests(requests);
+    manager.configureBuilder(builder);
+    check(fixture.configurationOrder.equals(Arrays.asList(
+            "track:requests", "playlist:requests", "direct:requests", "search:requests",
+            "track:builder", "playlist:builder", "direct:builder", "search:builder"))
+        && fixture.track.config.requests == requests && fixture.track.config.builder == builder
+        && fixture.playlist.config.requests == requests
+        && fixture.playlist.config.builder == builder
+        && fixture.direct.config.requests == requests && fixture.direct.config.builder == builder
+        && fixture.search.config.requests == requests && fixture.search.config.builder == builder,
+        "configuration delegation identity and order");
+    try (HttpInterface http = manager.getHttpInterface()) {
+      check(http != null, "HTTP interface creation");
+    }
+    manager.shutdown();
+    manager.shutdown();
+    check(fixture.shutdownOrder.equals(Arrays.asList(
+        "track", "playlist", "search", "direct", "track", "playlist", "search", "direct")),
+        "repeatable shutdown order");
+  }
+
+  private static void legacyDisposition() throws Exception {
+    Fixture fixture = new Fixture(true);
+    YandexMusicAudioSourceManager manager = fixture.manager;
+    check(manager.loadItem(null, new AudioReference(
+        "https://music.yandex.ru/album/11/track/22?from=gate", null)) == fixture.sentinel,
+        "album track result");
+    fixture.track.checkCall("11", "22");
+    check(manager.loadItem(null,
+        new AudioReference("http://music.yandex.com/track/33", null)) == fixture.sentinel,
+        "short track result");
+    fixture.track.checkCall("", "33");
+    check(manager.loadItem(null, new AudioReference(
+        "https://music.yandex.kz/users/alice/playlists/44", null)) == fixture.sentinel,
+        "user playlist result");
+    fixture.playlist.checkCall("alice", "44", "tracks");
+    manager.loadItem(null, new AudioReference("https://music.yandex.by/album/55", null));
+    fixture.playlist.checkCall("55", "volumes");
+    manager.loadItem(null,
+        new AudioReference("https://music.yandex.ru/artist/66/tracks", null));
+    fixture.playlist.checkCall("66", "popularTracks");
+    check(manager.loadItem(null, new AudioReference("legacy search", null)) == fixture.sentinel,
+        "search result");
+    fixture.search.checkCall("legacy search", fixture.playlist.proxy);
+    manager.shutdown();
+
+    Fixture disabled = new Fixture(false);
+    check(disabled.manager.loadItem(null, new AudioReference("legacy search", null)) == null
+        && disabled.search.loadCalls == 0, "disabled search fallthrough");
+    disabled.manager.shutdown();
+  }
+
+  private static void currentDisposition(String nativeLibrary) throws Exception {
+    Class.forName("dev.mantle.internal.NativeLoader")
+        .getMethod("load", String.class).invoke(null, nativeLibrary);
+    Class<?> nativeType = Class.forName("dev.mantle.internal.MantleNative");
+    Method load = nativeType.getDeclaredMethod("loadYandexMusicItem",
+        YandexMusicAudioSourceManager.class, AudioReference.class);
+    check(Modifier.isPublic(load.getModifiers()) && Modifier.isStatic(load.getModifiers())
+        && Modifier.isNative(load.getModifiers()), "current native route");
+    System.clearProperty("dev.mantle.yandex.accessToken");
+    YandexMusicAudioSourceManager manager = new YandexMusicAudioSourceManager();
+    check(manager.loadItem(null,
+        new AudioReference("https://example.invalid/track/71663565", null)) == null,
+        "foreign route rejected without credentials");
+    System.setProperty("dev.mantle.yandex.accessToken", "");
+    RuntimeException invalid = expect(RuntimeException.class, () -> manager.loadItem(null,
+        new AudioReference("https://music.yandex.ru/track/71663565", null)));
+    check(invalid.getMessage().contains("invalid Yandex Music JVM access token"),
+        "invalid caller token fails before service traffic");
+    manager.shutdown();
+    YandexMusicAudioSourceManager disabled = new YandexMusicAudioSourceManager(false);
+    check(disabled.loadItem(null, new AudioReference("ymsearch:architects", null)) == null,
+        "search flag enforced before credentials");
+    disabled.shutdown();
+    System.clearProperty("dev.mantle.yandex.accessToken");
+  }
+
+  private static String pattern(String name) throws Exception {
+    return ((Pattern) field(name).get(null)).pattern();
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = YandexMusicAudioSourceManager.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> type, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == type && field.getGenericType() == type
+        && field.getModifiers() == modifiers && !field.isSynthetic(), name + " metadata");
+  }
+
+  private static void checkConstructor(Constructor<?> constructor, Class<?>[] parameters) {
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && Arrays.equals(constructor.getParameterTypes(), parameters)
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic()
+        && !constructor.isVarArgs(), constructor + " metadata");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+                                  Class<?>[] parameters, Class<?>... exceptions)
+      throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getModifiers() == Modifier.PUBLIC
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.getTypeParameters().length == 0 && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), method + " metadata");
+  }
+
+  private static final class Fixture {
+    final List<String> shutdownOrder = new ArrayList<>();
+    final List<String> configurationOrder = new ArrayList<>();
+    final AudioTrack sentinel = proxy(AudioTrack.class, (instance, method, arguments) ->
+        defaultValue(method.getReturnType()));
+    final LoaderHandler track = new LoaderHandler("track", YandexMusicTrackLoader.class, this);
+    final LoaderHandler playlist =
+        new LoaderHandler("playlist", YandexMusicPlaylistLoader.class, this);
+    final LoaderHandler direct =
+        new LoaderHandler("direct", YandexMusicDirectUrlLoader.class, this);
+    final LoaderHandler search =
+        new LoaderHandler("search", YandexMusicSearchResultLoader.class, this);
+    final YandexMusicAudioSourceManager manager;
+
+    Fixture(boolean allowSearch) {
+      manager = new YandexMusicAudioSourceManager(allowSearch,
+          (YandexMusicTrackLoader) track.proxy, (YandexMusicPlaylistLoader) playlist.proxy,
+          (YandexMusicDirectUrlLoader) direct.proxy,
+          (YandexMusicSearchResultLoader) search.proxy);
+    }
+  }
+
+  private static final class LoaderHandler implements InvocationHandler {
+    final String name;
+    final Fixture fixture;
+    final Object proxy;
+    final ConfigHandler config;
+    final ExtendedHttpConfigurable configuration;
+    int configurationCalls;
+    int loadCalls;
+    Object[] lastArguments;
+
+    LoaderHandler(String name, Class<?> type, Fixture fixture) {
+      this.name = name;
+      this.fixture = fixture;
+      config = new ConfigHandler(name, fixture.configurationOrder);
+      configuration = proxy(ExtendedHttpConfigurable.class, config);
+      proxy = proxy(type, this);
+    }
+
+    public Object invoke(Object instance, Method method, Object[] arguments) {
+      if (method.getName().equals("getHttpConfiguration")) {
+        configurationCalls++;
+        return configuration;
+      }
+      if (method.getName().equals("shutdown")) {
+        fixture.shutdownOrder.add(name);
+        return null;
+      }
+      if (method.getName().startsWith("load") || method.getName().equals("getDirectUrl")) {
+        loadCalls++;
+        lastArguments = arguments == null ? new Object[0] : arguments.clone();
+        return method.getReturnType() == String.class ? "legacy-direct-url" : fixture.sentinel;
+      }
+      if (method.getName().equals("toString")) return "YandexLoaderFixture:" + name;
+      return defaultValue(method.getReturnType());
+    }
+
+    void checkCall(Object... prefix) {
+      check(loadCalls > 0 && lastArguments.length >= prefix.length, name + " call missing");
+      for (int index = 0; index < prefix.length; index++) {
+        check(lastArguments[index] == prefix[index] || lastArguments[index].equals(prefix[index]),
+            name + " argument " + index);
+      }
+    }
+  }
+
+  private static final class ConfigHandler implements InvocationHandler {
+    final String name;
+    final List<String> order;
+    Object requests;
+    Object builder;
+    ConfigHandler(String name, List<String> order) { this.name = name; this.order = order; }
+    public Object invoke(Object instance, Method method, Object[] arguments) {
+      if (method.getName().equals("configureRequests")) {
+        requests = arguments[0];
+        order.add(name + ":requests");
+      }
+      if (method.getName().equals("configureBuilder")) {
+        builder = arguments[0];
+        order.add(name + ":builder");
+      }
+      if (method.getName().equals("toString")) return "YandexConfigFixture:" + name;
+      return defaultValue(method.getReturnType());
+    }
+  }
+
+  private static <T> T rejectingProxy(Class<T> type) {
+    return proxy(type, (instance, method, arguments) -> {
+      throw new AssertionError(type.getSimpleName() + " unexpectedly invoked: " + method);
+    });
+  }
+
+  private static <T> T proxy(Class<T> type, InvocationHandler handler) {
+    return type.cast(Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type}, handler));
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (error instanceof InvocationTargetException) error = error.getCause();
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }

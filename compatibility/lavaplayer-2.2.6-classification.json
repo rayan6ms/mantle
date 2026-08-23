@@ -17282,189 +17282,300 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The exact public manager, source SPI, loader, HTTP configuration, serialization, reconstruction, and lifecycle shell is retained while current Yandex Music metadata uses Mantle's bounded caller-token native implementation instead of the historical global-OAuth loader flow.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-jvm/src/load_bridge.rs",
+        "crates/mantle-media/tests/phase12_yandex_music.rs",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0014-bounded-yandex-music-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public no-argument constructor delegates with search enabled and initializes the exact default loader and HTTP configuration graph.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Z)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public boolean constructor preserves the search flag and exact four default-loader construction order and HTTP configuration graph.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(ZLcom/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicTrackLoader;Lcom/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicPlaylistLoader;Lcom/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicDirectUrlLoader;Lcom/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicSearchResultLoader;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public collaborator constructor preserves every loader identity, search flag, default thread-local HTTP manager, Yandex context filter, and five-member combined configuration order exactly.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "loadItem",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The synchronous SPI return contract and search flag remain, while strict current track, collection, search, and recommendation routing crosses the bounded native source with explicit dev.mantle.yandex.accessToken credentials and rejects foreign inputs before credential or network access.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-jvm/src/load_bridge.rs",
+        "crates/mantle-media/tests/phase12_yandex_music.rs",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0014-bounded-yandex-music-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "isTrackEncodable",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves unconditional track encodability, including null input.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "encodeTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Ljava/io/DataOutput;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves the empty Yandex Music source-detail payload, argument non-use, and checked IOException declaration.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "decodeTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves empty-detail decoding into a YandexMusicAudioTrack with exact track-info and source-manager identity without reading DataInput.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public track factory returns a fresh YandexMusicAudioTrack preserving exact track-info and source-manager identity.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "shutdown",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Repeatable shutdown preserves HTTP-manager closure followed by track, playlist, search, and direct-loader shutdown in exact order.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getDirectUrlLoader",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicDirectUrlLoader;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The getter returns the exact caller-supplied or default direct-URL loader identity.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getHttpInterface",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The method delegates exactly to the owned thread-local HTTP-interface manager and returns a usable interface.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "configureRequests",
       "descriptor": "(Ljava/util/function/Function;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generic signature and exact request-configurator identity and five-member delegation order are preserved.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "configureBuilder",
       "descriptor": "(Ljava/util/function/Consumer;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generic signature and exact HTTP-builder configurator identity and five-member delegation order are preserved.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getHttpConfiguration",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The getter returns the stable combined five-member HTTP configuration identity exactly.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getMainHttpConfiguration",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The getter returns the owned main thread-local HTTP manager as the exact ExtendedHttpConfigurable identity.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getTrackLHttpConfiguration",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The getter delegates to the captured track loader and preserves its configuration identity and repeated dispatch.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getPlaylistLHttpConfiguration",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The getter delegates to the captured playlist loader and preserves its configuration identity and repeated dispatch.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getDirectUrlLHttpConfiguration",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The getter delegates to the captured direct-URL loader and preserves its configuration identity and repeated dispatch.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getSearchHttpConfiguration",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The getter delegates to the captured search loader and preserves its configuration identity and repeated dispatch.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getSourceName",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves the exact yandex-music source name.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioTrack",

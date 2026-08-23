@@ -602,6 +602,18 @@ pub extern "system" fn Java_dev_mantle_internal_MantleNative_loadVimeoItem<'loca
 
 #[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
 #[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_mantle_internal_MantleNative_loadYandexMusicItem<'local>(
+    mut env: EnvUnowned<'local>,
+    _class: JClass<'local>,
+    source: JObject<'local>,
+    reference: JObject<'local>,
+) -> JObject<'local> {
+    env.with_env(|env| load_bridge::load_yandex_music_item(env, &source, &reference))
+        .resolve::<ThrowRuntimeExAndDefault>()
+}
+
+#[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_dev_mantle_internal_MantleNative_processNicoTrack<'local>(
     mut env: EnvUnowned<'local>,
     _class: JClass<'local>,
