@@ -177,6 +177,8 @@ const M3U_SEGMENT_TOOLS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/stream/MantleM3uSegmentTools";
 const MPEG_TS_M3U_STREAM_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/stream/MpegTsM3uStreamAudioTrack";
+const TWITCH_CONSTANTS_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/twitch/TwitchConstants";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -242,6 +244,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     M3U_CHANNEL_STREAM_INFO_CLASS,
     M3U_SEGMENT_INFO_CLASS,
     MPEG_TS_M3U_STREAM_AUDIO_TRACK_CLASS,
+    TWITCH_CONSTANTS_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -619,6 +622,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | SOUND_CLOUD_MP3_SEGMENT_DECODER_CLASS
                 | SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS
                 | M3U_SEGMENT_URL_PROVIDER_CLASS
+                | TWITCH_CONSTANTS_CLASS
         ) || field
             .access_flags
             .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
@@ -816,6 +820,9 @@ fn replacement_body(
             descriptor,
             required_locals,
         );
+    }
+    if class_name == TWITCH_CONSTANTS_CLASS {
+        return twitch_constants_replacement(pool, name, descriptor);
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -16039,6 +16046,20 @@ fn mpeg_ts_m3u_process_joined_stream(pool: &mut ConstantPool<'static>) -> Result
             Instruction::Return,
         ],
     )
+}
+
+fn twitch_constants_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        _ => Err(format!(
+            "Phase 13 does not implement {TWITCH_CONSTANTS_CLASS}.{name}{descriptor}"
+        )
+        .into()),
+    }
 }
 
 #[allow(clippy::too_many_lines)]

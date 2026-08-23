@@ -605,9 +605,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[0].completed_slices[].symbols] | add) == .cohorts[0].classified_symbols and
   (.cohorts[0].classified_symbols + .cohorts[0].remaining_symbols) == .cohorts[0].symbols and
   .cohorts[1].status == "IN_PROGRESS" and
-  .cohorts[1].classified_symbols == 246 and
-  .cohorts[1].remaining_symbols == 452 and
-  (.cohorts[1].completed_slices | length) == 34 and
+  .cohorts[1].classified_symbols == 248 and
+  .cohorts[1].remaining_symbols == 450 and
+  (.cohorts[1].completed_slices | length) == 35 and
   .cohorts[1].completed_slices[0] == {
     id: "audio-source-manager-interface-contracts",
     classes: 1,
@@ -1063,11 +1063,24 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "tools/jvm-gate/src/main.rs"
     ]
   } and
+  .cohorts[1].completed_slices[34] == {
+    id: "twitch-constants-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 1,
+    symbols: 2,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
   ([.cohorts[1].completed_slices[].symbols] | add) == .cohorts[1].classified_symbols and
   (.cohorts[1].classified_symbols + .cohorts[1].remaining_symbols) == .cohorts[1].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 781 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 783 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 749 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 751 and
   ([$classifications.symbols[] |
     select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 26 and
   ([$classifications.symbols[] |
@@ -1163,7 +1176,8 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.source.stream.M3uStreamSegmentUrlProvider",
         "com.sedmelluq.discord.lavaplayer.source.stream.M3uStreamSegmentUrlProvider$ChannelStreamInfo",
         "com.sedmelluq.discord.lavaplayer.source.stream.M3uStreamSegmentUrlProvider$SegmentInfo",
-        "com.sedmelluq.discord.lavaplayer.source.stream.MpegTsM3uStreamAudioTrack"
+        "com.sedmelluq.discord.lavaplayer.source.stream.MpegTsM3uStreamAudioTrack",
+        "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchConstants"
       ][]; . == $symbol.binary_name)) and
     (if $symbol.binary_name ==
         "com.sedmelluq.discord.lavaplayer.source.nico.HeartbeatingHttpStream"
@@ -1237,7 +1251,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "twitch-constants-contracts" and
+  .phase_entry.next_slice == "twitch-stream-audio-source-manager-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 ' "$PLAN" >/dev/null
@@ -1245,7 +1259,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '102 reference classes / 810 symbols' \
+  '103 reference classes / 812 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -1255,4 +1269,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 781 classified symbols and 1,981 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 783 classified symbols and 1,979 unassessed symbols.\n'

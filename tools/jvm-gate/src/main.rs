@@ -176,6 +176,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-mpeg-ts-m3u-stream-audio-track-consumer" => {
             Some(MPEG_TS_M3U_STREAM_AUDIO_TRACK_CONSUMER)
         }
+        "write-twitch-constants-consumer" => Some(TWITCH_CONSTANTS_CONSUMER),
         _ => None,
     }
 }
@@ -14704,6 +14705,71 @@ public final class GateMpegTsM3uStreamAudioTrack {
   }
 
   private interface Operation { void run() throws Exception; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const TWITCH_CONSTANTS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.twitch.TwitchConstants;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+public final class GateTwitchConstants {
+  public static void main(String[] args) throws Exception {
+    Class<TwitchConstants> type = TwitchConstants.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredMethods().length == 0,
+        "class metadata");
+
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "constructor metadata");
+    Object first = constructor.newInstance();
+    Object second = constructor.newInstance();
+    check(first.getClass() == type && second.getClass() == type && first != second,
+        "construction");
+
+    Map<String, String> expected = new LinkedHashMap<>();
+    expected.put("TWITCH_GRAPHQL_BASE_URL", "https://gql.twitch.tv/gql");
+    expected.put("TWITCH_URL", "https://www.twitch.tv");
+    expected.put("TWITCH_IMAGE_PREVIEW_URL",
+        "https://static-cdn.jtvnw.net/previews-ttv/live_user_%s-440x248.jpg");
+    expected.put("METADATA_PAYLOAD",
+        "{\"operationName\":\"StreamMetadata\",\"variables\":{\"channelLogin\":\"%s\"},\"extensions\":{\"persistedQuery\":{\"version\":1,\"sha256Hash\":\"1c719a40e481453e5c48d9bb585d971b8b372f8ebb105b17076722264dfa5b3e\"}}}");
+    expected.put("ACCESS_TOKEN_PAYLOAD",
+        "{\"operationName\":\"PlaybackAccessToken_Template\",\"query\":\"query PlaybackAccessToken_Template($login: String!,$isLive:Boolean!,$vodID:ID!,$isVod:Boolean!,$playerType:String!){streamPlaybackAccessToken(channelName:$login,params:{platform:\\\"web\\\",playerBackend:\\\"mediaplayer\\\",playerType:$playerType})@include(if:$isLive){value signature __typename}videoPlaybackAccessToken(id:$vodID,params:{platform:\\\"web\\\",playerBackend:\\\"mediaplayer\\\",playerType:$playerType})@include(if:$isVod){value signature __typename}}\",\"variables\":{\"isLive\":true,\"login\":\"%s\",\"isVod\":false,\"vodID\":\"\",\"playerType\":\"site\"}}");
+
+    check(type.getDeclaredFields().length == expected.size(), "field count");
+    for (Map.Entry<String, String> entry : expected.entrySet()) {
+      Field field = type.getDeclaredField(entry.getKey());
+      check(field.getType() == String.class
+          && field.getModifiers() == (Modifier.STATIC | Modifier.FINAL)
+          && !field.isSynthetic(), entry.getKey() + " metadata");
+      field.setAccessible(true);
+      String actual = (String) field.get(null);
+      check(actual.equals(entry.getValue()) && actual == entry.getValue(),
+          entry.getKey() + " value and constant identity");
+    }
+
+    check(String.format(expected.get("TWITCH_IMAGE_PREVIEW_URL"), "mixed")
+        .endsWith("live_user_mixed-440x248.jpg"), "preview substitution");
+    check(String.format(expected.get("METADATA_PAYLOAD"), "mixed")
+        .contains("\"channelLogin\":\"mixed\""), "metadata substitution");
+    check(String.format(expected.get("ACCESS_TOKEN_PAYLOAD"), "mixed")
+        .contains("\"login\":\"mixed\""), "access-token substitution");
+
+    System.out.println("public-object-shell,5-package-constants,1-constructor,0-methods;"
+        + "construction,urls,image-template,metadata-payload,access-token-payload,"
+        + "format-substitution,constant-identity,reflection");
+  }
+
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }
