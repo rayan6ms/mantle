@@ -167,6 +167,14 @@ const M3U_STREAM_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/stream/M3uStreamAudioTrack";
 const M3U_STREAM_PROVIDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/stream/MantleM3uStreamProvider";
+const M3U_SEGMENT_URL_PROVIDER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider";
+const M3U_CHANNEL_STREAM_INFO_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider$ChannelStreamInfo";
+const M3U_SEGMENT_INFO_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider$SegmentInfo";
+const M3U_SEGMENT_TOOLS_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/stream/MantleM3uSegmentTools";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -228,6 +236,9 @@ const REFERENCE_CLASSES: &[&str] = &[
     SOUND_CLOUD_SEGMENT_DECODER_FACTORY_CLASS,
     SOUND_CLOUD_TRACK_FORMAT_CLASS,
     M3U_STREAM_AUDIO_TRACK_CLASS,
+    M3U_SEGMENT_URL_PROVIDER_CLASS,
+    M3U_CHANNEL_STREAM_INFO_CLASS,
+    M3U_SEGMENT_INFO_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -372,7 +383,9 @@ pub fn emit(
             .iter()
             .filter_map(|class| {
                 let name = class.class_name().ok()?.to_string();
-                (name.starts_with("dev/mantle/internal/") || name == M3U_STREAM_PROVIDER_CLASS)
+                (name.starts_with("dev/mantle/internal/")
+                    || name == M3U_STREAM_PROVIDER_CLASS
+                    || name == M3U_SEGMENT_TOOLS_CLASS)
                     .then_some(name)
             })
             .collect();
@@ -409,6 +422,7 @@ fn internal_classes(expected_abi: u8) -> Result<Vec<ClassFile<'static>>> {
         native_base_audio_track_class()?,
         native_audio_track_info_builder_class()?,
         m3u_stream_provider_class()?,
+        m3u_segment_tools_class()?,
     ])
 }
 
@@ -601,6 +615,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS
                 | SOUND_CLOUD_MP3_SEGMENT_DECODER_CLASS
                 | SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS
+                | M3U_SEGMENT_URL_PROVIDER_CLASS
         ) || field
             .access_flags
             .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
@@ -626,6 +641,9 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS
                 | SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS
                 | M3U_STREAM_AUDIO_TRACK_CLASS
+                | M3U_SEGMENT_URL_PROVIDER_CLASS
+                | M3U_CHANNEL_STREAM_INFO_CLASS
+                | M3U_SEGMENT_INFO_CLASS
         ) || method
             .access_flags
             .intersects(MethodAccessFlags::PUBLIC | MethodAccessFlags::PROTECTED)
@@ -772,6 +790,15 @@ fn replacement_body(
     }
     if class_name == M3U_STREAM_AUDIO_TRACK_CLASS {
         return m3u_stream_audio_track_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == M3U_SEGMENT_URL_PROVIDER_CLASS {
+        return m3u_segment_url_provider_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == M3U_CHANNEL_STREAM_INFO_CLASS {
+        return m3u_channel_stream_info_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == M3U_SEGMENT_INFO_CLASS {
+        return m3u_segment_info_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_M3U_INFO_CLASS {
         return sound_cloud_m3u_info_replacement(pool, name, descriptor, required_locals);
@@ -15200,6 +15227,36 @@ fn add_reference_implementation_state(
     if class_name == BASIC_PLAYLIST_CLASS {
         add_basic_playlist_state(class)?;
     }
+    if class_name == M3U_CHANNEL_STREAM_INFO_CLASS {
+        let owner = class
+            .constant_pool
+            .add_class(M3U_CHANNEL_STREAM_INFO_CLASS)?;
+        let constructor = class.constant_pool.add_method_ref(
+            owner,
+            "<init>",
+            "(Ljava/lang/String;Ljava/lang/String;)V",
+        )?;
+        let body = code(
+            &mut class.constant_pool,
+            4,
+            2,
+            vec![
+                Instruction::New(owner),
+                Instruction::Dup,
+                Instruction::Aload_0,
+                Instruction::Aload_1,
+                Instruction::Invokespecial(constructor),
+                Instruction::Areturn,
+            ],
+        )?;
+        add_method(
+            class,
+            MethodAccessFlags::STATIC,
+            "mantleCreate",
+            "(Ljava/lang/String;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider$ChannelStreamInfo;",
+            Some(body),
+        )?;
+    }
     Ok(())
 }
 
@@ -15440,6 +15497,364 @@ fn add_basic_playlist_state(class: &mut ClassFile<'static>) -> Result<()> {
         )?;
     }
     Ok(())
+}
+
+#[allow(clippy::too_many_lines)]
+fn m3u_segment_url_provider_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    let owner = pool.add_class(M3U_SEGMENT_URL_PROVIDER_CLASS)?;
+    let tools = pool.add_class(M3U_SEGMENT_TOOLS_CLASS)?;
+    match (name, descriptor) {
+        ("<init>", "()V") => {
+            let constructor = pool.add_method_ref(owner, "<init>", "(Ljava/lang/String;)V")?;
+            code(
+                pool,
+                2,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Aconst_null,
+                    Instruction::Invokespecial(constructor),
+                    Instruction::Return,
+                ],
+            )
+        }
+        ("<init>", "(Ljava/lang/String;)V") => {
+            let object = pool.add_class("java/lang/Object")?;
+            let object_constructor = pool.add_method_ref(object, "<init>", "()V")?;
+            let base_url = pool.add_field_ref(owner, "baseUrl", "Ljava/lang/String;")?;
+            let normalize =
+                pool.add_method_ref(tools, "baseUrl", "(Ljava/lang/String;)Ljava/lang/String;")?;
+            code(
+                pool,
+                2,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Invokespecial(object_constructor),
+                    Instruction::Aload_0,
+                    Instruction::Aload_1,
+                    Instruction::Invokestatic(normalize),
+                    Instruction::Putfield(base_url),
+                    Instruction::Return,
+                ],
+            )
+        }
+        ("createSegmentUrl", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;") => {
+            let method = pool.add_method_ref(
+                tools,
+                "createSegmentUrl",
+                "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+            )?;
+            code(
+                pool,
+                2,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Aload_1,
+                    Instruction::Invokestatic(method),
+                    Instruction::Areturn,
+                ],
+            )
+        }
+        (
+            "getNextSegmentUrl",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;)Ljava/lang/String;",
+        ) => m3u_provider_delegate(
+            pool,
+            tools,
+            "getNextSegmentUrl",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider;Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;)Ljava/lang/String;",
+            required_locals,
+            &[Instruction::Aload_0, Instruction::Aload_1],
+            Instruction::Areturn,
+            2,
+        ),
+        (
+            "getNextSegmentStream",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;)Ljava/io/InputStream;",
+        ) => {
+            let config = pool.add_field_ref(
+                owner,
+                "streamingRequestConfig",
+                "Lorg/apache/http/client/config/RequestConfig;",
+            )?;
+            let method = pool.add_method_ref(
+                tools,
+                "getNextSegmentStream",
+                "(Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider;Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Lorg/apache/http/client/config/RequestConfig;)Ljava/io/InputStream;",
+            )?;
+            code(
+                pool,
+                3,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Aload_1,
+                    Instruction::Getstatic(config),
+                    Instruction::Invokestatic(method),
+                    Instruction::Areturn,
+                ],
+            )
+        }
+        ("isAbsoluteUrl", "(Ljava/lang/String;)Z") => m3u_provider_delegate(
+            pool,
+            tools,
+            "isAbsoluteUrl",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider;Ljava/lang/String;)Z",
+            required_locals,
+            &[Instruction::Aload_0, Instruction::Aload_1],
+            Instruction::Ireturn,
+            2,
+        ),
+        ("getAbsoluteUrl", "(Ljava/lang/String;)Ljava/lang/String;") => m3u_provider_delegate(
+            pool,
+            tools,
+            "getAbsoluteUrl",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider;Ljava/lang/String;)Ljava/lang/String;",
+            required_locals,
+            &[Instruction::Aload_0, Instruction::Aload_1],
+            Instruction::Areturn,
+            2,
+        ),
+        ("loadChannelStreamsList", "([Ljava/lang/String;)Ljava/util/List;") => {
+            m3u_provider_delegate(
+                pool,
+                tools,
+                "loadChannelStreamsList",
+                "(Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider;[Ljava/lang/String;)Ljava/util/List;",
+                required_locals,
+                &[Instruction::Aload_0, Instruction::Aload_1],
+                Instruction::Areturn,
+                2,
+            )
+        }
+        (
+            "loadStreamSegmentsList",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/lang/String;)Ljava/util/List;",
+        ) => m3u_provider_delegate(
+            pool,
+            tools,
+            "loadStreamSegmentsList",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/lang/String;)Ljava/util/List;",
+            required_locals,
+            &[Instruction::Aload_1, Instruction::Aload_2],
+            Instruction::Areturn,
+            2,
+        ),
+        (
+            "chooseNextSegment",
+            "(Ljava/util/List;Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider$SegmentInfo;)Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider$SegmentInfo;",
+        ) => m3u_provider_delegate(
+            pool,
+            tools,
+            "chooseNextSegment",
+            "(Ljava/util/List;Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider$SegmentInfo;)Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider$SegmentInfo;",
+            required_locals,
+            &[Instruction::Aload_1, Instruction::Aload_2],
+            Instruction::Areturn,
+            2,
+        ),
+        ("parseSecondDuration", "(Ljava/lang/String;)Ljava/lang/Long;") => {
+            let method = pool.add_method_ref(
+                tools,
+                "parseSecondDuration",
+                "(Ljava/lang/String;)Ljava/lang/Long;",
+            )?;
+            code(
+                pool,
+                1,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Invokestatic(method),
+                    Instruction::Areturn,
+                ],
+            )
+        }
+        ("shouldWaitForSegment", "(JLjava/util/List;)Z") => {
+            let method =
+                pool.add_method_ref(tools, "shouldWaitForSegment", "(JLjava/util/List;)Z")?;
+            code(
+                pool,
+                3,
+                required_locals,
+                vec![
+                    Instruction::Lload_1,
+                    Instruction::Aload_3,
+                    Instruction::Invokestatic(method),
+                    Instruction::Ireturn,
+                ],
+            )
+        }
+        ("<clinit>", "()V") => m3u_segment_url_provider_initializer(pool),
+        _ => Err(format!(
+            "Phase 13 does not implement {M3U_SEGMENT_URL_PROVIDER_CLASS}.{name}{descriptor}"
+        )
+        .into()),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn m3u_provider_delegate(
+    pool: &mut ConstantPool<'static>,
+    tools: u16,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+    loads: &[Instruction],
+    return_instruction: Instruction,
+    max_stack: u16,
+) -> Result<Attribute> {
+    let method = pool.add_method_ref(tools, name, descriptor)?;
+    let mut instructions = loads.to_vec();
+    instructions.push(Instruction::Invokestatic(method));
+    instructions.push(return_instruction);
+    code(pool, max_stack, required_locals, instructions)
+}
+
+fn m3u_segment_url_provider_initializer(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(M3U_SEGMENT_URL_PROVIDER_CLASS)?;
+    let config = pool.add_class("org/apache/http/client/config/RequestConfig")?;
+    let builder = pool.add_class("org/apache/http/client/config/RequestConfig$Builder")?;
+    let custom = pool.add_method_ref(
+        config,
+        "custom",
+        "()Lorg/apache/http/client/config/RequestConfig$Builder;",
+    )?;
+    let builder_method_descriptor = "(I)Lorg/apache/http/client/config/RequestConfig$Builder;";
+    let socket = pool.add_method_ref(builder, "setSocketTimeout", builder_method_descriptor)?;
+    let connection_request = pool.add_method_ref(
+        builder,
+        "setConnectionRequestTimeout",
+        builder_method_descriptor,
+    )?;
+    let connect = pool.add_method_ref(builder, "setConnectTimeout", builder_method_descriptor)?;
+    let build = pool.add_method_ref(
+        builder,
+        "build",
+        "()Lorg/apache/http/client/config/RequestConfig;",
+    )?;
+    let field = pool.add_field_ref(
+        owner,
+        "streamingRequestConfig",
+        "Lorg/apache/http/client/config/RequestConfig;",
+    )?;
+    code(
+        pool,
+        2,
+        0,
+        vec![
+            Instruction::Invokestatic(custom),
+            Instruction::Sipush(5000),
+            Instruction::Invokevirtual(socket),
+            Instruction::Sipush(5000),
+            Instruction::Invokevirtual(connection_request),
+            Instruction::Sipush(5000),
+            Instruction::Invokevirtual(connect),
+            Instruction::Invokevirtual(build),
+            Instruction::Putstatic(field),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn m3u_channel_stream_info_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    if (name, descriptor) != ("<init>", "(Ljava/lang/String;Ljava/lang/String;)V") {
+        return Err(format!(
+            "Phase 13 does not implement {M3U_CHANNEL_STREAM_INFO_CLASS}.{name}{descriptor}"
+        )
+        .into());
+    }
+    m3u_string_value_constructor(
+        pool,
+        M3U_CHANNEL_STREAM_INFO_CLASS,
+        &["quality", "url"],
+        required_locals,
+    )
+}
+
+fn m3u_segment_info_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    if (name, descriptor)
+        != (
+            "<init>",
+            "(Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;)V",
+        )
+    {
+        return Err(format!(
+            "Phase 13 does not implement {M3U_SEGMENT_INFO_CLASS}.{name}{descriptor}"
+        )
+        .into());
+    }
+    let object = pool.add_class("java/lang/Object")?;
+    let object_constructor = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(M3U_SEGMENT_INFO_CLASS)?;
+    let url = pool.add_field_ref(owner, "url", "Ljava/lang/String;")?;
+    let duration = pool.add_field_ref(owner, "duration", "Ljava/lang/Long;")?;
+    let segment_name = pool.add_field_ref(owner, "name", "Ljava/lang/String;")?;
+    code(
+        pool,
+        2,
+        required_locals,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_constructor),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(url),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(duration),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Putfield(segment_name),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn m3u_string_value_constructor(
+    pool: &mut ConstantPool<'static>,
+    owner_name: &str,
+    fields: &[&str],
+    required_locals: u16,
+) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_constructor = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(owner_name)?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Invokespecial(object_constructor),
+    ];
+    for (index, field_name) in fields.iter().enumerate() {
+        let field = pool.add_field_ref(owner, *field_name, "Ljava/lang/String;")?;
+        instructions.extend([
+            Instruction::Aload_0,
+            if index == 0 {
+                Instruction::Aload_1
+            } else {
+                Instruction::Aload_2
+            },
+            Instruction::Putfield(field),
+        ]);
+    }
+    instructions.push(Instruction::Return);
+    code(pool, 2, required_locals, instructions)
 }
 
 fn m3u_stream_audio_track_replacement(
@@ -15755,6 +16170,918 @@ fn m3u_stream_provider_class() -> Result<ClassFile<'static>> {
         Some(run),
     )?;
     Ok(class)
+}
+
+#[allow(clippy::too_many_lines)]
+fn m3u_segment_tools_class() -> Result<ClassFile<'static>> {
+    let mut class = new_class(
+        M3U_SEGMENT_TOOLS_CLASS,
+        "java/lang/Object",
+        ClassAccessFlags::FINAL | ClassAccessFlags::SUPER,
+        &[],
+    )?;
+    for (name, descriptor, body) in [
+        (
+            "baseUrl",
+            "(Ljava/lang/String;)Ljava/lang/String;",
+            m3u_base_url_body(&mut class.constant_pool)?,
+        ),
+        (
+            "createSegmentUrl",
+            "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+            m3u_create_segment_url_body(&mut class.constant_pool)?,
+        ),
+        (
+            "isAbsoluteUrl",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider;Ljava/lang/String;)Z",
+            m3u_is_absolute_url_body(&mut class.constant_pool)?,
+        ),
+        (
+            "getAbsoluteUrl",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider;Ljava/lang/String;)Ljava/lang/String;",
+            m3u_get_absolute_url_body(&mut class.constant_pool)?,
+        ),
+        (
+            "parseSecondDuration",
+            "(Ljava/lang/String;)Ljava/lang/Long;",
+            m3u_parse_second_duration_body(&mut class.constant_pool)?,
+        ),
+        (
+            "chooseNextSegment",
+            "(Ljava/util/List;Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider$SegmentInfo;)Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider$SegmentInfo;",
+            m3u_choose_next_segment_body(&mut class.constant_pool)?,
+        ),
+        (
+            "shouldWaitForSegment",
+            "(JLjava/util/List;)Z",
+            m3u_should_wait_for_segment_body(&mut class.constant_pool)?,
+        ),
+        (
+            "loadChannelStreamsList",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider;[Ljava/lang/String;)Ljava/util/List;",
+            m3u_load_channel_streams_body(&mut class.constant_pool)?,
+        ),
+        (
+            "loadStreamSegmentsList",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/lang/String;)Ljava/util/List;",
+            m3u_load_stream_segments_body(&mut class.constant_pool)?,
+        ),
+        (
+            "getNextSegmentUrl",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider;Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;)Ljava/lang/String;",
+            m3u_get_next_segment_url_body(&mut class.constant_pool)?,
+        ),
+        (
+            "getNextSegmentStream",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider;Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Lorg/apache/http/client/config/RequestConfig;)Ljava/io/InputStream;",
+            m3u_get_next_segment_stream_body(&mut class.constant_pool)?,
+        ),
+        (
+            "closeFailedResponse",
+            "(Lorg/apache/http/client/methods/CloseableHttpResponse;Z)V",
+            m3u_close_failed_response_body(&mut class.constant_pool)?,
+        ),
+    ] {
+        add_method(
+            &mut class,
+            MethodAccessFlags::STATIC,
+            name,
+            descriptor,
+            Some(body),
+        )?;
+    }
+    Ok(class)
+}
+
+fn m3u_base_url_body(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let string = pool.add_class("java/lang/String")?;
+    let slash = pool.add_string("/")?;
+    let ends_with = pool.add_method_ref(string, "endsWith", "(Ljava/lang/String;)Z")?;
+    let length = pool.add_method_ref(string, "length", "()I")?;
+    let substring = pool.add_method_ref(string, "substring", "(II)Ljava/lang/String;")?;
+    let last_index = pool.add_method_ref(string, "lastIndexOf", "(Ljava/lang/String;)I")?;
+    code(
+        pool,
+        4,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Ifnonnull(4),
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+            Instruction::Aload_0,
+            Instruction::Ldc_w(slash),
+            Instruction::Invokevirtual(ends_with),
+            Instruction::Ifeq(16),
+            Instruction::Aload_0,
+            Instruction::Iconst_0,
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(length),
+            Instruction::Iconst_1,
+            Instruction::Isub,
+            Instruction::Invokevirtual(substring),
+            Instruction::Astore_0,
+            Instruction::Aload_0,
+            Instruction::Iconst_0,
+            Instruction::Aload_0,
+            Instruction::Ldc_w(slash),
+            Instruction::Invokevirtual(last_index),
+            Instruction::Invokevirtual(substring),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn m3u_create_segment_url_body(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let uri = pool.add_class("java/net/URI")?;
+    let create = pool.add_method_ref(uri, "create", "(Ljava/lang/String;)Ljava/net/URI;")?;
+    let resolve = pool.add_method_ref(uri, "resolve", "(Ljava/lang/String;)Ljava/net/URI;")?;
+    let to_string = pool.add_method_ref(uri, "toString", "()Ljava/lang/String;")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokestatic(create),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(resolve),
+            Instruction::Invokevirtual(to_string),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn m3u_is_absolute_url_body(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let provider = pool.add_class(M3U_SEGMENT_URL_PROVIDER_CLASS)?;
+    let base_url = pool.add_field_ref(provider, "baseUrl", "Ljava/lang/String;")?;
+    let uri = pool.add_class("java/net/URI")?;
+    let constructor = pool.add_method_ref(uri, "<init>", "(Ljava/lang/String;)V")?;
+    let is_absolute = pool.add_method_ref(uri, "isAbsolute", "()Z")?;
+    let syntax = pool.add_class("java/net/URISyntaxException")?;
+    code_with_exceptions(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(base_url),
+            Instruction::Ifnull(9),
+            Instruction::New(uri),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(constructor),
+            Instruction::Invokevirtual(is_absolute),
+            Instruction::Ireturn,
+            Instruction::Iconst_1,
+            Instruction::Ireturn,
+            Instruction::Astore_2,
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+        ],
+        vec![ExceptionTableEntry {
+            range_pc: 3..9,
+            handler_pc: 11,
+            catch_type: syntax,
+        }],
+    )
+}
+
+fn m3u_get_absolute_url_body(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let provider = pool.add_class(M3U_SEGMENT_URL_PROVIDER_CLASS)?;
+    let base_url = pool.add_field_ref(provider, "baseUrl", "Ljava/lang/String;")?;
+    let string = pool.add_class("java/lang/String")?;
+    let starts_with = pool.add_method_ref(string, "startsWith", "(Ljava/lang/String;)Z")?;
+    let builder = pool.add_class("java/lang/StringBuilder")?;
+    let constructor = pool.add_method_ref(builder, "<init>", "()V")?;
+    let append = pool.add_method_ref(
+        builder,
+        "append",
+        "(Ljava/lang/String;)Ljava/lang/StringBuilder;",
+    )?;
+    let to_string = pool.add_method_ref(builder, "toString", "()Ljava/lang/String;")?;
+    let slash = pool.add_string("/")?;
+    code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::New(builder),
+            Instruction::Dup,
+            Instruction::Invokespecial(constructor),
+            Instruction::Aload_0,
+            Instruction::Getfield(base_url),
+            Instruction::Invokevirtual(append),
+            Instruction::Aload_1,
+            Instruction::Ldc_w(slash),
+            Instruction::Invokevirtual(starts_with),
+            Instruction::Ifeq(12),
+            Instruction::Aload_1,
+            Instruction::Goto(15),
+            Instruction::Ldc_w(slash),
+            Instruction::Invokevirtual(append),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(append),
+            Instruction::Invokevirtual(to_string),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn m3u_parse_second_duration_body(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let double = pool.add_class("java/lang/Double")?;
+    let parse = pool.add_method_ref(double, "parseDouble", "(Ljava/lang/String;)D")?;
+    let thousand = pool.add_double(1000.0)?;
+    let long = pool.add_class("java/lang/Long")?;
+    let value_of = pool.add_method_ref(long, "valueOf", "(J)Ljava/lang/Long;")?;
+    let number_format = pool.add_class("java/lang/NumberFormatException")?;
+    code_with_exceptions(
+        pool,
+        4,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokestatic(parse),
+            Instruction::Ldc2_w(thousand),
+            Instruction::Dmul,
+            Instruction::D2l,
+            Instruction::Invokestatic(value_of),
+            Instruction::Areturn,
+            Instruction::Astore_1,
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+        ],
+        vec![ExceptionTableEntry {
+            range_pc: 0..7,
+            handler_pc: 7,
+            catch_type: number_format,
+        }],
+    )
+}
+
+fn m3u_choose_next_segment_body(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let list = pool.add_class("java/util/List")?;
+    let size = pool.add_interface_method_ref(list, "size", "()I")?;
+    let get = pool.add_interface_method_ref(list, "get", "(I)Ljava/lang/Object;")?;
+    let segment = pool.add_class(M3U_SEGMENT_INFO_CLASS)?;
+    let url = pool.add_field_ref(segment, "url", "Ljava/lang/String;")?;
+    let string = pool.add_class("java/lang/String")?;
+    let equals = pool.add_method_ref(string, "equals", "(Ljava/lang/Object;)Z")?;
+    code(
+        pool,
+        2,
+        6,
+        vec![
+            Instruction::Aconst_null,
+            Instruction::Astore_2,
+            Instruction::Aload_0,
+            Instruction::Invokeinterface(size, 1),
+            Instruction::Iconst_1,
+            Instruction::Isub,
+            Instruction::Istore_3,
+            Instruction::Iload_3,
+            Instruction::Iflt(26),
+            Instruction::Aload_0,
+            Instruction::Iload_3,
+            Instruction::Invokeinterface(get, 2),
+            Instruction::Checkcast(segment),
+            Instruction::Astore(4),
+            Instruction::Aload_1,
+            Instruction::Ifnull(22),
+            Instruction::Aload(4),
+            Instruction::Getfield(url),
+            Instruction::Aload_1,
+            Instruction::Getfield(url),
+            Instruction::Invokevirtual(equals),
+            Instruction::Ifne(26),
+            Instruction::Aload(4),
+            Instruction::Astore_2,
+            Instruction::Iinc(3, -1),
+            Instruction::Goto(7),
+            Instruction::Aload_2,
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn m3u_should_wait_for_segment_body(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let list = pool.add_class("java/util/List")?;
+    let is_empty = pool.add_interface_method_ref(list, "isEmpty", "()Z")?;
+    let get = pool.add_interface_method_ref(list, "get", "(I)Ljava/lang/Object;")?;
+    let segment = pool.add_class(M3U_SEGMENT_INFO_CLASS)?;
+    let duration = pool.add_field_ref(segment, "duration", "Ljava/lang/Long;")?;
+    let system = pool.add_class("java/lang/System")?;
+    let current_time = pool.add_method_ref(system, "currentTimeMillis", "()J")?;
+    let long = pool.add_class("java/lang/Long")?;
+    let long_value = pool.add_method_ref(long, "longValue", "()J")?;
+    code(
+        pool,
+        4,
+        5,
+        vec![
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(is_empty, 1),
+            Instruction::Ifne(21),
+            Instruction::Aload_2,
+            Instruction::Iconst_0,
+            Instruction::Invokeinterface(get, 2),
+            Instruction::Checkcast(segment),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Getfield(duration),
+            Instruction::Ifnull(21),
+            Instruction::Invokestatic(current_time),
+            Instruction::Lload_0,
+            Instruction::Lsub,
+            Instruction::Aload_3,
+            Instruction::Getfield(duration),
+            Instruction::Invokevirtual(long_value),
+            Instruction::Lcmp,
+            Instruction::Ifge(21),
+            Instruction::Iconst_1,
+            Instruction::Ireturn,
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn m3u_load_channel_streams_body(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let list = pool.add_class("java/util/List")?;
+    let array_list = pool.add_class("java/util/ArrayList")?;
+    let list_constructor = pool.add_method_ref(array_list, "<init>", "()V")?;
+    let add = pool.add_interface_method_ref(list, "add", "(Ljava/lang/Object;)Z")?;
+    let parser =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/playlists/ExtendedM3uParser")?;
+    let line_class = pool
+        .add_class("com/sedmelluq/discord/lavaplayer/container/playlists/ExtendedM3uParser$Line")?;
+    let parse_line = pool.add_method_ref(
+        parser,
+        "parseLine",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/container/playlists/ExtendedM3uParser$Line;",
+    )?;
+    let is_data = pool.add_method_ref(line_class, "isData", "()Z")?;
+    let is_directive = pool.add_method_ref(line_class, "isDirective", "()Z")?;
+    let line_data = pool.add_field_ref(line_class, "lineData", "Ljava/lang/String;")?;
+    let directive_name = pool.add_field_ref(line_class, "directiveName", "Ljava/lang/String;")?;
+    let provider = pool.add_class(M3U_SEGMENT_URL_PROVIDER_CLASS)?;
+    let quality = pool.add_method_ref(
+        provider,
+        "getQualityFromM3uDirective",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/playlists/ExtendedM3uParser$Line;)Ljava/lang/String;",
+    )?;
+    let tools = pool.add_class(M3U_SEGMENT_TOOLS_CLASS)?;
+    let is_absolute = pool.add_method_ref(
+        tools,
+        "isAbsoluteUrl",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider;Ljava/lang/String;)Z",
+    )?;
+    let get_absolute = pool.add_method_ref(
+        tools,
+        "getAbsoluteUrl",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider;Ljava/lang/String;)Ljava/lang/String;",
+    )?;
+    let channel = pool.add_class(M3U_CHANNEL_STREAM_INFO_CLASS)?;
+    let create = pool.add_method_ref(
+        channel,
+        "mantleCreate",
+        "(Ljava/lang/String;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider$ChannelStreamInfo;",
+    )?;
+    let string = pool.add_class("java/lang/String")?;
+    let equals = pool.add_method_ref(string, "equals", "(Ljava/lang/Object;)Z")?;
+    let stream_inf = pool.add_string("EXT-X-STREAM-INF")?;
+    let ext_inf = pool.add_string("EXTINF")?;
+    code(
+        pool,
+        4,
+        9,
+        vec![
+            Instruction::Aconst_null,                     // 0
+            Instruction::Astore_2,                        // 1
+            Instruction::New(array_list),                 // 2
+            Instruction::Dup,                             // 3
+            Instruction::Invokespecial(list_constructor), // 4
+            Instruction::Astore_3,                        // 5
+            Instruction::Iconst_0,                        // 6
+            Instruction::Istore(4),                       // 7
+            Instruction::Iload(4),                        // 8
+            Instruction::Aload_1,                         // 9
+            Instruction::Arraylength,                     // 10
+            Instruction::If_icmpge(67),                   // 11
+            Instruction::Aload_1,                         // 12
+            Instruction::Iload(4),                        // 13
+            Instruction::Aaload,                          // 14
+            Instruction::Astore(5),                       // 15
+            Instruction::Aload(5),                        // 16
+            Instruction::Invokestatic(parse_line),        // 17
+            Instruction::Astore(6),                       // 18
+            Instruction::Aload(6),                        // 19
+            Instruction::Invokevirtual(is_data),          // 20
+            Instruction::Ifeq(50),                        // 21
+            Instruction::Aload_2,                         // 22
+            Instruction::Ifnull(50),                      // 23
+            Instruction::Aload_0,                         // 24
+            Instruction::Aload_2,                         // 25
+            Instruction::Invokevirtual(quality),          // 26
+            Instruction::Astore(7),                       // 27
+            Instruction::Aload(7),                        // 28
+            Instruction::Ifnull(47),                      // 29
+            Instruction::Aload(6),                        // 30
+            Instruction::Getfield(line_data),             // 31
+            Instruction::Astore(8),                       // 32
+            Instruction::Aload_3,                         // 33
+            Instruction::Aload(7),                        // 34
+            Instruction::Aload_0,                         // 35
+            Instruction::Aload(8),                        // 36
+            Instruction::Invokestatic(is_absolute),       // 37
+            Instruction::Ifeq(41),                        // 38
+            Instruction::Aload(8),                        // 39
+            Instruction::Goto(44),                        // 40
+            Instruction::Aload_0,                         // 41
+            Instruction::Aload(8),                        // 42
+            Instruction::Invokestatic(get_absolute),      // 43
+            Instruction::Invokestatic(create),            // 44
+            Instruction::Invokeinterface(add, 2),         // 45
+            Instruction::Pop,                             // 46
+            Instruction::Aconst_null,                     // 47
+            Instruction::Astore_2,                        // 48
+            Instruction::Goto(65),                        // 49
+            Instruction::Aload(6),                        // 50
+            Instruction::Invokevirtual(is_directive),     // 51
+            Instruction::Ifeq(65),                        // 52
+            Instruction::Ldc_w(stream_inf),               // 53
+            Instruction::Aload(6),                        // 54
+            Instruction::Getfield(directive_name),        // 55
+            Instruction::Invokevirtual(equals),           // 56
+            Instruction::Ifne(63),                        // 57
+            Instruction::Ldc_w(ext_inf),                  // 58
+            Instruction::Aload(6),                        // 59
+            Instruction::Getfield(directive_name),        // 60
+            Instruction::Invokevirtual(equals),           // 61
+            Instruction::Ifeq(65),                        // 62
+            Instruction::Aload(6),                        // 63
+            Instruction::Astore_2,                        // 64
+            Instruction::Iinc(4, 1),                      // 65
+            Instruction::Goto(8),                         // 66
+            Instruction::Aload_3,                         // 67
+            Instruction::Areturn,                         // 68
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn m3u_load_stream_segments_body(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let list = pool.add_class("java/util/List")?;
+    let array_list = pool.add_class("java/util/ArrayList")?;
+    let list_constructor = pool.add_method_ref(array_list, "<init>", "()V")?;
+    let add = pool.add_interface_method_ref(list, "add", "(Ljava/lang/Object;)Z")?;
+    let http_get = pool.add_class("org/apache/http/client/methods/HttpGet")?;
+    let get_constructor = pool.add_method_ref(http_get, "<init>", "(Ljava/lang/String;)V")?;
+    let client_tools =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpClientTools")?;
+    let fetch_lines = pool.add_method_ref(
+        client_tools,
+        "fetchResponseLines",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Lorg/apache/http/client/methods/HttpUriRequest;Ljava/lang/String;)[Ljava/lang/String;",
+    )?;
+    let parser =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/playlists/ExtendedM3uParser")?;
+    let line_class = pool
+        .add_class("com/sedmelluq/discord/lavaplayer/container/playlists/ExtendedM3uParser$Line")?;
+    let parse_line = pool.add_method_ref(
+        parser,
+        "parseLine",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/container/playlists/ExtendedM3uParser$Line;",
+    )?;
+    let is_data = pool.add_method_ref(line_class, "isData", "()Z")?;
+    let is_directive = pool.add_method_ref(line_class, "isDirective", "()Z")?;
+    let line_data = pool.add_field_ref(line_class, "lineData", "Ljava/lang/String;")?;
+    let directive_name = pool.add_field_ref(line_class, "directiveName", "Ljava/lang/String;")?;
+    let extra_data = pool.add_field_ref(line_class, "extraData", "Ljava/lang/String;")?;
+    let string = pool.add_class("java/lang/String")?;
+    let equals = pool.add_method_ref(string, "equals", "(Ljava/lang/Object;)Z")?;
+    let contains = pool.add_method_ref(string, "contains", "(Ljava/lang/CharSequence;)Z")?;
+    let split = pool.add_method_ref(string, "split", "(Ljava/lang/String;I)[Ljava/lang/String;")?;
+    let segment = pool.add_class(M3U_SEGMENT_INFO_CLASS)?;
+    let segment_constructor = pool.add_method_ref(
+        segment,
+        "<init>",
+        "(Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;)V",
+    )?;
+    let tools = pool.add_class(M3U_SEGMENT_TOOLS_CLASS)?;
+    let parse_duration = pool.add_method_ref(
+        tools,
+        "parseSecondDuration",
+        "(Ljava/lang/String;)Ljava/lang/Long;",
+    )?;
+    let purpose = pool.add_string("stream segments list")?;
+    let ext_inf = pool.add_string("EXTINF")?;
+    let comma = pool.add_string(",")?;
+    code(
+        pool,
+        7,
+        9,
+        vec![
+            Instruction::New(array_list),                    // 0
+            Instruction::Dup,                                // 1
+            Instruction::Invokespecial(list_constructor),    // 2
+            Instruction::Astore_2,                           // 3
+            Instruction::Aconst_null,                        // 4
+            Instruction::Astore_3,                           // 5
+            Instruction::Aload_0,                            // 6
+            Instruction::New(http_get),                      // 7
+            Instruction::Dup,                                // 8
+            Instruction::Aload_1,                            // 9
+            Instruction::Invokespecial(get_constructor),     // 10
+            Instruction::Ldc_w(purpose),                     // 11
+            Instruction::Invokestatic(fetch_lines),          // 12
+            Instruction::Astore(4),                          // 13
+            Instruction::Iconst_0,                           // 14
+            Instruction::Istore(5),                          // 15
+            Instruction::Iload(5),                           // 16
+            Instruction::Aload(4),                           // 17
+            Instruction::Arraylength,                        // 18
+            Instruction::If_icmpge(81),                      // 19
+            Instruction::Aload(4),                           // 20
+            Instruction::Iload(5),                           // 21
+            Instruction::Aaload,                             // 22
+            Instruction::Astore(6),                          // 23
+            Instruction::Aload(6),                           // 24
+            Instruction::Invokestatic(parse_line),           // 25
+            Instruction::Astore(7),                          // 26
+            Instruction::Aload(7),                           // 27
+            Instruction::Invokevirtual(is_directive),        // 28
+            Instruction::Ifeq(37),                           // 29
+            Instruction::Ldc_w(ext_inf),                     // 30
+            Instruction::Aload(7),                           // 31
+            Instruction::Getfield(directive_name),           // 32
+            Instruction::Invokevirtual(equals),              // 33
+            Instruction::Ifeq(37),                           // 34
+            Instruction::Aload(7),                           // 35
+            Instruction::Astore_3,                           // 36
+            Instruction::Aload(7),                           // 37
+            Instruction::Invokevirtual(is_data),             // 38
+            Instruction::Ifeq(79),                           // 39
+            Instruction::Aload_3,                            // 40
+            Instruction::Ifnull(69),                         // 41
+            Instruction::Aload_3,                            // 42
+            Instruction::Getfield(extra_data),               // 43
+            Instruction::Ldc_w(comma),                       // 44
+            Instruction::Invokevirtual(contains),            // 45
+            Instruction::Ifeq(69),                           // 46
+            Instruction::Aload_3,                            // 47
+            Instruction::Getfield(extra_data),               // 48
+            Instruction::Ldc_w(comma),                       // 49
+            Instruction::Iconst_2,                           // 50
+            Instruction::Invokevirtual(split),               // 51
+            Instruction::Astore(8),                          // 52
+            Instruction::Aload_2,                            // 53
+            Instruction::New(segment),                       // 54
+            Instruction::Dup,                                // 55
+            Instruction::Aload(7),                           // 56
+            Instruction::Getfield(line_data),                // 57
+            Instruction::Aload(8),                           // 58
+            Instruction::Iconst_0,                           // 59
+            Instruction::Aaload,                             // 60
+            Instruction::Invokestatic(parse_duration),       // 61
+            Instruction::Aload(8),                           // 62
+            Instruction::Iconst_1,                           // 63
+            Instruction::Aaload,                             // 64
+            Instruction::Invokespecial(segment_constructor), // 65
+            Instruction::Invokeinterface(add, 2),            // 66
+            Instruction::Pop,                                // 67
+            Instruction::Goto(79),                           // 68
+            Instruction::Aload_2,                            // 69
+            Instruction::New(segment),                       // 70
+            Instruction::Dup,                                // 71
+            Instruction::Aload(7),                           // 72
+            Instruction::Getfield(line_data),                // 73
+            Instruction::Aconst_null,                        // 74
+            Instruction::Aconst_null,                        // 75
+            Instruction::Invokespecial(segment_constructor), // 76
+            Instruction::Invokeinterface(add, 2),            // 77
+            Instruction::Pop,                                // 78
+            Instruction::Iinc(5, 1),                         // 79
+            Instruction::Goto(16),                           // 80
+            Instruction::Aload_2,                            // 81
+            Instruction::Areturn,                            // 82
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn m3u_get_next_segment_url_body(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let provider = pool.add_class(M3U_SEGMENT_URL_PROVIDER_CLASS)?;
+    let fetch = pool.add_method_ref(
+        provider,
+        "fetchSegmentPlaylistUrl",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;)Ljava/lang/String;",
+    )?;
+    let load = pool.add_method_ref(
+        provider,
+        "loadStreamSegmentsList",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/lang/String;)Ljava/util/List;",
+    )?;
+    let last = pool.add_field_ref(
+        provider,
+        "lastSegment",
+        "Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider$SegmentInfo;",
+    )?;
+    let choose = pool.add_method_ref(
+        provider,
+        "chooseNextSegment",
+        "(Ljava/util/List;Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider$SegmentInfo;)Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider$SegmentInfo;",
+    )?;
+    let tools = pool.add_class(M3U_SEGMENT_TOOLS_CLASS)?;
+    let should_wait = pool.add_method_ref(tools, "shouldWaitForSegment", "(JLjava/util/List;)Z")?;
+    let system = pool.add_class("java/lang/System")?;
+    let current_time = pool.add_method_ref(system, "currentTimeMillis", "()J")?;
+    let thread = pool.add_class("java/lang/Thread")?;
+    let sleep = pool.add_method_ref(thread, "sleep", "(J)V")?;
+    let wait_step = pool.add_long(200)?;
+    let segment = pool.add_class(M3U_SEGMENT_INFO_CLASS)?;
+    let url = pool.add_field_ref(segment, "url", "Ljava/lang/String;")?;
+    let create_url = pool.add_method_ref(
+        provider,
+        "createSegmentUrl",
+        "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+    )?;
+    let io_exception = pool.add_class("java/io/IOException")?;
+    let interrupted = pool.add_class("java/lang/InterruptedException")?;
+    let friendly = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/FriendlyException")?;
+    let severity =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity")?;
+    let suspicious = pool.add_field_ref(
+        severity,
+        "SUSPICIOUS",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity;",
+    )?;
+    let friendly_constructor = pool.add_method_ref(
+        friendly,
+        "<init>",
+        "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity;Ljava/lang/Throwable;)V",
+    )?;
+    let runtime = pool.add_class("java/lang/RuntimeException")?;
+    let runtime_constructor = pool.add_method_ref(runtime, "<init>", "(Ljava/lang/Throwable;)V")?;
+    let message = pool.add_string("Failed to get next part of the stream.")?;
+    code_with_exceptions(
+        pool,
+        5,
+        7,
+        vec![
+            Instruction::Aload_0,                             // 0
+            Instruction::Aload_1,                             // 1
+            Instruction::Invokevirtual(fetch),                // 2
+            Instruction::Astore_2,                            // 3
+            Instruction::Aload_2,                             // 4
+            Instruction::Ifnonnull(8),                        // 5
+            Instruction::Aconst_null,                         // 6
+            Instruction::Areturn,                             // 7
+            Instruction::Invokestatic(current_time),          // 8
+            Instruction::Lstore_3,                            // 9
+            Instruction::Aload_0,                             // 10
+            Instruction::Aload_1,                             // 11
+            Instruction::Aload_2,                             // 12
+            Instruction::Invokevirtual(load),                 // 13
+            Instruction::Astore(6),                           // 14
+            Instruction::Aload_0,                             // 15
+            Instruction::Aload(6),                            // 16
+            Instruction::Aload_0,                             // 17
+            Instruction::Getfield(last),                      // 18
+            Instruction::Invokevirtual(choose),               // 19
+            Instruction::Astore(5),                           // 20
+            Instruction::Aload(5),                            // 21
+            Instruction::Ifnonnull(30),                       // 22
+            Instruction::Lload_3,                             // 23
+            Instruction::Aload(6),                            // 24
+            Instruction::Invokestatic(should_wait),           // 25
+            Instruction::Ifeq(30),                            // 26
+            Instruction::Ldc2_w(wait_step),                   // 27
+            Instruction::Invokestatic(sleep),                 // 28
+            Instruction::Goto(10),                            // 29
+            Instruction::Aload(5),                            // 30
+            Instruction::Ifnonnull(34),                       // 31
+            Instruction::Aconst_null,                         // 32
+            Instruction::Areturn,                             // 33
+            Instruction::Aload_0,                             // 34
+            Instruction::Aload(5),                            // 35
+            Instruction::Putfield(last),                      // 36
+            Instruction::Aload_2,                             // 37
+            Instruction::Aload(5),                            // 38
+            Instruction::Getfield(url),                       // 39
+            Instruction::Invokestatic(create_url),            // 40
+            Instruction::Areturn,                             // 41
+            Instruction::Astore_2,                            // 42
+            Instruction::New(friendly),                       // 43
+            Instruction::Dup,                                 // 44
+            Instruction::Ldc_w(message),                      // 45
+            Instruction::Getstatic(suspicious),               // 46
+            Instruction::Aload_2,                             // 47
+            Instruction::Invokespecial(friendly_constructor), // 48
+            Instruction::Athrow,                              // 49
+            Instruction::Astore_2,                            // 50
+            Instruction::New(runtime),                        // 51
+            Instruction::Dup,                                 // 52
+            Instruction::Aload_2,                             // 53
+            Instruction::Invokespecial(runtime_constructor),  // 54
+            Instruction::Athrow,                              // 55
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 0..42,
+                handler_pc: 42,
+                catch_type: io_exception,
+            },
+            ExceptionTableEntry {
+                range_pc: 0..42,
+                handler_pc: 50,
+                catch_type: interrupted,
+            },
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn m3u_get_next_segment_stream_body(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let http = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpInterface")?;
+    let get_context = pool.add_method_ref(
+        http,
+        "getContext",
+        "()Lorg/apache/http/client/protocol/HttpClientContext;",
+    )?;
+    let context = pool.add_class("org/apache/http/client/protocol/HttpClientContext")?;
+    let set_config = pool.add_method_ref(
+        context,
+        "setRequestConfig",
+        "(Lorg/apache/http/client/config/RequestConfig;)V",
+    )?;
+    let provider = pool.add_class(M3U_SEGMENT_URL_PROVIDER_CLASS)?;
+    let get_url = pool.add_method_ref(
+        provider,
+        "getNextSegmentUrl",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;)Ljava/lang/String;",
+    )?;
+    let create_request = pool.add_method_ref(
+        provider,
+        "createSegmentGetRequest",
+        "(Ljava/lang/String;)Lorg/apache/http/client/methods/HttpUriRequest;",
+    )?;
+    let execute = pool.add_method_ref(
+        http,
+        "execute",
+        "(Lorg/apache/http/client/methods/HttpUriRequest;)Lorg/apache/http/client/methods/CloseableHttpResponse;",
+    )?;
+    let response = pool.add_class("org/apache/http/client/methods/CloseableHttpResponse")?;
+    let get_status =
+        pool.add_interface_method_ref(response, "getStatusLine", "()Lorg/apache/http/StatusLine;")?;
+    let status = pool.add_class("org/apache/http/StatusLine")?;
+    let get_status_code = pool.add_interface_method_ref(status, "getStatusCode", "()I")?;
+    let client_tools =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpClientTools")?;
+    let is_success = pool.add_method_ref(client_tools, "isSuccessWithContent", "(I)Z")?;
+    let get_entity =
+        pool.add_interface_method_ref(response, "getEntity", "()Lorg/apache/http/HttpEntity;")?;
+    let entity = pool.add_class("org/apache/http/HttpEntity")?;
+    let get_content =
+        pool.add_interface_method_ref(entity, "getContent", "()Ljava/io/InputStream;")?;
+    let io_exception = pool.add_class("java/io/IOException")?;
+    let io_constructor = pool.add_method_ref(io_exception, "<init>", "(Ljava/lang/String;)V")?;
+    let runtime = pool.add_class("java/lang/RuntimeException")?;
+    let runtime_constructor = pool.add_method_ref(runtime, "<init>", "(Ljava/lang/Throwable;)V")?;
+    let builder = pool.add_class("java/lang/StringBuilder")?;
+    let builder_constructor = pool.add_method_ref(builder, "<init>", "()V")?;
+    let append_string = pool.add_method_ref(
+        builder,
+        "append",
+        "(Ljava/lang/String;)Ljava/lang/StringBuilder;",
+    )?;
+    let append_int = pool.add_method_ref(builder, "append", "(I)Ljava/lang/StringBuilder;")?;
+    let to_string = pool.add_method_ref(builder, "toString", "()Ljava/lang/String;")?;
+    let prefix = pool.add_string("Invalid status code from segment data URL: ")?;
+    let tools = pool.add_class(M3U_SEGMENT_TOOLS_CLASS)?;
+    let close_failed = pool.add_method_ref(
+        tools,
+        "closeFailedResponse",
+        "(Lorg/apache/http/client/methods/CloseableHttpResponse;Z)V",
+    )?;
+    code_with_exceptions(
+        pool,
+        5,
+        8,
+        vec![
+            Instruction::Aload_1,                             // 0
+            Instruction::Invokevirtual(get_context),          // 1
+            Instruction::Aload_2,                             // 2
+            Instruction::Invokevirtual(set_config),           // 3
+            Instruction::Aload_0,                             // 4
+            Instruction::Aload_1,                             // 5
+            Instruction::Invokevirtual(get_url),              // 6
+            Instruction::Astore_3,                            // 7
+            Instruction::Aload_3,                             // 8
+            Instruction::Ifnonnull(12),                       // 9
+            Instruction::Aconst_null,                         // 10
+            Instruction::Areturn,                             // 11
+            Instruction::Aconst_null,                         // 12
+            Instruction::Astore(4),                           // 13
+            Instruction::Iconst_0,                            // 14
+            Instruction::Istore(5),                           // 15
+            Instruction::Aload_1,                             // 16
+            Instruction::Aload_0,                             // 17
+            Instruction::Aload_3,                             // 18
+            Instruction::Invokevirtual(create_request),       // 19
+            Instruction::Invokevirtual(execute),              // 20
+            Instruction::Astore(4),                           // 21
+            Instruction::Aload(4),                            // 22
+            Instruction::Invokeinterface(get_status, 1),      // 23
+            Instruction::Invokeinterface(get_status_code, 1), // 24
+            Instruction::Istore(6),                           // 25
+            Instruction::Iload(6),                            // 26
+            Instruction::Invokestatic(is_success),            // 27
+            Instruction::Ifne(41),                            // 28
+            Instruction::New(io_exception),                   // 29
+            Instruction::Dup,                                 // 30
+            Instruction::New(builder),                        // 31
+            Instruction::Dup,                                 // 32
+            Instruction::Invokespecial(builder_constructor),  // 33
+            Instruction::Ldc_w(prefix),                       // 34
+            Instruction::Invokevirtual(append_string),        // 35
+            Instruction::Iload(6),                            // 36
+            Instruction::Invokevirtual(append_int),           // 37
+            Instruction::Invokevirtual(to_string),            // 38
+            Instruction::Invokespecial(io_constructor),       // 39
+            Instruction::Athrow,                              // 40
+            Instruction::Iconst_1,                            // 41
+            Instruction::Istore(5),                           // 42
+            Instruction::Aload(4),                            // 43
+            Instruction::Invokeinterface(get_entity, 1),      // 44
+            Instruction::Invokeinterface(get_content, 1),     // 45
+            Instruction::Astore(6),                           // 46
+            Instruction::Aload(4),                            // 47
+            Instruction::Iload(5),                            // 48
+            Instruction::Invokestatic(close_failed),          // 49
+            Instruction::Aload(6),                            // 50
+            Instruction::Areturn,                             // 51
+            Instruction::Astore(6),                           // 52
+            Instruction::New(runtime),                        // 53
+            Instruction::Dup,                                 // 54
+            Instruction::Aload(6),                            // 55
+            Instruction::Invokespecial(runtime_constructor),  // 56
+            Instruction::Astore(7),                           // 57
+            Instruction::Aload(4),                            // 58
+            Instruction::Iload(5),                            // 59
+            Instruction::Invokestatic(close_failed),          // 60
+            Instruction::Aload(7),                            // 61
+            Instruction::Athrow,                              // 62
+            Instruction::Astore(7),                           // 63
+            Instruction::Aload(4),                            // 64
+            Instruction::Iload(5),                            // 65
+            Instruction::Invokestatic(close_failed),          // 66
+            Instruction::Aload(7),                            // 67
+            Instruction::Athrow,                              // 68
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 16..47,
+                handler_pc: 52,
+                catch_type: io_exception,
+            },
+            ExceptionTableEntry {
+                range_pc: 16..47,
+                handler_pc: 63,
+                catch_type: 0,
+            },
+            ExceptionTableEntry {
+                range_pc: 52..58,
+                handler_pc: 63,
+                catch_type: 0,
+            },
+        ],
+    )
+}
+
+fn m3u_close_failed_response_body(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let exception_tools =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/ExceptionTools")?;
+    let close = pool.add_method_ref(
+        exception_tools,
+        "closeWithWarnings",
+        "(Ljava/lang/AutoCloseable;)V",
+    )?;
+    code(
+        pool,
+        1,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Ifnull(6),
+            Instruction::Iload_1,
+            Instruction::Ifne(6),
+            Instruction::Aload_0,
+            Instruction::Invokestatic(close),
+            Instruction::Return,
+        ],
+    )
 }
 
 #[allow(clippy::too_many_lines)]

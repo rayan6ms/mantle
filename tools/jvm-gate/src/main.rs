@@ -170,6 +170,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-sound-cloud-track-format-consumer" => Some(SOUND_CLOUD_TRACK_FORMAT_CONSUMER),
         "write-m3u-stream-audio-track-consumer" => Some(M3U_STREAM_AUDIO_TRACK_CONSUMER),
+        "write-m3u-stream-segment-url-provider-consumer" => {
+            Some(M3U_STREAM_SEGMENT_URL_PROVIDER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -3319,7 +3322,6 @@ import java.lang.invoke.MethodHandles;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Proxy;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
@@ -13756,6 +13758,472 @@ public final class GateClassloader {
   }
 }
 "#;
+
+const M3U_STREAM_SEGMENT_URL_PROVIDER_CONSUMER: &str = r##"
+import com.sedmelluq.discord.lavaplayer.container.playlists.ExtendedM3uParser;
+import com.sedmelluq.discord.lavaplayer.source.stream.M3uStreamSegmentUrlProvider;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException.Severity;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import org.apache.http.HttpEntity;
+import org.apache.http.StatusLine;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.protocol.HttpClientContext;
+
+public final class GateM3uStreamSegmentUrlProvider {
+  private static final String PROVIDER_NAME =
+      "com.sedmelluq.discord.lavaplayer.source.stream.M3uStreamSegmentUrlProvider";
+
+  public static void main(String[] args) throws Exception {
+    reflectionContract();
+    constructorsAndUrls();
+    channelPlaylistParsing();
+    segmentPlaylistParsing();
+    selectionAndNextUrl();
+    segmentStreams();
+    System.out.println("provider=public-abstract,4-fields,2-constructors,13-methods;"
+        + "nested=protected-static-values,5-fields,1-constructor;"
+        + "behavior=base-url,uri-resolution,channels,segments,generics,selection,lazy-wait,"
+        + "timeouts,response-ownership,identity,failures,reflection");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<M3uStreamSegmentUrlProvider> type = M3uStreamSegmentUrlProvider.class;
+    check(type.getName().equals(PROVIDER_NAME)
+        && type.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && type.getSuperclass() == Object.class && type.getInterfaces().length == 0,
+        "provider class metadata");
+    check(type.getDeclaredFields().length == 4 && type.getDeclaredConstructors().length == 2
+        && type.getDeclaredMethods().length == 13, "provider shell counts");
+    checkField(type, "SEGMENT_WAIT_STEP_MS", long.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "streamingRequestConfig", RequestConfig.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "baseUrl", String.class, Modifier.PROTECTED);
+    Class<?> segmentType = Class.forName(PROVIDER_NAME + "$SegmentInfo");
+    Class<?> channelType = Class.forName(PROVIDER_NAME + "$ChannelStreamInfo");
+    checkField(type, "lastSegment", segmentType, Modifier.PROTECTED);
+
+    checkConstructor(type, new Class<?>[0], Modifier.PROTECTED);
+    checkConstructor(type, new Class<?>[] {String.class}, Modifier.PROTECTED);
+    checkMethod(type, "createSegmentUrl", String.class,
+        Modifier.PROTECTED | Modifier.STATIC, new Class<?>[] {String.class, String.class}, none());
+    checkMethod(type, "getQualityFromM3uDirective", String.class,
+        Modifier.PROTECTED | Modifier.ABSTRACT,
+        new Class<?>[] {ExtendedM3uParser.Line.class}, none());
+    checkMethod(type, "fetchSegmentPlaylistUrl", String.class,
+        Modifier.PROTECTED | Modifier.ABSTRACT, new Class<?>[] {HttpInterface.class},
+        new Class<?>[] {IOException.class});
+    checkMethod(type, "getNextSegmentUrl", String.class, Modifier.PROTECTED,
+        new Class<?>[] {HttpInterface.class}, none());
+    checkMethod(type, "getNextSegmentStream", InputStream.class, Modifier.PUBLIC,
+        new Class<?>[] {HttpInterface.class}, none());
+    checkMethod(type, "createSegmentGetRequest", HttpUriRequest.class,
+        Modifier.PROTECTED | Modifier.ABSTRACT, new Class<?>[] {String.class}, none());
+    checkMethod(type, "isAbsoluteUrl", boolean.class, Modifier.PROTECTED,
+        new Class<?>[] {String.class}, none());
+    checkMethod(type, "getAbsoluteUrl", String.class, Modifier.PROTECTED,
+        new Class<?>[] {String.class}, none());
+    Method channels = checkMethod(type, "loadChannelStreamsList", List.class,
+        Modifier.PROTECTED, new Class<?>[] {String[].class}, none());
+    Method segments = checkMethod(type, "loadStreamSegmentsList", List.class,
+        Modifier.PROTECTED, new Class<?>[] {HttpInterface.class, String.class},
+        new Class<?>[] {IOException.class});
+    Method choose = checkMethod(type, "chooseNextSegment", segmentType, Modifier.PROTECTED,
+        new Class<?>[] {List.class, segmentType}, none());
+    check(genericName(channels.getGenericReturnType()).equals("java.util.List<" +
+        PROVIDER_NAME + "$ChannelStreamInfo>"), "channel generic return");
+    check(genericName(segments.getGenericReturnType()).equals("java.util.List<" +
+        PROVIDER_NAME + "$SegmentInfo>"), "segment generic return");
+    check(genericName(choose.getGenericParameterTypes()[0]).equals("java.util.List<" +
+        PROVIDER_NAME + "$SegmentInfo>"), "choose generic parameter");
+    check(Arrays.stream(type.getDeclaredMethods()).filter(method ->
+        Modifier.isPublic(method.getModifiers()) || Modifier.isProtected(method.getModifiers()))
+        .count() == 11L, "exported method count");
+
+    check(channelType.getModifiers() == (Modifier.PROTECTED | Modifier.STATIC)
+        && channelType.getDeclaringClass() == type && channelType.getDeclaredFields().length == 2,
+        "channel class metadata");
+    checkField(channelType, "quality", String.class, Modifier.PUBLIC | Modifier.FINAL);
+    checkField(channelType, "url", String.class, Modifier.PUBLIC | Modifier.FINAL);
+    check(channelType.getDeclaredConstructors().length == 1
+        && channelType.getDeclaredConstructors()[0].getModifiers() == Modifier.PRIVATE,
+        "channel constructor metadata");
+    check(Arrays.stream(channelType.getDeclaredMethods()).noneMatch(method ->
+        Modifier.isPublic(method.getModifiers()) || Modifier.isProtected(method.getModifiers())),
+        "channel exported methods");
+
+    check(segmentType.getModifiers() == (Modifier.PROTECTED | Modifier.STATIC)
+        && segmentType.getDeclaringClass() == type && segmentType.getDeclaredFields().length == 3,
+        "segment class metadata");
+    checkField(segmentType, "url", String.class, Modifier.PUBLIC | Modifier.FINAL);
+    checkField(segmentType, "duration", Long.class, Modifier.PUBLIC | Modifier.FINAL);
+    checkField(segmentType, "name", String.class, Modifier.PUBLIC | Modifier.FINAL);
+    check(segmentType.getDeclaredConstructors().length == 1
+        && segmentType.getDeclaredConstructors()[0].getModifiers() == Modifier.PUBLIC,
+        "segment constructor metadata");
+
+    Field wait = type.getDeclaredField("SEGMENT_WAIT_STEP_MS");
+    wait.setAccessible(true);
+    Field config = type.getDeclaredField("streamingRequestConfig");
+    config.setAccessible(true);
+    RequestConfig value = (RequestConfig) config.get(null);
+    check(wait.getLong(null) == 200L && value.getSocketTimeout() == 5000
+        && value.getConnectionRequestTimeout() == 5000 && value.getConnectTimeout() == 5000,
+        "static configuration");
+  }
+
+  private static void constructorsAndUrls() throws Exception {
+    ExposedProvider empty = new ExposedProvider();
+    check(empty.base() == null && empty.last() == null && empty.absolute("relative")
+        && empty.absolute("http://[") && empty.absolute(null), "null-base behavior");
+    ExposedProvider provider = new ExposedProvider("https://origin.example/root/master.m3u");
+    check("https://origin.example/root".equals(provider.base()) && provider.last() == null,
+        "origin base");
+    check("https://origin.example".equals(
+        new ExposedProvider("https://origin.example/root/").base()), "trailing slash quirk");
+    expect(StringIndexOutOfBoundsException.class, () -> new ExposedProvider("master.m3u"));
+    check("https://cdn.example/live/a.ts".equals(ExposedProvider.resolve(
+        "https://cdn.example/live/list.m3u", "a.ts")), "relative segment resolution");
+    check("https://other.example/a.ts".equals(ExposedProvider.resolve(
+        "https://cdn.example/live/list.m3u", "https://other.example/a.ts")),
+        "absolute segment resolution");
+    check(provider.absolute("https://cdn.example/x") && !provider.absolute("relative/x")
+        && !provider.absolute("http://[") && "https://origin.example/root/x".equals(
+            provider.makeAbsolute("x")) && "https://origin.example/root/x".equals(
+            provider.makeAbsolute("/x")), "URL helpers");
+    expect(NullPointerException.class, () -> provider.absolute(null));
+  }
+
+  private static void channelPlaylistParsing() throws Exception {
+    ExposedProvider provider = new ExposedProvider("https://origin.example/root/master.m3u");
+    provider.qualities.add("low");
+    provider.qualities.add("absolute");
+    provider.qualities.add(null);
+    List<?> streams = provider.channels(new String[] {
+        "#EXTM3U", "#EXT-X-STREAM-INF:BANDWIDTH=64000", "low/index.m3u",
+        "#EXTINF:ignored", "https://cdn.example/high.m3u",
+        "#EXT-X-STREAM-INF:SKIP", "skip.m3u", "orphan.m3u"
+    });
+    check(streams.size() == 2 && provider.qualityCalls == 3, "channel filtering");
+    check("low".equals(value(streams.get(0), "quality"))
+        && "https://origin.example/root/low/index.m3u".equals(value(streams.get(0), "url")),
+        "relative channel");
+    check("absolute".equals(value(streams.get(1), "quality"))
+        && "https://cdn.example/high.m3u".equals(value(streams.get(1), "url")),
+        "absolute channel");
+  }
+
+  private static void segmentPlaylistParsing() throws Exception {
+    String payload = "#EXTM3U\n#EXTINF:1.5,First\nseg1.ts\nbare.ts\n"
+        + "#EXTINF:bad,\nseg3.ts\n#EXTINF:2.25,Fourth,Comma\nseg4.ts\n";
+    RecordingResponse response = new RecordingResponse(200, payload);
+    RecordingHttp http = new RecordingHttp(response);
+    ExposedProvider provider = new ExposedProvider();
+    List<?> segments = provider.segments(http, "https://cdn.example/live/list.m3u");
+    check(http.executes == 1 && http.request instanceof HttpGet
+        && http.request.getURI().toString().equals("https://cdn.example/live/list.m3u")
+        && response.closes == 1, "playlist request and cleanup");
+    check(segments.size() == 4, "segment count");
+    checkSegment(segments.get(0), "seg1.ts", 1500L, "First");
+    checkSegment(segments.get(1), "bare.ts", 1500L, "First");
+    checkSegment(segments.get(2), "seg3.ts", null, "");
+    checkSegment(segments.get(3), "seg4.ts", 2250L, "Fourth,Comma");
+  }
+
+  private static void selectionAndNextUrl() throws Exception {
+    ExposedProvider provider = new ExposedProvider();
+    Object a = provider.segment("a.ts", 1000L, "a");
+    Object b = provider.segment("b.ts", 1000L, "b");
+    Object c = provider.segment("c.ts", 1000L, "c");
+    List<Object> values = Arrays.asList(a, b, c);
+    check(provider.choose(values, null) == a && provider.choose(values, a) == b
+        && provider.choose(values, b) == c
+        && provider.choose(values, provider.segment("missing", null, null)) == a
+        && provider.choose(new ArrayList<>(), null) == null, "segment selection");
+
+    provider.playlistUrl = "https://cdn.example/live/list.m3u";
+    provider.useRounds = true;
+    provider.round(a, b);
+    provider.round(a, b, c);
+    check("https://cdn.example/live/a.ts".equals(provider.baseNext(null))
+        && provider.last() == a, "first next URL");
+    check("https://cdn.example/live/b.ts".equals(provider.baseNext(null))
+        && provider.last() == b && provider.loadCalls == 2, "second next URL");
+
+    ExposedProvider none = new ExposedProvider();
+    none.playlistUrl = null;
+    check(none.baseNext(null) == null && none.loadCalls == 0, "null playlist URL");
+    IOException loadFailure = new IOException("playlist-lines");
+    none.playlistUrl = "https://cdn.example/list.m3u";
+    none.loadFailure = loadFailure;
+    FriendlyException friendly = expect(FriendlyException.class, () -> none.baseNext(null));
+    check(friendly.getCause() == loadFailure && friendly.severity == Severity.SUSPICIOUS
+        && friendly.getMessage().equals("Failed to get next part of the stream."),
+        "IO wrapping");
+
+    ExposedProvider interrupted = new ExposedProvider();
+    interrupted.playlistUrl = "https://cdn.example/live/list.m3u";
+    interrupted.useRounds = true;
+    Object current = interrupted.segment("same.ts", 10_000L, "same");
+    interrupted.setLast(current);
+    interrupted.round(interrupted.segment("same.ts", 10_000L, "same"));
+    Thread.currentThread().interrupt();
+    RuntimeException runtime = expect(RuntimeException.class, () -> interrupted.baseNext(null));
+    check(runtime.getCause() instanceof InterruptedException
+        && !Thread.currentThread().isInterrupted(), "interruption wrapping");
+  }
+
+  private static void segmentStreams() throws Exception {
+    ExposedProvider provider = new ExposedProvider();
+    provider.overrideNext = true;
+    RecordingHttp nullHttp = new RecordingHttp(null);
+    check(provider.nextStream(nullHttp) == null && nullHttp.executes == 0,
+        "null segment stream");
+    checkTimeouts(nullHttp.getContext().getRequestConfig());
+
+    provider.nextUrl = "https://cdn.example/segment.ts";
+    byte[] bytes = new byte[] {1, 2, 3};
+    RecordingResponse success = new RecordingResponse(200, bytes);
+    RecordingHttp successHttp = new RecordingHttp(success);
+    InputStream stream = provider.nextStream(successHttp);
+    check(stream == success.content && success.closes == 0 && successHttp.executes == 1
+        && provider.createdUrl.equals(provider.nextUrl)
+        && successHttp.request == provider.createdRequest, "successful stream ownership");
+    checkTimeouts(successHttp.getContext().getRequestConfig());
+
+    RecordingResponse bad = new RecordingResponse(404, bytes);
+    RecordingHttp badHttp = new RecordingHttp(bad);
+    RuntimeException badError = expect(RuntimeException.class, () -> provider.nextStream(badHttp));
+    check(badError.getCause() instanceof IOException
+        && badError.getCause().getMessage().equals(
+            "Invalid status code from segment data URL: 404") && bad.closes == 1,
+        "bad status cleanup");
+
+    IOException executeFailure = new IOException("execute");
+    RecordingHttp failingHttp = new RecordingHttp(null);
+    failingHttp.failure = executeFailure;
+    RuntimeException executeError = expect(
+        RuntimeException.class, () -> provider.nextStream(failingHttp));
+    check(executeError.getCause() == executeFailure, "execute failure identity");
+
+    IOException contentFailure = new IOException("content");
+    RecordingResponse content = new RecordingResponse(200, bytes);
+    content.contentFailure = contentFailure;
+    RuntimeException contentError = expect(RuntimeException.class,
+        () -> provider.nextStream(new RecordingHttp(content)));
+    check(contentError.getCause() == contentFailure && content.closes == 0,
+        "post-success content failure ownership");
+  }
+
+  private static final class ExposedProvider extends M3uStreamSegmentUrlProvider {
+    private final List<String> qualities = new ArrayList<>();
+    private final ArrayDeque<List<SegmentInfo>> rounds = new ArrayDeque<>();
+    private String playlistUrl;
+    private IOException fetchFailure;
+    private IOException loadFailure;
+    private boolean useRounds;
+    private boolean overrideNext;
+    private String nextUrl;
+    private String createdUrl;
+    private HttpUriRequest createdRequest;
+    private int qualityCalls;
+    private int loadCalls;
+
+    ExposedProvider() { super(); }
+    ExposedProvider(String origin) { super(origin); }
+    String base() { return baseUrl; }
+    Object last() { return lastSegment; }
+    void setLast(Object value) { lastSegment = (SegmentInfo) value; }
+    boolean absolute(String value) { return isAbsoluteUrl(value); }
+    String makeAbsolute(String value) { return getAbsoluteUrl(value); }
+    static String resolve(String playlist, String segment) {
+      return createSegmentUrl(playlist, segment);
+    }
+    List<?> channels(String[] lines) { return loadChannelStreamsList(lines); }
+    List<?> segments(HttpInterface http, String url) throws IOException {
+      return super.loadStreamSegmentsList(http, url);
+    }
+    Object segment(String url, Long duration, String name) {
+      return new SegmentInfo(url, duration, name);
+    }
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    Object choose(List<?> values, Object last) {
+      return chooseNextSegment((List) values, (SegmentInfo) last);
+    }
+    void round(Object... values) {
+      List<SegmentInfo> round = new ArrayList<>();
+      for (Object value : values) round.add((SegmentInfo) value);
+      rounds.add(round);
+    }
+    String baseNext(HttpInterface http) { return super.getNextSegmentUrl(http); }
+    InputStream nextStream(HttpInterface http) { return getNextSegmentStream(http); }
+
+    protected String getQualityFromM3uDirective(ExtendedM3uParser.Line line) {
+      qualityCalls++;
+      return qualities.remove(0);
+    }
+    protected String fetchSegmentPlaylistUrl(HttpInterface http) throws IOException {
+      if (fetchFailure != null) throw fetchFailure;
+      return playlistUrl;
+    }
+    protected List<SegmentInfo> loadStreamSegmentsList(HttpInterface http, String url)
+        throws IOException {
+      if (!useRounds && loadFailure == null) return super.loadStreamSegmentsList(http, url);
+      loadCalls++;
+      if (loadFailure != null) throw loadFailure;
+      return rounds.remove();
+    }
+    protected String getNextSegmentUrl(HttpInterface http) {
+      return overrideNext ? nextUrl : super.getNextSegmentUrl(http);
+    }
+    protected HttpUriRequest createSegmentGetRequest(String url) {
+      createdUrl = url;
+      createdRequest = new HttpGet(url);
+      return createdRequest;
+    }
+  }
+
+  private static final class RecordingHttp extends HttpInterface {
+    private final RecordingResponse response;
+    private HttpUriRequest request;
+    private IOException failure;
+    private int executes;
+    RecordingHttp(RecordingResponse response) {
+      super(null, HttpClientContext.create(), false, null);
+      this.response = response;
+    }
+    public CloseableHttpResponse execute(HttpUriRequest request) throws IOException {
+      this.request = request;
+      executes++;
+      if (failure != null) throw failure;
+      return response.proxy;
+    }
+  }
+
+  private static final class RecordingResponse {
+    private final CloseableHttpResponse proxy;
+    private final InputStream content;
+    private IOException contentFailure;
+    private int closes;
+    RecordingResponse(int status, String content) {
+      this(status, content.getBytes(StandardCharsets.UTF_8));
+    }
+    RecordingResponse(int status, byte[] content) {
+      this.content = new ByteArrayInputStream(content);
+      StatusLine statusLine = proxy(StatusLine.class, (method, arguments) ->
+          method.getName().equals("getStatusCode") ? status : defaultValue(method.getReturnType()));
+      HttpEntity entity = proxy(HttpEntity.class, (method, arguments) -> {
+        if (method.getName().equals("getContent")) {
+          if (contentFailure != null) throw contentFailure;
+          return this.content;
+        }
+        return defaultValue(method.getReturnType());
+      });
+      this.proxy = proxy(CloseableHttpResponse.class, (method, arguments) -> {
+        if (method.getName().equals("getStatusLine")) return statusLine;
+        if (method.getName().equals("getEntity")) return entity;
+        if (method.getName().equals("close")) { closes++; return null; }
+        return defaultValue(method.getReturnType());
+      });
+    }
+  }
+
+  private static void checkTimeouts(RequestConfig config) {
+    check(config != null && config.getSocketTimeout() == 5000
+        && config.getConnectionRequestTimeout() == 5000 && config.getConnectTimeout() == 5000,
+        "stream request timeouts");
+  }
+
+  private static void checkSegment(Object value, String url, Long duration, String name)
+      throws Exception {
+    check(equals(url, value(value, "url")) && equals(duration, value(value, "duration"))
+        && equals(name, value(value, "name")), "segment values");
+  }
+
+  private static Object value(Object instance, String name) throws Exception {
+    return instance.getClass().getField(name).get(instance);
+  }
+
+  private static boolean equals(Object left, Object right) {
+    return left == null ? right == null : left.equals(right);
+  }
+
+  private static String genericName(java.lang.reflect.Type type) {
+    return type.getTypeName();
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> type, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == type && field.getGenericType() == type
+        && field.getModifiers() == modifiers && !field.isSynthetic(), name + " metadata");
+  }
+
+  private static void checkConstructor(Class<?> owner, Class<?>[] parameters, int modifiers)
+      throws Exception {
+    Constructor<?> constructor = owner.getDeclaredConstructor(parameters);
+    check(constructor.getModifiers() == modifiers && constructor.getExceptionTypes().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
+  }
+
+  private static Method checkMethod(Class<?> owner, String name, Class<?> returnType,
+      int modifiers, Class<?>[] parameters, Class<?>[] exceptions) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isSynthetic() && !method.isBridge() && !method.isVarArgs(), name + " metadata");
+    return method;
+  }
+
+  private static Class<?>[] none() { return new Class<?>[0]; }
+
+  private interface ProxyCall { Object invoke(Method method, Object[] arguments) throws Throwable; }
+  private static <T> T proxy(Class<T> type, ProxyCall call) {
+    return type.cast(Proxy.newProxyInstance(
+        GateM3uStreamSegmentUrlProvider.class.getClassLoader(), new Class<?>[] {type},
+        (instance, method, arguments) -> call.invoke(method, arguments)));
+  }
+  private static Object defaultValue(Class<?> type) {
+    if (type == boolean.class) return false;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    return null;
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+  private interface Operation { void run() throws Exception; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"##;
 
 const M3U_STREAM_AUDIO_TRACK_CONSUMER: &str = r#"
 import com.sedmelluq.discord.lavaplayer.container.playlists.ExtendedM3uParser;
