@@ -14,9 +14,10 @@ use mantle_media::{
     TwitchSourceManager, TwitchSourceOptions, TwitchSourceTrack, VimeoAuthentication,
     VimeoSourceManager, VimeoSourceOptions, VimeoSourceTrack, YandexMusicAuthentication,
     YandexMusicPlaylistKind, YandexMusicSourceItem, YandexMusicSourceManager,
-    YandexMusicSourceOptions, YandexMusicSourcePlaylist, YandexMusicSourceTrack, YoutubeSourceItem,
+    YandexMusicSourceOptions, YandexMusicSourcePlaylist, YandexMusicSourceTrack,
+    YoutubeAudioSourceManager, YoutubeAuthentication, YoutubeSourceItem, YoutubeSourceOptions,
     YoutubeSourcePlaylist, YoutubeSourceTrack, route_twitch_identifier, route_vimeo_identifier,
-    route_yandex_music_identifier,
+    route_yandex_music_identifier, route_youtube_identifier,
 };
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -1141,6 +1142,42 @@ pub(crate) fn load_yandex_music_item<'local>(
     }
 }
 
+pub(crate) fn load_youtube_item<'local>(
+    env: &mut Env<'local>,
+    source: &JObject<'local>,
+    reference: &JObject<'local>,
+) -> jni::errors::Result<JObject<'local>> {
+    let reference = source_reference_from_java(env, reference)?;
+    let allow_search = env
+        .get_field(source, jni_str!("allowSearch"), jni_sig!("Z"))?
+        .z()?;
+    let options = YoutubeSourceOptions {
+        allow_search,
+        ..YoutubeSourceOptions::default()
+    };
+    let Some(identifier) = reference.identifier() else {
+        return Ok(JObject::null());
+    };
+    if route_youtube_identifier(identifier, &options).is_none() {
+        return Ok(JObject::null());
+    }
+
+    let manager = YoutubeAudioSourceManager::new(options, YoutubeAuthentication::default())
+        .map_err(|_| jni::errors::Error::NullPtr("could not create current YouTube source"))?;
+    let item = manager
+        .load(&reference)
+        .map_err(|_| jni::errors::Error::NullPtr("current YouTube metadata load failed"))?;
+    match item {
+        Some(SourceLoad::Item(YoutubeSourceItem::Track(track))) => {
+            create_youtube_source_track(env, &track, source)
+        }
+        Some(SourceLoad::Item(YoutubeSourceItem::Playlist(playlist))) => {
+            create_youtube_source_playlist(env, &playlist, source)
+        }
+        Some(SourceLoad::Referral(_)) | None => Ok(JObject::null()),
+    }
+}
+
 fn system_property(env: &mut Env<'_>, key: &str) -> jni::errors::Result<Option<String>> {
     let key = JObject::from(env.new_string(key)?);
     let value = env
@@ -1759,6 +1796,90 @@ fn create_vimeo_track<'local>(
         jni_str!("com/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioTrack"),
         jni_sig!("(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioSourceManager;)V"),
         &[JValue::Object(&java_info), JValue::Object(source)],
+    )
+}
+
+fn create_youtube_source_track<'local>(
+    env: &mut Env<'local>,
+    track: &YoutubeSourceTrack,
+    source: &JObject<'_>,
+) -> jni::errors::Result<JObject<'local>> {
+    let info = &track.info;
+    let duration = i64::try_from(info.duration.as_millis())
+        .map_err(|_| jni::errors::Error::NullPtr("YouTube duration exceeds JVM range"))?;
+    let title = JObject::from(env.new_string(&info.title)?);
+    let author = JObject::from(env.new_string(&info.author)?);
+    let identifier = JObject::from(env.new_string(&info.identifier)?);
+    let uri = optional_java_string(env, info.uri.as_deref())?;
+    let artwork = optional_java_string(env, info.artwork_url.as_deref())?;
+    let isrc = optional_java_string(env, info.isrc.as_deref())?;
+    let java_info = env.new_object(
+        jni_str!("com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo"),
+        jni_sig!("(Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V"),
+        &[
+            JValue::Object(&title),
+            JValue::Object(&author),
+            JValue::Long(duration),
+            JValue::Object(&identifier),
+            JValue::Bool(info.is_stream),
+            JValue::Object(&uri),
+            JValue::Object(&artwork),
+            JValue::Object(&isrc),
+        ],
+    )?;
+    env.new_object(
+        jni_str!(
+            "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAudioTrack"
+        ),
+        jni_sig!("(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAudioSourceManager;)V"),
+        &[JValue::Object(&java_info), JValue::Object(source)],
+    )
+}
+
+fn create_youtube_source_playlist<'local>(
+    env: &mut Env<'local>,
+    playlist: &YoutubeSourcePlaylist,
+    source: &JObject<'local>,
+) -> jni::errors::Result<JObject<'local>> {
+    let tracks = env.new_object(jni_str!("java/util/ArrayList"), jni_sig!("()V"), &[])?;
+    let source = env.new_global_ref(source)?;
+    for track in &playlist.tracks {
+        env.with_local_frame(16, |env| {
+            let java_track = create_youtube_source_track(env, track, source.as_obj())?;
+            let _ = env.call_method(
+                &tracks,
+                jni_str!("add"),
+                jni_sig!("(Ljava/lang/Object;)Z"),
+                &[JValue::Object(&java_track)],
+            )?;
+            Ok::<_, jni::errors::Error>(())
+        })?;
+    }
+    let selected = playlist.selected_track.map_or_else(
+        || Ok(JObject::null()),
+        |index| {
+            let index = i32::try_from(index).map_err(|_| {
+                jni::errors::Error::NullPtr("YouTube playlist selection exceeds JVM index")
+            })?;
+            env.call_method(
+                &tracks,
+                jni_str!("get"),
+                jni_sig!("(I)Ljava/lang/Object;"),
+                &[JValue::Int(index)],
+            )?
+            .l()
+        },
+    )?;
+    let name = JObject::from(env.new_string(&playlist.name)?);
+    env.new_object(
+        jni_str!("com/sedmelluq/discord/lavaplayer/track/BasicAudioPlaylist"),
+        jni_sig!("(Ljava/lang/String;Ljava/util/List;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Z)V"),
+        &[
+            JValue::Object(&name),
+            JValue::Object(&tracks),
+            JValue::Object(&selected),
+            JValue::Bool(playlist.is_search_result),
+        ],
     )
 }
 

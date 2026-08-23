@@ -239,6 +239,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
             Some(YOUTUBE_ACCESS_TOKEN_TRACKER_CONSUMER)
         }
         "write-youtube-cached-auth-script-consumer" => Some(YOUTUBE_CACHED_AUTH_SCRIPT_CONSUMER),
+        "write-youtube-audio-source-manager-consumer" => {
+            Some(YOUTUBE_AUDIO_SOURCE_MANAGER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -19068,6 +19071,419 @@ public final class GateYoutubeCachedAuthScript {
         + "identity=object");
   }
 
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_AUDIO_SOURCE_MANAGER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAccessTokenTracker;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioTrack;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeLinkRouter;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeMixLoader;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubePlaylistLoader;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSearchMusicResultLoader;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSearchResultLoader;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSignatureResolver;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackDetailsLoader;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpConfigurable;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpConfigurable;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager;
+import com.sedmelluq.discord.lavaplayer.track.AudioItem;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.impl.client.HttpClientBuilder;
+
+public final class GateYoutubeAudioSourceManager {
+  public static void main(String[] args) throws Exception {
+    check(args.length >= 1 && args.length <= 2, "expected disposition and optional native path");
+    boolean reference = args[0].equals("reference");
+    check(reference || args[0].equals("candidate"), "unknown disposition");
+    reflectionContract();
+    commonBehavior();
+    if (reference) legacyDisposition(); else currentDisposition(args[1]);
+    System.out.println(
+        "common=public-deprecated,audio-source-http-configurable,13-fields,3-constructors,"
+        + "20-methods,1-nested;construction,collaborator-identity,source-name,empty-details,"
+        + "track-reconstruction,playlist-pages,http-config,access-tracker,shutdown,reflection;"
+        + "service=" + (reference
+            ? "legacy-link-router,retry,credential-bootstrap,track-details-http"
+            : "current-native-bounded-routing,no-legacy-credential-bootstrap"));
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<YoutubeAudioSourceManager> type = YoutubeAudioSourceManager.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {
+            AudioSourceManager.class, HttpConfigurable.class})
+        && type.isAnnotationPresent(Deprecated.class) && !type.isSynthetic(), "class metadata");
+    check(type.getDeclaredFields().length == 13 && type.getDeclaredConstructors().length == 3
+        && type.getDeclaredMethods().length == 20 && type.getDeclaredClasses().length == 1,
+        "private shape");
+    check(type.getDeclaredClasses()[0].getSimpleName().equals("LoadingRoutes"), "nested type");
+
+    checkField("log", Class.forName("org.slf4j.Logger"),
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField("signatureResolver", YoutubeSignatureResolver.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField("httpInterfaceManager", HttpInterfaceManager.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField("combinedHttpConfiguration", ExtendedHttpConfigurable.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField("mixLoader", YoutubeMixLoader.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField("accessTokenTracker", YoutubeAccessTokenTracker.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField("allowSearch", boolean.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField("trackDetailsLoader", YoutubeTrackDetailsLoader.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField("searchResultLoader", YoutubeSearchResultLoader.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField("searchMusicResultLoader", YoutubeSearchMusicResultLoader.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField("playlistLoader", YoutubePlaylistLoader.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField("linkRouter", YoutubeLinkRouter.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField("loadingRoutes", type.getDeclaredClasses()[0], Modifier.PRIVATE | Modifier.FINAL);
+
+    checkConstructor(type.getDeclaredConstructor(), new Class<?>[0]);
+    checkConstructor(type.getDeclaredConstructor(boolean.class, String.class, String.class),
+        new Class<?>[] {boolean.class, String.class, String.class});
+    Class<?>[] collaborators = new Class<?>[] {boolean.class, String.class, String.class,
+        YoutubeTrackDetailsLoader.class, YoutubeSearchResultLoader.class,
+        YoutubeSearchMusicResultLoader.class, YoutubeSignatureResolver.class,
+        YoutubePlaylistLoader.class, YoutubeLinkRouter.class, YoutubeMixLoader.class};
+    checkConstructor(type.getDeclaredConstructor(collaborators), collaborators);
+    checkMethod("getTrackDetailsLoader", YoutubeTrackDetailsLoader.class, new Class<?>[0]);
+    checkMethod("getSignatureResolver", YoutubeSignatureResolver.class, new Class<?>[0]);
+    checkMethod("setPlaylistPageCount", void.class, new Class<?>[] {int.class});
+    checkMethod("getSourceName", String.class, new Class<?>[0]);
+    checkMethod("loadItem", AudioItem.class,
+        new Class<?>[] {AudioPlayerManager.class, AudioReference.class});
+    checkMethod("isTrackEncodable", boolean.class, new Class<?>[] {AudioTrack.class});
+    checkMethod("encodeTrack", void.class, new Class<?>[] {AudioTrack.class, DataOutput.class});
+    checkMethod("decodeTrack", AudioTrack.class,
+        new Class<?>[] {AudioTrackInfo.class, DataInput.class});
+    checkMethod("shutdown", void.class, new Class<?>[0]);
+    checkMethod("getAccessTokenTracker", YoutubeAccessTokenTracker.class, new Class<?>[0]);
+    checkMethod("getHttpInterface", HttpInterface.class, new Class<?>[0]);
+    checkMethod("configureRequests", void.class, new Class<?>[] {Function.class});
+    checkMethod("configureBuilder", void.class, new Class<?>[] {Consumer.class});
+    checkMethod("getHttpConfiguration", ExtendedHttpConfigurable.class, new Class<?>[0]);
+    checkMethod("getMainHttpConfiguration", ExtendedHttpConfigurable.class, new Class<?>[0]);
+    checkMethod("getSearchHttpConfiguration", ExtendedHttpConfigurable.class, new Class<?>[0]);
+    checkMethod("getSearchMusicHttpConfiguration", ExtendedHttpConfigurable.class,
+        new Class<?>[0]);
+    checkMethod("loadTrackWithVideoId", AudioItem.class,
+        new Class<?>[] {String.class, boolean.class});
+    check(type.getDeclaredMethod("configureRequests", Function.class).toGenericString().contains(
+            "Function<org.apache.http.client.config.RequestConfig,"
+                + " org.apache.http.client.config.RequestConfig>")
+        && type.getDeclaredMethod("configureBuilder", Consumer.class).toGenericString().contains(
+            "Consumer<org.apache.http.impl.client.HttpClientBuilder>"),
+        "generic configuration signatures");
+  }
+
+  private static void commonBehavior() throws Exception {
+    YoutubeAudioSourceManager defaults = new YoutubeAudioSourceManager();
+    check((boolean) field("allowSearch").get(defaults)
+        && field("trackDetailsLoader").get(defaults).getClass().getSimpleName()
+            .equals("DefaultYoutubeTrackDetailsLoader")
+        && field("searchResultLoader").get(defaults).getClass().getSimpleName()
+            .equals("YoutubeSearchProvider")
+        && field("searchMusicResultLoader").get(defaults).getClass().getSimpleName()
+            .equals("YoutubeSearchMusicProvider")
+        && field("signatureResolver").get(defaults).getClass().getSimpleName()
+            .equals("YoutubeSignatureCipherManager")
+        && field("playlistLoader").get(defaults).getClass().getSimpleName()
+            .equals("DefaultYoutubePlaylistLoader")
+        && field("linkRouter").get(defaults).getClass().getSimpleName()
+            .equals("DefaultYoutubeLinkRouter")
+        && field("mixLoader").get(defaults).getClass().getSimpleName()
+            .equals("YoutubeMixProvider"), "default collaborators");
+    defaults.shutdown();
+
+    Fixture fixture = new Fixture(true);
+    YoutubeAudioSourceManager manager = fixture.manager;
+    check((boolean) field("allowSearch").get(manager)
+        && manager.getTrackDetailsLoader() == fixture.details
+        && manager.getSignatureResolver() == fixture.signature
+        && field("searchResultLoader").get(manager) == fixture.search
+        && field("searchMusicResultLoader").get(manager) == fixture.music
+        && field("playlistLoader").get(manager) == fixture.playlist
+        && field("linkRouter").get(manager) == fixture.router
+        && field("mixLoader").get(manager) == fixture.mix, "collaborator identity");
+    check(manager.getSourceName().equals("youtube") && manager.isTrackEncodable(null),
+        "source and encodability");
+    manager.encodeTrack(null, rejectingProxy(DataOutput.class));
+    AudioTrackInfo info = new AudioTrackInfo("title", "author", 1234L, "dQw4w9WgXcQ", false,
+        "https://youtu.be/dQw4w9WgXcQ", "art", null);
+    AudioTrack decoded = manager.decodeTrack(info, rejectingProxy(DataInput.class));
+    check(decoded instanceof YoutubeAudioTrack && decoded.getInfo() == info
+        && decoded.getSourceManager() == manager, "empty-detail track reconstruction");
+    manager.setPlaylistPageCount(Integer.MIN_VALUE);
+    check(fixture.playlistHandler.pageCount == Integer.MIN_VALUE, "playlist page delegation");
+
+    check(manager.getAccessTokenTracker() != null
+        && field("httpInterfaceManager").get(manager)
+            == trackerField("httpInterfaceManager").get(manager.getAccessTokenTracker()),
+        "access tracker ownership");
+    check(manager.getHttpConfiguration() != null
+        && manager.getHttpConfiguration() == manager.getHttpConfiguration()
+        && manager.getMainHttpConfiguration() instanceof HttpInterfaceManager
+        && manager.getMainHttpConfiguration() != manager.getHttpConfiguration()
+        && manager.getSearchHttpConfiguration() == fixture.searchConfiguration
+        && manager.getSearchMusicHttpConfiguration() == fixture.musicConfiguration,
+        "configuration identity");
+    check(fixture.searchHandler.configurationCalls == 2
+        && fixture.musicHandler.configurationCalls == 2, "configuration getter dispatch");
+    Function<RequestConfig, RequestConfig> requests = value -> value;
+    Consumer<HttpClientBuilder> builder = value -> {};
+    manager.configureRequests(requests);
+    manager.configureBuilder(builder);
+    check(fixture.configurationOrder.equals(Arrays.asList(
+            "search:requests", "music:requests", "search:builder", "music:builder"))
+        && fixture.searchConfig.requests == requests && fixture.searchConfig.builder == builder
+        && fixture.musicConfig.requests == requests && fixture.musicConfig.builder == builder,
+        "configuration delegation identity and order");
+    try (HttpInterface http = manager.getHttpInterface()) {
+      check(http != null, "HTTP interface creation");
+    }
+    manager.shutdown();
+    manager.shutdown();
+  }
+
+  private static void legacyDisposition() throws Exception {
+    Fixture fixture = new Fixture(true);
+    AudioTrack sentinel = proxy(AudioTrack.class,
+        (instance, method, arguments) -> defaultValue(method.getReturnType()));
+    fixture.routerHandler.result = sentinel;
+    AudioReference reference = new AudioReference("legacy-route", null);
+    check(fixture.manager.loadItem(null, reference) == sentinel
+        && fixture.routerHandler.identifier.equals("legacy-route")
+        && fixture.routerHandler.routes != null, "legacy router delegation");
+    check(fixture.manager.loadTrackWithVideoId("missing-id", false) == AudioReference.NO_TRACK,
+        "legacy missing track sentinel");
+    FriendlyException unavailable = expect(FriendlyException.class,
+        () -> fixture.manager.loadTrackWithVideoId("missing-id", true));
+    check(unavailable.getMessage().equals("Video unavailable"), "legacy required track failure");
+    fixture.manager.shutdown();
+  }
+
+  private static void currentDisposition(String nativeLibrary) throws Exception {
+    Class.forName("dev.mantle.internal.NativeLoader")
+        .getMethod("load", String.class).invoke(null, nativeLibrary);
+    Class<?> nativeType = Class.forName("dev.mantle.internal.MantleNative");
+    Method load = nativeType.getDeclaredMethod("loadYoutubeItem",
+        YoutubeAudioSourceManager.class, AudioReference.class);
+    check(Modifier.isPublic(load.getModifiers()) && Modifier.isStatic(load.getModifiers())
+        && Modifier.isNative(load.getModifiers()), "current native route");
+    Fixture fixture = new Fixture(true);
+    check(fixture.manager.loadItem(null,
+        new AudioReference("https://example.invalid/not-youtube", null)) == null,
+        "foreign route rejected before service traffic");
+    check(fixture.manager.loadTrackWithVideoId("not-a-video-id", false) == null,
+        "invalid direct video rejected before service traffic");
+    fixture.manager.shutdown();
+    Fixture disabled = new Fixture(false);
+    check(disabled.manager.loadItem(null, new AudioReference("ytsearch:fixture", null)) == null,
+        "search flag enforced before service traffic");
+    disabled.manager.shutdown();
+    Fixture credentials = new Fixture(true, "person@example.invalid", "secret-value");
+    UnsupportedOperationException fenced = expect(UnsupportedOperationException.class,
+        () -> credentials.manager.getAccessTokenTracker().updateMasterToken());
+    check(fenced.getMessage().contains("Legacy YouTube JVM credential"),
+        "legacy credential acquisition fenced");
+    credentials.manager.shutdown();
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = YoutubeAudioSourceManager.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static Field trackerField(String name) throws Exception {
+    Field field = YoutubeAccessTokenTracker.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static void checkField(String name, Class<?> type, int modifiers) throws Exception {
+    Field field = YoutubeAudioSourceManager.class.getDeclaredField(name);
+    check(field.getType() == type && field.getGenericType() == type
+        && field.getModifiers() == modifiers && !field.isSynthetic(), name + " metadata");
+  }
+
+  private static void checkConstructor(Constructor<?> constructor, Class<?>[] parameters) {
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && Arrays.equals(constructor.getParameterTypes(), parameters)
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.isAnnotationPresent(Deprecated.class),
+        constructor + " metadata");
+  }
+
+  private static void checkMethod(String name, Class<?> returnType, Class<?>[] parameters)
+      throws Exception {
+    Method method = YoutubeAudioSourceManager.class.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getModifiers() == Modifier.PUBLIC
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs(),
+        method + " metadata");
+  }
+
+  private static final class Fixture {
+    final List<String> configurationOrder = new ArrayList<>();
+    final ObjectHandler detailsHandler = new ObjectHandler();
+    final YoutubeTrackDetailsLoader details = proxy(YoutubeTrackDetailsLoader.class, detailsHandler);
+    final ConfigHandler searchConfig = new ConfigHandler("search", configurationOrder);
+    final ConfigHandler musicConfig = new ConfigHandler("music", configurationOrder);
+    final ExtendedHttpConfigurable searchConfiguration =
+        proxy(ExtendedHttpConfigurable.class, searchConfig);
+    final ExtendedHttpConfigurable musicConfiguration =
+        proxy(ExtendedHttpConfigurable.class, musicConfig);
+    final LoaderHandler searchHandler = new LoaderHandler(searchConfiguration);
+    final LoaderHandler musicHandler = new LoaderHandler(musicConfiguration);
+    final YoutubeSearchResultLoader search = proxy(YoutubeSearchResultLoader.class, searchHandler);
+    final YoutubeSearchMusicResultLoader music =
+        proxy(YoutubeSearchMusicResultLoader.class, musicHandler);
+    final YoutubeSignatureResolver signature = rejectingProxy(YoutubeSignatureResolver.class);
+    final PlaylistHandler playlistHandler = new PlaylistHandler();
+    final YoutubePlaylistLoader playlist = proxy(YoutubePlaylistLoader.class, playlistHandler);
+    final RouterHandler routerHandler = new RouterHandler();
+    final YoutubeLinkRouter router = proxy(YoutubeLinkRouter.class, routerHandler);
+    final YoutubeMixLoader mix = rejectingProxy(YoutubeMixLoader.class);
+    final YoutubeAudioSourceManager manager;
+
+    Fixture(boolean allowSearch) { this(allowSearch, null, null); }
+
+    Fixture(boolean allowSearch, String email, String password) {
+      manager = new YoutubeAudioSourceManager(allowSearch, email, password, details, search, music,
+          signature, playlist, router, mix);
+    }
+  }
+
+  private static class ObjectHandler implements InvocationHandler {
+    public Object invoke(Object instance, Method method, Object[] arguments) {
+      if (method.getName().equals("toString")) return "YoutubeFixture:" + method.getDeclaringClass();
+      return defaultValue(method.getReturnType());
+    }
+  }
+
+  private static final class LoaderHandler extends ObjectHandler {
+    final ExtendedHttpConfigurable configuration;
+    int configurationCalls;
+    LoaderHandler(ExtendedHttpConfigurable configuration) { this.configuration = configuration; }
+    public Object invoke(Object instance, Method method, Object[] arguments) {
+      if (method.getName().equals("getHttpConfiguration")) {
+        configurationCalls++;
+        return configuration;
+      }
+      return super.invoke(instance, method, arguments);
+    }
+  }
+
+  private static final class PlaylistHandler extends ObjectHandler {
+    int pageCount;
+    public Object invoke(Object instance, Method method, Object[] arguments) {
+      if (method.getName().equals("setPlaylistPageCount")) {
+        pageCount = (Integer) arguments[0];
+        return null;
+      }
+      return super.invoke(instance, method, arguments);
+    }
+  }
+
+  private static final class RouterHandler extends ObjectHandler {
+    String identifier;
+    Object routes;
+    Object result;
+    public Object invoke(Object instance, Method method, Object[] arguments) {
+      if (method.getName().equals("route")) {
+        identifier = (String) arguments[0];
+        routes = arguments[1];
+        return result;
+      }
+      return super.invoke(instance, method, arguments);
+    }
+  }
+
+  private static final class ConfigHandler implements InvocationHandler {
+    final String name;
+    final List<String> order;
+    Object requests;
+    Object builder;
+    ConfigHandler(String name, List<String> order) { this.name = name; this.order = order; }
+    public Object invoke(Object instance, Method method, Object[] arguments) {
+      if (method.getName().equals("configureRequests")) {
+        requests = arguments[0];
+        order.add(name + ":requests");
+      }
+      if (method.getName().equals("configureBuilder")) {
+        builder = arguments[0];
+        order.add(name + ":builder");
+      }
+      if (method.getName().equals("toString")) return "YoutubeConfigFixture:" + name;
+      return defaultValue(method.getReturnType());
+    }
+  }
+
+  private static <T> T rejectingProxy(Class<T> type) {
+    return proxy(type, (instance, method, arguments) -> {
+      if (method.getName().equals("toString")) return "RejectingYoutubeFixture:" + type.getName();
+      throw new AssertionError(type.getSimpleName() + " unexpectedly invoked: " + method);
+    });
+  }
+
+  private static <T> T proxy(Class<T> type, InvocationHandler handler) {
+    return type.cast(Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type}, handler));
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (error instanceof java.lang.reflect.InvocationTargetException) error = error.getCause();
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }

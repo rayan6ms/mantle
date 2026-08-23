@@ -236,6 +236,8 @@ const YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAccessTokenTracker";
 const YOUTUBE_CACHED_AUTH_SCRIPT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAccessTokenTracker$CachedAuthScript";
+const YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAudioSourceManager";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -331,6 +333,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_INFO_STATUS_CLASS,
     YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS,
     YOUTUBE_CACHED_AUTH_SCRIPT_CLASS,
+    YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -726,6 +729,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | DEFAULT_YOUTUBE_TRACK_DETAILS_CLASS
             | DEFAULT_YOUTUBE_TRACK_DETAILS_LOADER_CLASS
             | YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS
+            | YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS
     )
 }
 
@@ -771,6 +775,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | DEFAULT_YOUTUBE_TRACK_DETAILS_CLASS
             | DEFAULT_YOUTUBE_TRACK_DETAILS_LOADER_CLASS
             | YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS
+            | YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS
     )
 }
 
@@ -1067,6 +1072,9 @@ fn replacement_body(
     }
     if class_name == YOUTUBE_CACHED_AUTH_SCRIPT_CLASS {
         return youtube_cached_auth_script_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS {
+        return youtube_audio_source_manager_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -20490,6 +20498,610 @@ fn youtube_cached_auth_script_constructor(pool: &mut ConstantPool<'static>) -> R
     )
 }
 
+#[allow(clippy::too_many_lines)]
+fn youtube_audio_source_manager_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => youtube_audio_source_manager_default_constructor(pool),
+        ("<init>", "(ZLjava/lang/String;Ljava/lang/String;)V") => {
+            youtube_audio_source_manager_standard_constructor(pool)
+        }
+        (
+            "<init>",
+            "(ZLjava/lang/String;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackDetailsLoader;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSearchResultLoader;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSearchMusicResultLoader;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSignatureResolver;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubePlaylistLoader;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeMixLoader;)V",
+        ) => youtube_audio_source_manager_constructor(pool),
+        (
+            "getTrackDetailsLoader",
+            "()Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackDetailsLoader;",
+        ) => object_getter(
+            pool,
+            YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS,
+            "trackDetailsLoader",
+            "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackDetailsLoader;",
+        ),
+        (
+            "getSignatureResolver",
+            "()Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSignatureResolver;",
+        ) => object_getter(
+            pool,
+            YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS,
+            "signatureResolver",
+            "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSignatureResolver;",
+        ),
+        ("setPlaylistPageCount", "(I)V") => youtube_audio_source_manager_playlist_pages(pool),
+        ("getSourceName", "()Ljava/lang/String;") => {
+            string_return(pool, "youtube", required_locals)
+        }
+        (
+            "loadItem",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+        ) => youtube_audio_source_manager_load_item(pool),
+        ("isTrackEncodable", "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)Z") => code(
+            pool,
+            1,
+            required_locals,
+            vec![Instruction::Iconst_1, Instruction::Ireturn],
+        ),
+        (
+            "encodeTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Ljava/io/DataOutput;)V",
+        ) => code(pool, 0, required_locals, vec![Instruction::Return]),
+        (
+            "decodeTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+        )
+        | (
+            "buildTrackFromInfo",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAudioTrack;",
+        ) => youtube_audio_source_manager_track(pool, required_locals),
+        ("shutdown", "()V") => youtube_audio_source_manager_shutdown(pool),
+        (
+            "getAccessTokenTracker",
+            "()Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAccessTokenTracker;",
+        ) => object_getter(
+            pool,
+            YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS,
+            "accessTokenTracker",
+            "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAccessTokenTracker;",
+        ),
+        ("getHttpInterface", "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;") => {
+            youtube_audio_source_manager_http_interface(pool)
+        }
+        ("configureRequests", "(Ljava/util/function/Function;)V") => {
+            youtube_audio_source_manager_configure(pool, true)
+        }
+        ("configureBuilder", "(Ljava/util/function/Consumer;)V") => {
+            youtube_audio_source_manager_configure(pool, false)
+        }
+        (
+            "getHttpConfiguration",
+            "()Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
+        ) => object_getter(
+            pool,
+            YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS,
+            "combinedHttpConfiguration",
+            "Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
+        ),
+        (
+            "getMainHttpConfiguration",
+            "()Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
+        ) => object_getter(
+            pool,
+            YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS,
+            "httpInterfaceManager",
+            "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+        ),
+        (
+            "getSearchHttpConfiguration",
+            "()Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
+        ) => youtube_audio_source_manager_loader_configuration(
+            pool,
+            "searchResultLoader",
+            "YoutubeSearchResultLoader",
+        ),
+        (
+            "getSearchMusicHttpConfiguration",
+            "()Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
+        ) => youtube_audio_source_manager_loader_configuration(
+            pool,
+            "searchMusicResultLoader",
+            "YoutubeSearchMusicResultLoader",
+        ),
+        (
+            "loadTrackWithVideoId",
+            "(Ljava/lang/String;Z)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+        ) => youtube_audio_source_manager_load_video(pool),
+        ("<clinit>", "()V") => youtube_audio_source_manager_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn youtube_audio_source_manager_default_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let init = pool.add_method_ref(owner, "<init>", "(ZLjava/lang/String;Ljava/lang/String;)V")?;
+    code(
+        pool,
+        4,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Iconst_1,
+            Instruction::Aconst_null,
+            Instruction::Aconst_null,
+            Instruction::Invokespecial(init),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn youtube_audio_source_manager_standard_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let init = pool.add_method_ref(
+        owner,
+        "<init>",
+        "(ZLjava/lang/String;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackDetailsLoader;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSearchResultLoader;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSearchMusicResultLoader;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSignatureResolver;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubePlaylistLoader;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeMixLoader;)V",
+    )?;
+    let defaults = [
+        "DefaultYoutubeTrackDetailsLoader",
+        "YoutubeSearchProvider",
+        "YoutubeSearchMusicProvider",
+        "YoutubeSignatureCipherManager",
+        "DefaultYoutubePlaylistLoader",
+        "DefaultYoutubeLinkRouter",
+        "YoutubeMixProvider",
+    ];
+    let mut classes = Vec::with_capacity(defaults.len());
+    let mut constructors = Vec::with_capacity(defaults.len());
+    for name in defaults {
+        let class = pool.add_class(format!(
+            "com/sedmelluq/discord/lavaplayer/source/youtube/{name}"
+        ))?;
+        constructors.push(pool.add_method_ref(class, "<init>", "()V")?);
+        classes.push(class);
+    }
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Iload_1,
+        Instruction::Aload_2,
+        Instruction::Aload_3,
+    ];
+    for (class, constructor) in classes.into_iter().zip(constructors) {
+        instructions.extend([
+            Instruction::New(class),
+            Instruction::Dup,
+            Instruction::Invokespecial(constructor),
+        ]);
+    }
+    instructions.extend([Instruction::Invokespecial(init), Instruction::Return]);
+    code(pool, 12, 4, instructions)
+}
+
+#[allow(clippy::too_many_lines)]
+fn youtube_audio_source_manager_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let loader_specs = [
+        ("trackDetailsLoader", "YoutubeTrackDetailsLoader", 4_u8),
+        ("searchResultLoader", "YoutubeSearchResultLoader", 5_u8),
+        (
+            "searchMusicResultLoader",
+            "YoutubeSearchMusicResultLoader",
+            6_u8,
+        ),
+        ("signatureResolver", "YoutubeSignatureResolver", 7_u8),
+        ("playlistLoader", "YoutubePlaylistLoader", 8_u8),
+        ("linkRouter", "YoutubeLinkRouter", 9_u8),
+        ("mixLoader", "YoutubeMixLoader", 10_u8),
+    ];
+    let mut loader_fields = Vec::with_capacity(loader_specs.len());
+    for (field_name, type_name, _) in loader_specs {
+        loader_fields.push(pool.add_field_ref(
+            owner,
+            field_name,
+            &format!("Lcom/sedmelluq/discord/lavaplayer/source/youtube/{type_name};"),
+        )?);
+    }
+    let allow_search = pool.add_field_ref(owner, "allowSearch", "Z")?;
+    let tools = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpClientTools")?;
+    let create_manager = pool.add_method_ref(
+        tools,
+        "createDefaultThreadLocalManager",
+        "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let manager_field = pool.add_field_ref(
+        owner,
+        "httpInterfaceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let manager_interface =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager")?;
+    let set_filter = pool.add_interface_method_ref(
+        manager_interface,
+        "setHttpContextFilter",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/http/HttpContextFilter;)V",
+    )?;
+    let tracker = pool.add_class(YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS)?;
+    let tracker_init = pool.add_method_ref(
+        tracker,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;Ljava/lang/String;Ljava/lang/String;)V",
+    )?;
+    let tracker_field = pool.add_field_ref(
+        owner,
+        "accessTokenTracker",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAccessTokenTracker;",
+    )?;
+    let filter =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeHttpContextFilter")?;
+    let filter_init = pool.add_method_ref(filter, "<init>", "()V")?;
+    let set_tracker = pool.add_method_ref(
+        filter,
+        "setTokenTracker",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAccessTokenTracker;)V",
+    )?;
+    let routes = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAudioSourceManager$LoadingRoutes",
+    )?;
+    let routes_init = pool.add_method_ref(
+        routes,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAudioSourceManager;)V",
+    )?;
+    let routes_field = pool.add_field_ref(
+        owner,
+        "loadingRoutes",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAudioSourceManager$LoadingRoutes;",
+    )?;
+    let configurable =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable")?;
+    let search = pool
+        .add_class("com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSearchResultLoader")?;
+    let search_music = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSearchMusicResultLoader",
+    )?;
+    let get_search_config = pool.add_interface_method_ref(
+        search,
+        "getHttpConfiguration",
+        "()Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
+    )?;
+    let get_music_config = pool.add_interface_method_ref(
+        search_music,
+        "getHttpConfiguration",
+        "()Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
+    )?;
+    let arrays = pool.add_class("java/util/Arrays")?;
+    let as_list = pool.add_method_ref(arrays, "asList", "([Ljava/lang/Object;)Ljava/util/List;")?;
+    let multi =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/http/MultiHttpConfigurable")?;
+    let multi_init = pool.add_method_ref(multi, "<init>", "(Ljava/util/Collection;)V")?;
+    let combined = pool.add_field_ref(
+        owner,
+        "combinedHttpConfiguration",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
+    )?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Invokespecial(object_init),
+        Instruction::Aload_0,
+        Instruction::Invokestatic(create_manager),
+        Instruction::Putfield(manager_field),
+        Instruction::Aload_0,
+        Instruction::New(tracker),
+        Instruction::Dup,
+        Instruction::Aload_0,
+        Instruction::Getfield(manager_field),
+        Instruction::Aload_2,
+        Instruction::Aload_3,
+        Instruction::Invokespecial(tracker_init),
+        Instruction::Putfield(tracker_field),
+        Instruction::New(filter),
+        Instruction::Dup,
+        Instruction::Invokespecial(filter_init),
+        Instruction::Dup,
+        Instruction::Aload_0,
+        Instruction::Getfield(tracker_field),
+        Instruction::Invokevirtual(set_tracker),
+        Instruction::Aload_0,
+        Instruction::Getfield(manager_field),
+        Instruction::Swap,
+        Instruction::Invokeinterface(set_filter, 2),
+        Instruction::Aload_0,
+        Instruction::Iload_1,
+        Instruction::Putfield(allow_search),
+    ];
+    for (index, (_, _, local)) in loader_specs.iter().enumerate() {
+        instructions.extend([
+            Instruction::Aload_0,
+            Instruction::Aload(*local),
+            Instruction::Putfield(loader_fields[index]),
+        ]);
+    }
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::New(routes),
+        Instruction::Dup,
+        Instruction::Aload_0,
+        Instruction::Invokespecial(routes_init),
+        Instruction::Putfield(routes_field),
+        Instruction::Aload_0,
+        Instruction::New(multi),
+        Instruction::Dup,
+        Instruction::Iconst_3,
+        Instruction::Anewarray(configurable),
+        Instruction::Dup,
+        Instruction::Iconst_0,
+        Instruction::Aload_0,
+        Instruction::Getfield(manager_field),
+        Instruction::Aastore,
+        Instruction::Dup,
+        Instruction::Iconst_1,
+        Instruction::Aload(5),
+        Instruction::Invokeinterface(get_search_config, 1),
+        Instruction::Aastore,
+        Instruction::Dup,
+        Instruction::Iconst_2,
+        Instruction::Aload(6),
+        Instruction::Invokeinterface(get_music_config, 1),
+        Instruction::Aastore,
+        Instruction::Invokestatic(as_list),
+        Instruction::Invokespecial(multi_init),
+        Instruction::Putfield(combined),
+        Instruction::Return,
+    ]);
+    code(pool, 7, 11, instructions)
+}
+
+fn youtube_audio_source_manager_playlist_pages(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let field = pool.add_field_ref(
+        owner,
+        "playlistLoader",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubePlaylistLoader;",
+    )?;
+    let interface =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/source/youtube/YoutubePlaylistLoader")?;
+    let set = pool.add_interface_method_ref(interface, "setPlaylistPageCount", "(I)V")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Iload_1,
+            Instruction::Invokeinterface(set, 2),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn youtube_audio_source_manager_load_item(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let native = pool.add_class(NATIVE_CLASS)?;
+    let load = pool.add_method_ref(
+        native,
+        "loadYoutubeItem",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAudioSourceManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+    )?;
+    code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Invokestatic(load),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn youtube_audio_source_manager_load_video(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let reference = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioReference")?;
+    let reference_init = pool.add_method_ref(
+        reference,
+        "<init>",
+        "(Ljava/lang/String;Ljava/lang/String;)V",
+    )?;
+    let native = pool.add_class(NATIVE_CLASS)?;
+    let load = pool.add_method_ref(
+        native,
+        "loadYoutubeItem",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAudioSourceManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+    )?;
+    code(
+        pool,
+        5,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::New(reference),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Aconst_null,
+            Instruction::Invokespecial(reference_init),
+            Instruction::Invokestatic(load),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn youtube_audio_source_manager_track(
+    pool: &mut ConstantPool<'static>,
+    required_locals: u16,
+) -> Result<Attribute> {
+    let track =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAudioTrack")?;
+    let init = pool.add_method_ref(
+        track,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAudioSourceManager;)V",
+    )?;
+    code(
+        pool,
+        4,
+        required_locals,
+        vec![
+            Instruction::New(track),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn youtube_audio_source_manager_shutdown(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let manager = pool.add_field_ref(
+        owner,
+        "httpInterfaceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let tools = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/ExceptionTools")?;
+    let close = pool.add_method_ref(tools, "closeWithWarnings", "(Ljava/lang/AutoCloseable;)V")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(manager),
+            Instruction::Invokestatic(close),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn youtube_audio_source_manager_http_interface(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let manager = pool.add_field_ref(
+        owner,
+        "httpInterfaceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let interface =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager")?;
+    let get = pool.add_interface_method_ref(
+        interface,
+        "getInterface",
+        "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(manager),
+            Instruction::Invokeinterface(get, 1),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn youtube_audio_source_manager_configure(
+    pool: &mut ConstantPool<'static>,
+    requests: bool,
+) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let combined = pool.add_field_ref(
+        owner,
+        "combinedHttpConfiguration",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
+    )?;
+    let configurable =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable")?;
+    let (name, descriptor) = if requests {
+        ("configureRequests", "(Ljava/util/function/Function;)V")
+    } else {
+        ("configureBuilder", "(Ljava/util/function/Consumer;)V")
+    };
+    let configure = pool.add_interface_method_ref(configurable, name, descriptor)?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(combined),
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(configure, 2),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn youtube_audio_source_manager_loader_configuration(
+    pool: &mut ConstantPool<'static>,
+    field_name: &str,
+    type_name: &str,
+) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let descriptor = format!("Lcom/sedmelluq/discord/lavaplayer/source/youtube/{type_name};");
+    let field = pool.add_field_ref(owner, field_name, &descriptor)?;
+    let interface = pool.add_class(format!(
+        "com/sedmelluq/discord/lavaplayer/source/youtube/{type_name}"
+    ))?;
+    let get = pool.add_interface_method_ref(
+        interface,
+        "getHttpConfiguration",
+        "()Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Invokeinterface(get, 1),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn youtube_audio_source_manager_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
 fn youtube_access_token_tracker_replacement(
     pool: &mut ConstantPool<'static>,
     name: &str,
@@ -23048,6 +23660,10 @@ fn native_class(expected_abi: u8) -> Result<ClassFile<'static>> {
         (
             "loadYandexMusicItem",
             "(Lcom/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicAudioSourceManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+        ),
+        (
+            "loadYoutubeItem",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAudioSourceManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
         ),
         (
             "processNicoTrack",

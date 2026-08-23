@@ -18292,198 +18292,318 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The public deprecated class shell, Object superclass, AudioSourceManager and HttpConfigurable interfaces, 13-field private state, three constructors, 20 declared methods, and LoadingRoutes nesting metadata are exact; legacy remote link-router acquisition is intentionally replaced by the bounded native YouTube source.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-core/tests/phase12_youtube.rs",
+        "docs/adr/0013-youtube-source-replacement-boundary.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The public no-argument constructor exactly establishes the default collaborator graph, enables search, leaves optional credentials absent, and preserves ordinary Object identity semantics.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(ZLjava/lang/String;Ljava/lang/String;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The public convenience constructor preserves the search flag and default collaborator graph, while optional legacy email/password bootstrap is deliberately fenced from construction because the current native source does not perform hidden network authentication.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-core/tests/phase12_youtube.rs",
+        "docs/adr/0013-youtube-source-replacement-boundary.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(ZLjava/lang/String;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackDetailsLoader;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSearchResultLoader;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSearchMusicResultLoader;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSignatureResolver;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubePlaylistLoader;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeMixLoader;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The full public constructor exactly preserves supplied collaborator identity, search state, HTTP configuration topology, and access-token ownership, while intentionally omitting the reference implementation's eager credential-driven remote bootstrap.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-core/tests/phase12_youtube.rs",
+        "docs/adr/0013-youtube-source-replacement-boundary.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getTrackDetailsLoader",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackDetailsLoader;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The getter returns the exact YoutubeTrackDetailsLoader instance captured by construction.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getSignatureResolver",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSignatureResolver;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The getter returns the exact YoutubeSignatureResolver instance captured by construction.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "setPlaylistPageCount",
       "descriptor": "(I)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The method forwards the full signed int value exactly once to the captured playlist loader.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getSourceName",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The method returns the exact stable source name youtube.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "loadItem",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The public load boundary preserves null and foreign-identifier rejection plus direct/search/playlist result materialization, but routes supported identifiers through the deterministic native YouTube source instead of the legacy retrying link-router and remote acquisition graph.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-core/tests/phase12_youtube.rs",
+        "docs/adr/0013-youtube-source-replacement-boundary.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "isTrackEncodable",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The method returns true unconditionally, including for a null track argument, matching the reference contract.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "encodeTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Ljava/io/DataOutput;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The method emits no source-specific payload and does not dereference either argument, matching the reference contract.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "decodeTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The method reconstructs a YoutubeAudioTrack from the supplied AudioTrackInfo with this manager as source and ignores the DataInput payload exactly.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "shutdown",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The method delegates shutdown to the owned HTTP interface manager and remains safely repeatable.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getAccessTokenTracker",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAccessTokenTracker;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The getter returns the single access-token tracker owned by the manager.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getHttpInterface",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The method returns a usable interface from the owned HTTP interface manager.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "configureRequests",
       "descriptor": "(Ljava/util/function/Function;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The raw generic request configurator is forwarded in exact main, search, and music configuration order.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "configureBuilder",
       "descriptor": "(Ljava/util/function/Consumer;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The raw generic builder configurator is forwarded in exact main, search, and music configuration order.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getHttpConfiguration",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The getter returns the stable combined HTTP configurable spanning main, search, and music delegates.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getMainHttpConfiguration",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The getter returns the owned main HTTP interface manager as the exact main configurable.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getSearchHttpConfiguration",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The getter returns the captured search loader HTTP configurable.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getSearchMusicHttpConfiguration",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The getter returns the captured music-search loader HTTP configurable.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "loadTrackWithVideoId",
       "descriptor": "(Ljava/lang/String;Z)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The public video-id boundary preserves direct-versus-playlist selection and track materialization, but resolves through the bounded native YouTube source instead of the legacy track-details HTTP loader.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-core/tests/phase12_youtube.rs",
+        "docs/adr/0013-youtube-source-replacement-boundary.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioTrack",
