@@ -169,6 +169,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
             Some(SOUND_CLOUD_SEGMENT_DECODER_FACTORY_CONSUMER)
         }
         "write-sound-cloud-track-format-consumer" => Some(SOUND_CLOUD_TRACK_FORMAT_CONSUMER),
+        "write-m3u-stream-audio-track-consumer" => Some(M3U_STREAM_AUDIO_TRACK_CONSUMER),
         _ => None,
     }
 }
@@ -13752,6 +13753,289 @@ public final class GateClassloader {
     loader.close();
     loader = null;
     return reference;
+  }
+}
+"#;
+
+const M3U_STREAM_AUDIO_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.playlists.ExtendedM3uParser;
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.stream.M3uStreamAudioTrack;
+import com.sedmelluq.discord.lavaplayer.source.stream.M3uStreamSegmentUrlProvider;
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter;
+import com.sedmelluq.discord.lavaplayer.tools.io.ChainedInputStream;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.DelegatedAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.protocol.HttpClientContext;
+
+public final class GateM3uStreamAudioTrack {
+  public static void main(String[] args) throws Exception {
+    reflectionContract();
+    constructionAndHooks();
+    lazyJoinedStream();
+    cleanupAndSuppression();
+    acquisitionFailure();
+    System.out.println("public-abstract,delegated,0-fields,1-constructor,4-exported-methods;"
+        + "construction,hooks,lazy-chain,segment-order,identity,cleanup,suppression,failures,reflection");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<M3uStreamAudioTrack> type = M3uStreamAudioTrack.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && type.getSuperclass() == DelegatedAudioTrack.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 0,
+        "class metadata");
+
+    Constructor<?> constructor = type.getDeclaredConstructor(AudioTrackInfo.class);
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "constructor metadata");
+    checkMethod(type, "getSegmentUrlProvider", M3uStreamSegmentUrlProvider.class,
+        Modifier.PROTECTED | Modifier.ABSTRACT, new Class<?>[0], new Class<?>[0], false);
+    checkMethod(type, "getHttpInterface", HttpInterface.class,
+        Modifier.PROTECTED | Modifier.ABSTRACT, new Class<?>[0], new Class<?>[0], false);
+    checkMethod(type, "processJoinedStream", void.class,
+        Modifier.PROTECTED | Modifier.ABSTRACT,
+        new Class<?>[] {LocalAudioTrackExecutor.class, InputStream.class},
+        new Class<?>[] {Exception.class}, false);
+    checkMethod(type, "process", void.class, Modifier.PUBLIC,
+        new Class<?>[] {LocalAudioTrackExecutor.class}, new Class<?>[] {Exception.class}, false);
+    checkMethod(type, "lambda$process$0", InputStream.class,
+        Modifier.PRIVATE | 0x1000, new Class<?>[] {HttpInterface.class},
+        new Class<?>[] {IOException.class}, true);
+    check(type.getDeclaredMethods().length == 5, "declared method count");
+    long exported = Arrays.stream(type.getDeclaredMethods())
+        .filter(method -> Modifier.isPublic(method.getModifiers())
+            || Modifier.isProtected(method.getModifiers()))
+        .count();
+    check(exported == 4L, "exported method count");
+  }
+
+  private static void constructionAndHooks() {
+    StringBuilder events = new StringBuilder();
+    QueueProvider provider = new QueueProvider(events);
+    RecordingHttpInterface http = new RecordingHttpInterface(events);
+    AudioTrackInfo info = info();
+    TestTrack track = new TestTrack(info, provider, http, events);
+    check(track.getInfo() == info && track.exposedProvider() == provider
+        && track.exposedHttp() == http, "construction and hook identity");
+  }
+
+  private static void lazyJoinedStream() throws Exception {
+    StringBuilder events = new StringBuilder();
+    QueueProvider provider = new QueueProvider(events,
+        new TrackingInputStream("a", "ab", events, null),
+        new TrackingInputStream("b", "cd", events, null));
+    RecordingHttpInterface http = new RecordingHttpInterface(events);
+    TestTrack track = new TestTrack(info(), provider, http, events);
+    track.process(null);
+
+    check(track.observedExecutor == null && track.observedStream instanceof ChainedInputStream,
+        "joined arguments");
+    check("abcd".equals(track.joinedData), "joined data");
+    check(provider.calls == 3 && provider.observedHttp == http,
+        "lazy provider order and HTTP identity");
+    check(provider.streams[0].closes == 1 && provider.streams[1].closes == 1
+        && http.closes == 1, "ordinary cleanup");
+    String order = events.toString();
+    check(order.startsWith("http;joined;")
+        && order.indexOf("close:a;") < order.indexOf("close:b;")
+        && order.indexOf("close:b;") < order.indexOf("http-close;"),
+        "resource order: " + order);
+  }
+
+  private static void cleanupAndSuppression() throws Exception {
+    StringBuilder events = new StringBuilder();
+    IOException chainClose = new IOException("chain-close");
+    IOException httpClose = new IOException("http-close");
+    QueueProvider provider = new QueueProvider(events,
+        new TrackingInputStream("failing", "x", events, chainClose));
+    RecordingHttpInterface http = new RecordingHttpInterface(events);
+    http.closeFailure = httpClose;
+    TestTrack track = new TestTrack(info(), provider, http, events);
+    Exception primary = new Exception("joined-primary");
+    track.joinedFailure = primary;
+    track.primeStreamBeforeFailure = true;
+
+    Exception thrown = expect(Exception.class, () -> track.process(null));
+    check(thrown == primary && Arrays.equals(thrown.getSuppressed(),
+        new Throwable[] {chainClose, httpClose}), "suppressed failure order");
+    check(provider.calls == 1 && provider.streams[0].closes == 1 && http.closes == 1,
+        "failure cleanup");
+  }
+
+  private static void acquisitionFailure() throws Exception {
+    StringBuilder events = new StringBuilder();
+    QueueProvider provider = new QueueProvider(events);
+    RecordingHttpInterface http = new RecordingHttpInterface(events);
+    TestTrack track = new TestTrack(info(), provider, http, events);
+    RuntimeException failure = new RuntimeException("http-hook");
+    track.httpFailure = failure;
+    RuntimeException thrown = expect(RuntimeException.class, () -> track.process(null));
+    check(thrown == failure && provider.calls == 0 && http.closes == 0
+        && track.joinedCalls == 0, "acquisition failure identity");
+  }
+
+  private static AudioTrackInfo info() {
+    return new AudioTrackInfo("title", "author", 123L, "fixture", false,
+        "https://example.invalid/fixture", null, null);
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+      int modifiers, Class<?>[] parameters, Class<?>[] exceptions, boolean synthetic)
+      throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.isSynthetic() == synthetic && !method.isBridge() && !method.isVarArgs(),
+        name + " metadata");
+  }
+
+  private static final class TestTrack extends M3uStreamAudioTrack {
+    private final QueueProvider provider;
+    private final RecordingHttpInterface http;
+    private final StringBuilder events;
+    private LocalAudioTrackExecutor observedExecutor;
+    private InputStream observedStream;
+    private String joinedData;
+    private Exception joinedFailure;
+    private RuntimeException httpFailure;
+    private boolean primeStreamBeforeFailure;
+    private int joinedCalls;
+
+    TestTrack(AudioTrackInfo info, QueueProvider provider, RecordingHttpInterface http,
+        StringBuilder events) {
+      super(info);
+      this.provider = provider;
+      this.http = http;
+      this.events = events;
+    }
+
+    protected M3uStreamSegmentUrlProvider getSegmentUrlProvider() { return provider; }
+    protected HttpInterface getHttpInterface() {
+      events.append("http;");
+      if (httpFailure != null) throw httpFailure;
+      return http;
+    }
+    protected void processJoinedStream(LocalAudioTrackExecutor executor, InputStream stream)
+        throws Exception {
+      joinedCalls++;
+      observedExecutor = executor;
+      observedStream = stream;
+      events.append("joined;");
+      if (joinedFailure != null) {
+        if (primeStreamBeforeFailure) stream.read();
+        throw joinedFailure;
+      }
+      ByteArrayOutputStream output = new ByteArrayOutputStream();
+      byte[] buffer = new byte[8];
+      int count;
+      while ((count = stream.read(buffer)) != -1) output.write(buffer, 0, count);
+      joinedData = new String(output.toByteArray(), StandardCharsets.UTF_8);
+    }
+    M3uStreamSegmentUrlProvider exposedProvider() { return getSegmentUrlProvider(); }
+    HttpInterface exposedHttp() { return getHttpInterface(); }
+    protected AudioTrack makeShallowClone() {
+      return new TestTrack(trackInfo, provider, http, events);
+    }
+    public AudioSourceManager getSourceManager() { return null; }
+  }
+
+  private static final class QueueProvider extends M3uStreamSegmentUrlProvider {
+    private final StringBuilder events;
+    private final TrackingInputStream[] streams;
+    private HttpInterface observedHttp;
+    private int calls;
+
+    QueueProvider(StringBuilder events, TrackingInputStream... streams) {
+      this.events = events;
+      this.streams = streams;
+    }
+    public InputStream getNextSegmentStream(HttpInterface http) {
+      calls++;
+      if (observedHttp == null) observedHttp = http;
+      check(observedHttp == http, "HTTP identity changed");
+      events.append("next;");
+      return calls <= streams.length ? streams[calls - 1] : null;
+    }
+    protected String getQualityFromM3uDirective(ExtendedM3uParser.Line line) { return null; }
+    protected String fetchSegmentPlaylistUrl(HttpInterface http) { return null; }
+    protected HttpUriRequest createSegmentGetRequest(String url) { return null; }
+  }
+
+  private static final class TrackingInputStream extends ByteArrayInputStream {
+    private final String name;
+    private final StringBuilder events;
+    private final IOException closeFailure;
+    private int closes;
+    TrackingInputStream(String name, String data, StringBuilder events, IOException closeFailure) {
+      super(data.getBytes(StandardCharsets.UTF_8));
+      this.name = name;
+      this.events = events;
+      this.closeFailure = closeFailure;
+    }
+    public void close() throws IOException {
+      closes++;
+      events.append("close:").append(name).append(';');
+      if (closeFailure != null) throw closeFailure;
+      super.close();
+    }
+  }
+
+  private static final class RecordingHttpInterface extends HttpInterface {
+    private final StringBuilder events;
+    private IOException closeFailure;
+    private int closes;
+    RecordingHttpInterface(StringBuilder events) {
+      super(null, HttpClientContext.create(), false, proxy(HttpContextFilter.class));
+      this.events = events;
+    }
+    public void close() throws IOException {
+      closes++;
+      events.append("http-close;");
+      if (closeFailure != null) throw closeFailure;
+    }
+  }
+
+  private static <T> T proxy(Class<T> type) {
+    return type.cast(Proxy.newProxyInstance(
+        GateM3uStreamAudioTrack.class.getClassLoader(), new Class<?>[] {type},
+        (proxy, method, args) -> {
+          if (method.getReturnType() == boolean.class) return false;
+          if (method.getReturnType() == int.class) return 0;
+          return null;
+        }));
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
   }
 }
 "#;

@@ -163,6 +163,10 @@ const SOUND_CLOUD_SEGMENT_DECODER_FACTORY_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudSegmentDecoder$Factory";
 const SOUND_CLOUD_TRACK_FORMAT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/soundcloud/SoundCloudTrackFormat";
+const M3U_STREAM_AUDIO_TRACK_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/stream/M3uStreamAudioTrack";
+const M3U_STREAM_PROVIDER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/stream/MantleM3uStreamProvider";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -223,6 +227,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     SOUND_CLOUD_SEGMENT_DECODER_CLASS,
     SOUND_CLOUD_SEGMENT_DECODER_FACTORY_CLASS,
     SOUND_CLOUD_TRACK_FORMAT_CLASS,
+    M3U_STREAM_AUDIO_TRACK_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -367,7 +372,8 @@ pub fn emit(
             .iter()
             .filter_map(|class| {
                 let name = class.class_name().ok()?.to_string();
-                name.starts_with("dev/mantle/internal/").then_some(name)
+                (name.starts_with("dev/mantle/internal/") || name == M3U_STREAM_PROVIDER_CLASS)
+                    .then_some(name)
             })
             .collect();
         let manifest = EmissionManifest {
@@ -402,6 +408,7 @@ fn internal_classes(expected_abi: u8) -> Result<Vec<ClassFile<'static>>> {
         native_track_marker_tracker_class()?,
         native_base_audio_track_class()?,
         native_audio_track_info_builder_class()?,
+        m3u_stream_provider_class()?,
     ])
 }
 
@@ -618,6 +625,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | SOUND_CLOUD_HTTP_CONTEXT_FILTER_CLASS
                 | SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS
                 | SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS
+                | M3U_STREAM_AUDIO_TRACK_CLASS
         ) || method
             .access_flags
             .intersects(MethodAccessFlags::PUBLIC | MethodAccessFlags::PROTECTED)
@@ -761,6 +769,9 @@ fn replacement_body(
     }
     if class_name == SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS {
         return sound_cloud_m3u_audio_track_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == M3U_STREAM_AUDIO_TRACK_CLASS {
+        return m3u_stream_audio_track_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_M3U_INFO_CLASS {
         return sound_cloud_m3u_info_replacement(pool, name, descriptor, required_locals);
@@ -15429,6 +15440,321 @@ fn add_basic_playlist_state(class: &mut ClassFile<'static>) -> Result<()> {
         )?;
     }
     Ok(())
+}
+
+fn m3u_stream_audio_track_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V") => {
+            let superclass = pool.add_class(DELEGATED_AUDIO_TRACK_CLASS)?;
+            let constructor = pool.add_method_ref(
+                superclass,
+                "<init>",
+                "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V",
+            )?;
+            code(
+                pool,
+                2,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Aload_1,
+                    Instruction::Invokespecial(constructor),
+                    Instruction::Return,
+                ],
+            )
+        }
+        (
+            "process",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+        ) => {
+            let helper = pool.add_class(M3U_STREAM_PROVIDER_CLASS)?;
+            let run = pool.add_method_ref(
+                helper,
+                "run",
+                "(Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+            )?;
+            code(
+                pool,
+                2,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Aload_1,
+                    Instruction::Invokestatic(run),
+                    Instruction::Return,
+                ],
+            )
+        }
+        (
+            "lambda$process$0",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;)Ljava/io/InputStream;",
+        ) => {
+            let track = pool.add_class(M3U_STREAM_AUDIO_TRACK_CLASS)?;
+            let get_provider = pool.add_method_ref(
+                track,
+                "getSegmentUrlProvider",
+                "()Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider;",
+            )?;
+            let provider = pool.add_class(
+                "com/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider",
+            )?;
+            let next = pool.add_method_ref(
+                provider,
+                "getNextSegmentStream",
+                "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;)Ljava/io/InputStream;",
+            )?;
+            code(
+                pool,
+                2,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Invokevirtual(get_provider),
+                    Instruction::Aload_1,
+                    Instruction::Invokevirtual(next),
+                    Instruction::Areturn,
+                ],
+            )
+        }
+        _ => Err(format!(
+            "Phase 13 does not implement {M3U_STREAM_AUDIO_TRACK_CLASS}.{name}{descriptor}"
+        )
+        .into()),
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+fn m3u_stream_provider_class() -> Result<ClassFile<'static>> {
+    const TRACK_DESCRIPTOR: &str =
+        "Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamAudioTrack;";
+    const HTTP_DESCRIPTOR: &str = "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;";
+
+    let mut class = new_class(
+        M3U_STREAM_PROVIDER_CLASS,
+        "java/lang/Object",
+        ClassAccessFlags::FINAL | ClassAccessFlags::SUPER,
+        &["com/sedmelluq/discord/lavaplayer/tools/io/ChainedInputStream$Provider"],
+    )?;
+    add_field(
+        &mut class,
+        FieldAccessFlags::PRIVATE | FieldAccessFlags::FINAL,
+        "track",
+        TRACK_DESCRIPTOR,
+    )?;
+    add_field(
+        &mut class,
+        FieldAccessFlags::PRIVATE | FieldAccessFlags::FINAL,
+        "http",
+        HTTP_DESCRIPTOR,
+    )?;
+
+    let object = class.constant_pool.add_class("java/lang/Object")?;
+    let object_constructor = class
+        .constant_pool
+        .add_method_ref(object, "<init>", "()V")?;
+    let helper = class.constant_pool.add_class(M3U_STREAM_PROVIDER_CLASS)?;
+    let track_field = class
+        .constant_pool
+        .add_field_ref(helper, "track", TRACK_DESCRIPTOR)?;
+    let http_field = class
+        .constant_pool
+        .add_field_ref(helper, "http", HTTP_DESCRIPTOR)?;
+    let constructor = code(
+        &mut class.constant_pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_constructor),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(track_field),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(http_field),
+            Instruction::Return,
+        ],
+    )?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::empty(),
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamAudioTrack;Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;)V",
+        Some(constructor),
+    )?;
+
+    let track_class = class
+        .constant_pool
+        .add_class(M3U_STREAM_AUDIO_TRACK_CLASS)?;
+    let get_provider = class.constant_pool.add_method_ref(
+        track_class,
+        "getSegmentUrlProvider",
+        "()Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider;",
+    )?;
+    let provider = class
+        .constant_pool
+        .add_class("com/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider")?;
+    let next_segment = class.constant_pool.add_method_ref(
+        provider,
+        "getNextSegmentStream",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;)Ljava/io/InputStream;",
+    )?;
+    let next = code(
+        &mut class.constant_pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(track_field),
+            Instruction::Invokevirtual(get_provider),
+            Instruction::Aload_0,
+            Instruction::Getfield(http_field),
+            Instruction::Invokevirtual(next_segment),
+            Instruction::Areturn,
+        ],
+    )?;
+    let exceptions_name = class.constant_pool.add_utf8("Exceptions")?;
+    let io_exception = class.constant_pool.add_class("java/io/IOException")?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC,
+        "next",
+        "()Ljava/io/InputStream;",
+        Some(next),
+    )?;
+    class
+        .methods
+        .last_mut()
+        .ok_or("missing generated next method")?
+        .attributes
+        .push(Attribute::Exceptions {
+            name_index: exceptions_name,
+            exception_indexes: vec![io_exception],
+        });
+
+    let get_http = class.constant_pool.add_method_ref(
+        track_class,
+        "getHttpInterface",
+        "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;",
+    )?;
+    let chain = class
+        .constant_pool
+        .add_class("com/sedmelluq/discord/lavaplayer/tools/io/ChainedInputStream")?;
+    let chain_constructor = class.constant_pool.add_method_ref(
+        chain,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/ChainedInputStream$Provider;)V",
+    )?;
+    let helper_constructor = class.constant_pool.add_method_ref(
+        helper,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamAudioTrack;Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;)V",
+    )?;
+    let process_joined = class.constant_pool.add_method_ref(
+        track_class,
+        "processJoinedStream",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;Ljava/io/InputStream;)V",
+    )?;
+    let chain_close = class.constant_pool.add_method_ref(chain, "close", "()V")?;
+    let http = class
+        .constant_pool
+        .add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpInterface")?;
+    let http_close = class.constant_pool.add_method_ref(http, "close", "()V")?;
+    let throwable = class.constant_pool.add_class("java/lang/Throwable")?;
+    let add_suppressed = class.constant_pool.add_method_ref(
+        throwable,
+        "addSuppressed",
+        "(Ljava/lang/Throwable;)V",
+    )?;
+    let run = code_with_exceptions(
+        &mut class.constant_pool,
+        6,
+        6,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(get_http),
+            Instruction::Astore_2,
+            Instruction::New(chain),
+            Instruction::Dup,
+            Instruction::New(helper),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Invokespecial(helper_constructor),
+            Instruction::Invokespecial(chain_constructor),
+            Instruction::Astore_3,
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(process_joined),
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(chain_close),
+            Instruction::Goto(29),
+            Instruction::Astore(4),
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(chain_close),
+            Instruction::Goto(27),
+            Instruction::Astore(5),
+            Instruction::Aload(4),
+            Instruction::Aload(5),
+            Instruction::Invokevirtual(add_suppressed),
+            Instruction::Aload(4),
+            Instruction::Athrow,
+            Instruction::Aload_2,
+            Instruction::Ifnull(46),
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(http_close),
+            Instruction::Goto(46),
+            Instruction::Astore_3,
+            Instruction::Aload_2,
+            Instruction::Ifnull(44),
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(http_close),
+            Instruction::Goto(44),
+            Instruction::Astore(4),
+            Instruction::Aload_3,
+            Instruction::Aload(4),
+            Instruction::Invokevirtual(add_suppressed),
+            Instruction::Aload_3,
+            Instruction::Athrow,
+            Instruction::Return,
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 12..16,
+                handler_pc: 19,
+                catch_type: throwable,
+            },
+            ExceptionTableEntry {
+                range_pc: 20..22,
+                handler_pc: 23,
+                catch_type: throwable,
+            },
+            ExceptionTableEntry {
+                range_pc: 3..29,
+                handler_pc: 34,
+                catch_type: throwable,
+            },
+            ExceptionTableEntry {
+                range_pc: 37..39,
+                handler_pc: 40,
+                catch_type: throwable,
+            },
+        ],
+    )?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::STATIC,
+        "run",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+        Some(run),
+    )?;
+    Ok(class)
 }
 
 #[allow(clippy::too_many_lines)]
