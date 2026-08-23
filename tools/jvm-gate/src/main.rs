@@ -218,6 +218,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-yandex-music-search-result-loader-consumer" => {
             Some(YANDEX_MUSIC_SEARCH_RESULT_LOADER_CONSUMER)
         }
+        "write-yandex-music-track-loader-consumer" => Some(YANDEX_MUSIC_TRACK_LOADER_CONSUMER),
         _ => None,
     }
 }
@@ -17976,6 +17977,122 @@ public final class GateYandexMusicSearchResultLoader {
                                       Function<AudioTrackInfo, AudioTrack> factory) {
       this.query = query;
       this.playlist = playlist;
+      this.factory = factory;
+      calls++;
+      return result;
+    }
+
+    @Override
+    public ExtendedHttpConfigurable getHttpConfiguration() {
+      return configuration;
+    }
+
+    @Override
+    public void shutdown() {
+      shutdowns++;
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YANDEX_MUSIC_TRACK_LOADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicApiLoader;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicTrackLoader;
+import com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpConfigurable;
+import com.sedmelluq.discord.lavaplayer.track.AudioItem;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.Type;
+import java.util.Arrays;
+import java.util.function.Function;
+
+public final class GateYandexMusicTrackLoader {
+  public static void main(String[] args) throws Exception {
+    Class<YandexMusicTrackLoader> type = YandexMusicTrackLoader.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.INTERFACE | Modifier.ABSTRACT)
+        && type.isInterface() && !type.isAnnotation() && !type.isEnum() && !type.isSynthetic(),
+        "interface metadata");
+    check(type.getSuperclass() == null
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {YandexMusicApiLoader.class})
+        && type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 1 && type.getMethods().length == 3
+        && type.getTypeParameters().length == 0, "interface shape");
+    Method load = type.getDeclaredMethod("loadTrack", String.class, String.class, Function.class);
+    check(load.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && load.getReturnType() == AudioItem.class
+        && Arrays.equals(load.getParameterTypes(),
+            new Class<?>[] {String.class, String.class, Function.class})
+        && load.getExceptionTypes().length == 0 && load.getTypeParameters().length == 0
+        && !load.isDefault() && !load.isBridge() && !load.isSynthetic() && !load.isVarArgs(),
+        "method metadata");
+    Type factoryType = load.getGenericParameterTypes()[2];
+    check(factoryType instanceof ParameterizedType, "factory generic type");
+    ParameterizedType factorySignature = (ParameterizedType) factoryType;
+    check(factorySignature.getRawType() == Function.class
+        && factorySignature.getOwnerType() == null
+        && Arrays.equals(factorySignature.getActualTypeArguments(),
+            new Type[] {AudioTrackInfo.class, AudioTrack.class}), "generic factory signature");
+
+    ExtendedHttpConfigurable configuration = proxy(ExtendedHttpConfigurable.class);
+    AudioItem result = proxy(AudioItem.class);
+    RecordingLoader loader = new RecordingLoader(configuration, result);
+    String trackId = new String("track-id");
+    String albumId = new String("album-id");
+    Function<AudioTrackInfo, AudioTrack> factory = info -> null;
+    check(loader.loadTrack(trackId, albumId, factory) == result
+        && loader.trackId == trackId && loader.albumId == albumId && loader.factory == factory
+        && loader.calls == 1, "argument and result identity");
+    loader.result = null;
+    check(loader.loadTrack(null, null, null) == null && loader.trackId == null
+        && loader.albumId == null && loader.factory == null && loader.calls == 2,
+        "null identity");
+    check(loader.getHttpConfiguration() == configuration, "inherited configuration dispatch");
+    loader.shutdown();
+    loader.shutdown();
+    check(loader.shutdowns == 2 && type.isAssignableFrom(RecordingLoader.class)
+        && Arrays.equals(RecordingLoader.class.getInterfaces(),
+            new Class<?>[] {YandexMusicTrackLoader.class}), "implementation hierarchy");
+    System.out.println("interface=public-abstract,object-root,yandex-api-loader-superinterface,"
+        + "0-fields,0-constructors,1-declared-method;generic-factory=track-info-to-track;"
+        + "implementation=track-album-factory-result-identity,null-identity,"
+        + "inherited-configuration-shutdown;reflection=exact");
+  }
+
+  private static <T> T proxy(Class<T> type) {
+    Object value = Proxy.newProxyInstance(GateYandexMusicTrackLoader.class.getClassLoader(),
+        new Class<?>[] {type}, (proxy, method, arguments) -> {
+          throw new AssertionError("proxy invoked: " + method.getName());
+        });
+    return type.cast(value);
+  }
+
+  private static final class RecordingLoader implements YandexMusicTrackLoader {
+    private final ExtendedHttpConfigurable configuration;
+    private AudioItem result;
+    private String trackId;
+    private String albumId;
+    private Function<AudioTrackInfo, AudioTrack> factory;
+    private int calls;
+    private int shutdowns;
+
+    private RecordingLoader(ExtendedHttpConfigurable configuration, AudioItem result) {
+      this.configuration = configuration;
+      this.result = result;
+    }
+
+    @Override
+    public AudioItem loadTrack(String trackId, String albumId,
+                               Function<AudioTrackInfo, AudioTrack> factory) {
+      this.trackId = trackId;
+      this.albumId = albumId;
       this.factory = factory;
       calls++;
       return result;
