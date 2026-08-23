@@ -187,6 +187,8 @@ const TWITCH_STREAM_SEGMENT_URL_PROVIDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamSegmentUrlProvider";
 const VIMEO_AUDIO_SOURCE_MANAGER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioSourceManager";
+const VIMEO_PLAYBACK_FORMAT_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioSourceManager$PlaybackFormat";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -257,6 +259,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     TWITCH_STREAM_AUDIO_TRACK_CLASS,
     TWITCH_STREAM_SEGMENT_URL_PROVIDER_CLASS,
     VIMEO_AUDIO_SOURCE_MANAGER_CLASS,
+    VIMEO_PLAYBACK_FORMAT_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -865,6 +868,9 @@ fn replacement_body(
     }
     if class_name == VIMEO_AUDIO_SOURCE_MANAGER_CLASS {
         return vimeo_audio_source_manager_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == VIMEO_PLAYBACK_FORMAT_CLASS {
+        return vimeo_playback_format_replacement(pool, name, descriptor);
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -17187,6 +17193,44 @@ fn vimeo_source_manager_clinit(pool: &mut ConstantPool<'static>) -> Result<Attri
             Instruction::Ldc_w(regex),
             Instruction::Invokestatic(compile),
             Instruction::Putstatic(field),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn vimeo_playback_format_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(Ljava/lang/String;Z)V") => vimeo_playback_format_constructor(pool),
+        _ => Err(format!(
+            "Phase 13 does not implement {VIMEO_PLAYBACK_FORMAT_CLASS}.{name}{descriptor}"
+        )
+        .into()),
+    }
+}
+
+fn vimeo_playback_format_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(VIMEO_PLAYBACK_FORMAT_CLASS)?;
+    let url = pool.add_field_ref(owner, "url", "Ljava/lang/String;")?;
+    let hls = pool.add_field_ref(owner, "isHls", "Z")?;
+    code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(url),
+            Instruction::Aload_0,
+            Instruction::Iload_2,
+            Instruction::Putfield(hls),
             Instruction::Return,
         ],
     )

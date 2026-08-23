@@ -605,9 +605,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[0].completed_slices[].symbols] | add) == .cohorts[0].classified_symbols and
   (.cohorts[0].classified_symbols + .cohorts[0].remaining_symbols) == .cohorts[0].symbols and
   .cohorts[1].status == "IN_PROGRESS" and
-  .cohorts[1].classified_symbols == 291 and
-  .cohorts[1].remaining_symbols == 407 and
-  (.cohorts[1].completed_slices | length) == 39 and
+  .cohorts[1].classified_symbols == 295 and
+  .cohorts[1].remaining_symbols == 403 and
+  (.cohorts[1].completed_slices | length) == 40 and
   .cohorts[1].completed_slices[0] == {
     id: "audio-source-manager-interface-contracts",
     classes: 1,
@@ -1139,11 +1139,24 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "docs/architecture/ADR-0017-bounded-vimeo-source.md"
     ]
   } and
+  .cohorts[1].completed_slices[39] == {
+    id: "vimeo-playback-format-contracts",
+    classes: 1,
+    fields: 2,
+    methods: 1,
+    symbols: 4,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
   ([.cohorts[1].completed_slices[].symbols] | add) == .cohorts[1].classified_symbols and
   (.cohorts[1].classified_symbols + .cohorts[1].remaining_symbols) == .cohorts[1].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 826 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 830 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 777 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 781 and
   ([$classifications.symbols[] |
     select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 43 and
   ([$classifications.symbols[] |
@@ -1244,7 +1257,8 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioSourceManager",
         "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioTrack",
         "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamSegmentUrlProvider",
-        "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager"
+        "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager",
+        "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager$PlaybackFormat"
       ][]; . == $symbol.binary_name)) and
     (if $symbol.binary_name ==
         "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager" and
@@ -1347,7 +1361,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "vimeo-playback-format-contracts" and
+  .phase_entry.next_slice == "vimeo-audio-track-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 ' "$PLAN" >/dev/null
@@ -1355,7 +1369,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '107 reference classes / 855 symbols' \
+  '108 reference classes / 859 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -1365,4 +1379,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 826 classified symbols and 1,936 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 830 classified symbols and 1,932 unassessed symbols.\n'

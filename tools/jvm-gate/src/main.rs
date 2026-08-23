@@ -185,6 +185,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
             Some(TWITCH_STREAM_SEGMENT_URL_PROVIDER_CONSUMER)
         }
         "write-vimeo-audio-source-manager-consumer" => Some(VIMEO_AUDIO_SOURCE_MANAGER_CONSUMER),
+        "write-vimeo-playback-format-consumer" => Some(VIMEO_PLAYBACK_FORMAT_CONSUMER),
         _ => None,
     }
 }
@@ -15817,6 +15818,60 @@ public final class GateVimeoAudioSourceManager {
   }
 
   private interface Operation { void run() throws Exception; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const VIMEO_PLAYBACK_FORMAT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+
+public final class GateVimeoPlaybackFormat {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1
+        && (args[0].equals("reference") || args[0].equals("candidate")),
+        "expected disposition");
+    Class<VimeoAudioSourceManager.PlaybackFormat> type =
+        VimeoAudioSourceManager.PlaybackFormat.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && type.getSuperclass() == Object.class && type.getInterfaces().length == 0
+        && type.getDeclaringClass() == VimeoAudioSourceManager.class
+        && type.getEnclosingClass() == VimeoAudioSourceManager.class
+        && type.getSimpleName().equals("PlaybackFormat"), "class metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredMethods().length == 0,
+        "member counts");
+    checkField(type, "url", String.class, Modifier.PUBLIC | Modifier.FINAL);
+    checkField(type, "isHls", boolean.class, Modifier.PUBLIC | Modifier.FINAL);
+    Constructor<?> constructor = type.getDeclaredConstructor(String.class, boolean.class);
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "constructor metadata");
+
+    String progressiveUrl = new String("https://player.vimeo.com/audio.mp4");
+    VimeoAudioSourceManager.PlaybackFormat progressive =
+        new VimeoAudioSourceManager.PlaybackFormat(progressiveUrl, false);
+    VimeoAudioSourceManager.PlaybackFormat hls =
+        new VimeoAudioSourceManager.PlaybackFormat(null, true);
+    check(progressive.url == progressiveUrl && !progressive.isHls
+        && hls.url == null && hls.isHls && progressive != hls && !progressive.equals(hls),
+        "constructor value identity");
+    System.out.println(
+        "public-static,object-super,2-public-final-fields,1-public-constructor;"
+        + "url-and-hls-value-identity,null-preserved,reflection");
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> type, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == type && field.getGenericType() == type
+        && field.getModifiers() == modifiers && !field.isSynthetic(), name + " metadata");
+  }
+
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }
