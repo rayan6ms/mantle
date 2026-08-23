@@ -221,6 +221,8 @@ const YANDEX_MUSIC_TRACK_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicTrackLoader";
 const YANDEX_MUSIC_UTILS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicUtils";
+const DEFAULT_YOUTUBE_LINK_ROUTER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -308,6 +310,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YANDEX_MUSIC_SEARCH_RESULT_LOADER_CLASS,
     YANDEX_MUSIC_TRACK_LOADER_CLASS,
     YANDEX_MUSIC_UTILS_CLASS,
+    DEFAULT_YOUTUBE_LINK_ROUTER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -698,6 +701,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | YANDEX_MUSIC_AUDIO_SOURCE_MANAGER_CLASS
             | YANDEX_MUSIC_AUDIO_TRACK_CLASS
             | YANDEX_MUSIC_UTILS_CLASS
+            | DEFAULT_YOUTUBE_LINK_ROUTER_CLASS
     )
 }
 
@@ -738,6 +742,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | YANDEX_MUSIC_AUDIO_SOURCE_MANAGER_CLASS
             | YANDEX_MUSIC_AUDIO_TRACK_CLASS
             | YANDEX_MUSIC_UTILS_CLASS
+            | DEFAULT_YOUTUBE_LINK_ROUTER_CLASS
     )
 }
 
@@ -1003,6 +1008,9 @@ fn replacement_body(
     }
     if class_name == YANDEX_MUSIC_UTILS_CLASS {
         return yandex_music_utils_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == DEFAULT_YOUTUBE_LINK_ROUTER_CLASS {
+        return default_youtube_link_router_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -17790,6 +17798,20 @@ fn stack_map_offset_delta(previous: &mut Option<usize>, target: usize) -> Result
     Ok(u16::try_from(delta)?)
 }
 
+fn youtube_full_frame(
+    previous: &mut Option<usize>,
+    target: usize,
+    locals: Vec<VerificationType>,
+    stack: Vec<VerificationType>,
+) -> Result<StackFrame> {
+    Ok(StackFrame::FullFrame {
+        frame_type: 255,
+        offset_delta: stack_map_offset_delta(previous, target)?,
+        locals,
+        stack,
+    })
+}
+
 #[allow(clippy::too_many_lines)]
 fn yandex_music_utils_extract_track(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
     let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
@@ -18116,6 +18138,944 @@ fn yandex_music_utils_extract_track(pool: &mut ConstantPool<'static>) -> Result<
     let mut body = code(pool, 14, 10, instructions)?;
     add_stack_map_table(pool, &mut body, frames)?;
     Ok(body)
+}
+
+fn default_youtube_link_router_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => default_youtube_link_router_constructor(pool),
+        (
+            "route",
+            "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes;)Ljava/lang/Object;",
+        ) => default_youtube_link_router_route(pool),
+        (
+            "routeDirectPlaylist",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes;Ljava/lang/String;)Ljava/lang/Object;",
+        ) => default_youtube_link_router_direct_playlist(pool),
+        (
+            "routeFromMainDomain",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes;Ljava/lang/String;)Ljava/lang/Object;",
+        ) => default_youtube_link_router_main_domain(pool),
+        (
+            "routeFromUrlWithVideoId",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter$UrlInfo;)Ljava/lang/Object;",
+        ) => default_youtube_link_router_video_id(pool),
+        (
+            "routeFromShortDomain",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes;Ljava/lang/String;)Ljava/lang/Object;",
+        ) => default_youtube_link_router_path(pool, 1),
+        (
+            "routeFromEmbed",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes;Ljava/lang/String;)Ljava/lang/Object;",
+        ) => default_youtube_link_router_path(pool, 7),
+        (
+            "routeFromShorts",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes;Ljava/lang/String;)Ljava/lang/Object;",
+        ) => default_youtube_link_router_path(pool, 8),
+        (
+            "routeFromLive",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes;Ljava/lang/String;)Ljava/lang/Object;",
+        ) => default_youtube_link_router_path(pool, 6),
+        (
+            "getUrlInfo",
+            "(Ljava/lang/String;Z)Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter$UrlInfo;",
+        ) => default_youtube_link_router_url_info(pool),
+        ("lambda$getUrlInfo$1", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;") => {
+            code(pool, 1, 2, vec![Instruction::Aload_0, Instruction::Areturn])
+        }
+        ("lambda$getUrlInfo$0", "(Lorg/apache/http/NameValuePair;)Z") => {
+            default_youtube_link_router_non_null_pair(pool)
+        }
+        ("<clinit>", "()V") => default_youtube_link_router_class_init(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {DEFAULT_YOUTUBE_LINK_ROUTER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn default_youtube_link_router_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let super_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(DEFAULT_YOUTUBE_LINK_ROUTER_CLASS)?;
+    let extractor = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter$Extractor",
+    )?;
+    let router_descriptor = "Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter$ExtractorRouter;";
+    let extractor_init = pool.add_method_ref(
+        extractor,
+        "<init>",
+        &format!("(Ljava/util/regex/Pattern;{router_descriptor})V"),
+    )?;
+    let direct_pattern =
+        pool.add_field_ref(owner, "directVideoIdPattern", "Ljava/util/regex/Pattern;")?;
+    let extractors = pool.add_field_ref(
+        owner,
+        "extractors",
+        "[Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter$Extractor;",
+    )?;
+    let pattern = pool.add_class("java/util/regex/Pattern")?;
+    let compile = pool.add_method_ref(
+        pattern,
+        "compile",
+        "(Ljava/lang/String;)Ljava/util/regex/Pattern;",
+    )?;
+    let stateless_router = pool.add_invoke_dynamic(
+        0,
+        "extract",
+        "()Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter$ExtractorRouter;",
+    )?;
+    let bound_router_descriptor =
+        format!("(L{DEFAULT_YOUTUBE_LINK_ROUTER_CLASS};){router_descriptor}");
+    let bound_routers = (1..=6)
+        .map(|bootstrap| pool.add_invoke_dynamic(bootstrap, "extract", &bound_router_descriptor))
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    let patterns = [
+        "^(?<list>(PL|LL|FL|UU)[a-zA-Z0-9_-]+)$",
+        "^(?:http://|https://|)(?:www\\.|m\\.|music\\.|)youtube\\.com/.*",
+        "^(?:http://|https://|)(?:www\\.|)youtu\\.be/.*",
+        "^(?:http://|https://|)(?:www\\.|m\\.|music\\.|)youtube\\.com/embed/.*",
+        "^(?:http://|https://|)(?:www\\.|m\\.|music\\.|)youtube\\.com/shorts/.*",
+        "^(?:http://|https://|)(?:www\\.|m\\.|music\\.|)youtube\\.com/live/.*",
+    ]
+    .into_iter()
+    .map(|value| pool.add_string(value))
+    .collect::<std::result::Result<Vec<_>, _>>()?;
+
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Invokespecial(super_init),
+        Instruction::Aload_0,
+        Instruction::Bipush(7),
+        Instruction::Anewarray(extractor),
+        Instruction::Dup,
+        Instruction::Iconst_0,
+        Instruction::New(extractor),
+        Instruction::Dup,
+        Instruction::Getstatic(direct_pattern),
+        Instruction::Invokedynamic(stateless_router),
+        Instruction::Invokespecial(extractor_init),
+        Instruction::Aastore,
+    ];
+    for (index, (pattern_value, router)) in patterns.into_iter().zip(bound_routers).enumerate() {
+        instructions.extend([
+            Instruction::Dup,
+            Instruction::Bipush(i8::try_from(index + 1)?),
+            Instruction::New(extractor),
+            Instruction::Dup,
+            Instruction::Ldc_w(pattern_value),
+            Instruction::Invokestatic(compile),
+            Instruction::Aload_0,
+            Instruction::Invokedynamic(router),
+            Instruction::Invokespecial(extractor_init),
+            Instruction::Aastore,
+        ]);
+    }
+    instructions.extend([Instruction::Putfield(extractors), Instruction::Return]);
+    code(pool, 8, 1, instructions)
+}
+
+#[allow(clippy::too_many_lines)]
+fn default_youtube_link_router_route(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_YOUTUBE_LINK_ROUTER_CLASS)?;
+    let string = pool.add_class("java/lang/String")?;
+    let routes =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes")?;
+    let extractor = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter$Extractor",
+    )?;
+    let extractor_array = pool.add_class(
+        "[Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter$Extractor;",
+    )?;
+    let extractor_router = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter$ExtractorRouter",
+    )?;
+    let starts_with = pool.add_method_ref(string, "startsWith", "(Ljava/lang/String;)Z")?;
+    let length = pool.add_method_ref(string, "length", "()I")?;
+    let substring = pool.add_method_ref(string, "substring", "(I)Ljava/lang/String;")?;
+    let trim = pool.add_method_ref(string, "trim", "()Ljava/lang/String;")?;
+    let search =
+        pool.add_interface_method_ref(routes, "search", "(Ljava/lang/String;)Ljava/lang/Object;")?;
+    let search_music = pool.add_interface_method_ref(
+        routes,
+        "searchMusic",
+        "(Ljava/lang/String;)Ljava/lang/Object;",
+    )?;
+    let extractors = pool.add_field_ref(
+        owner,
+        "extractors",
+        "[Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter$Extractor;",
+    )?;
+    let pattern = pool.add_field_ref(extractor, "pattern", "Ljava/util/regex/Pattern;")?;
+    let extractor_router_field = pool.add_field_ref(
+        extractor,
+        "router",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter$ExtractorRouter;",
+    )?;
+    let pattern_class = pool.add_class("java/util/regex/Pattern")?;
+    let matcher_method = pool.add_method_ref(
+        pattern_class,
+        "matcher",
+        "(Ljava/lang/CharSequence;)Ljava/util/regex/Matcher;",
+    )?;
+    let matcher_class = pool.add_class("java/util/regex/Matcher")?;
+    let regex_test = pool.add_method_ref(matcher_class, "matches", "()Z")?;
+    let extract = pool.add_interface_method_ref(
+        extractor_router,
+        "extract",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes;Ljava/lang/String;)Ljava/lang/Object;",
+    )?;
+    let search_prefix = pool.add_string("ytsearch:")?;
+    let music_prefix = pool.add_string("ytmsearch:")?;
+
+    let mut instructions = vec![
+        Instruction::Aload_1,
+        Instruction::Ldc_w(search_prefix),
+        Instruction::Invokevirtual(starts_with),
+        Instruction::Ifeq(0),
+        Instruction::Aload_2,
+        Instruction::Aload_1,
+        Instruction::Ldc_w(search_prefix),
+        Instruction::Invokevirtual(length),
+        Instruction::Invokevirtual(substring),
+        Instruction::Invokevirtual(trim),
+        Instruction::Invokeinterface(search, 2),
+        Instruction::Areturn,
+    ];
+    let music_target = instructions.len();
+    instructions[3] = Instruction::Ifeq(u16::try_from(music_target)?);
+    instructions.extend([
+        Instruction::Aload_1,
+        Instruction::Ldc_w(music_prefix),
+        Instruction::Invokevirtual(starts_with),
+        Instruction::Ifeq(0),
+        Instruction::Aload_2,
+        Instruction::Aload_1,
+        Instruction::Ldc_w(music_prefix),
+        Instruction::Invokevirtual(length),
+        Instruction::Invokevirtual(substring),
+        Instruction::Invokevirtual(trim),
+        Instruction::Invokeinterface(search_music, 2),
+        Instruction::Areturn,
+    ]);
+    let extractors_target = instructions.len();
+    instructions[music_target + 3] = Instruction::Ifeq(u16::try_from(extractors_target)?);
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Getfield(extractors),
+        Instruction::Astore_3,
+        Instruction::Aload_3,
+        Instruction::Arraylength,
+        Instruction::Istore(4),
+        Instruction::Iconst_0,
+        Instruction::Istore(5),
+    ]);
+    let loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(5),
+        Instruction::Iload(4),
+        Instruction::If_icmpge(0),
+        Instruction::Aload_3,
+        Instruction::Iload(5),
+        Instruction::Aaload,
+        Instruction::Astore(6),
+        Instruction::Aload(6),
+        Instruction::Getfield(pattern),
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(matcher_method),
+        Instruction::Invokevirtual(regex_test),
+        Instruction::Ifeq(0),
+        Instruction::Aload(6),
+        Instruction::Getfield(extractor_router_field),
+        Instruction::Aload_2,
+        Instruction::Aload_1,
+        Instruction::Invokeinterface(extract, 3),
+        Instruction::Astore(7),
+        Instruction::Aload(7),
+        Instruction::Ifnull(0),
+        Instruction::Aload(7),
+        Instruction::Areturn,
+    ]);
+    let loop_exit_branch = loop_target + 2;
+    let no_match_branch = loop_target + 12;
+    let null_item_branch = loop_target + 20;
+    let increment_target = instructions.len();
+    instructions[no_match_branch] = Instruction::Ifeq(u16::try_from(increment_target)?);
+    instructions[null_item_branch] = Instruction::Ifnull(u16::try_from(increment_target)?);
+    instructions.extend([
+        Instruction::Iinc(5, 1),
+        Instruction::Goto(u16::try_from(loop_target)?),
+    ]);
+    let null_target = instructions.len();
+    instructions[loop_exit_branch] = Instruction::If_icmpge(u16::try_from(null_target)?);
+    instructions.extend([Instruction::Aconst_null, Instruction::Areturn]);
+
+    let owner_type = VerificationType::Object { cpool_index: owner };
+    let string_type = VerificationType::Object {
+        cpool_index: string,
+    };
+    let routes_type = VerificationType::Object {
+        cpool_index: routes,
+    };
+    let base_locals = vec![owner_type, string_type, routes_type];
+    let loop_locals = [
+        base_locals.clone(),
+        vec![
+            VerificationType::Object {
+                cpool_index: extractor_array,
+            },
+            VerificationType::Integer,
+            VerificationType::Integer,
+        ],
+    ]
+    .concat();
+    let mut previous = None;
+    let mut frames = vec![
+        youtube_full_frame(&mut previous, music_target, base_locals.clone(), vec![])?,
+        youtube_full_frame(
+            &mut previous,
+            extractors_target,
+            base_locals.clone(),
+            vec![],
+        )?,
+        youtube_full_frame(&mut previous, loop_target, loop_locals.clone(), vec![])?,
+    ];
+    let mut increment_locals = loop_locals.clone();
+    increment_locals.push(VerificationType::Object {
+        cpool_index: extractor,
+    });
+    frames.push(youtube_full_frame(
+        &mut previous,
+        increment_target,
+        increment_locals,
+        vec![],
+    )?);
+    frames.push(youtube_full_frame(
+        &mut previous,
+        null_target,
+        loop_locals,
+        vec![],
+    )?);
+    let mut body = code(pool, 3, 8, instructions)?;
+    add_stack_map_table(pool, &mut body, frames)?;
+    Ok(body)
+}
+
+fn default_youtube_link_router_direct_playlist(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let routes =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes")?;
+    let playlist = pool.add_interface_method_ref(
+        routes,
+        "playlist",
+        "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;",
+    )?;
+    code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Aconst_null,
+            Instruction::Invokeinterface(playlist, 3),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn default_youtube_link_router_main_domain(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_YOUTUBE_LINK_ROUTER_CLASS)?;
+    let string = pool.add_class("java/lang/String")?;
+    let routes =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes")?;
+    let url_info = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter$UrlInfo",
+    )?;
+    let get_url_info = pool.add_method_ref(
+        owner,
+        "getUrlInfo",
+        "(Ljava/lang/String;Z)Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter$UrlInfo;",
+    )?;
+    let path = pool.add_field_ref(url_info, "path", "Ljava/lang/String;")?;
+    let parameters = pool.add_field_ref(url_info, "parameters", "Ljava/util/Map;")?;
+    let equals = pool.add_method_ref(string, "equals", "(Ljava/lang/Object;)Z")?;
+    let map = pool.add_class("java/util/Map")?;
+    let get =
+        pool.add_interface_method_ref(map, "get", "(Ljava/lang/Object;)Ljava/lang/Object;")?;
+    let route_video = pool.add_method_ref(
+        owner,
+        "routeFromUrlWithVideoId",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter$UrlInfo;)Ljava/lang/Object;",
+    )?;
+    let playlist = pool.add_interface_method_ref(
+        routes,
+        "playlist",
+        "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;",
+    )?;
+    let anonymous = pool.add_interface_method_ref(
+        routes,
+        "anonymous",
+        "(Ljava/lang/String;)Ljava/lang/Object;",
+    )?;
+    let watch = pool.add_string("/watch")?;
+    let playlist_path = pool.add_string("/playlist")?;
+    let anonymous_path = pool.add_string("/watch_videos")?;
+    let video_key = pool.add_string("v")?;
+    let list_key = pool.add_string("list")?;
+    let video_ids_key = pool.add_string("video_ids")?;
+
+    let mut instructions = vec![
+        Instruction::Aload_2,
+        Instruction::Iconst_1,
+        Instruction::Invokestatic(get_url_info),
+        Instruction::Astore_3,
+        Instruction::Ldc_w(watch),
+        Instruction::Aload_3,
+        Instruction::Getfield(path),
+        Instruction::Invokevirtual(equals),
+        Instruction::Ifeq(0),
+        Instruction::Aload_3,
+        Instruction::Getfield(parameters),
+        Instruction::Ldc_w(video_key),
+        Instruction::Invokeinterface(get, 2),
+        Instruction::Checkcast(string),
+        Instruction::Astore(4),
+        Instruction::Aload(4),
+        Instruction::Ifnull(0),
+        Instruction::Aload_0,
+        Instruction::Aload_1,
+        Instruction::Aload(4),
+        Instruction::Aload_3,
+        Instruction::Invokevirtual(route_video),
+        Instruction::Areturn,
+    ];
+    let playlist_target = instructions.len();
+    instructions[8] = Instruction::Ifeq(u16::try_from(playlist_target)?);
+    instructions.extend([
+        Instruction::Ldc_w(playlist_path),
+        Instruction::Aload_3,
+        Instruction::Getfield(path),
+        Instruction::Invokevirtual(equals),
+        Instruction::Ifeq(0),
+        Instruction::Aload_3,
+        Instruction::Getfield(parameters),
+        Instruction::Ldc_w(list_key),
+        Instruction::Invokeinterface(get, 2),
+        Instruction::Checkcast(string),
+        Instruction::Astore(4),
+        Instruction::Aload(4),
+        Instruction::Ifnull(0),
+        Instruction::Aload_1,
+        Instruction::Aload(4),
+        Instruction::Aconst_null,
+        Instruction::Invokeinterface(playlist, 3),
+        Instruction::Areturn,
+    ]);
+    let anonymous_target = instructions.len();
+    instructions[playlist_target + 4] = Instruction::Ifeq(u16::try_from(anonymous_target)?);
+    instructions.extend([
+        Instruction::Ldc_w(anonymous_path),
+        Instruction::Aload_3,
+        Instruction::Getfield(path),
+        Instruction::Invokevirtual(equals),
+        Instruction::Ifeq(0),
+        Instruction::Aload_3,
+        Instruction::Getfield(parameters),
+        Instruction::Ldc_w(video_ids_key),
+        Instruction::Invokeinterface(get, 2),
+        Instruction::Checkcast(string),
+        Instruction::Astore(4),
+        Instruction::Aload(4),
+        Instruction::Ifnull(0),
+        Instruction::Aload_1,
+        Instruction::Aload(4),
+        Instruction::Invokeinterface(anonymous, 2),
+        Instruction::Areturn,
+    ]);
+    let end_target = instructions.len();
+    instructions[16] = Instruction::Ifnull(u16::try_from(end_target)?);
+    instructions[playlist_target + 12] = Instruction::Ifnull(u16::try_from(end_target)?);
+    instructions[anonymous_target + 4] = Instruction::Ifeq(u16::try_from(end_target)?);
+    instructions[anonymous_target + 12] = Instruction::Ifnull(u16::try_from(end_target)?);
+    instructions.extend([Instruction::Aconst_null, Instruction::Areturn]);
+
+    let base_locals = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Object {
+            cpool_index: routes,
+        },
+        VerificationType::Object {
+            cpool_index: string,
+        },
+        VerificationType::Object {
+            cpool_index: url_info,
+        },
+    ];
+    let mut previous = None;
+    let frames = vec![
+        youtube_full_frame(&mut previous, playlist_target, base_locals.clone(), vec![])?,
+        youtube_full_frame(&mut previous, anonymous_target, base_locals.clone(), vec![])?,
+        youtube_full_frame(&mut previous, end_target, base_locals, vec![])?,
+    ];
+    let mut body = code(pool, 4, 5, instructions)?;
+    add_stack_map_table(pool, &mut body, frames)?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn default_youtube_link_router_video_id(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_YOUTUBE_LINK_ROUTER_CLASS)?;
+    let string = pool.add_class("java/lang/String")?;
+    let routes =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes")?;
+    let url_info = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter$UrlInfo",
+    )?;
+    let length = pool.add_method_ref(string, "length", "()I")?;
+    let substring = pool.add_method_ref(string, "substring", "(II)Ljava/lang/String;")?;
+    let starts_with = pool.add_method_ref(string, "startsWith", "(Ljava/lang/String;)Z")?;
+    let direct_pattern =
+        pool.add_field_ref(owner, "directVideoIdPattern", "Ljava/util/regex/Pattern;")?;
+    let pattern = pool.add_class("java/util/regex/Pattern")?;
+    let matcher_method = pool.add_method_ref(
+        pattern,
+        "matcher",
+        "(Ljava/lang/CharSequence;)Ljava/util/regex/Matcher;",
+    )?;
+    let matcher_class = pool.add_class("java/util/regex/Matcher")?;
+    let regex_test = pool.add_method_ref(matcher_class, "matches", "()Z")?;
+    let parameters = pool.add_field_ref(url_info, "parameters", "Ljava/util/Map;")?;
+    let map = pool.add_class("java/util/Map")?;
+    let contains = pool.add_interface_method_ref(map, "containsKey", "(Ljava/lang/Object;)Z")?;
+    let get =
+        pool.add_interface_method_ref(map, "get", "(Ljava/lang/Object;)Ljava/lang/Object;")?;
+    let none = pool.add_interface_method_ref(routes, "none", "()Ljava/lang/Object;")?;
+    let mix = pool.add_interface_method_ref(
+        routes,
+        "mix",
+        "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;",
+    )?;
+    let playlist = pool.add_interface_method_ref(
+        routes,
+        "playlist",
+        "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;",
+    )?;
+    let track =
+        pool.add_interface_method_ref(routes, "track", "(Ljava/lang/String;)Ljava/lang/Object;")?;
+    let list_key = pool.add_string("list")?;
+    let mix_prefix = pool.add_string("RD")?;
+
+    let mut instructions = vec![
+        Instruction::Aload_2,
+        Instruction::Invokevirtual(length),
+        Instruction::Bipush(11),
+        Instruction::If_icmple(0),
+        Instruction::Aload_2,
+        Instruction::Iconst_0,
+        Instruction::Bipush(11),
+        Instruction::Invokevirtual(substring),
+        Instruction::Astore_2,
+    ];
+    let normalized_target = instructions.len();
+    instructions[3] = Instruction::If_icmple(u16::try_from(normalized_target)?);
+    instructions.extend([
+        Instruction::Getstatic(direct_pattern),
+        Instruction::Aload_2,
+        Instruction::Invokevirtual(matcher_method),
+        Instruction::Invokevirtual(regex_test),
+        Instruction::Ifne(0),
+        Instruction::Aload_1,
+        Instruction::Invokeinterface(none, 1),
+        Instruction::Areturn,
+    ]);
+    let valid_target = instructions.len();
+    instructions[normalized_target + 4] = Instruction::Ifne(u16::try_from(valid_target)?);
+    instructions.extend([
+        Instruction::Aload_3,
+        Instruction::Getfield(parameters),
+        Instruction::Ldc_w(list_key),
+        Instruction::Invokeinterface(contains, 2),
+        Instruction::Ifeq(0),
+        Instruction::Aload_3,
+        Instruction::Getfield(parameters),
+        Instruction::Ldc_w(list_key),
+        Instruction::Invokeinterface(get, 2),
+        Instruction::Checkcast(string),
+        Instruction::Astore(4),
+        Instruction::Aload(4),
+        Instruction::Ldc_w(mix_prefix),
+        Instruction::Invokevirtual(starts_with),
+        Instruction::Ifeq(0),
+        Instruction::Aload_1,
+        Instruction::Aload(4),
+        Instruction::Aload_2,
+        Instruction::Invokeinterface(mix, 3),
+        Instruction::Areturn,
+    ]);
+    let playlist_target = instructions.len();
+    instructions[valid_target + 14] = Instruction::Ifeq(u16::try_from(playlist_target)?);
+    instructions.extend([
+        Instruction::Aload_1,
+        Instruction::Aload_3,
+        Instruction::Getfield(parameters),
+        Instruction::Ldc_w(list_key),
+        Instruction::Invokeinterface(get, 2),
+        Instruction::Checkcast(string),
+        Instruction::Aload_2,
+        Instruction::Invokeinterface(playlist, 3),
+        Instruction::Areturn,
+    ]);
+    let track_target = instructions.len();
+    instructions[valid_target + 4] = Instruction::Ifeq(u16::try_from(track_target)?);
+    instructions.extend([
+        Instruction::Aload_1,
+        Instruction::Aload_2,
+        Instruction::Invokeinterface(track, 2),
+        Instruction::Areturn,
+    ]);
+
+    let base_locals = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Object {
+            cpool_index: routes,
+        },
+        VerificationType::Object {
+            cpool_index: string,
+        },
+        VerificationType::Object {
+            cpool_index: url_info,
+        },
+    ];
+    let mut previous = None;
+    let mut frames = vec![
+        youtube_full_frame(
+            &mut previous,
+            normalized_target,
+            base_locals.clone(),
+            vec![],
+        )?,
+        youtube_full_frame(&mut previous, valid_target, base_locals.clone(), vec![])?,
+    ];
+    let mut playlist_locals = base_locals.clone();
+    playlist_locals.push(VerificationType::Object {
+        cpool_index: string,
+    });
+    frames.push(youtube_full_frame(
+        &mut previous,
+        playlist_target,
+        playlist_locals,
+        vec![],
+    )?);
+    frames.push(youtube_full_frame(
+        &mut previous,
+        track_target,
+        base_locals,
+        vec![],
+    )?);
+    let mut body = code(pool, 3, 5, instructions)?;
+    add_stack_map_table(pool, &mut body, frames)?;
+    Ok(body)
+}
+
+fn default_youtube_link_router_path(
+    pool: &mut ConstantPool<'static>,
+    offset: i8,
+) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_YOUTUBE_LINK_ROUTER_CLASS)?;
+    let string = pool.add_class("java/lang/String")?;
+    let url_info = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter$UrlInfo",
+    )?;
+    let get_url_info = pool.add_method_ref(
+        owner,
+        "getUrlInfo",
+        "(Ljava/lang/String;Z)Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter$UrlInfo;",
+    )?;
+    let path = pool.add_field_ref(url_info, "path", "Ljava/lang/String;")?;
+    let substring = pool.add_method_ref(string, "substring", "(I)Ljava/lang/String;")?;
+    let route_video = pool.add_method_ref(
+        owner,
+        "routeFromUrlWithVideoId",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter$UrlInfo;)Ljava/lang/Object;",
+    )?;
+    code(
+        pool,
+        4,
+        4,
+        vec![
+            Instruction::Aload_2,
+            Instruction::Iconst_1,
+            Instruction::Invokestatic(get_url_info),
+            Instruction::Astore_3,
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Aload_3,
+            Instruction::Getfield(path),
+            Instruction::Bipush(offset),
+            Instruction::Invokevirtual(substring),
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(route_video),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn default_youtube_link_router_url_info(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_YOUTUBE_LINK_ROUTER_CLASS)?;
+    let string = pool.add_class("java/lang/String")?;
+    let starts_with = pool.add_method_ref(string, "startsWith", "(Ljava/lang/String;)Z")?;
+    let substring = pool.add_method_ref(string, "substring", "(II)Ljava/lang/String;")?;
+    let http = pool.add_string("http://")?;
+    let https = pool.add_string("https://")?;
+    let add_protocol = pool.add_invoke_dynamic(
+        7,
+        "makeConcatWithConstants",
+        "(Ljava/lang/String;)Ljava/lang/String;",
+    )?;
+    let uri_builder = pool.add_class("org/apache/http/client/utils/URIBuilder")?;
+    let uri_init = pool.add_method_ref(uri_builder, "<init>", "(Ljava/lang/String;)V")?;
+    let get_path = pool.add_method_ref(uri_builder, "getPath", "()Ljava/lang/String;")?;
+    let get_query = pool.add_method_ref(uri_builder, "getQueryParams", "()Ljava/util/List;")?;
+    let list = pool.add_class("java/util/List")?;
+    let stream = pool.add_interface_method_ref(list, "stream", "()Ljava/util/stream/Stream;")?;
+    let stream_class = pool.add_class("java/util/stream/Stream")?;
+    let predicate = pool.add_invoke_dynamic(8, "test", "()Ljava/util/function/Predicate;")?;
+    let filter = pool.add_interface_method_ref(
+        stream_class,
+        "filter",
+        "(Ljava/util/function/Predicate;)Ljava/util/stream/Stream;",
+    )?;
+    let key = pool.add_invoke_dynamic(9, "apply", "()Ljava/util/function/Function;")?;
+    let value = pool.add_invoke_dynamic(10, "apply", "()Ljava/util/function/Function;")?;
+    let merge = pool.add_invoke_dynamic(11, "apply", "()Ljava/util/function/BinaryOperator;")?;
+    let collectors = pool.add_class("java/util/stream/Collectors")?;
+    let to_map = pool.add_method_ref(
+        collectors,
+        "toMap",
+        "(Ljava/util/function/Function;Ljava/util/function/Function;Ljava/util/function/BinaryOperator;)Ljava/util/stream/Collector;",
+    )?;
+    let collect = pool.add_interface_method_ref(
+        stream_class,
+        "collect",
+        "(Ljava/util/stream/Collector;)Ljava/lang/Object;",
+    )?;
+    let map = pool.add_class("java/util/Map")?;
+    let url_info = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter$UrlInfo",
+    )?;
+    let url_info_init =
+        pool.add_method_ref(url_info, "<init>", "(Ljava/lang/String;Ljava/util/Map;)V")?;
+    let syntax = pool.add_class("java/net/URISyntaxException")?;
+    let syntax_index = pool.add_method_ref(syntax, "getIndex", "()I")?;
+    let recurse = pool.add_method_ref(
+        owner,
+        "getUrlInfo",
+        "(Ljava/lang/String;Z)Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter$UrlInfo;",
+    )?;
+    let friendly = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/FriendlyException")?;
+    let severity =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity")?;
+    let common = pool.add_field_ref(
+        severity,
+        "COMMON",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity;",
+    )?;
+    let friendly_init = pool.add_method_ref(
+        friendly,
+        "<init>",
+        "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity;Ljava/lang/Throwable;)V",
+    )?;
+    let invalid_url = pool.add_invoke_dynamic(
+        12,
+        "makeConcatWithConstants",
+        "(Ljava/lang/String;)Ljava/lang/String;",
+    )?;
+
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Ldc_w(http),
+        Instruction::Invokevirtual(starts_with),
+        Instruction::Ifne(0),
+        Instruction::Aload_0,
+        Instruction::Ldc_w(https),
+        Instruction::Invokevirtual(starts_with),
+        Instruction::Ifne(0),
+        Instruction::Aload_0,
+        Instruction::Invokedynamic(add_protocol),
+        Instruction::Astore_0,
+    ];
+    let normalized_target = instructions.len();
+    instructions[3] = Instruction::Ifne(u16::try_from(normalized_target)?);
+    instructions[7] = Instruction::Ifne(u16::try_from(normalized_target)?);
+    instructions.extend([
+        Instruction::New(uri_builder),
+        Instruction::Dup,
+        Instruction::Aload_0,
+        Instruction::Invokespecial(uri_init),
+        Instruction::Astore_2,
+        Instruction::New(url_info),
+        Instruction::Dup,
+        Instruction::Aload_2,
+        Instruction::Invokevirtual(get_path),
+        Instruction::Aload_2,
+        Instruction::Invokevirtual(get_query),
+        Instruction::Invokeinterface(stream, 1),
+        Instruction::Invokedynamic(predicate),
+        Instruction::Invokeinterface(filter, 2),
+        Instruction::Invokedynamic(key),
+        Instruction::Invokedynamic(value),
+        Instruction::Invokedynamic(merge),
+        Instruction::Invokestatic(to_map),
+        Instruction::Invokeinterface(collect, 2),
+        Instruction::Checkcast(map),
+        Instruction::Invokespecial(url_info_init),
+        Instruction::Areturn,
+    ]);
+    let handler_target = instructions.len();
+    instructions.extend([
+        Instruction::Astore_2,
+        Instruction::Iload_1,
+        Instruction::Ifeq(0),
+        Instruction::Aload_0,
+        Instruction::Iconst_0,
+        Instruction::Aload_2,
+        Instruction::Invokevirtual(syntax_index),
+        Instruction::Iconst_1,
+        Instruction::Isub,
+        Instruction::Invokevirtual(substring),
+        Instruction::Iconst_0,
+        Instruction::Invokestatic(recurse),
+        Instruction::Areturn,
+    ]);
+    let throw_target = instructions.len();
+    instructions[handler_target + 2] = Instruction::Ifeq(u16::try_from(throw_target)?);
+    instructions.extend([
+        Instruction::New(friendly),
+        Instruction::Dup,
+        Instruction::Aload_0,
+        Instruction::Invokedynamic(invalid_url),
+        Instruction::Getstatic(common),
+        Instruction::Aload_2,
+        Instruction::Invokespecial(friendly_init),
+        Instruction::Athrow,
+    ]);
+
+    let base_locals = vec![
+        VerificationType::Object {
+            cpool_index: string,
+        },
+        VerificationType::Integer,
+    ];
+    let mut previous = None;
+    let frames = vec![
+        youtube_full_frame(
+            &mut previous,
+            normalized_target,
+            base_locals.clone(),
+            vec![],
+        )?,
+        youtube_full_frame(
+            &mut previous,
+            handler_target,
+            base_locals.clone(),
+            vec![VerificationType::Object {
+                cpool_index: syntax,
+            }],
+        )?,
+        youtube_full_frame(
+            &mut previous,
+            throw_target,
+            [
+                base_locals,
+                vec![VerificationType::Object {
+                    cpool_index: syntax,
+                }],
+            ]
+            .concat(),
+            vec![],
+        )?,
+    ];
+    let mut body = code_with_exceptions(
+        pool,
+        8,
+        3,
+        instructions,
+        vec![ExceptionTableEntry {
+            range_pc: 0..u16::try_from(handler_target)?,
+            handler_pc: u16::try_from(handler_target)?,
+            catch_type: syntax,
+        }],
+    )?;
+    add_stack_map_table(pool, &mut body, frames)?;
+    Ok(body)
+}
+
+fn default_youtube_link_router_non_null_pair(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let pair = pool.add_class("org/apache/http/NameValuePair")?;
+    let get_value = pool.add_interface_method_ref(pair, "getValue", "()Ljava/lang/String;")?;
+    let instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Invokeinterface(get_value, 1),
+        Instruction::Ifnull(5),
+        Instruction::Iconst_1,
+        Instruction::Goto(6),
+        Instruction::Iconst_0,
+        Instruction::Ireturn,
+    ];
+    let mut previous = None;
+    let frames = vec![
+        youtube_full_frame(
+            &mut previous,
+            5,
+            vec![VerificationType::Object { cpool_index: pair }],
+            vec![],
+        )?,
+        youtube_full_frame(
+            &mut previous,
+            6,
+            vec![VerificationType::Object { cpool_index: pair }],
+            vec![VerificationType::Integer],
+        )?,
+    ];
+    let mut body = code(pool, 1, 1, instructions)?;
+    add_stack_map_table(pool, &mut body, frames)?;
+    Ok(body)
+}
+
+fn default_youtube_link_router_class_init(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_YOUTUBE_LINK_ROUTER_CLASS)?;
+    let pattern = pool.add_class("java/util/regex/Pattern")?;
+    let compile = pool.add_method_ref(
+        pattern,
+        "compile",
+        "(Ljava/lang/String;)Ljava/util/regex/Pattern;",
+    )?;
+    let field = pool.add_field_ref(owner, "directVideoIdPattern", "Ljava/util/regex/Pattern;")?;
+    let value = pool.add_string("^(?<v>[a-zA-Z0-9_-]{11})$")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(value),
+            Instruction::Invokestatic(compile),
+            Instruction::Putstatic(field),
+            Instruction::Return,
+        ],
+    )
 }
 
 fn default_yandex_search_provider_replacement(

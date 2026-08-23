@@ -17752,90 +17752,100 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Generated class structure, private routing state, constructor initialization, interface identity, and the full exact URL-routing oracle match the frozen class.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeLinkRouter",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Generated construction initializes the frozen seven-pattern ordered extractor matrix and direct-video pattern.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeLinkRouter",
       "symbol_kind": "METHOD",
       "member_name": "route",
       "descriptor": "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes;)Ljava/lang/Object;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Generated routing preserves search prefixes, extractor order, callback dispatch, null propagation, unsupported-link nulls, and generic metadata.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeLinkRouter",
       "symbol_kind": "METHOD",
       "member_name": "routeDirectPlaylist",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes;Ljava/lang/String;)Ljava/lang/Object;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Generated routing preserves direct playlist ID dispatch with a null selected-video ID and result identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeLinkRouter",
       "symbol_kind": "METHOD",
       "member_name": "routeFromMainDomain",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes;Ljava/lang/String;)Ljava/lang/Object;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Generated routing preserves watch, playlist, and anonymous-video path selection, first duplicate query values, and null outcomes.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeLinkRouter",
       "symbol_kind": "METHOD",
       "member_name": "routeFromUrlWithVideoId",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter$UrlInfo;)Ljava/lang/Object;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Generated routing preserves eleven-character truncation and validation plus track, playlist, mix, and none callback selection.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeLinkRouter",
       "symbol_kind": "METHOD",
       "member_name": "routeFromShortDomain",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes;Ljava/lang/String;)Ljava/lang/Object;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Generated short-domain parsing preserves path extraction, query parameters, video normalization, and callback identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeLinkRouter",
       "symbol_kind": "METHOD",
       "member_name": "routeFromEmbed",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes;Ljava/lang/String;)Ljava/lang/Object;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Generated embed parsing preserves its exact path offset, query parameters, video normalization, and callback identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeLinkRouter",
       "symbol_kind": "METHOD",
       "member_name": "routeFromShorts",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes;Ljava/lang/String;)Ljava/lang/Object;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Generated shorts parsing preserves its exact path offset, query parameters, video normalization, and callback identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeLinkRouter",
       "symbol_kind": "METHOD",
       "member_name": "routeFromLive",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes;Ljava/lang/String;)Ljava/lang/Object;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Generated live-path parsing preserves its exact path offset, query parameters, video normalization, and callback identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubePlaylistLoader",

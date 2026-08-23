@@ -121,6 +121,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
     match command {
         "write-default-sound-cloud-data-loader-consumer" => {
@@ -220,6 +221,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-yandex-music-track-loader-consumer" => Some(YANDEX_MUSIC_TRACK_LOADER_CONSUMER),
         "write-yandex-music-utils-consumer" => Some(YANDEX_MUSIC_UTILS_CONSUMER),
+        "write-default-youtube-link-router-consumer" => Some(DEFAULT_YOUTUBE_LINK_ROUTER_CONSUMER),
         _ => None,
     }
 }
@@ -18229,6 +18231,163 @@ public final class GateYandexMusicUtils {
     return type.cast(value);
   }
 
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const DEFAULT_YOUTUBE_LINK_ROUTER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeLinkRouter;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeLinkRouter;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+public final class GateDefaultYoutubeLinkRouter {
+  public static void main(String[] args) throws Exception {
+    Class<DefaultYoutubeLinkRouter> type = DefaultYoutubeLinkRouter.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {YoutubeLinkRouter.class})
+        && type.getDeclaredFields().length == 9 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 11 && type.getTypeParameters().length == 0,
+        "class shape");
+    for (String name : new String[] {"SEARCH_PREFIX", "SEARCH_MUSIC_PREFIX", "PROTOCOL_REGEX",
+        "DOMAIN_REGEX", "SHORT_DOMAIN_REGEX", "VIDEO_ID_REGEX", "PLAYLIST_ID_REGEX"}) {
+      Field field = type.getDeclaredField(name);
+      check(field.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+          && field.getType() == String.class, "constant " + name);
+    }
+    Field pattern = type.getDeclaredField("directVideoIdPattern");
+    Field extractors = type.getDeclaredField("extractors");
+    check(pattern.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && extractors.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && extractors.getType().isArray(), "routing fields");
+    pattern.setAccessible(true);
+    extractors.setAccessible(true);
+    Constructor<DefaultYoutubeLinkRouter> constructor = type.getDeclaredConstructor();
+    DefaultYoutubeLinkRouter router = constructor.newInstance();
+    check(constructor.getModifiers() == Modifier.PUBLIC && pattern.get(null) != null
+        && ((Object[]) extractors.get(router)).length == 7, "constructor state");
+    Method route = type.getDeclaredMethod("route", String.class, YoutubeLinkRouter.Routes.class);
+    check(route.getModifiers() == Modifier.PUBLIC && route.getReturnType() == Object.class
+        && route.getTypeParameters().length == 1 && "T".equals(route.getTypeParameters()[0].getName())
+        && !route.isBridge() && !route.isSynthetic() && route.getExceptionTypes().length == 0,
+        "route metadata");
+    for (String name : new String[] {"routeDirectPlaylist", "routeFromMainDomain",
+        "routeFromUrlWithVideoId", "routeFromShortDomain", "routeFromEmbed", "routeFromShorts",
+        "routeFromLive"}) {
+      Method method = Arrays.stream(type.getDeclaredMethods())
+          .filter(value -> value.getName().equals(name)).findFirst().orElseThrow();
+      check(method.getModifiers() == Modifier.PROTECTED && method.getReturnType() == Object.class
+          && method.getTypeParameters().length == 1 && !method.isSynthetic(),
+          "protected metadata " + name);
+    }
+
+    Routes routes = new Routes();
+    expect(router.route("ytsearch:   lo fi mix  ", routes), "search:lo fi mix", routes, 1);
+    expect(router.route("ytmsearch: synth wave ", routes), "music:synth wave", routes, 2);
+    expect(router.route("abc_DEF-123", routes), "track:abc_DEF-123", routes, 3);
+    expect(router.route("PLfixture_123", routes), "playlist:PLfixture_123:null", routes, 4);
+    expect(router.route("youtube.com/watch?v=abcdefghijk", routes), "track:abcdefghijk", routes, 5);
+    expect(router.route("https://www.youtube.com/watch?v=abcdefghijkTRAILING", routes),
+        "track:abcdefghijk", routes, 6);
+    expect(router.route("https://music.youtube.com/watch?v=abcdefghijk&list=PLfixture", routes),
+        "playlist:PLfixture:abcdefghijk", routes, 7);
+    expect(router.route("https://m.youtube.com/watch?v=abcdefghijk&list=RDfixture", routes),
+        "mix:RDfixture:abcdefghijk", routes, 8);
+    expect(router.route("https://youtube.com/playlist?list=UUfixture", routes),
+        "playlist:UUfixture:null", routes, 9);
+    expect(router.route("https://youtube.com/watch_videos?video_ids=a,b,c", routes),
+        "anonymous:a,b,c", routes, 10);
+    expect(router.route("youtu.be/abcdefghijk?list=PLshort", routes),
+        "playlist:PLshort:abcdefghijk", routes, 11);
+    expect(router.route("youtube.com/embed/abcdefghijk", routes), "track:abcdefghijk", routes, 12);
+    expect(router.route("youtube.com/shorts/abcdefghijk?list=RDshort", routes),
+        "mix:RDshort:abcdefghijk", routes, 13);
+    expect(router.route("youtube.com/live/abcdefghijk", routes), "track:abcdefghijk", routes, 14);
+    expect(router.route("youtube.com/watch?v=bad", routes), "none", routes, 15);
+    expect(router.route("youtube.com/watch?v=abcdefghijk&v=zyxwvutsrqp", routes),
+        "track:abcdefghijk", routes, 16);
+    check(router.route("https://example.com/watch?v=abcdefghijk", routes) == null
+        && routes.calls == 16, "unsupported URL");
+
+    ExposedRouter exposed = new ExposedRouter();
+    expect(exposed.direct(routes, "LLdirect"), "playlist:LLdirect:null", routes, 17);
+    expect(exposed.main(routes, "youtube.com/watch?v=abcdefghijk&list=PLmain"),
+        "playlist:PLmain:abcdefghijk", routes, 18);
+    expect(exposed.shortUrl(routes, "youtu.be/abcdefghijk"), "track:abcdefghijk", routes, 19);
+    expect(exposed.embed(routes, "youtube.com/embed/abcdefghijk"), "track:abcdefghijk", routes, 20);
+    expect(exposed.shorts(routes, "youtube.com/shorts/abcdefghijk"), "track:abcdefghijk", routes, 21);
+    expect(exposed.live(routes, "youtube.com/live/abcdefghijk"), "track:abcdefghijk", routes, 22);
+
+    Class<?> urlInfoType = Class.forName(type.getName() + "$UrlInfo");
+    Constructor<?> urlInfoConstructor = urlInfoType.getDeclaredConstructor(String.class, Map.class);
+    urlInfoConstructor.setAccessible(true);
+    Map<String, String> parameters = new LinkedHashMap<>();
+    parameters.put("list", "RDreflect");
+    Object urlInfo = urlInfoConstructor.newInstance("/watch", parameters);
+    Method videoRoute = type.getDeclaredMethod("routeFromUrlWithVideoId",
+        YoutubeLinkRouter.Routes.class, String.class, urlInfoType);
+    videoRoute.setAccessible(true);
+    expect(videoRoute.invoke(router, routes, "abcdefghijkEXTRA", urlInfo),
+        "mix:RDreflect:abcdefghijk", routes, 23);
+
+    Routes nullRoutes = new Routes();
+    nullRoutes.returnNull = true;
+    check(router.route("abc_DEF-123", nullRoutes) == null && nullRoutes.calls == 1,
+        "null callback result");
+    System.out.println("class=public-concrete,object-root,youtube-router-interface,9-private-fields,"
+        + "1-constructor,11-declared-methods;routes=search,music,direct-video,direct-playlist,"
+        + "main-watch-playlist-mix-anonymous,short,embed,shorts,live,none,unsupported-null,"
+        + "truncate,duplicate-first,null-result;protected=7,generic-T;reflection=exact");
+  }
+
+  private static final class ExposedRouter extends DefaultYoutubeLinkRouter {
+    Object direct(YoutubeLinkRouter.Routes<Object> routes, String id) {
+      return routeDirectPlaylist(routes, id);
+    }
+    Object main(YoutubeLinkRouter.Routes<Object> routes, String url) {
+      return routeFromMainDomain(routes, url);
+    }
+    Object shortUrl(YoutubeLinkRouter.Routes<Object> routes, String url) {
+      return routeFromShortDomain(routes, url);
+    }
+    Object embed(YoutubeLinkRouter.Routes<Object> routes, String url) {
+      return routeFromEmbed(routes, url);
+    }
+    Object shorts(YoutubeLinkRouter.Routes<Object> routes, String url) {
+      return routeFromShorts(routes, url);
+    }
+    Object live(YoutubeLinkRouter.Routes<Object> routes, String url) {
+      return routeFromLive(routes, url);
+    }
+  }
+
+  private static final class Routes implements YoutubeLinkRouter.Routes<Object> {
+    int calls;
+    boolean returnNull;
+    private Object value(String value) { calls++; return returnNull ? null : value; }
+    @Override public Object track(String id) { return value("track:" + id); }
+    @Override public Object playlist(String id, String selected) {
+      return value("playlist:" + id + ":" + selected);
+    }
+    @Override public Object mix(String id, String selected) {
+      return value("mix:" + id + ":" + selected);
+    }
+    @Override public Object search(String query) { return value("search:" + query); }
+    @Override public Object searchMusic(String query) { return value("music:" + query); }
+    @Override public Object anonymous(String ids) { return value("anonymous:" + ids); }
+    @Override public Object none() { return value("none"); }
+  }
+
+  private static void expect(Object actual, String expected, Routes routes, int calls) {
+    check(expected.equals(actual) && routes.calls == calls, expected + " got " + actual);
+  }
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }
