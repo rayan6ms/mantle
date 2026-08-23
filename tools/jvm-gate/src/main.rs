@@ -235,6 +235,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
             Some(YOUTUBE_CACHED_PLAYER_SCRIPT_CONSUMER)
         }
         "write-youtube-info-status-consumer" => Some(YOUTUBE_INFO_STATUS_CONSUMER),
+        "write-youtube-access-token-tracker-consumer" => {
+            Some(YOUTUBE_ACCESS_TOKEN_TRACKER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -19087,6 +19090,263 @@ public final class GateYoutubeInfoStatus {
       if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
     }
   }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_ACCESS_TOKEN_TRACKER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAccessTokenTracker;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
+import org.apache.http.client.protocol.HttpClientContext;
+
+public final class GateYoutubeAccessTokenTracker {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1 && (args[0].equals("reference") || args[0].equals("candidate")),
+        "expected disposition");
+    boolean reference = args[0].equals("reference");
+    reflectionContract();
+    commonBehavior();
+    if (reference) referenceDisposition(); else currentDisposition();
+    System.out.println(
+        "common=public-concrete,23-fields,1-constructor,8-exported-methods,21-declared-methods,"
+        + "dependency-credential-capture,defaults,context-marker,cached-identity,private-shell;service="
+        + (reference ? "legacy-email-password-android-tv-visitor-http" :
+            "deterministic-no-network,native-auth-owner,cached-only"));
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<YoutubeAccessTokenTracker> type = YoutubeAccessTokenTracker.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && !type.isSynthetic(), "class metadata");
+    check(type.getDeclaredFields().length == 23 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 21, "private shape");
+    long exported = Arrays.stream(type.getDeclaredMethods())
+        .filter(method -> Modifier.isPublic(method.getModifiers())
+            || Modifier.isProtected(method.getModifiers()))
+        .count();
+    check(exported == 7L, "exported method count");
+
+    checkField("log", Class.forName("org.slf4j.Logger"),
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField("AUTH_SCRIPT_REGEX", String.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField("IDENTITY_REGEX", String.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField("authScriptPattern", Pattern.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField("identityPattern", Pattern.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField("TOKEN_FETCH_CONTEXT_ATTRIBUTE", String.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    for (String name : new String[] {"MASTER_TOKEN_REFRESH_INTERVAL",
+        "DEFAULT_ACCESS_TOKEN_REFRESH_INTERVAL", "VISITOR_ID_REFRESH_INTERVAL"}) {
+      checkField(name, long.class, Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    }
+    checkField("tokenLock", Object.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField("httpInterfaceManager", HttpInterfaceManager.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField("email", String.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField("password", String.class, Modifier.PRIVATE | Modifier.FINAL);
+    for (String name : new String[] {"masterToken", "accessToken", "visitorId"}) {
+      checkField(name, String.class, Modifier.PRIVATE);
+    }
+    for (String name : new String[] {"lastMasterTokenUpdate", "lastAccessTokenUpdate",
+        "lastVisitorIdUpdate", "accessTokenRefreshInterval"}) {
+      checkField(name, long.class, Modifier.PRIVATE);
+    }
+    checkField("loggedAgeRestrictionsWarning", boolean.class, Modifier.PRIVATE);
+    checkField("masterTokenFromTV", boolean.class, Modifier.PRIVATE);
+    checkField("cachedAuthScript", Class.forName(
+        "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAccessTokenTracker$CachedAuthScript"),
+        Modifier.PRIVATE | Modifier.VOLATILE);
+
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        HttpInterfaceManager.class, String.class, String.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    checkMethod(type.getDeclaredMethod("updateMasterToken"), void.class, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("updateAccessToken"), void.class, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("updateVisitorId"), String.class, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("getMasterToken"), String.class, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("getAccessToken"), String.class, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("getVisitorId"), String.class, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("isTokenFetchContext", HttpClientContext.class),
+        boolean.class, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("fetchMasterToken"), String.class, Modifier.PRIVATE,
+        IOException.class);
+    checkMethod(type.getDeclaredMethod("waitForAuth",
+        Class.forName("com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface"),
+        Class.forName("com.sedmelluq.discord.lavaplayer.tools.JsonBrowser"),
+        Class.forName("com.sedmelluq.discord.lavaplayer.source.youtube."
+            + "YoutubeAccessTokenTracker$CachedAuthScript")), String.class, Modifier.PRIVATE,
+        IOException.class, InterruptedException.class);
+    checkMethod(type.getDeclaredMethod("lambda$updateMasterToken$0"), void.class,
+        Modifier.PRIVATE | 0x1000);
+
+    check(stringField("AUTH_SCRIPT_REGEX").equals(
+        "<script id=\"base-js\" src=\"(.*?)\" nonce=\".*?\"></script>"), "auth regex");
+    check(stringField("IDENTITY_REGEX").equals("\\{clientId:\"(.+?)\",\\n?.+?:\"(.+?)\""),
+        "identity regex");
+    check(stringField("TOKEN_FETCH_CONTEXT_ATTRIBUTE").equals("yt-raw"), "context constant");
+    check(longField("MASTER_TOKEN_REFRESH_INTERVAL") == 604_800_000L
+        && longField("DEFAULT_ACCESS_TOKEN_REFRESH_INTERVAL") == 3_600_000L
+        && longField("VISITOR_ID_REFRESH_INTERVAL") == 600_000L, "refresh constants");
+    check(((Pattern) field("authScriptPattern").get(null)).pattern().equals(
+            stringField("AUTH_SCRIPT_REGEX"))
+        && ((Pattern) field("identityPattern").get(null)).pattern().equals(
+            stringField("IDENTITY_REGEX")), "compiled patterns");
+  }
+
+  private static void commonBehavior() throws Exception {
+    AtomicInteger acquisitions = new AtomicInteger();
+    HttpInterfaceManager manager = manager(acquisitions);
+    String email = new String("person@example.invalid");
+    String password = new String("secret-value");
+    YoutubeAccessTokenTracker tracker = new YoutubeAccessTokenTracker(manager, email, password);
+    check(field("httpInterfaceManager").get(tracker) == manager
+        && field("email").get(tracker) == email && field("password").get(tracker) == password
+        && field("tokenLock").get(tracker) != null
+        && field("masterToken").get(tracker) == null && field("accessToken").get(tracker) == null
+        && field("visitorId").get(tracker) == null
+        && field("lastMasterTokenUpdate").getLong(tracker) == 0L
+        && field("lastAccessTokenUpdate").getLong(tracker) == 0L
+        && field("lastVisitorIdUpdate").getLong(tracker) == 0L
+        && field("accessTokenRefreshInterval").getLong(tracker) == 3_600_000L
+        && !field("loggedAgeRestrictionsWarning").getBoolean(tracker)
+        && !field("masterTokenFromTV").getBoolean(tracker)
+        && field("cachedAuthScript").get(tracker) == null, "constructor state");
+
+    HttpClientContext context = HttpClientContext.create();
+    check(!tracker.isTokenFetchContext(context), "missing context marker");
+    context.setAttribute("yt-raw", Boolean.FALSE);
+    check(!tracker.isTokenFetchContext(context), "false context marker");
+    context.setAttribute("yt-raw", Boolean.TRUE);
+    check(tracker.isTokenFetchContext(context), "true identity context marker");
+    expect(NullPointerException.class, () -> tracker.isTokenFetchContext(null));
+
+    String master = new String("cached-master");
+    String access = new String("cached-access");
+    String visitor = new String("cached-visitor");
+    field("masterToken").set(tracker, master);
+    field("accessToken").set(tracker, access);
+    field("visitorId").set(tracker, visitor);
+    check(tracker.getMasterToken() == master && tracker.getAccessToken() == access
+        && tracker.getVisitorId() == visitor && acquisitions.get() == 0, "cached identity");
+  }
+
+  private static void referenceDisposition() throws Exception {
+    AtomicInteger acquisitions = new AtomicInteger();
+    YoutubeAccessTokenTracker tracker =
+        new YoutubeAccessTokenTracker(manager(acquisitions), null, "");
+    tracker.updateMasterToken();
+    tracker.updateAccessToken();
+    check(tracker.getMasterToken() == null && tracker.getAccessToken() == null
+        && field("loggedAgeRestrictionsWarning").getBoolean(tracker)
+        && acquisitions.get() == 0, "empty credentials stay offline");
+  }
+
+  private static void currentDisposition() throws Exception {
+    AtomicInteger acquisitions = new AtomicInteger();
+    String email = "private@example.invalid";
+    String password = "private-password";
+    YoutubeAccessTokenTracker tracker =
+        new YoutubeAccessTokenTracker(manager(acquisitions), email, password);
+    check(tracker.getMasterToken() == null && tracker.getAccessToken() == null
+        && tracker.getVisitorId() == null, "empty cache stays empty");
+    for (Operation operation : new Operation[] {tracker::updateMasterToken,
+        tracker::updateAccessToken, tracker::updateVisitorId}) {
+      UnsupportedOperationException error = expect(UnsupportedOperationException.class, operation);
+      check(error.getMessage().contains("Mantle native YouTube authentication")
+          && !error.getMessage().contains(email) && !error.getMessage().contains(password),
+          "bounded unsupported diagnostic");
+    }
+    Method legacy = YoutubeAccessTokenTracker.class.getDeclaredMethod("fetchMasterToken");
+    legacy.setAccessible(true);
+    UnsupportedOperationException privateError = expectInvocation(
+        UnsupportedOperationException.class, () -> legacy.invoke(tracker));
+    check(privateError.getMessage().contains("unsupported")
+        && acquisitions.get() == 0
+        && field("lastMasterTokenUpdate").getLong(tracker) == 0L
+        && field("lastAccessTokenUpdate").getLong(tracker) == 0L
+        && field("lastVisitorIdUpdate").getLong(tracker) == 0L,
+        "legacy acquisition fenced before state and HTTP");
+  }
+
+  private static HttpInterfaceManager manager(AtomicInteger acquisitions) {
+    return (HttpInterfaceManager) java.lang.reflect.Proxy.newProxyInstance(
+        GateYoutubeAccessTokenTracker.class.getClassLoader(),
+        new Class<?>[] {HttpInterfaceManager.class}, (proxy, method, args) -> {
+          if (method.getName().equals("getInterface")) acquisitions.incrementAndGet();
+          if (method.getName().equals("toString")) return "manager-proxy";
+          if (method.getReturnType() == boolean.class) return false;
+          if (method.getReturnType() == int.class) return 0;
+          if (method.getReturnType() == long.class) return 0L;
+          return null;
+        });
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = YoutubeAccessTokenTracker.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static String stringField(String name) throws Exception {
+    return (String) field(name).get(null);
+  }
+
+  private static long longField(String name) throws Exception {
+    return field(name).getLong(null);
+  }
+
+  private static void checkField(String name, Class<?> type, int modifiers) throws Exception {
+    Field field = field(name);
+    check(field.getType() == type && field.getModifiers() == modifiers && !field.isSynthetic(),
+        field + " metadata");
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, int modifiers,
+                                  Class<?>... exceptions) {
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && Arrays.equals(method.getExceptionTypes(), exceptions) && !method.isBridge(),
+        method + " metadata");
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private static <T extends Throwable> T expectInvocation(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (InvocationTargetException error) {
+      if (!type.isInstance(error.getCause())) throw new AssertionError("wrong cause", error);
+      return type.cast(error.getCause());
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

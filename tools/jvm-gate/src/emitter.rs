@@ -232,6 +232,8 @@ const DEFAULT_YOUTUBE_TRACK_DETAILS_LOADER_CLASS: &str =
 const YOUTUBE_CACHED_PLAYER_SCRIPT_CLASS: &str = "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$CachedPlayerScript";
 const YOUTUBE_INFO_STATUS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$InfoStatus";
+const YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAccessTokenTracker";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -325,6 +327,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     DEFAULT_YOUTUBE_TRACK_DETAILS_LOADER_CLASS,
     YOUTUBE_CACHED_PLAYER_SCRIPT_CLASS,
     YOUTUBE_INFO_STATUS_CLASS,
+    YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -719,6 +722,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | DEFAULT_YOUTUBE_PLAYLIST_LOADER_CLASS
             | DEFAULT_YOUTUBE_TRACK_DETAILS_CLASS
             | DEFAULT_YOUTUBE_TRACK_DETAILS_LOADER_CLASS
+            | YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS
     )
 }
 
@@ -763,6 +767,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | DEFAULT_YOUTUBE_PLAYLIST_LOADER_CLASS
             | DEFAULT_YOUTUBE_TRACK_DETAILS_CLASS
             | DEFAULT_YOUTUBE_TRACK_DETAILS_LOADER_CLASS
+            | YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS
     )
 }
 
@@ -1053,6 +1058,9 @@ fn replacement_body(
     }
     if class_name == YOUTUBE_CACHED_PLAYER_SCRIPT_CLASS {
         return youtube_cached_player_script_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS {
+        return youtube_access_token_tracker_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -20427,6 +20435,205 @@ fn youtube_cached_player_script_constructor(pool: &mut ConstantPool<'static>) ->
             Instruction::Aload_0,
             Instruction::Lload_2,
             Instruction::Putfield(timestamp),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn youtube_access_token_tracker_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;Ljava/lang/String;Ljava/lang/String;)V",
+        ) => youtube_access_token_tracker_constructor(pool),
+        ("getMasterToken", "()Ljava/lang/String;") => object_getter(
+            pool,
+            YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS,
+            "masterToken",
+            "Ljava/lang/String;",
+        ),
+        ("getAccessToken", "()Ljava/lang/String;") => object_getter(
+            pool,
+            YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS,
+            "accessToken",
+            "Ljava/lang/String;",
+        ),
+        ("getVisitorId", "()Ljava/lang/String;") => object_getter(
+            pool,
+            YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS,
+            "visitorId",
+            "Ljava/lang/String;",
+        ),
+        ("isTokenFetchContext", "(Lorg/apache/http/client/protocol/HttpClientContext;)Z") => {
+            youtube_access_token_tracker_is_fetch_context(pool)
+        }
+        ("<clinit>", "()V") => youtube_access_token_tracker_clinit(pool),
+        (
+            "updateMasterToken"
+            | "updateAccessToken"
+            | "updateVisitorId"
+            | "fetchMasterToken"
+            | "fetchAccessToken"
+            | "fetchVisitorId"
+            | "requestMasterToken"
+            | "requestAccessToken"
+            | "createAndroidAccount"
+            | "continueUrl"
+            | "exchangeOAuth2Token"
+            | "fetchTVScript"
+            | "extractIdentity"
+            | "requestAuthCode"
+            | "waitForAuth"
+            | "buildUri"
+            | "lambda$updateMasterToken$0",
+            _,
+        ) => unsupported_body(
+            pool,
+            "Legacy YouTube JVM credential and visitor-token acquisition is unsupported; use Mantle native YouTube authentication.",
+            required_locals,
+        ),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn youtube_access_token_tracker_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS)?;
+    let lock = pool.add_field_ref(owner, "tokenLock", "Ljava/lang/Object;")?;
+    let manager = pool.add_field_ref(
+        owner,
+        "httpInterfaceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let email = pool.add_field_ref(owner, "email", "Ljava/lang/String;")?;
+    let password = pool.add_field_ref(owner, "password", "Ljava/lang/String;")?;
+    let refresh = pool.add_field_ref(owner, "accessTokenRefreshInterval", "J")?;
+    let one_hour = pool.add_long(3_600_000)?;
+    code(
+        pool,
+        3,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::New(object),
+            Instruction::Dup,
+            Instruction::Invokespecial(object_init),
+            Instruction::Putfield(lock),
+            Instruction::Aload_0,
+            Instruction::Ldc2_w(one_hour),
+            Instruction::Putfield(refresh),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(manager),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(email),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Putfield(password),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn youtube_access_token_tracker_is_fetch_context(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let context = pool.add_class("org/apache/http/client/protocol/HttpClientContext")?;
+    let get_attribute = pool.add_method_ref(
+        context,
+        "getAttribute",
+        "(Ljava/lang/String;)Ljava/lang/Object;",
+    )?;
+    let boolean = pool.add_class("java/lang/Boolean")?;
+    let true_value = pool.add_field_ref(boolean, "TRUE", "Ljava/lang/Boolean;")?;
+    let attribute = pool.add_string("yt-raw")?;
+    let mut body = code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Ldc_w(attribute),
+            Instruction::Invokevirtual(get_attribute),
+            Instruction::Getstatic(true_value),
+            Instruction::If_acmpne(7),
+            Instruction::Iconst_1,
+            Instruction::Ireturn,
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::SameFrame { frame_type: 7 }],
+    )?;
+    Ok(body)
+}
+
+fn youtube_access_token_tracker_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS)?;
+    let factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let pattern = pool.add_class("java/util/regex/Pattern")?;
+    let compile = pool.add_method_ref(
+        pattern,
+        "compile",
+        "(Ljava/lang/String;)Ljava/util/regex/Pattern;",
+    )?;
+    let auth_pattern =
+        pool.add_field_ref(owner, "authScriptPattern", "Ljava/util/regex/Pattern;")?;
+    let identity_pattern =
+        pool.add_field_ref(owner, "identityPattern", "Ljava/util/regex/Pattern;")?;
+    let master_refresh = pool.add_field_ref(owner, "MASTER_TOKEN_REFRESH_INTERVAL", "J")?;
+    let access_refresh = pool.add_field_ref(owner, "DEFAULT_ACCESS_TOKEN_REFRESH_INTERVAL", "J")?;
+    let visitor_refresh = pool.add_field_ref(owner, "VISITOR_ID_REFRESH_INTERVAL", "J")?;
+    let auth_regex =
+        pool.add_string("<script id=\"base-js\" src=\"(.*?)\" nonce=\".*?\"></script>")?;
+    let identity_regex = pool.add_string("\\{clientId:\"(.+?)\",\\n?.+?:\"(.+?)\"")?;
+    let seven_days = pool.add_long(604_800_000)?;
+    let one_hour = pool.add_long(3_600_000)?;
+    let ten_minutes = pool.add_long(600_000)?;
+    code(
+        pool,
+        2,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Ldc_w(auth_regex),
+            Instruction::Invokestatic(compile),
+            Instruction::Putstatic(auth_pattern),
+            Instruction::Ldc_w(identity_regex),
+            Instruction::Invokestatic(compile),
+            Instruction::Putstatic(identity_pattern),
+            Instruction::Ldc2_w(seven_days),
+            Instruction::Putstatic(master_refresh),
+            Instruction::Ldc2_w(one_hour),
+            Instruction::Putstatic(access_refresh),
+            Instruction::Ldc2_w(ten_minutes),
+            Instruction::Putstatic(visitor_refresh),
             Instruction::Return,
         ],
     )

@@ -18162,81 +18162,90 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The exact exported and private tracker shell is retained, while legacy email/password, Android, TV-device-code, and visitor-ID traffic is fenced before HTTP acquisition in favor of Mantle's bounded native YouTube authentication.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_youtube.rs", "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAccessTokenTracker",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;Ljava/lang/String;Ljava/lang/String;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The constructor preserves dependency and credential reference identity, fresh lock state, null caches, zero timestamps, one-hour access refresh default, false flags, and null script cache.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAccessTokenTracker",
       "symbol_kind": "METHOD",
       "member_name": "updateMasterToken",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Legacy asynchronous email/password master-token acquisition is replaced by a credential-safe deterministic unsupported failure before HTTP or timestamp mutation; cached values remain available through the getter.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_youtube.rs", "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAccessTokenTracker",
       "symbol_kind": "METHOD",
       "member_name": "updateAccessToken",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Legacy Android and TV refresh-token exchange is replaced by a credential-safe deterministic unsupported failure before HTTP or timestamp mutation; cached values remain available through the getter.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_youtube.rs", "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAccessTokenTracker",
       "symbol_kind": "METHOD",
       "member_name": "updateVisitorId",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Legacy visitor-ID HTTP acquisition is replaced by a credential-safe deterministic unsupported failure before HTTP or timestamp mutation; cached visitor identity remains available through the getter.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_youtube.rs", "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAccessTokenTracker",
       "symbol_kind": "METHOD",
       "member_name": "getMasterToken",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The getter preserves cached master-token reference identity while disabling implicit legacy credential acquisition; an empty cache remains null without HTTP access.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_youtube.rs", "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAccessTokenTracker",
       "symbol_kind": "METHOD",
       "member_name": "getAccessToken",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The getter preserves cached access-token reference identity while disabling implicit legacy credential acquisition; an empty cache remains null without HTTP access.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_youtube.rs", "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAccessTokenTracker",
       "symbol_kind": "METHOD",
       "member_name": "getVisitorId",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The getter preserves cached visitor-ID reference identity while disabling implicit legacy acquisition; an empty cache remains null without HTTP access.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_youtube.rs", "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAccessTokenTracker",
       "symbol_kind": "METHOD",
       "member_name": "isTokenFetchContext",
       "descriptor": "(Lorg/apache/http/client/protocol/HttpClientContext;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact yt-raw Boolean.TRUE identity behavior, false and missing attributes, null-context failure, signature, and reflection metadata are covered by the Phase 13 oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAccessTokenTracker$CachedAuthScript",
