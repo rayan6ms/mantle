@@ -17682,18 +17682,20 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public abstract zero-field interface preserves the exact Object root and sole YandexMusicApiLoader superinterface, including inherited configuration and shutdown dispatch.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicSearchResultLoader",
       "symbol_kind": "METHOD",
       "member_name": "loadSearchResult",
       "descriptor": "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicPlaylistLoader;Ljava/util/function/Function;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Caller-defined implementations preserve exact nullable query, playlist-loader, Function<AudioTrackInfo, AudioTrack>, and AudioItem identities through the frozen public abstract signature and generic metadata.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicTrackLoader",
