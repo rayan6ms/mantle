@@ -173,6 +173,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-m3u-stream-segment-url-provider-consumer" => {
             Some(M3U_STREAM_SEGMENT_URL_PROVIDER_CONSUMER)
         }
+        "write-mpeg-ts-m3u-stream-audio-track-consumer" => {
+            Some(MPEG_TS_M3U_STREAM_AUDIO_TRACK_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -14488,6 +14491,205 @@ public final class GateM3uStreamAudioTrack {
           if (method.getReturnType() == int.class) return 0;
           return null;
         }));
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MPEG_TS_M3U_STREAM_AUDIO_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.adts.AdtsAudioTrack;
+import com.sedmelluq.discord.lavaplayer.container.mpegts.MpegTsElementaryInputStream;
+import com.sedmelluq.discord.lavaplayer.container.mpegts.PesPacketInputStream;
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.stream.M3uStreamAudioTrack;
+import com.sedmelluq.discord.lavaplayer.source.stream.M3uStreamSegmentUrlProvider;
+import com.sedmelluq.discord.lavaplayer.source.stream.MpegTsM3uStreamAudioTrack;
+import com.sedmelluq.discord.lavaplayer.tools.io.GreedyInputStream;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.InternalAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import java.io.FilterInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateMpegTsM3uStreamAudioTrack {
+  private static final Object UNSAFE = loadUnsafe();
+
+  public static void main(String[] args) throws Exception {
+    reflectionContract();
+    constructionContract();
+    wrapperAndDelegateContract();
+    nullAndFailureContract();
+    System.out.println("public-abstract,m3u-super,0-fields,1-constructor,1-method;"
+        + "construction,track-info,executor,ts-adts,pes,elementary-type,raw-identity,"
+        + "no-eager-read,nulls,failure-identity,reflection");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<MpegTsM3uStreamAudioTrack> type = MpegTsM3uStreamAudioTrack.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && type.getSuperclass() == M3uStreamAudioTrack.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 0,
+        "class metadata");
+    Constructor<?> constructor = type.getDeclaredConstructor(AudioTrackInfo.class);
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "constructor metadata");
+    Method process = type.getDeclaredMethod("processJoinedStream",
+        LocalAudioTrackExecutor.class, InputStream.class);
+    check(type.getDeclaredMethods().length == 1
+        && process.getReturnType() == void.class
+        && process.getModifiers() == Modifier.PROTECTED
+        && Arrays.equals(process.getExceptionTypes(), new Class<?>[] {Exception.class})
+        && !process.isSynthetic() && !process.isBridge() && !process.isVarArgs(),
+        "process metadata");
+  }
+
+  private static void constructionContract() {
+    AudioTrackInfo info = info();
+    TestTrack track = new TestTrack(info);
+    check(track.getInfo() == info, "constructor track info identity");
+    check(new TestTrack(null).getInfo() == null, "null track info");
+  }
+
+  private static void wrapperAndDelegateContract() throws Exception {
+    AudioTrackInfo info = info();
+    TestTrack track = new TestTrack(info);
+    CountingInputStream raw = new CountingInputStream();
+    LocalAudioTrackExecutor executor = allocate(LocalAudioTrackExecutor.class);
+    track.exposedProcess(executor, raw);
+
+    check(track.calls == 1 && track.executor == executor, "delegate executor identity");
+    check(track.delegate != null && track.delegate.getClass() == AdtsAudioTrack.class
+        && track.delegate.getInfo() == info, "ADTS delegate and track info");
+
+    Object pes = field(track.delegate, AdtsAudioTrack.class, "inputStream");
+    check(pes != null && pes.getClass() == PesPacketInputStream.class, "PES wrapper");
+    Object outerGreedy = field(pes, PesPacketInputStream.class, "inputStream");
+    check(outerGreedy != null && outerGreedy.getClass() == GreedyInputStream.class,
+        "outer greedy wrapper");
+    Object elementary = field(outerGreedy, FilterInputStream.class, "in");
+    check(elementary != null && elementary.getClass() == MpegTsElementaryInputStream.class,
+        "MPEG-TS elementary wrapper");
+    check(intField(elementary, MpegTsElementaryInputStream.class, "elementaryDataType") == 15,
+        "ADTS elementary type");
+    Object innerGreedy = field(elementary, MpegTsElementaryInputStream.class, "inputStream");
+    check(innerGreedy != null && innerGreedy.getClass() == GreedyInputStream.class,
+        "inner greedy wrapper");
+    check(field(innerGreedy, FilterInputStream.class, "in") == raw,
+        "raw stream identity");
+    check(raw.reads == 0, "construction eagerly read input");
+  }
+
+  private static void nullAndFailureContract() throws Exception {
+    TestTrack nullTrack = new TestTrack(info());
+    nullTrack.exposedProcess(null, null);
+    Object pes = field(nullTrack.delegate, AdtsAudioTrack.class, "inputStream");
+    Object outerGreedy = field(pes, PesPacketInputStream.class, "inputStream");
+    Object elementary = field(outerGreedy, FilterInputStream.class, "in");
+    Object innerGreedy = field(elementary, MpegTsElementaryInputStream.class, "inputStream");
+    check(nullTrack.executor == null && field(innerGreedy, FilterInputStream.class, "in") == null,
+        "null identities");
+
+    TestTrack failing = new TestTrack(info());
+    Exception failure = new Exception("delegate-failure");
+    failing.failure = failure;
+    Exception thrown = expect(Exception.class,
+        () -> failing.exposedProcess(null, new CountingInputStream()));
+    check(thrown == failure && failing.calls == 1 && failing.delegate != null,
+        "delegate failure identity");
+  }
+
+  private static AudioTrackInfo info() {
+    return new AudioTrackInfo("title", "author", 123L, "fixture", false,
+        "https://example.invalid/fixture", null, null);
+  }
+
+  private static final class TestTrack extends MpegTsM3uStreamAudioTrack {
+    private InternalAudioTrack delegate;
+    private LocalAudioTrackExecutor executor;
+    private Exception failure;
+    private int calls;
+
+    TestTrack(AudioTrackInfo info) { super(info); }
+    void exposedProcess(LocalAudioTrackExecutor executor, InputStream stream) throws Exception {
+      processJoinedStream(executor, stream);
+    }
+    protected synchronized void processDelegate(InternalAudioTrack delegate,
+        LocalAudioTrackExecutor executor) throws Exception {
+      calls++;
+      this.delegate = delegate;
+      this.executor = executor;
+      if (failure != null) throw failure;
+    }
+    protected M3uStreamSegmentUrlProvider getSegmentUrlProvider() { return null; }
+    protected HttpInterface getHttpInterface() { return null; }
+    protected AudioTrack makeShallowClone() { return new TestTrack(trackInfo); }
+    public AudioSourceManager getSourceManager() { return null; }
+  }
+
+  private static final class CountingInputStream extends InputStream {
+    private int reads;
+    public int read() { reads++; return -1; }
+    public int read(byte[] buffer, int offset, int length) {
+      reads++;
+      return -1;
+    }
+  }
+
+  private static Object field(Object target, Class<?> owner, String name) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    long offset = (Long) UNSAFE.getClass().getMethod("objectFieldOffset", Field.class)
+        .invoke(UNSAFE, field);
+    return UNSAFE.getClass().getMethod("getObject", Object.class, long.class)
+        .invoke(UNSAFE, target, offset);
+  }
+
+  private static int intField(Object target, Class<?> owner, String name) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    long offset = (Long) UNSAFE.getClass().getMethod("objectFieldOffset", Field.class)
+        .invoke(UNSAFE, field);
+    return (Integer) UNSAFE.getClass().getMethod("getInt", Object.class, long.class)
+        .invoke(UNSAFE, target, offset);
+  }
+
+  private static <T> T allocate(Class<T> type) throws Exception {
+    return type.cast(UNSAFE.getClass().getMethod("allocateInstance", Class.class)
+        .invoke(UNSAFE, type));
+  }
+
+  private static Object loadUnsafe() {
+    try {
+      Class<?> unsafeType = Class.forName("sun.misc.Unsafe");
+      Field singleton = unsafeType.getDeclaredField("theUnsafe");
+      singleton.setAccessible(true);
+      return singleton.get(null);
+    } catch (Exception error) {
+      throw new AssertionError(error);
+    }
   }
 
   private static <T extends Throwable> T expect(Class<T> type, Operation operation)

@@ -175,6 +175,8 @@ const M3U_SEGMENT_INFO_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider$SegmentInfo";
 const M3U_SEGMENT_TOOLS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/stream/MantleM3uSegmentTools";
+const MPEG_TS_M3U_STREAM_AUDIO_TRACK_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/stream/MpegTsM3uStreamAudioTrack";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -239,6 +241,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     M3U_SEGMENT_URL_PROVIDER_CLASS,
     M3U_CHANNEL_STREAM_INFO_CLASS,
     M3U_SEGMENT_INFO_CLASS,
+    MPEG_TS_M3U_STREAM_AUDIO_TRACK_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -799,6 +802,9 @@ fn replacement_body(
     }
     if class_name == M3U_SEGMENT_INFO_CLASS {
         return m3u_segment_info_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == MPEG_TS_M3U_STREAM_AUDIO_TRACK_CLASS {
+        return mpeg_ts_m3u_stream_audio_track_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_M3U_INFO_CLASS {
         return sound_cloud_m3u_info_replacement(pool, name, descriptor, required_locals);
@@ -15941,6 +15947,98 @@ fn m3u_stream_audio_track_replacement(
         )
         .into()),
     }
+}
+
+fn mpeg_ts_m3u_stream_audio_track_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V") => {
+            let superclass = pool.add_class(M3U_STREAM_AUDIO_TRACK_CLASS)?;
+            let constructor = pool.add_method_ref(
+                superclass,
+                "<init>",
+                "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V",
+            )?;
+            code(
+                pool,
+                2,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Aload_1,
+                    Instruction::Invokespecial(constructor),
+                    Instruction::Return,
+                ],
+            )
+        }
+        (
+            "processJoinedStream",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;Ljava/io/InputStream;)V",
+        ) => mpeg_ts_m3u_process_joined_stream(pool),
+        _ => Err(format!(
+            "Phase 13 does not implement {MPEG_TS_M3U_STREAM_AUDIO_TRACK_CLASS}.{name}{descriptor}"
+        )
+        .into()),
+    }
+}
+
+fn mpeg_ts_m3u_process_joined_stream(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MPEG_TS_M3U_STREAM_AUDIO_TRACK_CLASS)?;
+    let elementary = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/container/mpegts/MpegTsElementaryInputStream",
+    )?;
+    let elementary_init = pool.add_method_ref(elementary, "<init>", "(Ljava/io/InputStream;I)V")?;
+    let pes =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/mpegts/PesPacketInputStream")?;
+    let pes_init = pool.add_method_ref(pes, "<init>", "(Ljava/io/InputStream;)V")?;
+    let adts = pool.add_class("com/sedmelluq/discord/lavaplayer/container/adts/AdtsAudioTrack")?;
+    let adts_init = pool.add_method_ref(
+        adts,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Ljava/io/InputStream;)V",
+    )?;
+    let track_info = pool.add_field_ref(
+        owner,
+        "trackInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let process_delegate = pool.add_method_ref(
+        owner,
+        "processDelegate",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/InternalAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+    )?;
+    code(
+        pool,
+        5,
+        5,
+        vec![
+            Instruction::New(elementary),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Bipush(15),
+            Instruction::Invokespecial(elementary_init),
+            Instruction::Astore_3,
+            Instruction::New(pes),
+            Instruction::Dup,
+            Instruction::Aload_3,
+            Instruction::Invokespecial(pes_init),
+            Instruction::Astore(4),
+            Instruction::Aload_0,
+            Instruction::New(adts),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(track_info),
+            Instruction::Aload(4),
+            Instruction::Invokespecial(adts_init),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(process_delegate),
+            Instruction::Return,
+        ],
+    )
 }
 
 #[allow(clippy::too_many_lines)]
