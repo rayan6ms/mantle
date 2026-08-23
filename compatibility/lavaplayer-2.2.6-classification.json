@@ -17892,45 +17892,50 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Generated structure and JSON-backed metadata behavior match, while the frozen Java extractor chain is retired in favor of Mantle's bounded current YouTube source.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_youtube.rs", "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetails",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Generated construction preserves the public signature and exact video-ID and JSON-data reference capture.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetails",
       "symbol_kind": "METHOD",
       "member_name": "getTrackInfo",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Modern and legacy metadata, live temporal rules, thumbnails, watch URI construction, and common failures match the frozen behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetails",
       "symbol_kind": "METHOD",
       "member_name": "getFormats",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSignatureResolver;)Ljava/util/List;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The frozen four-extractor Java chain is replaced by deterministic failure before HTTP or signature-resolver access; current bounded format discovery remains native.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_youtube.rs", "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetails",
       "symbol_kind": "METHOD",
       "member_name": "getPlayerScript",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Returns the captured YoutubeTrackJsonData player-script URL exactly, including null.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader",

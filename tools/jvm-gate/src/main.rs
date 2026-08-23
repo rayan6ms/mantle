@@ -225,6 +225,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-default-youtube-playlist-loader-consumer" => {
             Some(DEFAULT_YOUTUBE_PLAYLIST_LOADER_CONSUMER)
         }
+        "write-default-youtube-track-details-consumer" => {
+            Some(DEFAULT_YOUTUBE_TRACK_DETAILS_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -18507,6 +18510,207 @@ public final class GateDefaultYoutubePlaylistLoader {
       check(error.getMessage().contains("Legacy YouTube playlist discovery is unsupported"),
           "stable unsupported disposition");
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const DEFAULT_YOUTUBE_TRACK_DETAILS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetails;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSignatureResolver;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackDetails;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackFormat;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackJsonData;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.Arrays;
+import java.util.List;
+
+public final class GateDefaultYoutubeTrackDetails {
+  private static final String VIDEO_ID = "dQw4w9WgXcQ";
+
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "mode required");
+    Class<DefaultYoutubeTrackDetails> type = DefaultYoutubeTrackDetails.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {YoutubeTrackDetails.class})
+        && type.getDeclaredFields().length == 4 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 7 && type.getDeclaredClasses().length == 1,
+        "class shape");
+
+    Field log = type.getDeclaredField("log");
+    Field extractors = type.getDeclaredField("FORMAT_EXTRACTORS");
+    Field videoId = type.getDeclaredField("videoId");
+    Field data = type.getDeclaredField("data");
+    check(log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && extractors.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && videoId.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && data.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL), "field metadata");
+    log.setAccessible(true);
+    extractors.setAccessible(true);
+    videoId.setAccessible(true);
+    data.setAccessible(true);
+    check(log.get(null) != null, "logger initialization");
+    Object[] chain = (Object[]) extractors.get(null);
+    check(chain.length == 4
+        && chain[0].getClass().getSimpleName().equals("LegacyAdaptiveFormatsExtractor")
+        && chain[1].getClass().getSimpleName().equals("StreamingDataFormatsExtractor")
+        && chain[2].getClass().getSimpleName().equals("LegacyDashMpdFormatsExtractor")
+        && chain[3].getClass().getSimpleName().equals("LegacyStreamMapFormatsExtractor"),
+        "extractor chain");
+
+    Constructor<DefaultYoutubeTrackDetails> constructor = type.getDeclaredConstructor(
+        String.class, YoutubeTrackJsonData.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    YoutubeTrackJsonData identityData = jsonData("{}", "{}", "/player.js");
+    DefaultYoutubeTrackDetails identity = constructor.newInstance(VIDEO_ID, identityData);
+    check(videoId.get(identity) == VIDEO_ID && data.get(identity) == identityData
+        && identity.getPlayerScript().equals("/player.js"), "constructor and script identity");
+
+    Method getInfo = type.getDeclaredMethod("getTrackInfo");
+    Method getFormats = type.getDeclaredMethod("getFormats", HttpInterface.class,
+        YoutubeSignatureResolver.class);
+    Method getScript = type.getDeclaredMethod("getPlayerScript");
+    check(getInfo.getModifiers() == Modifier.PUBLIC && getInfo.getReturnType() == AudioTrackInfo.class
+        && getFormats.getModifiers() == Modifier.PUBLIC && getFormats.getReturnType() == List.class
+        && getScript.getModifiers() == Modifier.PUBLIC && getScript.getReturnType() == String.class
+        && getInfo.getExceptionTypes().length == 0 && getFormats.getExceptionTypes().length == 0
+        && getScript.getExceptionTypes().length == 0, "public method metadata");
+    Type genericReturn = getFormats.getGenericReturnType();
+    check(genericReturn instanceof ParameterizedType
+        && ((ParameterizedType) genericReturn).getRawType() == List.class
+        && Arrays.equals(((ParameterizedType) genericReturn).getActualTypeArguments(),
+            new Type[] {YoutubeTrackFormat.class}), "format generic metadata");
+
+    Method loadFormats = type.getDeclaredMethod("loadTrackFormats", HttpInterface.class,
+        YoutubeSignatureResolver.class);
+    Method loadInfo = type.getDeclaredMethod("loadTrackInfo");
+    Method loadLegacy = type.getDeclaredMethod("loadLegacyTrackInfo");
+    Class<?> temporal = type.getDeclaredClasses()[0];
+    Method build = type.getDeclaredMethod("buildTrackInfo", String.class, String.class,
+        String.class, temporal, String.class);
+    check(loadFormats.getModifiers() == Modifier.PRIVATE && loadInfo.getModifiers() == Modifier.PRIVATE
+        && loadLegacy.getModifiers() == Modifier.PRIVATE && build.getModifiers() == Modifier.PRIVATE
+        && loadFormats.getReturnType() == List.class
+        && loadInfo.getReturnType() == AudioTrackInfo.class
+        && loadLegacy.getReturnType() == AudioTrackInfo.class
+        && build.getReturnType() == AudioTrackInfo.class, "private method metadata");
+    check(temporal.getSimpleName().equals("TemporalInfo")
+        && temporal.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC)
+        && temporal.getDeclaredFields().length == 2
+        && temporal.getDeclaredConstructors().length == 1
+        && temporal.getDeclaredMethods().length == 1, "temporal nest metadata");
+
+    DefaultYoutubeTrackDetails modernVod = details(
+        "{\"playabilityStatus\":{\"status\":\"OK\"},\"videoDetails\":{"
+            + "\"title\":\"Modern\",\"author\":\"Uploader\",\"lengthSeconds\":\"123\","
+            + "\"thumbnail\":{\"thumbnails\":[{\"url\":\"small\"},{\"url\":"
+            + "\"https://i.ytimg.com/vi/id/maxresdefault.jpg\"}]}}}", "{}", "modern.js");
+    checkInfo(modernVod.getTrackInfo(), "Modern", "Uploader", 123000L, false,
+        "https://i.ytimg.com/vi/id/maxresdefault.jpg");
+    check(modernVod.getPlayerScript().equals("modern.js"), "modern player script");
+
+    DefaultYoutubeTrackDetails modernLive = details(
+        "{\"playabilityStatus\":{\"status\":\"OK\",\"liveStreamability\":{}},"
+            + "\"videoDetails\":{\"title\":\"Live\",\"author\":\"Channel\","
+            + "\"lengthSeconds\":\"55\"}}", "{}", null);
+    checkInfo(modernLive.getTrackInfo(), "Live", "Channel", Long.MAX_VALUE, true,
+        "https://i.ytimg.com/vi/" + VIDEO_ID + "/mqdefault.jpg");
+
+    DefaultYoutubeTrackDetails legacyVod = details("{}",
+        "{\"status\":\"ok\",\"title\":\"Legacy\",\"author\":\"Old\","
+            + "\"length_seconds\":\"7\",\"live_playback\":\"0\"}", "legacy.js");
+    checkInfo(legacyVod.getTrackInfo(), "Legacy", "Old", 7000L, false,
+        "https://i.ytimg.com/vi/" + VIDEO_ID + "/mqdefault.jpg");
+    DefaultYoutubeTrackDetails legacyLive = details("{}",
+        "{\"status\":\"ok\",\"title\":\"Legacy Live\",\"author\":\"Old\","
+            + "\"length_seconds\":\"0\",\"live_playback\":\"1\"}", null);
+    checkInfo(legacyLive.getTrackInfo(), "Legacy Live", "Old", Long.MAX_VALUE, true,
+        "https://i.ytimg.com/vi/" + VIDEO_ID + "/mqdefault.jpg");
+    assertFriendly(details(
+        "{\"playabilityStatus\":{\"status\":\"ERROR\",\"reason\":\"Modern blocked\"}}",
+        "{}", null), "Modern blocked");
+    assertFriendly(details("{}", "{\"status\":\"fail\",\"reason\":\"Legacy blocked\"}",
+        null), "Legacy blocked");
+
+    DefaultYoutubeTrackDetails formats = details(
+        "{\"playabilityStatus\":{\"status\":\"OK\"},\"videoDetails\":{\"isLive\":false},"
+            + "\"streamingData\":{\"adaptiveFormats\":[{\"url\":"
+            + "\"https://media.example/audio?n=token\",\"mimeType\":"
+            + "\"audio/webm; codecs=\\\"opus\\\"\",\"bitrate\":128000,"
+            + "\"contentLength\":\"42\",\"audioChannels\":2}]}}", "{}", "format.js");
+    if (args[0].equals("candidate")) {
+      try {
+        formats.getFormats(null, null);
+        throw new AssertionError("legacy format extraction unexpectedly succeeded");
+      } catch (UnsupportedOperationException error) {
+        check(error.getMessage().contains("Legacy YouTube format extraction is unsupported"),
+            "stable format disposition");
+      }
+      check(videoId.get(formats) == VIDEO_ID && data.get(formats) != null,
+          "format failure preserves state");
+      System.out.println("common=public-concrete,object-root,track-details-interface,4-private-fields,"
+          + "1-constructor,7-declared-methods,temporal-nest;constructor-identity,player-script,"
+          + "generic-formats,modern-vod-live-error,legacy-vod-live-error,thumbnail-duration-uri,"
+          + "reflection;service=deterministic-no-network,current-bounded-native-source");
+    } else {
+      check(args[0].equals("reference"), "unknown mode");
+      List<YoutubeTrackFormat> found = formats.getFormats(null, null);
+      check(found.size() == 1 && found.get(0).getBitrate() == 128000L
+          && found.get(0).getContentLength() == 42L && found.get(0).getAudioChannels() == 2L,
+          "reference streaming format");
+      System.out.println("common=public-concrete,object-root,track-details-interface,4-private-fields,"
+          + "1-constructor,7-declared-methods,temporal-nest;constructor-identity,player-script,"
+          + "generic-formats,modern-vod-live-error,legacy-vod-live-error,thumbnail-duration-uri,"
+          + "reflection;service=legacy-four-extractor-chain,streaming-format");
+    }
+  }
+
+  private static DefaultYoutubeTrackDetails details(String player, String polymer, String script) {
+    return new DefaultYoutubeTrackDetails(VIDEO_ID, jsonData(player, polymer, script));
+  }
+
+  private static YoutubeTrackJsonData jsonData(String player, String polymer, String script) {
+    try {
+      return new YoutubeTrackJsonData(JsonBrowser.parse(player), JsonBrowser.parse(polymer), script);
+    } catch (Exception error) {
+      throw new AssertionError(error);
+    }
+  }
+
+  private static void checkInfo(AudioTrackInfo info, String title, String author, long length,
+      boolean stream, String artwork) {
+    check(eq(info.title, title) && eq(info.author, author) && info.length == length
+        && eq(info.identifier, VIDEO_ID) && info.isStream == stream
+        && eq(info.uri, "https://www.youtube.com/watch?v=" + VIDEO_ID)
+        && eq(info.artworkUrl, artwork) && info.isrc == null, "track info");
+  }
+
+  private static void assertFriendly(DefaultYoutubeTrackDetails details, String message) {
+    try {
+      details.getTrackInfo();
+      throw new AssertionError("track-info failure unexpectedly succeeded");
+    } catch (FriendlyException error) {
+      check(eq(error.getMessage(), message)
+          && error.severity == FriendlyException.Severity.COMMON && error.getCause() == null,
+          "friendly failure");
+    }
+  }
+
+  private static boolean eq(Object left, Object right) {
+    return left == null ? right == null : left.equals(right);
   }
 
   private static void check(boolean condition, String message) {

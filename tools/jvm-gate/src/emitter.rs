@@ -225,6 +225,8 @@ const DEFAULT_YOUTUBE_LINK_ROUTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter";
 const DEFAULT_YOUTUBE_PLAYLIST_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubePlaylistLoader";
+const DEFAULT_YOUTUBE_TRACK_DETAILS_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetails";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -314,6 +316,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YANDEX_MUSIC_UTILS_CLASS,
     DEFAULT_YOUTUBE_LINK_ROUTER_CLASS,
     DEFAULT_YOUTUBE_PLAYLIST_LOADER_CLASS,
+    DEFAULT_YOUTUBE_TRACK_DETAILS_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -706,6 +709,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | YANDEX_MUSIC_UTILS_CLASS
             | DEFAULT_YOUTUBE_LINK_ROUTER_CLASS
             | DEFAULT_YOUTUBE_PLAYLIST_LOADER_CLASS
+            | DEFAULT_YOUTUBE_TRACK_DETAILS_CLASS
     )
 }
 
@@ -748,6 +752,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | YANDEX_MUSIC_UTILS_CLASS
             | DEFAULT_YOUTUBE_LINK_ROUTER_CLASS
             | DEFAULT_YOUTUBE_PLAYLIST_LOADER_CLASS
+            | DEFAULT_YOUTUBE_TRACK_DETAILS_CLASS
     )
 }
 
@@ -1024,6 +1029,9 @@ fn replacement_body(
             descriptor,
             required_locals,
         );
+    }
+    if class_name == DEFAULT_YOUTUBE_TRACK_DETAILS_CLASS {
+        return default_youtube_track_details_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -19175,6 +19183,544 @@ fn default_youtube_playlist_loader_alert_text(
             Instruction::Areturn,
         ],
     )
+}
+
+fn default_youtube_track_details_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData;)V",
+        ) => default_youtube_track_details_constructor(pool),
+        ("getTrackInfo", "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;") => {
+            default_youtube_track_details_info(pool)
+        }
+        (
+            "getFormats" | "loadTrackFormats",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSignatureResolver;)Ljava/util/List;",
+        ) => unsupported_body(
+            pool,
+            "Legacy YouTube format extraction is unsupported; use Mantle's bounded current YouTube source.",
+            required_locals,
+        ),
+        ("getPlayerScript", "()Ljava/lang/String;") => {
+            default_youtube_track_details_player_script(pool)
+        }
+        ("loadTrackInfo", "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;") => {
+            default_youtube_track_details_load_info(pool)
+        }
+        ("loadLegacyTrackInfo", "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;") => {
+            default_youtube_track_details_load_legacy_info(pool)
+        }
+        (
+            "buildTrackInfo",
+            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetails$TemporalInfo;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+        ) => default_youtube_track_details_build_info(pool),
+        ("<clinit>", "()V") => default_youtube_track_details_class_init(pool),
+        _ => unsupported_body(
+            pool,
+            "Unsupported default YouTube track-details operation.",
+            required_locals,
+        ),
+    }
+}
+
+fn default_youtube_track_details_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(DEFAULT_YOUTUBE_TRACK_DETAILS_CLASS)?;
+    let video_id = pool.add_field_ref(owner, "videoId", "Ljava/lang/String;")?;
+    let data = pool.add_field_ref(
+        owner,
+        "data",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData;",
+    )?;
+    code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(video_id),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(data),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn default_youtube_track_details_info(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_YOUTUBE_TRACK_DETAILS_CLASS)?;
+    let load = pool.add_method_ref(
+        owner,
+        "loadTrackInfo",
+        "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(load),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn default_youtube_track_details_player_script(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_YOUTUBE_TRACK_DETAILS_CLASS)?;
+    let data_class =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData")?;
+    let data = pool.add_field_ref(
+        owner,
+        "data",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData;",
+    )?;
+    let script = pool.add_field_ref(data_class, "playerScriptUrl", "Ljava/lang/String;")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(data),
+            Instruction::Getfield(script),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn default_youtube_track_details_load_info(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_YOUTUBE_TRACK_DETAILS_CLASS)?;
+    let data_class =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData")?;
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let string = pool.add_class("java/lang/String")?;
+    let temporal = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetails$TemporalInfo",
+    )?;
+    let friendly = pool.add_class(FRIENDLY_EXCEPTION_CLASS)?;
+    let severity = pool.add_class(FRIENDLY_EXCEPTION_SEVERITY_CLASS)?;
+    let data = pool.add_field_ref(
+        owner,
+        "data",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData;",
+    )?;
+    let video_id = pool.add_field_ref(owner, "videoId", "Ljava/lang/String;")?;
+    let player_response = pool.add_field_ref(
+        data_class,
+        "playerResponse",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let get = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let text_method = pool.add_method_ref(json, "text", "()Ljava/lang/String;")?;
+    let is_null = pool.add_method_ref(json, "isNull", "()Z")?;
+    let equals = pool.add_method_ref(string, "equals", "(Ljava/lang/Object;)Z")?;
+    let friendly_init = pool.add_method_ref(
+        friendly,
+        "<init>",
+        "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity;Ljava/lang/Throwable;)V",
+    )?;
+    let common = pool.add_field_ref(
+        severity,
+        "COMMON",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity;",
+    )?;
+    let legacy = pool.add_method_ref(
+        owner,
+        "loadLegacyTrackInfo",
+        "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let temporal_from_raw = pool.add_method_ref(
+        temporal,
+        "fromRawData",
+        "(ZLcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Z)Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetails$TemporalInfo;",
+    )?;
+    let thumbnail = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/ThumbnailTools")?;
+    let youtube_thumbnail = pool.add_method_ref(
+        thumbnail,
+        "getYouTubeThumbnail",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Ljava/lang/String;)Ljava/lang/String;",
+    )?;
+    let build = pool.add_method_ref(
+        owner,
+        "buildTrackInfo",
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetails$TemporalInfo;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let playability = pool.add_string("playabilityStatus")?;
+    let status = pool.add_string("status")?;
+    let error = pool.add_string("ERROR")?;
+    let reason = pool.add_string("reason")?;
+    let video_details = pool.add_string("videoDetails")?;
+    let title = pool.add_string("title")?;
+    let author = pool.add_string("author")?;
+    let live = pool.add_string("liveStreamability")?;
+    let length = pool.add_string("lengthSeconds")?;
+
+    let mut instructions = vec![
+        Instruction::Ldc_w(error),
+        Instruction::Aload_0,
+        Instruction::Getfield(data),
+        Instruction::Getfield(player_response),
+        Instruction::Ldc_w(playability),
+        Instruction::Invokevirtual(get),
+        Instruction::Ldc_w(status),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text_method),
+        Instruction::Invokevirtual(equals),
+        Instruction::Ifeq(0),
+        Instruction::New(friendly),
+        Instruction::Dup,
+        Instruction::Aload_0,
+        Instruction::Getfield(data),
+        Instruction::Getfield(player_response),
+        Instruction::Ldc_w(playability),
+        Instruction::Invokevirtual(get),
+        Instruction::Ldc_w(reason),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text_method),
+        Instruction::Getstatic(common),
+        Instruction::Aconst_null,
+        Instruction::Invokespecial(friendly_init),
+        Instruction::Athrow,
+    ];
+    let playable_target = instructions.len();
+    instructions[10] = Instruction::Ifeq(u16::try_from(playable_target)?);
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Getfield(data),
+        Instruction::Getfield(player_response),
+        Instruction::Ldc_w(video_details),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(is_null),
+        Instruction::Ifeq(0),
+        Instruction::Aload_0,
+        Instruction::Invokevirtual(legacy),
+        Instruction::Areturn,
+    ]);
+    let modern_target = instructions.len();
+    instructions[playable_target + 6] = Instruction::Ifeq(u16::try_from(modern_target)?);
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Aload_0,
+        Instruction::Getfield(video_id),
+        Instruction::Aload_0,
+        Instruction::Getfield(data),
+        Instruction::Getfield(player_response),
+        Instruction::Ldc_w(video_details),
+        Instruction::Invokevirtual(get),
+        Instruction::Ldc_w(title),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text_method),
+        Instruction::Aload_0,
+        Instruction::Getfield(data),
+        Instruction::Getfield(player_response),
+        Instruction::Ldc_w(video_details),
+        Instruction::Invokevirtual(get),
+        Instruction::Ldc_w(author),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text_method),
+        Instruction::Aload_0,
+        Instruction::Getfield(data),
+        Instruction::Getfield(player_response),
+        Instruction::Ldc_w(playability),
+        Instruction::Invokevirtual(get),
+        Instruction::Ldc_w(live),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(is_null),
+        Instruction::Iconst_1,
+        Instruction::Ixor,
+        Instruction::Aload_0,
+        Instruction::Getfield(data),
+        Instruction::Getfield(player_response),
+        Instruction::Ldc_w(video_details),
+        Instruction::Invokevirtual(get),
+        Instruction::Ldc_w(length),
+        Instruction::Invokevirtual(get),
+        Instruction::Iconst_0,
+        Instruction::Invokestatic(temporal_from_raw),
+        Instruction::Aload_0,
+        Instruction::Getfield(data),
+        Instruction::Getfield(player_response),
+        Instruction::Ldc_w(video_details),
+        Instruction::Invokevirtual(get),
+        Instruction::Aload_0,
+        Instruction::Getfield(video_id),
+        Instruction::Invokestatic(youtube_thumbnail),
+        Instruction::Invokevirtual(build),
+        Instruction::Areturn,
+    ]);
+
+    let owner_type = VerificationType::Object { cpool_index: owner };
+    let mut previous = None;
+    let frames = vec![
+        youtube_full_frame(
+            &mut previous,
+            playable_target,
+            vec![owner_type.clone()],
+            vec![],
+        )?,
+        youtube_full_frame(&mut previous, modern_target, vec![owner_type], vec![])?,
+    ];
+    let mut body = code(pool, 8, 1, instructions)?;
+    add_stack_map_table(pool, &mut body, frames)?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn default_youtube_track_details_load_legacy_info(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_YOUTUBE_TRACK_DETAILS_CLASS)?;
+    let data_class =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData")?;
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let string = pool.add_class("java/lang/String")?;
+    let temporal = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetails$TemporalInfo",
+    )?;
+    let friendly = pool.add_class(FRIENDLY_EXCEPTION_CLASS)?;
+    let severity = pool.add_class(FRIENDLY_EXCEPTION_SEVERITY_CLASS)?;
+    let data = pool.add_field_ref(
+        owner,
+        "data",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData;",
+    )?;
+    let video_id = pool.add_field_ref(owner, "videoId", "Ljava/lang/String;")?;
+    let polymer = pool.add_field_ref(
+        data_class,
+        "polymerArguments",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let get = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let text_method = pool.add_method_ref(json, "text", "()Ljava/lang/String;")?;
+    let equals = pool.add_method_ref(string, "equals", "(Ljava/lang/Object;)Z")?;
+    let friendly_init = pool.add_method_ref(
+        friendly,
+        "<init>",
+        "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity;Ljava/lang/Throwable;)V",
+    )?;
+    let common = pool.add_field_ref(
+        severity,
+        "COMMON",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity;",
+    )?;
+    let temporal_from_raw = pool.add_method_ref(
+        temporal,
+        "fromRawData",
+        "(ZLcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Z)Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetails$TemporalInfo;",
+    )?;
+    let thumbnail = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/ThumbnailTools")?;
+    let youtube_thumbnail = pool.add_method_ref(
+        thumbnail,
+        "getYouTubeThumbnail",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Ljava/lang/String;)Ljava/lang/String;",
+    )?;
+    let build = pool.add_method_ref(
+        owner,
+        "buildTrackInfo",
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetails$TemporalInfo;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let fail = pool.add_string("fail")?;
+    let one = pool.add_string("1")?;
+    let status = pool.add_string("status")?;
+    let reason = pool.add_string("reason")?;
+    let live = pool.add_string("live_playback")?;
+    let length = pool.add_string("length_seconds")?;
+    let title = pool.add_string("title")?;
+    let author = pool.add_string("author")?;
+
+    let mut instructions = vec![
+        Instruction::Ldc_w(fail),
+        Instruction::Aload_0,
+        Instruction::Getfield(data),
+        Instruction::Getfield(polymer),
+        Instruction::Ldc_w(status),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text_method),
+        Instruction::Invokevirtual(equals),
+        Instruction::Ifeq(0),
+        Instruction::New(friendly),
+        Instruction::Dup,
+        Instruction::Aload_0,
+        Instruction::Getfield(data),
+        Instruction::Getfield(polymer),
+        Instruction::Ldc_w(reason),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text_method),
+        Instruction::Getstatic(common),
+        Instruction::Aconst_null,
+        Instruction::Invokespecial(friendly_init),
+        Instruction::Athrow,
+    ];
+    let success_target = instructions.len();
+    instructions[8] = Instruction::Ifeq(u16::try_from(success_target)?);
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Aload_0,
+        Instruction::Getfield(video_id),
+        Instruction::Aload_0,
+        Instruction::Getfield(data),
+        Instruction::Getfield(polymer),
+        Instruction::Ldc_w(title),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text_method),
+        Instruction::Aload_0,
+        Instruction::Getfield(data),
+        Instruction::Getfield(polymer),
+        Instruction::Ldc_w(author),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text_method),
+        Instruction::Ldc_w(one),
+        Instruction::Aload_0,
+        Instruction::Getfield(data),
+        Instruction::Getfield(polymer),
+        Instruction::Ldc_w(live),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text_method),
+        Instruction::Invokevirtual(equals),
+        Instruction::Aload_0,
+        Instruction::Getfield(data),
+        Instruction::Getfield(polymer),
+        Instruction::Ldc_w(length),
+        Instruction::Invokevirtual(get),
+        Instruction::Iconst_1,
+        Instruction::Invokestatic(temporal_from_raw),
+        Instruction::Aload_0,
+        Instruction::Getfield(data),
+        Instruction::Getfield(polymer),
+        Instruction::Aload_0,
+        Instruction::Getfield(video_id),
+        Instruction::Invokestatic(youtube_thumbnail),
+        Instruction::Invokevirtual(build),
+        Instruction::Areturn,
+    ]);
+    let owner_type = VerificationType::Object { cpool_index: owner };
+    let mut previous = None;
+    let frames = vec![youtube_full_frame(
+        &mut previous,
+        success_target,
+        vec![owner_type],
+        vec![],
+    )?];
+    let mut body = code(pool, 8, 1, instructions)?;
+    add_stack_map_table(pool, &mut body, frames)?;
+    Ok(body)
+}
+
+fn default_youtube_track_details_build_info(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let temporal = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetails$TemporalInfo",
+    )?;
+    let duration = pool.add_field_ref(temporal, "durationMillis", "J")?;
+    let active = pool.add_field_ref(temporal, "isActiveStream", "Z")?;
+    let info = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo")?;
+    let info_init = pool.add_method_ref(
+        info,
+        "<init>",
+        "(Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+    )?;
+    let string = pool.add_class("java/lang/String")?;
+    let concat = pool.add_method_ref(string, "concat", "(Ljava/lang/String;)Ljava/lang/String;")?;
+    let watch = pool.add_string("https://www.youtube.com/watch?v=")?;
+    code(
+        pool,
+        11,
+        6,
+        vec![
+            Instruction::New(info),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Aload_3,
+            Instruction::Aload(4),
+            Instruction::Getfield(duration),
+            Instruction::Aload_1,
+            Instruction::Aload(4),
+            Instruction::Getfield(active),
+            Instruction::Ldc_w(watch),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(concat),
+            Instruction::Aload(5),
+            Instruction::Aconst_null,
+            Instruction::Invokespecial(info_init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn default_youtube_track_details_class_init(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_YOUTUBE_TRACK_DETAILS_CLASS)?;
+    let logger_factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        logger_factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let extractor = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/source/youtube/format/YoutubeTrackFormatExtractor",
+    )?;
+    let extractors = pool.add_field_ref(
+        owner,
+        "FORMAT_EXTRACTORS",
+        "[Lcom/sedmelluq/discord/lavaplayer/source/youtube/format/YoutubeTrackFormatExtractor;",
+    )?;
+    let extractor_classes = [
+        "com/sedmelluq/discord/lavaplayer/source/youtube/format/LegacyAdaptiveFormatsExtractor",
+        "com/sedmelluq/discord/lavaplayer/source/youtube/format/StreamingDataFormatsExtractor",
+        "com/sedmelluq/discord/lavaplayer/source/youtube/format/LegacyDashMpdFormatsExtractor",
+        "com/sedmelluq/discord/lavaplayer/source/youtube/format/LegacyStreamMapFormatsExtractor",
+    ];
+    let mut instructions = vec![
+        Instruction::Ldc_w(owner),
+        Instruction::Invokestatic(get_logger),
+        Instruction::Putstatic(log),
+        Instruction::Iconst_4,
+        Instruction::Anewarray(extractor),
+    ];
+    for (index, class_name) in extractor_classes.iter().enumerate() {
+        let class = pool.add_class(class_name)?;
+        let init = pool.add_method_ref(class, "<init>", "()V")?;
+        let index_instruction = match index {
+            0 => Instruction::Iconst_0,
+            1 => Instruction::Iconst_1,
+            2 => Instruction::Iconst_2,
+            3 => Instruction::Iconst_3,
+            _ => unreachable!(),
+        };
+        instructions.extend([
+            Instruction::Dup,
+            index_instruction,
+            Instruction::New(class),
+            Instruction::Dup,
+            Instruction::Invokespecial(init),
+            Instruction::Aastore,
+        ]);
+    }
+    instructions.extend([Instruction::Putstatic(extractors), Instruction::Return]);
+    code(pool, 5, 0, instructions)
 }
 
 fn default_yandex_search_provider_replacement(
