@@ -238,6 +238,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-youtube-access-token-tracker-consumer" => {
             Some(YOUTUBE_ACCESS_TOKEN_TRACKER_CONSUMER)
         }
+        "write-youtube-cached-auth-script-consumer" => Some(YOUTUBE_CACHED_AUTH_SCRIPT_CONSUMER),
         _ => None,
     }
 }
@@ -19004,6 +19005,67 @@ public final class GateYoutubeCachedPlayerScript {
 
     System.out.println("shape=protected-static-member,object-root,2-public-final-fields,"
         + "1-public-constructor,0-methods;capture=reference,null,long-extremes;identity=object");
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_CACHED_AUTH_SCRIPT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAccessTokenTracker;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+
+public final class GateYoutubeCachedAuthScript {
+  private static final class Probe extends YoutubeAccessTokenTracker {
+    Probe() {
+      super(null, null, null);
+    }
+
+    Object create(String clientId, String clientSecret) {
+      return new CachedAuthScript(clientId, clientSecret);
+    }
+  }
+
+  public static void main(String[] args) throws Exception {
+    Class<?> type = Class.forName("com.sedmelluq.discord.lavaplayer.source.youtube."
+        + "YoutubeAccessTokenTracker$CachedAuthScript");
+    check(type.getModifiers() == (Modifier.PROTECTED | Modifier.STATIC)
+        && type.getSuperclass() == Object.class && type.getInterfaces().length == 0
+        && type.getDeclaringClass() == YoutubeAccessTokenTracker.class
+        && type.getNestHost() == YoutubeAccessTokenTracker.class
+        && type.isMemberClass() && !type.isSynthetic(), "class metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredMethods().length == 0
+        && type.getDeclaredConstructors().length == 1, "class shape");
+
+    Field clientId = type.getDeclaredField("clientId");
+    Field clientSecret = type.getDeclaredField("clientSecret");
+    check(clientId.getType() == String.class && clientSecret.getType() == String.class
+        && clientId.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && clientSecret.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL), "field metadata");
+    Constructor<?> constructor = type.getDeclaredConstructor(String.class, String.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+
+    Probe probe = new Probe();
+    String id = new String("client-id");
+    String secret = new String("client-secret");
+    Object populated = probe.create(id, secret);
+    Object empty = probe.create(null, null);
+    check(clientId.get(populated) == id && clientSecret.get(populated) == secret,
+        "reference field capture");
+    check(clientId.get(empty) == null && clientSecret.get(empty) == null,
+        "null field capture");
+    check(!populated.equals(probe.create(id, secret))
+        && populated.hashCode() == System.identityHashCode(populated)
+        && populated.toString().startsWith(type.getName() + "@"), "object identity semantics");
+
+    System.out.println("shape=protected-static-member,object-root,2-public-final-fields,"
+        + "1-public-constructor,0-methods;capture=client-id,client-secret,null,reference;"
+        + "identity=object");
   }
 
   private static void check(boolean condition, String message) {

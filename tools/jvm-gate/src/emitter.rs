@@ -234,6 +234,8 @@ const YOUTUBE_INFO_STATUS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$InfoStatus";
 const YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAccessTokenTracker";
+const YOUTUBE_CACHED_AUTH_SCRIPT_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAccessTokenTracker$CachedAuthScript";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -328,6 +330,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_CACHED_PLAYER_SCRIPT_CLASS,
     YOUTUBE_INFO_STATUS_CLASS,
     YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS,
+    YOUTUBE_CACHED_AUTH_SCRIPT_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -1061,6 +1064,9 @@ fn replacement_body(
     }
     if class_name == YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS {
         return youtube_access_token_tracker_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == YOUTUBE_CACHED_AUTH_SCRIPT_CLASS {
+        return youtube_cached_auth_script_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -20435,6 +20441,50 @@ fn youtube_cached_player_script_constructor(pool: &mut ConstantPool<'static>) ->
             Instruction::Aload_0,
             Instruction::Lload_2,
             Instruction::Putfield(timestamp),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn youtube_cached_auth_script_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(Ljava/lang/String;Ljava/lang/String;)V") => {
+            youtube_cached_auth_script_constructor(pool)
+        }
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {YOUTUBE_CACHED_AUTH_SCRIPT_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn youtube_cached_auth_script_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(YOUTUBE_CACHED_AUTH_SCRIPT_CLASS)?;
+    let client_id = pool.add_field_ref(owner, "clientId", "Ljava/lang/String;")?;
+    let client_secret = pool.add_field_ref(owner, "clientSecret", "Ljava/lang/String;")?;
+    code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(client_id),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(client_secret),
             Instruction::Return,
         ],
     )
