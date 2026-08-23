@@ -247,6 +247,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-youtube-client-config-consumer" => Some(YOUTUBE_CLIENT_CONFIG_CONSUMER),
         "write-youtube-constants-consumer" => Some(YOUTUBE_CONSTANTS_CONSUMER),
         "write-youtube-format-info-consumer" => Some(YOUTUBE_FORMAT_INFO_CONSUMER),
+        "write-youtube-http-context-filter-consumer" => Some(YOUTUBE_HTTP_CONTEXT_FILTER_CONSUMER),
         _ => None,
     }
 }
@@ -19664,6 +19665,283 @@ public final class GateYoutubeAudioTrack {
   private static final class ExposedTrack extends YoutubeAudioTrack {
     ExposedTrack(AudioTrackInfo info, YoutubeAudioSourceManager source) { super(info, source); }
     AudioTrack shallowClone() { return super.makeShallowClone(); }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_HTTP_CONTEXT_FILTER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAccessTokenTracker;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeHttpContextFilter;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter;
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextRetryCounter;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.net.SocketException;
+import java.net.URI;
+import java.util.Arrays;
+import org.apache.http.HttpResponse;
+import org.apache.http.ProtocolVersion;
+import org.apache.http.client.CookieStore;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.protocol.HttpClientContext;
+import org.apache.http.impl.client.BasicCookieStore;
+import org.apache.http.impl.cookie.BasicClientCookie;
+import org.apache.http.message.BasicHttpResponse;
+
+public final class GateYoutubeHttpContextFilter {
+  private static final String DISABLED =
+      "Legacy YouTube JVM HTTP credential and visitor-token forwarding is unsupported; "
+      + "use Mantle native YouTube authentication.";
+
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1 && (args[0].equals("reference") || args[0].equals("candidate")),
+        "expected disposition");
+    reflectionContract();
+    commonContract();
+    if (args[0].equals("reference")) {
+      referenceServiceContract();
+      System.out.println("common=public-concrete,5-fields,1-constructor,6-callbacks,constant,"
+          + "tracker-setter,cookie-reset,context-close,raw-bypass,api-key,retry-counter,"
+          + "429-block,connection-reset,reflection;service=legacy-authorization,visitor-forwarding,"
+          + "401-refresh");
+    } else {
+      candidateServiceContract();
+      System.out.println("common=public-concrete,5-fields,1-constructor,6-callbacks,constant,"
+          + "tracker-setter,cookie-reset,context-close,raw-bypass,api-key,retry-counter,"
+          + "429-block,connection-reset,reflection;service=bounded-native-auth,no-authorization,"
+          + "no-visitor-forwarding,no-401-refresh");
+    }
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<YoutubeHttpContextFilter> type = YoutubeHttpContextFilter.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {HttpContextFilter.class})
+        && !type.isSynthetic(), "class metadata");
+    check(type.getDeclaredFields().length == 5 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 6, "member counts");
+    checkField("log", Class.forName("org.slf4j.Logger"),
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField("ATTRIBUTE_RESET_RETRY", String.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField("ATTRIBUTE_USER_AGENT_SPECIFIED", String.class,
+        Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
+    checkField("retryCounter", HttpContextRetryCounter.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField("tokenTracker", YoutubeAccessTokenTracker.class, Modifier.PRIVATE);
+    check(stringField("ATTRIBUTE_RESET_RETRY").equals("isResetRetry")
+        && YoutubeHttpContextFilter.ATTRIBUTE_USER_AGENT_SPECIFIED.equals("isUserAgentSpecified")
+        && stringField("ATTRIBUTE_USER_AGENT_SPECIFIED")
+            == YoutubeHttpContextFilter.ATTRIBUTE_USER_AGENT_SPECIFIED,
+        "constant values and identity");
+    check(field("log").get(null) != null && field("retryCounter").get(null) != null,
+        "static state");
+
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    checkMethod("setTokenTracker", void.class, YoutubeAccessTokenTracker.class);
+    checkMethod("onContextOpen", void.class, HttpClientContext.class);
+    checkMethod("onContextClose", void.class, HttpClientContext.class);
+    checkMethod("onRequest", void.class, HttpClientContext.class, HttpUriRequest.class,
+        boolean.class);
+    checkMethod("onRequestResponse", boolean.class, HttpClientContext.class,
+        HttpUriRequest.class, HttpResponse.class);
+    checkMethod("onRequestException", boolean.class, HttpClientContext.class,
+        HttpUriRequest.class, Throwable.class);
+  }
+
+  private static void commonContract() throws Exception {
+    YoutubeHttpContextFilter filter = new YoutubeHttpContextFilter();
+    check(field("tokenTracker").get(filter) == null, "constructor state");
+    YoutubeAccessTokenTracker tracker = new YoutubeAccessTokenTracker(null, null, null);
+    filter.setTokenTracker(tracker);
+    check(field("tokenTracker").get(filter) == tracker, "setter identity");
+    filter.setTokenTracker(null);
+    check(field("tokenTracker").get(filter) == null, "setter null");
+    filter.setTokenTracker(tracker);
+
+    HttpClientContext cookies = HttpClientContext.create();
+    filter.onContextOpen(cookies);
+    check(cookies.getCookieStore() instanceof BasicCookieStore
+        && cookies.getCookieStore().getCookies().isEmpty(), "cookie store creation");
+    CookieStore existing = new BasicCookieStore();
+    BasicClientCookie cookie = new BasicClientCookie("session", "secret-cookie");
+    cookie.setDomain("youtube.com");
+    cookie.setPath("/");
+    existing.addCookie(cookie);
+    cookies.setCookieStore(existing);
+    filter.onContextOpen(cookies);
+    check(cookies.getCookieStore() == existing && existing.getCookies().isEmpty(),
+        "existing cookie reset");
+    expect(NullPointerException.class, () -> filter.onContextOpen(null));
+    filter.onContextClose(null);
+
+    HttpClientContext raw = HttpClientContext.create();
+    raw.setAttribute("yt-raw", Boolean.TRUE);
+    HttpGet rawRequest = new HttpGet("https://example.com/raw?x=1");
+    filter.onRequest(raw, rawRequest, false);
+    check(rawRequest.getURI().equals(URI.create("https://example.com/raw?x=1"))
+        && rawRequest.getAllHeaders().length == 0, "raw context bypass");
+
+    HttpClientContext anonymous = HttpClientContext.create();
+    anonymous.setAttribute("isResetRetry", Boolean.TRUE);
+    HttpGet request = new HttpGet("https://youtubei.googleapis.com/youtubei/v1/player?key=old&x=1");
+    filter.onRequest(anonymous, request, false);
+    check(anonymous.getAttribute("isResetRetry") == null
+        && request.getURI().toString().contains("key=AIzaSyA8eiZmM1FaDVjRy-df2KTyQ_vz_yYM39w")
+        && !request.getURI().toString().contains("key=old")
+        && request.getURI().toString().contains("x=1"), "anonymous API key");
+    filter.onRequest(anonymous, request, true);
+    check(!filter.onRequestResponse(anonymous, request, response(401)),
+        "bounded retry count");
+
+    FriendlyException blocked = expect(FriendlyException.class,
+        () -> filter.onRequestResponse(HttpClientContext.create(), request, response(429)));
+    check(blocked.getMessage().equals("This IP address has been blocked by YouTube (429).")
+        && blocked.severity == FriendlyException.Severity.COMMON && blocked.getCause() == null,
+        "429 disposition");
+    check(!filter.onRequestResponse(HttpClientContext.create(), request, response(200)),
+        "ordinary response");
+
+    HttpClientContext reset = HttpClientContext.create();
+    SocketException connectionReset = new SocketException("Connection reset");
+    check(filter.onRequestException(reset, null, connectionReset)
+        && reset.getAttribute("isResetRetry") == Boolean.TRUE
+        && !filter.onRequestException(reset, null, connectionReset)
+        && !filter.onRequestException(HttpClientContext.create(), null,
+            new SocketException("Other")), "connection reset retry");
+  }
+
+  private static void referenceServiceContract() throws Exception {
+    YoutubeAccessTokenTracker tracker = new YoutubeAccessTokenTracker(null, null, null);
+    String access = new String("legacy-access-secret");
+    String visitor = new String("legacy-visitor-secret");
+    trackerField("accessToken").set(tracker, access);
+    trackerField("visitorId").set(tracker, visitor);
+    trackerField("lastVisitorIdUpdate").setLong(tracker, System.currentTimeMillis());
+    YoutubeHttpContextFilter filter = filter(tracker);
+    HttpClientContext context = HttpClientContext.create();
+    String userAgent = new String("frozen-user-agent");
+    context.setAttribute(YoutubeHttpContextFilter.ATTRIBUTE_USER_AGENT_SPECIFIED, userAgent);
+    HttpGet request = new HttpGet("https://youtubei.googleapis.com/youtubei/v1/player");
+    filter.onRequest(context, request, false);
+    checkHeader(request, "User-Agent", userAgent);
+    checkHeader(request, "X-Goog-Visitor-Id", visitor);
+    checkHeader(request, "Authorization", "Bearer " + access);
+    check(context.getAttribute(YoutubeHttpContextFilter.ATTRIBUTE_USER_AGENT_SPECIFIED) == null,
+        "legacy user-agent marker removal");
+
+    trackerField("lastAccessTokenUpdate").setLong(tracker, System.currentTimeMillis());
+    check(filter.onRequestResponse(HttpClientContext.create(), request, response(401)),
+        "legacy 401 refresh decision");
+  }
+
+  private static void candidateServiceContract() throws Exception {
+    CountingTracker tracker = new CountingTracker();
+    YoutubeHttpContextFilter filter = filter(tracker);
+
+    HttpClientContext visitorContext = HttpClientContext.create();
+    visitorContext.setAttribute(YoutubeHttpContextFilter.ATTRIBUTE_USER_AGENT_SPECIFIED,
+        "private-user-agent");
+    HttpGet visitorRequest = new HttpGet("https://youtubei.googleapis.com/youtubei/v1/player");
+    UnsupportedOperationException visitorFailure = expect(UnsupportedOperationException.class,
+        () -> filter.onRequest(visitorContext, visitorRequest, false));
+    check(DISABLED.equals(visitorFailure.getMessage()) && tracker.visitorUpdates == 0
+        && visitorRequest.getAllHeaders().length == 0
+        && visitorContext.getAttribute(YoutubeHttpContextFilter.ATTRIBUTE_USER_AGENT_SPECIFIED)
+            != null, "visitor forwarding fenced");
+
+    tracker.accessToken = "private-access-token";
+    HttpGet authenticated = new HttpGet("https://youtubei.googleapis.com/youtubei/v1/player");
+    UnsupportedOperationException accessFailure = expect(UnsupportedOperationException.class,
+        () -> filter.onRequest(HttpClientContext.create(), authenticated, false));
+    check(DISABLED.equals(accessFailure.getMessage()) && tracker.accessReads == 1
+        && authenticated.getFirstHeader("Authorization") == null
+        && authenticated.getURI().getQuery() == null, "authorization forwarding fenced");
+    check(!filter.onRequestResponse(HttpClientContext.create(), authenticated, response(401))
+        && tracker.accessUpdates == 0, "401 refresh fenced");
+  }
+
+  private static YoutubeHttpContextFilter filter(YoutubeAccessTokenTracker tracker) {
+    YoutubeHttpContextFilter filter = new YoutubeHttpContextFilter();
+    filter.setTokenTracker(tracker);
+    return filter;
+  }
+
+  private static HttpResponse response(int status) {
+    return new BasicHttpResponse(new ProtocolVersion("HTTP", 1, 1), status, "fixture");
+  }
+
+  private static void checkHeader(HttpUriRequest request, String name, String value) {
+    check(request.getFirstHeader(name) != null
+        && request.getFirstHeader(name).getValue().equals(value), name + " header");
+  }
+
+  private static void checkField(String name, Class<?> type, int modifiers) throws Exception {
+    Field field = YoutubeHttpContextFilter.class.getDeclaredField(name);
+    check(field.getType() == type && field.getGenericType() == type
+        && field.getModifiers() == modifiers && !field.isSynthetic(), name + " metadata");
+  }
+
+  private static Method checkMethod(String name, Class<?> returnType, Class<?>... parameters)
+      throws Exception {
+    Method method = YoutubeHttpContextFilter.class.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == returnType
+        && method.getGenericReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs(), name + " metadata");
+    return method;
+  }
+
+  private static String stringField(String name) throws Exception {
+    return (String) field(name).get(null);
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = YoutubeHttpContextFilter.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static Field trackerField(String name) throws Exception {
+    Field field = YoutubeAccessTokenTracker.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private static final class CountingTracker extends YoutubeAccessTokenTracker {
+    String accessToken;
+    int accessReads;
+    int accessUpdates;
+    int visitorUpdates;
+
+    CountingTracker() { super(null, null, null); }
+    @Override public String getAccessToken() { accessReads++; return accessToken; }
+    @Override public void updateAccessToken() { accessUpdates++; }
+    @Override public String updateVisitorId() { visitorUpdates++; return "unexpected-visitor"; }
   }
 
   private interface Operation { void run() throws Exception; }

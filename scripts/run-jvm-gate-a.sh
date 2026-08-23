@@ -22,7 +22,7 @@ cargo run --locked -q -p mantle-jvm-gate -- emit \
 cargo run --locked -q -p mantle-jvm-gate -- verify-structure \
   --reference-jar "$REFERENCE_JAR" --candidate-jar "$JAR"
 
-for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame audio-frame-provider-tools audio-processing-context audio-player-options decoded-track-holder track-state-listener audio-output-hook audio-load-result-handler functional-result-handler audio-player-lifecycle-manager audio-player-interface default-audio-player default-audio-player-manager internal-audio-track audio-track-executor local-audio-track-executor-callback local-audio-track-executor track-marker-tracker base-audio-track primordial-audio-track-executor delegated-audio-track audio-track-info-builder abstract-audio-frame-buffer allocating-audio-frame-buffer non-allocating-audio-frame-buffer audio-source-manager-interface audio-source-managers probing-audio-source-manager local-audio-source-manager local-audio-track local-seekable-input-stream heartbeating-http-stream nico-audio-source-manager nico-audio-track default-sound-cloud-data-loader default-sound-cloud-data-reader default-sound-cloud-format-handler default-sound-cloud-playlist-loader default-sound-cloud-track-format sound-cloud-audio-source-manager sound-cloud-audio-source-manager-builder sound-cloud-audio-track sound-cloud-client-id-tracker sound-cloud-data-loader sound-cloud-data-reader sound-cloud-format-handler sound-cloud-helper sound-cloud-http-context-filter sound-cloud-m3u-audio-track sound-cloud-m3u-info sound-cloud-mp3-segment-decoder sound-cloud-opus-segment-decoder sound-cloud-playlist-loader sound-cloud-segment-decoder sound-cloud-segment-decoder-factory sound-cloud-track-format m3u-stream-audio-track m3u-stream-segment-url-provider mpeg-ts-m3u-stream-audio-track twitch-constants twitch-stream-audio-source-manager twitch-stream-audio-track twitch-stream-segment-url-provider vimeo-audio-source-manager vimeo-playback-format vimeo-audio-track abstract-yandex-music-api-loader yandex-music-api-extractor default-yandex-music-direct-url-loader default-yandex-music-playlist-loader default-yandex-music-track-loader default-yandex-search-provider yandex-http-context-filter yandex-music-api-loader yandex-music-audio-source-manager yandex-music-audio-track yandex-music-direct-url-loader yandex-music-playlist-loader yandex-music-search-result-loader yandex-music-track-loader yandex-music-utils default-youtube-link-router default-youtube-playlist-loader default-youtube-track-details default-youtube-track-details-loader youtube-cached-player-script youtube-info-status youtube-access-token-tracker youtube-cached-auth-script youtube-audio-source-manager youtube-audio-track youtube-cipher-operation youtube-client-config youtube-constants youtube-format-info; do
+for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame audio-frame-provider-tools audio-processing-context audio-player-options decoded-track-holder track-state-listener audio-output-hook audio-load-result-handler functional-result-handler audio-player-lifecycle-manager audio-player-interface default-audio-player default-audio-player-manager internal-audio-track audio-track-executor local-audio-track-executor-callback local-audio-track-executor track-marker-tracker base-audio-track primordial-audio-track-executor delegated-audio-track audio-track-info-builder abstract-audio-frame-buffer allocating-audio-frame-buffer non-allocating-audio-frame-buffer audio-source-manager-interface audio-source-managers probing-audio-source-manager local-audio-source-manager local-audio-track local-seekable-input-stream heartbeating-http-stream nico-audio-source-manager nico-audio-track default-sound-cloud-data-loader default-sound-cloud-data-reader default-sound-cloud-format-handler default-sound-cloud-playlist-loader default-sound-cloud-track-format sound-cloud-audio-source-manager sound-cloud-audio-source-manager-builder sound-cloud-audio-track sound-cloud-client-id-tracker sound-cloud-data-loader sound-cloud-data-reader sound-cloud-format-handler sound-cloud-helper sound-cloud-http-context-filter sound-cloud-m3u-audio-track sound-cloud-m3u-info sound-cloud-mp3-segment-decoder sound-cloud-opus-segment-decoder sound-cloud-playlist-loader sound-cloud-segment-decoder sound-cloud-segment-decoder-factory sound-cloud-track-format m3u-stream-audio-track m3u-stream-segment-url-provider mpeg-ts-m3u-stream-audio-track twitch-constants twitch-stream-audio-source-manager twitch-stream-audio-track twitch-stream-segment-url-provider vimeo-audio-source-manager vimeo-playback-format vimeo-audio-track abstract-yandex-music-api-loader yandex-music-api-extractor default-yandex-music-direct-url-loader default-yandex-music-playlist-loader default-yandex-music-track-loader default-yandex-search-provider yandex-http-context-filter yandex-music-api-loader yandex-music-audio-source-manager yandex-music-audio-track yandex-music-direct-url-loader yandex-music-playlist-loader yandex-music-search-result-loader yandex-music-track-loader yandex-music-utils default-youtube-link-router default-youtube-playlist-loader default-youtube-track-details default-youtube-track-details-loader youtube-cached-player-script youtube-info-status youtube-access-token-tracker youtube-cached-auth-script youtube-audio-source-manager youtube-audio-track youtube-cipher-operation youtube-client-config youtube-constants youtube-format-info youtube-http-context-filter; do
   case "$consumer" in
     smoke) consumer_class='Smoke' ;;
     probe) consumer_class='Probe' ;;
@@ -134,6 +134,7 @@ for consumer in smoke probe integration classloader event track-value track-enum
     youtube-client-config) consumer_class='YoutubeClientConfig' ;;
     youtube-constants) consumer_class='YoutubeConstants' ;;
     youtube-format-info) consumer_class='YoutubeFormatInfo' ;;
+    youtube-http-context-filter) consumer_class='YoutubeHttpContextFilter' ;;
   esac
   cargo run --locked -q -p mantle-jvm-gate -- "write-$consumer-consumer" \
     --output "$WORK/Gate${consumer_class}.java"
@@ -255,7 +256,8 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateYoutubeCipherOperation.java" \
   "$WORK/GateYoutubeClientConfig.java" \
   "$WORK/GateYoutubeConstants.java" \
-  "$WORK/GateYoutubeFormatInfo.java"
+  "$WORK/GateYoutubeFormatInfo.java" \
+  "$WORK/GateYoutubeHttpContextFilter.java"
 
 readonly GATE_CLASSPATH="$classes_argument$classpath_separator$jar_argument"
 java -Xverify:all \
@@ -1537,6 +1539,19 @@ cmp "$WORK/youtube-format-info-reference.txt" "$WORK/youtube-format-info-candida
 grep --fixed-strings \
   'public-final-enum,5-constants,2-public-fields,3-public-methods;mime-codec-pairs,values-copy,lookup-identity,exact-before-substring,unknown-null,lookup-errors,reflection' \
   "$WORK/youtube-format-info-candidate.txt" >/dev/null
+# Preserve the HTTP filter shell and anonymous mechanics while fencing legacy token forwarding.
+java -Xverify:all -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateYoutubeHttpContextFilter reference \
+  >"$WORK/youtube-http-context-filter-reference.txt"
+java -Xverify:all -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateYoutubeHttpContextFilter candidate \
+  >"$WORK/youtube-http-context-filter-candidate.txt"
+grep --fixed-strings \
+  'common=public-concrete,5-fields,1-constructor,6-callbacks,constant,tracker-setter,cookie-reset,context-close,raw-bypass,api-key,retry-counter,429-block,connection-reset,reflection;service=legacy-authorization,visitor-forwarding,401-refresh' \
+  "$WORK/youtube-http-context-filter-reference.txt" >/dev/null
+grep --fixed-strings \
+  'common=public-concrete,5-fields,1-constructor,6-callbacks,constant,tracker-setter,cookie-reset,context-close,raw-bypass,api-key,retry-counter,429-block,connection-reset,reflection;service=bounded-native-auth,no-authorization,no-visitor-forwarding,no-401-refresh' \
+  "$WORK/youtube-http-context-filter-candidate.txt" >/dev/null
 java -Xverify:all -cp "$GATE_CLASSPATH" GateSmoke "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateIntegration "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" callbacks

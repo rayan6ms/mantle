@@ -253,6 +253,8 @@ const YOUTUBE_CONSTANTS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeConstants";
 const YOUTUBE_FORMAT_INFO_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeFormatInfo";
+const YOUTUBE_HTTP_CONTEXT_FILTER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeHttpContextFilter";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -356,6 +358,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_ANDROID_VERSION_CLASS,
     YOUTUBE_CONSTANTS_CLASS,
     YOUTUBE_FORMAT_INFO_CLASS,
+    YOUTUBE_HTTP_CONTEXT_FILTER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -758,6 +761,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | YOUTUBE_ANDROID_VERSION_CLASS
             | YOUTUBE_CONSTANTS_CLASS
             | YOUTUBE_FORMAT_INFO_CLASS
+            | YOUTUBE_HTTP_CONTEXT_FILTER_CLASS
     )
 }
 
@@ -806,6 +810,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS
             | YOUTUBE_AUDIO_TRACK_CLASS
             | YOUTUBE_CLIENT_CONFIG_CLASS
+            | YOUTUBE_HTTP_CONTEXT_FILTER_CLASS
     )
 }
 
@@ -1117,6 +1122,9 @@ fn replacement_body(
     }
     if class_name == YOUTUBE_ANDROID_VERSION_CLASS {
         return youtube_android_version_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == YOUTUBE_HTTP_CONTEXT_FILTER_CLASS {
+        return youtube_http_context_filter_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == YOUTUBE_CONSTANTS_CLASS {
         return youtube_constants_replacement(pool, name, descriptor);
@@ -22282,6 +22290,430 @@ fn youtube_access_token_tracker_clinit(pool: &mut ConstantPool<'static>) -> Resu
             Instruction::Putstatic(access_refresh),
             Instruction::Ldc2_w(ten_minutes),
             Instruction::Putstatic(visitor_refresh),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn youtube_http_context_filter_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        (
+            "setTokenTracker",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAccessTokenTracker;)V",
+        ) => object_setter(
+            pool,
+            YOUTUBE_HTTP_CONTEXT_FILTER_CLASS,
+            "tokenTracker",
+            "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAccessTokenTracker;",
+        ),
+        ("onContextOpen", "(Lorg/apache/http/client/protocol/HttpClientContext;)V") => {
+            yandex_http_context_filter_context_open(pool)
+        }
+        ("onContextClose", "(Lorg/apache/http/client/protocol/HttpClientContext;)V") => {
+            void_return(pool, required_locals)
+        }
+        (
+            "onRequest",
+            "(Lorg/apache/http/client/protocol/HttpClientContext;Lorg/apache/http/client/methods/HttpUriRequest;Z)V",
+        ) => youtube_http_context_filter_request(pool),
+        (
+            "onRequestResponse",
+            "(Lorg/apache/http/client/protocol/HttpClientContext;Lorg/apache/http/client/methods/HttpUriRequest;Lorg/apache/http/HttpResponse;)Z",
+        ) => youtube_http_context_filter_response(pool),
+        (
+            "onRequestException",
+            "(Lorg/apache/http/client/protocol/HttpClientContext;Lorg/apache/http/client/methods/HttpUriRequest;Ljava/lang/Throwable;)Z",
+        ) => youtube_http_context_filter_exception(pool),
+        ("<clinit>", "()V") => youtube_http_context_filter_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {YOUTUBE_HTTP_CONTEXT_FILTER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+fn youtube_http_context_filter_request(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_HTTP_CONTEXT_FILTER_CLASS)?;
+    let context = pool.add_class("org/apache/http/client/protocol/HttpClientContext")?;
+    let remove_attribute = pool.add_method_ref(
+        context,
+        "removeAttribute",
+        "(Ljava/lang/String;)Ljava/lang/Object;",
+    )?;
+    let get_attribute = pool.add_method_ref(
+        context,
+        "getAttribute",
+        "(Ljava/lang/String;)Ljava/lang/Object;",
+    )?;
+    let retry_type =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/http/HttpContextRetryCounter")?;
+    let retry = pool.add_field_ref(
+        owner,
+        "retryCounter",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/http/HttpContextRetryCounter;",
+    )?;
+    let handle_update = pool.add_method_ref(
+        retry_type,
+        "handleUpdate",
+        "(Lorg/apache/http/client/protocol/HttpClientContext;Z)V",
+    )?;
+    let tracker_type = pool.add_class(YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS)?;
+    let tracker = pool.add_field_ref(
+        owner,
+        "tokenTracker",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAccessTokenTracker;",
+    )?;
+    let is_fetch = pool.add_method_ref(
+        tracker_type,
+        "isTokenFetchContext",
+        "(Lorg/apache/http/client/protocol/HttpClientContext;)Z",
+    )?;
+    let get_access = pool.add_method_ref(tracker_type, "getAccessToken", "()Ljava/lang/String;")?;
+    let format_tools = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/DataFormatTools")?;
+    let is_empty = pool.add_method_ref(format_tools, "isNullOrEmpty", "(Ljava/lang/String;)Z")?;
+    let request = pool.add_class("org/apache/http/client/methods/HttpUriRequest")?;
+    let get_uri = pool.add_interface_method_ref(request, "getURI", "()Ljava/net/URI;")?;
+    let builder = pool.add_class("org/apache/http/client/utils/URIBuilder")?;
+    let builder_init = pool.add_method_ref(builder, "<init>", "(Ljava/net/URI;)V")?;
+    let set_parameter = pool.add_method_ref(
+        builder,
+        "setParameter",
+        "(Ljava/lang/String;Ljava/lang/String;)Lorg/apache/http/client/utils/URIBuilder;",
+    )?;
+    let build = pool.add_method_ref(builder, "build", "()Ljava/net/URI;")?;
+    let request_base = pool.add_class("org/apache/http/client/methods/HttpRequestBase")?;
+    let set_uri = pool.add_method_ref(request_base, "setURI", "(Ljava/net/URI;)V")?;
+    let unsupported = pool.add_class("java/lang/UnsupportedOperationException")?;
+    let unsupported_init = pool.add_method_ref(unsupported, "<init>", "(Ljava/lang/String;)V")?;
+    let illegal = pool.add_class("java/lang/IllegalStateException")?;
+    let illegal_init = pool.add_method_ref(illegal, "<init>", "(Ljava/lang/String;)V")?;
+    let syntax = pool.add_class("java/net/URISyntaxException")?;
+    let runtime = pool.add_class("java/lang/RuntimeException")?;
+    let runtime_init = pool.add_method_ref(runtime, "<init>", "(Ljava/lang/Throwable;)V")?;
+    let string = pool.add_class("java/lang/String")?;
+    let uri = pool.add_class("java/net/URI")?;
+    let reset_attribute = pool.add_string("isResetRetry")?;
+    let user_agent_attribute = pool.add_string("isUserAgentSpecified")?;
+    let key = pool.add_string("key")?;
+    let api_key = pool.add_string("AIzaSyA8eiZmM1FaDVjRy-df2KTyQ_vz_yYM39w")?;
+    let disabled = pool.add_string(
+        "Legacy YouTube JVM HTTP credential and visitor-token forwarding is unsupported; use Mantle native YouTube authentication.",
+    )?;
+    let cannot_update = pool.add_string("Cannot update request URI.")?;
+    let instructions = vec![
+        Instruction::Iload_3,
+        Instruction::Ifne(6),
+        Instruction::Aload_1,
+        Instruction::Ldc_w(reset_attribute),
+        Instruction::Invokevirtual(remove_attribute),
+        Instruction::Pop,
+        Instruction::Getstatic(retry),
+        Instruction::Aload_1,
+        Instruction::Iload_3,
+        Instruction::Invokevirtual(handle_update),
+        Instruction::Aload_0,
+        Instruction::Getfield(tracker),
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(is_fetch),
+        Instruction::Ifeq(16),
+        Instruction::Return,
+        Instruction::Aload_1,
+        Instruction::Ldc_w(user_agent_attribute),
+        Instruction::Invokevirtual(get_attribute),
+        Instruction::Ifnull(25),
+        Instruction::New(unsupported),
+        Instruction::Dup,
+        Instruction::Ldc_w(disabled),
+        Instruction::Invokespecial(unsupported_init),
+        Instruction::Athrow,
+        Instruction::Aload_0,
+        Instruction::Getfield(tracker),
+        Instruction::Invokevirtual(get_access),
+        Instruction::Astore(4),
+        Instruction::Aload(4),
+        Instruction::Invokestatic(is_empty),
+        Instruction::Ifne(37),
+        Instruction::New(unsupported),
+        Instruction::Dup,
+        Instruction::Ldc_w(disabled),
+        Instruction::Invokespecial(unsupported_init),
+        Instruction::Athrow,
+        Instruction::New(builder),
+        Instruction::Dup,
+        Instruction::Aload_2,
+        Instruction::Invokeinterface(get_uri, 1),
+        Instruction::Invokespecial(builder_init),
+        Instruction::Ldc_w(key),
+        Instruction::Ldc_w(api_key),
+        Instruction::Invokevirtual(set_parameter),
+        Instruction::Invokevirtual(build),
+        Instruction::Astore(5),
+        Instruction::Aload_2,
+        Instruction::Instanceof(request_base),
+        Instruction::Ifeq(55),
+        Instruction::Aload_2,
+        Instruction::Checkcast(request_base),
+        Instruction::Aload(5),
+        Instruction::Invokevirtual(set_uri),
+        Instruction::Return,
+        Instruction::New(illegal),
+        Instruction::Dup,
+        Instruction::Ldc_w(cannot_update),
+        Instruction::Invokespecial(illegal_init),
+        Instruction::Athrow,
+        Instruction::Astore(5),
+        Instruction::New(runtime),
+        Instruction::Dup,
+        Instruction::Aload(5),
+        Instruction::Invokespecial(runtime_init),
+        Instruction::Athrow,
+    ];
+    let base_locals = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Object {
+            cpool_index: context,
+        },
+        VerificationType::Object {
+            cpool_index: request,
+        },
+        VerificationType::Integer,
+    ];
+    let access_locals = [
+        base_locals.clone(),
+        vec![VerificationType::Object {
+            cpool_index: string,
+        }],
+    ]
+    .concat();
+    let mut previous = None;
+    let frames = vec![
+        youtube_full_frame(&mut previous, 6, base_locals.clone(), vec![])?,
+        youtube_full_frame(&mut previous, 16, base_locals.clone(), vec![])?,
+        youtube_full_frame(&mut previous, 25, base_locals.clone(), vec![])?,
+        youtube_full_frame(&mut previous, 37, access_locals.clone(), vec![])?,
+        youtube_full_frame(
+            &mut previous,
+            55,
+            [
+                access_locals.clone(),
+                vec![VerificationType::Object { cpool_index: uri }],
+            ]
+            .concat(),
+            vec![],
+        )?,
+        youtube_full_frame(
+            &mut previous,
+            60,
+            access_locals,
+            vec![VerificationType::Object {
+                cpool_index: syntax,
+            }],
+        )?,
+    ];
+    let mut body = code_with_exceptions(
+        pool,
+        4,
+        6,
+        instructions,
+        vec![ExceptionTableEntry {
+            range_pc: 37..60,
+            handler_pc: 60,
+            catch_type: syntax,
+        }],
+    )?;
+    add_stack_map_table(pool, &mut body, frames)?;
+    Ok(body)
+}
+
+fn youtube_http_context_filter_response(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_HTTP_CONTEXT_FILTER_CLASS)?;
+    let response = pool.add_class("org/apache/http/HttpResponse")?;
+    let get_status_line =
+        pool.add_interface_method_ref(response, "getStatusLine", "()Lorg/apache/http/StatusLine;")?;
+    let status_line = pool.add_class("org/apache/http/StatusLine")?;
+    let get_status = pool.add_interface_method_ref(status_line, "getStatusCode", "()I")?;
+    let friendly = pool.add_class(FRIENDLY_EXCEPTION_CLASS)?;
+    let severity = pool.add_class(FRIENDLY_EXCEPTION_SEVERITY_CLASS)?;
+    let common = pool.add_field_ref(
+        severity,
+        "COMMON",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity;",
+    )?;
+    let friendly_init = pool.add_method_ref(
+        friendly,
+        "<init>",
+        "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity;Ljava/lang/Throwable;)V",
+    )?;
+    let tracker_type = pool.add_class(YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS)?;
+    let tracker = pool.add_field_ref(
+        owner,
+        "tokenTracker",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAccessTokenTracker;",
+    )?;
+    let is_fetch = pool.add_method_ref(
+        tracker_type,
+        "isTokenFetchContext",
+        "(Lorg/apache/http/client/protocol/HttpClientContext;)Z",
+    )?;
+    let retry_type =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/http/HttpContextRetryCounter")?;
+    let retry = pool.add_field_ref(
+        owner,
+        "retryCounter",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/http/HttpContextRetryCounter;",
+    )?;
+    let get_retry = pool.add_method_ref(
+        retry_type,
+        "getRetryCount",
+        "(Lorg/apache/http/client/protocol/HttpClientContext;)I",
+    )?;
+    let blocked = pool.add_string("This IP address has been blocked by YouTube (429).")?;
+    let mut body = code(
+        pool,
+        5,
+        5,
+        vec![
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(get_status_line, 1),
+            Instruction::Invokeinterface(get_status, 1),
+            Instruction::Istore(4),
+            Instruction::Iload(4),
+            Instruction::Sipush(429),
+            Instruction::If_icmpne(14),
+            Instruction::New(friendly),
+            Instruction::Dup,
+            Instruction::Ldc_w(blocked),
+            Instruction::Getstatic(common),
+            Instruction::Aconst_null,
+            Instruction::Invokespecial(friendly_init),
+            Instruction::Athrow,
+            Instruction::Aload_0,
+            Instruction::Getfield(tracker),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(is_fetch),
+            Instruction::Ifeq(21),
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+            Instruction::Getstatic(retry),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(get_retry),
+            Instruction::Iconst_1,
+            Instruction::If_icmplt(28),
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: 14,
+                locals: vec![VerificationType::Integer],
+            },
+            StackFrame::SameFrame { frame_type: 6 },
+            StackFrame::SameFrame { frame_type: 6 },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn youtube_http_context_filter_exception(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let client_tools =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpClientTools")?;
+    let is_reset = pool.add_method_ref(
+        client_tools,
+        "isConnectionResetException",
+        "(Ljava/lang/Throwable;)Z",
+    )?;
+    let context = pool.add_class("org/apache/http/client/protocol/HttpClientContext")?;
+    let get_attribute = pool.add_method_ref(
+        context,
+        "getAttribute",
+        "(Ljava/lang/String;)Ljava/lang/Object;",
+    )?;
+    let set_attribute = pool.add_method_ref(
+        context,
+        "setAttribute",
+        "(Ljava/lang/String;Ljava/lang/Object;)V",
+    )?;
+    let boolean = pool.add_class("java/lang/Boolean")?;
+    let true_value = pool.add_field_ref(boolean, "TRUE", "Ljava/lang/Boolean;")?;
+    let reset_attribute = pool.add_string("isResetRetry")?;
+    let mut body = code(
+        pool,
+        3,
+        4,
+        vec![
+            Instruction::Aload_3,
+            Instruction::Invokestatic(is_reset),
+            Instruction::Ifeq(13),
+            Instruction::Aload_1,
+            Instruction::Ldc_w(reset_attribute),
+            Instruction::Invokevirtual(get_attribute),
+            Instruction::Ifnonnull(13),
+            Instruction::Aload_1,
+            Instruction::Ldc_w(reset_attribute),
+            Instruction::Getstatic(true_value),
+            Instruction::Invokevirtual(set_attribute),
+            Instruction::Iconst_1,
+            Instruction::Ireturn,
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::SameFrame { frame_type: 13 }],
+    )?;
+    Ok(body)
+}
+
+fn youtube_http_context_filter_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_HTTP_CONTEXT_FILTER_CLASS)?;
+    let factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let retry_type =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/http/HttpContextRetryCounter")?;
+    let retry_init = pool.add_method_ref(retry_type, "<init>", "(Ljava/lang/String;)V")?;
+    let retry = pool.add_field_ref(
+        owner,
+        "retryCounter",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/http/HttpContextRetryCounter;",
+    )?;
+    let retry_name = pool.add_string("yt-token-retry")?;
+    code(
+        pool,
+        3,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::New(retry_type),
+            Instruction::Dup,
+            Instruction::Ldc_w(retry_name),
+            Instruction::Invokespecial(retry_init),
+            Instruction::Putstatic(retry),
             Instruction::Return,
         ],
     )

@@ -19428,81 +19428,132 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The exact public Object/HttpContextFilter shell, five-field private/public shape, construction, tracker identity, cookie lifecycle, anonymous API-key flow, reset counters, 429 failure, and connection-reset retry remain; the class disposition is semantic because legacy cached bearer and visitor-token forwarding is fenced in favor of Mantle's explicit bounded native authentication.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-media/tests/phase12_youtube.rs",
+        "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeHttpContextFilter",
       "symbol_kind": "FIELD",
       "member_name": "ATTRIBUTE_USER_AGENT_SPECIFIED",
       "descriptor": "Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The public static final user-agent context attribute retains the exact String value, ConstantValue identity, descriptor, and modifiers.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeHttpContextFilter",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The public no-argument constructor delegates to Object and leaves the mutable tracker reference null exactly.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeHttpContextFilter",
       "symbol_kind": "METHOD",
       "member_name": "setTokenTracker",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAccessTokenTracker;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The public setter stores and clears the exact nullable YoutubeAccessTokenTracker reference identity in the frozen private field.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeHttpContextFilter",
       "symbol_kind": "METHOD",
       "member_name": "onContextOpen",
       "descriptor": "(Lorg/apache/http/client/protocol/HttpClientContext;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Context opening creates a BasicCookieStore only when absent, preserves existing store identity, and clears all cookies exactly, including the null-context failure.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeHttpContextFilter",
       "symbol_kind": "METHOD",
       "member_name": "onContextClose",
       "descriptor": "(Lorg/apache/http/client/protocol/HttpClientContext;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Context closing remains an exact no-op, including for a null context.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeHttpContextFilter",
       "symbol_kind": "METHOD",
       "member_name": "onRequest",
       "descriptor": "(Lorg/apache/http/client/protocol/HttpClientContext;Lorg/apache/http/client/methods/HttpUriRequest;Z)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Raw token-fetch bypass, reset-marker handling, retry counting, and anonymous API-key replacement remain exact; legacy user-agent visitor acquisition and cached bearer forwarding now fail deterministically before request mutation under ADR-0013.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-media/tests/phase12_youtube.rs",
+        "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeHttpContextFilter",
       "symbol_kind": "METHOD",
       "member_name": "onRequestResponse",
       "descriptor": "(Lorg/apache/http/client/protocol/HttpClientContext;Lorg/apache/http/client/methods/HttpUriRequest;Lorg/apache/http/HttpResponse;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The exact 429 FriendlyException, raw-context and bounded-retry false decisions remain, while legacy 401-triggered access-token refresh is disabled without tracker mutation in favor of Mantle native authentication.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-media/tests/phase12_youtube.rs",
+        "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeHttpContextFilter",
       "symbol_kind": "METHOD",
       "member_name": "onRequestException",
       "descriptor": "(Lorg/apache/http/client/protocol/HttpClientContext;Lorg/apache/http/client/methods/HttpUriRequest;Ljava/lang/Throwable;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Connection-reset exceptions receive exactly one context-marked retry, repeated resets and all other throwables return false, and the callback signature and metadata remain exact.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeLinkRouter",
