@@ -231,6 +231,10 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-default-youtube-track-details-loader-consumer" => {
             Some(DEFAULT_YOUTUBE_TRACK_DETAILS_LOADER_CONSUMER)
         }
+        "write-youtube-cached-player-script-consumer" => {
+            Some(YOUTUBE_CACHED_PLAYER_SCRIPT_CONSUMER)
+        }
+        "write-youtube-info-status-consumer" => Some(YOUTUBE_INFO_STATUS_CONSUMER),
         _ => None,
     }
 }
@@ -18942,6 +18946,146 @@ public final class GateDefaultYoutubeTrackDetailsLoader {
 
   private static boolean eq(Object left, Object right) {
     return left == null ? right == null : left.equals(right);
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_CACHED_PLAYER_SCRIPT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+
+public final class GateYoutubeCachedPlayerScript {
+  private static final class Probe extends DefaultYoutubeTrackDetailsLoader {
+    Object create(String url, long timestamp) {
+      return new CachedPlayerScript(url, timestamp);
+    }
+  }
+
+  public static void main(String[] args) throws Exception {
+    Class<?> type = Class.forName("com.sedmelluq.discord.lavaplayer.source.youtube."
+        + "DefaultYoutubeTrackDetailsLoader$CachedPlayerScript");
+    check(type.getModifiers() == (Modifier.PROTECTED | Modifier.STATIC)
+        && type.getSuperclass() == Object.class && type.getInterfaces().length == 0
+        && type.getDeclaringClass() == DefaultYoutubeTrackDetailsLoader.class
+        && type.getNestHost() == DefaultYoutubeTrackDetailsLoader.class
+        && type.isMemberClass() && !type.isSynthetic(), "class metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredMethods().length == 0
+        && type.getDeclaredConstructors().length == 1, "class shape");
+
+    Field url = type.getDeclaredField("playerScriptUrl");
+    Field timestamp = type.getDeclaredField("timestamp");
+    check(url.getType() == String.class && timestamp.getType() == long.class
+        && url.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && timestamp.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL), "field metadata");
+    Constructor<?> constructor = type.getDeclaredConstructor(String.class, long.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+
+    Probe probe = new Probe();
+    String identity = new String("https://player.example/base.js");
+    Object positive = probe.create(identity, Long.MAX_VALUE);
+    Object negative = probe.create(null, Long.MIN_VALUE);
+    check(url.get(positive) == identity && timestamp.getLong(positive) == Long.MAX_VALUE,
+        "positive field capture");
+    check(url.get(negative) == null && timestamp.getLong(negative) == Long.MIN_VALUE,
+        "null and negative field capture");
+    check(!positive.equals(probe.create(identity, Long.MAX_VALUE))
+        && positive.hashCode() == System.identityHashCode(positive)
+        && positive.toString().startsWith(type.getName() + "@"), "object identity semantics");
+
+    System.out.println("shape=protected-static-member,object-root,2-public-final-fields,"
+        + "1-public-constructor,0-methods;capture=reference,null,long-extremes;identity=object");
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_INFO_STATUS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateYoutubeInfoStatus {
+  private static final class Probe extends DefaultYoutubeTrackDetailsLoader {
+    static Object[] values() {
+      return InfoStatus.values();
+    }
+
+    static Object valueOf(String name) {
+      return InfoStatus.valueOf(name);
+    }
+  }
+
+  public static void main(String[] args) throws Exception {
+    Class<?> type = Class.forName("com.sedmelluq.discord.lavaplayer.source.youtube."
+        + "DefaultYoutubeTrackDetailsLoader$InfoStatus");
+    check((type.getModifiers() & ~0x4000)
+            == (Modifier.PROTECTED | Modifier.STATIC | Modifier.FINAL)
+        && type.isEnum() && type.getSuperclass() == Enum.class && type.getInterfaces().length == 0
+        && type.getDeclaringClass() == DefaultYoutubeTrackDetailsLoader.class
+        && type.getNestHost() == DefaultYoutubeTrackDetailsLoader.class
+        && type.isMemberClass() && !type.isSynthetic(), "class metadata");
+
+    Field[] fields = Arrays.stream(type.getDeclaredFields())
+        .filter(field -> Modifier.isPublic(field.getModifiers()))
+        .toArray(Field[]::new);
+    Method values = type.getDeclaredMethod("values");
+    Method valueOf = type.getDeclaredMethod("valueOf", String.class);
+    Constructor<?> constructor = type.getDeclaredConstructor(String.class, int.class);
+    check(fields.length == 7 && type.getDeclaredMethods().length == 2
+        && type.getDeclaredConstructors().length == 1, "exported shape");
+    check(Arrays.stream(fields).allMatch(field -> field.getType() == type && field.isEnumConstant()
+            && (field.getModifiers() & ~0x4000)
+                == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL))
+        && values.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && values.getReturnType().isArray() && values.getReturnType().getComponentType() == type
+        && values.getParameterCount() == 0
+        && valueOf.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && valueOf.getReturnType() == type
+        && Arrays.equals(valueOf.getParameterTypes(), new Class<?>[] { String.class })
+        && Modifier.isPrivate(constructor.getModifiers()), "member metadata");
+
+    Object[] constants = Probe.values();
+    check(Arrays.toString(constants).equals("[INFO_PRESENT, REQUIRES_LOGIN, DOES_NOT_EXIST, "
+        + "CONTENT_CHECK_REQUIRED, LIVE_STREAM_OFFLINE, PREMIERE_TRAILER, NON_EMBEDDABLE]"),
+        "constant order");
+    for (int index = 0; index < constants.length; index++) {
+      Enum<?> value = (Enum<?>) constants[index];
+      check(value.ordinal() == index && value.name().equals(value.toString())
+          && Probe.valueOf(value.name()) == value && fields[index].get(null) == value,
+          "constant identity " + index);
+    }
+    constants[0] = null;
+    check(Probe.values()[0] == Probe.valueOf("INFO_PRESENT"), "values copy");
+    check(Arrays.equals(type.getEnumConstants(), Probe.values()), "reflection constants");
+    expect(IllegalArgumentException.class, () -> Probe.valueOf("missing"));
+    expect(NullPointerException.class, () -> Probe.valueOf(null));
+
+    System.out.println("shape=protected-static-final-enum,enum-root,7-public-constants,"
+        + "2-public-static-methods,1-private-constructor;order=INFO_PRESENT,REQUIRES_LOGIN,"
+        + "DOES_NOT_EXIST,CONTENT_CHECK_REQUIRED,LIVE_STREAM_OFFLINE,PREMIERE_TRAILER,"
+        + "NON_EMBEDDABLE;identity=name,ordinal,field,lookup;copy=true;lookup-errors=iae,npe");
+  }
+
+  private static void expect(Class<? extends Throwable> type, Runnable operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
   }
 
   private static void check(boolean condition, String message) {

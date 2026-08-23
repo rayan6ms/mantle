@@ -18022,126 +18022,140 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The protected static concrete member shell, Object root, declaring class, nest host, and non-synthetic metadata match exactly.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader$CachedPlayerScript",
       "symbol_kind": "FIELD",
       "member_name": "playerScriptUrl",
       "descriptor": "Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public final String field preserves the caller's exact reference, including null.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader$CachedPlayerScript",
       "symbol_kind": "FIELD",
       "member_name": "timestamp",
       "descriptor": "J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public final long field preserves the complete signed 64-bit timestamp range.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader$CachedPlayerScript",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Ljava/lang/String;J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public constructor captures URL identity and the full-width timestamp without validation or transformation.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader$InfoStatus",
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The protected static final nested enum retains its Enum superclass, generic signature, declaring class, nest host, and seven-constant public surface.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader$InfoStatus",
       "symbol_kind": "FIELD",
       "member_name": "INFO_PRESENT",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$InfoStatus;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The INFO_PRESENT enum constant retains exact identity, name, and ordinal zero.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader$InfoStatus",
       "symbol_kind": "FIELD",
       "member_name": "REQUIRES_LOGIN",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$InfoStatus;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The REQUIRES_LOGIN enum constant retains exact identity, name, and ordinal one.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader$InfoStatus",
       "symbol_kind": "FIELD",
       "member_name": "DOES_NOT_EXIST",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$InfoStatus;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The DOES_NOT_EXIST enum constant retains exact identity, name, and ordinal two.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader$InfoStatus",
       "symbol_kind": "FIELD",
       "member_name": "CONTENT_CHECK_REQUIRED",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$InfoStatus;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The CONTENT_CHECK_REQUIRED enum constant retains exact identity, name, and ordinal three.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader$InfoStatus",
       "symbol_kind": "FIELD",
       "member_name": "LIVE_STREAM_OFFLINE",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$InfoStatus;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The LIVE_STREAM_OFFLINE enum constant retains exact identity, name, and ordinal four.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader$InfoStatus",
       "symbol_kind": "FIELD",
       "member_name": "PREMIERE_TRAILER",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$InfoStatus;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The PREMIERE_TRAILER enum constant retains exact identity, name, and ordinal five.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader$InfoStatus",
       "symbol_kind": "FIELD",
       "member_name": "NON_EMBEDDABLE",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$InfoStatus;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The NON_EMBEDDABLE enum constant retains exact identity, name, and ordinal six.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader$InfoStatus",
       "symbol_kind": "METHOD",
       "member_name": "values",
       "descriptor": "()[Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$InfoStatus;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "values returns all seven constants in declaration order through an independent array on every call.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader$InfoStatus",
       "symbol_kind": "METHOD",
       "member_name": "valueOf",
       "descriptor": "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$InfoStatus;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "valueOf preserves exact-name identity and the reference IllegalArgumentException and NullPointerException failure modes.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAccessTokenTracker",

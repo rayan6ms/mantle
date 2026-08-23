@@ -229,6 +229,9 @@ const DEFAULT_YOUTUBE_TRACK_DETAILS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetails";
 const DEFAULT_YOUTUBE_TRACK_DETAILS_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader";
+const YOUTUBE_CACHED_PLAYER_SCRIPT_CLASS: &str = "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$CachedPlayerScript";
+const YOUTUBE_INFO_STATUS_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$InfoStatus";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -320,6 +323,8 @@ const REFERENCE_CLASSES: &[&str] = &[
     DEFAULT_YOUTUBE_PLAYLIST_LOADER_CLASS,
     DEFAULT_YOUTUBE_TRACK_DETAILS_CLASS,
     DEFAULT_YOUTUBE_TRACK_DETAILS_LOADER_CLASS,
+    YOUTUBE_CACHED_PLAYER_SCRIPT_CLASS,
+    YOUTUBE_INFO_STATUS_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -1045,6 +1050,9 @@ fn replacement_body(
             descriptor,
             required_locals,
         );
+    }
+    if class_name == YOUTUBE_CACHED_PLAYER_SCRIPT_CLASS {
+        return youtube_cached_player_script_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -14703,6 +14711,15 @@ fn track_enum_constants(class_name: &str) -> Option<&'static [&'static str]> {
         ]),
         FRIENDLY_EXCEPTION_SEVERITY_CLASS => Some(&["COMMON", "SUSPICIOUS", "FAULT"]),
         RESAMPLING_CLASS => Some(&["HIGH", "MEDIUM", "LOW"]),
+        YOUTUBE_INFO_STATUS_CLASS => Some(&[
+            "INFO_PRESENT",
+            "REQUIRES_LOGIN",
+            "DOES_NOT_EXIST",
+            "CONTENT_CHECK_REQUIRED",
+            "LIVE_STREAM_OFFLINE",
+            "PREMIERE_TRAILER",
+            "NON_EMBEDDABLE",
+        ]),
         _ => None,
     }
 }
@@ -20368,6 +20385,48 @@ fn default_youtube_track_details_loader_class_init(
             Instruction::Ldc_w(owner),
             Instruction::Invokestatic(get_logger),
             Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn youtube_cached_player_script_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(Ljava/lang/String;J)V") => youtube_cached_player_script_constructor(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {YOUTUBE_CACHED_PLAYER_SCRIPT_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn youtube_cached_player_script_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(YOUTUBE_CACHED_PLAYER_SCRIPT_CLASS)?;
+    let url = pool.add_field_ref(owner, "playerScriptUrl", "Ljava/lang/String;")?;
+    let timestamp = pool.add_field_ref(owner, "timestamp", "J")?;
+    code(
+        pool,
+        3,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(url),
+            Instruction::Aload_0,
+            Instruction::Lload_2,
+            Instruction::Putfield(timestamp),
             Instruction::Return,
         ],
     )
