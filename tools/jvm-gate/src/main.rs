@@ -197,6 +197,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-default-yandex-music-playlist-loader-consumer" => {
             Some(DEFAULT_YANDEX_MUSIC_PLAYLIST_LOADER_CONSUMER)
         }
+        "write-default-yandex-music-track-loader-consumer" => {
+            Some(DEFAULT_YANDEX_MUSIC_TRACK_LOADER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -16532,6 +16535,108 @@ public final class GateDefaultYandexMusicPlaylistLoader {
 
   private interface Invocation {
     void run() throws Exception;
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const DEFAULT_YANDEX_MUSIC_TRACK_LOADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.yamusic.AbstractYandexMusicApiLoader;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.DefaultYandexMusicTrackLoader;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicTrackLoader;
+import com.sedmelluq.discord.lavaplayer.track.AudioItem;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
+
+public final class GateDefaultYandexMusicTrackLoader {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "mode required");
+    Class<?> type = DefaultYandexMusicTrackLoader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && !type.isInterface() && !type.isEnum()
+        && !type.isAnnotation() && !type.isSynthetic(), "class metadata");
+    check(type.getSuperclass() == AbstractYandexMusicApiLoader.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {YandexMusicTrackLoader.class}),
+        "class hierarchy");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 2, "member counts");
+    Field format = type.getDeclaredField("TRACKS_INFO_FORMAT");
+    format.setAccessible(true);
+    check(format.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && format.getType() == String.class
+        && format.get(null).equals("https://api.music.yandex.net/tracks?trackIds="),
+        "constant metadata");
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    Method loadTrack = type.getDeclaredMethod("loadTrack", String.class, String.class,
+        Function.class);
+    check(loadTrack.getModifiers() == Modifier.PUBLIC && loadTrack.getReturnType() == AudioItem.class
+        && loadTrack.getExceptionTypes().length == 0 && !loadTrack.isBridge()
+        && !loadTrack.isSynthetic() && !loadTrack.isVarArgs(), "load metadata");
+    Type genericFactory = loadTrack.getGenericParameterTypes()[2];
+    check(genericFactory instanceof ParameterizedType
+        && ((ParameterizedType) genericFactory).getRawType() == Function.class
+        && Arrays.equals(((ParameterizedType) genericFactory).getActualTypeArguments(),
+            new Type[] {AudioTrackInfo.class, AudioTrack.class}), "factory generic metadata");
+    Class<?> http = Class.forName("com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface");
+    Class<?> json = Class.forName("com.sedmelluq.discord.lavaplayer.tools.JsonBrowser");
+    Method lambda = type.getDeclaredMethod("lambda$loadTrack$0", Function.class, http, json);
+    check(lambda.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | 0x1000)
+        && lambda.getReturnType() == AudioItem.class
+        && Arrays.equals(lambda.getExceptionTypes(), new Class<?>[] {Exception.class}),
+        "synthetic lambda metadata");
+
+    DefaultYandexMusicTrackLoader loader =
+        (DefaultYandexMusicTrackLoader) constructor.newInstance();
+    check(loader instanceof YandexMusicTrackLoader && loader.getHttpConfiguration() != null,
+        "construction and inherited configuration");
+    AtomicInteger factoryCalls = new AtomicInteger();
+    Function<AudioTrackInfo, AudioTrack> factory = info -> {
+      factoryCalls.incrementAndGet();
+      return null;
+    };
+    try {
+      if (args[0].equals("candidate")) {
+        assertUnsupported(loader, "http://127.0.0.1:1", "track", factory);
+        assertUnsupported(loader, null, null, factory);
+        check(factoryCalls.get() == 0, "factory was not invoked");
+        System.out.println("common=public-concrete,abstract-api-super,track-loader-interface,"
+            + "1-private-constant,1-constructor,1-exported-method;construction,http-config,"
+            + "generic-factory,synthetic-lambda,reflection;service=deterministic-no-network,"
+            + "current-bounded-native-source");
+      } else {
+        check(args[0].equals("reference"), "unknown mode");
+        System.out.println("common=public-concrete,abstract-api-super,track-loader-interface,"
+            + "1-private-constant,1-constructor,1-exported-method;construction,http-config,"
+            + "generic-factory,synthetic-lambda,reflection;service=legacy-query-api-json");
+      }
+    } finally {
+      loader.shutdown();
+      loader.shutdown();
+    }
+  }
+
+  private static void assertUnsupported(DefaultYandexMusicTrackLoader loader, String album,
+      String track, Function<AudioTrackInfo, AudioTrack> factory) {
+    try {
+      loader.loadTrack(album, track, factory);
+      throw new AssertionError("legacy track discovery unexpectedly succeeded");
+    } catch (UnsupportedOperationException error) {
+      check(error.getMessage().contains("Legacy Yandex track discovery is unsupported"),
+          "stable unsupported disposition");
+    }
   }
 
   private static void check(boolean condition, String message) {
