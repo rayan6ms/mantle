@@ -16840,45 +16840,50 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The public abstract Object shell, YandexMusicApiLoader interface, protected mutable HTTP-manager state, generic extractor signature, configuration identity, and shutdown lifecycle remain compatible while the obsolete arbitrary-URL API helper is deterministic no-network and current service work stays in Mantle's bounded authenticated native source.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "crates/mantle-media/tests/phase12_yandex_music.rs", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "docs/architecture/ADR-0014-bounded-yandex-music-source.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.AbstractYandexMusicApiLoader",
       "symbol_kind": "FIELD",
       "member_name": "httpInterfaceManager",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The sole protected mutable field retains the exact HttpInterfaceManager reference and remains replaceable by subclasses and reflective consumers.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.AbstractYandexMusicApiLoader",
       "symbol_kind": "METHOD",
       "member_name": "extractFromApi",
       "descriptor": "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/yamusic/AbstractYandexMusicApiLoader$ApiExtractor;)Ljava/lang/Object;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The protected generic method and erased JVM descriptor remain exact, but invocation fails deterministically before network access instead of accepting arbitrary URLs and reading unbounded legacy JSON; current authenticated metadata is provided by the bounded native Yandex Music source.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "crates/mantle-media/tests/phase12_yandex_music.rs", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "docs/architecture/ADR-0014-bounded-yandex-music-source.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.AbstractYandexMusicApiLoader",
       "symbol_kind": "METHOD",
       "member_name": "getHttpConfiguration",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public HTTP-configuration accessor returns the exact mutable manager field through ExtendedHttpConfigurable.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.AbstractYandexMusicApiLoader",
       "symbol_kind": "METHOD",
       "member_name": "shutdown",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Shutdown delegates every call to ExceptionTools.closeWithWarnings for the current manager, preserving repeatable close attempts and warning-only close failures.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.AbstractYandexMusicApiLoader$ApiExtractor",

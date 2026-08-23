@@ -187,6 +187,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-vimeo-audio-source-manager-consumer" => Some(VIMEO_AUDIO_SOURCE_MANAGER_CONSUMER),
         "write-vimeo-playback-format-consumer" => Some(VIMEO_PLAYBACK_FORMAT_CONSUMER),
         "write-vimeo-audio-track-consumer" => Some(VIMEO_AUDIO_TRACK_CONSUMER),
+        "write-abstract-yandex-music-api-loader-consumer" => {
+            Some(ABSTRACT_YANDEX_MUSIC_API_LOADER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -16032,6 +16035,142 @@ public final class GateVimeoAudioTrack {
   }
 
   private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const ABSTRACT_YANDEX_MUSIC_API_LOADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.yamusic.AbstractYandexMusicApiLoader;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.DefaultYandexMusicTrackLoader;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicApiLoader;
+import com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpConfigurable;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
+import java.lang.reflect.Proxy;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public final class GateAbstractYandexMusicApiLoader {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "expected service disposition");
+    boolean reference = args[0].equals("reference");
+    check(reference || args[0].equals("candidate"), "unknown disposition");
+    reflectionContract();
+    lifecycleContract();
+    if (!reference) currentDisposition();
+    System.out.println(
+        "common=public-abstract,object-super,yandex-api-loader,1-protected-field,"
+        + "1-package-constructor,3-exported-methods;generic-extractor,http-config-identity,"
+        + "mutable-manager,repeatable-warning-close,reflection;service="
+        + (reference ? "legacy-arbitrary-url-get-unbounded-json" :
+            "deterministic-no-network,current-bounded-native-source"));
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<AbstractYandexMusicApiLoader> type = AbstractYandexMusicApiLoader.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 1
+        && type.getInterfaces()[0] == YandexMusicApiLoader.class, "class metadata");
+    check(type.getDeclaredFields().length == 1, "field count");
+    Field manager = type.getDeclaredField("httpInterfaceManager");
+    check(manager.getType() == HttpInterfaceManager.class
+        && manager.getGenericType() == HttpInterfaceManager.class
+        && manager.getModifiers() == Modifier.PROTECTED && !manager.isSynthetic(),
+        "manager field metadata");
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(type.getDeclaredConstructors().length == 1 && constructor.getModifiers() == 0
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "constructor metadata");
+    check(type.getDeclaredMethods().length == 3, "declared method count");
+    Method extract = type.getDeclaredMethod("extractFromApi", String.class,
+        Class.forName(type.getName() + "$ApiExtractor"));
+    check(extract.getModifiers() == Modifier.PROTECTED && extract.getReturnType() == Object.class
+        && extract.getExceptionTypes().length == 0 && !extract.isBridge()
+        && !extract.isSynthetic() && !extract.isVarArgs(), "extract metadata");
+    TypeVariable<Method>[] parameters = extract.getTypeParameters();
+    Type genericExtractor = extract.getGenericParameterTypes()[1];
+    check(parameters.length == 1 && extract.getGenericReturnType().equals(parameters[0])
+        && genericExtractor instanceof ParameterizedType
+        && ((ParameterizedType) genericExtractor).getActualTypeArguments().length == 1
+        && ((ParameterizedType) genericExtractor).getActualTypeArguments()[0].equals(parameters[0]),
+        "generic extractor signature");
+    checkMethod(type, "getHttpConfiguration", ExtendedHttpConfigurable.class, Modifier.PUBLIC);
+    checkMethod(type, "shutdown", void.class, Modifier.PUBLIC);
+  }
+
+  private static void lifecycleContract() throws Exception {
+    AbstractYandexMusicApiLoader loader = new DefaultYandexMusicTrackLoader();
+    Field managerField = AbstractYandexMusicApiLoader.class
+        .getDeclaredField("httpInterfaceManager");
+    managerField.setAccessible(true);
+    Object initial = managerField.get(loader);
+    check(initial instanceof HttpInterfaceManager && loader.getHttpConfiguration() == initial,
+        "initial manager identity");
+    loader.shutdown();
+
+    AtomicInteger closes = new AtomicInteger();
+    HttpInterfaceManager replacement = (HttpInterfaceManager) Proxy.newProxyInstance(
+        GateAbstractYandexMusicApiLoader.class.getClassLoader(),
+        new Class<?>[] {HttpInterfaceManager.class},
+        (proxy, method, arguments) -> {
+          if (method.getName().equals("close")) {
+            if (closes.incrementAndGet() == 3) throw new IOException("expected close failure");
+            return null;
+          }
+          if (method.getName().equals("toString")) return "gate-yandex-http-manager";
+          if (method.getName().equals("hashCode")) return System.identityHashCode(proxy);
+          if (method.getName().equals("equals")) return proxy == arguments[0];
+          Class<?> returnType = method.getReturnType();
+          if (returnType == boolean.class) return false;
+          if (returnType == int.class) return 0;
+          if (returnType == long.class) return 0L;
+          return null;
+        });
+    managerField.set(loader, replacement);
+    check(loader.getHttpConfiguration() == replacement, "replacement manager identity");
+    loader.shutdown();
+    loader.shutdown();
+    loader.shutdown();
+    check(closes.get() == 3, "repeatable warning close");
+  }
+
+  private static void currentDisposition() throws Exception {
+    AbstractYandexMusicApiLoader loader = new DefaultYandexMusicTrackLoader();
+    try {
+      Method extract = AbstractYandexMusicApiLoader.class.getDeclaredMethod("extractFromApi",
+          String.class, Class.forName(AbstractYandexMusicApiLoader.class.getName() + "$ApiExtractor"));
+      extract.setAccessible(true);
+      extract.invoke(loader, "http://127.0.0.1:1/legacy-yandex-api", null);
+      throw new AssertionError("legacy API extraction unexpectedly succeeded");
+    } catch (InvocationTargetException error) {
+      Throwable cause = error.getCause();
+      check(cause instanceof UnsupportedOperationException
+          && cause.getMessage().contains("Legacy Yandex API extraction is unsupported"),
+          "legacy extraction fails before network access");
+    } finally {
+      loader.shutdown();
+    }
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType, int modifiers)
+      throws Exception {
+    Method method = owner.getDeclaredMethod(name);
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && method.getParameterCount() == 0 && method.getExceptionTypes().length == 0
+        && method.getTypeParameters().length == 0 && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), name + " metadata");
+  }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

@@ -191,6 +191,8 @@ const VIMEO_PLAYBACK_FORMAT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioSourceManager$PlaybackFormat";
 const VIMEO_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioTrack";
+const ABSTRACT_YANDEX_MUSIC_API_LOADER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/yamusic/AbstractYandexMusicApiLoader";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -263,6 +265,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     VIMEO_AUDIO_SOURCE_MANAGER_CLASS,
     VIMEO_PLAYBACK_FORMAT_CLASS,
     VIMEO_AUDIO_TRACK_CLASS,
+    ABSTRACT_YANDEX_MUSIC_API_LOADER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -644,6 +647,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | TWITCH_STREAM_SEGMENT_URL_PROVIDER_CLASS
             | VIMEO_AUDIO_SOURCE_MANAGER_CLASS
             | VIMEO_AUDIO_TRACK_CLASS
+            | ABSTRACT_YANDEX_MUSIC_API_LOADER_CLASS
     )
 }
 
@@ -676,6 +680,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | TWITCH_STREAM_SEGMENT_URL_PROVIDER_CLASS
             | VIMEO_AUDIO_SOURCE_MANAGER_CLASS
             | VIMEO_AUDIO_TRACK_CLASS
+            | ABSTRACT_YANDEX_MUSIC_API_LOADER_CLASS
     )
 }
 
@@ -889,6 +894,14 @@ fn replacement_body(
     }
     if class_name == VIMEO_AUDIO_TRACK_CLASS {
         return vimeo_audio_track_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == ABSTRACT_YANDEX_MUSIC_API_LOADER_CLASS {
+        return abstract_yandex_music_api_loader_replacement(
+            pool,
+            name,
+            descriptor,
+            required_locals,
+        );
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -17466,6 +17479,98 @@ fn vimeo_audio_track_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribut
             Instruction::Ldc_w(owner),
             Instruction::Invokestatic(get_logger),
             Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn abstract_yandex_music_api_loader_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => abstract_yandex_music_api_loader_constructor(pool),
+        (
+            "extractFromApi",
+            "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/yamusic/AbstractYandexMusicApiLoader$ApiExtractor;)Ljava/lang/Object;",
+        ) => unsupported_body(
+            pool,
+            "Legacy Yandex API extraction is unsupported; use Mantle's bounded current Yandex Music source.",
+            required_locals,
+        ),
+        (
+            "getHttpConfiguration",
+            "()Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
+        ) => object_getter(
+            pool,
+            ABSTRACT_YANDEX_MUSIC_API_LOADER_CLASS,
+            "httpInterfaceManager",
+            "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+        ),
+        ("shutdown", "()V") => abstract_yandex_music_api_loader_shutdown(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {ABSTRACT_YANDEX_MUSIC_API_LOADER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn abstract_yandex_music_api_loader_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let tools = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpClientTools")?;
+    let create_manager = pool.add_method_ref(
+        tools,
+        "createDefaultThreadLocalManager",
+        "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let owner = pool.add_class(ABSTRACT_YANDEX_MUSIC_API_LOADER_CLASS)?;
+    let manager = pool.add_field_ref(
+        owner,
+        "httpInterfaceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Invokestatic(create_manager),
+            Instruction::Putfield(manager),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn abstract_yandex_music_api_loader_shutdown(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(ABSTRACT_YANDEX_MUSIC_API_LOADER_CLASS)?;
+    let manager = pool.add_field_ref(
+        owner,
+        "httpInterfaceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let tools = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/ExceptionTools")?;
+    let close = pool.add_method_ref(tools, "closeWithWarnings", "(Ljava/lang/AutoCloseable;)V")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(manager),
+            Instruction::Invokestatic(close),
             Instruction::Return,
         ],
     )

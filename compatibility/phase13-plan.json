@@ -602,8 +602,8 @@
       "objective": "Expand source SPI, built-in manager shells, class lookup, and serialization-visible types.",
       "exit_evidence": "Source SPI extension tests, source lookup tests, per-symbol ledger entries, and Revapi diff.",
       "status": "IN_PROGRESS",
-      "classified_symbols": 301,
-      "remaining_symbols": 397,
+      "classified_symbols": 306,
+      "remaining_symbols": 392,
       "completed_slices": [
         {
           "id": "audio-source-manager-interface-contracts",
@@ -1164,6 +1164,21 @@
             "tools/jvm-gate/src/main.rs",
             "docs/architecture/ADR-0017-bounded-vimeo-source.md"
           ]
+        },
+        {
+          "id": "yandex-abstract-api-loader-contracts",
+          "classes": 1,
+          "fields": 1,
+          "methods": 3,
+          "symbols": 5,
+          "classification": "A_EXACT/C_SEMANTIC",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "crates/mantle-media/tests/phase12_yandex_music.rs",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs",
+            "docs/architecture/ADR-0014-bounded-yandex-music-source.md"
+          ]
         }
       ]
     },
@@ -1285,7 +1300,7 @@
   "phase_entry": {
     "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
     "first_execution_cohort": "core-player-track",
-    "next_slice": "yandex-abstract-api-loader-contracts",
+    "next_slice": "yandex-api-extractor-contracts",
     "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
   }
 }
