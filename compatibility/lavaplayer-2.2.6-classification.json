@@ -16910,27 +16910,46 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The public concrete AbstractYandexMusicApiLoader shell, direct-URL interface, frozen private constants and helper signatures, construction, inherited configuration, and lifecycle remain compatible while obsolete two-stage API/storage discovery is deterministic no-network and current playback stays in Mantle's bounded native Yandex Music source.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-media/tests/phase12_yandex_music.rs",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0014-bounded-yandex-music-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.DefaultYandexMusicDirectUrlLoader",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public no-argument constructor delegates to AbstractYandexMusicApiLoader, creates inherited HTTP configuration, and supports the inherited repeatable shutdown lifecycle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.DefaultYandexMusicDirectUrlLoader",
       "symbol_kind": "METHOD",
       "member_name": "getDirectUrl",
       "descriptor": "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The public String/String-to-String signature remains exact, but invocation fails deterministically before network access instead of fetching legacy unbounded API JSON and arbitrary storage XML to construct an MD5-signed URL; current playback uses the bounded native Yandex Music source.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-media/tests/phase12_yandex_music.rs",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0014-bounded-yandex-music-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.DefaultYandexMusicPlaylistLoader",

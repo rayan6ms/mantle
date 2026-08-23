@@ -195,6 +195,8 @@ const ABSTRACT_YANDEX_MUSIC_API_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/yamusic/AbstractYandexMusicApiLoader";
 const YANDEX_MUSIC_API_EXTRACTOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/yamusic/AbstractYandexMusicApiLoader$ApiExtractor";
+const DEFAULT_YANDEX_MUSIC_DIRECT_URL_LOADER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/yamusic/DefaultYandexMusicDirectUrlLoader";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -269,6 +271,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     VIMEO_AUDIO_TRACK_CLASS,
     ABSTRACT_YANDEX_MUSIC_API_LOADER_CLASS,
     YANDEX_MUSIC_API_EXTRACTOR_CLASS,
+    DEFAULT_YANDEX_MUSIC_DIRECT_URL_LOADER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -651,6 +654,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | VIMEO_AUDIO_SOURCE_MANAGER_CLASS
             | VIMEO_AUDIO_TRACK_CLASS
             | ABSTRACT_YANDEX_MUSIC_API_LOADER_CLASS
+            | DEFAULT_YANDEX_MUSIC_DIRECT_URL_LOADER_CLASS
     )
 }
 
@@ -684,6 +688,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | VIMEO_AUDIO_SOURCE_MANAGER_CLASS
             | VIMEO_AUDIO_TRACK_CLASS
             | ABSTRACT_YANDEX_MUSIC_API_LOADER_CLASS
+            | DEFAULT_YANDEX_MUSIC_DIRECT_URL_LOADER_CLASS
     )
 }
 
@@ -900,6 +905,14 @@ fn replacement_body(
     }
     if class_name == ABSTRACT_YANDEX_MUSIC_API_LOADER_CLASS {
         return abstract_yandex_music_api_loader_replacement(
+            pool,
+            name,
+            descriptor,
+            required_locals,
+        );
+    }
+    if class_name == DEFAULT_YANDEX_MUSIC_DIRECT_URL_LOADER_CLASS {
+        return default_yandex_music_direct_url_loader_replacement(
             pool,
             name,
             descriptor,
@@ -17553,6 +17566,35 @@ fn abstract_yandex_music_api_loader_constructor(
             Instruction::Return,
         ],
     )
+}
+
+fn default_yandex_music_direct_url_loader_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => {
+            let super_class = pool.add_class(ABSTRACT_YANDEX_MUSIC_API_LOADER_CLASS)?;
+            let super_init = pool.add_method_ref(super_class, "<init>", "()V")?;
+            code(
+                pool,
+                1,
+                1,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Invokespecial(super_init),
+                    Instruction::Return,
+                ],
+            )
+        }
+        _ => unsupported_body(
+            pool,
+            "Legacy Yandex direct-URL discovery is unsupported; use Mantle's bounded current Yandex Music source.",
+            required_locals,
+        ),
+    }
 }
 
 fn abstract_yandex_music_api_loader_shutdown(

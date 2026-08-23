@@ -191,6 +191,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
             Some(ABSTRACT_YANDEX_MUSIC_API_LOADER_CONSUMER)
         }
         "write-yandex-music-api-extractor-consumer" => Some(YANDEX_MUSIC_API_EXTRACTOR_CONSUMER),
+        "write-default-yandex-music-direct-url-loader-consumer" => {
+            Some(DEFAULT_YANDEX_MUSIC_DIRECT_URL_LOADER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -16251,6 +16254,106 @@ public final class GateYandexMusicApiExtractor {
         "protected-static-generic-interface,no-reflection-super,1-type-variable,"
         + "1-public-abstract-method;erased-object-return,generic-T-return,"
         + "http-json-parameters,checked-exception,proxy-invocation,reflection");
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const DEFAULT_YANDEX_MUSIC_DIRECT_URL_LOADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.yamusic.AbstractYandexMusicApiLoader;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.DefaultYandexMusicDirectUrlLoader;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicDirectUrlLoader;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateDefaultYandexMusicDirectUrlLoader {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "mode required");
+    Class<?> type = DefaultYandexMusicDirectUrlLoader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && !type.isInterface() && !type.isEnum()
+        && !type.isAnnotation() && !type.isSynthetic(), "class metadata");
+    check(type.getSuperclass() == AbstractYandexMusicApiLoader.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {YandexMusicDirectUrlLoader.class}),
+        "class hierarchy");
+    check(type.getDeclaredFields().length == 3 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 4, "member counts");
+    checkConstant(type, "TRACK_DOWNLOAD_INFO",
+        "https://api.music.yandex.net/tracks/%s/download-info");
+    checkConstant(type, "DIRECT_URL_FORMAT", "https://%s/get-%s/%s/%s%s");
+    checkConstant(type, "MP3_SALT", "XGRlBW9FXlekgbPrRHuSiA");
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    Method directUrl = type.getDeclaredMethod("getDirectUrl", String.class, String.class);
+    check(directUrl.getModifiers() == Modifier.PUBLIC && directUrl.getReturnType() == String.class
+        && directUrl.getExceptionTypes().length == 0 && !directUrl.isBridge()
+        && !directUrl.isSynthetic() && !directUrl.isVarArgs(), "direct URL metadata");
+    Method downloadInfo = type.getDeclaredMethod("extractDownloadInfo", String.class);
+    check(downloadInfo.getModifiers() == Modifier.PRIVATE
+        && downloadInfo.getReturnType().getName().equals(type.getName() + "$DownloadInfo")
+        && Arrays.equals(downloadInfo.getExceptionTypes(), new Class<?>[] {IOException.class})
+        && !downloadInfo.isSynthetic(), "download-info helper metadata");
+    Method lambdaOne = type.getDeclaredMethod("lambda$getDirectUrl$1", String.class,
+        Class.forName("com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface"),
+        Class.forName("com.sedmelluq.discord.lavaplayer.tools.JsonBrowser"));
+    check(lambdaOne.getModifiers() == (Modifier.PRIVATE | 0x1000)
+        && lambdaOne.getReturnType() == String.class
+        && Arrays.equals(lambdaOne.getExceptionTypes(), new Class<?>[] {Exception.class}),
+        "capturing lambda metadata");
+    Method lambdaZero = type.getDeclaredMethod("lambda$getDirectUrl$0", String.class,
+        Class.forName("com.sedmelluq.discord.lavaplayer.tools.JsonBrowser"));
+    check(lambdaZero.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | 0x1000)
+        && lambdaZero.getReturnType() == boolean.class
+        && lambdaZero.getExceptionTypes().length == 0, "predicate lambda metadata");
+
+    DefaultYandexMusicDirectUrlLoader loader =
+        (DefaultYandexMusicDirectUrlLoader) constructor.newInstance();
+    check(loader != null && loader instanceof YandexMusicDirectUrlLoader
+        && loader.getHttpConfiguration() != null, "construction and inherited configuration");
+    try {
+      if (args[0].equals("candidate")) {
+        assertUnsupported(loader, "http://127.0.0.1:1/legacy-track", "mp3");
+        assertUnsupported(loader, null, null);
+        System.out.println("common=public-concrete,abstract-api-super,direct-url-interface,"
+            + "3-private-constants,1-constructor,1-exported-method;construction,http-config,"
+            + "private-helper-signatures,reflection;service=deterministic-no-network,"
+            + "current-bounded-native-source");
+      } else {
+        check(args[0].equals("reference"), "unknown mode");
+        System.out.println("common=public-concrete,abstract-api-super,direct-url-interface,"
+            + "3-private-constants,1-constructor,1-exported-method;construction,http-config,"
+            + "private-helper-signatures,reflection;service=legacy-api-json-and-storage-xml,"
+            + "md5-signed-direct-url");
+      }
+    } finally {
+      loader.shutdown();
+      loader.shutdown();
+    }
+  }
+
+  private static void assertUnsupported(DefaultYandexMusicDirectUrlLoader loader,
+      String trackId, String codec) {
+    try {
+      loader.getDirectUrl(trackId, codec);
+      throw new AssertionError("legacy direct URL discovery unexpectedly succeeded");
+    } catch (UnsupportedOperationException error) {
+      check(error.getMessage().contains("Legacy Yandex direct-URL discovery is unsupported"),
+          "stable unsupported disposition");
+    }
+  }
+
+  private static void checkConstant(Class<?> type, String name, String value) throws Exception {
+    Field field = type.getDeclaredField(name);
+    field.setAccessible(true);
+    check(field.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && field.getType() == String.class && field.get(null).equals(value), name + " metadata");
   }
 
   private static void check(boolean condition, String message) {

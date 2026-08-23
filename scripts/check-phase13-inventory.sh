@@ -605,9 +605,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[0].completed_slices[].symbols] | add) == .cohorts[0].classified_symbols and
   (.cohorts[0].classified_symbols + .cohorts[0].remaining_symbols) == .cohorts[0].symbols and
   .cohorts[1].status == "IN_PROGRESS" and
-  .cohorts[1].classified_symbols == 308 and
-  .cohorts[1].remaining_symbols == 390 and
-  (.cohorts[1].completed_slices | length) == 43 and
+  .cohorts[1].classified_symbols == 311 and
+  .cohorts[1].remaining_symbols == 387 and
+  (.cohorts[1].completed_slices | length) == 44 and
   .cohorts[1].completed_slices[0] == {
     id: "audio-source-manager-interface-contracts",
     classes: 1,
@@ -1196,13 +1196,28 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "tools/jvm-gate/src/main.rs"
     ]
   } and
+  .cohorts[1].completed_slices[43] == {
+    id: "default-yandex-music-direct-url-loader-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 2,
+    symbols: 3,
+    classification: "A_EXACT/C_SEMANTIC",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "crates/mantle-media/tests/phase12_yandex_music.rs",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs",
+      "docs/architecture/ADR-0014-bounded-yandex-music-source.md"
+    ]
+  } and
   ([.cohorts[1].completed_slices[].symbols] | add) == .cohorts[1].classified_symbols and
   (.cohorts[1].classified_symbols + .cohorts[1].remaining_symbols) == .cohorts[1].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 843 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 846 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 790 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 791 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 47 and
+    select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 49 and
   ([$classifications.symbols[] |
     select(.assessment == "CLASSIFIED" and .classification == "D_LEGACY")] | length) == 6 and
   all($classifications.symbols[] | select(.assessment == "CLASSIFIED");
@@ -1305,9 +1320,16 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager$PlaybackFormat",
         "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioTrack",
         "com.sedmelluq.discord.lavaplayer.source.yamusic.AbstractYandexMusicApiLoader",
-        "com.sedmelluq.discord.lavaplayer.source.yamusic.AbstractYandexMusicApiLoader$ApiExtractor"
+        "com.sedmelluq.discord.lavaplayer.source.yamusic.AbstractYandexMusicApiLoader$ApiExtractor",
+        "com.sedmelluq.discord.lavaplayer.source.yamusic.DefaultYandexMusicDirectUrlLoader"
       ][]; . == $symbol.binary_name)) and
     (if $symbol.binary_name ==
+        "com.sedmelluq.discord.lavaplayer.source.yamusic.DefaultYandexMusicDirectUrlLoader" and
+        ($symbol.symbol_kind == "CLASS" or $symbol.member_name == "getDirectUrl")
+      then .classification == "C_SEMANTIC" and
+        (.tests | index("crates/mantle-media/tests/phase12_yandex_music.rs")) != null and
+        (.tests | index("docs/architecture/ADR-0014-bounded-yandex-music-source.md")) != null
+      elif $symbol.binary_name ==
         "com.sedmelluq.discord.lavaplayer.source.yamusic.AbstractYandexMusicApiLoader" and
         ($symbol.symbol_kind == "CLASS" or $symbol.member_name == "extractFromApi")
       then .classification == "C_SEMANTIC" and
@@ -1421,7 +1443,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "default-yandex-music-direct-url-loader-contracts" and
+  .phase_entry.next_slice == "default-yandex-music-playlist-loader-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 ' "$PLAN" >/dev/null
@@ -1429,7 +1451,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '111 reference classes / 872 symbols' \
+  '112 reference classes / 875 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -1439,4 +1461,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 843 classified symbols and 1,919 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 846 classified symbols and 1,916 unassessed symbols.\n'
