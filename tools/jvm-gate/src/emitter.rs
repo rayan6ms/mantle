@@ -201,6 +201,8 @@ const DEFAULT_YANDEX_MUSIC_PLAYLIST_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/yamusic/DefaultYandexMusicPlaylistLoader";
 const DEFAULT_YANDEX_MUSIC_TRACK_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/yamusic/DefaultYandexMusicTrackLoader";
+const DEFAULT_YANDEX_SEARCH_PROVIDER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/yamusic/DefaultYandexSearchProvider";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -278,6 +280,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     DEFAULT_YANDEX_MUSIC_DIRECT_URL_LOADER_CLASS,
     DEFAULT_YANDEX_MUSIC_PLAYLIST_LOADER_CLASS,
     DEFAULT_YANDEX_MUSIC_TRACK_LOADER_CLASS,
+    DEFAULT_YANDEX_SEARCH_PROVIDER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -663,6 +666,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | DEFAULT_YANDEX_MUSIC_DIRECT_URL_LOADER_CLASS
             | DEFAULT_YANDEX_MUSIC_PLAYLIST_LOADER_CLASS
             | DEFAULT_YANDEX_MUSIC_TRACK_LOADER_CLASS
+            | DEFAULT_YANDEX_SEARCH_PROVIDER_CLASS
     )
 }
 
@@ -699,6 +703,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | DEFAULT_YANDEX_MUSIC_DIRECT_URL_LOADER_CLASS
             | DEFAULT_YANDEX_MUSIC_PLAYLIST_LOADER_CLASS
             | DEFAULT_YANDEX_MUSIC_TRACK_LOADER_CLASS
+            | DEFAULT_YANDEX_SEARCH_PROVIDER_CLASS
     )
 }
 
@@ -944,6 +949,9 @@ fn replacement_body(
             descriptor,
             required_locals,
         );
+    }
+    if class_name == DEFAULT_YANDEX_SEARCH_PROVIDER_CLASS {
+        return default_yandex_search_provider_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -17670,6 +17678,127 @@ fn default_yandex_music_track_loader_replacement(
             required_locals,
         ),
     }
+}
+
+fn default_yandex_search_provider_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => {
+            let super_class = pool.add_class(ABSTRACT_YANDEX_MUSIC_API_LOADER_CLASS)?;
+            let super_init = pool.add_method_ref(super_class, "<init>", "()V")?;
+            code(
+                pool,
+                1,
+                1,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Invokespecial(super_init),
+                    Instruction::Return,
+                ],
+            )
+        }
+        (
+            "loadSearchResult",
+            "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicPlaylistLoader;Ljava/util/function/Function;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+        ) => default_yandex_search_provider_load(pool),
+        ("<clinit>", "()V") => default_yandex_search_provider_static_initializer(pool),
+        _ => unsupported_body(
+            pool,
+            "Legacy Yandex search discovery is unsupported; use Mantle's bounded current Yandex Music source.",
+            required_locals,
+        ),
+    }
+}
+
+fn default_yandex_search_provider_load(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let string = pool.add_class("java/lang/String")?;
+    let starts_with = pool.add_method_ref(string, "startsWith", "(Ljava/lang/String;)Z")?;
+    let pattern = pool.add_class("java/util/regex/Pattern")?;
+    let matcher = pool.add_method_ref(
+        pattern,
+        "matcher",
+        "(Ljava/lang/CharSequence;)Ljava/util/regex/Matcher;",
+    )?;
+    let matcher_class = pool.add_class("java/util/regex/Matcher")?;
+    let find = pool.add_method_ref(matcher_class, "find", "()Z")?;
+    let owner = pool.add_class(DEFAULT_YANDEX_SEARCH_PROVIDER_CLASS)?;
+    let search_pattern =
+        pool.add_field_ref(owner, "SEARCH_PATTERN", "Ljava/util/regex/Pattern;")?;
+    let prefix = pool.add_string("ymsearch")?;
+    let exception = pool.add_class("java/lang/UnsupportedOperationException")?;
+    let exception_init = pool.add_method_ref(exception, "<init>", "(Ljava/lang/String;)V")?;
+    let message = pool.add_string(
+        "Legacy Yandex search discovery is unsupported; use Mantle's bounded current Yandex Music source.",
+    )?;
+    let mut body = code(
+        pool,
+        3,
+        4,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Ifnonnull(4),
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+            Instruction::Aload_1,
+            Instruction::Ldc_w(prefix),
+            Instruction::Invokevirtual(starts_with),
+            Instruction::Ifne(10),
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+            Instruction::Getstatic(search_pattern),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(matcher),
+            Instruction::Invokevirtual(find),
+            Instruction::Ifne(17),
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+            Instruction::New(exception),
+            Instruction::Dup,
+            Instruction::Ldc_w(message),
+            Instruction::Invokespecial(exception_init),
+            Instruction::Athrow,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::SameFrame { frame_type: 4 },
+            StackFrame::SameFrame { frame_type: 5 },
+            StackFrame::SameFrame { frame_type: 6 },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn default_yandex_search_provider_static_initializer(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let pattern = pool.add_class("java/util/regex/Pattern")?;
+    let compile = pool.add_method_ref(
+        pattern,
+        "compile",
+        "(Ljava/lang/String;)Ljava/util/regex/Pattern;",
+    )?;
+    let owner = pool.add_class(DEFAULT_YANDEX_SEARCH_PROVIDER_CLASS)?;
+    let search_pattern =
+        pool.add_field_ref(owner, "SEARCH_PATTERN", "Ljava/util/regex/Pattern;")?;
+    let expression = pool.add_string("ymsearch(:([a-zA-Z]+))?(:([0-9]+))?:([^:]+)")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(expression),
+            Instruction::Invokestatic(compile),
+            Instruction::Putstatic(search_pattern),
+            Instruction::Return,
+        ],
+    )
 }
 
 fn default_yandex_music_playlist_loader_constructor(

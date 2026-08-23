@@ -17078,27 +17078,46 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The public concrete AbstractYandexMusicApiLoader/YandexMusicSearchResultLoader shell, four private constants, compiled search pattern, private helper and synthetic lambda signatures, inherited HTTP configuration, and lifecycle remain frozen; recognized legacy searches fail before network or collaborator access while current authenticated search uses Mantle's bounded native source.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-media/tests/phase12_yandex_music.rs",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0014-bounded-yandex-music-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.DefaultYandexSearchProvider",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public no-argument constructor delegates exactly to AbstractYandexMusicApiLoader and creates the inherited HTTP configuration manager after exact static search-pattern initialization.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.DefaultYandexSearchProvider",
       "symbol_kind": "METHOD",
       "member_name": "loadSearchResult",
       "descriptor": "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicPlaylistLoader;Ljava/util/function/Function;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The query, playlist-loader, generic Function<AudioTrackInfo, AudioTrack>, AudioItem return, and malformed-query null fallthrough remain exact, but recognized legacy searches fail before arbitrary-URL JSON, playlist-loader, or factory access; current authenticated track search uses the bounded native Yandex Music source.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-media/tests/phase12_yandex_music.rs",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0014-bounded-yandex-music-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexHttpContextFilter",

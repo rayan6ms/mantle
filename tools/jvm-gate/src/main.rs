@@ -200,6 +200,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-default-yandex-music-track-loader-consumer" => {
             Some(DEFAULT_YANDEX_MUSIC_TRACK_LOADER_CONSUMER)
         }
+        "write-default-yandex-search-provider-consumer" => {
+            Some(DEFAULT_YANDEX_SEARCH_PROVIDER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -16637,6 +16640,160 @@ public final class GateDefaultYandexMusicTrackLoader {
       check(error.getMessage().contains("Legacy Yandex track discovery is unsupported"),
           "stable unsupported disposition");
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const DEFAULT_YANDEX_SEARCH_PROVIDER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.yamusic.AbstractYandexMusicApiLoader;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.DefaultYandexSearchProvider;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicPlaylistLoader;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicSearchResultLoader;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.track.AudioItem;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.Type;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
+import java.util.regex.Pattern;
+
+public final class GateDefaultYandexSearchProvider {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "mode required");
+    Class<?> type = DefaultYandexSearchProvider.class;
+    check(type.getModifiers() == Modifier.PUBLIC && !type.isInterface() && !type.isEnum()
+        && !type.isAnnotation() && !type.isSynthetic(), "class metadata");
+    check(type.getSuperclass() == AbstractYandexMusicApiLoader.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {YandexMusicSearchResultLoader.class}),
+        "class hierarchy");
+    check(type.getDeclaredFields().length == 4 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 8, "member counts");
+
+    checkConstant(type, "DEFAULT_LIMIT", int.class, Integer.valueOf(10));
+    checkConstant(type, "TRACKS_INFO_FORMAT", String.class,
+        "https://api.music.yandex.net/search?type=%s&page=0&text=%s");
+    checkConstant(type, "SEARCH_PREFIX", String.class, "ymsearch");
+    Field patternField = type.getDeclaredField("SEARCH_PATTERN");
+    patternField.setAccessible(true);
+    check(patternField.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && patternField.getType() == Pattern.class, "pattern field metadata");
+    Pattern pattern = (Pattern) patternField.get(null);
+    check(pattern.pattern().equals("ymsearch(:([a-zA-Z]+))?(:([0-9]+))?:([^:]+)")
+        && pattern.flags() == 0, "compiled pattern");
+
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    Method load = type.getDeclaredMethod("loadSearchResult", String.class,
+        YandexMusicPlaylistLoader.class, Function.class);
+    check(load.getModifiers() == Modifier.PUBLIC && load.getReturnType() == AudioItem.class
+        && load.getExceptionTypes().length == 0 && !load.isBridge() && !load.isSynthetic()
+        && !load.isVarArgs(), "load metadata");
+    Type genericFactory = load.getGenericParameterTypes()[2];
+    check(genericFactory instanceof ParameterizedType
+        && ((ParameterizedType) genericFactory).getRawType() == Function.class
+        && Arrays.equals(((ParameterizedType) genericFactory).getActualTypeArguments(),
+            new Type[] {AudioTrackInfo.class, AudioTrack.class}), "factory generic metadata");
+
+    checkPrivate(type.getDeclaredMethod("loadTracks", List.class, int.class, Function.class),
+        AudioItem.class);
+    checkPrivate(type.getDeclaredMethod("loadPlaylist", List.class,
+        YandexMusicPlaylistLoader.class, Function.class), AudioItem.class);
+    checkPrivate(type.getDeclaredMethod("loadAlbum", List.class,
+        YandexMusicPlaylistLoader.class, Function.class), AudioItem.class);
+    checkPrivate(type.getDeclaredMethod("getResults", JsonBrowser.class, String.class), List.class);
+    checkPrivate(type.getDeclaredMethod("getValidType", String.class), String.class);
+    checkPrivate(type.getDeclaredMethod("getValidLimit", String.class), Integer.class);
+    Method lambda = type.getDeclaredMethod("lambda$loadSearchResult$0", String.class, int.class,
+        Function.class, YandexMusicPlaylistLoader.class, HttpInterface.class, JsonBrowser.class);
+    check(lambda.getModifiers() == (Modifier.PRIVATE | 0x1000)
+        && lambda.getReturnType() == AudioItem.class
+        && Arrays.equals(lambda.getExceptionTypes(), new Class<?>[] {Exception.class}),
+        "synthetic lambda metadata");
+
+    DefaultYandexSearchProvider provider =
+        (DefaultYandexSearchProvider) constructor.newInstance();
+    check(provider instanceof YandexMusicSearchResultLoader
+        && provider.getHttpConfiguration() != null, "construction and inherited configuration");
+    AtomicInteger collaboratorCalls = new AtomicInteger();
+    YandexMusicPlaylistLoader playlistLoader = (YandexMusicPlaylistLoader) Proxy.newProxyInstance(
+        GateDefaultYandexSearchProvider.class.getClassLoader(),
+        new Class<?>[] {YandexMusicPlaylistLoader.class}, (proxy, method, arguments) -> {
+          collaboratorCalls.incrementAndGet();
+          throw new AssertionError("playlist loader was invoked");
+        });
+    Function<AudioTrackInfo, AudioTrack> trackFactory = info -> {
+      collaboratorCalls.incrementAndGet();
+      throw new AssertionError("track factory was invoked");
+    };
+    try {
+      for (String query : new String[] {null, "", "search:test", "ymsearch", "ymsearch:",
+          "ymsearch::test", "prefix-ymsearch:test"}) {
+        check(provider.loadSearchResult(query, playlistLoader, trackFactory) == null,
+            "unrecognized query must fall through: " + query);
+      }
+      check(collaboratorCalls.get() == 0, "invalid queries touched collaborators");
+      if (args[0].equals("candidate")) {
+        assertUnsupported(provider, "ymsearch:animals & architects", playlistLoader, trackFactory);
+        assertUnsupported(provider, "ymsearch:album:1:animals", playlistLoader, trackFactory);
+        assertUnsupported(provider, "ymsearch:playlist:99:animals", playlistLoader, trackFactory);
+        check(collaboratorCalls.get() == 0, "recognized queries touched collaborators");
+        System.out.println("common=public-concrete,abstract-api-super,search-loader-interface,"
+            + "4-private-constants,1-constructor,1-exported-method;construction,http-config,"
+            + "compiled-pattern,generic-factory,private-helper-and-lambda-signatures,"
+            + "invalid-query-fallthrough,reflection;service=deterministic-no-network,"
+            + "current-bounded-native-search");
+      } else {
+        check(args[0].equals("reference"), "unknown mode");
+        System.out.println("common=public-concrete,abstract-api-super,search-loader-interface,"
+            + "4-private-constants,1-constructor,1-exported-method;construction,http-config,"
+            + "compiled-pattern,generic-factory,private-helper-and-lambda-signatures,"
+            + "invalid-query-fallthrough,reflection;service=legacy-query-api-json");
+      }
+    } finally {
+      provider.shutdown();
+      provider.shutdown();
+    }
+  }
+
+  private static void assertUnsupported(DefaultYandexSearchProvider provider, String query,
+      YandexMusicPlaylistLoader playlistLoader,
+      Function<AudioTrackInfo, AudioTrack> trackFactory) {
+    try {
+      provider.loadSearchResult(query, playlistLoader, trackFactory);
+      throw new AssertionError("legacy search discovery unexpectedly succeeded");
+    } catch (UnsupportedOperationException error) {
+      check(error.getMessage().contains("Legacy Yandex search discovery is unsupported"),
+          "stable unsupported disposition");
+    }
+  }
+
+  private static void checkConstant(Class<?> type, String name, Class<?> fieldType, Object value)
+      throws Exception {
+    Field field = type.getDeclaredField(name);
+    field.setAccessible(true);
+    check(field.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && field.getType() == fieldType && field.get(null).equals(value), name + " metadata");
+  }
+
+  private static void checkPrivate(Method method, Class<?> returnType) {
+    check(method.getModifiers() == Modifier.PRIVATE && method.getReturnType() == returnType
+        && method.getExceptionTypes().length == 0 && !method.isSynthetic(),
+        method.getName() + " metadata");
   }
 
   private static void check(boolean condition, String message) {
