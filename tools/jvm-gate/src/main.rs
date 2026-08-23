@@ -203,6 +203,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-default-yandex-search-provider-consumer" => {
             Some(DEFAULT_YANDEX_SEARCH_PROVIDER_CONSUMER)
         }
+        "write-yandex-http-context-filter-consumer" => Some(YANDEX_HTTP_CONTEXT_FILTER_CONSUMER),
         _ => None,
     }
 }
@@ -16794,6 +16795,140 @@ public final class GateDefaultYandexSearchProvider {
     check(method.getModifiers() == Modifier.PRIVATE && method.getReturnType() == returnType
         && method.getExceptionTypes().length == 0 && !method.isSynthetic(),
         method.getName() + " metadata");
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YANDEX_HTTP_CONTEXT_FILTER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexHttpContextFilter;
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.CookieStore;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.protocol.HttpClientContext;
+import org.apache.http.impl.client.BasicCookieStore;
+import org.apache.http.impl.cookie.BasicClientCookie;
+
+public final class GateYandexHttpContextFilter {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "mode required");
+    Class<?> type = YandexHttpContextFilter.class;
+    check(type.getModifiers() == Modifier.PUBLIC && !type.isInterface() && !type.isEnum()
+        && !type.isAnnotation() && !type.isSynthetic(), "class metadata");
+    check(type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {HttpContextFilter.class}),
+        "class hierarchy");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 6, "member counts");
+    Field token = type.getDeclaredField("oAuthToken");
+    token.setAccessible(true);
+    check(token.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC)
+        && token.getType() == String.class && token.get(null) == null, "token field metadata");
+
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    Method setter = checkMethod(type, "setOAuthToken", void.class,
+        Modifier.PUBLIC | Modifier.STATIC, String.class);
+    Method open = checkMethod(type, "onContextOpen", void.class, Modifier.PUBLIC,
+        HttpClientContext.class);
+    Method close = checkMethod(type, "onContextClose", void.class, Modifier.PUBLIC,
+        HttpClientContext.class);
+    Method requestMethod = checkMethod(type, "onRequest", void.class, Modifier.PUBLIC,
+        HttpClientContext.class, HttpUriRequest.class, boolean.class);
+    Method responseMethod = checkMethod(type, "onRequestResponse", boolean.class, Modifier.PUBLIC,
+        HttpClientContext.class, HttpUriRequest.class, HttpResponse.class);
+    Method exceptionMethod = checkMethod(type, "onRequestException", boolean.class, Modifier.PUBLIC,
+        HttpClientContext.class, HttpUriRequest.class, Throwable.class);
+    check(setter != null && open != null && close != null && requestMethod != null
+        && responseMethod != null && exceptionMethod != null, "method lookup");
+
+    YandexHttpContextFilter filter = (YandexHttpContextFilter) constructor.newInstance();
+    check(filter instanceof HttpContextFilter, "construction");
+    HttpClientContext context = HttpClientContext.create();
+    check(context.getCookieStore() == null, "fresh context cookie state");
+    filter.onContextOpen(context);
+    check(context.getCookieStore() != null && context.getCookieStore().getCookies().isEmpty(),
+        "cookie store creation");
+    CookieStore existing = new BasicCookieStore();
+    BasicClientCookie cookie = new BasicClientCookie("session", "secret-cookie");
+    cookie.setDomain("music.yandex.net");
+    cookie.setPath("/");
+    existing.addCookie(cookie);
+    context.setCookieStore(existing);
+    filter.onContextOpen(context);
+    check(context.getCookieStore() == existing && existing.getCookies().isEmpty(),
+        "existing cookie store reset");
+    filter.onContextClose(null);
+    check(!filter.onRequestResponse(null, null, null), "response retry policy");
+    check(!filter.onRequestException(null, null, new RuntimeException("fixture")),
+        "exception retry policy");
+
+    YandexHttpContextFilter.setOAuthToken(null);
+    HttpGet anonymous = new HttpGet("https://music.yandex.net/album/1/track/2");
+    filter.onRequest(context, anonymous, false);
+    checkHeader(anonymous, "User-Agent", "Yandex-Music-API");
+    checkHeader(anonymous, "X-Yandex-Music-Client", "WindowsPhone/3.20");
+    check(anonymous.getFirstHeader("Authorization") == null, "anonymous authorization");
+    filter.onRequest(context, anonymous, true);
+    check(anonymous.getHeaders("User-Agent").length == 1
+        && anonymous.getHeaders("X-Yandex-Music-Client").length == 1,
+        "repetition replaces headers");
+
+    YandexHttpContextFilter.setOAuthToken("secret-marker");
+    check(token.get(null).equals("secret-marker"), "setter stores token exactly");
+    HttpGet authenticated = new HttpGet("https://music.yandex.net/album/1/track/2");
+    if (args[0].equals("candidate")) {
+      try {
+        filter.onRequest(context, authenticated, false);
+        throw new AssertionError("legacy global OAuth forwarding unexpectedly succeeded");
+      } catch (UnsupportedOperationException error) {
+        check(error.getMessage().contains("Legacy global Yandex OAuth forwarding is unsupported"),
+            "stable unsupported disposition");
+      }
+      checkHeader(authenticated, "User-Agent", "Yandex-Music-API");
+      checkHeader(authenticated, "X-Yandex-Music-Client", "WindowsPhone/3.20");
+      check(authenticated.getFirstHeader("Authorization") == null,
+          "candidate leaked global authorization");
+      System.out.println("common=public-concrete,object-super,http-context-filter-interface,"
+          + "1-private-static-field,1-constructor,6-exported-methods;construction,static-setter,"
+          + "cookie-reset,context-close,non-secret-request-headers,repetition,false-retry-policy,"
+          + "reflection;service=global-oauth-rejected,current-origin-bounded-manager-auth");
+    } else {
+      check(args[0].equals("reference"), "unknown mode");
+      filter.onRequest(context, authenticated, false);
+      checkHeader(authenticated, "Authorization", "OAuth secret-marker");
+      System.out.println("common=public-concrete,object-super,http-context-filter-interface,"
+          + "1-private-static-field,1-constructor,6-exported-methods;construction,static-setter,"
+          + "cookie-reset,context-close,non-secret-request-headers,repetition,false-retry-policy,"
+          + "reflection;service=legacy-global-oauth-forwarding");
+    }
+    YandexHttpContextFilter.setOAuthToken(null);
+    check(token.get(null) == null, "token reset");
+  }
+
+  private static Method checkMethod(Class<?> type, String name, Class<?> returnType,
+      int modifiers, Class<?>... parameters) throws Exception {
+    Method method = type.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == modifiers && method.getReturnType() == returnType
+        && method.getExceptionTypes().length == 0 && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), name + " metadata");
+    return method;
+  }
+
+  private static void checkHeader(HttpUriRequest request, String name, String value) {
+    check(request.getFirstHeader(name) != null
+        && request.getFirstHeader(name).getValue().equals(value), name + " header");
   }
 
   private static void check(boolean condition, String message) {

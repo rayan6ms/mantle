@@ -17124,72 +17124,116 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The public concrete Object/HttpContextFilter shell, private static token field, construction, exact token capture, cookie reset, non-secret request headers, close behavior, and false retry decisions remain frozen; the class disposition is semantic because legacy global OAuth forwarding is rejected while current authentication is per-manager and origin-bounded.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-media/tests/phase12_yandex_music.rs",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0014-bounded-yandex-music-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexHttpContextFilter",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public no-argument constructor delegates directly to Object without adding instance state.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexHttpContextFilter",
       "symbol_kind": "METHOD",
       "member_name": "setOAuthToken",
       "descriptor": "(Ljava/lang/String;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public static setter stores and clears the exact nullable String identity in the frozen private static field; use of that global value by requests is separately retired.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexHttpContextFilter",
       "symbol_kind": "METHOD",
       "member_name": "onContextOpen",
       "descriptor": "(Lorg/apache/http/client/protocol/HttpClientContext;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Context opening creates a BasicCookieStore only when absent, preserves existing store identity, and clears all cookies for each request sequence exactly.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexHttpContextFilter",
       "symbol_kind": "METHOD",
       "member_name": "onContextClose",
       "descriptor": "(Lorg/apache/http/client/protocol/HttpClientContext;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Context closing remains an exact no-op, including for a null context.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexHttpContextFilter",
       "symbol_kind": "METHOD",
       "member_name": "onRequest",
       "descriptor": "(Lorg/apache/http/client/protocol/HttpClientContext;Lorg/apache/http/client/methods/HttpUriRequest;Z)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The HttpContextFilter signature, Yandex-Music-API and WindowsPhone client headers, and repetition replacement behavior remain exact, but a configured global OAuth token causes deterministic failure without an Authorization header; current native requests use explicit origin-bounded per-manager credentials.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-media/tests/phase12_yandex_music.rs",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0014-bounded-yandex-music-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexHttpContextFilter",
       "symbol_kind": "METHOD",
       "member_name": "onRequestResponse",
       "descriptor": "(Lorg/apache/http/client/protocol/HttpClientContext;Lorg/apache/http/client/methods/HttpUriRequest;Lorg/apache/http/HttpResponse;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Every response returns false without inspecting context, request, or response, preserving the exact no-retry decision.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexHttpContextFilter",
       "symbol_kind": "METHOD",
       "member_name": "onRequestException",
       "descriptor": "(Lorg/apache/http/client/protocol/HttpClientContext;Lorg/apache/http/client/methods/HttpUriRequest;Ljava/lang/Throwable;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Every request exception returns false without inspecting context, request, or throwable, preserving the exact no-retry decision.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicApiLoader",

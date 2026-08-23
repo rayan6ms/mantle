@@ -203,6 +203,8 @@ const DEFAULT_YANDEX_MUSIC_TRACK_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/yamusic/DefaultYandexMusicTrackLoader";
 const DEFAULT_YANDEX_SEARCH_PROVIDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/yamusic/DefaultYandexSearchProvider";
+const YANDEX_HTTP_CONTEXT_FILTER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/yamusic/YandexHttpContextFilter";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -281,6 +283,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     DEFAULT_YANDEX_MUSIC_PLAYLIST_LOADER_CLASS,
     DEFAULT_YANDEX_MUSIC_TRACK_LOADER_CLASS,
     DEFAULT_YANDEX_SEARCH_PROVIDER_CLASS,
+    YANDEX_HTTP_CONTEXT_FILTER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -667,6 +670,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | DEFAULT_YANDEX_MUSIC_PLAYLIST_LOADER_CLASS
             | DEFAULT_YANDEX_MUSIC_TRACK_LOADER_CLASS
             | DEFAULT_YANDEX_SEARCH_PROVIDER_CLASS
+            | YANDEX_HTTP_CONTEXT_FILTER_CLASS
     )
 }
 
@@ -952,6 +956,9 @@ fn replacement_body(
     }
     if class_name == DEFAULT_YANDEX_SEARCH_PROVIDER_CLASS {
         return default_yandex_search_provider_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == YANDEX_HTTP_CONTEXT_FILTER_CLASS {
+        return yandex_http_context_filter_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -17799,6 +17806,181 @@ fn default_yandex_search_provider_static_initializer(
             Instruction::Return,
         ],
     )
+}
+
+fn yandex_http_context_filter_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => {
+            let object = pool.add_class("java/lang/Object")?;
+            let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+            code(
+                pool,
+                1,
+                1,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Invokespecial(object_init),
+                    Instruction::Return,
+                ],
+            )
+        }
+        ("setOAuthToken", "(Ljava/lang/String;)V") => {
+            yandex_http_context_filter_set_oauth_token(pool)
+        }
+        ("onContextOpen", "(Lorg/apache/http/client/protocol/HttpClientContext;)V") => {
+            yandex_http_context_filter_context_open(pool)
+        }
+        ("onContextClose", "(Lorg/apache/http/client/protocol/HttpClientContext;)V") => {
+            code(pool, 0, 2, vec![Instruction::Return])
+        }
+        (
+            "onRequest",
+            "(Lorg/apache/http/client/protocol/HttpClientContext;Lorg/apache/http/client/methods/HttpUriRequest;Z)V",
+        ) => yandex_http_context_filter_request(pool),
+        (
+            "onRequestResponse",
+            "(Lorg/apache/http/client/protocol/HttpClientContext;Lorg/apache/http/client/methods/HttpUriRequest;Lorg/apache/http/HttpResponse;)Z",
+        )
+        | (
+            "onRequestException",
+            "(Lorg/apache/http/client/protocol/HttpClientContext;Lorg/apache/http/client/methods/HttpUriRequest;Ljava/lang/Throwable;)Z",
+        ) => code(
+            pool,
+            1,
+            4,
+            vec![Instruction::Iconst_0, Instruction::Ireturn],
+        ),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {YANDEX_HTTP_CONTEXT_FILTER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn yandex_http_context_filter_set_oauth_token(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(YANDEX_HTTP_CONTEXT_FILTER_CLASS)?;
+    let token = pool.add_field_ref(owner, "oAuthToken", "Ljava/lang/String;")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Putstatic(token),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn yandex_http_context_filter_context_open(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let context = pool.add_class("org/apache/http/client/protocol/HttpClientContext")?;
+    let get_cookie_store = pool.add_method_ref(
+        context,
+        "getCookieStore",
+        "()Lorg/apache/http/client/CookieStore;",
+    )?;
+    let set_cookie_store = pool.add_method_ref(
+        context,
+        "setCookieStore",
+        "(Lorg/apache/http/client/CookieStore;)V",
+    )?;
+    let basic_store = pool.add_class("org/apache/http/impl/client/BasicCookieStore")?;
+    let basic_store_init = pool.add_method_ref(basic_store, "<init>", "()V")?;
+    let cookie_store = pool.add_class("org/apache/http/client/CookieStore")?;
+    let clear = pool.add_interface_method_ref(cookie_store, "clear", "()V")?;
+    let mut body = code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(get_cookie_store),
+            Instruction::Astore_2,
+            Instruction::Aload_2,
+            Instruction::Ifnonnull(12),
+            Instruction::New(basic_store),
+            Instruction::Dup,
+            Instruction::Invokespecial(basic_store_init),
+            Instruction::Astore_2,
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(set_cookie_store),
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(clear, 1),
+            Instruction::Return,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::AppendFrame {
+            frame_type: 252,
+            offset_delta: 12,
+            locals: vec![VerificationType::Object {
+                cpool_index: cookie_store,
+            }],
+        }],
+    )?;
+    Ok(body)
+}
+
+fn yandex_http_context_filter_request(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let request = pool.add_class("org/apache/http/client/methods/HttpUriRequest")?;
+    let set_header = pool.add_interface_method_ref(
+        request,
+        "setHeader",
+        "(Ljava/lang/String;Ljava/lang/String;)V",
+    )?;
+    let owner = pool.add_class(YANDEX_HTTP_CONTEXT_FILTER_CLASS)?;
+    let token = pool.add_field_ref(owner, "oAuthToken", "Ljava/lang/String;")?;
+    let user_agent = pool.add_string("User-Agent")?;
+    let user_agent_value = pool.add_string("Yandex-Music-API")?;
+    let client = pool.add_string("X-Yandex-Music-Client")?;
+    let client_value = pool.add_string("WindowsPhone/3.20")?;
+    let exception = pool.add_class("java/lang/UnsupportedOperationException")?;
+    let exception_init = pool.add_method_ref(exception, "<init>", "(Ljava/lang/String;)V")?;
+    let message = pool.add_string(
+        "Legacy global Yandex OAuth forwarding is unsupported; use Mantle's bounded per-manager credentials.",
+    )?;
+    let mut body = code(
+        pool,
+        3,
+        4,
+        vec![
+            Instruction::Aload_2,
+            Instruction::Ldc_w(user_agent),
+            Instruction::Ldc_w(user_agent_value),
+            Instruction::Invokeinterface(set_header, 3),
+            Instruction::Aload_2,
+            Instruction::Ldc_w(client),
+            Instruction::Ldc_w(client_value),
+            Instruction::Invokeinterface(set_header, 3),
+            Instruction::Getstatic(token),
+            Instruction::Ifnull(15),
+            Instruction::New(exception),
+            Instruction::Dup,
+            Instruction::Ldc_w(message),
+            Instruction::Invokespecial(exception_init),
+            Instruction::Athrow,
+            Instruction::Return,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::SameFrame { frame_type: 15 }],
+    )?;
+    Ok(body)
 }
 
 fn default_yandex_music_playlist_loader_constructor(
