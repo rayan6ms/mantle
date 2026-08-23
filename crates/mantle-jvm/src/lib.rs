@@ -638,6 +638,18 @@ pub extern "system" fn Java_dev_mantle_internal_MantleNative_processTwitchTrack<
 
 #[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
 #[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_mantle_internal_MantleNative_processVimeoTrack<'local>(
+    mut env: EnvUnowned<'local>,
+    _class: JClass<'local>,
+    track: JObject<'local>,
+    executor: JObject<'local>,
+) {
+    env.with_env(|env| playback_bridge::process_vimeo_track(env, &track, &executor))
+        .resolve::<ThrowRuntimeExAndDefault>();
+}
+
+#[allow(unsafe_code, reason = "JNI requires stable exported symbol names")]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_dev_mantle_internal_MantleNative_cancelLoad<'local>(
     mut env: EnvUnowned<'local>,
     _class: JClass<'local>,

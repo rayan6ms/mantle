@@ -16780,54 +16780,60 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The public concrete DelegatedAudioTrack shell, frozen fields, construction, source identity, relative-URL helper, and cloning remain compatible while playback deliberately uses the bounded current Vimeo resolver instead of legacy viewer-JWT and HLS/MPEG dispatch.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "crates/mantle-jvm/src/playback_bridge.rs", "crates/mantle-media/tests/phase12_vimeo.rs", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "docs/architecture/ADR-0017-bounded-vimeo-source.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioSourceManager;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The sole public constructor delegates the exact AudioTrackInfo reference to DelegatedAudioTrack and retains the exact VimeoAudioSourceManager reference.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Processing preserves the LocalAudioTrackExecutor boundary but resolves fresh current Vimeo metadata and bounded progressive MP4 through native playback, with optional explicit caller access-token credentials and deterministic pre-network failure for invalid credentials, rather than invoking legacy viewer-JWT, HLS, or MPEG paths.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "crates/mantle-jvm/src/playback_bridge.rs", "crates/mantle-media/tests/phase12_vimeo.rs", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "docs/architecture/ADR-0017-bounded-vimeo-source.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "resolveRelativeUrl",
       "descriptor": "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The protected helper exactly preserves simple, leading-slash, and repeated parent-relative URL resolution, including the reference null and root-parent exception behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "makeShallowClone",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Shallow cloning reconstructs VimeoAudioTrack with the inherited exact AudioTrackInfo reference and the same source-manager identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "getSourceManager",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The source-manager accessor returns the exact constructor-supplied VimeoAudioSourceManager through the AudioSourceManager contract.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.AbstractYandexMusicApiLoader",

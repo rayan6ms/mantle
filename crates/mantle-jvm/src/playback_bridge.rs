@@ -14,7 +14,8 @@ use mantle_media::{
     SoundCloudPlaybackSession, SoundCloudSourceManager, SoundCloudSourceOptions,
     TwitchAuthentication, TwitchLivePlaybackOptions, TwitchLivePlaybackPoll,
     TwitchLivePlaybackSession, TwitchSourceManager, TwitchSourceOptions, TwitchSourceTrack,
-    route_twitch_identifier,
+    VimeoAuthentication, VimeoPlaybackSession, VimeoSourceManager, VimeoSourceOptions,
+    VimeoSourceTrack, route_twitch_identifier,
 };
 
 const TRANSCODE_INPUT_CHUNK_FRAMES: usize = 1_024;
@@ -132,6 +133,46 @@ pub(crate) fn process_twitch_track(
         )
         .map_err(|_| failure("current Twitch playback discovery failed"))?;
     process_twitch_live_session(env, executor, session, &cancellation)
+}
+
+pub(crate) fn process_vimeo_track(
+    env: &mut Env<'_>,
+    track: &JObject<'_>,
+    executor: &JObject<'_>,
+) -> jni::errors::Result<()> {
+    let options = VimeoSourceOptions::default();
+    let manager = match system_property(env, "dev.mantle.vimeo.accessToken")? {
+        Some(access_token) => {
+            let authentication = VimeoAuthentication::new(access_token)
+                .map_err(|_| failure("invalid Vimeo JVM access token"))?;
+            VimeoSourceManager::with_authentication(options, authentication)
+        }
+        None => VimeoSourceManager::new(options),
+    }
+    .map_err(|_| failure("could not create current Vimeo playback source"))?;
+    let java_info = env
+        .get_field(
+            track,
+            jni_str!("trackInfo"),
+            jni_sig!("Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;"),
+        )?
+        .l()?;
+    let source_track = VimeoSourceTrack {
+        info: crate::track_info_from_java(env, &java_info)?,
+        playback: None,
+    };
+    let cancellation = MediaCancellation::new();
+    let session = manager
+        .open_track_playback(
+            &source_track,
+            HttpRangeOptions::default(),
+            MediaLimits::default(),
+            cancellation.clone(),
+        )
+        .map_err(|_| failure("current Vimeo playback handoff failed"))?
+        .ok_or_else(|| failure("current Vimeo track has no compatible playback"))?;
+
+    process_playback_session(env, executor, session, &cancellation)
 }
 
 fn process_playback_session<S: PcmPlaybackSession>(
@@ -408,6 +449,17 @@ impl PcmPlaybackSession for SoundCloudPlaybackSession {
     fn read_pcm(&mut self, output: &mut PcmFrame) -> jni::errors::Result<bool> {
         self.read_pcm(output)
             .map_err(|_| failure("SoundCloud media decoding failed"))
+    }
+}
+
+impl PcmPlaybackSession for VimeoPlaybackSession {
+    fn info(&self) -> &MediaInfo {
+        self.info()
+    }
+
+    fn read_pcm(&mut self, output: &mut PcmFrame) -> jni::errors::Result<bool> {
+        self.read_pcm(output)
+            .map_err(|_| failure("Vimeo media decoding failed"))
     }
 }
 

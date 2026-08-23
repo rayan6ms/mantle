@@ -189,6 +189,8 @@ const VIMEO_AUDIO_SOURCE_MANAGER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioSourceManager";
 const VIMEO_PLAYBACK_FORMAT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioSourceManager$PlaybackFormat";
+const VIMEO_AUDIO_TRACK_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioTrack";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -260,6 +262,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     TWITCH_STREAM_SEGMENT_URL_PROVIDER_CLASS,
     VIMEO_AUDIO_SOURCE_MANAGER_CLASS,
     VIMEO_PLAYBACK_FORMAT_CLASS,
+    VIMEO_AUDIO_TRACK_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -605,78 +608,90 @@ fn method_key(class: &ClassFile<'_>, method: &Method) -> Result<(String, String)
     ))
 }
 
+fn retain_private_fields(class_name: &str) -> bool {
+    matches!(
+        class_name,
+        PLAYER_LIFECYCLE_MANAGER_CLASS
+            | FUNCTIONAL_RESULT_HANDLER_CLASS
+            | TRACK_MARKER_TRACKER_CLASS
+            | BASE_AUDIO_TRACK_CLASS
+            | DELEGATED_AUDIO_TRACK_CLASS
+            | TRACK_INFO_BUILDER_CLASS
+            | ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
+            | NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
+            | PROBING_AUDIO_SOURCE_MANAGER_CLASS
+            | LOCAL_AUDIO_TRACK_CLASS
+            | LOCAL_SEEKABLE_INPUT_STREAM_CLASS
+            | HEARTBEATING_HTTP_STREAM_CLASS
+            | NICO_AUDIO_SOURCE_MANAGER_CLASS
+            | NICO_AUDIO_TRACK_CLASS
+            | DEFAULT_SOUND_CLOUD_DATA_READER_CLASS
+            | DEFAULT_SOUND_CLOUD_FORMAT_HANDLER_CLASS
+            | DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS
+            | DEFAULT_SOUND_CLOUD_TRACK_FORMAT_CLASS
+            | SOUND_CLOUD_AUDIO_SOURCE_MANAGER_CLASS
+            | SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS
+            | SOUND_CLOUD_AUDIO_TRACK_CLASS
+            | SOUND_CLOUD_CLIENT_ID_TRACKER_CLASS
+            | SOUND_CLOUD_HTTP_CONTEXT_FILTER_CLASS
+            | SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS
+            | SOUND_CLOUD_MP3_SEGMENT_DECODER_CLASS
+            | SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS
+            | M3U_SEGMENT_URL_PROVIDER_CLASS
+            | TWITCH_CONSTANTS_CLASS
+            | TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS
+            | TWITCH_STREAM_AUDIO_TRACK_CLASS
+            | TWITCH_STREAM_SEGMENT_URL_PROVIDER_CLASS
+            | VIMEO_AUDIO_SOURCE_MANAGER_CLASS
+            | VIMEO_AUDIO_TRACK_CLASS
+    )
+}
+
+fn retain_private_methods(class_name: &str) -> bool {
+    matches!(
+        class_name,
+        TRACK_INFO_BUILDER_CLASS
+            | ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
+            | NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
+            | LOCAL_SEEKABLE_INPUT_STREAM_CLASS
+            | HEARTBEATING_HTTP_STREAM_CLASS
+            | NICO_AUDIO_SOURCE_MANAGER_CLASS
+            | NICO_AUDIO_TRACK_CLASS
+            | DEFAULT_SOUND_CLOUD_DATA_LOADER_CLASS
+            | DEFAULT_SOUND_CLOUD_DATA_READER_CLASS
+            | DEFAULT_SOUND_CLOUD_FORMAT_HANDLER_CLASS
+            | DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS
+            | SOUND_CLOUD_AUDIO_SOURCE_MANAGER_CLASS
+            | SOUND_CLOUD_AUDIO_TRACK_CLASS
+            | SOUND_CLOUD_CLIENT_ID_TRACKER_CLASS
+            | SOUND_CLOUD_HTTP_CONTEXT_FILTER_CLASS
+            | SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS
+            | SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS
+            | M3U_STREAM_AUDIO_TRACK_CLASS
+            | M3U_SEGMENT_URL_PROVIDER_CLASS
+            | M3U_CHANNEL_STREAM_INFO_CLASS
+            | M3U_SEGMENT_INFO_CLASS
+            | TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS
+            | TWITCH_STREAM_AUDIO_TRACK_CLASS
+            | TWITCH_STREAM_SEGMENT_URL_PROVIDER_CLASS
+            | VIMEO_AUDIO_SOURCE_MANAGER_CLASS
+            | VIMEO_AUDIO_TRACK_CLASS
+    )
+}
+
 fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<'static>> {
     let class_name = class.class_name()?.to_string();
     class.fields.retain(|field| {
-        matches!(
-            class_name.as_str(),
-            PLAYER_LIFECYCLE_MANAGER_CLASS
-                | FUNCTIONAL_RESULT_HANDLER_CLASS
-                | TRACK_MARKER_TRACKER_CLASS
-                | BASE_AUDIO_TRACK_CLASS
-                | DELEGATED_AUDIO_TRACK_CLASS
-                | TRACK_INFO_BUILDER_CLASS
-                | ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
-                | NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
-                | PROBING_AUDIO_SOURCE_MANAGER_CLASS
-                | LOCAL_AUDIO_TRACK_CLASS
-                | LOCAL_SEEKABLE_INPUT_STREAM_CLASS
-                | HEARTBEATING_HTTP_STREAM_CLASS
-                | NICO_AUDIO_SOURCE_MANAGER_CLASS
-                | NICO_AUDIO_TRACK_CLASS
-                | DEFAULT_SOUND_CLOUD_DATA_READER_CLASS
-                | DEFAULT_SOUND_CLOUD_FORMAT_HANDLER_CLASS
-                | DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS
-                | DEFAULT_SOUND_CLOUD_TRACK_FORMAT_CLASS
-                | SOUND_CLOUD_AUDIO_SOURCE_MANAGER_CLASS
-                | SOUND_CLOUD_AUDIO_SOURCE_MANAGER_BUILDER_CLASS
-                | SOUND_CLOUD_AUDIO_TRACK_CLASS
-                | SOUND_CLOUD_CLIENT_ID_TRACKER_CLASS
-                | SOUND_CLOUD_HTTP_CONTEXT_FILTER_CLASS
-                | SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS
-                | SOUND_CLOUD_MP3_SEGMENT_DECODER_CLASS
-                | SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS
-                | M3U_SEGMENT_URL_PROVIDER_CLASS
-                | TWITCH_CONSTANTS_CLASS
-                | TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS
-                | TWITCH_STREAM_AUDIO_TRACK_CLASS
-                | TWITCH_STREAM_SEGMENT_URL_PROVIDER_CLASS
-                | VIMEO_AUDIO_SOURCE_MANAGER_CLASS
-        ) || field
-            .access_flags
-            .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
+        retain_private_fields(&class_name)
+            || field
+                .access_flags
+                .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
     });
     class.methods.retain(|method| {
-        matches!(
-            class_name.as_str(),
-            TRACK_INFO_BUILDER_CLASS
-                | ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
-                | NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
-                | LOCAL_SEEKABLE_INPUT_STREAM_CLASS
-                | HEARTBEATING_HTTP_STREAM_CLASS
-                | NICO_AUDIO_SOURCE_MANAGER_CLASS
-                | NICO_AUDIO_TRACK_CLASS
-                | DEFAULT_SOUND_CLOUD_DATA_LOADER_CLASS
-                | DEFAULT_SOUND_CLOUD_DATA_READER_CLASS
-                | DEFAULT_SOUND_CLOUD_FORMAT_HANDLER_CLASS
-                | DEFAULT_SOUND_CLOUD_PLAYLIST_LOADER_CLASS
-                | SOUND_CLOUD_AUDIO_SOURCE_MANAGER_CLASS
-                | SOUND_CLOUD_AUDIO_TRACK_CLASS
-                | SOUND_CLOUD_CLIENT_ID_TRACKER_CLASS
-                | SOUND_CLOUD_HTTP_CONTEXT_FILTER_CLASS
-                | SOUND_CLOUD_M3U_AUDIO_TRACK_CLASS
-                | SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS
-                | M3U_STREAM_AUDIO_TRACK_CLASS
-                | M3U_SEGMENT_URL_PROVIDER_CLASS
-                | M3U_CHANNEL_STREAM_INFO_CLASS
-                | M3U_SEGMENT_INFO_CLASS
-                | TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS
-                | TWITCH_STREAM_AUDIO_TRACK_CLASS
-                | TWITCH_STREAM_SEGMENT_URL_PROVIDER_CLASS
-                | VIMEO_AUDIO_SOURCE_MANAGER_CLASS
-        ) || method
-            .access_flags
-            .intersects(MethodAccessFlags::PUBLIC | MethodAccessFlags::PROTECTED)
+        retain_private_methods(&class_name)
+            || method
+                .access_flags
+                .intersects(MethodAccessFlags::PUBLIC | MethodAccessFlags::PROTECTED)
     });
 
     let pool = &mut class.constant_pool;
@@ -871,6 +886,9 @@ fn replacement_body(
     }
     if class_name == VIMEO_PLAYBACK_FORMAT_CLASS {
         return vimeo_playback_format_replacement(pool, name, descriptor);
+    }
+    if class_name == VIMEO_AUDIO_TRACK_CLASS {
+        return vimeo_audio_track_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -17236,6 +17254,223 @@ fn vimeo_playback_format_constructor(pool: &mut ConstantPool<'static>) -> Result
     )
 }
 
+fn vimeo_audio_track_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioSourceManager;)V",
+        ) => vimeo_audio_track_constructor(pool),
+        (
+            "process",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+        ) => vimeo_audio_track_process(pool),
+        ("resolveRelativeUrl", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;") => {
+            vimeo_audio_track_resolve_relative_url(pool)
+        }
+        ("makeShallowClone", "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;") => {
+            vimeo_audio_track_shallow_clone(pool)
+        }
+        ("getSourceManager", "()Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;") => {
+            object_getter(
+                pool,
+                VIMEO_AUDIO_TRACK_CLASS,
+                "sourceManager",
+                "Lcom/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioSourceManager;",
+            )
+        }
+        ("<clinit>", "()V") => vimeo_audio_track_clinit(pool),
+        (
+            "extractHlsAudioPlaylistUrl",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/lang/String;)Ljava/lang/String;",
+        ) => unsupported_body(
+            pool,
+            "Legacy Vimeo HLS playlist extraction is unsupported; use Mantle's bounded progressive MP4 source.",
+            required_locals,
+        ),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {VIMEO_AUDIO_TRACK_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn vimeo_audio_track_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let parent = pool.add_class(DELEGATED_AUDIO_TRACK_CLASS)?;
+    let parent_init = pool.add_method_ref(
+        parent,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V",
+    )?;
+    let owner = pool.add_class(VIMEO_AUDIO_TRACK_CLASS)?;
+    let source = pool.add_field_ref(
+        owner,
+        "sourceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioSourceManager;",
+    )?;
+    code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(parent_init),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(source),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn vimeo_audio_track_process(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let native = pool.add_class(NATIVE_CLASS)?;
+    let process = pool.add_method_ref(
+        native,
+        "processVimeoTrack",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+    )?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokestatic(process),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn vimeo_audio_track_resolve_relative_url(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let string = pool.add_class("java/lang/String")?;
+    let starts_with = pool.add_method_ref(string, "startsWith", "(Ljava/lang/String;)Z")?;
+    let substring_from = pool.add_method_ref(string, "substring", "(I)Ljava/lang/String;")?;
+    let substring_range = pool.add_method_ref(string, "substring", "(II)Ljava/lang/String;")?;
+    let last_index = pool.add_method_ref(string, "lastIndexOf", "(I)I")?;
+    let value_of =
+        pool.add_method_ref(string, "valueOf", "(Ljava/lang/Object;)Ljava/lang/String;")?;
+    let concat = pool.add_method_ref(string, "concat", "(Ljava/lang/String;)Ljava/lang/String;")?;
+    let parent = pool.add_string("../")?;
+    let slash = pool.add_string("/")?;
+    let mut body = code(
+        pool,
+        4,
+        3,
+        vec![
+            Instruction::Nop,
+            Instruction::Aload_2,
+            Instruction::Ldc_w(parent),
+            Instruction::Invokevirtual(starts_with),
+            Instruction::Ifeq(17),
+            Instruction::Aload_2,
+            Instruction::Iconst_3,
+            Instruction::Invokevirtual(substring_from),
+            Instruction::Astore_2,
+            Instruction::Aload_1,
+            Instruction::Iconst_0,
+            Instruction::Aload_1,
+            Instruction::Bipush(47),
+            Instruction::Invokevirtual(last_index),
+            Instruction::Invokevirtual(substring_range),
+            Instruction::Astore_1,
+            Instruction::Goto(1),
+            Instruction::Aload_1,
+            Instruction::Invokestatic(value_of),
+            Instruction::Aload_2,
+            Instruction::Ldc_w(slash),
+            Instruction::Invokevirtual(starts_with),
+            Instruction::Ifeq(26),
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(concat),
+            Instruction::Areturn,
+            Instruction::Ldc_w(slash),
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(concat),
+            Instruction::Invokevirtual(concat),
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::SameFrame { frame_type: 1 },
+            StackFrame::SameFrame { frame_type: 15 },
+            StackFrame::SameLocals1StackItemFrame {
+                frame_type: 72,
+                stack: vec![VerificationType::Object {
+                    cpool_index: string,
+                }],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn vimeo_audio_track_shallow_clone(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(VIMEO_AUDIO_TRACK_CLASS)?;
+    let info = pool.add_field_ref(
+        owner,
+        "trackInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let source = pool.add_field_ref(
+        owner,
+        "sourceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioSourceManager;",
+    )?;
+    let init = pool.add_method_ref(
+        owner,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioSourceManager;)V",
+    )?;
+    code(
+        pool,
+        4,
+        1,
+        vec![
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(info),
+            Instruction::Aload_0,
+            Instruction::Getfield(source),
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn vimeo_audio_track_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(VIMEO_AUDIO_TRACK_CLASS)?;
+    let factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
 #[allow(clippy::too_many_lines)]
 fn m3u_stream_provider_class() -> Result<ClassFile<'static>> {
     const TRACK_DESCRIPTOR: &str =
@@ -18455,6 +18690,10 @@ fn native_class(expected_abi: u8) -> Result<ClassFile<'static>> {
         (
             "processTwitchTrack",
             "(Lcom/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+        ),
+        (
+            "processVimeoTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
         ),
         (
             "loadItemReference",
