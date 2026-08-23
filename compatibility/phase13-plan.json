@@ -602,8 +602,8 @@
       "objective": "Expand source SPI, built-in manager shells, class lookup, and serialization-visible types.",
       "exit_evidence": "Source SPI extension tests, source lookup tests, per-symbol ledger entries, and Revapi diff.",
       "status": "IN_PROGRESS",
-      "classified_symbols": 248,
-      "remaining_symbols": 450,
+      "classified_symbols": 265,
+      "remaining_symbols": 433,
       "completed_slices": [
         {
           "id": "audio-source-manager-interface-contracts",
@@ -1072,6 +1072,22 @@
             "tools/jvm-gate/src/emitter.rs",
             "tools/jvm-gate/src/main.rs"
           ]
+        },
+        {
+          "id": "twitch-stream-audio-source-manager-contracts",
+          "classes": 1,
+          "fields": 0,
+          "methods": 16,
+          "symbols": 17,
+          "classification": "A_EXACT/C_SEMANTIC",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "crates/mantle-jvm/src/load_bridge.rs",
+            "crates/mantle-media/tests/phase12_twitch.rs",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs",
+            "docs/architecture/ADR-0018-bounded-twitch-live-source.md"
+          ]
         }
       ]
     },
@@ -1193,7 +1209,7 @@
   "phase_entry": {
     "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
     "first_execution_cohort": "core-player-track",
-    "next_slice": "twitch-stream-audio-source-manager-contracts",
+    "next_slice": "twitch-stream-audio-track-contracts",
     "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
   }
 }

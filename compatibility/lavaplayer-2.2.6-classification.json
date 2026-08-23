@@ -16310,153 +16310,170 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The public manager and SPI shell is retained, while caller-owned bounded Helix metadata replaces legacy homepage credential scraping and undocumented GraphQL metadata.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_twitch.rs", "docs/architecture/ADR-0018-bounded-twitch-live-source.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Construction preserves the public zero-argument shell and initialized HTTP manager but reads explicit JVM credential properties without legacy homepage network access.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_twitch.rs", "docs/architecture/ADR-0018-bounded-twitch-live-source.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getClientId",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The getter preserves field identity, with the field now populated from the explicit dev.mantle.twitch.clientId JVM credential boundary instead of scraped page state.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_twitch.rs", "docs/architecture/ADR-0018-bounded-twitch-live-source.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getDeviceId",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The getter preserves field identity, with the optional device ID now populated from the explicit dev.mantle.twitch.deviceId JVM property instead of harvested cookies.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_twitch.rs", "docs/architecture/ADR-0018-bounded-twitch-live-source.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getSourceName",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves the exact twitch source name.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "loadItem",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The manager contract remains synchronous and route-filtered, while recognized channels cross the bounded native Helix resolver with explicit client-ID and OAuth properties and no homepage scrape.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_twitch.rs", "docs/architecture/ADR-0018-bounded-twitch-live-source.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "isTrackEncodable",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves unconditional Twitch track encodability, including null input.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "encodeTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Ljava/io/DataOutput;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves empty source-detail encoding without accessing either argument.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "decodeTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves empty-detail decoding into a Twitch track with exact track-info and source-manager identity and no DataInput access.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getChannelIdentifierFromUrl",
       "descriptor": "(Ljava/lang/String;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves the exact HTTPS Twitch host regex, Locale.ROOT lowercasing, null behavior, and rejection shapes.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "createGetRequest",
       "descriptor": "(Ljava/lang/String;)Lorg/apache/http/client/methods/HttpUriRequest;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves String-based HttpGet construction, URI value, and Client-ID and X-Device-ID headers.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "createGetRequest",
       "descriptor": "(Ljava/net/URI;)Lorg/apache/http/client/methods/HttpUriRequest;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves URI-based HttpGet construction, URI identity by value, and Client-ID and X-Device-ID headers.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getHttpInterface",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "HTTP-interface delegation and identity are retained for the compatibility shell, while Twitch service traffic is owned by the bounded native client.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_twitch.rs", "docs/architecture/ADR-0018-bounded-twitch-live-source.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "configureRequests",
       "descriptor": "(Ljava/util/function/Function;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Request-configuration delegation and argument identity remain compatible on the retained JVM HTTP shell; current Twitch service requests use the bounded native client policy.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_twitch.rs", "docs/architecture/ADR-0018-bounded-twitch-live-source.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "configureBuilder",
       "descriptor": "(Ljava/util/function/Consumer;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Builder-configuration delegation and argument identity remain compatible on the retained JVM HTTP shell; current Twitch service requests use the bounded native client policy.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_twitch.rs", "docs/architecture/ADR-0018-bounded-twitch-live-source.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "fetchAccessToken",
       "descriptor": "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The protected hook remains present but deterministically rejects the obsolete undocumented GraphQL token exchange; bounded playback owns a credential-separated compatibility query.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_twitch.rs", "docs/architecture/ADR-0018-bounded-twitch-live-source.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "shutdown",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves repeatable shutdown delegation to the owned HTTP-interface manager.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioTrack",

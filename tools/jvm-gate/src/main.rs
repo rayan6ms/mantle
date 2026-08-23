@@ -177,6 +177,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
             Some(MPEG_TS_M3U_STREAM_AUDIO_TRACK_CONSUMER)
         }
         "write-twitch-constants-consumer" => Some(TWITCH_CONSTANTS_CONSUMER),
+        "write-twitch-stream-audio-source-manager-consumer" => {
+            Some(TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -14770,6 +14773,345 @@ public final class GateTwitchConstants {
         + "format-substitution,constant-identity,reflection");
   }
 
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamAudioTrack;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpConfigurable;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.net.URI;
+import java.util.Arrays;
+import java.util.Locale;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.protocol.HttpClientContext;
+
+public final class GateTwitchStreamAudioSourceManager {
+  private static final Object UNSAFE = loadUnsafe();
+
+  public static void main(String[] args) throws Exception {
+    check(args.length >= 1 && args.length <= 2, "expected disposition and optional native path");
+    boolean reference = args[0].equals("reference");
+    check(reference || args[0].equals("candidate"), "unknown disposition");
+    check(reference == (args.length == 1), "candidate requires native path");
+    reflectionContract();
+    commonBehavior();
+    if (!reference) currentDisposition(args[1]);
+    System.out.println(
+        "common=public-concrete,6-fields,1-constructor,15-exported-methods,"
+        + "source-name,legacy-route,empty-details,decode,requests,headers,http-config,shutdown;service="
+        + (reference ? "legacy-homepage-graphql" :
+            "current-helix,explicit-credentials,no-homepage-scrape,bounded-native"));
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<TwitchStreamAudioSourceManager> type = TwitchStreamAudioSourceManager.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(),
+            new Class<?>[] {AudioSourceManager.class, HttpConfigurable.class}), "class metadata");
+    check(type.getDeclaredFields().length == 6, "field count");
+    checkField(type, "log", Class.forName("org.slf4j.Logger"),
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "STREAM_NAME_REGEX", String.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "streamNameRegex", Pattern.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "httpInterfaceManager", HttpInterfaceManager.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "twitchClientId", String.class, Modifier.PRIVATE);
+    checkField(type, "twitchDeviceId", String.class, Modifier.PRIVATE);
+
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "constructor metadata");
+    check(type.getDeclaredMethods().length == 18, "method count");
+    long exported = Arrays.stream(type.getDeclaredMethods())
+        .filter(method -> Modifier.isPublic(method.getModifiers())
+            || Modifier.isProtected(method.getModifiers()))
+        .count();
+    check(exported == 15L, "exported method count");
+    checkMethod(type, "getClientId", String.class, Modifier.PUBLIC, new Class<?>[0]);
+    checkMethod(type, "getDeviceId", String.class, Modifier.PUBLIC, new Class<?>[0]);
+    checkMethod(type, "getSourceName", String.class, Modifier.PUBLIC, new Class<?>[0]);
+    checkMethod(type, "loadItem",
+        com.sedmelluq.discord.lavaplayer.track.AudioItem.class, Modifier.PUBLIC,
+        new Class<?>[] {com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager.class,
+            AudioReference.class});
+    checkMethod(type, "isTrackEncodable", boolean.class, Modifier.PUBLIC,
+        new Class<?>[] {AudioTrack.class});
+    checkMethod(type, "encodeTrack", void.class, Modifier.PUBLIC,
+        new Class<?>[] {AudioTrack.class, DataOutput.class}, java.io.IOException.class);
+    checkMethod(type, "decodeTrack", AudioTrack.class, Modifier.PUBLIC,
+        new Class<?>[] {AudioTrackInfo.class, DataInput.class}, java.io.IOException.class);
+    checkMethod(type, "getChannelIdentifierFromUrl", String.class,
+        Modifier.PUBLIC | Modifier.STATIC, new Class<?>[] {String.class});
+    checkMethod(type, "createGetRequest", HttpUriRequest.class, Modifier.PUBLIC,
+        new Class<?>[] {String.class});
+    checkMethod(type, "createGetRequest", HttpUriRequest.class, Modifier.PUBLIC,
+        new Class<?>[] {URI.class});
+    checkMethod(type, "getHttpInterface", HttpInterface.class, Modifier.PUBLIC,
+        new Class<?>[0]);
+    checkMethod(type, "configureRequests", void.class, Modifier.PUBLIC,
+        new Class<?>[] {java.util.function.Function.class});
+    checkMethod(type, "configureBuilder", void.class, Modifier.PUBLIC,
+        new Class<?>[] {java.util.function.Consumer.class});
+    checkMethod(type, "fetchAccessToken", JsonBrowser.class, Modifier.PROTECTED,
+        new Class<?>[] {String.class});
+    checkMethod(type, "shutdown", void.class, Modifier.PUBLIC, new Class<?>[0]);
+  }
+
+  private static void commonBehavior() throws Exception {
+    RecordingHttpInterface http = new RecordingHttpInterface();
+    ManagerHandler handler = new ManagerHandler(http);
+    TwitchStreamAudioSourceManager manager = fabricated(handler.proxy(), "client-fixture",
+        "device-fixture");
+    check(manager.getSourceName().equals("twitch")
+        && manager.getClientId().equals("client-fixture")
+        && manager.getDeviceId().equals("device-fixture"), "source and credential getters");
+
+    Locale previous = Locale.getDefault();
+    try {
+      Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+      check("mixed_i".equals(TwitchStreamAudioSourceManager.getChannelIdentifierFromUrl(
+          "https://www.twitch.tv/MIXED_I")), "locale-root route normalization");
+    } finally {
+      Locale.setDefault(previous);
+    }
+    check("channel".equals(TwitchStreamAudioSourceManager.getChannelIdentifierFromUrl(
+        "https://twitch.tv/Channel")), "bare host route");
+    check("channel".equals(TwitchStreamAudioSourceManager.getChannelIdentifierFromUrl(
+        "https://go.twitch.tv/Channel")), "go host route");
+    check("channel".equals(TwitchStreamAudioSourceManager.getChannelIdentifierFromUrl(
+        "https://m.twitch.tv/Channel")), "mobile host route");
+    for (String rejected : new String[] {"http://twitch.tv/channel",
+        "https://example.invalid/channel", "https://twitch.tv/channel/extra",
+        "twitch.tv/channel"}) {
+      check(TwitchStreamAudioSourceManager.getChannelIdentifierFromUrl(rejected) == null,
+          "route rejection: " + rejected);
+    }
+    expect(NullPointerException.class,
+        () -> TwitchStreamAudioSourceManager.getChannelIdentifierFromUrl(null));
+
+    check(manager.isTrackEncodable(null), "encodability");
+    manager.encodeTrack(null, proxy(DataOutput.class));
+    AudioTrackInfo info = new AudioTrackInfo("title", "author", 1234L, "channel", true,
+        "https://www.twitch.tv/channel", "art", null);
+    AudioTrack decoded = manager.decodeTrack(info, proxy(DataInput.class));
+    check(decoded instanceof TwitchStreamAudioTrack && decoded.getInfo() == info
+        && decoded.getSourceManager() == manager, "empty-detail decode");
+
+    HttpUriRequest fromText = manager.createGetRequest("https://example.invalid/text");
+    HttpUriRequest fromUri = manager.createGetRequest(URI.create("https://example.invalid/uri"));
+    check(fromText.getURI().equals(URI.create("https://example.invalid/text"))
+        && fromUri.getURI().equals(URI.create("https://example.invalid/uri")), "request URIs");
+    for (HttpUriRequest request : new HttpUriRequest[] {fromText, fromUri}) {
+      check("client-fixture".equals(request.getFirstHeader("Client-ID").getValue())
+          && "device-fixture".equals(request.getFirstHeader("X-Device-ID").getValue()),
+          "request headers");
+    }
+
+    java.util.function.Function<org.apache.http.client.config.RequestConfig,
+        org.apache.http.client.config.RequestConfig> requestConfig = value -> value;
+    java.util.function.Consumer<org.apache.http.impl.client.HttpClientBuilder> builderConfig =
+        value -> {};
+    check(manager.getHttpInterface() == http, "HTTP interface identity");
+    manager.configureRequests(requestConfig);
+    manager.configureBuilder(builderConfig);
+    check(handler.requestConfig == requestConfig && handler.builderConfig == builderConfig,
+        "HTTP configuration identity");
+    manager.shutdown();
+    manager.shutdown();
+    check(handler.closes.get() == 2, "shutdown delegation");
+  }
+
+  private static void currentDisposition(String nativeLibrary) throws Exception {
+    Class.forName("dev.mantle.internal.NativeLoader")
+        .getMethod("load", String.class).invoke(null, nativeLibrary);
+    clearProperties();
+    TwitchStreamAudioSourceManager empty = new TwitchStreamAudioSourceManager();
+    check(empty.getClientId() == null && empty.getDeviceId() == null,
+        "constructor does not scrape credentials");
+    empty.shutdown();
+
+    System.setProperty("dev.mantle.twitch.clientId", "client-current");
+    System.setProperty("dev.mantle.twitch.accessToken", "oauth-current");
+    System.setProperty("dev.mantle.twitch.deviceId", "device-current");
+    TwitchStreamAudioSourceManager configured = new TwitchStreamAudioSourceManager();
+    check("client-current".equals(configured.getClientId())
+        && "device-current".equals(configured.getDeviceId()), "explicit constructor credentials");
+    Class<?> nativeType = Class.forName("dev.mantle.internal.MantleNative");
+    Method load = nativeType.getDeclaredMethod("loadTwitchItem",
+        TwitchStreamAudioSourceManager.class, AudioReference.class);
+    check(Modifier.isPublic(load.getModifiers()) && Modifier.isStatic(load.getModifiers())
+        && Modifier.isNative(load.getModifiers()), "current native route");
+    check(configured.loadItem(null,
+        new AudioReference("https://example.invalid/channel", null)) == null,
+        "foreign route rejected without service traffic");
+
+    System.clearProperty("dev.mantle.twitch.clientId");
+    System.clearProperty("dev.mantle.twitch.accessToken");
+    RuntimeException missing = expect(RuntimeException.class, () -> configured.loadItem(null,
+        new AudioReference("https://www.twitch.tv/fixture_channel", null)));
+    check(missing.getMessage().contains("dev.mantle.twitch.clientId"),
+        "missing credentials fail before network");
+    Method token = TwitchStreamAudioSourceManager.class.getDeclaredMethod(
+        "fetchAccessToken", String.class);
+    token.setAccessible(true);
+    UnsupportedOperationException unsupported = expectInvocation(
+        UnsupportedOperationException.class, () -> token.invoke(configured, "fixture_channel"));
+    check(unsupported.getMessage().contains("bounded credential-separated bridge"),
+        "legacy token hook disabled");
+    configured.shutdown();
+    clearProperties();
+  }
+
+  private static TwitchStreamAudioSourceManager fabricated(
+      HttpInterfaceManager http, String clientId, String deviceId) throws Exception {
+    TwitchStreamAudioSourceManager manager = allocate(TwitchStreamAudioSourceManager.class);
+    set(manager, "httpInterfaceManager", http);
+    set(manager, "twitchClientId", clientId);
+    set(manager, "twitchDeviceId", deviceId);
+    return manager;
+  }
+
+  private static void set(Object owner, String name, Object value) throws Exception {
+    Field field = TwitchStreamAudioSourceManager.class.getDeclaredField(name);
+    field.setAccessible(true);
+    field.set(owner, value);
+  }
+
+  private static void clearProperties() {
+    System.clearProperty("dev.mantle.twitch.clientId");
+    System.clearProperty("dev.mantle.twitch.accessToken");
+    System.clearProperty("dev.mantle.twitch.deviceId");
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> type, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == type && field.getGenericType() == type
+        && field.getModifiers() == modifiers && !field.isSynthetic(), name + " metadata");
+  }
+
+  private static Method checkMethod(Class<?> owner, String name, Class<?> returnType,
+                                    int modifiers, Class<?>[] parameters,
+                                    Class<?>... exceptions) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.getTypeParameters().length == 0 && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), method + " metadata");
+    return method;
+  }
+
+  private static final class RecordingHttpInterface extends HttpInterface {
+    RecordingHttpInterface() { super(null, HttpClientContext.create(), false, null); }
+  }
+
+  private static final class ManagerHandler implements InvocationHandler {
+    private final HttpInterface http;
+    private Object requestConfig;
+    private Object builderConfig;
+    private final AtomicInteger closes = new AtomicInteger();
+    ManagerHandler(HttpInterface http) { this.http = http; }
+    HttpInterfaceManager proxy() {
+      return (HttpInterfaceManager) Proxy.newProxyInstance(
+          HttpInterfaceManager.class.getClassLoader(),
+          new Class<?>[] {HttpInterfaceManager.class}, this);
+    }
+    public Object invoke(Object instance, Method method, Object[] arguments) {
+      if (method.getName().equals("getInterface")) return http;
+      if (method.getName().equals("configureRequests")) requestConfig = arguments[0];
+      if (method.getName().equals("configureBuilder")) builderConfig = arguments[0];
+      if (method.getName().equals("close")) closes.incrementAndGet();
+      if (method.getName().equals("toString")) return "TwitchManagerFixture";
+      return defaultValue(method.getReturnType());
+    }
+  }
+
+  private static <T> T proxy(Class<T> type) {
+    return type.cast(Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type},
+        (instance, method, arguments) -> {
+          throw new AssertionError("unexpected detail access: " + method);
+        }));
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
+  }
+
+  private static <T> T allocate(Class<T> type) throws Exception {
+    return type.cast(UNSAFE.getClass().getMethod("allocateInstance", Class.class)
+        .invoke(UNSAFE, type));
+  }
+
+  private static Object loadUnsafe() {
+    try {
+      Class<?> unsafeType = Class.forName("sun.misc.Unsafe");
+      Field singleton = unsafeType.getDeclaredField("theUnsafe");
+      singleton.setAccessible(true);
+      return singleton.get(null);
+    } catch (Exception error) {
+      throw new AssertionError(error);
+    }
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private static <T extends Throwable> T expectInvocation(
+      Class<T> type, Operation operation) throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (java.lang.reflect.InvocationTargetException error) {
+      Throwable cause = error.getCause();
+      if (!type.isInstance(cause)) throw new AssertionError("wrong exception", cause);
+      return type.cast(cause);
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }

@@ -10,9 +10,10 @@ use mantle_core::{
     encode_source_details,
 };
 use mantle_media::{
-    NicoNicoSourceManager, NicoNicoSourceOptions, NicoNicoSourceTrack, YandexMusicPlaylistKind,
+    NicoNicoSourceManager, NicoNicoSourceOptions, NicoNicoSourceTrack, TwitchAuthentication,
+    TwitchSourceManager, TwitchSourceOptions, TwitchSourceTrack, YandexMusicPlaylistKind,
     YandexMusicSourceItem, YandexMusicSourcePlaylist, YandexMusicSourceTrack, YoutubeSourceItem,
-    YoutubeSourcePlaylist, YoutubeSourceTrack,
+    YoutubeSourcePlaylist, YoutubeSourceTrack, route_twitch_identifier,
 };
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -1024,6 +1025,61 @@ pub(crate) fn load_nico_item<'local>(
     }
 }
 
+pub(crate) fn load_twitch_item<'local>(
+    env: &mut Env<'local>,
+    source: &JObject<'local>,
+    reference: &JObject<'local>,
+) -> jni::errors::Result<JObject<'local>> {
+    let reference = source_reference_from_java(env, reference)?;
+    let options = TwitchSourceOptions::default();
+    let Some(identifier) = reference.identifier() else {
+        return Ok(JObject::null());
+    };
+    if route_twitch_identifier(identifier, &options).is_none() {
+        return Ok(JObject::null());
+    }
+
+    let client_id =
+        system_property(env, "dev.mantle.twitch.clientId")?.ok_or(jni::errors::Error::NullPtr(
+            "Twitch metadata requires the dev.mantle.twitch.clientId system property",
+        ))?;
+    let access_token = system_property(env, "dev.mantle.twitch.accessToken")?.ok_or(
+        jni::errors::Error::NullPtr(
+            "Twitch metadata requires the dev.mantle.twitch.accessToken system property",
+        ),
+    )?;
+    let device_id = system_property(env, "dev.mantle.twitch.deviceId")?;
+    let authentication =
+        TwitchAuthentication::with_device_id(client_id, access_token, device_id)
+            .map_err(|_| jni::errors::Error::NullPtr("invalid Twitch JVM credentials"))?;
+    let manager = TwitchSourceManager::new(options, authentication)
+        .map_err(|_| jni::errors::Error::NullPtr("could not create current Twitch source"))?;
+    let item = manager
+        .load(&reference)
+        .map_err(|_| jni::errors::Error::NullPtr("current Twitch metadata load failed"))?;
+    match item {
+        Some(SourceLoad::Item(track)) => create_twitch_track(env, &track, source),
+        Some(SourceLoad::Referral(_)) | None => Ok(JObject::null()),
+    }
+}
+
+fn system_property(env: &mut Env<'_>, key: &str) -> jni::errors::Result<Option<String>> {
+    let key = JObject::from(env.new_string(key)?);
+    let value = env
+        .call_static_method(
+            jni_str!("java/lang/System"),
+            jni_str!("getProperty"),
+            jni_sig!("(Ljava/lang/String;)Ljava/lang/String;"),
+            &[JValue::Object(&key)],
+        )?
+        .l()?;
+    if value.is_null() {
+        Ok(None)
+    } else {
+        Ok(Some(JString::cast_local(env, value)?.try_to_string(env)?))
+    }
+}
+
 fn current_executor(
     env: &mut Env<'_>,
 ) -> jni::errors::Result<Arc<SourceLoadExecutor<BridgeItem, OpaqueLoadKey>>> {
@@ -1554,6 +1610,41 @@ fn create_nico_track<'local>(
     env.new_object(
         jni_str!("com/sedmelluq/discord/lavaplayer/source/nico/NicoAudioTrack"),
         jni_sig!("(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/nico/NicoAudioSourceManager;)V"),
+        &[JValue::Object(&java_info), JValue::Object(source)],
+    )
+}
+
+fn create_twitch_track<'local>(
+    env: &mut Env<'local>,
+    track: &TwitchSourceTrack,
+    source: &JObject<'local>,
+) -> jni::errors::Result<JObject<'local>> {
+    let info = &track.info;
+    let duration = i64::try_from(info.duration.as_millis())
+        .map_err(|_| jni::errors::Error::NullPtr("Twitch duration exceeds JVM range"))?;
+    let title = JObject::from(env.new_string(&info.title)?);
+    let author = JObject::from(env.new_string(&info.author)?);
+    let identifier = JObject::from(env.new_string(&info.identifier)?);
+    let uri = optional_java_string(env, info.uri.as_deref())?;
+    let artwork = optional_java_string(env, info.artwork_url.as_deref())?;
+    let isrc = optional_java_string(env, info.isrc.as_deref())?;
+    let java_info = env.new_object(
+        jni_str!("com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo"),
+        jni_sig!("(Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V"),
+        &[
+            JValue::Object(&title),
+            JValue::Object(&author),
+            JValue::Long(duration),
+            JValue::Object(&identifier),
+            JValue::Bool(info.is_stream),
+            JValue::Object(&uri),
+            JValue::Object(&artwork),
+            JValue::Object(&isrc),
+        ],
+    )?;
+    env.new_object(
+        jni_str!("com/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamAudioTrack"),
+        jni_sig!("(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamAudioSourceManager;)V"),
         &[JValue::Object(&java_info), JValue::Object(source)],
     )
 }
