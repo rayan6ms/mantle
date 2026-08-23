@@ -17632,18 +17632,20 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public abstract zero-field interface preserves the exact Object root and sole YandexMusicApiLoader superinterface, with inherited configuration and shutdown dispatch.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicDirectUrlLoader",
       "symbol_kind": "METHOD",
       "member_name": "getDirectUrl",
       "descriptor": "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Caller-defined implementations receive the exact track-ID and codec references and return the exact nullable String reference through the frozen public abstract signature.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicPlaylistLoader",

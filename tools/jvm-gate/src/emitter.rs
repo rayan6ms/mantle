@@ -211,6 +211,8 @@ const YANDEX_MUSIC_AUDIO_SOURCE_MANAGER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicAudioSourceManager";
 const YANDEX_MUSIC_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicAudioTrack";
+const YANDEX_MUSIC_DIRECT_URL_LOADER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicDirectUrlLoader";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -293,6 +295,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YANDEX_MUSIC_API_LOADER_CLASS,
     YANDEX_MUSIC_AUDIO_SOURCE_MANAGER_CLASS,
     YANDEX_MUSIC_AUDIO_TRACK_CLASS,
+    YANDEX_MUSIC_DIRECT_URL_LOADER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,

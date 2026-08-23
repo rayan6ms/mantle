@@ -209,6 +209,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
             Some(YANDEX_MUSIC_AUDIO_SOURCE_MANAGER_CONSUMER)
         }
         "write-yandex-music-audio-track-consumer" => Some(YANDEX_MUSIC_AUDIO_TRACK_CONSUMER),
+        "write-yandex-music-direct-url-loader-consumer" => {
+            Some(YANDEX_MUSIC_DIRECT_URL_LOADER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -17616,6 +17619,100 @@ public final class GateYandexMusicAudioTrack {
   }
 
   private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YANDEX_MUSIC_DIRECT_URL_LOADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicApiLoader;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicDirectUrlLoader;
+import com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpConfigurable;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+
+public final class GateYandexMusicDirectUrlLoader {
+  public static void main(String[] args) throws Exception {
+    Class<YandexMusicDirectUrlLoader> type = YandexMusicDirectUrlLoader.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.INTERFACE | Modifier.ABSTRACT)
+        && type.isInterface() && !type.isAnnotation() && !type.isEnum() && !type.isSynthetic(),
+        "interface metadata");
+    check(type.getSuperclass() == null
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {YandexMusicApiLoader.class})
+        && type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 1 && type.getMethods().length == 3
+        && type.getTypeParameters().length == 0, "interface shape");
+    Method direct = type.getDeclaredMethod("getDirectUrl", String.class, String.class);
+    check(direct.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && direct.getReturnType() == String.class
+        && Arrays.equals(direct.getParameterTypes(), new Class<?>[] {String.class, String.class})
+        && direct.getExceptionTypes().length == 0 && direct.getTypeParameters().length == 0
+        && !direct.isDefault() && !direct.isBridge() && !direct.isSynthetic()
+        && !direct.isVarArgs(), "method metadata");
+
+    ExtendedHttpConfigurable configuration = proxy(ExtendedHttpConfigurable.class);
+    RecordingLoader loader = new RecordingLoader(configuration);
+    String firstTrack = new String("71663565");
+    String firstCodec = new String("mp3");
+    check(loader.getDirectUrl(firstTrack, firstCodec) == loader.result
+        && loader.trackId == firstTrack && loader.codec == firstCodec && loader.calls == 1,
+        "argument and result identity");
+    loader.result = null;
+    check(loader.getDirectUrl(null, null) == null && loader.trackId == null
+        && loader.codec == null && loader.calls == 2, "null identity");
+    check(loader.getHttpConfiguration() == configuration, "inherited configuration dispatch");
+    loader.shutdown();
+    loader.shutdown();
+    check(loader.shutdowns == 2 && type.isAssignableFrom(RecordingLoader.class)
+        && Arrays.equals(RecordingLoader.class.getInterfaces(),
+            new Class<?>[] {YandexMusicDirectUrlLoader.class}), "implementation hierarchy");
+    System.out.println("interface=public-abstract,object-root,yandex-api-loader-superinterface,"
+        + "0-fields,0-constructors,1-declared-method;implementation=argument-result-identity,"
+        + "null-identity,inherited-configuration-shutdown;reflection=exact");
+  }
+
+  private static <T> T proxy(Class<T> type) {
+    Object value = Proxy.newProxyInstance(GateYandexMusicDirectUrlLoader.class.getClassLoader(),
+        new Class<?>[] {type}, (proxy, method, arguments) -> {
+          throw new AssertionError("configuration proxy invoked: " + method.getName());
+        });
+    return type.cast(value);
+  }
+
+  private static final class RecordingLoader implements YandexMusicDirectUrlLoader {
+    private final ExtendedHttpConfigurable configuration;
+    private String result = new String("https://example.invalid/audio.mp3");
+    private String trackId;
+    private String codec;
+    private int calls;
+    private int shutdowns;
+
+    private RecordingLoader(ExtendedHttpConfigurable configuration) {
+      this.configuration = configuration;
+    }
+
+    @Override
+    public String getDirectUrl(String trackId, String codec) {
+      this.trackId = trackId;
+      this.codec = codec;
+      calls++;
+      return result;
+    }
+
+    @Override
+    public ExtendedHttpConfigurable getHttpConfiguration() {
+      return configuration;
+    }
+
+    @Override
+    public void shutdown() {
+      shutdowns++;
+    }
+  }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
