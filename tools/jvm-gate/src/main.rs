@@ -246,6 +246,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-youtube-cipher-operation-consumer" => Some(YOUTUBE_CIPHER_OPERATION_CONSUMER),
         "write-youtube-client-config-consumer" => Some(YOUTUBE_CLIENT_CONFIG_CONSUMER),
         "write-youtube-constants-consumer" => Some(YOUTUBE_CONSTANTS_CONSUMER),
+        "write-youtube-format-info-consumer" => Some(YOUTUBE_FORMAT_INFO_CONSUMER),
         _ => None,
     }
 }
@@ -20138,6 +20139,150 @@ public final class GateYoutubeConstants {
     System.out.println("public-object-shell,46-package-constants,1-public-constructor,0-methods;"
         + "fresh-construction,object-identity,youtube-api,music-api,tv-auth,legacy-auth,"
         + "payload-composition,constant-identity,reflection");
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_FORMAT_INFO_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeFormatInfo;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import org.apache.http.entity.ContentType;
+import org.apache.http.message.BasicNameValuePair;
+
+public final class GateYoutubeFormatInfo {
+  public static void main(String[] args) throws Exception {
+    reflectionContract();
+    enumContract();
+    lookupContract();
+    System.out.println("public-final-enum,5-constants,2-public-fields,3-public-methods;"
+        + "mime-codec-pairs,values-copy,lookup-identity,exact-before-substring,"
+        + "unknown-null,lookup-errors,reflection");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<YoutubeFormatInfo> type = YoutubeFormatInfo.class;
+    check((type.getModifiers() & ~0x4000) == (Modifier.PUBLIC | Modifier.FINAL)
+        && type.isEnum() && type.getSuperclass() == Enum.class
+        && type.getInterfaces().length == 0 && !type.isSynthetic(), "class metadata");
+    check(type.getDeclaredFields().length == 8 && type.getDeclaredMethods().length == 3
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredClasses().length == 0,
+        "declared shape");
+    for (String name : new String[] {
+        "WEBM_OPUS", "WEBM_VORBIS", "MP4_AAC_LC", "WEBM_VIDEO_VORBIS",
+        "MP4_VIDEO_AAC_LC"
+    }) {
+      Field field = type.getDeclaredField(name);
+      check(field.getType() == type && field.getGenericType() == type && field.isEnumConstant()
+          && (field.getModifiers() & ~0x4000)
+              == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL)
+          && !field.isSynthetic() && field.get(null) == YoutubeFormatInfo.valueOf(name),
+          name + " metadata");
+    }
+    for (String name : new String[] {"mimeType", "codec"}) {
+      Field field = type.getDeclaredField(name);
+      check(field.getType() == String.class && field.getGenericType() == String.class
+          && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+          && !field.isSynthetic(), name + " metadata");
+    }
+    Field values = type.getDeclaredField("$VALUES");
+    check(values.getType() == YoutubeFormatInfo[].class && Modifier.isPrivate(values.getModifiers())
+        && Modifier.isStatic(values.getModifiers()) && Modifier.isFinal(values.getModifiers())
+        && values.isSynthetic(), "$VALUES metadata");
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        String.class, int.class, String.class, String.class);
+    check(Modifier.isPrivate(constructor.getModifiers()) && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0
+        && constructor.getTypeParameters().length == 0, "constructor metadata");
+    checkMethod(type, "values", YoutubeFormatInfo[].class, new Class<?>[0]);
+    checkMethod(type, "valueOf", YoutubeFormatInfo.class, new Class<?>[] {String.class});
+    checkMethod(type, "get", YoutubeFormatInfo.class, new Class<?>[] {ContentType.class});
+  }
+
+  private static void enumContract() {
+    YoutubeFormatInfo[] expected = {
+        YoutubeFormatInfo.WEBM_OPUS,
+        YoutubeFormatInfo.WEBM_VORBIS,
+        YoutubeFormatInfo.MP4_AAC_LC,
+        YoutubeFormatInfo.WEBM_VIDEO_VORBIS,
+        YoutubeFormatInfo.MP4_VIDEO_AAC_LC
+    };
+    String[][] metadata = {
+        {"audio/webm", "opus"},
+        {"audio/webm", "vorbis"},
+        {"audio/mp4", "mp4a.40.2"},
+        {"video/webm", "vorbis"},
+        {"video/mp4", "mp4a.40.2"}
+    };
+    YoutubeFormatInfo[] values = YoutubeFormatInfo.values();
+    check(Arrays.equals(values, expected) && Arrays.equals(YoutubeFormatInfo.class.getEnumConstants(), expected),
+        "enum order");
+    for (int index = 0; index < expected.length; index++) {
+      YoutubeFormatInfo value = expected[index];
+      check(value.ordinal() == index && YoutubeFormatInfo.valueOf(value.name()) == value
+          && value.mimeType.equals(metadata[index][0]) && value.codec.equals(metadata[index][1])
+          && value.mimeType == metadata[index][0] && value.codec == metadata[index][1],
+          value.name() + " state");
+    }
+    values[0] = null;
+    check(YoutubeFormatInfo.values()[0] == YoutubeFormatInfo.WEBM_OPUS, "values copy");
+    expect(IllegalArgumentException.class, () -> YoutubeFormatInfo.valueOf("missing"));
+    expect(NullPointerException.class, () -> YoutubeFormatInfo.valueOf(null));
+  }
+
+  private static void lookupContract() {
+    checkLookup("audio/webm", "opus", YoutubeFormatInfo.WEBM_OPUS);
+    checkLookup("audio/webm", "vorbis", YoutubeFormatInfo.WEBM_VORBIS);
+    checkLookup("audio/mp4", "mp4a.40.2", YoutubeFormatInfo.MP4_AAC_LC);
+    checkLookup("video/webm", "vorbis", YoutubeFormatInfo.WEBM_VIDEO_VORBIS);
+    checkLookup("video/mp4", "mp4a.40.2", YoutubeFormatInfo.MP4_VIDEO_AAC_LC);
+    checkLookup("audio/webm", "vorbis, opus", YoutubeFormatInfo.WEBM_OPUS);
+    checkLookup("video/webm", "vp9, vorbis", YoutubeFormatInfo.WEBM_VIDEO_VORBIS);
+    checkLookup("video/mp4", "avc1.640028, mp4a.40.2",
+        YoutubeFormatInfo.MP4_VIDEO_AAC_LC);
+    check(YoutubeFormatInfo.get(contentType("application/octet-stream", "opus")) == null
+        && YoutubeFormatInfo.get(contentType("audio/webm", "flac")) == null
+        && YoutubeFormatInfo.get(ContentType.create("application/octet-stream")) == null,
+        "unknown lookup");
+    expect(NullPointerException.class, () -> YoutubeFormatInfo.get(null));
+    expect(NullPointerException.class,
+        () -> YoutubeFormatInfo.get(ContentType.create("audio/webm")));
+  }
+
+  private static void checkLookup(String mimeType, String codec, YoutubeFormatInfo expected) {
+    check(YoutubeFormatInfo.get(contentType(mimeType, codec)) == expected,
+        mimeType + ";" + codec);
+  }
+
+  private static ContentType contentType(String mimeType, String codec) {
+    return ContentType.create(mimeType, new BasicNameValuePair("codecs", codec));
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+                                  Class<?>[] parameters) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getModifiers()
+            == (Modifier.PUBLIC | Modifier.STATIC)
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs(),
+        method + " metadata");
+  }
+
+  private static void expect(Class<? extends Throwable> type, Runnable operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
   }
 
   private static void check(boolean condition, String message) {

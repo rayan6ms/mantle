@@ -251,6 +251,8 @@ const YOUTUBE_ANDROID_VERSION_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig$AndroidVersion";
 const YOUTUBE_CONSTANTS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeConstants";
+const YOUTUBE_FORMAT_INFO_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeFormatInfo";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -353,6 +355,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_CLIENT_CONFIG_CLASS,
     YOUTUBE_ANDROID_VERSION_CLASS,
     YOUTUBE_CONSTANTS_CLASS,
+    YOUTUBE_FORMAT_INFO_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -754,6 +757,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | YOUTUBE_CLIENT_CONFIG_CLASS
             | YOUTUBE_ANDROID_VERSION_CLASS
             | YOUTUBE_CONSTANTS_CLASS
+            | YOUTUBE_FORMAT_INFO_CLASS
     )
 }
 
@@ -1116,6 +1120,9 @@ fn replacement_body(
     }
     if class_name == YOUTUBE_CONSTANTS_CLASS {
         return youtube_constants_replacement(pool, name, descriptor);
+    }
+    if class_name == YOUTUBE_FORMAT_INFO_CLASS {
+        return youtube_format_info_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -14785,6 +14792,13 @@ fn track_enum_constants(class_name: &str) -> Option<&'static [&'static str]> {
         ]),
         YOUTUBE_CIPHER_OPERATION_TYPE_CLASS => Some(&["SWAP", "REVERSE", "SLICE", "SPLICE"]),
         YOUTUBE_ANDROID_VERSION_CLASS => Some(&["ANDROID_11"]),
+        YOUTUBE_FORMAT_INFO_CLASS => Some(&[
+            "WEBM_OPUS",
+            "WEBM_VORBIS",
+            "MP4_AAC_LC",
+            "WEBM_VIDEO_VORBIS",
+            "MP4_VIDEO_AAC_LC",
+        ]),
         _ => None,
     }
 }
@@ -15635,6 +15649,7 @@ fn add_track_enum_state(class: &mut ClassFile<'static>, class_name: &str) -> Res
     let constructor_descriptor = match class_name {
         TRACK_END_REASON_CLASS => "(Ljava/lang/String;IZ)V",
         YOUTUBE_ANDROID_VERSION_CLASS => "(Ljava/lang/String;ILjava/lang/String;I)V",
+        YOUTUBE_FORMAT_INFO_CLASS => "(Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;)V",
         _ => "(Ljava/lang/String;I)V",
     };
     let constructor = match class_name {
@@ -15642,6 +15657,7 @@ fn add_track_enum_state(class: &mut ClassFile<'static>, class_name: &str) -> Res
         YOUTUBE_ANDROID_VERSION_CLASS => {
             youtube_android_version_constructor(&mut class.constant_pool)?
         }
+        YOUTUBE_FORMAT_INFO_CLASS => youtube_format_info_constructor(&mut class.constant_pool)?,
         _ => enum_constructor(&mut class.constant_pool)?,
     };
     add_method(
@@ -15653,6 +15669,8 @@ fn add_track_enum_state(class: &mut ClassFile<'static>, class_name: &str) -> Res
     )?;
     let initializer = if class_name == YOUTUBE_ANDROID_VERSION_CLASS {
         youtube_android_version_initializer(&mut class.constant_pool)?
+    } else if class_name == YOUTUBE_FORMAT_INFO_CLASS {
+        youtube_format_info_initializer(&mut class.constant_pool)?
     } else {
         track_enum_initializer(&mut class.constant_pool, class_name, constructor_descriptor)?
     };
@@ -21934,6 +21952,140 @@ fn youtube_constants_replacement(
         )
         .into()),
     }
+}
+
+fn youtube_format_info_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    let values_descriptor = format!("()[L{YOUTUBE_FORMAT_INFO_CLASS};");
+    let value_of_descriptor = format!("(Ljava/lang/String;)L{YOUTUBE_FORMAT_INFO_CLASS};");
+    match (name, descriptor) {
+        ("values", value) if value == values_descriptor => {
+            track_enum_values(pool, YOUTUBE_FORMAT_INFO_CLASS)
+        }
+        ("valueOf", value) if value == value_of_descriptor => {
+            track_enum_value_of(pool, YOUTUBE_FORMAT_INFO_CLASS)
+        }
+        (
+            "get",
+            "(Lorg/apache/http/entity/ContentType;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeFormatInfo;",
+        ) => youtube_format_info_get(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {YOUTUBE_FORMAT_INFO_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+fn youtube_format_info_get(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    const CONSTANTS: [&str; 5] = [
+        "WEBM_OPUS",
+        "WEBM_VORBIS",
+        "MP4_AAC_LC",
+        "WEBM_VIDEO_VORBIS",
+        "MP4_VIDEO_AAC_LC",
+    ];
+    let owner = pool.add_class(YOUTUBE_FORMAT_INFO_CLASS)?;
+    let descriptor = format!("L{YOUTUBE_FORMAT_INFO_CLASS};");
+    let mime_type = pool.add_field_ref(owner, "mimeType", "Ljava/lang/String;")?;
+    let codec = pool.add_field_ref(owner, "codec", "Ljava/lang/String;")?;
+    let content_type = pool.add_class("org/apache/http/entity/ContentType")?;
+    let get_mime_type = pool.add_method_ref(content_type, "getMimeType", "()Ljava/lang/String;")?;
+    let get_parameter = pool.add_method_ref(
+        content_type,
+        "getParameter",
+        "(Ljava/lang/String;)Ljava/lang/String;",
+    )?;
+    let string = pool.add_class("java/lang/String")?;
+    let equals = pool.add_method_ref(string, "equals", "(Ljava/lang/Object;)Z")?;
+    let contains = pool.add_method_ref(string, "contains", "(Ljava/lang/CharSequence;)Z")?;
+    let codecs = pool.add_string("codecs")?;
+    let mut fields = Vec::with_capacity(CONSTANTS.len());
+    for name in CONSTANTS {
+        fields.push(pool.add_field_ref(owner, name, &descriptor)?);
+    }
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Invokevirtual(get_mime_type),
+        Instruction::Astore_1,
+        Instruction::Aload_0,
+        Instruction::Ldc_w(codecs),
+        Instruction::Invokevirtual(get_parameter),
+        Instruction::Astore_2,
+    ];
+    let mut frame_targets = Vec::with_capacity(fields.len() * 2);
+    for field in &fields {
+        let mime_branch = instructions.len() + 4;
+        instructions.extend([
+            Instruction::Getstatic(*field),
+            Instruction::Getfield(mime_type),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(equals),
+            Instruction::Ifeq(0),
+            Instruction::Getstatic(*field),
+            Instruction::Getfield(codec),
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(equals),
+            Instruction::Ifeq(0),
+            Instruction::Getstatic(*field),
+            Instruction::Areturn,
+        ]);
+        let next = u16::try_from(instructions.len())?;
+        instructions[mime_branch] = Instruction::Ifeq(next);
+        instructions[mime_branch + 5] = Instruction::Ifeq(next);
+        frame_targets.push(next);
+    }
+    for field in &fields {
+        let mime_branch = instructions.len() + 4;
+        instructions.extend([
+            Instruction::Getstatic(*field),
+            Instruction::Getfield(mime_type),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(equals),
+            Instruction::Ifeq(0),
+            Instruction::Aload_2,
+            Instruction::Getstatic(*field),
+            Instruction::Getfield(codec),
+            Instruction::Invokevirtual(contains),
+            Instruction::Ifeq(0),
+            Instruction::Getstatic(*field),
+            Instruction::Areturn,
+        ]);
+        let next = u16::try_from(instructions.len())?;
+        instructions[mime_branch] = Instruction::Ifeq(next);
+        instructions[mime_branch + 5] = Instruction::Ifeq(next);
+        frame_targets.push(next);
+    }
+    instructions.extend([Instruction::Aconst_null, Instruction::Areturn]);
+    let mut body = code(pool, 2, 3, instructions)?;
+    let first = frame_targets
+        .first()
+        .copied()
+        .ok_or("YouTube format info requires lookup targets")?;
+    let mut frames = vec![StackFrame::AppendFrame {
+        frame_type: 253,
+        offset_delta: first,
+        locals: vec![
+            VerificationType::Object {
+                cpool_index: string,
+            },
+            VerificationType::Object {
+                cpool_index: string,
+            },
+        ],
+    }];
+    for targets in frame_targets.windows(2) {
+        frames.push(StackFrame::SameFrame {
+            frame_type: u8::try_from(targets[1] - targets[0] - 1)?,
+        });
+    }
+    add_stack_map_table(pool, &mut body, frames)?;
+    Ok(body)
 }
 
 fn youtube_access_token_tracker_replacement(
@@ -33821,6 +33973,80 @@ fn youtube_android_version_initializer(pool: &mut ConstantPool<'static>) -> Resu
             Instruction::Return,
         ],
     )
+}
+
+fn youtube_format_info_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let enumeration = pool.add_class("java/lang/Enum")?;
+    let enum_init = pool.add_method_ref(enumeration, "<init>", "(Ljava/lang/String;I)V")?;
+    let owner = pool.add_class(YOUTUBE_FORMAT_INFO_CLASS)?;
+    let mime_type = pool.add_field_ref(owner, "mimeType", "Ljava/lang/String;")?;
+    let codec = pool.add_field_ref(owner, "codec", "Ljava/lang/String;")?;
+    code(
+        pool,
+        3,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Iload_2,
+            Instruction::Invokespecial(enum_init),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Putfield(mime_type),
+            Instruction::Aload_0,
+            Instruction::Aload(4),
+            Instruction::Putfield(codec),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn youtube_format_info_initializer(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    const VALUES: [(&str, &str, &str); 5] = [
+        ("WEBM_OPUS", "audio/webm", "opus"),
+        ("WEBM_VORBIS", "audio/webm", "vorbis"),
+        ("MP4_AAC_LC", "audio/mp4", "mp4a.40.2"),
+        ("WEBM_VIDEO_VORBIS", "video/webm", "vorbis"),
+        ("MP4_VIDEO_AAC_LC", "video/mp4", "mp4a.40.2"),
+    ];
+    let owner = pool.add_class(YOUTUBE_FORMAT_INFO_CLASS)?;
+    let descriptor = format!("L{YOUTUBE_FORMAT_INFO_CLASS};");
+    let constructor = pool.add_method_ref(
+        owner,
+        "<init>",
+        "(Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;)V",
+    )?;
+    let values_field = pool.add_field_ref(
+        owner,
+        "$VALUES",
+        "[Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeFormatInfo;",
+    )?;
+    let mut instructions = Vec::with_capacity(VALUES.len() * 11 + 25);
+    for (ordinal, (name, mime_type, codec)) in VALUES.iter().enumerate() {
+        let field = pool.add_field_ref(owner, *name, &descriptor)?;
+        instructions.extend([
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Ldc_w(pool.add_string(*name)?),
+            small_integer_instruction(ordinal)?,
+            Instruction::Ldc_w(pool.add_string(*mime_type)?),
+            Instruction::Ldc_w(pool.add_string(*codec)?),
+            Instruction::Invokespecial(constructor),
+            Instruction::Putstatic(field),
+        ]);
+    }
+    instructions.extend([Instruction::Iconst_5, Instruction::Anewarray(owner)]);
+    for (ordinal, (name, _, _)) in VALUES.iter().enumerate() {
+        let field = pool.add_field_ref(owner, *name, &descriptor)?;
+        instructions.extend([
+            Instruction::Dup,
+            small_integer_instruction(ordinal)?,
+            Instruction::Getstatic(field),
+            Instruction::Aastore,
+        ]);
+    }
+    instructions.extend([Instruction::Putstatic(values_field), Instruction::Return]);
+    code(pool, 6, 0, instructions)
 }
 
 fn end_reason_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {

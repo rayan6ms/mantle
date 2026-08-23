@@ -19274,99 +19274,154 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The exact public final enum structure, five constants, two public final metadata fields, lookup surface, and reflection metadata are retained.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeFormatInfo",
       "symbol_kind": "FIELD",
       "member_name": "WEBM_OPUS",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeFormatInfo;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The enum constant retains exact identity, order, audio/webm MIME type, and opus codec metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeFormatInfo",
       "symbol_kind": "FIELD",
       "member_name": "WEBM_VORBIS",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeFormatInfo;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The enum constant retains exact identity, order, audio/webm MIME type, and vorbis codec metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeFormatInfo",
       "symbol_kind": "FIELD",
       "member_name": "MP4_AAC_LC",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeFormatInfo;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The enum constant retains exact identity, order, audio/mp4 MIME type, and mp4a.40.2 codec metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeFormatInfo",
       "symbol_kind": "FIELD",
       "member_name": "WEBM_VIDEO_VORBIS",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeFormatInfo;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The enum constant retains exact identity, order, video/webm MIME type, and vorbis codec metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeFormatInfo",
       "symbol_kind": "FIELD",
       "member_name": "MP4_VIDEO_AAC_LC",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeFormatInfo;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The enum constant retains exact identity, order, video/mp4 MIME type, and mp4a.40.2 codec metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeFormatInfo",
       "symbol_kind": "FIELD",
       "member_name": "mimeType",
       "descriptor": "Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The public final field retains the exact per-constant MIME type String and reference identity.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeFormatInfo",
       "symbol_kind": "FIELD",
       "member_name": "codec",
       "descriptor": "Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The public final field retains the exact per-constant codec String and reference identity.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeFormatInfo",
       "symbol_kind": "METHOD",
       "member_name": "values",
       "descriptor": "()[Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeFormatInfo;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The enum values method returns the exact ordered constants in a fresh array.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeFormatInfo",
       "symbol_kind": "METHOD",
       "member_name": "valueOf",
       "descriptor": "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeFormatInfo;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The enum lookup retains exact identity and IllegalArgumentException/NullPointerException failures.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeFormatInfo",
       "symbol_kind": "METHOD",
       "member_name": "get",
       "descriptor": "(Lorg/apache/http/entity/ContentType;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeFormatInfo;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Content-type lookup retains exact-match precedence, ordered codec-substring fallback, null unknown results, and reference-equal failures.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeHttpContextFilter",
