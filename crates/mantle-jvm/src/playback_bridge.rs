@@ -15,7 +15,8 @@ use mantle_media::{
     TwitchAuthentication, TwitchLivePlaybackOptions, TwitchLivePlaybackPoll,
     TwitchLivePlaybackSession, TwitchSourceManager, TwitchSourceOptions, TwitchSourceTrack,
     VimeoAuthentication, VimeoPlaybackSession, VimeoSourceManager, VimeoSourceOptions,
-    VimeoSourceTrack, route_twitch_identifier,
+    VimeoSourceTrack, YandexMusicAuthentication, YandexMusicPlaybackSession,
+    YandexMusicSourceManager, YandexMusicSourceOptions, route_twitch_identifier,
 };
 
 const TRANSCODE_INPUT_CHUNK_FRAMES: usize = 1_024;
@@ -171,6 +172,40 @@ pub(crate) fn process_vimeo_track(
         )
         .map_err(|_| failure("current Vimeo playback handoff failed"))?
         .ok_or_else(|| failure("current Vimeo track has no compatible playback"))?;
+
+    process_playback_session(env, executor, session, &cancellation)
+}
+
+pub(crate) fn process_yandex_music_track(
+    env: &mut Env<'_>,
+    track: &JObject<'_>,
+    executor: &JObject<'_>,
+) -> jni::errors::Result<()> {
+    let access_token = system_property(env, "dev.mantle.yandex.accessToken")?
+        .ok_or_else(|| failure("Yandex Music playback requires dev.mantle.yandex.accessToken"))?;
+    let authentication = YandexMusicAuthentication::new(access_token)
+        .map_err(|_| failure("invalid Yandex Music JVM access token"))?;
+    let manager =
+        YandexMusicSourceManager::new(YandexMusicSourceOptions::default(), authentication)
+            .map_err(|_| failure("could not create current Yandex Music playback source"))?;
+    let java_info = env
+        .get_field(
+            track,
+            jni_str!("trackInfo"),
+            jni_sig!("Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;"),
+        )?
+        .l()?;
+    let info = crate::track_info_from_java(env, &java_info)?;
+    let cancellation = MediaCancellation::new();
+    let session = manager
+        .open_track_playback(
+            &info.identifier,
+            HttpRangeOptions::default(),
+            MediaLimits::default(),
+            cancellation.clone(),
+        )
+        .map_err(|_| failure("current Yandex Music playback handoff failed"))?
+        .ok_or_else(|| failure("current Yandex Music track has no compatible playback"))?;
 
     process_playback_session(env, executor, session, &cancellation)
 }
@@ -460,6 +495,17 @@ impl PcmPlaybackSession for VimeoPlaybackSession {
     fn read_pcm(&mut self, output: &mut PcmFrame) -> jni::errors::Result<bool> {
         self.read_pcm(output)
             .map_err(|_| failure("Vimeo media decoding failed"))
+    }
+}
+
+impl PcmPlaybackSession for YandexMusicPlaybackSession {
+    fn info(&self) -> &MediaInfo {
+        self.info()
+    }
+
+    fn read_pcm(&mut self, output: &mut PcmFrame) -> jni::errors::Result<bool> {
+        self.read_pcm(output)
+            .map_err(|_| failure("Yandex Music media decoding failed"))
     }
 }
 

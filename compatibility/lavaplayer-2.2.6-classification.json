@@ -17582,45 +17582,50 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The public concrete DelegatedAudioTrack shell, frozen two-field layout, construction, track-info and source identities, and fresh cloning remain compatible while playback deliberately uses Mantle's bounded authenticated Yandex MP3 resolver instead of the legacy direct-URL loader.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "crates/mantle-jvm/src/playback_bridge.rs", "crates/mantle-media/tests/phase12_yandex_music.rs", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "docs/architecture/ADR-0014-bounded-yandex-music-source.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicAudioSourceManager;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The sole public constructor delegates the exact AudioTrackInfo reference to DelegatedAudioTrack and retains the exact YandexMusicAudioSourceManager reference.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Processing preserves the checked LocalAudioTrackExecutor boundary but uses an explicit caller JVM token and Mantle's bounded signed-URL, range-input, MP3 decode, PCM assembly, Opus encoding, volume, and frame-buffer path instead of the legacy global-OAuth direct-URL loader; missing and invalid credentials fail deterministically before network access.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "crates/mantle-jvm/src/playback_bridge.rs", "crates/mantle-media/tests/phase12_yandex_music.rs", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "docs/architecture/ADR-0014-bounded-yandex-music-source.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "makeClone",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Cloning returns a fresh YandexMusicAudioTrack at the default position with the exact inherited AudioTrackInfo and source-manager identities.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "getSourceManager",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The source-manager accessor returns the exact constructor-supplied YandexMusicAudioSourceManager through the AudioSourceManager contract.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicDirectUrlLoader",

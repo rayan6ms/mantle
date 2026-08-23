@@ -208,6 +208,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-yandex-music-audio-source-manager-consumer" => {
             Some(YANDEX_MUSIC_AUDIO_SOURCE_MANAGER_CONSUMER)
         }
+        "write-yandex-music-audio-track-consumer" => Some(YANDEX_MUSIC_AUDIO_TRACK_CONSUMER),
         _ => None,
     }
 }
@@ -17429,6 +17430,193 @@ public final class GateYandexMusicAudioSourceManager {
   }
 
   private interface Operation { void run() throws Exception; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YANDEX_MUSIC_AUDIO_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioTrack;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicDirectUrlLoader;
+import com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpConfigurable;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.DelegatedAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import org.apache.http.client.protocol.HttpClientContext;
+
+public final class GateYandexMusicAudioTrack {
+  public static void main(String[] args) throws Exception {
+    check(args.length >= 1 && args.length <= 2, "expected disposition and optional native path");
+    boolean reference = args[0].equals("reference");
+    check(reference || args[0].equals("candidate"), "unknown disposition");
+    check(reference == (args.length == 1), "candidate requires native path");
+    reflectionContract();
+    commonBehavior();
+    if (reference) legacyDisposition();
+    else currentDisposition(args[1]);
+    System.out.println(
+        "common=public-concrete,delegated-super,2-fields,1-constructor,3-methods;"
+        + "construction,track-info,source-identity,fresh-clone,reflection;service="
+        + (reference ? "legacy-direct-url-http-mp3" :
+            "current-native-bounded-mp3,explicit-token,no-legacy-direct-loader"));
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<YandexMusicAudioTrack> type = YandexMusicAudioTrack.class;
+    check(type.getModifiers() == Modifier.PUBLIC
+        && type.getSuperclass() == DelegatedAudioTrack.class
+        && type.getInterfaces().length == 0, "class metadata");
+    check(type.getDeclaredFields().length == 2, "field count");
+    checkField(type, "log", Class.forName("org.slf4j.Logger"),
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "sourceManager", YandexMusicAudioSourceManager.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        AudioTrackInfo.class, YandexMusicAudioSourceManager.class);
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "constructor metadata");
+    check(type.getDeclaredMethods().length == 3, "declared method count");
+    checkMethod(type, "process", void.class, Modifier.PUBLIC,
+        new Class<?>[] {LocalAudioTrackExecutor.class}, Exception.class);
+    checkMethod(type, "makeClone", AudioTrack.class, Modifier.PUBLIC, new Class<?>[0]);
+    checkMethod(type, "getSourceManager", AudioSourceManager.class, Modifier.PUBLIC,
+        new Class<?>[0]);
+  }
+
+  private static void commonBehavior() throws Exception {
+    YandexMusicAudioSourceManager source = new YandexMusicAudioSourceManager(false);
+    AudioTrackInfo info = new AudioTrackInfo("title", "author", 1234L, "71663565", false,
+        "https://music.yandex.ru/track/71663565", "art", null);
+    YandexMusicAudioTrack track = new YandexMusicAudioTrack(info, source);
+    check(track.getInfo() == info && track.getSourceManager() == source
+        && field("sourceManager").get(track) == source, "captured identity");
+    check(field("log").get(null) != null, "static logger");
+    AudioTrack clone = track.makeClone();
+    check(clone instanceof YandexMusicAudioTrack && clone != track && clone.getInfo() == info
+        && clone.getSourceManager() == source && clone.getPosition() == 0L,
+        "fresh clone identity");
+    source.shutdown();
+  }
+
+  private static void legacyDisposition() throws Exception {
+    RecordingManager source = new RecordingManager();
+    YandexMusicAudioTrack track = new YandexMusicAudioTrack(new AudioTrackInfo(
+        "title", "author", 1234L, "71663565", false,
+        "https://music.yandex.ru/track/71663565", null, null), source);
+    RuntimeException failure = expect(RuntimeException.class, () -> track.process(null));
+    check(failure == source.sentinel && source.interfaceCalls == 1
+        && source.directCalls == 1 && source.closeCalls == 1,
+        "legacy direct URL and HTTP lifetime");
+    source.shutdown();
+  }
+
+  private static void currentDisposition(String nativeLibrary) throws Exception {
+    Class.forName("dev.mantle.internal.NativeLoader")
+        .getMethod("load", String.class).invoke(null, nativeLibrary);
+    Class<?> nativeType = Class.forName("dev.mantle.internal.MantleNative");
+    Method process = nativeType.getDeclaredMethod("processYandexMusicTrack",
+        YandexMusicAudioTrack.class, LocalAudioTrackExecutor.class);
+    check(Modifier.isPublic(process.getModifiers()) && Modifier.isStatic(process.getModifiers())
+        && Modifier.isNative(process.getModifiers()), "current native route");
+    YandexMusicAudioSourceManager source = new YandexMusicAudioSourceManager(false);
+    YandexMusicAudioTrack track = new YandexMusicAudioTrack(new AudioTrackInfo(
+        "title", "author", 1234L, "71663565", false,
+        "https://music.yandex.ru/track/71663565", null, null), source);
+    System.clearProperty("dev.mantle.yandex.accessToken");
+    RuntimeException missing = expect(RuntimeException.class, () -> track.process(null));
+    check(missing.getMessage().contains("requires dev.mantle.yandex.accessToken"),
+        "missing caller token fails before service traffic");
+    System.setProperty("dev.mantle.yandex.accessToken", "");
+    RuntimeException invalid = expect(RuntimeException.class, () -> track.process(null));
+    check(invalid.getMessage().contains("invalid Yandex Music JVM access token"),
+        "invalid caller token fails before service traffic");
+    System.clearProperty("dev.mantle.yandex.accessToken");
+    source.shutdown();
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = YandexMusicAudioTrack.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> type, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == type && field.getGenericType() == type
+        && field.getModifiers() == modifiers && !field.isSynthetic(), name + " metadata");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+                                  int modifiers, Class<?>[] parameters,
+                                  Class<?>... exceptions) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.getTypeParameters().length == 0 && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), method + " metadata");
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private static final class RecordingManager extends YandexMusicAudioSourceManager {
+    final RuntimeException sentinel = new RuntimeException("legacy-direct-url-sentinel");
+    final HttpInterface http;
+    int interfaceCalls;
+    int directCalls;
+    int closeCalls;
+
+    RecordingManager() {
+      super(false);
+      http = new HttpInterface(null, HttpClientContext.create(), false, null) {
+        @Override public void close() throws IOException { closeCalls++; }
+      };
+    }
+
+    @Override public HttpInterface getHttpInterface() {
+      interfaceCalls++;
+      return http;
+    }
+
+    @Override public YandexMusicDirectUrlLoader getDirectUrlLoader() {
+      return new YandexMusicDirectUrlLoader() {
+        @Override public String getDirectUrl(String identifier, String format) {
+          directCalls++;
+          check(identifier.equals("71663565") && format.equals("mp3"),
+              "legacy direct URL arguments");
+          throw sentinel;
+        }
+        @Override public ExtendedHttpConfigurable getHttpConfiguration() { return null; }
+        @Override public void shutdown() {}
+      };
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }

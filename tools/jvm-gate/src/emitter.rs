@@ -209,6 +209,8 @@ const YANDEX_MUSIC_API_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicApiLoader";
 const YANDEX_MUSIC_AUDIO_SOURCE_MANAGER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicAudioSourceManager";
+const YANDEX_MUSIC_AUDIO_TRACK_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicAudioTrack";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -290,6 +292,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YANDEX_HTTP_CONTEXT_FILTER_CLASS,
     YANDEX_MUSIC_API_LOADER_CLASS,
     YANDEX_MUSIC_AUDIO_SOURCE_MANAGER_CLASS,
+    YANDEX_MUSIC_AUDIO_TRACK_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -678,6 +681,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | DEFAULT_YANDEX_SEARCH_PROVIDER_CLASS
             | YANDEX_HTTP_CONTEXT_FILTER_CLASS
             | YANDEX_MUSIC_AUDIO_SOURCE_MANAGER_CLASS
+            | YANDEX_MUSIC_AUDIO_TRACK_CLASS
     )
 }
 
@@ -716,6 +720,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | DEFAULT_YANDEX_MUSIC_TRACK_LOADER_CLASS
             | DEFAULT_YANDEX_SEARCH_PROVIDER_CLASS
             | YANDEX_MUSIC_AUDIO_SOURCE_MANAGER_CLASS
+            | YANDEX_MUSIC_AUDIO_TRACK_CLASS
     )
 }
 
@@ -975,6 +980,9 @@ fn replacement_body(
             descriptor,
             required_locals,
         );
+    }
+    if class_name == YANDEX_MUSIC_AUDIO_TRACK_CLASS {
+        return yandex_music_audio_track_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -18709,6 +18717,148 @@ fn yandex_music_source_manager_clinit(pool: &mut ConstantPool<'static>) -> Resul
     code(pool, 1, 0, instructions)
 }
 
+fn yandex_music_audio_track_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicAudioSourceManager;)V",
+        ) => yandex_music_audio_track_constructor(pool),
+        (
+            "process",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+        ) => yandex_music_audio_track_process(pool),
+        ("makeClone", "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;") => {
+            yandex_music_audio_track_clone(pool)
+        }
+        ("getSourceManager", "()Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;") => {
+            object_getter(
+                pool,
+                YANDEX_MUSIC_AUDIO_TRACK_CLASS,
+                "sourceManager",
+                "Lcom/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicAudioSourceManager;",
+            )
+        }
+        ("<clinit>", "()V") => yandex_music_audio_track_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {YANDEX_MUSIC_AUDIO_TRACK_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn yandex_music_audio_track_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let parent = pool.add_class(DELEGATED_AUDIO_TRACK_CLASS)?;
+    let parent_init = pool.add_method_ref(
+        parent,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V",
+    )?;
+    let owner = pool.add_class(YANDEX_MUSIC_AUDIO_TRACK_CLASS)?;
+    let source = pool.add_field_ref(
+        owner,
+        "sourceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicAudioSourceManager;",
+    )?;
+    code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(parent_init),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(source),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn yandex_music_audio_track_process(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let native = pool.add_class(NATIVE_CLASS)?;
+    let process = pool.add_method_ref(
+        native,
+        "processYandexMusicTrack",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+    )?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokestatic(process),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn yandex_music_audio_track_clone(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YANDEX_MUSIC_AUDIO_TRACK_CLASS)?;
+    let info = pool.add_field_ref(
+        owner,
+        "trackInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let source = pool.add_field_ref(
+        owner,
+        "sourceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicAudioSourceManager;",
+    )?;
+    let init = pool.add_method_ref(
+        owner,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicAudioSourceManager;)V",
+    )?;
+    code(
+        pool,
+        4,
+        1,
+        vec![
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(info),
+            Instruction::Aload_0,
+            Instruction::Getfield(source),
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn yandex_music_audio_track_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YANDEX_MUSIC_AUDIO_TRACK_CLASS)?;
+    let factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
 #[allow(clippy::too_many_lines)]
 fn m3u_stream_provider_class() -> Result<ClassFile<'static>> {
     const TRACK_DESCRIPTOR: &str =
@@ -19936,6 +20086,10 @@ fn native_class(expected_abi: u8) -> Result<ClassFile<'static>> {
         (
             "processVimeoTrack",
             "(Lcom/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+        ),
+        (
+            "processYandexMusicTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
         ),
         (
             "loadItemReference",
