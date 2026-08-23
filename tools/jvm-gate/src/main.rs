@@ -243,6 +243,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
             Some(YOUTUBE_AUDIO_SOURCE_MANAGER_CONSUMER)
         }
         "write-youtube-audio-track-consumer" => Some(YOUTUBE_AUDIO_TRACK_CONSUMER),
+        "write-youtube-cipher-operation-consumer" => Some(YOUTUBE_CIPHER_OPERATION_CONSUMER),
         _ => None,
     }
 }
@@ -19663,6 +19664,122 @@ public final class GateYoutubeAudioTrack {
   }
 
   private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_CIPHER_OPERATION_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeCipherOperation;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeCipherOperationType;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateYoutubeCipherOperation {
+  public static void main(String[] args) throws Exception {
+    operationContract();
+    typeContract();
+    System.out.println("operation=public-concrete,object-root,2-public-final-fields,"
+        + "1-public-constructor,0-methods;capture=type-reference-null,full-int;identity=object;"
+        + "type=public-final-enum,4-public-constants,2-public-static-methods,"
+        + "1-private-constructor;order=SWAP,REVERSE,SLICE,SPLICE;"
+        + "identity=name,ordinal,field,lookup;copy=true;lookup-errors=iae,npe");
+  }
+
+  private static void operationContract() throws Exception {
+    Class<YoutubeCipherOperation> type = YoutubeCipherOperation.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && !type.isEnum() && !type.isSynthetic()
+        && !type.isMemberClass(), "operation class metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 0 && type.getDeclaredClasses().length == 0,
+        "operation shape");
+    checkField(type, "type", YoutubeCipherOperationType.class);
+    checkField(type, "parameter", int.class);
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        YoutubeCipherOperationType.class, int.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && Arrays.equals(constructor.getParameterTypes(),
+            new Class<?>[] {YoutubeCipherOperationType.class, int.class})
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic()
+        && !constructor.isVarArgs(), "operation constructor metadata");
+
+    YoutubeCipherOperation minimum = new YoutubeCipherOperation(
+        YoutubeCipherOperationType.SPLICE, Integer.MIN_VALUE);
+    YoutubeCipherOperation maximum = new YoutubeCipherOperation(null, Integer.MAX_VALUE);
+    YoutubeCipherOperation duplicate = new YoutubeCipherOperation(
+        YoutubeCipherOperationType.SPLICE, Integer.MIN_VALUE);
+    check(minimum.type == YoutubeCipherOperationType.SPLICE
+        && minimum.parameter == Integer.MIN_VALUE && maximum.type == null
+        && maximum.parameter == Integer.MAX_VALUE, "operation capture");
+    check(minimum.equals(minimum) && !minimum.equals(duplicate) && minimum != duplicate,
+        "operation identity");
+  }
+
+  private static void typeContract() throws Exception {
+    Class<YoutubeCipherOperationType> type = YoutubeCipherOperationType.class;
+    check((type.getModifiers() & ~0x4000) == (Modifier.PUBLIC | Modifier.FINAL)
+        && type.isEnum() && type.getSuperclass() == Enum.class && type.getInterfaces().length == 0
+        && !type.isMemberClass() && !type.isSynthetic(), "enum class metadata");
+    Field[] fields = Arrays.stream(type.getDeclaredFields())
+        .filter(field -> Modifier.isPublic(field.getModifiers()))
+        .toArray(Field[]::new);
+    Method values = type.getDeclaredMethod("values");
+    Method valueOf = type.getDeclaredMethod("valueOf", String.class);
+    Constructor<?> constructor = type.getDeclaredConstructor(String.class, int.class);
+    check(fields.length == 4 && type.getDeclaredMethods().length == 2
+        && type.getDeclaredConstructors().length == 1, "enum exported shape");
+    check(Arrays.stream(fields).allMatch(field -> field.getType() == type && field.isEnumConstant()
+            && (field.getModifiers() & ~0x4000)
+                == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL))
+        && values.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && values.getReturnType().isArray() && values.getReturnType().getComponentType() == type
+        && values.getParameterCount() == 0
+        && valueOf.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && valueOf.getReturnType() == type
+        && Arrays.equals(valueOf.getParameterTypes(), new Class<?>[] {String.class})
+        && Modifier.isPrivate(constructor.getModifiers()), "enum member metadata");
+
+    YoutubeCipherOperationType[] constants = YoutubeCipherOperationType.values();
+    check(Arrays.toString(constants).equals("[SWAP, REVERSE, SLICE, SPLICE]"),
+        "enum constant order");
+    for (int index = 0; index < constants.length; index++) {
+      YoutubeCipherOperationType value = constants[index];
+      check(value.ordinal() == index && value.name().equals(value.toString())
+          && YoutubeCipherOperationType.valueOf(value.name()) == value
+          && fields[index].get(null) == value, "enum constant identity " + index);
+    }
+    constants[0] = null;
+    check(YoutubeCipherOperationType.values()[0] == YoutubeCipherOperationType.SWAP,
+        "enum values copy");
+    check(Arrays.equals(type.getEnumConstants(), YoutubeCipherOperationType.values()),
+        "enum reflection constants");
+    expect(IllegalArgumentException.class,
+        () -> YoutubeCipherOperationType.valueOf("missing"));
+    expect(NullPointerException.class, () -> YoutubeCipherOperationType.valueOf(null));
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> fieldType)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getGenericType() == fieldType
+        && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && !field.isSynthetic() && !field.isEnumConstant(), name + " metadata");
+  }
+
+  private static void expect(Class<? extends Throwable> type, Runnable operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
+  }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

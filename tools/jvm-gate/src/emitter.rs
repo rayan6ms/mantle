@@ -240,6 +240,10 @@ const YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAudioSourceManager";
 const YOUTUBE_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAudioTrack";
+const YOUTUBE_CIPHER_OPERATION_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeCipherOperation";
+const YOUTUBE_CIPHER_OPERATION_TYPE_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeCipherOperationType";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -337,6 +341,8 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_CACHED_AUTH_SCRIPT_CLASS,
     YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS,
     YOUTUBE_AUDIO_TRACK_CLASS,
+    YOUTUBE_CIPHER_OPERATION_CLASS,
+    YOUTUBE_CIPHER_OPERATION_TYPE_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -1083,6 +1089,9 @@ fn replacement_body(
     }
     if class_name == YOUTUBE_AUDIO_TRACK_CLASS {
         return youtube_audio_track_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == YOUTUBE_CIPHER_OPERATION_CLASS {
+        return youtube_cipher_operation_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -14750,6 +14759,7 @@ fn track_enum_constants(class_name: &str) -> Option<&'static [&'static str]> {
             "PREMIERE_TRAILER",
             "NON_EMBEDDABLE",
         ]),
+        YOUTUBE_CIPHER_OPERATION_TYPE_CLASS => Some(&["SWAP", "REVERSE", "SLICE", "SPLICE"]),
         _ => None,
     }
 }
@@ -21253,6 +21263,55 @@ fn youtube_audio_track_clinit(pool: &mut ConstantPool<'static>) -> Result<Attrib
             Instruction::Ldc_w(owner),
             Instruction::Invokestatic(get_logger),
             Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn youtube_cipher_operation_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeCipherOperationType;I)V",
+        ) => youtube_cipher_operation_constructor(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {YOUTUBE_CIPHER_OPERATION_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn youtube_cipher_operation_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(YOUTUBE_CIPHER_OPERATION_CLASS)?;
+    let operation_type = pool.add_field_ref(
+        owner,
+        "type",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeCipherOperationType;",
+    )?;
+    let parameter = pool.add_field_ref(owner, "parameter", "I")?;
+    code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(operation_type),
+            Instruction::Aload_0,
+            Instruction::Iload_2,
+            Instruction::Putfield(parameter),
             Instruction::Return,
         ],
     )
