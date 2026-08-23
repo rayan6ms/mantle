@@ -184,6 +184,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-twitch-stream-segment-url-provider-consumer" => {
             Some(TWITCH_STREAM_SEGMENT_URL_PROVIDER_CONSUMER)
         }
+        "write-vimeo-audio-source-manager-consumer" => Some(VIMEO_AUDIO_SOURCE_MANAGER_CONSUMER),
         _ => None,
     }
 }
@@ -15547,6 +15548,280 @@ public final class GateTwitchStreamSegmentUrlProvider {
   }
 }
 "##;
+
+const VIMEO_AUDIO_SOURCE_MANAGER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioTrack;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpConfigurable;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager;
+import com.sedmelluq.discord.lavaplayer.track.AudioItem;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
+import org.apache.http.client.protocol.HttpClientContext;
+
+public final class GateVimeoAudioSourceManager {
+  private static final Object UNSAFE = loadUnsafe();
+
+  public static void main(String[] args) throws Exception {
+    check(args.length >= 1 && args.length <= 2, "expected disposition and optional native path");
+    boolean reference = args[0].equals("reference");
+    check(reference || args[0].equals("candidate"), "unknown disposition");
+    check(reference == (args.length == 1), "candidate requires native path");
+    reflectionContract();
+    commonBehavior();
+    if (!reference) currentDisposition(args[1]);
+    System.out.println(
+        "common=public-concrete,audio-source-http-configurable,3-fields,1-constructor,"
+        + "11-exported-methods;construction,source-name,empty-details,decode,http-config,shutdown,"
+        + "reflection;service="
+        + (reference ? "legacy-viewer-jwt-api-and-config" :
+            "current-public-config-or-caller-token,bounded-native,no-viewer-jwt"));
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<VimeoAudioSourceManager> type = VimeoAudioSourceManager.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(),
+            new Class<?>[] {AudioSourceManager.class, HttpConfigurable.class}), "class metadata");
+    check(type.getDeclaredFields().length == 3, "field count");
+    checkField(type, "TRACK_URL_REGEX", String.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "trackUrlPattern", Pattern.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "httpInterfaceManager", HttpInterfaceManager.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "constructor metadata");
+    check(type.getDeclaredMethods().length == 17, "declared method count");
+    long exported = Arrays.stream(type.getDeclaredMethods())
+        .filter(method -> Modifier.isPublic(method.getModifiers())
+            || Modifier.isProtected(method.getModifiers()))
+        .count();
+    check(exported == 11L, "exported method count");
+    checkMethod(type, "getSourceName", String.class, Modifier.PUBLIC, new Class<?>[0]);
+    checkMethod(type, "loadItem", AudioItem.class, Modifier.PUBLIC,
+        new Class<?>[] {AudioPlayerManager.class, AudioReference.class});
+    checkMethod(type, "isTrackEncodable", boolean.class, Modifier.PUBLIC,
+        new Class<?>[] {AudioTrack.class});
+    checkMethod(type, "encodeTrack", void.class, Modifier.PUBLIC,
+        new Class<?>[] {AudioTrack.class, DataOutput.class}, java.io.IOException.class);
+    checkMethod(type, "decodeTrack", AudioTrack.class, Modifier.PUBLIC,
+        new Class<?>[] {AudioTrackInfo.class, DataInput.class}, java.io.IOException.class);
+    checkMethod(type, "shutdown", void.class, Modifier.PUBLIC, new Class<?>[0]);
+    checkMethod(type, "getHttpInterface", HttpInterface.class, Modifier.PUBLIC, new Class<?>[0]);
+    checkMethod(type, "configureRequests", void.class, Modifier.PUBLIC,
+        new Class<?>[] {java.util.function.Function.class});
+    checkMethod(type, "configureBuilder", void.class, Modifier.PUBLIC,
+        new Class<?>[] {java.util.function.Consumer.class});
+    checkMethod(type, "getVideoFromApi", JsonBrowser.class, Modifier.PUBLIC,
+        new Class<?>[] {HttpInterface.class, String.class}, java.io.IOException.class,
+        java.net.URISyntaxException.class);
+    checkMethod(type, "getPlaybackFormat", VimeoAudioSourceManager.PlaybackFormat.class,
+        Modifier.PUBLIC, new Class<?>[] {HttpInterface.class, String.class},
+        java.io.IOException.class);
+  }
+
+  private static void commonBehavior() throws Exception {
+    VimeoAudioSourceManager constructed = new VimeoAudioSourceManager();
+    Object constructedHttp = field("httpInterfaceManager").get(constructed);
+    check(constructedHttp instanceof HttpInterfaceManager
+        && field("TRACK_URL_REGEX").get(null).equals("^https?://vimeo.com/([0-9]+)(?:\\?.*|)$")
+        && field("trackUrlPattern").get(null) instanceof Pattern, "construction and statics");
+    constructed.shutdown();
+
+    RecordingHttpInterface http = new RecordingHttpInterface();
+    ManagerHandler handler = new ManagerHandler(http);
+    VimeoAudioSourceManager manager = fabricated(handler.proxy());
+    check(manager.getSourceName().equals("vimeo") && manager.isTrackEncodable(null),
+        "source identity and encodability");
+    manager.encodeTrack(null, proxy(DataOutput.class));
+    AudioTrackInfo info = new AudioTrackInfo("title", "author", 1234L, "76979871", false,
+        "https://vimeo.com/76979871", "art", null);
+    AudioTrack decoded = manager.decodeTrack(info, proxy(DataInput.class));
+    check(decoded instanceof VimeoAudioTrack && decoded.getInfo() == info
+        && decoded.getSourceManager() == manager, "empty-detail decode");
+    Method getManager = VimeoAudioSourceManager.class.getDeclaredMethod("getHttpInterfaceManager");
+    getManager.setAccessible(true);
+    check(manager.getHttpInterface() == http && getManager.invoke(manager) == handler.proxyValue,
+        "HTTP identity");
+    java.util.function.Function<org.apache.http.client.config.RequestConfig,
+        org.apache.http.client.config.RequestConfig> requests = value -> value;
+    java.util.function.Consumer<org.apache.http.impl.client.HttpClientBuilder> builder = value -> {};
+    manager.configureRequests(requests);
+    manager.configureBuilder(builder);
+    check(handler.requestConfig == requests && handler.builderConfig == builder,
+        "HTTP configuration identity");
+    manager.shutdown();
+    manager.shutdown();
+    check(handler.closes.get() == 2, "shutdown delegation");
+  }
+
+  private static void currentDisposition(String nativeLibrary) throws Exception {
+    Class.forName("dev.mantle.internal.NativeLoader")
+        .getMethod("load", String.class).invoke(null, nativeLibrary);
+    Class<?> nativeType = Class.forName("dev.mantle.internal.MantleNative");
+    Method load = nativeType.getDeclaredMethod(
+        "loadVimeoItem", VimeoAudioSourceManager.class, AudioReference.class);
+    check(Modifier.isPublic(load.getModifiers()) && Modifier.isStatic(load.getModifiers())
+        && Modifier.isNative(load.getModifiers()), "current native route");
+    clearProperties();
+    VimeoAudioSourceManager manager = new VimeoAudioSourceManager();
+    check(manager.loadItem(null,
+        new AudioReference("https://example.invalid/76979871", null)) == null,
+        "foreign route rejected without service traffic");
+    System.setProperty("dev.mantle.vimeo.accessToken", "");
+    RuntimeException invalid = expect(RuntimeException.class, () -> manager.loadItem(null,
+        new AudioReference("https://vimeo.com/76979871", null)));
+    check(invalid.getMessage().contains("invalid Vimeo JVM access token"),
+        "invalid caller token fails before service traffic");
+    UnsupportedOperationException api = expect(UnsupportedOperationException.class,
+        () -> manager.getVideoFromApi(null, "76979871"));
+    check(api.getMessage().contains("explicit caller token"), "legacy viewer JWT disabled");
+    UnsupportedOperationException format = expect(UnsupportedOperationException.class,
+        () -> manager.getPlaybackFormat(null, "https://example.invalid/config"));
+    check(format.getMessage().contains("bounded progressive MP4 discovery"),
+        "legacy format hook disabled");
+    manager.shutdown();
+    clearProperties();
+  }
+
+  private static VimeoAudioSourceManager fabricated(HttpInterfaceManager http) throws Exception {
+    VimeoAudioSourceManager manager = allocate(VimeoAudioSourceManager.class);
+    Field field = VimeoAudioSourceManager.class.getDeclaredField("httpInterfaceManager");
+    field.setAccessible(true);
+    field.set(manager, http);
+    return manager;
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = VimeoAudioSourceManager.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static void clearProperties() {
+    System.clearProperty("dev.mantle.vimeo.accessToken");
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> type, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == type && field.getGenericType() == type
+        && field.getModifiers() == modifiers && !field.isSynthetic(), name + " metadata");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+                                  int modifiers, Class<?>[] parameters,
+                                  Class<?>... exceptions) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.getTypeParameters().length == 0 && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), method + " metadata");
+  }
+
+  private static final class RecordingHttpInterface extends HttpInterface {
+    RecordingHttpInterface() { super(null, HttpClientContext.create(), false, null); }
+  }
+
+  private static final class ManagerHandler implements InvocationHandler {
+    private final HttpInterface http;
+    private final AtomicInteger closes = new AtomicInteger();
+    private HttpInterfaceManager proxyValue;
+    private Object requestConfig;
+    private Object builderConfig;
+    ManagerHandler(HttpInterface http) { this.http = http; }
+    HttpInterfaceManager proxy() {
+      if (proxyValue == null) {
+        proxyValue = (HttpInterfaceManager) Proxy.newProxyInstance(
+            HttpInterfaceManager.class.getClassLoader(),
+            new Class<?>[] {HttpInterfaceManager.class}, this);
+      }
+      return proxyValue;
+    }
+    public Object invoke(Object instance, Method method, Object[] arguments) {
+      if (method.getName().equals("getInterface")) return http;
+      if (method.getName().equals("configureRequests")) requestConfig = arguments[0];
+      if (method.getName().equals("configureBuilder")) builderConfig = arguments[0];
+      if (method.getName().equals("close")) closes.incrementAndGet();
+      if (method.getName().equals("toString")) return "VimeoManagerFixture";
+      return defaultValue(method.getReturnType());
+    }
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
+  }
+
+  private static <T> T allocate(Class<T> type) throws Exception {
+    return type.cast(UNSAFE.getClass().getMethod("allocateInstance", Class.class)
+        .invoke(UNSAFE, type));
+  }
+
+  private static <T> T proxy(Class<T> type) {
+    return type.cast(Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type},
+        (instance, method, arguments) -> defaultValue(method.getReturnType())));
+  }
+
+  private static Object loadUnsafe() {
+    try {
+      Class<?> unsafeType = Class.forName("sun.misc.Unsafe");
+      Field singleton = unsafeType.getDeclaredField("theUnsafe");
+      singleton.setAccessible(true);
+      return singleton.get(null);
+    } catch (Exception error) {
+      throw new AssertionError(error);
+    }
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (error instanceof InvocationTargetException) error = error.getCause();
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
 
 fn required_path(args: &[String], name: &str) -> Result<PathBuf> {
     Ok(PathBuf::from(required_value(args, name)?))

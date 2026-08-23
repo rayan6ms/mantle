@@ -22,7 +22,7 @@ cargo run --locked -q -p mantle-jvm-gate -- emit \
 cargo run --locked -q -p mantle-jvm-gate -- verify-structure \
   --reference-jar "$REFERENCE_JAR" --candidate-jar "$JAR"
 
-for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame audio-frame-provider-tools audio-processing-context audio-player-options decoded-track-holder track-state-listener audio-output-hook audio-load-result-handler functional-result-handler audio-player-lifecycle-manager audio-player-interface default-audio-player default-audio-player-manager internal-audio-track audio-track-executor local-audio-track-executor-callback local-audio-track-executor track-marker-tracker base-audio-track primordial-audio-track-executor delegated-audio-track audio-track-info-builder abstract-audio-frame-buffer allocating-audio-frame-buffer non-allocating-audio-frame-buffer audio-source-manager-interface audio-source-managers probing-audio-source-manager local-audio-source-manager local-audio-track local-seekable-input-stream heartbeating-http-stream nico-audio-source-manager nico-audio-track default-sound-cloud-data-loader default-sound-cloud-data-reader default-sound-cloud-format-handler default-sound-cloud-playlist-loader default-sound-cloud-track-format sound-cloud-audio-source-manager sound-cloud-audio-source-manager-builder sound-cloud-audio-track sound-cloud-client-id-tracker sound-cloud-data-loader sound-cloud-data-reader sound-cloud-format-handler sound-cloud-helper sound-cloud-http-context-filter sound-cloud-m3u-audio-track sound-cloud-m3u-info sound-cloud-mp3-segment-decoder sound-cloud-opus-segment-decoder sound-cloud-playlist-loader sound-cloud-segment-decoder sound-cloud-segment-decoder-factory sound-cloud-track-format m3u-stream-audio-track m3u-stream-segment-url-provider mpeg-ts-m3u-stream-audio-track twitch-constants twitch-stream-audio-source-manager twitch-stream-audio-track twitch-stream-segment-url-provider; do
+for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame audio-frame-provider-tools audio-processing-context audio-player-options decoded-track-holder track-state-listener audio-output-hook audio-load-result-handler functional-result-handler audio-player-lifecycle-manager audio-player-interface default-audio-player default-audio-player-manager internal-audio-track audio-track-executor local-audio-track-executor-callback local-audio-track-executor track-marker-tracker base-audio-track primordial-audio-track-executor delegated-audio-track audio-track-info-builder abstract-audio-frame-buffer allocating-audio-frame-buffer non-allocating-audio-frame-buffer audio-source-manager-interface audio-source-managers probing-audio-source-manager local-audio-source-manager local-audio-track local-seekable-input-stream heartbeating-http-stream nico-audio-source-manager nico-audio-track default-sound-cloud-data-loader default-sound-cloud-data-reader default-sound-cloud-format-handler default-sound-cloud-playlist-loader default-sound-cloud-track-format sound-cloud-audio-source-manager sound-cloud-audio-source-manager-builder sound-cloud-audio-track sound-cloud-client-id-tracker sound-cloud-data-loader sound-cloud-data-reader sound-cloud-format-handler sound-cloud-helper sound-cloud-http-context-filter sound-cloud-m3u-audio-track sound-cloud-m3u-info sound-cloud-mp3-segment-decoder sound-cloud-opus-segment-decoder sound-cloud-playlist-loader sound-cloud-segment-decoder sound-cloud-segment-decoder-factory sound-cloud-track-format m3u-stream-audio-track m3u-stream-segment-url-provider mpeg-ts-m3u-stream-audio-track twitch-constants twitch-stream-audio-source-manager twitch-stream-audio-track twitch-stream-segment-url-provider vimeo-audio-source-manager; do
   case "$consumer" in
     smoke) consumer_class='Smoke' ;;
     probe) consumer_class='Probe' ;;
@@ -102,6 +102,7 @@ for consumer in smoke probe integration classloader event track-value track-enum
     twitch-stream-audio-source-manager) consumer_class='TwitchStreamAudioSourceManager' ;;
     twitch-stream-audio-track) consumer_class='TwitchStreamAudioTrack' ;;
     twitch-stream-segment-url-provider) consumer_class='TwitchStreamSegmentUrlProvider' ;;
+    vimeo-audio-source-manager) consumer_class='VimeoAudioSourceManager' ;;
   esac
   cargo run --locked -q -p mantle-jvm-gate -- "write-$consumer-consumer" \
     --output "$WORK/Gate${consumer_class}.java"
@@ -191,7 +192,8 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateTwitchConstants.java" \
   "$WORK/GateTwitchStreamAudioSourceManager.java" \
   "$WORK/GateTwitchStreamAudioTrack.java" \
-  "$WORK/GateTwitchStreamSegmentUrlProvider.java"
+  "$WORK/GateTwitchStreamSegmentUrlProvider.java" \
+  "$WORK/GateVimeoAudioSourceManager.java"
 
 readonly GATE_CLASSPATH="$classes_argument$classpath_separator$jar_argument"
 java -Xverify:all \
@@ -1079,6 +1081,21 @@ grep --fixed-strings \
 grep --fixed-strings \
   'common=public-concrete,m3u-provider-super,6-fields,1-constructor,3-exported-methods;construction,video-quality,manager-get-request,reflection;service=deterministic-retired-provider,bounded-native-playback' \
   "$WORK/twitch-stream-segment-url-provider-candidate.txt" >/dev/null
+# Preserve manager identity, serialization, reconstruction, HTTP configuration, and lifecycle while
+# current metadata resolution bypasses hidden viewer JWTs for bounded public config or caller auth.
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateVimeoAudioSourceManager reference \
+  >"$WORK/vimeo-audio-source-manager-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateVimeoAudioSourceManager candidate "$native" \
+  >"$WORK/vimeo-audio-source-manager-candidate.txt"
+grep --fixed-strings \
+  'common=public-concrete,audio-source-http-configurable,3-fields,1-constructor,11-exported-methods;construction,source-name,empty-details,decode,http-config,shutdown,reflection;service=legacy-viewer-jwt-api-and-config' \
+  "$WORK/vimeo-audio-source-manager-reference.txt" >/dev/null
+grep --fixed-strings \
+  'common=public-concrete,audio-source-http-configurable,3-fields,1-constructor,11-exported-methods;construction,source-name,empty-details,decode,http-config,shutdown,reflection;service=current-public-config-or-caller-token,bounded-native,no-viewer-jwt' \
+  "$WORK/vimeo-audio-source-manager-candidate.txt" >/dev/null
 java -Xverify:all -cp "$GATE_CLASSPATH" GateSmoke "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateIntegration "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" callbacks

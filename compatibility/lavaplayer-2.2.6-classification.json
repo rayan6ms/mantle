@@ -16610,117 +16610,130 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The exact manager, source SPI, HTTP configuration, serialization, reconstruction, and lifecycle shell is retained, while metadata and playback discovery move from hidden viewer-JWT scraping to Mantle's bounded public-config or explicit caller-token implementation.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "crates/mantle-jvm/src/load_bridge.rs", "crates/mantle-media/tests/phase12_vimeo.rs", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "docs/architecture/ADR-0017-bounded-vimeo-source.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves public construction and exact default thread-local HTTP manager initialization without service traffic.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getSourceName",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves the exact vimeo source name.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "loadItem",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The SPI return contract is retained, while strict current public/player/unlisted routing and metadata resolution use bounded native public config or optional dev.mantle.vimeo.accessToken authentication without hidden viewer JWTs.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "crates/mantle-jvm/src/load_bridge.rs", "crates/mantle-media/tests/phase12_vimeo.rs", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "docs/architecture/ADR-0017-bounded-vimeo-source.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "isTrackEncodable",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves unconditional track encodability, including null input.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "encodeTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Ljava/io/DataOutput;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves the empty Vimeo source-detail payload and checked IOException declaration.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "decodeTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves VimeoAudioTrack reconstruction with exact track-info and source-manager identity while ignoring the empty detail input.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "shutdown",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves repeatable shutdown delegation to the captured HTTP manager.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getHttpInterface",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves HTTP-interface delegation and return identity through the captured manager.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "configureRequests",
       "descriptor": "(Ljava/util/function/Function;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves the generic signature and exact request-configurator delegation identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "configureBuilder",
       "descriptor": "(Ljava/util/function/Consumer;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves the generic signature and exact HTTP-builder configurator delegation identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getVideoFromApi",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The exact public checked-exception signature remains, but the hidden viewer-JWT API escape hatch fails deterministically; current official API access requires an explicit caller token at the bounded native boundary.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "crates/mantle-jvm/src/load_bridge.rs", "crates/mantle-media/tests/phase12_vimeo.rs", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "docs/architecture/ADR-0017-bounded-vimeo-source.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getPlaybackFormat",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioSourceManager$PlaybackFormat;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The exact public checked-exception signature remains, but the legacy unbounded format hook fails deterministically; current playback refreshes expiring links and admits only bounded validated progressive MP4.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "crates/mantle-jvm/src/load_bridge.rs", "crates/mantle-media/tests/phase12_vimeo.rs", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "docs/architecture/ADR-0017-bounded-vimeo-source.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager$PlaybackFormat",

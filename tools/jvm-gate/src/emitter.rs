@@ -185,6 +185,8 @@ const TWITCH_STREAM_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamAudioTrack";
 const TWITCH_STREAM_SEGMENT_URL_PROVIDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamSegmentUrlProvider";
+const VIMEO_AUDIO_SOURCE_MANAGER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioSourceManager";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -254,6 +256,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS,
     TWITCH_STREAM_AUDIO_TRACK_CLASS,
     TWITCH_STREAM_SEGMENT_URL_PROVIDER_CLASS,
+    VIMEO_AUDIO_SOURCE_MANAGER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -635,6 +638,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS
                 | TWITCH_STREAM_AUDIO_TRACK_CLASS
                 | TWITCH_STREAM_SEGMENT_URL_PROVIDER_CLASS
+                | VIMEO_AUDIO_SOURCE_MANAGER_CLASS
         ) || field
             .access_flags
             .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
@@ -666,6 +670,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 | TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS
                 | TWITCH_STREAM_AUDIO_TRACK_CLASS
                 | TWITCH_STREAM_SEGMENT_URL_PROVIDER_CLASS
+                | VIMEO_AUDIO_SOURCE_MANAGER_CLASS
         ) || method
             .access_flags
             .intersects(MethodAccessFlags::PUBLIC | MethodAccessFlags::PROTECTED)
@@ -857,6 +862,9 @@ fn replacement_body(
             descriptor,
             required_locals,
         );
+    }
+    if class_name == VIMEO_AUDIO_SOURCE_MANAGER_CLASS {
+        return vimeo_audio_source_manager_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -16935,6 +16943,255 @@ fn twitch_stream_segment_url_provider_clinit(
     )
 }
 
+fn vimeo_audio_source_manager_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => vimeo_source_manager_constructor(pool),
+        ("getSourceName", "()Ljava/lang/String;") => string_return(pool, "vimeo", required_locals),
+        (
+            "loadItem",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+        ) => vimeo_source_manager_load_item(pool),
+        ("isTrackEncodable", "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)Z") => code(
+            pool,
+            1,
+            required_locals,
+            vec![Instruction::Iconst_1, Instruction::Ireturn],
+        ),
+        (
+            "encodeTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Ljava/io/DataOutput;)V",
+        ) => code(pool, 0, required_locals, vec![Instruction::Return]),
+        (
+            "decodeTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+        ) => vimeo_source_manager_decode_track(pool),
+        ("shutdown", "()V") => vimeo_source_manager_shutdown(pool),
+        ("getHttpInterface", "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;") => {
+            vimeo_source_manager_get_http_interface(pool)
+        }
+        (
+            "getHttpInterfaceManager",
+            "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+        ) => object_getter(
+            pool,
+            VIMEO_AUDIO_SOURCE_MANAGER_CLASS,
+            "httpInterfaceManager",
+            "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+        ),
+        ("configureRequests", "(Ljava/util/function/Function;)V") => {
+            vimeo_source_manager_configure(pool, true)
+        }
+        ("configureBuilder", "(Ljava/util/function/Consumer;)V") => {
+            vimeo_source_manager_configure(pool, false)
+        }
+        (
+            "getVideoFromApi",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+        ) => unsupported_body(
+            pool,
+            "Legacy Vimeo viewer-JWT API access is unsupported; current metadata uses bounded public config or an explicit caller token.",
+            required_locals,
+        ),
+        (
+            "getPlaybackFormat",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioSourceManager$PlaybackFormat;",
+        ) => unsupported_body(
+            pool,
+            "Legacy Vimeo format selection is unsupported; current playback refreshes and validates bounded progressive MP4 discovery.",
+            required_locals,
+        ),
+        ("<clinit>", "()V") => vimeo_source_manager_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {VIMEO_AUDIO_SOURCE_MANAGER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn vimeo_source_manager_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let tools = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpClientTools")?;
+    let create = pool.add_method_ref(
+        tools,
+        "createDefaultThreadLocalManager",
+        "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let owner = pool.add_class(VIMEO_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let field = pool.add_field_ref(
+        owner,
+        "httpInterfaceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Invokestatic(create),
+            Instruction::Putfield(field),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn vimeo_source_manager_load_item(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let native = pool.add_class(NATIVE_CLASS)?;
+    let load = pool.add_method_ref(
+        native,
+        "loadVimeoItem",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioSourceManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+    )?;
+    code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Invokestatic(load),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn vimeo_source_manager_decode_track(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let track = pool.add_class("com/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioTrack")?;
+    let init = pool.add_method_ref(
+        track,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioSourceManager;)V",
+    )?;
+    code(
+        pool,
+        4,
+        3,
+        vec![
+            Instruction::New(track),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn vimeo_source_manager_get_http_interface(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(VIMEO_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let field = pool.add_field_ref(
+        owner,
+        "httpInterfaceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let manager =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager")?;
+    let get = pool.add_interface_method_ref(
+        manager,
+        "getInterface",
+        "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Invokeinterface(get, 1),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn vimeo_source_manager_configure(
+    pool: &mut ConstantPool<'static>,
+    requests: bool,
+) -> Result<Attribute> {
+    let owner = pool.add_class(VIMEO_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let field = pool.add_field_ref(
+        owner,
+        "httpInterfaceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let manager =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager")?;
+    let (name, descriptor) = if requests {
+        ("configureRequests", "(Ljava/util/function/Function;)V")
+    } else {
+        ("configureBuilder", "(Ljava/util/function/Consumer;)V")
+    };
+    let configure = pool.add_interface_method_ref(manager, name, descriptor)?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(configure, 2),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn vimeo_source_manager_shutdown(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(VIMEO_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let field = pool.add_field_ref(
+        owner,
+        "httpInterfaceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let tools = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/ExceptionTools")?;
+    let close = pool.add_method_ref(tools, "closeWithWarnings", "(Ljava/lang/AutoCloseable;)V")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Invokestatic(close),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn vimeo_source_manager_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let pattern = pool.add_class("java/util/regex/Pattern")?;
+    let compile = pool.add_method_ref(
+        pattern,
+        "compile",
+        "(Ljava/lang/String;)Ljava/util/regex/Pattern;",
+    )?;
+    let regex = pool.add_string("^https?://vimeo.com/([0-9]+)(?:\\?.*|)$")?;
+    let owner = pool.add_class(VIMEO_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let field = pool.add_field_ref(owner, "trackUrlPattern", "Ljava/util/regex/Pattern;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(regex),
+            Instruction::Invokestatic(compile),
+            Instruction::Putstatic(field),
+            Instruction::Return,
+        ],
+    )
+}
+
 #[allow(clippy::too_many_lines)]
 fn m3u_stream_provider_class() -> Result<ClassFile<'static>> {
     const TRACK_DESCRIPTOR: &str =
@@ -18138,6 +18395,10 @@ fn native_class(expected_abi: u8) -> Result<ClassFile<'static>> {
         (
             "loadTwitchItem",
             "(Lcom/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamAudioSourceManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+        ),
+        (
+            "loadVimeoItem",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioSourceManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
         ),
         (
             "processNicoTrack",

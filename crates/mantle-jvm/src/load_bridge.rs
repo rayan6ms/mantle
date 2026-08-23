@@ -11,9 +11,10 @@ use mantle_core::{
 };
 use mantle_media::{
     NicoNicoSourceManager, NicoNicoSourceOptions, NicoNicoSourceTrack, TwitchAuthentication,
-    TwitchSourceManager, TwitchSourceOptions, TwitchSourceTrack, YandexMusicPlaylistKind,
+    TwitchSourceManager, TwitchSourceOptions, TwitchSourceTrack, VimeoAuthentication,
+    VimeoSourceManager, VimeoSourceOptions, VimeoSourceTrack, YandexMusicPlaylistKind,
     YandexMusicSourceItem, YandexMusicSourcePlaylist, YandexMusicSourceTrack, YoutubeSourceItem,
-    YoutubeSourcePlaylist, YoutubeSourceTrack, route_twitch_identifier,
+    YoutubeSourcePlaylist, YoutubeSourceTrack, route_twitch_identifier, route_vimeo_identifier,
 };
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -1063,6 +1064,38 @@ pub(crate) fn load_twitch_item<'local>(
     }
 }
 
+pub(crate) fn load_vimeo_item<'local>(
+    env: &mut Env<'local>,
+    source: &JObject<'local>,
+    reference: &JObject<'local>,
+) -> jni::errors::Result<JObject<'local>> {
+    let reference = source_reference_from_java(env, reference)?;
+    let options = VimeoSourceOptions::default();
+    let Some(identifier) = reference.identifier() else {
+        return Ok(JObject::null());
+    };
+    if route_vimeo_identifier(identifier, &options).is_none() {
+        return Ok(JObject::null());
+    }
+
+    let manager = match system_property(env, "dev.mantle.vimeo.accessToken")? {
+        Some(access_token) => {
+            let authentication = VimeoAuthentication::new(access_token)
+                .map_err(|_| jni::errors::Error::NullPtr("invalid Vimeo JVM access token"))?;
+            VimeoSourceManager::with_authentication(options, authentication)
+        }
+        None => VimeoSourceManager::new(options),
+    }
+    .map_err(|_| jni::errors::Error::NullPtr("could not create current Vimeo source"))?;
+    let item = manager
+        .load(&reference)
+        .map_err(|_| jni::errors::Error::NullPtr("current Vimeo metadata load failed"))?;
+    match item {
+        Some(SourceLoad::Item(track)) => create_vimeo_track(env, &track, source),
+        Some(SourceLoad::Referral(_)) | None => Ok(JObject::null()),
+    }
+}
+
 fn system_property(env: &mut Env<'_>, key: &str) -> jni::errors::Result<Option<String>> {
     let key = JObject::from(env.new_string(key)?);
     let value = env
@@ -1645,6 +1678,41 @@ fn create_twitch_track<'local>(
     env.new_object(
         jni_str!("com/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamAudioTrack"),
         jni_sig!("(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamAudioSourceManager;)V"),
+        &[JValue::Object(&java_info), JValue::Object(source)],
+    )
+}
+
+fn create_vimeo_track<'local>(
+    env: &mut Env<'local>,
+    track: &VimeoSourceTrack,
+    source: &JObject<'local>,
+) -> jni::errors::Result<JObject<'local>> {
+    let info = &track.info;
+    let duration = i64::try_from(info.duration.as_millis())
+        .map_err(|_| jni::errors::Error::NullPtr("Vimeo duration exceeds JVM range"))?;
+    let title = JObject::from(env.new_string(&info.title)?);
+    let author = JObject::from(env.new_string(&info.author)?);
+    let identifier = JObject::from(env.new_string(&info.identifier)?);
+    let uri = optional_java_string(env, info.uri.as_deref())?;
+    let artwork = optional_java_string(env, info.artwork_url.as_deref())?;
+    let isrc = optional_java_string(env, info.isrc.as_deref())?;
+    let java_info = env.new_object(
+        jni_str!("com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo"),
+        jni_sig!("(Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V"),
+        &[
+            JValue::Object(&title),
+            JValue::Object(&author),
+            JValue::Long(duration),
+            JValue::Object(&identifier),
+            JValue::Bool(info.is_stream),
+            JValue::Object(&uri),
+            JValue::Object(&artwork),
+            JValue::Object(&isrc),
+        ],
+    )?;
+    env.new_object(
+        jni_str!("com/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioTrack"),
+        jni_sig!("(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioSourceManager;)V"),
         &[JValue::Object(&java_info), JValue::Object(source)],
     )
 }
