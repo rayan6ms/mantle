@@ -16560,45 +16560,50 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The exact public M3U provider shell, constructor state, Twitch quality parsing, and manager-owned request behavior are retained, while obsolete GraphQL-token and Usher discovery is retired in favor of Mantle's bounded native Twitch playback path.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "crates/mantle-media/tests/phase12_twitch.rs", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "docs/architecture/ADR-0018-bounded-twitch-live-source.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamSegmentUrlProvider",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/twitch/TwitchStreamAudioSourceManager;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves parent construction with a null base URL, exact channel and manager capture, empty playlist cache, and the initial minus-one token expiration.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamSegmentUrlProvider",
       "symbol_kind": "METHOD",
       "member_name": "getQualityFromM3uDirective",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/playlists/ExtendedM3uParser$Line;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves protected extraction of the Twitch VIDEO directive argument, including the missing-value result.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamSegmentUrlProvider",
       "symbol_kind": "METHOD",
       "member_name": "fetchSegmentPlaylistUrl",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The protected checked-exception signature remains binary-compatible, but legacy GraphQL playback-token and Usher playlist discovery now fails deterministically before network access because current track processing uses the bounded native Twitch HLS pipeline.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "crates/mantle-media/tests/phase12_twitch.rs", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "docs/architecture/ADR-0018-bounded-twitch-live-source.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.twitch.TwitchStreamSegmentUrlProvider",
       "symbol_kind": "METHOD",
       "member_name": "createSegmentGetRequest",
       "descriptor": "(Ljava/lang/String;)Lorg/apache/http/client/methods/HttpUriRequest;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves protected delegation to the captured source manager, the HttpGet URI, and caller client/device headers.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager",
