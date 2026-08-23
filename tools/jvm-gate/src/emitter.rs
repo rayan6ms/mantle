@@ -227,6 +227,8 @@ const DEFAULT_YOUTUBE_PLAYLIST_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubePlaylistLoader";
 const DEFAULT_YOUTUBE_TRACK_DETAILS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetails";
+const DEFAULT_YOUTUBE_TRACK_DETAILS_LOADER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -317,6 +319,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     DEFAULT_YOUTUBE_LINK_ROUTER_CLASS,
     DEFAULT_YOUTUBE_PLAYLIST_LOADER_CLASS,
     DEFAULT_YOUTUBE_TRACK_DETAILS_CLASS,
+    DEFAULT_YOUTUBE_TRACK_DETAILS_LOADER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -710,6 +713,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | DEFAULT_YOUTUBE_LINK_ROUTER_CLASS
             | DEFAULT_YOUTUBE_PLAYLIST_LOADER_CLASS
             | DEFAULT_YOUTUBE_TRACK_DETAILS_CLASS
+            | DEFAULT_YOUTUBE_TRACK_DETAILS_LOADER_CLASS
     )
 }
 
@@ -753,6 +757,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | DEFAULT_YOUTUBE_LINK_ROUTER_CLASS
             | DEFAULT_YOUTUBE_PLAYLIST_LOADER_CLASS
             | DEFAULT_YOUTUBE_TRACK_DETAILS_CLASS
+            | DEFAULT_YOUTUBE_TRACK_DETAILS_LOADER_CLASS
     )
 }
 
@@ -1032,6 +1037,14 @@ fn replacement_body(
     }
     if class_name == DEFAULT_YOUTUBE_TRACK_DETAILS_CLASS {
         return default_youtube_track_details_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == DEFAULT_YOUTUBE_TRACK_DETAILS_LOADER_CLASS {
+        return default_youtube_track_details_loader_replacement(
+            pool,
+            name,
+            descriptor,
+            required_locals,
+        );
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -19721,6 +19734,643 @@ fn default_youtube_track_details_class_init(pool: &mut ConstantPool<'static>) ->
     }
     instructions.extend([Instruction::Putstatic(extractors), Instruction::Return]);
     code(pool, 5, 0, instructions)
+}
+
+fn default_youtube_track_details_loader_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => default_youtube_track_details_loader_constructor(pool),
+        (
+            "checkPlayabilityStatus",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Z)Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$InfoStatus;",
+        ) => default_youtube_track_details_loader_check_status(pool),
+        (
+            "getUnplayableReason",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/lang/String;",
+        ) => default_youtube_track_details_loader_unplayable_reason(pool),
+        (
+            "lambda$getUnplayableReason$0",
+            "(Ljava/lang/StringBuilder;Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)V",
+        ) => default_youtube_track_details_loader_reason_lambda(pool),
+        ("<clinit>", "()V") => default_youtube_track_details_loader_class_init(pool),
+        _ => unsupported_body(
+            pool,
+            "Legacy YouTube track-detail acquisition is unsupported; use Mantle's bounded current YouTube source.",
+            required_locals,
+        ),
+    }
+}
+
+fn default_youtube_track_details_loader_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(DEFAULT_YOUTUBE_TRACK_DETAILS_LOADER_CLASS)?;
+    let cached = pool.add_field_ref(
+        owner,
+        "cachedPlayerScript",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$CachedPlayerScript;",
+    )?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aconst_null,
+            Instruction::Putfield(cached),
+            Instruction::Return,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn default_youtube_track_details_loader_check_status(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_YOUTUBE_TRACK_DETAILS_LOADER_CLASS)?;
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let string = pool.add_class("java/lang/String")?;
+    let status_type = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$InfoStatus",
+    )?;
+    let friendly = pool.add_class(FRIENDLY_EXCEPTION_CLASS)?;
+    let severity = pool.add_class(FRIENDLY_EXCEPTION_SEVERITY_CLASS)?;
+    let runtime = pool.add_class("java/lang/RuntimeException")?;
+    let illegal_state = pool.add_class("java/lang/IllegalStateException")?;
+    let get = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let text_method = pool.add_method_ref(json, "text", "()Ljava/lang/String;")?;
+    let is_null = pool.add_method_ref(json, "isNull", "()Z")?;
+    let equals = pool.add_method_ref(string, "equals", "(Ljava/lang/Object;)Z")?;
+    let contains = pool.add_method_ref(string, "contains", "(Ljava/lang/CharSequence;)Z")?;
+    let runtime_init = pool.add_method_ref(runtime, "<init>", "(Ljava/lang/String;)V")?;
+    let illegal_init = pool.add_method_ref(illegal_state, "<init>", "(Ljava/lang/String;)V")?;
+    let friendly_init = pool.add_method_ref(
+        friendly,
+        "<init>",
+        "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity;Ljava/lang/Throwable;)V",
+    )?;
+    let common = pool.add_field_ref(
+        severity,
+        "COMMON",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity;",
+    )?;
+    let suspicious = pool.add_field_ref(
+        severity,
+        "SUSPICIOUS",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity;",
+    )?;
+    let info_present = pool.add_field_ref(
+        status_type,
+        "INFO_PRESENT",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$InfoStatus;",
+    )?;
+    let requires_login = pool.add_field_ref(
+        status_type,
+        "REQUIRES_LOGIN",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$InfoStatus;",
+    )?;
+    let does_not_exist = pool.add_field_ref(
+        status_type,
+        "DOES_NOT_EXIST",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$InfoStatus;",
+    )?;
+    let premiere = pool.add_field_ref(
+        status_type,
+        "PREMIERE_TRAILER",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$InfoStatus;",
+    )?;
+    let non_embeddable = pool.add_field_ref(
+        status_type,
+        "NON_EMBEDDABLE",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$InfoStatus;",
+    )?;
+    let get_reason = pool.add_method_ref(
+        owner,
+        "getUnplayableReason",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/lang/String;",
+    )?;
+    let playability = pool.add_string("playabilityStatus")?;
+    let status = pool.add_string("status")?;
+    let reason = pool.add_string("reason")?;
+    let ok = pool.add_string("OK")?;
+    let error = pool.add_string("ERROR")?;
+    let unplayable = pool.add_string("UNPLAYABLE")?;
+    let login_required = pool.add_string("LOGIN_REQUIRED")?;
+    let content_required = pool.add_string("CONTENT_CHECK_REQUIRED")?;
+    let live_offline = pool.add_string("LIVE_STREAM_OFFLINE")?;
+    let unavailable = pool.add_string("This video is unavailable")?;
+    let disabled =
+        pool.add_string("Playback on other websites has been disabled by the video owner")?;
+    let private = pool.add_string("This video is private")?;
+    let inappropriate = pool.add_string("This video may be inappropriate for some users")?;
+    let private_message = pool.add_string("This is a private video.")?;
+    let age_message = pool.add_string("This video requires age verification.")?;
+    let credentials_message =
+        pool.add_string("You did not set email and password in YoutubeAudioSourceManager.")?;
+    let anonymous_message = pool.add_string("This video cannot be viewed anonymously.")?;
+    let no_block = pool.add_string("No playability status block.")?;
+    let no_status = pool.add_string("No playability status field.")?;
+    let error_screen = pool.add_string("errorScreen")?;
+    let trailer_renderer = pool.add_string("ypcTrailerRenderer")?;
+
+    let mut instructions = vec![
+        Instruction::Aload_1,
+        Instruction::Ldc_w(playability),
+        Instruction::Invokevirtual(get),
+        Instruction::Astore_3,
+        Instruction::Aload_3,
+        Instruction::Invokevirtual(is_null),
+        Instruction::Ifeq(0),
+        Instruction::New(runtime),
+        Instruction::Dup,
+        Instruction::Ldc_w(no_block),
+        Instruction::Invokespecial(runtime_init),
+        Instruction::Athrow,
+    ];
+    let block_target = instructions.len();
+    instructions[6] = Instruction::Ifeq(u16::try_from(block_target)?);
+    instructions.extend([
+        Instruction::Aload_3,
+        Instruction::Ldc_w(status),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text_method),
+        Instruction::Astore(4),
+        Instruction::Aload(4),
+        Instruction::Ifnonnull(0),
+        Instruction::New(runtime),
+        Instruction::Dup,
+        Instruction::Ldc_w(no_status),
+        Instruction::Invokespecial(runtime_init),
+        Instruction::Athrow,
+    ]);
+    let status_target = instructions.len();
+    instructions[block_target + 6] = Instruction::Ifnonnull(u16::try_from(status_target)?);
+
+    instructions.extend([
+        Instruction::Ldc_w(ok),
+        Instruction::Aload(4),
+        Instruction::Invokevirtual(equals),
+        Instruction::Ifeq(0),
+        Instruction::Getstatic(info_present),
+        Instruction::Areturn,
+    ]);
+    let error_target = instructions.len();
+    instructions[status_target + 3] = Instruction::Ifeq(u16::try_from(error_target)?);
+    instructions.extend([
+        Instruction::Ldc_w(error),
+        Instruction::Aload(4),
+        Instruction::Invokevirtual(equals),
+        Instruction::Ifeq(0),
+        Instruction::Aload_3,
+        Instruction::Ldc_w(reason),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text_method),
+        Instruction::Ldc_w(unavailable),
+        Instruction::Invokevirtual(contains),
+        Instruction::Ifeq(0),
+        Instruction::Getstatic(does_not_exist),
+        Instruction::Areturn,
+    ]);
+    let error_throw_target = instructions.len();
+    instructions[error_target + 10] = Instruction::Ifeq(u16::try_from(error_throw_target)?);
+    instructions.extend([
+        Instruction::New(friendly),
+        Instruction::Dup,
+        Instruction::Aload_3,
+        Instruction::Ldc_w(reason),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text_method),
+        Instruction::Getstatic(common),
+        Instruction::Aconst_null,
+        Instruction::Invokespecial(friendly_init),
+        Instruction::Athrow,
+    ]);
+    let unplayable_target = instructions.len();
+    instructions[error_target + 3] = Instruction::Ifeq(u16::try_from(unplayable_target)?);
+    instructions.extend([
+        Instruction::Ldc_w(unplayable),
+        Instruction::Aload(4),
+        Instruction::Invokevirtual(equals),
+        Instruction::Ifeq(0),
+        Instruction::Aload_0,
+        Instruction::Aload_3,
+        Instruction::Invokevirtual(get_reason),
+        Instruction::Astore(5),
+        Instruction::Aload(5),
+        Instruction::Ldc_w(disabled),
+        Instruction::Invokevirtual(contains),
+        Instruction::Ifeq(0),
+        Instruction::Getstatic(non_embeddable),
+        Instruction::Areturn,
+    ]);
+    let unplayable_throw_target = instructions.len();
+    instructions[unplayable_target + 11] =
+        Instruction::Ifeq(u16::try_from(unplayable_throw_target)?);
+    instructions.extend([
+        Instruction::New(friendly),
+        Instruction::Dup,
+        Instruction::Aload(5),
+        Instruction::Getstatic(common),
+        Instruction::Aconst_null,
+        Instruction::Invokespecial(friendly_init),
+        Instruction::Athrow,
+    ]);
+    let login_target = instructions.len();
+    instructions[unplayable_target + 3] = Instruction::Ifeq(u16::try_from(login_target)?);
+    instructions.extend([
+        Instruction::Ldc_w(login_required),
+        Instruction::Aload(4),
+        Instruction::Invokevirtual(equals),
+        Instruction::Ifeq(0),
+        Instruction::Aload_3,
+        Instruction::Ldc_w(reason),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text_method),
+        Instruction::Astore(5),
+        Instruction::Aload(5),
+        Instruction::Ldc_w(private),
+        Instruction::Invokevirtual(contains),
+        Instruction::Ifeq(0),
+        Instruction::New(friendly),
+        Instruction::Dup,
+        Instruction::Ldc_w(private_message),
+        Instruction::Getstatic(common),
+        Instruction::Aconst_null,
+        Instruction::Invokespecial(friendly_init),
+        Instruction::Athrow,
+    ]);
+    let not_private_target = instructions.len();
+    instructions[login_target + 12] = Instruction::Ifeq(u16::try_from(not_private_target)?);
+    instructions.extend([
+        Instruction::Aload(5),
+        Instruction::Ldc_w(inappropriate),
+        Instruction::Invokevirtual(contains),
+        Instruction::Ifeq(0),
+        Instruction::Iload_2,
+        Instruction::Ifeq(0),
+        Instruction::New(friendly),
+        Instruction::Dup,
+        Instruction::Ldc_w(age_message),
+        Instruction::Getstatic(suspicious),
+        Instruction::New(illegal_state),
+        Instruction::Dup,
+        Instruction::Ldc_w(credentials_message),
+        Instruction::Invokespecial(illegal_init),
+        Instruction::Invokespecial(friendly_init),
+        Instruction::Athrow,
+    ]);
+    let login_return_target = instructions.len();
+    instructions[not_private_target + 3] = Instruction::Ifeq(u16::try_from(login_return_target)?);
+    instructions[not_private_target + 5] = Instruction::Ifeq(u16::try_from(login_return_target)?);
+    instructions.extend([Instruction::Getstatic(requires_login), Instruction::Areturn]);
+    let content_target = instructions.len();
+    instructions[login_target + 3] = Instruction::Ifeq(u16::try_from(content_target)?);
+    instructions.extend([
+        Instruction::Ldc_w(content_required),
+        Instruction::Aload(4),
+        Instruction::Invokevirtual(equals),
+        Instruction::Ifeq(0),
+        Instruction::New(friendly),
+        Instruction::Dup,
+        Instruction::Aload_0,
+        Instruction::Aload_3,
+        Instruction::Invokevirtual(get_reason),
+        Instruction::Getstatic(common),
+        Instruction::Aconst_null,
+        Instruction::Invokespecial(friendly_init),
+        Instruction::Athrow,
+    ]);
+    let live_target = instructions.len();
+    instructions[content_target + 3] = Instruction::Ifeq(u16::try_from(live_target)?);
+    instructions.extend([
+        Instruction::Ldc_w(live_offline),
+        Instruction::Aload(4),
+        Instruction::Invokevirtual(equals),
+        Instruction::Ifeq(0),
+        Instruction::Aload_3,
+        Instruction::Ldc_w(error_screen),
+        Instruction::Invokevirtual(get),
+        Instruction::Ldc_w(trailer_renderer),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(is_null),
+        Instruction::Ifne(0),
+        Instruction::Getstatic(premiere),
+        Instruction::Areturn,
+    ]);
+    let live_throw_target = instructions.len();
+    instructions[live_target + 10] = Instruction::Ifne(u16::try_from(live_throw_target)?);
+    instructions.extend([
+        Instruction::New(friendly),
+        Instruction::Dup,
+        Instruction::Aload_0,
+        Instruction::Aload_3,
+        Instruction::Invokevirtual(get_reason),
+        Instruction::Getstatic(common),
+        Instruction::Aconst_null,
+        Instruction::Invokespecial(friendly_init),
+        Instruction::Athrow,
+    ]);
+    let unknown_target = instructions.len();
+    instructions[live_target + 3] = Instruction::Ifeq(u16::try_from(unknown_target)?);
+    instructions.extend([
+        Instruction::New(friendly),
+        Instruction::Dup,
+        Instruction::Ldc_w(anonymous_message),
+        Instruction::Getstatic(common),
+        Instruction::Aconst_null,
+        Instruction::Invokespecial(friendly_init),
+        Instruction::Athrow,
+    ]);
+
+    let owner_type = VerificationType::Object { cpool_index: owner };
+    let json_type = VerificationType::Object { cpool_index: json };
+    let string_type = VerificationType::Object {
+        cpool_index: string,
+    };
+    let base = vec![owner_type, json_type.clone(), VerificationType::Integer];
+    let block = [base.clone(), vec![json_type]].concat();
+    let status_locals = [block.clone(), vec![string_type.clone()]].concat();
+    let reason_locals = [status_locals.clone(), vec![string_type]].concat();
+    let mut previous = None;
+    let frames = vec![
+        youtube_full_frame(&mut previous, block_target, block.clone(), vec![])?,
+        youtube_full_frame(&mut previous, status_target, status_locals.clone(), vec![])?,
+        youtube_full_frame(&mut previous, error_target, status_locals.clone(), vec![])?,
+        youtube_full_frame(
+            &mut previous,
+            error_throw_target,
+            status_locals.clone(),
+            vec![],
+        )?,
+        youtube_full_frame(
+            &mut previous,
+            unplayable_target,
+            status_locals.clone(),
+            vec![],
+        )?,
+        youtube_full_frame(
+            &mut previous,
+            unplayable_throw_target,
+            reason_locals.clone(),
+            vec![],
+        )?,
+        youtube_full_frame(&mut previous, login_target, status_locals.clone(), vec![])?,
+        youtube_full_frame(
+            &mut previous,
+            not_private_target,
+            reason_locals.clone(),
+            vec![],
+        )?,
+        youtube_full_frame(&mut previous, login_return_target, reason_locals, vec![])?,
+        youtube_full_frame(&mut previous, content_target, status_locals.clone(), vec![])?,
+        youtube_full_frame(&mut previous, live_target, status_locals.clone(), vec![])?,
+        youtube_full_frame(
+            &mut previous,
+            live_throw_target,
+            status_locals.clone(),
+            vec![],
+        )?,
+        youtube_full_frame(&mut previous, unknown_target, status_locals, vec![])?,
+    ];
+    let mut body = code(pool, 7, 6, instructions)?;
+    add_stack_map_table(pool, &mut body, frames)?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn default_youtube_track_details_loader_unplayable_reason(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_YOUTUBE_TRACK_DETAILS_LOADER_CLASS)?;
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let string = pool.add_class("java/lang/String")?;
+    let builder = pool.add_class("java/lang/StringBuilder")?;
+    let list = pool.add_class("java/util/List")?;
+    let iterator = pool.add_class("java/util/Iterator")?;
+    let get = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let text_method = pool.add_method_ref(json, "text", "()Ljava/lang/String;")?;
+    let is_null = pool.add_method_ref(json, "isNull", "()Z")?;
+    let is_list = pool.add_method_ref(json, "isList", "()Z")?;
+    let values = pool.add_method_ref(json, "values", "()Ljava/util/List;")?;
+    let list_iterator =
+        pool.add_interface_method_ref(list, "iterator", "()Ljava/util/Iterator;")?;
+    let has_next = pool.add_interface_method_ref(iterator, "hasNext", "()Z")?;
+    let next = pool.add_interface_method_ref(iterator, "next", "()Ljava/lang/Object;")?;
+    let builder_init = pool.add_method_ref(builder, "<init>", "()V")?;
+    let append_string = pool.add_method_ref(
+        builder,
+        "append",
+        "(Ljava/lang/String;)Ljava/lang/StringBuilder;",
+    )?;
+    let append_char = pool.add_method_ref(builder, "append", "(C)Ljava/lang/StringBuilder;")?;
+    let builder_string = pool.add_method_ref(builder, "toString", "()Ljava/lang/String;")?;
+    let error_screen = pool.add_string("errorScreen")?;
+    let error_renderer = pool.add_string("playerErrorMessageRenderer")?;
+    let reason = pool.add_string("reason")?;
+    let subreason = pool.add_string("subreason")?;
+    let simple_text = pool.add_string("simpleText")?;
+    let runs = pool.add_string("runs")?;
+    let text_field = pool.add_string("text")?;
+
+    let mut instructions = vec![
+        Instruction::Aload_1,
+        Instruction::Ldc_w(error_screen),
+        Instruction::Invokevirtual(get),
+        Instruction::Ldc_w(error_renderer),
+        Instruction::Invokevirtual(get),
+        Instruction::Astore_2,
+        Instruction::Aload_1,
+        Instruction::Ldc_w(reason),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text_method),
+        Instruction::Astore_3,
+        Instruction::Aload_2,
+        Instruction::Ldc_w(subreason),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(is_null),
+        Instruction::Ifne(0),
+        Instruction::Aload_2,
+        Instruction::Ldc_w(subreason),
+        Instruction::Invokevirtual(get),
+        Instruction::Astore(4),
+        Instruction::Aload(4),
+        Instruction::Ldc_w(simple_text),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(is_null),
+        Instruction::Ifne(0),
+        Instruction::Aload(4),
+        Instruction::Ldc_w(simple_text),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text_method),
+        Instruction::Astore_3,
+        Instruction::Goto(0),
+    ];
+    let runs_target = instructions.len();
+    instructions[24] = Instruction::Ifne(u16::try_from(runs_target)?);
+    instructions.extend([
+        Instruction::Aload(4),
+        Instruction::Ldc_w(runs),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(is_null),
+        Instruction::Ifne(0),
+        Instruction::Aload(4),
+        Instruction::Ldc_w(runs),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(is_list),
+        Instruction::Ifeq(0),
+        Instruction::New(builder),
+        Instruction::Dup,
+        Instruction::Invokespecial(builder_init),
+        Instruction::Astore(5),
+        Instruction::Aload(4),
+        Instruction::Ldc_w(runs),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(values),
+        Instruction::Invokeinterface(list_iterator, 1),
+        Instruction::Astore(6),
+    ]);
+    let loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload(6),
+        Instruction::Invokeinterface(has_next, 1),
+        Instruction::Ifeq(0),
+        Instruction::Aload(6),
+        Instruction::Invokeinterface(next, 1),
+        Instruction::Checkcast(json),
+        Instruction::Astore(7),
+        Instruction::Aload(5),
+        Instruction::Aload(7),
+        Instruction::Ldc_w(text_field),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text_method),
+        Instruction::Invokevirtual(append_string),
+        Instruction::Pop,
+        Instruction::Aload(5),
+        Instruction::Bipush(10),
+        Instruction::Invokevirtual(append_char),
+        Instruction::Pop,
+        Instruction::Goto(u16::try_from(loop_target)?),
+    ]);
+    let loop_done = instructions.len();
+    instructions[loop_target + 2] = Instruction::Ifeq(u16::try_from(loop_done)?);
+    instructions.extend([
+        Instruction::Aload(5),
+        Instruction::Invokevirtual(builder_string),
+        Instruction::Astore_3,
+    ]);
+    let return_target = instructions.len();
+    instructions[15] = Instruction::Ifne(u16::try_from(return_target)?);
+    instructions[30] = Instruction::Goto(u16::try_from(return_target)?);
+    instructions[runs_target + 4] = Instruction::Ifne(u16::try_from(return_target)?);
+    instructions[runs_target + 9] = Instruction::Ifeq(u16::try_from(return_target)?);
+    instructions.extend([Instruction::Aload_3, Instruction::Areturn]);
+
+    let owner_type = VerificationType::Object { cpool_index: owner };
+    let json_type = VerificationType::Object { cpool_index: json };
+    let string_type = VerificationType::Object {
+        cpool_index: string,
+    };
+    let builder_type = VerificationType::Object {
+        cpool_index: builder,
+    };
+    let iterator_type = VerificationType::Object {
+        cpool_index: iterator,
+    };
+    let base = vec![
+        owner_type,
+        json_type.clone(),
+        json_type.clone(),
+        string_type,
+    ];
+    let subreason_locals = [base.clone(), vec![json_type]].concat();
+    let loop_locals = [subreason_locals.clone(), vec![builder_type, iterator_type]].concat();
+    let mut previous = None;
+    let frames = vec![
+        youtube_full_frame(&mut previous, runs_target, subreason_locals, vec![])?,
+        youtube_full_frame(&mut previous, loop_target, loop_locals.clone(), vec![])?,
+        youtube_full_frame(&mut previous, loop_done, loop_locals, vec![])?,
+        youtube_full_frame(&mut previous, return_target, base, vec![])?,
+    ];
+    let mut body = code(pool, 3, 8, instructions)?;
+    add_stack_map_table(pool, &mut body, frames)?;
+    Ok(body)
+}
+
+fn default_youtube_track_details_loader_reason_lambda(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let builder = pool.add_class("java/lang/StringBuilder")?;
+    let get = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let text_method = pool.add_method_ref(json, "text", "()Ljava/lang/String;")?;
+    let append_string = pool.add_method_ref(
+        builder,
+        "append",
+        "(Ljava/lang/String;)Ljava/lang/StringBuilder;",
+    )?;
+    let append_char = pool.add_method_ref(builder, "append", "(C)Ljava/lang/StringBuilder;")?;
+    let text_field = pool.add_string("text")?;
+    code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Ldc_w(text_field),
+            Instruction::Invokevirtual(get),
+            Instruction::Invokevirtual(text_method),
+            Instruction::Invokevirtual(append_string),
+            Instruction::Bipush(10),
+            Instruction::Invokevirtual(append_char),
+            Instruction::Pop,
+            Instruction::Return,
+        ],
+    )
+}
+
+fn default_youtube_track_details_loader_class_init(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_YOUTUBE_TRACK_DETAILS_LOADER_CLASS)?;
+    let logger_factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        logger_factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
 }
 
 fn default_yandex_search_provider_replacement(

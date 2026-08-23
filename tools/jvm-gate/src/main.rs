@@ -228,6 +228,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-default-youtube-track-details-consumer" => {
             Some(DEFAULT_YOUTUBE_TRACK_DETAILS_CONSUMER)
         }
+        "write-default-youtube-track-details-loader-consumer" => {
+            Some(DEFAULT_YOUTUBE_TRACK_DETAILS_LOADER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -18706,6 +18709,234 @@ public final class GateDefaultYoutubeTrackDetails {
       check(eq(error.getMessage(), message)
           && error.severity == FriendlyException.Severity.COMMON && error.getCause() == null,
           "friendly failure");
+    }
+  }
+
+  private static boolean eq(Object left, Object right) {
+    return left == null ? right == null : left.equals(right);
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const DEFAULT_YOUTUBE_TRACK_DETAILS_LOADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackDetailsLoader;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackJsonData;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.TreeSet;
+
+public final class GateDefaultYoutubeTrackDetailsLoader {
+  private static final class Probe extends DefaultYoutubeTrackDetailsLoader {
+    String status(String json, boolean second) {
+      return checkPlayabilityStatus(parse(json), second).name();
+    }
+
+    String reason(String json) {
+      return getUnplayableReason(parse(json));
+    }
+
+    Object base(JsonBrowser json) throws IOException {
+      return loadBaseResponse(json, null, null, null);
+    }
+
+    Object innertube() throws IOException {
+      return loadTrackInfoFromInnertube(null, null, null, null);
+    }
+
+    Object augment() throws IOException {
+      return augmentWithPlayerScript(null, null, null, false);
+    }
+  }
+
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "mode required");
+    Class<DefaultYoutubeTrackDetailsLoader> type = DefaultYoutubeTrackDetailsLoader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {YoutubeTrackDetailsLoader.class})
+        && type.getDeclaredFields().length == 2 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 9 && type.getDeclaredClasses().length == 2,
+        "class shape");
+    Field log = type.getDeclaredField("log");
+    Field cached = type.getDeclaredField("cachedPlayerScript");
+    check(log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && cached.getModifiers() == (Modifier.PRIVATE | Modifier.VOLATILE), "field metadata");
+    log.setAccessible(true);
+    cached.setAccessible(true);
+    check(log.get(null) != null, "logger initialization");
+    Probe probe = new Probe();
+    check(cached.get(probe) == null, "empty initial cache");
+
+    Set<String> nested = new TreeSet<>();
+    for (Class<?> child : type.getDeclaredClasses()) nested.add(child.getSimpleName());
+    check(nested.equals(new TreeSet<>(Arrays.asList("CachedPlayerScript", "InfoStatus"))),
+        "nested declarations");
+    check(type.getDeclaredConstructor().getModifiers() == Modifier.PUBLIC,
+        "constructor metadata");
+    Method loadDetails = type.getDeclaredMethod("loadDetails", HttpInterface.class, String.class,
+        boolean.class, YoutubeAudioSourceManager.class);
+    Method load = type.getDeclaredMethod("load", HttpInterface.class, String.class, boolean.class,
+        YoutubeAudioSourceManager.class);
+    Method base = type.getDeclaredMethod("loadBaseResponse", JsonBrowser.class, HttpInterface.class,
+        String.class, YoutubeAudioSourceManager.class);
+    Class<?> statusType = Arrays.stream(type.getDeclaredClasses())
+        .filter(child -> child.getSimpleName().equals("InfoStatus")).findFirst().orElseThrow();
+    Method status = type.getDeclaredMethod("checkPlayabilityStatus", JsonBrowser.class, boolean.class);
+    Method reason = type.getDeclaredMethod("getUnplayableReason", JsonBrowser.class);
+    Method innertube = type.getDeclaredMethod("loadTrackInfoFromInnertube", HttpInterface.class,
+        String.class, YoutubeAudioSourceManager.class, statusType);
+    Method augment = type.getDeclaredMethod("augmentWithPlayerScript", YoutubeTrackJsonData.class,
+        HttpInterface.class, String.class, boolean.class);
+    Method fetch = type.getDeclaredMethod("fetchScript", String.class, HttpInterface.class);
+    Method lambda = type.getDeclaredMethod("lambda$getUnplayableReason$0", StringBuilder.class,
+        JsonBrowser.class);
+    check(loadDetails.getModifiers() == Modifier.PUBLIC
+        && load.getModifiers() == Modifier.PRIVATE
+        && base.getModifiers() == Modifier.PROTECTED
+        && status.getModifiers() == Modifier.PROTECTED
+        && reason.getModifiers() == Modifier.PROTECTED
+        && innertube.getModifiers() == Modifier.PROTECTED
+        && augment.getModifiers() == Modifier.PROTECTED
+        && fetch.getModifiers() == Modifier.PRIVATE
+        && lambda.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | 0x1000)
+        && lambda.isSynthetic(), "method modifiers");
+    check(Arrays.equals(load.getExceptionTypes(), new Class<?>[] {IOException.class})
+        && Arrays.equals(base.getExceptionTypes(), new Class<?>[] {IOException.class})
+        && Arrays.equals(innertube.getExceptionTypes(), new Class<?>[] {IOException.class})
+        && Arrays.equals(augment.getExceptionTypes(), new Class<?>[] {IOException.class})
+        && Arrays.equals(fetch.getExceptionTypes(), new Class<?>[] {IOException.class})
+        && loadDetails.getExceptionTypes().length == 0 && status.getExceptionTypes().length == 0
+        && reason.getExceptionTypes().length == 0, "exception metadata");
+    lambda.setAccessible(true);
+    StringBuilder joined = new StringBuilder();
+    lambda.invoke(null, joined, parse("{\"text\":\"part\"}"));
+    check(joined.toString().equals("part\n"), "synthetic reason helper");
+
+    check(probe.status("{\"playabilityStatus\":{\"status\":\"OK\"}}", false)
+        .equals("INFO_PRESENT"), "OK status");
+    check(probe.status("{\"playabilityStatus\":{\"status\":\"ERROR\",\"reason\":"
+        + "\"This video is unavailable in this region\"}}", false).equals("DOES_NOT_EXIST"),
+        "missing status");
+    check(probe.status("{\"playabilityStatus\":{\"status\":\"UNPLAYABLE\",\"reason\":"
+        + "\"Playback on other websites has been disabled by the video owner\"}}", false)
+        .equals("NON_EMBEDDABLE"), "embed status");
+    check(probe.status("{\"playabilityStatus\":{\"status\":\"LOGIN_REQUIRED\",\"reason\":"
+        + "\"This video may be inappropriate for some users\"}}", false)
+        .equals("REQUIRES_LOGIN"), "first login status");
+    check(probe.status("{\"playabilityStatus\":{\"status\":\"LIVE_STREAM_OFFLINE\","
+        + "\"errorScreen\":{\"ypcTrailerRenderer\":{}}}}", false)
+        .equals("PREMIERE_TRAILER"), "premiere status");
+    assertRuntime(() -> probe.status("{}", false), "No playability status block.");
+    assertRuntime(() -> probe.status("{\"playabilityStatus\":{}}", false),
+        "No playability status field.");
+    assertFriendly(() -> probe.status("{\"playabilityStatus\":{\"status\":\"ERROR\","
+        + "\"reason\":\"Blocked\"}}", false), "Blocked", FriendlyException.Severity.COMMON,
+        null);
+    assertFriendly(() -> probe.status("{\"playabilityStatus\":{\"status\":\"UNPLAYABLE\","
+        + "\"reason\":\"fallback\",\"errorScreen\":{\"playerErrorMessageRenderer\":{"
+        + "\"subreason\":{\"simpleText\":\"Detailed\"}}}}}", false), "Detailed",
+        FriendlyException.Severity.COMMON, null);
+    assertFriendly(() -> probe.status("{\"playabilityStatus\":{\"status\":\"LOGIN_REQUIRED\","
+        + "\"reason\":\"This video is private for this account\"}}", false),
+        "This is a private video.", FriendlyException.Severity.COMMON, null);
+    assertFriendly(() -> probe.status("{\"playabilityStatus\":{\"status\":\"LOGIN_REQUIRED\","
+        + "\"reason\":\"This video may be inappropriate for some users\"}}", true),
+        "This video requires age verification.", FriendlyException.Severity.SUSPICIOUS,
+        IllegalStateException.class);
+    assertFriendly(() -> probe.status("{\"playabilityStatus\":{\"status\":"
+        + "\"CONTENT_CHECK_REQUIRED\",\"reason\":\"Check content\"}}", false),
+        "Check content", FriendlyException.Severity.COMMON, null);
+    assertFriendly(() -> probe.status("{\"playabilityStatus\":{\"status\":"
+        + "\"LIVE_STREAM_OFFLINE\",\"reason\":\"Offline\"}}", false), "Offline",
+        FriendlyException.Severity.COMMON, null);
+    assertFriendly(() -> probe.status("{\"playabilityStatus\":{\"status\":\"MYSTERY\"}}",
+        false), "This video cannot be viewed anonymously.", FriendlyException.Severity.COMMON, null);
+
+    check(probe.reason("{\"reason\":\"Fallback\"}").equals("Fallback"), "fallback reason");
+    check(probe.reason("{\"reason\":\"Fallback\",\"errorScreen\":{"
+        + "\"playerErrorMessageRenderer\":{\"subreason\":{\"simpleText\":\"Simple\"}}}}")
+        .equals("Simple"), "simple reason");
+    check(probe.reason("{\"reason\":\"Fallback\",\"errorScreen\":{"
+        + "\"playerErrorMessageRenderer\":{\"subreason\":{\"runs\":[{\"text\":\"One\"},"
+        + "{\"text\":\"Two\"}]}}}}" ).equals("One\nTwo\n"), "runs reason");
+
+    if (args[0].equals("candidate")) {
+      assertUnsupported(() -> probe.loadDetails(null, null, false, null));
+      assertUnsupported(() -> probe.base(null));
+      assertUnsupported(probe::innertube);
+      assertUnsupported(probe::augment);
+      check(cached.get(probe) == null, "service failures preserve cache");
+      System.out.println("common=public-concrete,object-root,details-loader-interface,2-private-fields,"
+          + "1-constructor,9-declared-methods,2-nested-declarations;constructor-empty-cache,"
+          + "playability-matrix,reason-fallback-simple-runs,synthetic-helper,exceptions,reflection;"
+          + "service=deterministic-no-network,current-bounded-native-source");
+    } else {
+      check(args[0].equals("reference"), "unknown mode");
+      System.out.println("common=public-concrete,object-root,details-loader-interface,2-private-fields,"
+          + "1-constructor,9-declared-methods,2-nested-declarations;constructor-empty-cache,"
+          + "playability-matrix,reason-fallback-simple-runs,synthetic-helper,exceptions,reflection;"
+          + "service=legacy-innertube-embed-player-script-cache");
+    }
+  }
+
+  private interface CheckedCall {
+    Object run() throws Exception;
+  }
+
+  private static JsonBrowser parse(String json) {
+    try {
+      return JsonBrowser.parse(json);
+    } catch (Exception error) {
+      throw new AssertionError(error);
+    }
+  }
+
+  private static void assertRuntime(CheckedCall call, String message) {
+    try {
+      call.run();
+      throw new AssertionError("runtime failure unexpectedly succeeded");
+    } catch (RuntimeException error) {
+      check(eq(error.getMessage(), message), "runtime message");
+    } catch (Exception error) {
+      throw new AssertionError(error);
+    }
+  }
+
+  private static void assertFriendly(CheckedCall call, String message,
+      FriendlyException.Severity severity, Class<?> cause) {
+    try {
+      call.run();
+      throw new AssertionError("friendly failure unexpectedly succeeded");
+    } catch (FriendlyException error) {
+      check(eq(error.getMessage(), message) && error.severity == severity
+          && (cause == null ? error.getCause() == null : cause.isInstance(error.getCause())),
+          "friendly failure");
+    } catch (Exception error) {
+      throw new AssertionError(error);
+    }
+  }
+
+  private static void assertUnsupported(CheckedCall call) {
+    try {
+      call.run();
+      throw new AssertionError("legacy acquisition unexpectedly succeeded");
+    } catch (UnsupportedOperationException error) {
+      check(error.getMessage().contains("Legacy YouTube track-detail acquisition is unsupported"),
+          "stable service disposition");
+    } catch (Exception error) {
+      throw new AssertionError(error);
     }
   }
 

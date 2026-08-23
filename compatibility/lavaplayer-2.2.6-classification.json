@@ -17942,72 +17942,80 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Generated structure, construction, playability parsing, and reason extraction match, while legacy InnerTube/embed/player-script acquisition is retired in favor of Mantle's bounded current YouTube source.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_youtube.rs", "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Generated construction preserves the public zero-argument shell and null private volatile player-script cache.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader",
       "symbol_kind": "METHOD",
       "member_name": "loadDetails",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/lang/String;ZLcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAudioSourceManager;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackDetails;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The legacy multi-request detail loader is replaced by deterministic failure before HTTP or source-manager access; current loading remains native.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_youtube.rs", "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader",
       "symbol_kind": "METHOD",
       "member_name": "loadBaseResponse",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAudioSourceManager;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Legacy fallback response loading is fenced before JSON collaborators or retry traffic; native current-client fallback owns the service behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_youtube.rs", "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader",
       "symbol_kind": "METHOD",
       "member_name": "checkPlayabilityStatus",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Z)Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$InfoStatus;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The full frozen status matrix, second-check age handling, enum results, friendly messages, severities, causes, and malformed-field failures match.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader",
       "symbol_kind": "METHOD",
       "member_name": "getUnplayableReason",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Fallback reason, simple-text override, ordered run concatenation, and trailing-newline behavior match exactly.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader",
       "symbol_kind": "METHOD",
       "member_name": "loadTrackInfoFromInnertube",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeAudioSourceManager;Lcom/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeTrackDetailsLoader$InfoStatus;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Legacy InnerTube client payload and signature-timestamp traffic is replaced by deterministic failure before collaborator access.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_youtube.rs", "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader",
       "symbol_kind": "METHOD",
       "member_name": "augmentWithPlayerScript",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData;Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/lang/String;Z)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The legacy mutable ten-minute embed-page script cache is retired; calls fail before cache mutation or HTTP and native bounded acquisition owns current scripts.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-media/tests/phase12_youtube.rs", "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubeTrackDetailsLoader$CachedPlayerScript",
