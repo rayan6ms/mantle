@@ -212,6 +212,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-yandex-music-direct-url-loader-consumer" => {
             Some(YANDEX_MUSIC_DIRECT_URL_LOADER_CONSUMER)
         }
+        "write-yandex-music-playlist-loader-consumer" => {
+            Some(YANDEX_MUSIC_PLAYLIST_LOADER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -17701,6 +17704,160 @@ public final class GateYandexMusicDirectUrlLoader {
       this.codec = codec;
       calls++;
       return result;
+    }
+
+    @Override
+    public ExtendedHttpConfigurable getHttpConfiguration() {
+      return configuration;
+    }
+
+    @Override
+    public void shutdown() {
+      shutdowns++;
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YANDEX_MUSIC_PLAYLIST_LOADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicApiLoader;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicPlaylistLoader;
+import com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpConfigurable;
+import com.sedmelluq.discord.lavaplayer.track.AudioItem;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.Type;
+import java.util.Arrays;
+import java.util.function.Function;
+
+public final class GateYandexMusicPlaylistLoader {
+  public static void main(String[] args) throws Exception {
+    Class<YandexMusicPlaylistLoader> type = YandexMusicPlaylistLoader.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.INTERFACE | Modifier.ABSTRACT)
+        && type.isInterface() && !type.isAnnotation() && !type.isEnum() && !type.isSynthetic(),
+        "interface metadata");
+    check(type.getSuperclass() == null
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {YandexMusicApiLoader.class})
+        && type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 2 && type.getMethods().length == 4
+        && type.getTypeParameters().length == 0, "interface shape");
+    Method user = type.getDeclaredMethod("loadPlaylist", String.class, String.class,
+        String.class, Function.class);
+    Method album = type.getDeclaredMethod("loadPlaylist", String.class, String.class,
+        Function.class);
+    checkMethod(user, new Class<?>[] {String.class, String.class, String.class, Function.class});
+    checkMethod(album, new Class<?>[] {String.class, String.class, Function.class});
+    checkFactorySignature(user, 3);
+    checkFactorySignature(album, 2);
+
+    ExtendedHttpConfigurable configuration = proxy(ExtendedHttpConfigurable.class);
+    AudioItem userResult = proxy(AudioItem.class);
+    AudioItem albumResult = proxy(AudioItem.class);
+    RecordingLoader loader = new RecordingLoader(configuration, userResult, albumResult);
+    String login = new String("alice");
+    String id = new String("44");
+    String property = new String("tracks");
+    Function<AudioTrackInfo, AudioTrack> factory = info -> null;
+    check(loader.loadPlaylist(login, id, property, factory) == userResult
+        && loader.login == login && loader.id == id && loader.property == property
+        && loader.factory == factory && loader.userCalls == 1, "user overload identity");
+    String albumId = new String("55");
+    String volume = new String("volumes");
+    check(loader.loadPlaylist(albumId, volume, factory) == albumResult
+        && loader.album == albumId && loader.property == volume && loader.factory == factory
+        && loader.albumCalls == 1, "album overload identity");
+    loader.userResult = null;
+    loader.albumResult = null;
+    check(loader.loadPlaylist(null, null, null, null) == null
+        && loader.loadPlaylist(null, null, null) == null
+        && loader.login == null && loader.id == null && loader.album == null
+        && loader.property == null && loader.factory == null,
+        "null identity and overload dispatch");
+    check(loader.getHttpConfiguration() == configuration, "inherited configuration dispatch");
+    loader.shutdown();
+    loader.shutdown();
+    check(loader.shutdowns == 2 && type.isAssignableFrom(RecordingLoader.class)
+        && Arrays.equals(RecordingLoader.class.getInterfaces(),
+            new Class<?>[] {YandexMusicPlaylistLoader.class}), "implementation hierarchy");
+    System.out.println("interface=public-abstract,object-root,yandex-api-loader-superinterface,"
+        + "0-fields,0-constructors,2-overloaded-methods;generic-factory=track-info-to-track;"
+        + "implementation=overload-argument-result-identity,null-identity,"
+        + "inherited-configuration-shutdown;reflection=exact");
+  }
+
+  private static void checkMethod(Method method, Class<?>[] parameters) {
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == AudioItem.class
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), method + " metadata");
+  }
+
+  private static void checkFactorySignature(Method method, int index) {
+    Type factory = method.getGenericParameterTypes()[index];
+    check(factory instanceof ParameterizedType, method + " factory type");
+    ParameterizedType parameterized = (ParameterizedType) factory;
+    check(parameterized.getRawType() == Function.class && parameterized.getOwnerType() == null
+        && Arrays.equals(parameterized.getActualTypeArguments(),
+            new Type[] {AudioTrackInfo.class, AudioTrack.class}), method + " generic factory");
+  }
+
+  private static <T> T proxy(Class<T> type) {
+    Object value = Proxy.newProxyInstance(GateYandexMusicPlaylistLoader.class.getClassLoader(),
+        new Class<?>[] {type}, (proxy, method, arguments) -> {
+          throw new AssertionError("proxy invoked: " + method.getName());
+        });
+    return type.cast(value);
+  }
+
+  private static final class RecordingLoader implements YandexMusicPlaylistLoader {
+    private final ExtendedHttpConfigurable configuration;
+    private AudioItem userResult;
+    private AudioItem albumResult;
+    private String login;
+    private String id;
+    private String album;
+    private String property;
+    private Function<AudioTrackInfo, AudioTrack> factory;
+    private int userCalls;
+    private int albumCalls;
+    private int shutdowns;
+
+    private RecordingLoader(ExtendedHttpConfigurable configuration, AudioItem userResult,
+                            AudioItem albumResult) {
+      this.configuration = configuration;
+      this.userResult = userResult;
+      this.albumResult = albumResult;
+    }
+
+    @Override
+    public AudioItem loadPlaylist(String login, String id, String property,
+                                  Function<AudioTrackInfo, AudioTrack> factory) {
+      this.login = login;
+      this.id = id;
+      this.property = property;
+      this.factory = factory;
+      userCalls++;
+      return userResult;
+    }
+
+    @Override
+    public AudioItem loadPlaylist(String album, String property,
+                                  Function<AudioTrackInfo, AudioTrack> factory) {
+      this.album = album;
+      this.property = property;
+      this.factory = factory;
+      albumCalls++;
+      return albumResult;
     }
 
     @Override
