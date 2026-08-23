@@ -36,6 +36,7 @@ const LOCAL_TRACK_EXECUTOR_HELPER_CLASS: &str = "dev/mantle/internal/NativeLocal
 const TRACK_MARKER_TRACKER_HELPER_CLASS: &str = "dev/mantle/internal/NativeTrackMarkerTracker";
 const BASE_AUDIO_TRACK_HELPER_CLASS: &str = "dev/mantle/internal/NativeBaseAudioTrack";
 const TRACK_INFO_BUILDER_HELPER_CLASS: &str = "dev/mantle/internal/NativeAudioTrackInfoBuilder";
+const YOUTUBE_CLIENT_CONFIG_HELPER_CLASS: &str = "dev/mantle/internal/NativeYoutubeClientConfig";
 const MANAGER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayerManager";
 const DEFAULT_PLAYER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayer";
 const AUDIO_PLAYER_MANAGER_CLASS: &str =
@@ -244,6 +245,10 @@ const YOUTUBE_CIPHER_OPERATION_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeCipherOperation";
 const YOUTUBE_CIPHER_OPERATION_TYPE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeCipherOperationType";
+const YOUTUBE_CLIENT_CONFIG_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig";
+const YOUTUBE_ANDROID_VERSION_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig$AndroidVersion";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -343,6 +348,8 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_AUDIO_TRACK_CLASS,
     YOUTUBE_CIPHER_OPERATION_CLASS,
     YOUTUBE_CIPHER_OPERATION_TYPE_CLASS,
+    YOUTUBE_CLIENT_CONFIG_CLASS,
+    YOUTUBE_ANDROID_VERSION_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -525,6 +532,7 @@ fn internal_classes(expected_abi: u8) -> Result<Vec<ClassFile<'static>>> {
         native_track_marker_tracker_class()?,
         native_base_audio_track_class()?,
         native_audio_track_info_builder_class()?,
+        native_youtube_client_config_class()?,
         m3u_stream_provider_class()?,
         m3u_segment_tools_class()?,
     ])
@@ -740,6 +748,8 @@ fn retain_private_fields(class_name: &str) -> bool {
             | YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS
             | YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS
             | YOUTUBE_AUDIO_TRACK_CLASS
+            | YOUTUBE_CLIENT_CONFIG_CLASS
+            | YOUTUBE_ANDROID_VERSION_CLASS
     )
 }
 
@@ -787,6 +797,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS
             | YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS
             | YOUTUBE_AUDIO_TRACK_CLASS
+            | YOUTUBE_CLIENT_CONFIG_CLASS
     )
 }
 
@@ -1092,6 +1103,12 @@ fn replacement_body(
     }
     if class_name == YOUTUBE_CIPHER_OPERATION_CLASS {
         return youtube_cipher_operation_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == YOUTUBE_CLIENT_CONFIG_CLASS {
+        return youtube_client_config_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == YOUTUBE_ANDROID_VERSION_CLASS {
+        return youtube_android_version_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -14760,6 +14777,7 @@ fn track_enum_constants(class_name: &str) -> Option<&'static [&'static str]> {
             "NON_EMBEDDABLE",
         ]),
         YOUTUBE_CIPHER_OPERATION_TYPE_CLASS => Some(&["SWAP", "REVERSE", "SLICE", "SPLICE"]),
+        YOUTUBE_ANDROID_VERSION_CLASS => Some(&["ANDROID_11"]),
         _ => None,
     }
 }
@@ -15607,15 +15625,17 @@ fn add_terminator_frame_state(class: &mut ClassFile<'static>) -> Result<()> {
 }
 
 fn add_track_enum_state(class: &mut ClassFile<'static>, class_name: &str) -> Result<()> {
-    let constructor_descriptor = if class_name == TRACK_END_REASON_CLASS {
-        "(Ljava/lang/String;IZ)V"
-    } else {
-        "(Ljava/lang/String;I)V"
+    let constructor_descriptor = match class_name {
+        TRACK_END_REASON_CLASS => "(Ljava/lang/String;IZ)V",
+        YOUTUBE_ANDROID_VERSION_CLASS => "(Ljava/lang/String;ILjava/lang/String;I)V",
+        _ => "(Ljava/lang/String;I)V",
     };
-    let constructor = if class_name == TRACK_END_REASON_CLASS {
-        end_reason_constructor(&mut class.constant_pool)?
-    } else {
-        enum_constructor(&mut class.constant_pool)?
+    let constructor = match class_name {
+        TRACK_END_REASON_CLASS => end_reason_constructor(&mut class.constant_pool)?,
+        YOUTUBE_ANDROID_VERSION_CLASS => {
+            youtube_android_version_constructor(&mut class.constant_pool)?
+        }
+        _ => enum_constructor(&mut class.constant_pool)?,
     };
     add_method(
         class,
@@ -15624,8 +15644,11 @@ fn add_track_enum_state(class: &mut ClassFile<'static>, class_name: &str) -> Res
         constructor_descriptor,
         Some(constructor),
     )?;
-    let initializer =
-        track_enum_initializer(&mut class.constant_pool, class_name, constructor_descriptor)?;
+    let initializer = if class_name == YOUTUBE_ANDROID_VERSION_CLASS {
+        youtube_android_version_initializer(&mut class.constant_pool)?
+    } else {
+        track_enum_initializer(&mut class.constant_pool, class_name, constructor_descriptor)?
+    };
     add_method(
         class,
         MethodAccessFlags::STATIC,
@@ -21317,6 +21340,581 @@ fn youtube_cipher_operation_constructor(pool: &mut ConstantPool<'static>) -> Res
     )
 }
 
+#[allow(clippy::too_many_lines)]
+fn youtube_client_config_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => youtube_client_config_constructor(pool),
+        ("<init>", "(Lorg/json/JSONObject;Ljava/lang/String;Ljava/lang/String;)V") => {
+            youtube_client_config_copy_constructor(pool)
+        }
+        ("copy", "()Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig;") => {
+            youtube_client_config_copy(pool)
+        }
+        (
+            "withClientName",
+            "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig;",
+        ) => youtube_client_config_with_name(pool),
+        ("getName", "()Ljava/lang/String;") => object_getter(
+            pool,
+            YOUTUBE_CLIENT_CONFIG_CLASS,
+            "name",
+            "Ljava/lang/String;",
+        ),
+        (
+            "withUserAgent",
+            "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig;",
+        ) => youtube_client_config_set_string(pool, "userAgent"),
+        ("getUserAgent", "()Ljava/lang/String;") => object_getter(
+            pool,
+            YOUTUBE_CLIENT_CONFIG_CLASS,
+            "userAgent",
+            "Ljava/lang/String;",
+        ),
+        (
+            "withApiKey",
+            "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig;",
+        ) => youtube_client_config_set_string(pool, "apiKey"),
+        ("getApiKey", "()Ljava/lang/String;") => object_getter(
+            pool,
+            YOUTUBE_CLIENT_CONFIG_CLASS,
+            "apiKey",
+            "Ljava/lang/String;",
+        ),
+        (
+            "withClientDefaultScreenParameters",
+            "()Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig;",
+        ) => youtube_client_config_default_screen(pool),
+        (
+            "withThirdPartyEmbedUrl",
+            "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig;",
+        ) => youtube_client_config_nested_string(pool, &["context", "thirdParty"], "embedUrl"),
+        (
+            "withPlaybackSignatureTimestamp",
+            "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig;",
+        ) => youtube_client_config_nested_string(
+            pool,
+            &["playbackContext", "contentPlaybackContext"],
+            "signatureTimestamp",
+        ),
+        (
+            "withRootField",
+            "(Ljava/lang/String;Ljava/lang/Object;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig;",
+        ) => youtube_client_config_root_field(pool),
+        (
+            "withClientField",
+            "(Ljava/lang/String;Ljava/lang/Object;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig;",
+        ) => youtube_client_config_context_field(pool, "client"),
+        (
+            "withUserField",
+            "(Ljava/lang/String;Ljava/lang/Object;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig;",
+        ) => youtube_client_config_context_field(pool, "user"),
+        (
+            "setAttribute",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig;",
+        ) => youtube_client_config_set_attribute(pool),
+        ("toJsonString", "()Ljava/lang/String;") => youtube_client_config_to_json(pool),
+        ("<clinit>", "()V") => youtube_client_config_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {YOUTUBE_CLIENT_CONFIG_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn youtube_client_config_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let json = pool.add_class("org/json/JSONObject")?;
+    let json_init = pool.add_method_ref(json, "<init>", "()V")?;
+    let owner = pool.add_class(YOUTUBE_CLIENT_CONFIG_CLASS)?;
+    let root = pool.add_field_ref(owner, "root", "Lorg/json/JSONObject;")?;
+    let user_agent = pool.add_field_ref(owner, "userAgent", "Ljava/lang/String;")?;
+    let name = pool.add_field_ref(owner, "name", "Ljava/lang/String;")?;
+    code(
+        pool,
+        3,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(json_init),
+            Instruction::Aload_0,
+            Instruction::New(json),
+            Instruction::Dup,
+            Instruction::Invokespecial(json_init),
+            Instruction::Putfield(root),
+            Instruction::Aload_0,
+            Instruction::Aconst_null,
+            Instruction::Putfield(user_agent),
+            Instruction::Aload_0,
+            Instruction::Aconst_null,
+            Instruction::Putfield(name),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn youtube_client_config_copy_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let json = pool.add_class("org/json/JSONObject")?;
+    let json_init = pool.add_method_ref(json, "<init>", "()V")?;
+    let owner = pool.add_class(YOUTUBE_CLIENT_CONFIG_CLASS)?;
+    let root = pool.add_field_ref(owner, "root", "Lorg/json/JSONObject;")?;
+    let user_agent = pool.add_field_ref(owner, "userAgent", "Ljava/lang/String;")?;
+    let name = pool.add_field_ref(owner, "name", "Ljava/lang/String;")?;
+    code(
+        pool,
+        2,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(json_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(root),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(user_agent),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Putfield(name),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn youtube_client_config_copy(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_CLIENT_CONFIG_CLASS)?;
+    let root = pool.add_field_ref(owner, "root", "Lorg/json/JSONObject;")?;
+    let user_agent = pool.add_field_ref(owner, "userAgent", "Ljava/lang/String;")?;
+    let name = pool.add_field_ref(owner, "name", "Ljava/lang/String;")?;
+    let owner_init = pool.add_method_ref(
+        owner,
+        "<init>",
+        "(Lorg/json/JSONObject;Ljava/lang/String;Ljava/lang/String;)V",
+    )?;
+    let json = pool.add_class("org/json/JSONObject")?;
+    let to_map = pool.add_method_ref(json, "toMap", "()Ljava/util/Map;")?;
+    let json_map_init = pool.add_method_ref(json, "<init>", "(Ljava/util/Map;)V")?;
+    code(
+        pool,
+        6,
+        1,
+        vec![
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::New(json),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(root),
+            Instruction::Invokevirtual(to_map),
+            Instruction::Invokespecial(json_map_init),
+            Instruction::Aload_0,
+            Instruction::Getfield(user_agent),
+            Instruction::Aload_0,
+            Instruction::Getfield(name),
+            Instruction::Invokespecial(owner_init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn youtube_client_config_with_name(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_CLIENT_CONFIG_CLASS)?;
+    let name = pool.add_field_ref(owner, "name", "Ljava/lang/String;")?;
+    let with_client = pool.add_method_ref(
+        owner,
+        "withClientField",
+        "(Ljava/lang/String;Ljava/lang/Object;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig;",
+    )?;
+    let client_name = pool.add_string("clientName")?;
+    code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(name),
+            Instruction::Aload_0,
+            Instruction::Ldc_w(client_name),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(with_client),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn youtube_client_config_set_string(
+    pool: &mut ConstantPool<'static>,
+    field_name: &str,
+) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_CLIENT_CONFIG_CLASS)?;
+    let field = pool.add_field_ref(owner, field_name, "Ljava/lang/String;")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(field),
+            Instruction::Aload_0,
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn youtube_client_config_default_screen(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_CLIENT_CONFIG_CLASS)?;
+    let with_client = pool.add_method_ref(
+        owner,
+        "withClientField",
+        "(Ljava/lang/String;Ljava/lang/Object;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig;",
+    )?;
+    let integer = pool.add_class("java/lang/Integer")?;
+    let value_of = pool.add_method_ref(integer, "valueOf", "(I)Ljava/lang/Integer;")?;
+    let density = pool.add_string("screenDensityFloat")?;
+    let height = pool.add_string("screenHeightPoints")?;
+    let pixel_density = pool.add_string("screenPixelDensity")?;
+    let width = pool.add_string("screenWidthPoints")?;
+    code(
+        pool,
+        3,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Ldc_w(density),
+            Instruction::Iconst_1,
+            Instruction::Invokestatic(value_of),
+            Instruction::Invokevirtual(with_client),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Ldc_w(height),
+            Instruction::Sipush(1080),
+            Instruction::Invokestatic(value_of),
+            Instruction::Invokevirtual(with_client),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Ldc_w(pixel_density),
+            Instruction::Iconst_1,
+            Instruction::Invokestatic(value_of),
+            Instruction::Invokevirtual(with_client),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Ldc_w(width),
+            Instruction::Sipush(1920),
+            Instruction::Invokestatic(value_of),
+            Instruction::Invokevirtual(with_client),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn youtube_client_config_nested_string(
+    pool: &mut ConstantPool<'static>,
+    parents: &[&str],
+    leaf: &str,
+) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_CLIENT_CONFIG_CLASS)?;
+    let root = pool.add_field_ref(owner, "root", "Lorg/json/JSONObject;")?;
+    let helper = pool.add_class(YOUTUBE_CLIENT_CONFIG_HELPER_CLASS)?;
+    let join = pool.add_method_ref(
+        helper,
+        "join",
+        "(Lorg/json/JSONObject;Ljava/lang/String;)Lorg/json/JSONObject;",
+    )?;
+    let json = pool.add_class("org/json/JSONObject")?;
+    let put = pool.add_method_ref(
+        json,
+        "put",
+        "(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;",
+    )?;
+    let mut instructions = vec![Instruction::Aload_0, Instruction::Getfield(root)];
+    for parent in parents {
+        instructions.extend([
+            Instruction::Ldc_w(pool.add_string(*parent)?),
+            Instruction::Invokestatic(join),
+        ]);
+    }
+    instructions.extend([
+        Instruction::Ldc_w(pool.add_string(leaf)?),
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(put),
+        Instruction::Pop,
+        Instruction::Aload_0,
+        Instruction::Areturn,
+    ]);
+    code(pool, 3, 2, instructions)
+}
+
+fn youtube_client_config_root_field(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_CLIENT_CONFIG_CLASS)?;
+    let root = pool.add_field_ref(owner, "root", "Lorg/json/JSONObject;")?;
+    let json = pool.add_class("org/json/JSONObject")?;
+    let put = pool.add_method_ref(
+        json,
+        "put",
+        "(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;",
+    )?;
+    code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(root),
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(put),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn youtube_client_config_context_field(
+    pool: &mut ConstantPool<'static>,
+    section: &str,
+) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_CLIENT_CONFIG_CLASS)?;
+    let root = pool.add_field_ref(owner, "root", "Lorg/json/JSONObject;")?;
+    let helper = pool.add_class(YOUTUBE_CLIENT_CONFIG_HELPER_CLASS)?;
+    let join = pool.add_method_ref(
+        helper,
+        "join",
+        "(Lorg/json/JSONObject;Ljava/lang/String;)Lorg/json/JSONObject;",
+    )?;
+    let json = pool.add_class("org/json/JSONObject")?;
+    let put = pool.add_method_ref(
+        json,
+        "put",
+        "(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;",
+    )?;
+    let context = pool.add_string("context")?;
+    let section = pool.add_string(section)?;
+    code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(root),
+            Instruction::Ldc_w(context),
+            Instruction::Invokestatic(join),
+            Instruction::Ldc_w(section),
+            Instruction::Invokestatic(join),
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(put),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn youtube_client_config_set_attribute(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_CLIENT_CONFIG_CLASS)?;
+    let user_agent = pool.add_field_ref(owner, "userAgent", "Ljava/lang/String;")?;
+    let http = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpInterface")?;
+    let get_context = pool.add_method_ref(
+        http,
+        "getContext",
+        "()Lorg/apache/http/client/protocol/HttpClientContext;",
+    )?;
+    let context = pool.add_class("org/apache/http/client/protocol/HttpClientContext")?;
+    let set_attribute = pool.add_method_ref(
+        context,
+        "setAttribute",
+        "(Ljava/lang/String;Ljava/lang/Object;)V",
+    )?;
+    let attribute = pool.add_string("isUserAgentSpecified")?;
+    let mut body = code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(user_agent),
+            Instruction::Ifnull(10),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(get_context),
+            Instruction::Ldc_w(attribute),
+            Instruction::Aload_0,
+            Instruction::Getfield(user_agent),
+            Instruction::Invokevirtual(set_attribute),
+            Instruction::Nop,
+            Instruction::Aload_0,
+            Instruction::Areturn,
+        ],
+    )?;
+    add_same_frame(pool, &mut body, 10)?;
+    Ok(body)
+}
+
+fn youtube_client_config_to_json(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_CLIENT_CONFIG_CLASS)?;
+    let root = pool.add_field_ref(owner, "root", "Lorg/json/JSONObject;")?;
+    let json = pool.add_class("org/json/JSONObject")?;
+    let to_string = pool.add_method_ref(json, "toString", "()Ljava/lang/String;")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(root),
+            Instruction::Invokevirtual(to_string),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn youtube_client_config_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_CLIENT_CONFIG_CLASS)?;
+    let android_version = pool.add_class(YOUTUBE_ANDROID_VERSION_CLASS)?;
+    let android_11 = pool.add_field_ref(
+        android_version,
+        "ANDROID_11",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig$AndroidVersion;",
+    )?;
+    let default_android = pool.add_field_ref(
+        owner,
+        "DEFAULT_ANDROID_VERSION",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig$AndroidVersion;",
+    )?;
+    let descriptor = "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig;";
+    let android = pool.add_field_ref(owner, "ANDROID", descriptor)?;
+    let tv = pool.add_field_ref(owner, "TV_EMBEDDED", descriptor)?;
+    let web = pool.add_field_ref(owner, "WEB", descriptor)?;
+    let music = pool.add_field_ref(owner, "MUSIC", descriptor)?;
+    let init = pool.add_method_ref(owner, "<init>", "()V")?;
+    let with_string_descriptor =
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig;";
+    let with_api = pool.add_method_ref(owner, "withApiKey", with_string_descriptor)?;
+    let with_user_agent = pool.add_method_ref(owner, "withUserAgent", with_string_descriptor)?;
+    let with_name = pool.add_method_ref(owner, "withClientName", with_string_descriptor)?;
+    let with_client = pool.add_method_ref(
+        owner,
+        "withClientField",
+        "(Ljava/lang/String;Ljava/lang/Object;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig;",
+    )?;
+    let with_screen = pool.add_method_ref(
+        owner,
+        "withClientDefaultScreenParameters",
+        "()Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig;",
+    )?;
+    let with_embed =
+        pool.add_method_ref(owner, "withThirdPartyEmbedUrl", with_string_descriptor)?;
+    let integer = pool.add_class("java/lang/Integer")?;
+    let integer_value = pool.add_method_ref(integer, "valueOf", "(I)Ljava/lang/Integer;")?;
+    let client_version = pool.add_string("clientVersion")?;
+    let mut instructions = vec![
+        Instruction::Getstatic(android_11),
+        Instruction::Putstatic(default_android),
+        Instruction::New(owner),
+        Instruction::Dup,
+        Instruction::Invokespecial(init),
+        Instruction::Ldc_w(pool.add_string("AIzaSyA8eiZmM1FaDVjRy-df2KTyQ_vz_yYM39w")?),
+        Instruction::Invokevirtual(with_api),
+        Instruction::Ldc_w(
+            pool.add_string("com.google.android.youtube/18.06.35 (Linux; U; Android 11) gzip")?,
+        ),
+        Instruction::Invokevirtual(with_user_agent),
+        Instruction::Ldc_w(pool.add_string("ANDROID")?),
+        Instruction::Invokevirtual(with_name),
+        Instruction::Ldc_w(client_version),
+        Instruction::Ldc_w(pool.add_string("18.06.35")?),
+        Instruction::Invokevirtual(with_client),
+        Instruction::Ldc_w(pool.add_string("androidSdkVersion")?),
+        Instruction::Bipush(30),
+        Instruction::Invokestatic(integer_value),
+        Instruction::Invokevirtual(with_client),
+        Instruction::Invokevirtual(with_screen),
+        Instruction::Putstatic(android),
+        Instruction::New(owner),
+        Instruction::Dup,
+        Instruction::Invokespecial(init),
+        Instruction::Ldc_w(pool.add_string("AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8")?),
+        Instruction::Invokevirtual(with_api),
+        Instruction::Ldc_w(pool.add_string("TVHTML5_SIMPLY_EMBEDDED_PLAYER")?),
+        Instruction::Invokevirtual(with_name),
+        Instruction::Ldc_w(client_version),
+        Instruction::Ldc_w(pool.add_string("2.0")?),
+        Instruction::Invokevirtual(with_client),
+        Instruction::Ldc_w(pool.add_string("clientScreen")?),
+        Instruction::Ldc_w(pool.add_string("EMBED")?),
+        Instruction::Invokevirtual(with_client),
+        Instruction::Invokevirtual(with_screen),
+        Instruction::Ldc_w(pool.add_string("https://google.com")?),
+        Instruction::Invokevirtual(with_embed),
+        Instruction::Putstatic(tv),
+        Instruction::New(owner),
+        Instruction::Dup,
+        Instruction::Invokespecial(init),
+        Instruction::Ldc_w(pool.add_string("AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8")?),
+        Instruction::Invokevirtual(with_api),
+        Instruction::Ldc_w(pool.add_string("WEB")?),
+        Instruction::Invokevirtual(with_name),
+        Instruction::Ldc_w(client_version),
+        Instruction::Ldc_w(pool.add_string("2.20220801.00.00")?),
+        Instruction::Invokevirtual(with_client),
+        Instruction::Putstatic(web),
+        Instruction::New(owner),
+        Instruction::Dup,
+        Instruction::Invokespecial(init),
+        Instruction::Ldc_w(pool.add_string("AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30")?),
+        Instruction::Invokevirtual(with_api),
+        Instruction::Ldc_w(pool.add_string("WEB_REMIX")?),
+        Instruction::Invokevirtual(with_name),
+        Instruction::Ldc_w(client_version),
+        Instruction::Ldc_w(pool.add_string("1.20220727.01.00")?),
+        Instruction::Invokevirtual(with_client),
+        Instruction::Putstatic(music),
+        Instruction::Return,
+    ];
+    code(pool, 4, 0, std::mem::take(&mut instructions))
+}
+
+fn youtube_android_version_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    let values_descriptor = format!("()[L{YOUTUBE_ANDROID_VERSION_CLASS};");
+    let value_of_descriptor = format!("(Ljava/lang/String;)L{YOUTUBE_ANDROID_VERSION_CLASS};");
+    match (name, descriptor) {
+        ("values", value) if value == values_descriptor => {
+            track_enum_values(pool, YOUTUBE_ANDROID_VERSION_CLASS)
+        }
+        ("valueOf", value) if value == value_of_descriptor => {
+            track_enum_value_of(pool, YOUTUBE_ANDROID_VERSION_CLASS)
+        }
+        ("getOsVersion", "()Ljava/lang/String;") => object_getter(
+            pool,
+            YOUTUBE_ANDROID_VERSION_CLASS,
+            "osVersion",
+            "Ljava/lang/String;",
+        ),
+        ("getSdkVersion", "()I") => int_getter(pool, YOUTUBE_ANDROID_VERSION_CLASS, "sdkVersion"),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {YOUTUBE_ANDROID_VERSION_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
 fn youtube_access_token_tracker_replacement(
     pool: &mut ConstantPool<'static>,
     name: &str,
@@ -23940,6 +24538,87 @@ fn native_class(expected_abi: u8) -> Result<ClassFile<'static>> {
         "ensureAbi",
         "()V",
         Some(body),
+    )?;
+    Ok(class)
+}
+
+fn native_youtube_client_config_class() -> Result<ClassFile<'static>> {
+    let mut class = new_class(
+        YOUTUBE_CLIENT_CONFIG_HELPER_CLASS,
+        "java/lang/Object",
+        ClassAccessFlags::PUBLIC | ClassAccessFlags::FINAL | ClassAccessFlags::SUPER,
+        &[],
+    )?;
+    let constructor = object_constructor(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PRIVATE,
+        "<init>",
+        "()V",
+        Some(constructor),
+    )?;
+
+    let json = class.constant_pool.add_class("org/json/JSONObject")?;
+    let json_init = class.constant_pool.add_method_ref(json, "<init>", "()V")?;
+    let opt = class.constant_pool.add_method_ref(
+        json,
+        "opt",
+        "(Ljava/lang/String;)Ljava/lang/Object;",
+    )?;
+    let put = class.constant_pool.add_method_ref(
+        json,
+        "put",
+        "(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;",
+    )?;
+    let get = class.constant_pool.add_method_ref(
+        json,
+        "getJSONObject",
+        "(Ljava/lang/String;)Lorg/json/JSONObject;",
+    )?;
+    let mut join = code(
+        &mut class.constant_pool,
+        4,
+        2,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Ifnull(19),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(opt),
+            Instruction::Ifnull(10),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(get),
+            Instruction::Areturn,
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::New(json),
+            Instruction::Dup,
+            Instruction::Invokespecial(json_init),
+            Instruction::Invokevirtual(put),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(get),
+            Instruction::Areturn,
+            Instruction::Aload_0,
+            Instruction::Aconst_null,
+            Instruction::Invokevirtual(get),
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        &mut class.constant_pool,
+        &mut join,
+        vec![
+            StackFrame::SameFrame { frame_type: 10 },
+            StackFrame::SameFrame { frame_type: 8 },
+        ],
+    )?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+        "join",
+        "(Lorg/json/JSONObject;Ljava/lang/String;)Lorg/json/JSONObject;",
+        Some(join),
     )?;
     Ok(class)
 }
@@ -33057,6 +33736,70 @@ fn marker_state_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribut
 
 fn enum_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
     marker_state_constructor(pool)
+}
+
+fn youtube_android_version_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let enumeration = pool.add_class("java/lang/Enum")?;
+    let enum_init = pool.add_method_ref(enumeration, "<init>", "(Ljava/lang/String;I)V")?;
+    let owner = pool.add_class(YOUTUBE_ANDROID_VERSION_CLASS)?;
+    let os_version = pool.add_field_ref(owner, "osVersion", "Ljava/lang/String;")?;
+    let sdk_version = pool.add_field_ref(owner, "sdkVersion", "I")?;
+    code(
+        pool,
+        3,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Iload_2,
+            Instruction::Invokespecial(enum_init),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Putfield(os_version),
+            Instruction::Aload_0,
+            Instruction::Iload(4),
+            Instruction::Putfield(sdk_version),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn youtube_android_version_initializer(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_ANDROID_VERSION_CLASS)?;
+    let descriptor =
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig$AndroidVersion;";
+    let constant = pool.add_field_ref(owner, "ANDROID_11", descriptor)?;
+    let values = pool.add_field_ref(
+        owner,
+        "$VALUES",
+        "[Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeClientConfig$AndroidVersion;",
+    )?;
+    let init = pool.add_method_ref(owner, "<init>", "(Ljava/lang/String;ILjava/lang/String;I)V")?;
+    let name = pool.add_string("ANDROID_11")?;
+    let os_version = pool.add_string("11")?;
+    code(
+        pool,
+        6,
+        0,
+        vec![
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Ldc_w(name),
+            Instruction::Iconst_0,
+            Instruction::Ldc_w(os_version),
+            Instruction::Bipush(30),
+            Instruction::Invokespecial(init),
+            Instruction::Putstatic(constant),
+            Instruction::Iconst_1,
+            Instruction::Anewarray(owner),
+            Instruction::Dup,
+            Instruction::Iconst_0,
+            Instruction::Getstatic(constant),
+            Instruction::Aastore,
+            Instruction::Putstatic(values),
+            Instruction::Return,
+        ],
+    )
 }
 
 fn end_reason_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {

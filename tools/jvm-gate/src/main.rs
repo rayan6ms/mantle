@@ -244,6 +244,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-youtube-audio-track-consumer" => Some(YOUTUBE_AUDIO_TRACK_CONSUMER),
         "write-youtube-cipher-operation-consumer" => Some(YOUTUBE_CIPHER_OPERATION_CONSUMER),
+        "write-youtube-client-config-consumer" => Some(YOUTUBE_CLIENT_CONFIG_CONSUMER),
         _ => None,
     }
 }
@@ -19770,6 +19771,245 @@ public final class GateYoutubeCipherOperation {
     check(field.getType() == fieldType && field.getGenericType() == fieldType
         && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
         && !field.isSynthetic() && !field.isEnumConstant(), name + " metadata");
+  }
+
+  private static void expect(Class<? extends Throwable> type, Runnable operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_CLIENT_CONFIG_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeClientConfig;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeClientConfig.AndroidVersion;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import org.apache.http.client.protocol.HttpClientContext;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+public final class GateYoutubeClientConfig {
+  public static void main(String[] args) throws Exception {
+    reflectionContract();
+    freshAndFluentContract();
+    copyContract();
+    attributeContract();
+    presetContract();
+    androidVersionContract();
+    System.out.println("config=public-json-object,9-fields,2-constructors,15-methods,1-nested;"
+        + "fresh-null-empty,fluent-root-client-user-screen-embed-playback,deep-copy,"
+        + "name-user-agent-identity,api-key-reset-on-copy,http-context-attribute,"
+        + "four-mutable-presets;android-version=ANDROID_11,os-11,sdk-30,enum-copy-lookup");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<YoutubeClientConfig> type = YoutubeClientConfig.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == JSONObject.class
+        && type.getInterfaces().length == 0 && !type.isSynthetic() && !type.isEnum(),
+        "config class metadata");
+    check(type.getDeclaredFields().length == 9 && type.getDeclaredConstructors().length == 2
+        && type.getDeclaredMethods().length == 15 && type.getDeclaredClasses().length == 1,
+        "config private shape");
+    checkField(type, "DEFAULT_ANDROID_VERSION", AndroidVersion.class,
+        Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
+    for (String name : new String[] {"ANDROID", "TV_EMBEDDED", "WEB", "MUSIC"}) {
+      checkField(type, name, YoutubeClientConfig.class, Modifier.PUBLIC | Modifier.STATIC);
+    }
+    checkField(type, "name", String.class, Modifier.PRIVATE);
+    checkField(type, "userAgent", String.class, Modifier.PRIVATE);
+    checkField(type, "apiKey", String.class, Modifier.PRIVATE);
+    checkField(type, "root", JSONObject.class, Modifier.PRIVATE | Modifier.FINAL);
+    Constructor<?> publicConstructor = type.getDeclaredConstructor();
+    Constructor<?> privateConstructor = type.getDeclaredConstructor(
+        JSONObject.class, String.class, String.class);
+    check(publicConstructor.getModifiers() == Modifier.PUBLIC
+        && Modifier.isPrivate(privateConstructor.getModifiers()), "constructor metadata");
+    checkMethod(type, "copy", YoutubeClientConfig.class, new Class<?>[0]);
+    checkMethod(type, "withClientName", YoutubeClientConfig.class,
+        new Class<?>[] {String.class});
+    checkMethod(type, "getName", String.class, new Class<?>[0]);
+    checkMethod(type, "withUserAgent", YoutubeClientConfig.class,
+        new Class<?>[] {String.class});
+    checkMethod(type, "getUserAgent", String.class, new Class<?>[0]);
+    checkMethod(type, "withApiKey", YoutubeClientConfig.class,
+        new Class<?>[] {String.class});
+    checkMethod(type, "getApiKey", String.class, new Class<?>[0]);
+    checkMethod(type, "withClientDefaultScreenParameters", YoutubeClientConfig.class,
+        new Class<?>[0]);
+    checkMethod(type, "withThirdPartyEmbedUrl", YoutubeClientConfig.class,
+        new Class<?>[] {String.class});
+    checkMethod(type, "withPlaybackSignatureTimestamp", YoutubeClientConfig.class,
+        new Class<?>[] {String.class});
+    for (String name : new String[] {"withRootField", "withClientField", "withUserField"}) {
+      checkMethod(type, name, YoutubeClientConfig.class,
+          new Class<?>[] {String.class, Object.class});
+    }
+    checkMethod(type, "setAttribute", YoutubeClientConfig.class,
+        new Class<?>[] {HttpInterface.class});
+    checkMethod(type, "toJsonString", String.class, new Class<?>[0]);
+  }
+
+  private static void freshAndFluentContract() throws Exception {
+    YoutubeClientConfig config = new YoutubeClientConfig();
+    check(config.getName() == null && config.getUserAgent() == null && config.getApiKey() == null
+        && config.toJsonString().equals("{}") && config.toString().equals("{}")
+        && config.length() == 0, "fresh state");
+    String name = new String("probe-name");
+    String userAgent = new String("probe-agent");
+    String apiKey = new String("probe-key");
+    check(config.withClientName(name) == config && config.withUserAgent(userAgent) == config
+        && config.withApiKey(apiKey) == config && config.getName() == name
+        && config.getUserAgent() == userAgent && config.getApiKey() == apiKey,
+        "fluent identity");
+    check(config.withRootField("rootValue", 7) == config
+        && config.withClientField("clientValue", "client") == config
+        && config.withUserField("userValue", true) == config
+        && config.withClientDefaultScreenParameters() == config
+        && config.withThirdPartyEmbedUrl("https://embed.invalid") == config
+        && config.withPlaybackSignatureTimestamp("12345") == config, "fluent return values");
+    JSONObject json = new JSONObject(config.toJsonString());
+    JSONObject context = json.getJSONObject("context");
+    JSONObject client = context.getJSONObject("client");
+    check(json.getInt("rootValue") == 7 && client.getString("clientName").equals(name)
+        && client.getString("clientValue").equals("client")
+        && client.getInt("screenDensityFloat") == 1
+        && client.getInt("screenHeightPoints") == 1080
+        && client.getInt("screenPixelDensity") == 1
+        && client.getInt("screenWidthPoints") == 1920
+        && context.getJSONObject("user").getBoolean("userValue")
+        && context.getJSONObject("thirdParty").getString("embedUrl")
+            .equals("https://embed.invalid")
+        && json.getJSONObject("playbackContext").getJSONObject("contentPlaybackContext")
+            .getString("signatureTimestamp").equals("12345"), "nested JSON state");
+    expect(NullPointerException.class, () -> config.withRootField(null, 1));
+    expect(NullPointerException.class, () -> config.withClientField(null, 1));
+    YoutubeClientConfig collision = new YoutubeClientConfig().withRootField("context", "text");
+    expect(JSONException.class, () -> collision.withClientField("key", "value"));
+  }
+
+  private static void copyContract() {
+    String name = new String("copy-name");
+    String userAgent = new String("copy-agent");
+    YoutubeClientConfig original = new YoutubeClientConfig().withClientName(name)
+        .withUserAgent(userAgent).withApiKey("not-copied")
+        .withClientField("before", 1).withUserField("flag", true);
+    YoutubeClientConfig copy = original.copy();
+    check(copy != original && copy.getName() == name && copy.getUserAgent() == userAgent
+        && copy.getApiKey() == null
+        && new JSONObject(copy.toJsonString()).similar(new JSONObject(original.toJsonString())),
+        "copy state");
+    original.withClientField("originalOnly", 2);
+    copy.withUserField("copyOnly", false);
+    JSONObject originalJson = new JSONObject(original.toJsonString());
+    JSONObject copyJson = new JSONObject(copy.toJsonString());
+    check(!copyJson.getJSONObject("context").getJSONObject("client").has("originalOnly")
+        && !originalJson.getJSONObject("context").getJSONObject("user").has("copyOnly"),
+        "deep copy");
+  }
+
+  private static void attributeContract() {
+    YoutubeClientConfig config = new YoutubeClientConfig();
+    check(config.setAttribute(null) == config, "null interface ignored without user agent");
+    String userAgent = new String("attribute-agent");
+    HttpClientContext context = HttpClientContext.create();
+    HttpInterface http = new HttpInterface(null, context, false, null);
+    check(config.withUserAgent(userAgent).setAttribute(http) == config
+        && context.getAttribute("isUserAgentSpecified") == userAgent,
+        "HTTP context attribute identity");
+    expect(NullPointerException.class, () -> config.setAttribute(null));
+  }
+
+  private static void presetContract() throws Exception {
+    check(YoutubeClientConfig.DEFAULT_ANDROID_VERSION == AndroidVersion.ANDROID_11,
+        "default Android version");
+    checkPreset(YoutubeClientConfig.ANDROID, "ANDROID", "18.06.35",
+        "AIzaSyA8eiZmM1FaDVjRy-df2KTyQ_vz_yYM39w");
+    check(YoutubeClientConfig.ANDROID.getUserAgent()
+        .equals("com.google.android.youtube/18.06.35 (Linux; U; Android 11) gzip")
+        && new JSONObject(YoutubeClientConfig.ANDROID.toJsonString()).getJSONObject("context")
+            .getJSONObject("client").getInt("androidSdkVersion") == 30,
+        "Android preset");
+    checkPreset(YoutubeClientConfig.TV_EMBEDDED, "TVHTML5_SIMPLY_EMBEDDED_PLAYER", "2.0",
+        "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8");
+    check(new JSONObject(YoutubeClientConfig.TV_EMBEDDED.toJsonString())
+        .getJSONObject("context").getJSONObject("thirdParty").getString("embedUrl")
+        .equals("https://google.com"), "TV preset embed");
+    checkPreset(YoutubeClientConfig.WEB, "WEB", "2.20220801.00.00",
+        "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8");
+    checkPreset(YoutubeClientConfig.MUSIC, "WEB_REMIX", "1.20220727.01.00",
+        "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30");
+    YoutubeClientConfig saved = YoutubeClientConfig.WEB;
+    YoutubeClientConfig replacement = new YoutubeClientConfig();
+    YoutubeClientConfig.WEB = replacement;
+    check(YoutubeClientConfig.WEB == replacement, "mutable preset field");
+    YoutubeClientConfig.WEB = saved;
+  }
+
+  private static void checkPreset(YoutubeClientConfig config, String name, String version,
+                                  String apiKey) {
+    JSONObject client = new JSONObject(config.toJsonString())
+        .getJSONObject("context").getJSONObject("client");
+    check(config.getName().equals(name) && config.getApiKey().equals(apiKey)
+        && client.getString("clientName").equals(name)
+        && client.getString("clientVersion").equals(version), name + " preset");
+  }
+
+  private static void androidVersionContract() throws Exception {
+    Class<AndroidVersion> type = AndroidVersion.class;
+    check((type.getModifiers() & ~0x4000)
+            == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL)
+        && type.isEnum() && type.getSuperclass() == Enum.class && type.getDeclaringClass()
+            == YoutubeClientConfig.class && type.getNestHost() == YoutubeClientConfig.class
+        && !type.isSynthetic(), "AndroidVersion class metadata");
+    check(type.getDeclaredFields().length == 4 && type.getDeclaredMethods().length == 4
+        && type.getDeclaredConstructors().length == 1, "AndroidVersion private shape");
+    Field constant = type.getDeclaredField("ANDROID_11");
+    check(constant.isEnumConstant() && (constant.getModifiers() & ~0x4000)
+        == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL), "Android constant metadata");
+    checkField(type, "osVersion", String.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "sdkVersion", int.class, Modifier.PRIVATE | Modifier.FINAL);
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        String.class, int.class, String.class, int.class);
+    check(Modifier.isPrivate(constructor.getModifiers()), "Android constructor metadata");
+    AndroidVersion[] values = AndroidVersion.values();
+    check(values.length == 1 && values[0] == AndroidVersion.ANDROID_11
+        && values[0].name().equals("ANDROID_11") && values[0].ordinal() == 0
+        && values[0].getOsVersion().equals("11") && values[0].getSdkVersion() == 30
+        && AndroidVersion.valueOf("ANDROID_11") == values[0], "Android value state");
+    values[0] = null;
+    check(AndroidVersion.values()[0] == AndroidVersion.ANDROID_11, "Android values copy");
+    expect(IllegalArgumentException.class, () -> AndroidVersion.valueOf("missing"));
+    expect(NullPointerException.class, () -> AndroidVersion.valueOf(null));
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> fieldType, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getGenericType() == fieldType
+        && field.getModifiers() == modifiers && !field.isSynthetic(), name + " metadata");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+                                  Class<?>[] parameters) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getModifiers() == Modifier.PUBLIC
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs(),
+        method + " metadata");
   }
 
   private static void expect(Class<? extends Throwable> type, Runnable operation) {
