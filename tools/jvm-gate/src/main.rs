@@ -190,6 +190,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-abstract-yandex-music-api-loader-consumer" => {
             Some(ABSTRACT_YANDEX_MUSIC_API_LOADER_CONSUMER)
         }
+        "write-yandex-music-api-extractor-consumer" => Some(YANDEX_MUSIC_API_EXTRACTOR_CONSUMER),
         _ => None,
     }
 }
@@ -16170,6 +16171,86 @@ public final class GateAbstractYandexMusicApiLoader {
         && method.getParameterCount() == 0 && method.getExceptionTypes().length == 0
         && method.getTypeParameters().length == 0 && !method.isBridge()
         && !method.isSynthetic() && !method.isVarArgs(), name + " metadata");
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YANDEX_MUSIC_API_EXTRACTOR_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.yamusic.AbstractYandexMusicApiLoader;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.TypeVariable;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public final class GateYandexMusicApiExtractor {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 0, "unexpected arguments");
+    Class<?> owner = AbstractYandexMusicApiLoader.class;
+    Class<?> type = Class.forName(owner.getName() + "$ApiExtractor");
+    int modifiers = Modifier.PROTECTED | Modifier.STATIC | Modifier.INTERFACE | Modifier.ABSTRACT;
+    check(type.getModifiers() == modifiers && type.isInterface() && !type.isAnnotation()
+        && !type.isEnum() && !type.isSynthetic(), "interface metadata");
+    check(type.getSuperclass() == null && type.getInterfaces().length == 0
+        && type.getGenericInterfaces().length == 0 && type.getGenericSuperclass() == null,
+        "interface hierarchy");
+    check(type.getDeclaringClass() == owner && type.getNestHost() == owner
+        && type.getSimpleName().equals("ApiExtractor")
+        && Arrays.asList(owner.getDeclaredClasses()).contains(type), "nested metadata");
+    TypeVariable<?>[] variables = type.getTypeParameters();
+    check(variables.length == 1 && variables[0].getName().equals("T")
+        && variables[0].getBounds().length == 1
+        && variables[0].getBounds()[0] == Object.class, "class generic signature");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 1, "member counts");
+    Method extract = type.getDeclaredMethod("extract", HttpInterface.class, JsonBrowser.class);
+    check(extract.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && extract.getReturnType() == Object.class
+        && Arrays.equals(extract.getParameterTypes(),
+            new Class<?>[] {HttpInterface.class, JsonBrowser.class})
+        && Arrays.equals(extract.getGenericParameterTypes(),
+            new Class<?>[] {HttpInterface.class, JsonBrowser.class})
+        && extract.getGenericReturnType().equals(variables[0])
+        && Arrays.equals(extract.getExceptionTypes(), new Class<?>[] {Exception.class})
+        && extract.getTypeParameters().length == 0 && !extract.isDefault()
+        && !extract.isBridge() && !extract.isSynthetic() && !extract.isVarArgs(),
+        "extract metadata");
+    extract.setAccessible(true);
+    AtomicInteger calls = new AtomicInteger();
+    Object sentinel = new Object();
+    Object success = Proxy.newProxyInstance(GateYandexMusicApiExtractor.class.getClassLoader(),
+        new Class<?>[] {type}, (proxy, method, arguments) -> {
+          check(method.getName().equals("extract") && arguments.length == 2,
+              "proxy invocation shape");
+          calls.incrementAndGet();
+          return sentinel;
+        });
+    check(extract.invoke(success, null, null) == sentinel && calls.get() == 1,
+        "generic return invocation");
+    Object failure = Proxy.newProxyInstance(GateYandexMusicApiExtractor.class.getClassLoader(),
+        new Class<?>[] {type}, (proxy, method, arguments) -> {
+          throw new Exception("expected checked failure");
+        });
+    try {
+      extract.invoke(failure, null, null);
+      throw new AssertionError("checked exception unexpectedly absent");
+    } catch (InvocationTargetException error) {
+      check(error.getCause().getClass() == Exception.class
+          && error.getCause().getMessage().equals("expected checked failure"),
+          "checked exception propagation");
+    }
+    System.out.println(
+        "protected-static-generic-interface,no-reflection-super,1-type-variable,"
+        + "1-public-abstract-method;erased-object-return,generic-T-return,"
+        + "http-json-parameters,checked-exception,proxy-invocation,reflection");
   }
 
   private static void check(boolean condition, String message) {

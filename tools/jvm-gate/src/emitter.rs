@@ -193,6 +193,8 @@ const VIMEO_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/vimeo/VimeoAudioTrack";
 const ABSTRACT_YANDEX_MUSIC_API_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/yamusic/AbstractYandexMusicApiLoader";
+const YANDEX_MUSIC_API_EXTRACTOR_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/yamusic/AbstractYandexMusicApiLoader$ApiExtractor";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -266,6 +268,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     VIMEO_PLAYBACK_FORMAT_CLASS,
     VIMEO_AUDIO_TRACK_CLASS,
     ABSTRACT_YANDEX_MUSIC_API_LOADER_CLASS,
+    YANDEX_MUSIC_API_EXTRACTOR_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,

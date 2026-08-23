@@ -605,9 +605,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[0].completed_slices[].symbols] | add) == .cohorts[0].classified_symbols and
   (.cohorts[0].classified_symbols + .cohorts[0].remaining_symbols) == .cohorts[0].symbols and
   .cohorts[1].status == "IN_PROGRESS" and
-  .cohorts[1].classified_symbols == 306 and
-  .cohorts[1].remaining_symbols == 392 and
-  (.cohorts[1].completed_slices | length) == 42 and
+  .cohorts[1].classified_symbols == 308 and
+  .cohorts[1].remaining_symbols == 390 and
+  (.cohorts[1].completed_slices | length) == 43 and
   .cohorts[1].completed_slices[0] == {
     id: "audio-source-manager-interface-contracts",
     classes: 1,
@@ -1183,11 +1183,24 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "docs/architecture/ADR-0014-bounded-yandex-music-source.md"
     ]
   } and
+  .cohorts[1].completed_slices[42] == {
+    id: "yandex-api-extractor-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 1,
+    symbols: 2,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
   ([.cohorts[1].completed_slices[].symbols] | add) == .cohorts[1].classified_symbols and
   (.cohorts[1].classified_symbols + .cohorts[1].remaining_symbols) == .cohorts[1].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 841 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 843 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 788 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 790 and
   ([$classifications.symbols[] |
     select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 47 and
   ([$classifications.symbols[] |
@@ -1291,7 +1304,8 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager",
         "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioSourceManager$PlaybackFormat",
         "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioTrack",
-        "com.sedmelluq.discord.lavaplayer.source.yamusic.AbstractYandexMusicApiLoader"
+        "com.sedmelluq.discord.lavaplayer.source.yamusic.AbstractYandexMusicApiLoader",
+        "com.sedmelluq.discord.lavaplayer.source.yamusic.AbstractYandexMusicApiLoader$ApiExtractor"
       ][]; . == $symbol.binary_name)) and
     (if $symbol.binary_name ==
         "com.sedmelluq.discord.lavaplayer.source.yamusic.AbstractYandexMusicApiLoader" and
@@ -1407,7 +1421,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "yandex-api-extractor-contracts" and
+  .phase_entry.next_slice == "default-yandex-music-direct-url-loader-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 ' "$PLAN" >/dev/null
@@ -1415,7 +1429,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '110 reference classes / 870 symbols' \
+  '111 reference classes / 872 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -1425,4 +1439,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 841 classified symbols and 1,921 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 843 classified symbols and 1,919 unassessed symbols.\n'
