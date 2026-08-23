@@ -223,6 +223,8 @@ const YANDEX_MUSIC_UTILS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicUtils";
 const DEFAULT_YOUTUBE_LINK_ROUTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubeLinkRouter";
+const DEFAULT_YOUTUBE_PLAYLIST_LOADER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/DefaultYoutubePlaylistLoader";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -311,6 +313,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YANDEX_MUSIC_TRACK_LOADER_CLASS,
     YANDEX_MUSIC_UTILS_CLASS,
     DEFAULT_YOUTUBE_LINK_ROUTER_CLASS,
+    DEFAULT_YOUTUBE_PLAYLIST_LOADER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -702,6 +705,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | YANDEX_MUSIC_AUDIO_TRACK_CLASS
             | YANDEX_MUSIC_UTILS_CLASS
             | DEFAULT_YOUTUBE_LINK_ROUTER_CLASS
+            | DEFAULT_YOUTUBE_PLAYLIST_LOADER_CLASS
     )
 }
 
@@ -743,6 +747,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | YANDEX_MUSIC_AUDIO_TRACK_CLASS
             | YANDEX_MUSIC_UTILS_CLASS
             | DEFAULT_YOUTUBE_LINK_ROUTER_CLASS
+            | DEFAULT_YOUTUBE_PLAYLIST_LOADER_CLASS
     )
 }
 
@@ -1011,6 +1016,14 @@ fn replacement_body(
     }
     if class_name == DEFAULT_YOUTUBE_LINK_ROUTER_CLASS {
         return default_youtube_link_router_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == DEFAULT_YOUTUBE_PLAYLIST_LOADER_CLASS {
+        return default_youtube_playlist_loader_replacement(
+            pool,
+            name,
+            descriptor,
+            required_locals,
+        );
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -19074,6 +19087,92 @@ fn default_youtube_link_router_class_init(pool: &mut ConstantPool<'static>) -> R
             Instruction::Invokestatic(compile),
             Instruction::Putstatic(field),
             Instruction::Return,
+        ],
+    )
+}
+
+fn default_youtube_playlist_loader_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => default_youtube_playlist_loader_constructor(pool),
+        ("setPlaylistPageCount", "(I)V") => default_youtube_playlist_loader_set_page_count(pool),
+        (
+            "lambda$findErrorAlert$0",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/lang/String;",
+        ) => default_youtube_playlist_loader_alert_text(pool),
+        _ => unsupported_body(
+            pool,
+            "Legacy YouTube playlist discovery is unsupported; use Mantle's bounded current YouTube source.",
+            required_locals,
+        ),
+    }
+}
+
+fn default_youtube_playlist_loader_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let super_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(DEFAULT_YOUTUBE_PLAYLIST_LOADER_CLASS)?;
+    let page_count = pool.add_field_ref(owner, "playlistPageCount", "I")?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(super_init),
+            Instruction::Aload_0,
+            Instruction::Bipush(6),
+            Instruction::Putfield(page_count),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn default_youtube_playlist_loader_set_page_count(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(DEFAULT_YOUTUBE_PLAYLIST_LOADER_CLASS)?;
+    let page_count = pool.add_field_ref(owner, "playlistPageCount", "I")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Iload_1,
+            Instruction::Putfield(page_count),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn default_youtube_playlist_loader_alert_text(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let get = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let text_method = pool.add_method_ref(json, "text", "()Ljava/lang/String;")?;
+    let text_field = pool.add_string("text")?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Ldc_w(text_field),
+            Instruction::Invokevirtual(get),
+            Instruction::Invokevirtual(text_method),
+            Instruction::Areturn,
         ],
     )
 }

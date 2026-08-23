@@ -222,6 +222,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-yandex-music-track-loader-consumer" => Some(YANDEX_MUSIC_TRACK_LOADER_CONSUMER),
         "write-yandex-music-utils-consumer" => Some(YANDEX_MUSIC_UTILS_CONSUMER),
         "write-default-youtube-link-router-consumer" => Some(DEFAULT_YOUTUBE_LINK_ROUTER_CONSUMER),
+        "write-default-youtube-playlist-loader-consumer" => {
+            Some(DEFAULT_YOUTUBE_PLAYLIST_LOADER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -18388,6 +18391,124 @@ public final class GateDefaultYoutubeLinkRouter {
   private static void expect(Object actual, String expected, Routes routes, int calls) {
     check(expected.equals(actual) && routes.calls == calls, expected + " got " + actual);
   }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const DEFAULT_YOUTUBE_PLAYLIST_LOADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.DefaultYoutubePlaylistLoader;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubePlaylistLoader;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
+
+public final class GateDefaultYoutubePlaylistLoader {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "mode required");
+    Class<DefaultYoutubePlaylistLoader> type = DefaultYoutubePlaylistLoader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {YoutubePlaylistLoader.class})
+        && type.getDeclaredFields().length == 1 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 7 && type.getTypeParameters().length == 0,
+        "class shape");
+    Field pageCount = type.getDeclaredField("playlistPageCount");
+    check(pageCount.getModifiers() == (Modifier.PRIVATE | Modifier.VOLATILE)
+        && pageCount.getType() == int.class, "page-count field");
+    pageCount.setAccessible(true);
+    Constructor<DefaultYoutubePlaylistLoader> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    DefaultYoutubePlaylistLoader loader = constructor.newInstance();
+    check(pageCount.getInt(loader) == 6, "default page count");
+
+    Method setter = type.getDeclaredMethod("setPlaylistPageCount", int.class);
+    check(setter.getModifiers() == Modifier.PUBLIC && setter.getReturnType() == void.class
+        && setter.getExceptionTypes().length == 0 && !setter.isBridge() && !setter.isSynthetic(),
+        "setter metadata");
+    for (int value : new int[] {0, -7, Integer.MAX_VALUE, 6}) {
+      loader.setPlaylistPageCount(value);
+      check(pageCount.getInt(loader) == value, "unrestricted page-count mutation");
+    }
+
+    Method load = type.getDeclaredMethod("load", HttpInterface.class, String.class, String.class,
+        Function.class);
+    check(load.getModifiers() == Modifier.PUBLIC && load.getReturnType() == AudioPlaylist.class
+        && load.getExceptionTypes().length == 0 && !load.isBridge() && !load.isSynthetic()
+        && !load.isVarArgs(), "load metadata");
+    Type genericFactory = load.getGenericParameterTypes()[3];
+    check(genericFactory instanceof ParameterizedType
+        && ((ParameterizedType) genericFactory).getRawType() == Function.class
+        && Arrays.equals(((ParameterizedType) genericFactory).getActualTypeArguments(),
+            new Type[] {AudioTrackInfo.class, AudioTrack.class}), "factory generic metadata");
+
+    Method build = type.getDeclaredMethod("buildPlaylist", HttpInterface.class, JsonBrowser.class,
+        String.class, Function.class);
+    Method alert = type.getDeclaredMethod("findErrorAlert", JsonBrowser.class);
+    Method selected = type.getDeclaredMethod("findSelectedTrack", List.class, String.class);
+    Method extract = type.getDeclaredMethod("extractPlaylistTracks", JsonBrowser.class, List.class,
+        Function.class);
+    Method lambda = type.getDeclaredMethod("lambda$findErrorAlert$0", JsonBrowser.class);
+    check(build.getModifiers() == Modifier.PRIVATE && build.getReturnType() == AudioPlaylist.class
+        && Arrays.equals(build.getExceptionTypes(), new Class<?>[] {IOException.class})
+        && alert.getModifiers() == Modifier.PRIVATE && alert.getReturnType() == String.class
+        && selected.getModifiers() == Modifier.PRIVATE && selected.getReturnType() == AudioTrack.class
+        && extract.getModifiers() == Modifier.PRIVATE && extract.getReturnType() == String.class
+        && lambda.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | 0x1000)
+        && lambda.getReturnType() == String.class && lambda.isSynthetic(), "private metadata");
+    lambda.setAccessible(true);
+    check("joined".equals(lambda.invoke(null, JsonBrowser.parse("{\"text\":\"joined\"}"))),
+        "synthetic helper value");
+
+    AtomicInteger factoryCalls = new AtomicInteger();
+    Function<AudioTrackInfo, AudioTrack> factory = info -> {
+      factoryCalls.incrementAndGet();
+      return null;
+    };
+    if (args[0].equals("candidate")) {
+      assertUnsupported(loader, null, null, null, factory);
+      assertUnsupported(loader, null, "PLfixture", "abcdefghijk", factory);
+      check(factoryCalls.get() == 0 && pageCount.getInt(loader) == 6,
+          "failure precedes collaborators and preserves state");
+      System.out.println("common=public-concrete,object-root,playlist-loader-interface,"
+          + "1-private-volatile-field,1-constructor,2-exported-methods;default-page-count-6,"
+          + "unrestricted-mutation,generic-factory,private-signatures,synthetic-helper,reflection;"
+          + "service=deterministic-no-network,current-bounded-native-source");
+    } else {
+      check(args[0].equals("reference"), "unknown mode");
+      System.out.println("common=public-concrete,object-root,playlist-loader-interface,"
+          + "1-private-volatile-field,1-constructor,2-exported-methods;default-page-count-6,"
+          + "unrestricted-mutation,generic-factory,private-signatures,synthetic-helper,reflection;"
+          + "service=legacy-innertube-browse,mutable-page-count");
+    }
+  }
+
+  private static void assertUnsupported(DefaultYoutubePlaylistLoader loader,
+      HttpInterface http, String playlist, String selected,
+      Function<AudioTrackInfo, AudioTrack> factory) {
+    try {
+      loader.load(http, playlist, selected, factory);
+      throw new AssertionError("legacy playlist discovery unexpectedly succeeded");
+    } catch (UnsupportedOperationException error) {
+      check(error.getMessage().contains("Legacy YouTube playlist discovery is unsupported"),
+          "stable unsupported disposition");
+    }
+  }
+
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }
