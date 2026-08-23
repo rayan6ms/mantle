@@ -194,6 +194,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-default-yandex-music-direct-url-loader-consumer" => {
             Some(DEFAULT_YANDEX_MUSIC_DIRECT_URL_LOADER_CONSUMER)
         }
+        "write-default-yandex-music-playlist-loader-consumer" => {
+            Some(DEFAULT_YANDEX_MUSIC_PLAYLIST_LOADER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -16354,6 +16357,181 @@ public final class GateDefaultYandexMusicDirectUrlLoader {
     field.setAccessible(true);
     check(field.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
         && field.getType() == String.class && field.get(null).equals(value), name + " metadata");
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const DEFAULT_YANDEX_MUSIC_PLAYLIST_LOADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.yamusic.DefaultYandexMusicPlaylistLoader;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.DefaultYandexMusicTrackLoader;
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicPlaylistLoader;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import com.sedmelluq.discord.lavaplayer.track.AudioItem;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.Arrays;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
+
+public final class GateDefaultYandexMusicPlaylistLoader {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "mode required");
+    Class<?> type = DefaultYandexMusicPlaylistLoader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && !type.isInterface() && !type.isEnum()
+        && !type.isAnnotation() && !type.isSynthetic(), "class metadata");
+    check(type.getSuperclass() == DefaultYandexMusicTrackLoader.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {YandexMusicPlaylistLoader.class}),
+        "class hierarchy");
+    check(type.getDeclaredFields().length == 4 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 9, "member counts");
+    checkConstant(type, "PLAYLIST_INFO_FORMAT",
+        "https://api.music.yandex.net/users/%s/playlists/%s");
+    checkConstant(type, "ALBUM_INFO_FORMAT",
+        "https://api.music.yandex.net/albums/%s/with-tracks");
+    checkConstant(type, "ARTIST_INFO_FORMAT",
+        "https://api.music.yandex.net/artists/%s/brief-info");
+    Field executorField = type.getDeclaredField("tracksLoader");
+    check(executorField.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && executorField.getType() == ExecutorService.class, "executor field metadata");
+    executorField.setAccessible(true);
+
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    Method userPlaylist = type.getDeclaredMethod("loadPlaylist", String.class, String.class,
+        String.class, Function.class);
+    checkLoadMethod(userPlaylist, 4);
+    Method collectionPlaylist = type.getDeclaredMethod("loadPlaylist", String.class,
+        String.class, Function.class);
+    checkLoadMethod(collectionPlaylist, 3);
+    Method shutdown = type.getDeclaredMethod("shutdown");
+    check(shutdown.getModifiers() == Modifier.PUBLIC && shutdown.getReturnType() == void.class
+        && shutdown.getExceptionTypes().length == 0 && !shutdown.isSynthetic(),
+        "shutdown metadata");
+    Method hasError = type.getDeclaredMethod("hasError", JsonBrowser.class);
+    check(hasError.getModifiers() == Modifier.STATIC && hasError.getReturnType() == boolean.class
+        && hasError.getExceptionTypes().length == 0 && !hasError.isSynthetic(),
+        "error parser metadata");
+    hasError.setAccessible(true);
+    check(!(Boolean) hasError.invoke(null, JsonBrowser.parse("{}"))
+        && (Boolean) hasError.invoke(null, JsonBrowser.parse("{\"error\":\"not-found\"}")),
+        "error parser values");
+    try {
+      hasError.invoke(null, JsonBrowser.parse("{\"error\":\"denied\"}"));
+      throw new AssertionError("unexpected Yandex error code was accepted");
+    } catch (InvocationTargetException error) {
+      check(error.getCause() instanceof FriendlyException
+          && error.getCause().getMessage().equals("Yandex Music returned an error code: denied")
+          && ((FriendlyException) error.getCause()).severity
+              == FriendlyException.Severity.SUSPICIOUS,
+          "error parser failure");
+    }
+    checkPrivateMethods(type);
+
+    DefaultYandexMusicPlaylistLoader loader =
+        (DefaultYandexMusicPlaylistLoader) constructor.newInstance();
+    ExecutorService executor = (ExecutorService) executorField.get(loader);
+    check(loader instanceof YandexMusicPlaylistLoader && loader.getHttpConfiguration() != null
+        && executor != null && !executor.isShutdown(), "construction and executor lifecycle");
+    AtomicInteger factoryCalls = new AtomicInteger();
+    Function<AudioTrackInfo, AudioTrack> factory = info -> {
+      factoryCalls.incrementAndGet();
+      return null;
+    };
+    try {
+      if (args[0].equals("candidate")) {
+        assertUnsupported(() -> loader.loadPlaylist("http://127.0.0.1:1", "id", "tracks",
+            factory));
+        assertUnsupported(() -> loader.loadPlaylist(null, null, factory));
+        check(factoryCalls.get() == 0, "factory was not invoked");
+        System.out.println("common=public-concrete,track-loader-super,playlist-interface,"
+            + "4-fields,1-constructor,4-exported-methods;constants,construction,http-config,"
+            + "pure-error-parser,executor-shutdown,private-signatures,reflection;"
+            + "service=deterministic-no-network,current-bounded-native-source");
+      } else {
+        check(args[0].equals("reference"), "unknown mode");
+        System.out.println("common=public-concrete,track-loader-super,playlist-interface,"
+            + "4-fields,1-constructor,4-exported-methods;constants,construction,http-config,"
+            + "pure-error-parser,executor-shutdown,private-signatures,reflection;"
+            + "service=legacy-api-json,unbounded-cached-track-fanout");
+      }
+    } finally {
+      loader.shutdown();
+      loader.shutdown();
+      check(executor.isShutdown(), "executor shutdown");
+    }
+  }
+
+  private static void checkLoadMethod(Method method, int parameterCount) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == AudioItem.class
+        && method.getParameterCount() == parameterCount && method.getExceptionTypes().length == 0
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs(),
+        "load method metadata");
+    Type genericFactory = method.getGenericParameterTypes()[parameterCount - 1];
+    check(genericFactory instanceof ParameterizedType
+        && ((ParameterizedType) genericFactory).getRawType() == Function.class
+        && Arrays.equals(((ParameterizedType) genericFactory).getActualTypeArguments(),
+            new Type[] {AudioTrackInfo.class, AudioTrack.class}), "factory generic metadata");
+  }
+
+  private static void checkPrivateMethods(Class<?> type) throws Exception {
+    Method url = type.getDeclaredMethod("loadPlaylistUrl", String.class, String.class,
+        Function.class);
+    Method track = type.getDeclaredMethod("loadTrack", JsonBrowser.class, Function.class);
+    check(url.getModifiers() == Modifier.PRIVATE && url.getReturnType() == AudioItem.class
+        && track.getModifiers() == Modifier.PRIVATE && track.getReturnType() == AudioTrack.class,
+        "private helper metadata");
+    Class<?> http = Class.forName("com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface");
+    Method lambdaTwo = type.getDeclaredMethod("lambda$loadPlaylistUrl$2", String.class,
+        Function.class, http, JsonBrowser.class);
+    Method lambdaOne = type.getDeclaredMethod("lambda$loadPlaylistUrl$1", JsonBrowser.class,
+        Function.class);
+    Method lambdaZero = type.getDeclaredMethod("lambda$loadPlaylistUrl$0", JsonBrowser.class,
+        Function.class);
+    check(lambdaTwo.getModifiers() == (Modifier.PRIVATE | 0x1000)
+        && lambdaTwo.getReturnType() == AudioItem.class
+        && Arrays.equals(lambdaTwo.getExceptionTypes(), new Class<?>[] {Exception.class})
+        && lambdaOne.getModifiers() == (Modifier.PRIVATE | 0x1000)
+        && lambdaOne.getReturnType() == AudioTrack.class
+        && Arrays.equals(lambdaOne.getExceptionTypes(), new Class<?>[] {Exception.class})
+        && lambdaZero.getModifiers() == (Modifier.PRIVATE | 0x1000)
+        && lambdaZero.getReturnType() == AudioTrack.class
+        && Arrays.equals(lambdaZero.getExceptionTypes(), new Class<?>[] {Exception.class}),
+        "synthetic lambda metadata");
+  }
+
+  private static void assertUnsupported(Invocation invocation) throws Exception {
+    try {
+      invocation.run();
+      throw new AssertionError("legacy playlist discovery unexpectedly succeeded");
+    } catch (UnsupportedOperationException error) {
+      check(error.getMessage().contains("Legacy Yandex playlist discovery is unsupported"),
+          "stable unsupported disposition");
+    }
+  }
+
+  private static void checkConstant(Class<?> type, String name, String value) throws Exception {
+    Field field = type.getDeclaredField(name);
+    field.setAccessible(true);
+    check(field.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && field.getType() == String.class && field.get(null).equals(value), name + " metadata");
+  }
+
+  private interface Invocation {
+    void run() throws Exception;
   }
 
   private static void check(boolean condition, String message) {

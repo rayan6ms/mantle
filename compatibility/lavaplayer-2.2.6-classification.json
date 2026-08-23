@@ -16956,45 +16956,76 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The public concrete DefaultYandexMusicTrackLoader shell, playlist interface, frozen constants and executor field, construction, pure error parsing, generic helpers, inherited configuration, and shutdown remain compatible while legacy arbitrary-URL JSON and unbounded cached-thread track fan-out are deterministic no-network and current collections stay in Mantle's bounded native Yandex Music source.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-media/tests/phase12_yandex_music.rs",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0014-bounded-yandex-music-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.DefaultYandexMusicPlaylistLoader",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public no-argument constructor delegates to DefaultYandexMusicTrackLoader and retains the exact fresh cached ExecutorService field without starting worker threads eagerly.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.DefaultYandexMusicPlaylistLoader",
       "symbol_kind": "METHOD",
       "member_name": "loadPlaylist",
       "descriptor": "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/function/Function;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The user-playlist overload preserves its exact strings, generic track factory, and AudioItem signature but fails before legacy arbitrary-URL JSON, cached-thread fan-out, or factory access; current authenticated playlists use the bounded native Yandex Music source.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-media/tests/phase12_yandex_music.rs",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0014-bounded-yandex-music-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.DefaultYandexMusicPlaylistLoader",
       "symbol_kind": "METHOD",
       "member_name": "loadPlaylist",
       "descriptor": "(Ljava/lang/String;Ljava/lang/String;Ljava/util/function/Function;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The album/artist overload preserves its exact strings, generic track factory, and AudioItem signature but fails before legacy arbitrary-URL JSON, cached-thread fan-out, or factory access; current bounded albums and artists remain in the native Yandex Music source.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-media/tests/phase12_yandex_music.rs",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0014-bounded-yandex-music-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.DefaultYandexMusicPlaylistLoader",
       "symbol_kind": "METHOD",
       "member_name": "shutdown",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Shutdown preserves superclass warning-only HTTP-manager closure, shuts down the exact cached ExecutorService, and remains repeatable.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.DefaultYandexMusicTrackLoader",

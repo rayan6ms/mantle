@@ -197,6 +197,8 @@ const YANDEX_MUSIC_API_EXTRACTOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/yamusic/AbstractYandexMusicApiLoader$ApiExtractor";
 const DEFAULT_YANDEX_MUSIC_DIRECT_URL_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/yamusic/DefaultYandexMusicDirectUrlLoader";
+const DEFAULT_YANDEX_MUSIC_PLAYLIST_LOADER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/yamusic/DefaultYandexMusicPlaylistLoader";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -272,6 +274,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     ABSTRACT_YANDEX_MUSIC_API_LOADER_CLASS,
     YANDEX_MUSIC_API_EXTRACTOR_CLASS,
     DEFAULT_YANDEX_MUSIC_DIRECT_URL_LOADER_CLASS,
+    DEFAULT_YANDEX_MUSIC_PLAYLIST_LOADER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -655,6 +658,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | VIMEO_AUDIO_TRACK_CLASS
             | ABSTRACT_YANDEX_MUSIC_API_LOADER_CLASS
             | DEFAULT_YANDEX_MUSIC_DIRECT_URL_LOADER_CLASS
+            | DEFAULT_YANDEX_MUSIC_PLAYLIST_LOADER_CLASS
     )
 }
 
@@ -689,6 +693,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | VIMEO_AUDIO_TRACK_CLASS
             | ABSTRACT_YANDEX_MUSIC_API_LOADER_CLASS
             | DEFAULT_YANDEX_MUSIC_DIRECT_URL_LOADER_CLASS
+            | DEFAULT_YANDEX_MUSIC_PLAYLIST_LOADER_CLASS
     )
 }
 
@@ -913,6 +918,14 @@ fn replacement_body(
     }
     if class_name == DEFAULT_YANDEX_MUSIC_DIRECT_URL_LOADER_CLASS {
         return default_yandex_music_direct_url_loader_replacement(
+            pool,
+            name,
+            descriptor,
+            required_locals,
+        );
+    }
+    if class_name == DEFAULT_YANDEX_MUSIC_PLAYLIST_LOADER_CLASS {
+        return default_yandex_music_playlist_loader_replacement(
             pool,
             name,
             descriptor,
@@ -17595,6 +17608,186 @@ fn default_yandex_music_direct_url_loader_replacement(
             required_locals,
         ),
     }
+}
+
+fn default_yandex_music_playlist_loader_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => default_yandex_music_playlist_loader_constructor(pool),
+        ("hasError", "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Z") => {
+            default_yandex_music_playlist_loader_has_error(pool)
+        }
+        ("shutdown", "()V") => default_yandex_music_playlist_loader_shutdown(pool),
+        _ => unsupported_body(
+            pool,
+            "Legacy Yandex playlist discovery is unsupported; use Mantle's bounded current Yandex Music source.",
+            required_locals,
+        ),
+    }
+}
+
+fn default_yandex_music_playlist_loader_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let super_class = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/source/yamusic/DefaultYandexMusicTrackLoader",
+    )?;
+    let super_init = pool.add_method_ref(super_class, "<init>", "()V")?;
+    let executors = pool.add_class("java/util/concurrent/Executors")?;
+    let new_cached = pool.add_method_ref(
+        executors,
+        "newCachedThreadPool",
+        "()Ljava/util/concurrent/ExecutorService;",
+    )?;
+    let owner = pool.add_class(DEFAULT_YANDEX_MUSIC_PLAYLIST_LOADER_CLASS)?;
+    let tracks_loader = pool.add_field_ref(
+        owner,
+        "tracksLoader",
+        "Ljava/util/concurrent/ExecutorService;",
+    )?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(super_init),
+            Instruction::Aload_0,
+            Instruction::Invokestatic(new_cached),
+            Instruction::Putfield(tracks_loader),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn default_yandex_music_playlist_loader_has_error(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let get = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let is_null = pool.add_method_ref(json, "isNull", "()Z")?;
+    let text = pool.add_method_ref(json, "text", "()Ljava/lang/String;")?;
+    let string = pool.add_class("java/lang/String")?;
+    let equals = pool.add_method_ref(string, "equals", "(Ljava/lang/Object;)Z")?;
+    let builder = pool.add_class("java/lang/StringBuilder")?;
+    let builder_init = pool.add_method_ref(builder, "<init>", "()V")?;
+    let append = pool.add_method_ref(
+        builder,
+        "append",
+        "(Ljava/lang/String;)Ljava/lang/StringBuilder;",
+    )?;
+    let to_string = pool.add_method_ref(builder, "toString", "()Ljava/lang/String;")?;
+    let friendly = pool.add_class(FRIENDLY_EXCEPTION_CLASS)?;
+    let friendly_init = pool.add_method_ref(
+        friendly,
+        "<init>",
+        "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity;Ljava/lang/Throwable;)V",
+    )?;
+    let severity = pool.add_class(FRIENDLY_EXCEPTION_SEVERITY_CLASS)?;
+    let suspicious = pool.add_field_ref(
+        severity,
+        "SUSPICIOUS",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity;",
+    )?;
+    let error_key = pool.add_string("error")?;
+    let not_found = pool.add_string("not-found")?;
+    let error_prefix = pool.add_string("Yandex Music returned an error code: ")?;
+    let mut body = code(
+        pool,
+        6,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Ldc_w(error_key),
+            Instruction::Invokevirtual(get),
+            Instruction::Astore_1,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(is_null),
+            Instruction::Ifeq(9),
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(text),
+            Instruction::Astore_2,
+            Instruction::Ldc_w(not_found),
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(equals),
+            Instruction::Ifeq(18),
+            Instruction::Iconst_1,
+            Instruction::Ireturn,
+            Instruction::New(friendly),
+            Instruction::Dup,
+            Instruction::New(builder),
+            Instruction::Dup,
+            Instruction::Invokespecial(builder_init),
+            Instruction::Ldc_w(error_prefix),
+            Instruction::Invokevirtual(append),
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(append),
+            Instruction::Invokevirtual(to_string),
+            Instruction::Getstatic(suspicious),
+            Instruction::Aconst_null,
+            Instruction::Invokespecial(friendly_init),
+            Instruction::Athrow,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: 9,
+                locals: vec![VerificationType::Object { cpool_index: json }],
+            },
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: 8,
+                locals: vec![VerificationType::Object {
+                    cpool_index: string,
+                }],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn default_yandex_music_playlist_loader_shutdown(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let super_class = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/source/yamusic/DefaultYandexMusicTrackLoader",
+    )?;
+    let super_shutdown = pool.add_method_ref(super_class, "shutdown", "()V")?;
+    let owner = pool.add_class(DEFAULT_YANDEX_MUSIC_PLAYLIST_LOADER_CLASS)?;
+    let tracks_loader = pool.add_field_ref(
+        owner,
+        "tracksLoader",
+        "Ljava/util/concurrent/ExecutorService;",
+    )?;
+    let executor = pool.add_class("java/util/concurrent/ExecutorService")?;
+    let shutdown = pool.add_interface_method_ref(executor, "shutdown", "()V")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(super_shutdown),
+            Instruction::Aload_0,
+            Instruction::Getfield(tracks_loader),
+            Instruction::Invokeinterface(shutdown, 1),
+            Instruction::Return,
+        ],
+    )
 }
 
 fn abstract_yandex_music_api_loader_shutdown(
