@@ -204,6 +204,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
             Some(DEFAULT_YANDEX_SEARCH_PROVIDER_CONSUMER)
         }
         "write-yandex-http-context-filter-consumer" => Some(YANDEX_HTTP_CONTEXT_FILTER_CONSUMER),
+        "write-yandex-music-api-loader-consumer" => Some(YANDEX_MUSIC_API_LOADER_CONSUMER),
         _ => None,
     }
 }
@@ -16929,6 +16930,89 @@ public final class GateYandexHttpContextFilter {
   private static void checkHeader(HttpUriRequest request, String name, String value) {
     check(request.getFirstHeader(name) != null
         && request.getFirstHeader(name).getValue().equals(value), name + " header");
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YANDEX_MUSIC_API_LOADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicApiLoader;
+import com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpConfigurable;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+
+public final class GateYandexMusicApiLoader {
+  public static void main(String[] args) throws Exception {
+    Class<YandexMusicApiLoader> type = YandexMusicApiLoader.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.INTERFACE | Modifier.ABSTRACT)
+        && type.isInterface() && !type.isAnnotation() && !type.isEnum() && !type.isSynthetic(),
+        "interface metadata");
+    check(type.getSuperclass() == null && type.getInterfaces().length == 0
+        && type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 2 && type.getTypeParameters().length == 0,
+        "interface shape");
+    Method configuration = type.getDeclaredMethod("getHttpConfiguration");
+    checkMethod(configuration, ExtendedHttpConfigurable.class);
+    Method shutdown = type.getDeclaredMethod("shutdown");
+    checkMethod(shutdown, void.class);
+
+    ExtendedHttpConfigurable first = proxy(ExtendedHttpConfigurable.class);
+    RecordingLoader loader = new RecordingLoader(first);
+    check(loader.getHttpConfiguration() == first && loader.configurationCalls == 1,
+        "configuration identity");
+    loader.configuration = null;
+    check(loader.getHttpConfiguration() == null && loader.configurationCalls == 2,
+        "null configuration identity");
+    loader.shutdown();
+    loader.shutdown();
+    check(loader.shutdowns == 2, "repeatable shutdown dispatch");
+    check(type.isAssignableFrom(RecordingLoader.class)
+        && Arrays.equals(RecordingLoader.class.getInterfaces(),
+            new Class<?>[] {YandexMusicApiLoader.class}), "caller implementation hierarchy");
+    System.out.println("interface=public-abstract,object-root,0-superinterfaces,0-fields,"
+        + "0-constructors,2-abstract-methods;implementation=configuration-identity,null-identity,"
+        + "repeatable-shutdown;reflection=exact");
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType) {
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == returnType && method.getParameterCount() == 0
+        && method.getExceptionTypes().length == 0 && !method.isDefault() && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), method.getName() + " metadata");
+  }
+
+  private static <T> T proxy(Class<T> type) {
+    Object value = Proxy.newProxyInstance(GateYandexMusicApiLoader.class.getClassLoader(),
+        new Class<?>[] {type}, (proxy, method, arguments) -> {
+          throw new AssertionError("configuration proxy invoked: " + method.getName());
+        });
+    return type.cast(value);
+  }
+
+  private static final class RecordingLoader implements YandexMusicApiLoader {
+    private ExtendedHttpConfigurable configuration;
+    private int configurationCalls;
+    private int shutdowns;
+
+    private RecordingLoader(ExtendedHttpConfigurable configuration) {
+      this.configuration = configuration;
+    }
+
+    @Override
+    public ExtendedHttpConfigurable getHttpConfiguration() {
+      configurationCalls++;
+      return configuration;
+    }
+
+    @Override
+    public void shutdown() {
+      shutdowns++;
+    }
   }
 
   private static void check(boolean condition, String message) {

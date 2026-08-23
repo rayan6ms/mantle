@@ -205,6 +205,8 @@ const DEFAULT_YANDEX_SEARCH_PROVIDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/yamusic/DefaultYandexSearchProvider";
 const YANDEX_HTTP_CONTEXT_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/yamusic/YandexHttpContextFilter";
+const YANDEX_MUSIC_API_LOADER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicApiLoader";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -284,6 +286,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     DEFAULT_YANDEX_MUSIC_TRACK_LOADER_CLASS,
     DEFAULT_YANDEX_SEARCH_PROVIDER_CLASS,
     YANDEX_HTTP_CONTEXT_FILTER_CLASS,
+    YANDEX_MUSIC_API_LOADER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,

@@ -17240,27 +17240,42 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public abstract interface retains its Object root, empty superinterface/field/constructor surface, two abstract methods, caller-defined implementation dispatch, and reflection metadata exactly.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicApiLoader",
       "symbol_kind": "METHOD",
       "member_name": "getHttpConfiguration",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public abstract zero-argument method preserves its ExtendedHttpConfigurable return, implementation dispatch, object identity, nullable return, and reflection metadata exactly.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicApiLoader",
       "symbol_kind": "METHOD",
       "member_name": "shutdown",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public abstract zero-argument void method preserves caller implementation dispatch and repeated invocation exactly.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicAudioSourceManager",
