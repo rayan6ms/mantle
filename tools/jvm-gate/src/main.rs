@@ -219,6 +219,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
             Some(YANDEX_MUSIC_SEARCH_RESULT_LOADER_CONSUMER)
         }
         "write-yandex-music-track-loader-consumer" => Some(YANDEX_MUSIC_TRACK_LOADER_CONSUMER),
+        "write-yandex-music-utils-consumer" => Some(YANDEX_MUSIC_UTILS_CONSUMER),
         _ => None,
     }
 }
@@ -18107,6 +18108,125 @@ public final class GateYandexMusicTrackLoader {
     public void shutdown() {
       shutdowns++;
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YANDEX_MUSIC_UTILS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicUtils;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.Type;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+
+public final class GateYandexMusicUtils {
+  public static void main(String[] args) throws Exception {
+    Class<YandexMusicUtils> type = YandexMusicUtils.class;
+    check(type.getModifiers() == Modifier.PUBLIC && !type.isInterface() && !type.isAnnotation()
+        && !type.isEnum() && !type.isSynthetic() && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 1
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredMethods().length == 2
+        && type.getTypeParameters().length == 0, "class shape");
+    Field format = type.getDeclaredField("TRACK_URL_FORMAT");
+    check(format.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && format.getType() == String.class && !format.isEnumConstant() && !format.isSynthetic(),
+        "constant metadata");
+    format.setAccessible(true);
+    check("https://music.yandex.ru/album/%s/track/%s".equals(format.get(null)),
+        "constant value");
+    Constructor<YandexMusicUtils> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0 && constructor.getTypeParameters().length == 0
+        && constructor.newInstance().getClass() == type, "constructor");
+    Method extract = type.getDeclaredMethod("extractTrack", JsonBrowser.class, Function.class);
+    check(extract.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && extract.getReturnType() == AudioTrack.class
+        && Arrays.equals(extract.getParameterTypes(),
+            new Class<?>[] {JsonBrowser.class, Function.class})
+        && extract.getExceptionTypes().length == 0 && extract.getTypeParameters().length == 0
+        && !extract.isBridge() && !extract.isSynthetic() && !extract.isVarArgs(),
+        "extract metadata");
+    Type factoryType = extract.getGenericParameterTypes()[1];
+    check(factoryType instanceof ParameterizedType, "factory generic type");
+    ParameterizedType factorySignature = (ParameterizedType) factoryType;
+    check(factorySignature.getRawType() == Function.class
+        && factorySignature.getOwnerType() == null
+        && Arrays.equals(factorySignature.getActualTypeArguments(),
+            new Type[] {AudioTrackInfo.class, AudioTrack.class}), "generic factory signature");
+    Method helper = type.getDeclaredMethod("lambda$extractTrack$0", JsonBrowser.class);
+    check(helper.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | 0x1000)
+        && helper.getReturnType() == String.class && helper.isSynthetic() && !helper.isBridge()
+        && !helper.isVarArgs() && helper.getExceptionTypes().length == 0, "helper metadata");
+
+    AudioTrack result = proxy(AudioTrack.class);
+    AtomicReference<AudioTrackInfo> captured = new AtomicReference<>();
+    AtomicInteger calls = new AtomicInteger();
+    Function<AudioTrackInfo, AudioTrack> factory = info -> {
+      captured.set(info);
+      calls.incrementAndGet();
+      return result;
+    };
+    AudioTrack direct = YandexMusicUtils.extractTrack(JsonBrowser.parse("{"
+        + "\"id\":\"44\",\"title\":\"Fixture Song\",\"durationMs\":9876,"
+        + "\"artists\":[{\"name\":\"Artist A\"},{\"name\":\"Artist B\"}],"
+        + "\"albums\":[{\"id\":\"55\",\"coverUri\":\"album/%%\"}],"
+        + "\"coverUri\":\"track/%%\",\"ogImage\":\"og/%%\"}"), factory);
+    AudioTrackInfo info = captured.get();
+    check(direct == result && calls.get() == 1 && "Fixture Song".equals(info.title)
+        && "Artist A, Artist B".equals(info.author) && info.length == 9876L
+        && "44".equals(info.identifier) && !info.isStream
+        && "https://music.yandex.ru/album/55/track/44".equals(info.uri)
+        && "https://track/1000x1000".equals(info.artworkUrl) && info.isrc == null,
+        "direct extraction and cover priority");
+
+    YandexMusicUtils.extractTrack(JsonBrowser.parse("{\"track\":{"
+        + "\"id\":\"45\",\"title\":\"Wrapped\",\"durationMs\":1,"
+        + "\"artists\":[],\"albums\":[{\"id\":\"56\",\"coverUri\":\"album/%%\"}],"
+        + "\"ogImage\":\"og/%%\"}}"), factory);
+    check(calls.get() == 2 && "45".equals(captured.get().identifier)
+        && "".equals(captured.get().author)
+        && "https://og/1000x1000".equals(captured.get().artworkUrl),
+        "wrapper and og-image fallback");
+
+    YandexMusicUtils.extractTrack(JsonBrowser.parse("{"
+        + "\"id\":\"46\",\"title\":\"Album Art\",\"durationMs\":2,"
+        + "\"artists\":[{\"name\":\"Solo\"}],"
+        + "\"albums\":[{\"id\":\"57\",\"coverUri\":\"album/%%\"}]}"), factory);
+    check(calls.get() == 3
+        && "https://album/1000x1000".equals(captured.get().artworkUrl),
+        "album cover fallback");
+
+    AudioTrack nullResult = YandexMusicUtils.extractTrack(JsonBrowser.parse("{"
+        + "\"id\":\"47\",\"title\":\"No Art\",\"durationMs\":3,"
+        + "\"artists\":[{\"name\":\"Solo\"}],\"albums\":[{\"id\":\"58\"}]}"),
+        ignored -> null);
+    check(nullResult == null, "null factory result identity");
+    System.out.println("class=public-concrete,object-root,0-interfaces,1-private-constant,"
+        + "1-constructor,2-declared-methods;generic-factory=track-info-to-track;"
+        + "extraction=wrapper,direct,artist-order,metadata,url,cover-priority-og-album-null,"
+        + "factory-result-identity;reflection=exact");
+  }
+
+  private static <T> T proxy(Class<T> type) {
+    Object value = Proxy.newProxyInstance(GateYandexMusicUtils.class.getClassLoader(),
+        new Class<?>[] {type}, (proxy, method, arguments) -> {
+          throw new AssertionError("proxy invoked: " + method.getName());
+        });
+    return type.cast(value);
   }
 
   private static void check(boolean condition, String message) {

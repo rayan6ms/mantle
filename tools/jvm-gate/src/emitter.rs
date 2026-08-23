@@ -219,6 +219,8 @@ const YANDEX_MUSIC_SEARCH_RESULT_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicSearchResultLoader";
 const YANDEX_MUSIC_TRACK_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicTrackLoader";
+const YANDEX_MUSIC_UTILS_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/yamusic/YandexMusicUtils";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -305,6 +307,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YANDEX_MUSIC_PLAYLIST_LOADER_CLASS,
     YANDEX_MUSIC_SEARCH_RESULT_LOADER_CLASS,
     YANDEX_MUSIC_TRACK_LOADER_CLASS,
+    YANDEX_MUSIC_UTILS_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -694,6 +697,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | YANDEX_HTTP_CONTEXT_FILTER_CLASS
             | YANDEX_MUSIC_AUDIO_SOURCE_MANAGER_CLASS
             | YANDEX_MUSIC_AUDIO_TRACK_CLASS
+            | YANDEX_MUSIC_UTILS_CLASS
     )
 }
 
@@ -733,6 +737,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | DEFAULT_YANDEX_SEARCH_PROVIDER_CLASS
             | YANDEX_MUSIC_AUDIO_SOURCE_MANAGER_CLASS
             | YANDEX_MUSIC_AUDIO_TRACK_CLASS
+            | YANDEX_MUSIC_UTILS_CLASS
     )
 }
 
@@ -995,6 +1000,9 @@ fn replacement_body(
     }
     if class_name == YANDEX_MUSIC_AUDIO_TRACK_CLASS {
         return yandex_music_audio_track_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == YANDEX_MUSIC_UTILS_CLASS {
+        return yandex_music_utils_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -17721,6 +17729,393 @@ fn default_yandex_music_track_loader_replacement(
             required_locals,
         ),
     }
+}
+
+fn yandex_music_utils_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        (
+            "extractTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Ljava/util/function/Function;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+        ) => yandex_music_utils_extract_track(pool),
+        (
+            "lambda$extractTrack$0",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/lang/String;",
+        ) => yandex_music_utils_artist_name(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {YANDEX_MUSIC_UTILS_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn yandex_music_utils_artist_name(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let get = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let text = pool.add_method_ref(json, "text", "()Ljava/lang/String;")?;
+    let name = pool.add_string("name")?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Ldc_w(name),
+            Instruction::Invokevirtual(get),
+            Instruction::Invokevirtual(text),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn stack_map_offset_delta(previous: &mut Option<usize>, target: usize) -> Result<u16> {
+    let delta = match *previous {
+        Some(previous) => target
+            .checked_sub(previous)
+            .and_then(|value| value.checked_sub(1))
+            .ok_or("stack-map targets are not strictly increasing")?,
+        None => target,
+    };
+    *previous = Some(target);
+    Ok(u16::try_from(delta)?)
+}
+
+#[allow(clippy::too_many_lines)]
+fn yandex_music_utils_extract_track(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let get = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let index = pool.add_method_ref(
+        json,
+        "index",
+        "(I)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let values = pool.add_method_ref(json, "values", "()Ljava/util/List;")?;
+    let text = pool.add_method_ref(json, "text", "()Ljava/lang/String;")?;
+    let is_null = pool.add_method_ref(json, "isNull", "()Z")?;
+    let as_type = pool.add_method_ref(json, "as", "(Ljava/lang/Class;)Ljava/lang/Object;")?;
+    let list = pool.add_class("java/util/List")?;
+    let list_iterator =
+        pool.add_interface_method_ref(list, "iterator", "()Ljava/util/Iterator;")?;
+    let iterator = pool.add_class("java/util/Iterator")?;
+    let has_next = pool.add_interface_method_ref(iterator, "hasNext", "()Z")?;
+    let next = pool.add_interface_method_ref(iterator, "next", "()Ljava/lang/Object;")?;
+    let joiner = pool.add_class("java/util/StringJoiner")?;
+    let joiner_init = pool.add_method_ref(joiner, "<init>", "(Ljava/lang/CharSequence;)V")?;
+    let joiner_add = pool.add_method_ref(
+        joiner,
+        "add",
+        "(Ljava/lang/CharSequence;)Ljava/util/StringJoiner;",
+    )?;
+    let joiner_string = pool.add_method_ref(joiner, "toString", "()Ljava/lang/String;")?;
+    let string = pool.add_class("java/lang/String")?;
+    let replace = pool.add_method_ref(
+        string,
+        "replace",
+        "(Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Ljava/lang/String;",
+    )?;
+    let concat = pool.add_method_ref(string, "concat", "(Ljava/lang/String;)Ljava/lang/String;")?;
+    let format = pool.add_method_ref(
+        string,
+        "format",
+        "(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;",
+    )?;
+    let long = pool.add_class("java/lang/Long")?;
+    let long_value = pool.add_method_ref(long, "longValue", "()J")?;
+    let info = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo")?;
+    let info_init = pool.add_method_ref(
+        info,
+        "<init>",
+        "(Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+    )?;
+    let function = pool.add_class("java/util/function/Function")?;
+    let apply =
+        pool.add_interface_method_ref(function, "apply", "(Ljava/lang/Object;)Ljava/lang/Object;")?;
+    let track_type = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrack")?;
+    let object = pool.add_class("java/lang/Object")?;
+    let track = pool.add_string("track")?;
+    let artists = pool.add_string("artists")?;
+    let name = pool.add_string("name")?;
+    let id = pool.add_string("id")?;
+    let albums = pool.add_string("albums")?;
+    let cover_uri = pool.add_string("coverUri")?;
+    let og_image = pool.add_string("ogImage")?;
+    let title = pool.add_string("title")?;
+    let duration = pool.add_string("durationMs")?;
+    let comma = pool.add_string(", ")?;
+    let cover_marker = pool.add_string("%%")?;
+    let cover_size = pool.add_string("1000x1000")?;
+    let https = pool.add_string("https://")?;
+    let track_url = pool.add_string("https://music.yandex.ru/album/%s/track/%s")?;
+
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Ldc_w(track),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(is_null),
+        Instruction::Ifne(0),
+        Instruction::Aload_0,
+        Instruction::Ldc_w(track),
+        Instruction::Invokevirtual(get),
+        Instruction::Astore_0,
+    ];
+    let wrapper_target = instructions.len();
+    instructions[4] = Instruction::Ifne(u16::try_from(wrapper_target)?);
+    instructions.extend([
+        Instruction::New(joiner),
+        Instruction::Dup,
+        Instruction::Ldc_w(comma),
+        Instruction::Invokespecial(joiner_init),
+        Instruction::Astore_2,
+        Instruction::Aload_0,
+        Instruction::Ldc_w(artists),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(values),
+        Instruction::Invokeinterface(list_iterator, 1),
+        Instruction::Astore_3,
+    ]);
+    let loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_3,
+        Instruction::Invokeinterface(has_next, 1),
+        Instruction::Ifeq(0),
+        Instruction::Aload_3,
+        Instruction::Invokeinterface(next, 1),
+        Instruction::Checkcast(json),
+        Instruction::Astore(4),
+        Instruction::Aload_2,
+        Instruction::Aload(4),
+        Instruction::Ldc_w(name),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text),
+        Instruction::Invokevirtual(joiner_add),
+        Instruction::Pop,
+        Instruction::Goto(u16::try_from(loop_target)?),
+    ]);
+    let loop_exit_branch = loop_target + 2;
+    let loop_exit = instructions.len();
+    instructions[loop_exit_branch] = Instruction::Ifeq(u16::try_from(loop_exit)?);
+    instructions.extend([
+        Instruction::Aload_2,
+        Instruction::Invokevirtual(joiner_string),
+        Instruction::Astore(4),
+        Instruction::Aload_0,
+        Instruction::Ldc_w(id),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text),
+        Instruction::Astore(5),
+        Instruction::Aload_0,
+        Instruction::Ldc_w(albums),
+        Instruction::Invokevirtual(get),
+        Instruction::Iconst_0,
+        Instruction::Invokevirtual(index),
+        Instruction::Astore(6),
+        Instruction::Aload(6),
+        Instruction::Ldc_w(id),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text),
+        Instruction::Astore(7),
+        Instruction::Aconst_null,
+        Instruction::Astore(8),
+        Instruction::Aload_0,
+        Instruction::Ldc_w(cover_uri),
+        Instruction::Invokevirtual(get),
+        Instruction::Astore(9),
+        Instruction::Aload(9),
+        Instruction::Invokevirtual(is_null),
+        Instruction::Ifne(0),
+        Instruction::Ldc_w(https),
+        Instruction::Aload(9),
+        Instruction::Invokevirtual(text),
+        Instruction::Ldc_w(cover_marker),
+        Instruction::Ldc_w(cover_size),
+        Instruction::Invokevirtual(replace),
+        Instruction::Invokevirtual(concat),
+        Instruction::Astore(8),
+    ]);
+    let cover_one_branch = instructions.len() - 9;
+    let cover_one_done = instructions.len();
+    instructions[cover_one_branch] = Instruction::Ifne(u16::try_from(cover_one_done)?);
+    instructions.extend([
+        Instruction::Aload(8),
+        Instruction::Ifnonnull(0),
+        Instruction::Aload_0,
+        Instruction::Ldc_w(og_image),
+        Instruction::Invokevirtual(get),
+        Instruction::Astore(9),
+        Instruction::Aload(9),
+        Instruction::Invokevirtual(is_null),
+        Instruction::Ifne(0),
+        Instruction::Ldc_w(https),
+        Instruction::Aload(9),
+        Instruction::Invokevirtual(text),
+        Instruction::Ldc_w(cover_marker),
+        Instruction::Ldc_w(cover_size),
+        Instruction::Invokevirtual(replace),
+        Instruction::Invokevirtual(concat),
+        Instruction::Astore(8),
+    ]);
+    let cover_two_skip = cover_one_done + 1;
+    let cover_two_null = cover_one_done + 8;
+    let cover_two_done = instructions.len();
+    instructions[cover_two_skip] = Instruction::Ifnonnull(u16::try_from(cover_two_done)?);
+    instructions[cover_two_null] = Instruction::Ifne(u16::try_from(cover_two_done)?);
+    instructions.extend([
+        Instruction::Aload(8),
+        Instruction::Ifnonnull(0),
+        Instruction::Aload(6),
+        Instruction::Ldc_w(cover_uri),
+        Instruction::Invokevirtual(get),
+        Instruction::Astore(9),
+        Instruction::Aload(9),
+        Instruction::Invokevirtual(is_null),
+        Instruction::Ifne(0),
+        Instruction::Ldc_w(https),
+        Instruction::Aload(9),
+        Instruction::Invokevirtual(text),
+        Instruction::Ldc_w(cover_marker),
+        Instruction::Ldc_w(cover_size),
+        Instruction::Invokevirtual(replace),
+        Instruction::Invokevirtual(concat),
+        Instruction::Astore(8),
+    ]);
+    let cover_three_skip = cover_two_done + 1;
+    let cover_three_null = cover_two_done + 8;
+    let cover_three_done = instructions.len();
+    instructions[cover_three_skip] = Instruction::Ifnonnull(u16::try_from(cover_three_done)?);
+    instructions[cover_three_null] = Instruction::Ifne(u16::try_from(cover_three_done)?);
+    instructions.extend([
+        Instruction::Aload_1,
+        Instruction::New(info),
+        Instruction::Dup,
+        Instruction::Aload_0,
+        Instruction::Ldc_w(title),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text),
+        Instruction::Aload(4),
+        Instruction::Aload_0,
+        Instruction::Ldc_w(duration),
+        Instruction::Invokevirtual(get),
+        Instruction::Ldc_w(long),
+        Instruction::Invokevirtual(as_type),
+        Instruction::Checkcast(long),
+        Instruction::Invokevirtual(long_value),
+        Instruction::Aload_0,
+        Instruction::Ldc_w(id),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text),
+        Instruction::Iconst_0,
+        Instruction::Ldc_w(track_url),
+        Instruction::Iconst_2,
+        Instruction::Anewarray(object),
+        Instruction::Dup,
+        Instruction::Iconst_0,
+        Instruction::Aload(7),
+        Instruction::Aastore,
+        Instruction::Dup,
+        Instruction::Iconst_1,
+        Instruction::Aload(5),
+        Instruction::Aastore,
+        Instruction::Invokestatic(format),
+        Instruction::Aload(8),
+        Instruction::Aconst_null,
+        Instruction::Invokespecial(info_init),
+        Instruction::Invokeinterface(apply, 2),
+        Instruction::Checkcast(track_type),
+        Instruction::Areturn,
+    ]);
+
+    let mut previous = None;
+    let json_type = VerificationType::Object { cpool_index: json };
+    let function_type = VerificationType::Object {
+        cpool_index: function,
+    };
+    let joiner_type = VerificationType::Object {
+        cpool_index: joiner,
+    };
+    let iterator_type = VerificationType::Object {
+        cpool_index: iterator,
+    };
+    let string_type = VerificationType::Object {
+        cpool_index: string,
+    };
+    let base_locals = vec![json_type.clone(), function_type.clone()];
+    let loop_locals = vec![
+        json_type.clone(),
+        function_type.clone(),
+        joiner_type,
+        iterator_type,
+    ];
+    let cover_locals = vec![
+        json_type,
+        function_type,
+        VerificationType::Object {
+            cpool_index: joiner,
+        },
+        VerificationType::Object {
+            cpool_index: iterator,
+        },
+        string_type.clone(),
+        string_type.clone(),
+        VerificationType::Object { cpool_index: json },
+        string_type.clone(),
+        string_type,
+        VerificationType::Object { cpool_index: json },
+    ];
+    let frames = vec![
+        StackFrame::FullFrame {
+            frame_type: 255,
+            offset_delta: stack_map_offset_delta(&mut previous, wrapper_target)?,
+            locals: base_locals,
+            stack: Vec::new(),
+        },
+        StackFrame::FullFrame {
+            frame_type: 255,
+            offset_delta: stack_map_offset_delta(&mut previous, loop_target)?,
+            locals: loop_locals.clone(),
+            stack: Vec::new(),
+        },
+        StackFrame::FullFrame {
+            frame_type: 255,
+            offset_delta: stack_map_offset_delta(&mut previous, loop_exit)?,
+            locals: loop_locals,
+            stack: Vec::new(),
+        },
+        StackFrame::FullFrame {
+            frame_type: 255,
+            offset_delta: stack_map_offset_delta(&mut previous, cover_one_done)?,
+            locals: cover_locals.clone(),
+            stack: Vec::new(),
+        },
+        StackFrame::FullFrame {
+            frame_type: 255,
+            offset_delta: stack_map_offset_delta(&mut previous, cover_two_done)?,
+            locals: cover_locals.clone(),
+            stack: Vec::new(),
+        },
+        StackFrame::FullFrame {
+            frame_type: 255,
+            offset_delta: stack_map_offset_delta(&mut previous, cover_three_done)?,
+            locals: cover_locals,
+            stack: Vec::new(),
+        },
+    ];
+    let mut body = code(pool, 14, 10, instructions)?;
+    add_stack_map_table(pool, &mut body, frames)?;
+    Ok(body)
 }
 
 fn default_yandex_search_provider_replacement(
