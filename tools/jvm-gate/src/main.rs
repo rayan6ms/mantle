@@ -190,6 +190,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-bandcamp-audio-track-consumer" => Some(BANDCAMP_AUDIO_TRACK_CONSUMER),
         "write-beam-audio-source-manager-consumer" => Some(BEAM_AUDIO_SOURCE_MANAGER_CONSUMER),
+        "write-beam-audio-track-consumer" => Some(BEAM_AUDIO_TRACK_CONSUMER),
         "write-vimeo-audio-source-manager-consumer" => Some(VIMEO_AUDIO_SOURCE_MANAGER_CONSUMER),
         "write-vimeo-playback-format-consumer" => Some(VIMEO_PLAYBACK_FORMAT_CONSUMER),
         "write-vimeo-audio-track-consumer" => Some(VIMEO_AUDIO_TRACK_CONSUMER),
@@ -16670,6 +16671,231 @@ public final class GateBeamAudioSourceManager {
     }
   }
 
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const BEAM_AUDIO_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.beam.BeamAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.beam.BeamAudioTrack;
+import com.sedmelluq.discord.lavaplayer.source.beam.BeamSegmentUrlProvider;
+import com.sedmelluq.discord.lavaplayer.source.stream.M3uStreamSegmentUrlProvider;
+import com.sedmelluq.discord.lavaplayer.source.stream.MpegTsM3uStreamAudioTrack;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import org.apache.http.client.protocol.HttpClientContext;
+
+public final class GateBeamAudioTrack {
+  private static final Object UNSAFE = loadUnsafe();
+
+  public static void main(String[] args) throws Exception {
+    check(args.length >= 1 && args.length <= 2, "expected disposition and optional native path");
+    boolean reference = args[0].equals("reference");
+    check(reference || args[0].equals("candidate"), "unknown disposition");
+    check(reference == (args.length == 1), "candidate requires native path");
+    reflectionContract();
+    commonBehavior();
+    if (!reference) currentDisposition(args[1]);
+    System.out.println(
+        "common=public-concrete,mpeg-ts-m3u-super,3-fields,1-constructor,5-exported-methods;"
+        + "construction,source-identity,segment-provider,private-parsing,http-delegation,"
+        + "shallow-clone,reflection;service="
+        + (reference ? "legacy-mixer-hls" : "retired-stable-failure,no-network"));
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<BeamAudioTrack> type = BeamAudioTrack.class;
+    check(type.getModifiers() == Modifier.PUBLIC
+        && type.getSuperclass() == MpegTsM3uStreamAudioTrack.class
+        && type.getInterfaces().length == 0, "class metadata");
+    check(type.getDeclaredFields().length == 3, "field count");
+    checkField(type, "log", Class.forName("org.slf4j.Logger"),
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "sourceManager", BeamAudioSourceManager.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "segmentUrlProvider", M3uStreamSegmentUrlProvider.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        AudioTrackInfo.class, BeamAudioSourceManager.class);
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "constructor metadata");
+    check(type.getDeclaredMethods().length == 7, "declared method count");
+    long exported = Arrays.stream(type.getDeclaredMethods())
+        .filter(method -> Modifier.isPublic(method.getModifiers())
+            || Modifier.isProtected(method.getModifiers()))
+        .count();
+    check(exported == 5L, "exported method count");
+    checkMethod(type, "getSegmentUrlProvider", M3uStreamSegmentUrlProvider.class,
+        Modifier.PROTECTED, new Class<?>[0]);
+    checkMethod(type, "getHttpInterface", HttpInterface.class,
+        Modifier.PROTECTED, new Class<?>[0]);
+    checkMethod(type, "process", void.class, Modifier.PUBLIC,
+        new Class<?>[] {LocalAudioTrackExecutor.class}, Exception.class);
+    checkMethod(type, "makeShallowClone", AudioTrack.class,
+        Modifier.PROTECTED, new Class<?>[0]);
+    checkMethod(type, "getSourceManager", AudioSourceManager.class,
+        Modifier.PUBLIC, new Class<?>[0]);
+    checkMethod(type, "getChannelId", String.class, Modifier.PRIVATE, new Class<?>[0]);
+    checkMethod(type, "getChannelUrl", String.class, Modifier.PRIVATE, new Class<?>[0]);
+  }
+
+  private static void commonBehavior() throws Exception {
+    RecordingHttpInterface http = new RecordingHttpInterface();
+    BeamAudioSourceManager source = fabricatedSource(http);
+    AudioTrackInfo info = new AudioTrackInfo("title", "Fixture_Channel", Long.MAX_VALUE,
+        "424242|Fixture_Channel|https://mixer.com/Fixture_Channel", true,
+        "https://beam.pro/Fixture_Channel", "art", null);
+    ExposedTrack track = new ExposedTrack(info, source);
+    Object provider = field("segmentUrlProvider").get(track);
+    check(track.getInfo() == info && track.getSourceManager() == source
+        && field("sourceManager").get(track) == source, "captured identity");
+    check(provider instanceof BeamSegmentUrlProvider && track.provider() == provider
+        && privateField(BeamSegmentUrlProvider.class, "channelId").get(provider).equals("424242"),
+        "segment provider identity and channel ID");
+    check(track.http() == http, "HTTP delegation identity");
+    Method channelId = BeamAudioTrack.class.getDeclaredMethod("getChannelId");
+    Method channelUrl = BeamAudioTrack.class.getDeclaredMethod("getChannelUrl");
+    channelId.setAccessible(true);
+    channelUrl.setAccessible(true);
+    check(channelId.invoke(track).equals("424242")
+        && channelUrl.invoke(track).equals("https://mixer.com/Fixture_Channel"),
+        "private composite parsing");
+    BeamAudioTrack clone = (BeamAudioTrack) track.shallowClone();
+    Object cloneProvider = field("segmentUrlProvider").get(clone);
+    check(clone != track && clone.getInfo() == info && clone.getSourceManager() == source
+        && cloneProvider instanceof BeamSegmentUrlProvider && cloneProvider != provider
+        && privateField(BeamSegmentUrlProvider.class, "channelId").get(cloneProvider)
+            .equals("424242"), "shallow clone identity");
+    check(field("log").get(null) != null, "static logger");
+
+    AudioTrackInfo noSeparator = new AudioTrackInfo(
+        "title", "author", 1L, "missing-separator", true, null, null, null);
+    expect(StringIndexOutOfBoundsException.class,
+        () -> new BeamAudioTrack(noSeparator, source));
+    BeamAudioTrack nullSource = new BeamAudioTrack(info, null);
+    check(nullSource.getSourceManager() == null, "null source preserved");
+    expect(NullPointerException.class, () -> new ExposedTrack(info, null).http());
+  }
+
+  private static void currentDisposition(String nativeLibrary) throws Exception {
+    Class.forName("dev.mantle.internal.NativeLoader")
+        .getMethod("load", String.class).invoke(null, nativeLibrary);
+    Class<?> nativeType = Class.forName("dev.mantle.internal.MantleNative");
+    Method process = nativeType.getDeclaredMethod(
+        "processBeamTrack", BeamAudioTrack.class, LocalAudioTrackExecutor.class);
+    check(Modifier.isPublic(process.getModifiers()) && Modifier.isStatic(process.getModifiers())
+        && Modifier.isNative(process.getModifiers()), "current native route");
+    BeamAudioTrack track = new BeamAudioTrack(new AudioTrackInfo(
+        "title", "Fixture_Channel", Long.MAX_VALUE,
+        "424242|Fixture_Channel|https://mixer.com/Fixture_Channel", true,
+        "https://beam.pro/Fixture_Channel", null, null), fabricatedSource(null));
+    RuntimeException closed = expect(RuntimeException.class, () -> track.process(null));
+    check(closed.getMessage().contains("Beam/Mixer service is closed"),
+        "retired playback fails before executor or service traffic");
+  }
+
+  private static BeamAudioSourceManager fabricatedSource(HttpInterface http) throws Exception {
+    BeamAudioSourceManager source = allocate(BeamAudioSourceManager.class);
+    HttpInterfaceManager manager = (HttpInterfaceManager) Proxy.newProxyInstance(
+        HttpInterfaceManager.class.getClassLoader(), new Class<?>[] {HttpInterfaceManager.class},
+        new ManagerHandler(http));
+    Field field = BeamAudioSourceManager.class.getDeclaredField("httpInterfaceManager");
+    field.setAccessible(true);
+    field.set(source, manager);
+    return source;
+  }
+
+  private static Field field(String name) throws Exception {
+    return privateField(BeamAudioTrack.class, name);
+  }
+
+  private static Field privateField(Class<?> owner, String name) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> type, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == type && field.getGenericType() == type
+        && field.getModifiers() == modifiers && !field.isSynthetic(), name + " metadata");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+                                  int modifiers, Class<?>[] parameters,
+                                  Class<?>... exceptions) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.getTypeParameters().length == 0 && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), method + " metadata");
+  }
+
+  private static <T> T allocate(Class<T> type) throws Exception {
+    return type.cast(UNSAFE.getClass().getMethod("allocateInstance", Class.class)
+        .invoke(UNSAFE, type));
+  }
+
+  private static Object loadUnsafe() {
+    try {
+      Class<?> type = Class.forName("sun.misc.Unsafe");
+      Field field = type.getDeclaredField("theUnsafe");
+      field.setAccessible(true);
+      return field.get(null);
+    } catch (Exception error) {
+      throw new ExceptionInInitializerError(error);
+    }
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private static final class RecordingHttpInterface extends HttpInterface {
+    RecordingHttpInterface() { super(null, HttpClientContext.create(), false, null); }
+  }
+
+  private static final class ManagerHandler implements InvocationHandler {
+    private final HttpInterface http;
+    ManagerHandler(HttpInterface http) { this.http = http; }
+    public Object invoke(Object instance, Method method, Object[] arguments) {
+      if (method.getName().equals("getInterface")) return http;
+      return null;
+    }
+  }
+
+  private static final class ExposedTrack extends BeamAudioTrack {
+    ExposedTrack(AudioTrackInfo info, BeamAudioSourceManager source) { super(info, source); }
+    M3uStreamSegmentUrlProvider provider() { return getSegmentUrlProvider(); }
+    HttpInterface http() { return getHttpInterface(); }
+    AudioTrack shallowClone() { return makeShallowClone(); }
+  }
+
+  private interface Operation { void run() throws Exception; }
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }

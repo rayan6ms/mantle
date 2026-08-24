@@ -602,8 +602,8 @@
       "objective": "Expand source SPI, built-in manager shells, class lookup, and serialization-visible types.",
       "exit_evidence": "Source SPI extension tests, source lookup tests, per-symbol ledger entries, and Revapi diff.",
       "status": "IN_PROGRESS",
-      "classified_symbols": 651,
-      "remaining_symbols": 47,
+      "classified_symbols": 658,
+      "remaining_symbols": 40,
       "completed_slices": [
         {
           "id": "audio-source-manager-interface-contracts",
@@ -1958,6 +1958,22 @@
             "tools/jvm-gate/src/main.rs",
             "docs/architecture/ADR-0019-compatibility-only-beam-source.md"
           ]
+        },
+        {
+          "id": "beam-audio-track-contracts",
+          "classes": 1,
+          "fields": 0,
+          "methods": 6,
+          "symbols": 7,
+          "classification": "MIXED_A_EXACT_D_LEGACY",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "crates/mantle-jvm/src/playback_bridge.rs",
+            "crates/mantle-media/tests/phase12_beam.rs",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs",
+            "docs/architecture/ADR-0019-compatibility-only-beam-source.md"
+          ]
         }
       ]
     },
@@ -2079,7 +2095,7 @@
   "phase_entry": {
     "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
     "first_execution_cohort": "core-player-track",
-    "next_slice": "beam-audio-track-contracts",
+    "next_slice": "beam-segment-url-provider-contracts",
     "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
   }
 }

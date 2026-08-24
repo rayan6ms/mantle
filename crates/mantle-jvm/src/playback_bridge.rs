@@ -8,19 +8,21 @@ use mantle_audio::{
     EncodedFrameSlot, MAX_RESAMPLER_BUFFERED_FRAMES, OpusEncodingQuality, PcmFormat, PcmFrame,
     PcmOpusEncoder, PcmResampler, ResamplingQuality, VolumeLevel,
 };
+use mantle_core::{SourceCancellation, SourceManager};
 use mantle_media::{
     BandcampPlaybackSession, BandcampRoute, BandcampSourceManager, BandcampSourceOptions,
-    BandcampSourceTrack, HttpRangeOptions, MediaCancellation, MediaInfo, MediaLimits,
-    NicoNicoPlaybackSession, NicoNicoSourceManager, NicoNicoSourceOptions, NicoNicoSourceTrack,
-    SoundCloudAuthentication, SoundCloudPlaybackSession, SoundCloudSourceManager,
-    SoundCloudSourceOptions, TwitchAuthentication, TwitchLivePlaybackOptions,
-    TwitchLivePlaybackPoll, TwitchLivePlaybackSession, TwitchSourceManager, TwitchSourceOptions,
-    TwitchSourceTrack, VimeoAuthentication, VimeoPlaybackSession, VimeoSourceManager,
-    VimeoSourceOptions, VimeoSourceTrack, YandexMusicAuthentication, YandexMusicPlaybackSession,
-    YandexMusicSourceManager, YandexMusicSourceOptions, YoutubeAudioSourceManager,
-    YoutubeAuthentication, YoutubeLivePlaybackOptions, YoutubeLivePlaybackPoll,
-    YoutubeLivePlaybackSession, YoutubePlaybackSession, YoutubeSourceOptions,
-    route_bandcamp_identifier, route_twitch_identifier,
+    BandcampSourceTrack, BeamErrorKind, BeamSourceManager, HttpRangeOptions, MediaCancellation,
+    MediaInfo, MediaLimits, NicoNicoPlaybackSession, NicoNicoSourceManager, NicoNicoSourceOptions,
+    NicoNicoSourceTrack, SoundCloudAuthentication, SoundCloudPlaybackSession,
+    SoundCloudSourceManager, SoundCloudSourceOptions, TwitchAuthentication,
+    TwitchLivePlaybackOptions, TwitchLivePlaybackPoll, TwitchLivePlaybackSession,
+    TwitchSourceManager, TwitchSourceOptions, TwitchSourceTrack, VimeoAuthentication,
+    VimeoPlaybackSession, VimeoSourceManager, VimeoSourceOptions, VimeoSourceTrack,
+    YandexMusicAuthentication, YandexMusicPlaybackSession, YandexMusicSourceManager,
+    YandexMusicSourceOptions, YoutubeAudioSourceManager, YoutubeAuthentication,
+    YoutubeLivePlaybackOptions, YoutubeLivePlaybackPoll, YoutubeLivePlaybackSession,
+    YoutubePlaybackSession, YoutubeSourceOptions, route_bandcamp_identifier,
+    route_twitch_identifier,
 };
 
 const TRANSCODE_INPUT_CHUNK_FRAMES: usize = 1_024;
@@ -66,6 +68,34 @@ pub(crate) fn process_bandcamp_track(
         .ok_or_else(|| failure("current Bandcamp track has no compatible playback"))?;
 
     process_playback_session(env, executor, session, &cancellation)
+}
+
+pub(crate) fn process_beam_track(
+    env: &mut Env<'_>,
+    track: &JObject<'_>,
+    _executor: &JObject<'_>,
+) -> jni::errors::Result<()> {
+    let java_info = env
+        .get_field(
+            track,
+            jni_str!("trackInfo"),
+            jni_sig!("Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;"),
+        )?
+        .l()?;
+    let info = crate::track_info_from_java(env, &java_info)?;
+    let manager = BeamSourceManager::default();
+    let source_track = manager
+        .decode_with_info(&info, &[])
+        .map_err(|_| failure("invalid legacy Beam track details"))?;
+    match manager.open_track_playback(&source_track, &SourceCancellation::new()) {
+        Err(error) if error.kind() == BeamErrorKind::ServiceClosed => Err(failure(
+            "Beam/Mixer service is closed; legacy track playback is unavailable",
+        )),
+        Err(_) => Err(failure("invalid legacy Beam playback state")),
+        Ok(()) => Err(failure(
+            "retired Beam playback unexpectedly became available",
+        )),
+    }
 }
 
 pub(crate) fn process_nico_track(

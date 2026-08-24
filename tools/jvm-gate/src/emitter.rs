@@ -121,6 +121,7 @@ const BANDCAMP_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/bandcamp/BandcampAudioTrack";
 const BEAM_AUDIO_SOURCE_MANAGER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/beam/BeamAudioSourceManager";
+const BEAM_AUDIO_TRACK_CLASS: &str = "com/sedmelluq/discord/lavaplayer/source/beam/BeamAudioTrack";
 const HEARTBEATING_HTTP_STREAM_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/nico/HeartbeatingHttpStream";
 const NICO_AUDIO_SOURCE_MANAGER_CLASS: &str =
@@ -349,6 +350,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     BANDCAMP_AUDIO_SOURCE_MANAGER_CLASS,
     BANDCAMP_AUDIO_TRACK_CLASS,
     BEAM_AUDIO_SOURCE_MANAGER_CLASS,
+    BEAM_AUDIO_TRACK_CLASS,
     HEARTBEATING_HTTP_STREAM_CLASS,
     NICO_AUDIO_SOURCE_MANAGER_CLASS,
     NICO_AUDIO_TRACK_CLASS,
@@ -806,6 +808,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | BANDCAMP_AUDIO_SOURCE_MANAGER_CLASS
             | BANDCAMP_AUDIO_TRACK_CLASS
             | BEAM_AUDIO_SOURCE_MANAGER_CLASS
+            | BEAM_AUDIO_TRACK_CLASS
             | HEARTBEATING_HTTP_STREAM_CLASS
             | NICO_AUDIO_SOURCE_MANAGER_CLASS
             | NICO_AUDIO_TRACK_CLASS
@@ -872,6 +875,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | LOCAL_SEEKABLE_INPUT_STREAM_CLASS
             | BANDCAMP_AUDIO_TRACK_CLASS
             | BEAM_AUDIO_SOURCE_MANAGER_CLASS
+            | BEAM_AUDIO_TRACK_CLASS
             | HEARTBEATING_HTTP_STREAM_CLASS
             | NICO_AUDIO_SOURCE_MANAGER_CLASS
             | NICO_AUDIO_TRACK_CLASS
@@ -1018,6 +1022,9 @@ fn replacement_body(
     }
     if class_name == BEAM_AUDIO_SOURCE_MANAGER_CLASS {
         return beam_audio_source_manager_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == BEAM_AUDIO_TRACK_CLASS {
+        return beam_audio_track_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == HEARTBEATING_HTTP_STREAM_CLASS {
         return heartbeating_http_stream_replacement(pool, name, descriptor, required_locals);
@@ -3869,6 +3876,268 @@ fn beam_audio_source_manager_clinit(pool: &mut ConstantPool<'static>) -> Result<
             Instruction::Ldc_w(regex),
             Instruction::Invokestatic(compile),
             Instruction::Putstatic(field),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn beam_audio_track_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/beam/BeamAudioSourceManager;)V",
+        ) => beam_audio_track_constructor(pool),
+        (
+            "getSegmentUrlProvider",
+            "()Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider;",
+        ) => object_getter(
+            pool,
+            BEAM_AUDIO_TRACK_CLASS,
+            "segmentUrlProvider",
+            "Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider;",
+        ),
+        ("getHttpInterface", "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;") => {
+            beam_audio_track_get_http_interface(pool)
+        }
+        (
+            "process",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+        ) => beam_audio_track_process(pool),
+        ("makeShallowClone", "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;") => {
+            beam_audio_track_shallow_clone(pool)
+        }
+        ("getSourceManager", "()Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;") => {
+            object_getter(
+                pool,
+                BEAM_AUDIO_TRACK_CLASS,
+                "sourceManager",
+                "Lcom/sedmelluq/discord/lavaplayer/source/beam/BeamAudioSourceManager;",
+            )
+        }
+        ("getChannelId", "()Ljava/lang/String;") => beam_audio_track_channel_id(pool),
+        ("getChannelUrl", "()Ljava/lang/String;") => beam_audio_track_channel_url(pool),
+        ("<clinit>", "()V") => beam_audio_track_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {BEAM_AUDIO_TRACK_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn beam_audio_track_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let parent =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/source/stream/MpegTsM3uStreamAudioTrack")?;
+    let parent_init = pool.add_method_ref(
+        parent,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V",
+    )?;
+    let owner = pool.add_class(BEAM_AUDIO_TRACK_CLASS)?;
+    let source = pool.add_field_ref(
+        owner,
+        "sourceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/source/beam/BeamAudioSourceManager;",
+    )?;
+    let get_channel_id = pool.add_method_ref(owner, "getChannelId", "()Ljava/lang/String;")?;
+    let provider =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/source/beam/BeamSegmentUrlProvider")?;
+    let provider_init = pool.add_method_ref(provider, "<init>", "(Ljava/lang/String;)V")?;
+    let segment_provider = pool.add_field_ref(
+        owner,
+        "segmentUrlProvider",
+        "Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider;",
+    )?;
+    code(
+        pool,
+        4,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(parent_init),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(source),
+            Instruction::Aload_0,
+            Instruction::New(provider),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(get_channel_id),
+            Instruction::Invokespecial(provider_init),
+            Instruction::Putfield(segment_provider),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn beam_audio_track_get_http_interface(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BEAM_AUDIO_TRACK_CLASS)?;
+    let source = pool.add_field_ref(
+        owner,
+        "sourceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/source/beam/BeamAudioSourceManager;",
+    )?;
+    let source_class = pool.add_class(BEAM_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let get = pool.add_method_ref(
+        source_class,
+        "getHttpInterface",
+        "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(source),
+            Instruction::Invokevirtual(get),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn beam_audio_track_process(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let native = pool.add_class(NATIVE_CLASS)?;
+    let process = pool.add_method_ref(
+        native,
+        "processBeamTrack",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/beam/BeamAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+    )?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokestatic(process),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn beam_audio_track_shallow_clone(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BEAM_AUDIO_TRACK_CLASS)?;
+    let track_info = pool.add_field_ref(
+        owner,
+        "trackInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let source = pool.add_field_ref(
+        owner,
+        "sourceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/source/beam/BeamAudioSourceManager;",
+    )?;
+    let init = pool.add_method_ref(
+        owner,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/beam/BeamAudioSourceManager;)V",
+    )?;
+    code(
+        pool,
+        4,
+        1,
+        vec![
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(track_info),
+            Instruction::Aload_0,
+            Instruction::Getfield(source),
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn beam_audio_track_channel_id(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BEAM_AUDIO_TRACK_CLASS)?;
+    let track_info = pool.add_field_ref(
+        owner,
+        "trackInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let info = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo")?;
+    let identifier = pool.add_field_ref(info, "identifier", "Ljava/lang/String;")?;
+    let string = pool.add_class("java/lang/String")?;
+    let index = pool.add_method_ref(string, "indexOf", "(I)I")?;
+    let substring = pool.add_method_ref(string, "substring", "(II)Ljava/lang/String;")?;
+    code(
+        pool,
+        4,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(track_info),
+            Instruction::Getfield(identifier),
+            Instruction::Iconst_0,
+            Instruction::Aload_0,
+            Instruction::Getfield(track_info),
+            Instruction::Getfield(identifier),
+            Instruction::Bipush(124),
+            Instruction::Invokevirtual(index),
+            Instruction::Invokevirtual(substring),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn beam_audio_track_channel_url(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BEAM_AUDIO_TRACK_CLASS)?;
+    let track_info = pool.add_field_ref(
+        owner,
+        "trackInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let info = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo")?;
+    let identifier = pool.add_field_ref(info, "identifier", "Ljava/lang/String;")?;
+    let string = pool.add_class("java/lang/String")?;
+    let last_index = pool.add_method_ref(string, "lastIndexOf", "(I)I")?;
+    let substring = pool.add_method_ref(string, "substring", "(I)Ljava/lang/String;")?;
+    code(
+        pool,
+        3,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(track_info),
+            Instruction::Getfield(identifier),
+            Instruction::Aload_0,
+            Instruction::Getfield(track_info),
+            Instruction::Getfield(identifier),
+            Instruction::Bipush(124),
+            Instruction::Invokevirtual(last_index),
+            Instruction::Iconst_1,
+            Instruction::Iadd,
+            Instruction::Invokevirtual(substring),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn beam_audio_track_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BEAM_AUDIO_TRACK_CLASS)?;
+    let factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
             Instruction::Return,
         ],
     )
@@ -29190,6 +29459,10 @@ fn native_class(expected_abi: u8) -> Result<ClassFile<'static>> {
         (
             "processBandcampTrack",
             "(Lcom/sedmelluq/discord/lavaplayer/source/bandcamp/BandcampAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+        ),
+        (
+            "processBeamTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/beam/BeamAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
         ),
         (
             "processSoundCloudTrack",

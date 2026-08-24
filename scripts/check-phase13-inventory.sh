@@ -605,9 +605,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[0].completed_slices[].symbols] | add) == .cohorts[0].classified_symbols and
   (.cohorts[0].classified_symbols + .cohorts[0].remaining_symbols) == .cohorts[0].symbols and
   .cohorts[1].status == "IN_PROGRESS" and
-  .cohorts[1].classified_symbols == 651 and
-  .cohorts[1].remaining_symbols == 47 and
-  (.cohorts[1].completed_slices | length) == 98 and
+  .cohorts[1].classified_symbols == 658 and
+  .cohorts[1].remaining_symbols == 40 and
+  (.cohorts[1].completed_slices | length) == 99 and
   .cohorts[1].completed_slices[0] == {
     id: "audio-source-manager-interface-contracts",
     classes: 1,
@@ -1962,15 +1962,31 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "docs/architecture/ADR-0019-compatibility-only-beam-source.md"
     ]
   } and
+  .cohorts[1].completed_slices[98] == {
+    id: "beam-audio-track-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 6,
+    symbols: 7,
+    classification: "MIXED_A_EXACT_D_LEGACY",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "crates/mantle-jvm/src/playback_bridge.rs",
+      "crates/mantle-media/tests/phase12_beam.rs",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs",
+      "docs/architecture/ADR-0019-compatibility-only-beam-source.md"
+    ]
+  } and
   ([.cohorts[1].completed_slices[].symbols] | add) == .cohorts[1].classified_symbols and
   (.cohorts[1].classified_symbols + .cohorts[1].remaining_symbols) == .cohorts[1].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1186 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1193 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1063 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1068 and
   ([$classifications.symbols[] |
     select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 115 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "D_LEGACY")] | length) == 8 and
+    select(.assessment == "CLASSIFIED" and .classification == "D_LEGACY")] | length) == 10 and
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackDetailsLoader" and
@@ -2013,6 +2029,20 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
       (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
       (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 11 and
+  ([$classifications.symbols[] |
+    select(.binary_name ==
+      "com.sedmelluq.discord.lavaplayer.source.beam.BeamAudioTrack" and
+      .assessment == "CLASSIFIED" and
+      (if .symbol_kind == "CLASS" or .member_name == "process"
+       then .classification == "D_LEGACY" and
+         (.tests | index("crates/mantle-jvm/src/playback_bridge.rs")) != null and
+         (.tests | index("crates/mantle-media/tests/phase12_beam.rs")) != null and
+         (.tests | index("docs/architecture/ADR-0019-compatibility-only-beam-source.md")) != null
+       else .classification == "A_EXACT"
+       end) and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 7 and
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackJsonData" and
@@ -2141,6 +2171,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.source.bandcamp.BandcampAudioSourceManager",
         "com.sedmelluq.discord.lavaplayer.source.bandcamp.BandcampAudioTrack",
         "com.sedmelluq.discord.lavaplayer.source.beam.BeamAudioSourceManager",
+        "com.sedmelluq.discord.lavaplayer.source.beam.BeamAudioTrack",
         "com.sedmelluq.discord.lavaplayer.source.nico.HeartbeatingHttpStream",
         "com.sedmelluq.discord.lavaplayer.source.nico.NicoAudioSourceManager",
         "com.sedmelluq.discord.lavaplayer.source.nico.NicoAudioTrack",
@@ -2401,6 +2432,13 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         (.tests | index("crates/mantle-media/tests/phase12_beam.rs")) != null and
         (.tests | index("docs/architecture/ADR-0019-compatibility-only-beam-source.md")) != null
       elif $symbol.binary_name ==
+        "com.sedmelluq.discord.lavaplayer.source.beam.BeamAudioTrack" and
+        ($symbol.symbol_kind == "CLASS" or $symbol.member_name == "process")
+      then .classification == "D_LEGACY" and
+        (.tests | index("crates/mantle-jvm/src/playback_bridge.rs")) != null and
+        (.tests | index("crates/mantle-media/tests/phase12_beam.rs")) != null and
+        (.tests | index("docs/architecture/ADR-0019-compatibility-only-beam-source.md")) != null
+      elif $symbol.binary_name ==
         "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioTrack" and
         ($symbol.symbol_kind == "CLASS" or $symbol.member_name == "process")
       then .classification == "C_SEMANTIC" and
@@ -2508,7 +2546,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "beam-audio-track-contracts" and
+  .phase_entry.next_slice == "beam-segment-url-provider-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 ' "$PLAN" >/dev/null
@@ -2516,7 +2554,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '169 reference classes / 1,215 symbols' \
+  '170 reference classes / 1,222 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -2526,4 +2564,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 1,186 classified symbols and 1,576 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 1,193 classified symbols and 1,569 unassessed symbols.\n'
