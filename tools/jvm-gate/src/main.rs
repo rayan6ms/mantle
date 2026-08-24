@@ -274,6 +274,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
             Some(YOUTUBE_SIGNATURE_CIPHER_MANAGER_CONSUMER)
         }
         "write-youtube-signature-resolver-consumer" => Some(YOUTUBE_SIGNATURE_RESOLVER_CONSUMER),
+        "write-youtube-track-details-consumer" => Some(YOUTUBE_TRACK_DETAILS_CONSUMER),
         _ => None,
     }
 }
@@ -21964,6 +21965,167 @@ public final class GateYoutubeSignatureResolver {
       dashCalls++;
       if (failure != null) throw failure;
       return dashResult;
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_TRACK_DETAILS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSignatureCipher;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSignatureResolver;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackDetails;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackFormat;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+public final class GateYoutubeTrackDetails {
+  public static void main(String[] args) throws Exception {
+    reflectionContract();
+    dispatchContract();
+    System.out.println("public-abstract-interface,0-fields,0-constructors,3-methods;"
+        + "info=audio-track-info;formats=list-of-youtube-track-format;script=string;"
+        + "identity=arguments,returns,nulls,unchecked;reflection=exact");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<YoutubeTrackDetails> type = YoutubeTrackDetails.class;
+    int modifiers = Modifier.PUBLIC | Modifier.INTERFACE | Modifier.ABSTRACT;
+    check(type.getModifiers() == modifiers && type.isInterface() && !type.isAnnotation()
+        && !type.isEnum() && !type.isSynthetic() && !type.isMemberClass(), "type metadata");
+    check(type.getSuperclass() == null && type.getGenericSuperclass() == null
+        && type.getInterfaces().length == 0 && type.getGenericInterfaces().length == 0
+        && type.getTypeParameters().length == 0, "type hierarchy");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 3 && type.getDeclaredClasses().length == 0,
+        "type shape");
+    checkMethod(type, "getTrackInfo", AudioTrackInfo.class, new Class<?>[0]);
+    Method formats = checkMethod(type, "getFormats", List.class,
+        new Class<?>[] {HttpInterface.class, YoutubeSignatureResolver.class});
+    Type generic = formats.getGenericReturnType();
+    check(generic instanceof ParameterizedType, "formats parameterized return");
+    ParameterizedType list = (ParameterizedType) generic;
+    check(list.getRawType() == List.class && list.getOwnerType() == null
+        && Arrays.equals(list.getActualTypeArguments(), new Type[] {YoutubeTrackFormat.class}),
+        "formats generic return");
+    checkMethod(type, "getPlayerScript", String.class, new Class<?>[0]);
+  }
+
+  private static void dispatchContract() throws Exception {
+    RecordingDetails details = new RecordingDetails();
+    AudioTrackInfo info = new AudioTrackInfo("title", "author", 1L, "id", false, "uri");
+    List<YoutubeTrackFormat> formats = new ArrayList<>();
+    String script = new String("player-script");
+    HttpInterface http = new HttpInterface(null, null, false, null);
+    YoutubeSignatureResolver resolver = new EmptyResolver();
+    details.info = info;
+    details.formats = formats;
+    details.script = script;
+
+    check(details.getTrackInfo() == info && details.infoCalls == 1, "info identity");
+    check(details.getFormats(http, resolver) == formats && details.http == http
+        && details.resolver == resolver && details.formatCalls == 1, "formats identity");
+    check(details.getPlayerScript() == script && details.scriptCalls == 1, "script identity");
+
+    details.info = null;
+    details.formats = null;
+    details.script = null;
+    check(details.getTrackInfo() == null && details.infoCalls == 2, "info null");
+    check(details.getFormats(null, null) == null && details.http == null
+        && details.resolver == null && details.formatCalls == 2, "formats nulls");
+    check(details.getPlayerScript() == null && details.scriptCalls == 2, "script null");
+
+    RuntimeException failure = new RuntimeException("unchecked-sentinel");
+    details.failure = failure;
+    expectSame(failure, details::getTrackInfo, "info unchecked");
+    expectSame(failure, () -> details.getFormats(http, resolver), "formats unchecked");
+    expectSame(failure, details::getPlayerScript, "script unchecked");
+    check(details.infoCalls == 3 && details.formatCalls == 3 && details.scriptCalls == 3,
+        "unchecked dispatch counts");
+  }
+
+  private static Method checkMethod(Class<?> owner, String name, Class<?> result,
+      Class<?>[] parameters) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == result && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs(),
+        name + " metadata");
+    return method;
+  }
+
+  private static final class RecordingDetails implements YoutubeTrackDetails {
+    AudioTrackInfo info;
+    List<YoutubeTrackFormat> formats;
+    String script;
+    HttpInterface http;
+    YoutubeSignatureResolver resolver;
+    RuntimeException failure;
+    int infoCalls;
+    int formatCalls;
+    int scriptCalls;
+
+    @Override public AudioTrackInfo getTrackInfo() {
+      infoCalls++;
+      if (failure != null) throw failure;
+      return info;
+    }
+
+    @Override public List<YoutubeTrackFormat> getFormats(
+        HttpInterface http, YoutubeSignatureResolver resolver) {
+      this.http = http;
+      this.resolver = resolver;
+      formatCalls++;
+      if (failure != null) throw failure;
+      return formats;
+    }
+
+    @Override public String getPlayerScript() {
+      scriptCalls++;
+      if (failure != null) throw failure;
+      return script;
+    }
+  }
+
+  private static final class EmptyResolver implements YoutubeSignatureResolver {
+    @Override public YoutubeSignatureCipher getExtractedScript(
+        HttpInterface http, String script) throws IOException {
+      return null;
+    }
+
+    @Override public URI resolveFormatUrl(
+        HttpInterface http, String script, YoutubeTrackFormat format) throws Exception {
+      return null;
+    }
+
+    @Override public String resolveDashUrl(
+        HttpInterface http, String script, String dash) throws Exception {
+      return null;
+    }
+  }
+
+  private interface ThrowingSupplier { Object get() throws Exception; }
+
+  private static void expectSame(
+      RuntimeException expected, ThrowingSupplier operation, String message) throws Exception {
+    try {
+      operation.get();
+      throw new AssertionError("expected unchecked failure");
+    } catch (RuntimeException error) {
+      check(error == expected, message);
     }
   }
 

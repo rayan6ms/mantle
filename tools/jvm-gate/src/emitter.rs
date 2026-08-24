@@ -285,6 +285,8 @@ const YOUTUBE_SIGNATURE_CIPHER_MANAGER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSignatureCipherManager";
 const YOUTUBE_SIGNATURE_RESOLVER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSignatureResolver";
+const YOUTUBE_TRACK_DETAILS_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackDetails";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -404,6 +406,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_SIGNATURE_CIPHER_CLASS,
     YOUTUBE_SIGNATURE_CIPHER_MANAGER_CLASS,
     YOUTUBE_SIGNATURE_RESOLVER_CLASS,
+    YOUTUBE_TRACK_DETAILS_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
