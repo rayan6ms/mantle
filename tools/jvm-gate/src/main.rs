@@ -195,6 +195,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-getyarn-audio-source-manager-consumer" => {
             Some(GETYARN_AUDIO_SOURCE_MANAGER_CONSUMER)
         }
+        "write-getyarn-audio-track-consumer" => Some(GETYARN_AUDIO_TRACK_CONSUMER),
         "write-vimeo-audio-source-manager-consumer" => Some(VIMEO_AUDIO_SOURCE_MANAGER_CONSUMER),
         "write-vimeo-playback-format-consumer" => Some(VIMEO_PLAYBACK_FORMAT_CONSUMER),
         "write-vimeo-audio-track-consumer" => Some(VIMEO_AUDIO_TRACK_CONSUMER),
@@ -17305,6 +17306,146 @@ public final class GateGetyarnAudioSourceManager {
     }
   }
 
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const GETYARN_AUDIO_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.getyarn.GetyarnAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.getyarn.GetyarnAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.DelegatedAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateGetyarnAudioTrack {
+  public static void main(String[] args) throws Exception {
+    check(args.length >= 1 && args.length <= 2, "expected disposition and optional native path");
+    boolean reference = args[0].equals("reference");
+    check(reference || args[0].equals("candidate"), "unknown disposition");
+    check(reference == (args.length == 1), "candidate requires native path");
+    reflectionContract();
+    commonBehavior();
+    if (!reference) currentDisposition(args[1]);
+    System.out.println(
+        "common=public-concrete,delegated-audio-track-super,2-fields,1-constructor,"
+        + "2-exported-methods;construction,source-identity,shallow-clone,reflection;service="
+        + (reference ? "legacy-direct-media-http" : "retired-stable-failure,no-network"));
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<GetyarnAudioTrack> type = GetyarnAudioTrack.class;
+    check(type.getModifiers() == Modifier.PUBLIC
+        && type.getSuperclass() == DelegatedAudioTrack.class
+        && type.getInterfaces().length == 0, "class metadata");
+    check(type.getDeclaredFields().length == 2, "field count");
+    checkField(type, "log", Class.forName("org.slf4j.Logger"),
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "sourceManager", GetyarnAudioSourceManager.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        AudioTrackInfo.class, GetyarnAudioSourceManager.class);
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "constructor metadata");
+    check(type.getDeclaredMethods().length == 2, "declared method count");
+    long exported = Arrays.stream(type.getDeclaredMethods())
+        .filter(method -> Modifier.isPublic(method.getModifiers())
+            || Modifier.isProtected(method.getModifiers()))
+        .count();
+    check(exported == 2L, "exported method count");
+    checkMethod(type, "process", void.class, Modifier.PUBLIC,
+        new Class<?>[] {LocalAudioTrackExecutor.class}, Exception.class);
+    checkMethod(type, "makeShallowClone", AudioTrack.class,
+        Modifier.PROTECTED, new Class<?>[0]);
+  }
+
+  private static void commonBehavior() throws Exception {
+    GetyarnAudioSourceManager source = new GetyarnAudioSourceManager();
+    AudioTrackInfo info = new AudioTrackInfo("Fixture quote", "Unknown", 4_000L,
+        "https://cdn.example.invalid/fixture.mp4?token=redacted", false,
+        "https://getyarn.io/yarn-clip/fixture-id", "art", null);
+    ExposedTrack track = new ExposedTrack(info, source);
+    check(track.getInfo() == info && field("sourceManager").get(track) == source,
+        "captured identity");
+    GetyarnAudioTrack clone = (GetyarnAudioTrack) track.shallowClone();
+    check(clone != track && clone.getInfo() == info
+        && field("sourceManager").get(clone) == source, "shallow clone identity");
+    check(field("log").get(null) != null, "static logger");
+
+    GetyarnAudioTrack nullSource = new GetyarnAudioTrack(info, null);
+    check(nullSource.getInfo() == info && field("sourceManager").get(nullSource) == null,
+        "null source preserved");
+    source.shutdown();
+  }
+
+  private static void currentDisposition(String nativeLibrary) throws Exception {
+    Class.forName("dev.mantle.internal.NativeLoader")
+        .getMethod("load", String.class).invoke(null, nativeLibrary);
+    Class<?> nativeType = Class.forName("dev.mantle.internal.MantleNative");
+    Method process = nativeType.getDeclaredMethod(
+        "processGetyarnTrack", GetyarnAudioTrack.class, LocalAudioTrackExecutor.class);
+    check(Modifier.isPublic(process.getModifiers()) && Modifier.isStatic(process.getModifiers())
+        && Modifier.isNative(process.getModifiers()), "current native route");
+    AudioTrackInfo info = new AudioTrackInfo("Fixture quote", "Unknown", 4_000L,
+        "https://cdn.example.invalid/fixture.mp4?token=redacted", false,
+        "https://getyarn.io/yarn-clip/fixture-id", null, null);
+    GetyarnAudioTrack track = new GetyarnAudioTrack(info, null);
+    RuntimeException unsupported = expect(RuntimeException.class, () -> track.process(null));
+    check(unsupported.getMessage().contains(
+        "Getyarn playback has no supported current protocol"),
+        "retired playback fails before source manager, executor, or service traffic");
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = GetyarnAudioTrack.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> type, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == type && field.getGenericType() == type
+        && field.getModifiers() == modifiers && !field.isSynthetic(), name + " metadata");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+                                  int modifiers, Class<?>[] parameters,
+                                  Class<?>... exceptions) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.getTypeParameters().length == 0 && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), method + " metadata");
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private static final class ExposedTrack extends GetyarnAudioTrack {
+    ExposedTrack(AudioTrackInfo info, GetyarnAudioSourceManager source) { super(info, source); }
+    AudioTrack shallowClone() { return makeShallowClone(); }
+  }
+
+  private interface Operation { void run() throws Exception; }
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }

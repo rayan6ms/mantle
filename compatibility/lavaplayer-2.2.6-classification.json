@@ -13601,36 +13601,62 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "D_LEGACY",
+      "notes": "The exact public DelegatedAudioTrack shell is emitted while direct legacy media playback now validates reconstructed state and returns a stable unsupported-protocol failure without source-manager, executor, or network access.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-jvm/src/playback_bridge.rs",
+        "crates/mantle-media/tests/phase12_getyarn.rs",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0020-compatibility-only-getyarn-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.getyarn.GetyarnAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/getyarn/GetyarnAudioSourceManager;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves exact track-info and source-manager identity, including null source capture, plus constructor and private-field metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.getyarn.GetyarnAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "D_LEGACY",
+      "notes": "Reference direct HTTP/MPEG playback is retired; the native compatibility route reconstructs valid legacy state and returns the stable unsupported-protocol failure before dereferencing source manager or executor or performing network traffic.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-jvm/src/playback_bridge.rs",
+        "crates/mantle-media/tests/phase12_getyarn.rs",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0020-compatibility-only-getyarn-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.getyarn.GetyarnAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "makeShallowClone",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves a distinct GetyarnAudioTrack with exact track-info and source-manager identity and protected method metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.http.HttpAudioSourceManager",

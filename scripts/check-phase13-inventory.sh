@@ -605,9 +605,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[0].completed_slices[].symbols] | add) == .cohorts[0].classified_symbols and
   (.cohorts[0].classified_symbols + .cohorts[0].remaining_symbols) == .cohorts[0].symbols and
   .cohorts[1].status == "IN_PROGRESS" and
-  .cohorts[1].classified_symbols == 674 and
-  .cohorts[1].remaining_symbols == 24 and
-  (.cohorts[1].completed_slices | length) == 101 and
+  .cohorts[1].classified_symbols == 678 and
+  .cohorts[1].remaining_symbols == 20 and
+  (.cohorts[1].completed_slices | length) == 102 and
   .cohorts[1].completed_slices[0] == {
     id: "audio-source-manager-interface-contracts",
     classes: 1,
@@ -2009,15 +2009,31 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "docs/architecture/ADR-0020-compatibility-only-getyarn-source.md"
     ]
   } and
+  .cohorts[1].completed_slices[101] == {
+    id: "getyarn-audio-track-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 3,
+    symbols: 4,
+    classification: "MIXED_A_EXACT_D_LEGACY",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "crates/mantle-jvm/src/playback_bridge.rs",
+      "crates/mantle-media/tests/phase12_getyarn.rs",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs",
+      "docs/architecture/ADR-0020-compatibility-only-getyarn-source.md"
+    ]
+  } and
   ([.cohorts[1].completed_slices[].symbols] | add) == .cohorts[1].classified_symbols and
   (.cohorts[1].classified_symbols + .cohorts[1].remaining_symbols) == .cohorts[1].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1209 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1213 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1080 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1082 and
   ([$classifications.symbols[] |
     select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 115 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "D_LEGACY")] | length) == 14 and
+    select(.assessment == "CLASSIFIED" and .classification == "D_LEGACY")] | length) == 16 and
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackDetailsLoader" and
@@ -2060,6 +2076,20 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
       (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
       (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 11 and
+  ([$classifications.symbols[] |
+    select(.binary_name ==
+      "com.sedmelluq.discord.lavaplayer.source.getyarn.GetyarnAudioTrack" and
+      .assessment == "CLASSIFIED" and
+      (if .symbol_kind == "CLASS" or .member_name == "process"
+       then .classification == "D_LEGACY" and
+         (.tests | index("crates/mantle-jvm/src/playback_bridge.rs")) != null and
+         (.tests | index("crates/mantle-media/tests/phase12_getyarn.rs")) != null and
+         (.tests | index("docs/architecture/ADR-0020-compatibility-only-getyarn-source.md")) != null
+       else .classification == "A_EXACT"
+       end) and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 4 and
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.source.beam.BeamAudioSourceManager" and
@@ -2232,6 +2262,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.source.beam.BeamAudioTrack",
         "com.sedmelluq.discord.lavaplayer.source.beam.BeamSegmentUrlProvider",
         "com.sedmelluq.discord.lavaplayer.source.getyarn.GetyarnAudioSourceManager",
+        "com.sedmelluq.discord.lavaplayer.source.getyarn.GetyarnAudioTrack",
         "com.sedmelluq.discord.lavaplayer.source.nico.HeartbeatingHttpStream",
         "com.sedmelluq.discord.lavaplayer.source.nico.NicoAudioSourceManager",
         "com.sedmelluq.discord.lavaplayer.source.nico.NicoAudioTrack",
@@ -2512,6 +2543,13 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         (.tests | index("crates/mantle-media/tests/phase12_getyarn.rs")) != null and
         (.tests | index("docs/architecture/ADR-0020-compatibility-only-getyarn-source.md")) != null
       elif $symbol.binary_name ==
+        "com.sedmelluq.discord.lavaplayer.source.getyarn.GetyarnAudioTrack" and
+        ($symbol.symbol_kind == "CLASS" or $symbol.member_name == "process")
+      then .classification == "D_LEGACY" and
+        (.tests | index("crates/mantle-jvm/src/playback_bridge.rs")) != null and
+        (.tests | index("crates/mantle-media/tests/phase12_getyarn.rs")) != null and
+        (.tests | index("docs/architecture/ADR-0020-compatibility-only-getyarn-source.md")) != null
+      elif $symbol.binary_name ==
         "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioTrack" and
         ($symbol.symbol_kind == "CLASS" or $symbol.member_name == "process")
       then .classification == "C_SEMANTIC" and
@@ -2619,7 +2657,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "getyarn-audio-track-contracts" and
+  .phase_entry.next_slice == "http-audio-source-manager-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 ' "$PLAN" >/dev/null
@@ -2627,7 +2665,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '172 reference classes / 1,238 symbols' \
+  '173 reference classes / 1,242 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -2637,4 +2675,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 1,209 classified symbols and 1,553 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 1,213 classified symbols and 1,549 unassessed symbols.\n'
