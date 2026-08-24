@@ -303,6 +303,8 @@ const OFFLINE_YOUTUBE_TRACK_FORMAT_EXTRACTOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/format/OfflineYoutubeTrackFormatExtractor";
 const STREAMING_DATA_FORMATS_EXTRACTOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/format/StreamingDataFormatsExtractor";
+const YOUTUBE_TRACK_FORMAT_EXTRACTOR_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/format/YoutubeTrackFormatExtractor";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -431,6 +433,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CLASS,
     OFFLINE_YOUTUBE_TRACK_FORMAT_EXTRACTOR_CLASS,
     STREAMING_DATA_FORMATS_EXTRACTOR_CLASS,
+    YOUTUBE_TRACK_FORMAT_EXTRACTOR_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
