@@ -281,6 +281,8 @@ const YOUTUBE_SEARCH_RESULT_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSearchResultLoader";
 const YOUTUBE_SIGNATURE_CIPHER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSignatureCipher";
+const YOUTUBE_SIGNATURE_CIPHER_MANAGER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSignatureCipherManager";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -398,6 +400,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_SEARCH_PROVIDER_CLASS,
     YOUTUBE_SEARCH_RESULT_LOADER_CLASS,
     YOUTUBE_SIGNATURE_CIPHER_CLASS,
+    YOUTUBE_SIGNATURE_CIPHER_MANAGER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -806,6 +809,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | YOUTUBE_SEARCH_MUSIC_PROVIDER_CLASS
             | YOUTUBE_SEARCH_PROVIDER_CLASS
             | YOUTUBE_SIGNATURE_CIPHER_CLASS
+            | YOUTUBE_SIGNATURE_CIPHER_MANAGER_CLASS
     )
 }
 
@@ -852,6 +856,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | DEFAULT_YOUTUBE_TRACK_DETAILS_LOADER_CLASS
             | YOUTUBE_ACCESS_TOKEN_TRACKER_CLASS
             | YOUTUBE_AUDIO_SOURCE_MANAGER_CLASS
+            | YOUTUBE_SIGNATURE_CIPHER_MANAGER_CLASS
             | YOUTUBE_AUDIO_TRACK_CLASS
             | YOUTUBE_CLIENT_CONFIG_CLASS
             | YOUTUBE_HTTP_CONTEXT_FILTER_CLASS
@@ -891,6 +896,9 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             .sum::<u16>();
         let required_locals =
             parameter_slots + u16::from(!method.access_flags.contains(MethodAccessFlags::STATIC));
+        if class_name == YOUTUBE_SIGNATURE_CIPHER_MANAGER_CLASS && name == "<clinit>" {
+            continue;
+        }
         let had_code = method
             .attributes
             .iter()
@@ -1191,6 +1199,14 @@ fn replacement_body(
     }
     if class_name == YOUTUBE_SIGNATURE_CIPHER_CLASS {
         return youtube_signature_cipher_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == YOUTUBE_SIGNATURE_CIPHER_MANAGER_CLASS {
+        return youtube_signature_cipher_manager_replacement(
+            pool,
+            name,
+            descriptor,
+            required_locals,
+        );
     }
     if class_name == YOUTUBE_CLIENT_CONFIG_CLASS {
         return youtube_client_config_replacement(pool, name, descriptor, required_locals);
@@ -22094,6 +22110,66 @@ fn youtube_signature_cipher_string_setter(
             Instruction::Aload_0,
             Instruction::Aload_1,
             Instruction::Putfield(field),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn youtube_signature_cipher_manager_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => youtube_signature_cipher_manager_constructor(pool),
+        _ => unsupported_body(
+            pool,
+            "Legacy YouTube signature manager is unsupported; use Mantle's bounded native signature and n transformer.",
+            required_locals,
+        ),
+    }
+}
+
+fn youtube_signature_cipher_manager_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(YOUTUBE_SIGNATURE_CIPHER_MANAGER_CLASS)?;
+    let map_class = pool.add_class("java/util/concurrent/ConcurrentHashMap")?;
+    let map_init = pool.add_method_ref(map_class, "<init>", "()V")?;
+    let set_class = pool.add_class("java/util/HashSet")?;
+    let set_init = pool.add_method_ref(set_class, "<init>", "()V")?;
+    let cache = pool.add_field_ref(owner, "cipherCache", "Ljava/util/concurrent/ConcurrentMap;")?;
+    let dumped = pool.add_field_ref(owner, "dumpedScriptUrls", "Ljava/util/Set;")?;
+    let engine = pool.add_field_ref(owner, "scriptEngine", "Ljavax/script/ScriptEngine;")?;
+    let lock = pool.add_field_ref(owner, "cipherLoadLock", "Ljava/lang/Object;")?;
+    code(
+        pool,
+        3,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::New(map_class),
+            Instruction::Dup,
+            Instruction::Invokespecial(map_init),
+            Instruction::Putfield(cache),
+            Instruction::Aload_0,
+            Instruction::New(set_class),
+            Instruction::Dup,
+            Instruction::Invokespecial(set_init),
+            Instruction::Putfield(dumped),
+            Instruction::Aload_0,
+            Instruction::Aconst_null,
+            Instruction::Putfield(engine),
+            Instruction::Aload_0,
+            Instruction::New(object),
+            Instruction::Dup,
+            Instruction::Invokespecial(object_init),
+            Instruction::Putfield(lock),
             Instruction::Return,
         ],
     )

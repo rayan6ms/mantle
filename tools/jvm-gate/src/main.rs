@@ -270,6 +270,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
             Some(YOUTUBE_SEARCH_RESULT_LOADER_CONSUMER)
         }
         "write-youtube-signature-cipher-consumer" => Some(YOUTUBE_SIGNATURE_CIPHER_CONSUMER),
+        "write-youtube-signature-cipher-manager-consumer" => {
+            Some(YOUTUBE_SIGNATURE_CIPHER_MANAGER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -21609,6 +21612,203 @@ public final class GateYoutubeSignatureCipher {
     } catch (Throwable error) {
       if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
       return type.cast(error);
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_SIGNATURE_CIPHER_MANAGER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSignatureCipher;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSignatureCipherManager;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSignatureResolver;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackFormat;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.net.URI;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.regex.Pattern;
+import javax.script.ScriptEngine;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.slf4j.Logger;
+
+public final class GateYoutubeSignatureCipherManager {
+  private static final String FENCE = "Legacy YouTube signature manager is unsupported; "
+      + "use Mantle's bounded native signature and n transformer.";
+
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "mode");
+    reflectionContract();
+    YoutubeSignatureCipherManager first = new YoutubeSignatureCipherManager();
+    YoutubeSignatureCipherManager second = new YoutubeSignatureCipherManager();
+    stateContract(first, second);
+    String service = serviceContract(first, args[0]);
+    System.out.println("common=public-concrete,object-root,signature-resolver,24-private-fields,"
+        + "1-constructor,3-exported-methods,6-private-methods;fresh-concurrent-cache,"
+        + "fresh-dump-set,fresh-lock,static-constants,compiled-patterns,logger,signatures,"
+        + "reflection;service=" + service);
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<YoutubeSignatureCipherManager> type = YoutubeSignatureCipherManager.class;
+    check(type.getModifiers() == Modifier.PUBLIC && !type.isInterface() && !type.isAnnotation()
+        && !type.isEnum() && !type.isSynthetic() && !type.isMemberClass(), "type metadata");
+    check(type.getSuperclass() == Object.class && type.getGenericSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {YoutubeSignatureResolver.class})
+        && Arrays.equals(type.getGenericInterfaces(), new Type[] {YoutubeSignatureResolver.class})
+        && type.getTypeParameters().length == 0, "type hierarchy");
+    check(type.getDeclaredFields().length == 24 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 9 && type.getDeclaredClasses().length == 0,
+        "type shape");
+
+    checkStaticField(type, "log", Logger.class);
+    String[] constants = {"VARIABLE_PART", "VARIABLE_PART_DEFINE", "BEFORE_ACCESS",
+        "AFTER_ACCESS", "VARIABLE_PART_ACCESS", "REVERSE_PART", "SLICE_PART", "SPLICE_PART",
+        "SWAP_PART", "PATTERN_PREFIX"};
+    for (String name : constants) checkStaticField(type, name, String.class);
+    String[] patterns = {"functionPattern", "actionsPattern", "reversePattern", "slicePattern",
+        "splicePattern", "swapPattern", "timestampPattern", "nFunctionPattern",
+        "signatureExtraction"};
+    for (String name : patterns) checkStaticField(type, name, Pattern.class);
+    checkInstanceField(type, "cipherCache", ConcurrentMap.class,
+        new Type[] {String.class, YoutubeSignatureCipher.class});
+    checkInstanceField(type, "dumpedScriptUrls", Set.class, new Type[] {String.class});
+    checkInstanceField(type, "scriptEngine", ScriptEngine.class, null);
+    checkInstanceField(type, "cipherLoadLock", Object.class, null);
+
+    Constructor<YoutubeSignatureCipherManager> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0
+        && constructor.getTypeParameters().length == 0 && !constructor.isSynthetic()
+        && !constructor.isVarArgs(), "constructor metadata");
+    checkMethod(type, "resolveFormatUrl", Modifier.PUBLIC, URI.class,
+        new Class<?>[] {HttpInterface.class, String.class, YoutubeTrackFormat.class},
+        new Class<?>[] {IOException.class}, false);
+    checkMethod(type, "resolveDashUrl", Modifier.PUBLIC, String.class,
+        new Class<?>[] {HttpInterface.class, String.class, String.class},
+        new Class<?>[] {IOException.class}, false);
+    checkMethod(type, "getExtractedScript", Modifier.PUBLIC, YoutubeSignatureCipher.class,
+        new Class<?>[] {HttpInterface.class, String.class},
+        new Class<?>[] {IOException.class}, false);
+    checkMethod(type, "validateResponseCode", Modifier.PRIVATE, void.class,
+        new Class<?>[] {String.class, CloseableHttpResponse.class},
+        new Class<?>[] {IOException.class}, false);
+    Method quoted = checkMethod(type, "getQuotedFunctions", Modifier.PRIVATE, List.class,
+        new Class<?>[] {String[].class}, new Class<?>[0], true);
+    check(quoted.getGenericReturnType() instanceof ParameterizedType
+        && Arrays.equals(((ParameterizedType) quoted.getGenericReturnType()).getActualTypeArguments(),
+            new Type[] {String.class}), "quoted generic result");
+    checkMethod(type, "dumpProblematicScript", Modifier.PRIVATE, void.class,
+        new Class<?>[] {String.class, String.class, String.class}, new Class<?>[0], false);
+    checkMethod(type, "extractFromScript", Modifier.PRIVATE, YoutubeSignatureCipher.class,
+        new Class<?>[] {String.class, String.class}, new Class<?>[0], false);
+    checkMethod(type, "extractDollarEscapedFirstGroup", Modifier.PRIVATE | Modifier.STATIC,
+        String.class, new Class<?>[] {Pattern.class, String.class}, new Class<?>[0], false);
+    checkMethod(type, "parseTokenScriptUrl", Modifier.PRIVATE | Modifier.STATIC, URI.class,
+        new Class<?>[] {String.class}, new Class<?>[0], false);
+  }
+
+  private static void stateContract(YoutubeSignatureCipherManager first,
+      YoutubeSignatureCipherManager second) throws Exception {
+    Object firstCache = read(first, "cipherCache");
+    Object secondCache = read(second, "cipherCache");
+    Object firstSet = read(first, "dumpedScriptUrls");
+    Object secondSet = read(second, "dumpedScriptUrls");
+    Object firstLock = read(first, "cipherLoadLock");
+    Object secondLock = read(second, "cipherLoadLock");
+    check(firstCache instanceof ConcurrentHashMap && secondCache instanceof ConcurrentHashMap
+        && firstCache != secondCache && ((ConcurrentMap<?, ?>) firstCache).isEmpty(),
+        "fresh cache");
+    check(firstSet instanceof HashSet && secondSet instanceof HashSet && firstSet != secondSet
+        && ((Set<?>) firstSet).isEmpty(), "fresh dump set");
+    check(firstLock != secondLock && firstLock.getClass() == Object.class
+        && secondLock.getClass() == Object.class, "fresh lock");
+    for (Field field : YoutubeSignatureCipherManager.class.getDeclaredFields()) {
+      if (Modifier.isStatic(field.getModifiers())) {
+        field.setAccessible(true);
+        check(field.get(null) != null, field.getName() + " static initialization");
+      }
+    }
+  }
+
+  private static String serviceContract(YoutubeSignatureCipherManager manager, String mode)
+      throws Exception {
+    Object engine = read(manager, "scriptEngine");
+    if (mode.equals("reference")) {
+      check(engine instanceof ScriptEngine, "legacy engine");
+      String dash = new String("unsigned-dash-manifest");
+      check(manager.resolveDashUrl(null, null, dash) == dash, "unsigned dash identity");
+      return "legacy-rhino,pass-through-unsigned-dash";
+    }
+    check(mode.equals("candidate") && engine == null, "deterministic engine state");
+    expectFence(() -> manager.resolveFormatUrl(null, null, null));
+    expectFence(() -> manager.resolveDashUrl(null, null, null));
+    expectFence(() -> manager.getExtractedScript(null, null));
+    return "deterministic-no-engine,no-http-or-script-access,bounded-native-signature-and-n";
+  }
+
+  private static void checkStaticField(Class<?> owner, String name, Class<?> fieldType)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && field.getType() == fieldType && !field.isSynthetic(), name + " field");
+  }
+
+  private static void checkInstanceField(Class<?> owner, String name, Class<?> fieldType,
+      Type[] arguments) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && field.getType() == fieldType && !field.isSynthetic(), name + " field");
+    if (arguments == null) {
+      check(field.getGenericType() == fieldType, name + " ordinary type");
+    } else {
+      check(field.getGenericType() instanceof ParameterizedType, name + " generic kind");
+      ParameterizedType generic = (ParameterizedType) field.getGenericType();
+      check(generic.getRawType() == fieldType && generic.getOwnerType() == null
+          && Arrays.equals(generic.getActualTypeArguments(), arguments), name + " generic type");
+    }
+  }
+
+  private static Method checkMethod(Class<?> owner, String name, int modifiers, Class<?> result,
+      Class<?>[] parameters, Class<?>[] exceptions, boolean varArgs) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    int expectedModifiers = modifiers | (varArgs ? 0x80 : 0);
+    check(method.getModifiers() == expectedModifiers && method.getReturnType() == result
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.getTypeParameters().length == 0 && !method.isDefault() && !method.isBridge()
+        && !method.isSynthetic() && method.isVarArgs() == varArgs, name + " metadata");
+    return method;
+  }
+
+  private static Object read(Object owner, String name) throws Exception {
+    Field field = owner.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(owner);
+  }
+
+  private interface ThrowingRunnable { void run() throws Exception; }
+
+  private static void expectFence(ThrowingRunnable operation) throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected deterministic fence");
+    } catch (UnsupportedOperationException error) {
+      check(FENCE.equals(error.getMessage()), "fence message");
     }
   }
 

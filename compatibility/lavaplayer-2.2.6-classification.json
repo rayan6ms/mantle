@@ -20404,45 +20404,80 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The generated public concrete YoutubeSignatureResolver shell retains all 24 private fields, nine declared methods, static constants/patterns/logger, generic cache/set metadata, and fresh cache/set/lock state while omitting Rhino and fencing the frozen network/script manager in favor of Mantle's bounded native signature and n transformer.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-media/tests/phase12_youtube.rs",
+        "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSignatureCipherManager",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The generated public constructor retains fresh ConcurrentHashMap, HashSet, and lock ownership but deliberately leaves the legacy Rhino ScriptEngine absent for deterministic native-only transformation.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-media/tests/phase12_youtube.rs",
+        "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSignatureCipherManager",
       "symbol_kind": "METHOD",
       "member_name": "resolveFormatUrl",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackFormat;)Ljava/net/URI;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The frozen format-URL resolver is replaced by a stable deterministic fence before format, HTTP, cache, or script-engine access; Mantle resolves current formats through its bounded native playback pipeline.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-media/tests/phase12_youtube.rs",
+        "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSignatureCipherManager",
       "symbol_kind": "METHOD",
       "member_name": "resolveDashUrl",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The frozen DASH signature-regex resolver is replaced by a stable deterministic fence before argument, HTTP, cache, or script access; the oracle records the reference unsigned-DASH identity fast path separately.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-media/tests/phase12_youtube.rs",
+        "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSignatureCipherManager",
       "symbol_kind": "METHOD",
       "member_name": "getExtractedScript",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSignatureCipher;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The frozen player-script fetch/cache/regex extractor is replaced by a stable deterministic fence before URL, HTTP, cache, or script access; Mantle uses bounded current-script acquisition and strictly parsed native operations.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-media/tests/phase12_youtube.rs",
+        "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSignatureResolver",
