@@ -101,6 +101,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
             Some(NON_ALLOCATING_AUDIO_FRAME_BUFFER_CONSUMER)
         }
         "write-audio-filter-interface-consumer" => Some(AUDIO_FILTER_INTERFACE_CONSUMER),
+        "write-audio-filter-chain-consumer" => Some(AUDIO_FILTER_CHAIN_CONSUMER),
         "write-audio-source-manager-interface-consumer" => {
             Some(AUDIO_SOURCE_MANAGER_INTERFACE_CONSUMER)
         }
@@ -7257,6 +7258,106 @@ public final class GateAudioFilterInterface {
     }
 
     public void close() { closes++; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_FILTER_CHAIN_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.AudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.AudioFilterChain;
+import com.sedmelluq.discord.lavaplayer.filter.UniversalPcmAudioFilter;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+public final class GateAudioFilterChain {
+  public static void main(String[] args) throws Exception {
+    construction();
+    nullConstruction();
+    reflection();
+    System.out.println(
+        "construction=identity,nulls,no-copy;"
+        + "reflection=public-concrete-object,3-public-final-fields,1-constructor,0-methods,generics");
+  }
+
+  private static void construction() {
+    UniversalPcmAudioFilter input = proxy(UniversalPcmAudioFilter.class);
+    List<AudioFilter> filters = new ArrayList<>();
+    filters.add(input);
+    Object context = new Object();
+    AudioFilterChain chain = new AudioFilterChain(input, filters, context);
+
+    check(chain.input == input && chain.filters == filters && chain.context == context,
+        "constructor identity");
+    filters.add(input);
+    check(chain.filters.size() == 2, "filter list is not copied");
+  }
+
+  private static void nullConstruction() {
+    AudioFilterChain chain = new AudioFilterChain(null, null, null);
+    check(chain.input == null && chain.filters == null && chain.context == null,
+        "null identity");
+  }
+
+  private static void reflection() throws Exception {
+    Class<AudioFilterChain> type = AudioFilterChain.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers()) && !type.isInterface()
+        && type.getSuperclass() == Object.class && type.getInterfaces().length == 0,
+        "class metadata");
+    check(type.getDeclaredFields().length == 3 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 0, "member counts");
+
+    checkField(type.getDeclaredField("input"), UniversalPcmAudioFilter.class, null);
+    checkField(type.getDeclaredField("filters"), List.class,
+        "java.util.List<com.sedmelluq.discord.lavaplayer.filter.AudioFilter>");
+    checkField(type.getDeclaredField("context"), Object.class, null);
+
+    Constructor<AudioFilterChain> constructor = type.getDeclaredConstructor(
+        UniversalPcmAudioFilter.class, List.class, Object.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    check(Arrays.equals(constructor.getParameterTypes(), new Class<?>[] {
+        UniversalPcmAudioFilter.class, List.class, Object.class }),
+        "constructor parameter types");
+    Type[] genericParameters = constructor.getGenericParameterTypes();
+    check(genericParameters.length == 3
+        && genericParameters[0] == UniversalPcmAudioFilter.class
+        && genericParameters[1].getTypeName().equals(
+            "java.util.List<com.sedmelluq.discord.lavaplayer.filter.AudioFilter>")
+        && genericParameters[2] == Object.class, "constructor generic signature");
+  }
+
+  private static void checkField(Field field, Class<?> fieldType, String genericType) {
+    check(field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && field.getType() == fieldType && !field.isSynthetic(), field.getName() + " metadata");
+    if (genericType != null) {
+      check(field.getGenericType().getTypeName().equals(genericType),
+          field.getName() + " generic signature");
+    } else {
+      check(field.getGenericType() == fieldType, field.getName() + " raw type");
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] { type },
+        (instance, method, arguments) -> {
+          if (method.getName().equals("toString")) return type.getSimpleName() + "Proxy";
+          if (method.getName().equals("hashCode")) return System.identityHashCode(instance);
+          if (method.getName().equals("equals")) return instance == arguments[0];
+          return null;
+        });
   }
 
   private static void check(boolean condition, String message) {

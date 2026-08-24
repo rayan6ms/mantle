@@ -69,6 +69,7 @@ const TERMINATOR_FRAME_CLASS: &str =
 const AUDIO_FRAME_BUFFER_FACTORY_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBufferFactory";
 const AUDIO_FILTER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilter";
+const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const MARKER_STATE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState";
 const TRACK_STATE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/AudioTrackState";
@@ -350,6 +351,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/player/hook/AudioOutputHook",
     "com/sedmelluq/discord/lavaplayer/player/hook/AudioOutputHookFactory",
     AUDIO_FILTER_CLASS,
+    AUDIO_FILTER_CHAIN_CLASS,
     "com/sedmelluq/discord/lavaplayer/filter/PcmFilterFactory",
     "com/sedmelluq/discord/lavaplayer/format/AudioDataFormat",
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
@@ -1028,6 +1030,9 @@ fn replacement_body(
     if class_name == AUDIO_SOURCE_MANAGERS_CLASS {
         return audio_source_managers_replacement(pool, name, descriptor, required_locals);
     }
+    if class_name == AUDIO_FILTER_CHAIN_CLASS {
+        return audio_filter_chain_replacement(pool, name, descriptor, required_locals);
+    }
     if class_name == PROBING_AUDIO_SOURCE_MANAGER_CLASS {
         return probing_audio_source_manager_replacement(pool, name, descriptor, required_locals);
     }
@@ -1512,6 +1517,57 @@ fn replacement_body(
             required_locals,
         )?,
     })
+}
+
+fn audio_filter_chain_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;Ljava/util/List;Ljava/lang/Object;)V",
+        ) => audio_filter_chain_constructor(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {AUDIO_FILTER_CHAIN_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn audio_filter_chain_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(AUDIO_FILTER_CHAIN_CLASS)?;
+    let input = pool.add_field_ref(
+        owner,
+        "input",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;",
+    )?;
+    let filters = pool.add_field_ref(owner, "filters", "Ljava/util/List;")?;
+    let context = pool.add_field_ref(owner, "context", "Ljava/lang/Object;")?;
+    code(
+        pool,
+        2,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(input),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(filters),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Putfield(context),
+            Instruction::Return,
+        ],
+    )
 }
 
 fn audio_source_managers_replacement(
