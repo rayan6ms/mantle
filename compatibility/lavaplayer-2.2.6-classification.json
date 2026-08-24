@@ -19700,18 +19700,28 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The public abstract mix-loader interface retains its empty field, constructor, hierarchy, type-variable, and nested-class shape together with exact reflection metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeMixLoader",
       "symbol_kind": "METHOD",
       "member_name": "load",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/lang/String;Ljava/lang/String;Ljava/util/function/Function;)Lcom/sedmelluq/discord/lavaplayer/track/AudioPlaylist;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The sole public abstract load method retains exact HttpInterface and String parameters, Function<AudioTrackInfo, AudioTrack> generic metadata, AudioPlaylist return, argument and result identity, null handling, lazy factory ownership, and unchecked propagation.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeMixProvider",

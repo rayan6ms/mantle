@@ -249,6 +249,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-youtube-format-info-consumer" => Some(YOUTUBE_FORMAT_INFO_CONSUMER),
         "write-youtube-http-context-filter-consumer" => Some(YOUTUBE_HTTP_CONTEXT_FILTER_CONSUMER),
         "write-youtube-link-router-consumer" => Some(YOUTUBE_LINK_ROUTER_CONSUMER),
+        "write-youtube-mix-loader-consumer" => Some(YOUTUBE_MIX_LOADER_CONSUMER),
         _ => None,
     }
 }
@@ -19838,6 +19839,121 @@ public final class GateYoutubeLinkRouter {
     @Override public String searchMusic(String value) { return record("music", value, null); }
     @Override public String anonymous(String value) { return record("anonymous", value, null); }
     @Override public String none() { return record("none", null, null); }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_MIX_LOADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeMixLoader;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.Type;
+import java.util.Arrays;
+import java.util.function.Function;
+import org.apache.http.client.protocol.HttpClientContext;
+
+public final class GateYoutubeMixLoader {
+  public static void main(String[] args) throws Exception {
+    reflectionContract();
+    dispatchContract();
+    System.out.println("public-abstract-interface,0-fields,0-constructors,1-method;load=http,mix-id,"
+        + "selected-id,generic-track-factory,audio-playlist;identity=arguments,return,nulls,unchecked;"
+        + "factory=lazy;reflection=exact");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<YoutubeMixLoader> type = YoutubeMixLoader.class;
+    int modifiers = Modifier.PUBLIC | Modifier.INTERFACE | Modifier.ABSTRACT;
+    check(type.getModifiers() == modifiers && type.isInterface() && !type.isAnnotation()
+        && !type.isEnum() && !type.isSynthetic() && !type.isMemberClass(), "type metadata");
+    check(type.getSuperclass() == null && type.getGenericSuperclass() == null
+        && type.getInterfaces().length == 0 && type.getGenericInterfaces().length == 0
+        && type.getTypeParameters().length == 0, "type hierarchy");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 1 && type.getDeclaredClasses().length == 0,
+        "type shape");
+
+    Method load = type.getDeclaredMethod("load", HttpInterface.class, String.class, String.class,
+        Function.class);
+    check(load.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && load.getReturnType() == AudioPlaylist.class
+        && load.getGenericReturnType() == AudioPlaylist.class
+        && Arrays.equals(load.getParameterTypes(), new Class<?>[] {
+            HttpInterface.class, String.class, String.class, Function.class})
+        && load.getExceptionTypes().length == 0 && load.getTypeParameters().length == 0
+        && !load.isDefault() && !load.isBridge() && !load.isSynthetic() && !load.isVarArgs(),
+        "load metadata");
+    Type[] parameters = load.getGenericParameterTypes();
+    check(parameters[0] == HttpInterface.class && parameters[1] == String.class
+        && parameters[2] == String.class && parameters[3] instanceof ParameterizedType,
+        "load generic parameters");
+    ParameterizedType factory = (ParameterizedType) parameters[3];
+    check(factory.getRawType() == Function.class && factory.getOwnerType() == null
+        && Arrays.equals(factory.getActualTypeArguments(),
+            new Type[] {AudioTrackInfo.class, AudioTrack.class}), "factory signature");
+  }
+
+  private static void dispatchContract() {
+    RecordingLoader loader = new RecordingLoader();
+    HttpInterface http = new HttpInterface(null, HttpClientContext.create(), false, null);
+    String mixId = new String("mix-id");
+    String selectedId = new String("selected-id");
+    Function<AudioTrackInfo, AudioTrack> factory = info -> {
+      throw new AssertionError("factory invoked");
+    };
+    AudioPlaylist playlist = (AudioPlaylist) Proxy.newProxyInstance(
+        GateYoutubeMixLoader.class.getClassLoader(), new Class<?>[] {AudioPlaylist.class},
+        (proxy, method, args) -> { throw new AssertionError("playlist invoked"); });
+
+    loader.result = playlist;
+    check(loader.load(http, mixId, selectedId, factory) == playlist, "return identity");
+    check(loader.http == http && loader.mixId == mixId && loader.selectedId == selectedId
+        && loader.factory == factory && loader.calls == 1, "argument identity");
+
+    loader.result = null;
+    check(loader.load(null, null, null, null) == null && loader.http == null
+        && loader.mixId == null && loader.selectedId == null && loader.factory == null
+        && loader.calls == 2, "null contract");
+
+    RuntimeException failure = new RuntimeException("unchecked-sentinel");
+    loader.failure = failure;
+    try {
+      loader.load(http, mixId, selectedId, factory);
+      throw new AssertionError("expected unchecked failure");
+    } catch (RuntimeException error) {
+      check(error == failure && loader.calls == 3, "unchecked identity");
+    }
+  }
+
+  private static final class RecordingLoader implements YoutubeMixLoader {
+    HttpInterface http;
+    String mixId;
+    String selectedId;
+    Function<AudioTrackInfo, AudioTrack> factory;
+    AudioPlaylist result;
+    RuntimeException failure;
+    int calls;
+
+    @Override public AudioPlaylist load(HttpInterface http, String mixId, String selectedId,
+                                        Function<AudioTrackInfo, AudioTrack> factory) {
+      this.http = http;
+      this.mixId = mixId;
+      this.selectedId = selectedId;
+      this.factory = factory;
+      calls++;
+      if (failure != null) throw failure;
+      return result;
+    }
   }
 
   private static void check(boolean condition, String message) {

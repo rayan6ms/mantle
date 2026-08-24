@@ -259,6 +259,8 @@ const YOUTUBE_LINK_ROUTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter";
 const YOUTUBE_LINK_ROUTER_ROUTES_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeLinkRouter$Routes";
+const YOUTUBE_MIX_LOADER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeMixLoader";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -365,6 +367,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_HTTP_CONTEXT_FILTER_CLASS,
     YOUTUBE_LINK_ROUTER_CLASS,
     YOUTUBE_LINK_ROUTER_ROUTES_CLASS,
+    YOUTUBE_MIX_LOADER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
