@@ -286,6 +286,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-legacy-dash-mpd-formats-extractor-consumer" => {
             Some(LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CONSUMER)
         }
+        "write-legacy-stream-map-formats-extractor-consumer" => {
+            Some(LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -23094,6 +23097,205 @@ public final class GateLegacyDashMpdFormatsExtractor {
     if (type == double.class) return 0.0d;
     if (type == char.class) return (char) 0;
     return null;
+  }
+
+  private interface ThrowingSupplier { Object get() throws Exception; }
+
+  private static <T extends Throwable> T expect(
+      Class<T> expected, ThrowingSupplier operation, String message) {
+    try {
+      operation.get();
+      throw new AssertionError("expected " + expected.getName() + ": " + message);
+    } catch (Throwable error) {
+      if (!expected.isInstance(error)) throw new AssertionError(message, error);
+      return expected.cast(error);
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeFormatInfo;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackFormat;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackJsonData;
+import com.sedmelluq.discord.lavaplayer.source.youtube.format.LegacyStreamMapFormatsExtractor;
+import com.sedmelluq.discord.lavaplayer.source.youtube.format.OfflineYoutubeTrackFormatExtractor;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import org.slf4j.Logger;
+
+public final class GateLegacyStreamMapFormatsExtractor {
+  public static void main(String[] args) throws Exception {
+    reflectionContract();
+    absentContract();
+    mappingContract();
+    isolationContract();
+    System.out.println("public-concrete-object,offline-extractor,1-private-static-final-log,"
+        + "1-constructor,1-public-method,2-private-helpers;absent=shared-empty;"
+        + "stream-map=ordered,array-list,url-decoded,per-entry-isolation,skip-missing-fields;"
+        + "quality=small,medium,hd720,default-negative;"
+        + "format=type,length,fixed-channels,url,empty-n,signature,key,default-audio;"
+        + "errors=swallowed;reflection=exact");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<LegacyStreamMapFormatsExtractor> type = LegacyStreamMapFormatsExtractor.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getGenericSuperclass() == Object.class
+        && type.getInterfaces().length == 1
+        && type.getInterfaces()[0] == OfflineYoutubeTrackFormatExtractor.class
+        && type.getGenericInterfaces().length == 1
+        && type.getGenericInterfaces()[0] == OfflineYoutubeTrackFormatExtractor.class
+        && type.getTypeParameters().length == 0 && !type.isInterface() && !type.isEnum()
+        && !type.isAnnotation() && !type.isSynthetic() && !type.isMemberClass(), "class metadata");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 3 && type.getDeclaredClasses().length == 0,
+        "declared shape");
+
+    Field log = type.getDeclaredField("log");
+    check(log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && log.getType() == Logger.class && log.getGenericType() == Logger.class
+        && !log.isEnumConstant() && !log.isSynthetic(), "logger metadata");
+    Constructor<LegacyStreamMapFormatsExtractor> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getParameterCount() == 0
+        && constructor.getExceptionTypes().length == 0 && constructor.getTypeParameters().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
+
+    Method extract = type.getDeclaredMethod("extract", YoutubeTrackJsonData.class);
+    checkMethod(extract, Modifier.PUBLIC, List.class, YoutubeTrackJsonData.class);
+    checkListType(extract.getGenericReturnType(), "extract return");
+    Method load = type.getDeclaredMethod("loadTrackFormatsFromFormatStreamMap", String.class);
+    checkMethod(load, Modifier.PRIVATE, List.class, String.class);
+    checkListType(load.getGenericReturnType(), "load return");
+    Method quality = type.getDeclaredMethod("qualityToBitrateValue", String.class);
+    checkMethod(quality, Modifier.PRIVATE, long.class, String.class);
+    quality.setAccessible(true);
+    LegacyStreamMapFormatsExtractor extractor = new LegacyStreamMapFormatsExtractor();
+    check(((Long) quality.invoke(extractor, "small")) == -10L
+        && ((Long) quality.invoke(extractor, "medium")) == -5L
+        && ((Long) quality.invoke(extractor, "hd720")) == -4L
+        && ((Long) quality.invoke(extractor, "large")) == -1L
+        && ((Long) quality.invoke(extractor, new Object[] {null})) == -1L,
+        "quality tiers");
+  }
+
+  private static void absentContract() throws Exception {
+    LegacyStreamMapFormatsExtractor extractor = new LegacyStreamMapFormatsExtractor();
+    List<YoutubeTrackFormat> absent = extractor.extract(data(null));
+    check(absent == Collections.<YoutubeTrackFormat>emptyList() && absent.isEmpty(),
+        "shared absent result");
+    expect(UnsupportedOperationException.class, () -> absent.add(null), "absent immutable");
+    expect(NullPointerException.class, () -> extractor.extract(null), "null data");
+    expect(NullPointerException.class,
+        () -> extractor.extract(new YoutubeTrackJsonData(JsonBrowser.NULL_BROWSER, null, null)),
+        "null polymer arguments");
+  }
+
+  private static void mappingContract() throws Exception {
+    String webm = item("https%3A%2F%2Fmedia.example.test%2Faudio%3Fx%3D1%26clen%3D"
+        + "9223372036854775807%26tail%3D2", "audio%2Fwebm%3B+codecs%3D%22opus%22",
+        "small", "%2B%2F%3D", "customSig");
+    String mp4 = item("relative%2Faudio%3Fclen%3D-1%26tail%3D2",
+        "audio%2Fmp4%3B+codecs%3D%22mp4a.40.2%22", "medium", null, null);
+    String hd = item("relative%2Fhd%3Fclen%3D0%26tail%3D2",
+        "audio%2Fwebm%3B+codecs%3D%22opus%22", "hd720", null, null);
+    String unknown = item("relative%2Funknown%3Fclen%3D1%26tail%3D2",
+        "audio%2Fwebm%3B+codecs%3D%22vorbis%22", "large", null, "");
+    LegacyStreamMapFormatsExtractor extractor = new LegacyStreamMapFormatsExtractor();
+    List<YoutubeTrackFormat> formats = extractor.extract(data(webm + "," + mp4 + "," + hd
+        + "," + unknown));
+    check(formats.getClass() == ArrayList.class && formats.size() == 4, "ordered array list");
+    checkFormat(formats.get(0), YoutubeFormatInfo.WEBM_OPUS, "audio/webm", "opus", -10L,
+        Long.MAX_VALUE, "https://media.example.test/audio?x=1&clen=9223372036854775807&tail=2",
+        "+/=", "customSig");
+    checkFormat(formats.get(1), YoutubeFormatInfo.MP4_AAC_LC, "audio/mp4", "mp4a.40.2", -5L,
+        -1L, "relative/audio?clen=-1&tail=2", null, "signature");
+    checkFormat(formats.get(2), YoutubeFormatInfo.WEBM_OPUS, "audio/webm", "opus", -4L,
+        0L, "relative/hd?clen=0&tail=2", null, "signature");
+    checkFormat(formats.get(3), YoutubeFormatInfo.WEBM_VORBIS, "audio/webm", "vorbis", -1L,
+        1L, "relative/unknown?clen=1&tail=2", null, "");
+    formats.add(null);
+    check(formats.size() == 5, "result mutable");
+    List<YoutubeTrackFormat> repeated = extractor.extract(data(webm));
+    check(repeated != formats && repeated.size() == 1 && repeated.get(0) != formats.get(0),
+        "fresh instances");
+  }
+
+  private static void isolationContract() throws Exception {
+    String missingUrl = "type=audio%2Fwebm&quality=small";
+    String missingLength = "url=relative%3Fx%3D1%26tail%3D2&type=audio%2Fwebm&quality=small";
+    String invalidType = "url=relative%3Fclen%3D1%26tail%3D2&quality=small";
+    String invalidLength = "url=relative%3Fclen%3Dnot-long%26tail%3D2"
+        + "&type=audio%2Fwebm%3B+codecs%3D%22opus%22&quality=small";
+    String valid = item("relative%3Fclen%3D7%26tail%3D2",
+        "audio%2Fwebm%3B+codecs%3D%22opus%22", null, null, null);
+    LegacyStreamMapFormatsExtractor extractor = new LegacyStreamMapFormatsExtractor();
+    List<YoutubeTrackFormat> formats = extractor.extract(data(missingUrl + "," + missingLength
+        + "," + invalidType + "," + invalidLength + "," + valid));
+    check(formats.size() == 1 && formats.get(0).getContentLength() == 7L
+        && formats.get(0).getBitrate() == -1L, "skip and isolate failures");
+    List<YoutubeTrackFormat> failed = extractor.extract(data(invalidType + "," + invalidLength));
+    check(failed.getClass() == ArrayList.class && failed.isEmpty(), "all failures swallowed");
+    failed.add(null);
+    List<YoutubeTrackFormat> empty = extractor.extract(data(""));
+    check(empty.getClass() == ArrayList.class && empty.isEmpty(), "present empty mutable");
+  }
+
+  private static String item(
+      String url, String type, String quality, String signature, String signatureKey) {
+    StringBuilder value = new StringBuilder("url=").append(url).append("&type=").append(type);
+    if (quality != null) value.append("&quality=").append(quality);
+    if (signature != null) value.append("&s=").append(signature);
+    if (signatureKey != null) value.append("&sp=").append(signatureKey);
+    return value.toString();
+  }
+
+  private static void checkFormat(YoutubeTrackFormat format, YoutubeFormatInfo info,
+      String mime, String codec, long bitrate, long length, String url, String signature,
+      String signatureKey) {
+    check(format.getInfo() == info && format.getType().getMimeType().equals(mime)
+        && format.getType().getParameter("codecs").equals(codec)
+        && format.getBitrate() == bitrate && format.getContentLength() == length
+        && format.getAudioChannels() == 2L && format.getUrl().toString().equals(url)
+        && format.getNParameter().equals("")
+        && (signature == null ? format.getSignature() == null : format.getSignature().equals(signature))
+        && format.getSignatureKey().equals(signatureKey) && format.isDefaultAudioTrack(),
+        "format mapping " + url);
+  }
+
+  private static YoutubeTrackJsonData data(String streamMap) throws Exception {
+    JsonBrowser arguments = JsonBrowser.newMap();
+    if (streamMap != null) arguments.put("url_encoded_fmt_stream_map", streamMap);
+    return new YoutubeTrackJsonData(JsonBrowser.NULL_BROWSER, arguments, null);
+  }
+
+  private static void checkMethod(
+      Method method, int modifiers, Class<?> returnType, Class<?> parameter) {
+    check(method.getModifiers() == modifiers && method.getReturnType() == returnType
+        && method.getParameterCount() == 1 && method.getParameterTypes()[0] == parameter
+        && method.getGenericParameterTypes()[0] == parameter
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), method.getName() + " metadata");
+  }
+
+  private static void checkListType(java.lang.reflect.Type value, String message) {
+    check(value instanceof ParameterizedType, message + " parameterized");
+    ParameterizedType type = (ParameterizedType) value;
+    check(type.getRawType() == List.class && type.getOwnerType() == null
+        && type.getActualTypeArguments().length == 1
+        && type.getActualTypeArguments()[0] == YoutubeTrackFormat.class, message);
   }
 
   private interface ThrowingSupplier { Object get() throws Exception; }

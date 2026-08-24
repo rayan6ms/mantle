@@ -297,6 +297,8 @@ const LEGACY_ADAPTIVE_FORMATS_EXTRACTOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/format/LegacyAdaptiveFormatsExtractor";
 const LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/format/LegacyDashMpdFormatsExtractor";
+const LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/format/LegacyStreamMapFormatsExtractor";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -422,6 +424,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_TRACK_JSON_DATA_CLASS,
     LEGACY_ADAPTIVE_FORMATS_EXTRACTOR_CLASS,
     LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CLASS,
+    LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -834,6 +837,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | YOUTUBE_SIGNATURE_CIPHER_CLASS
             | YOUTUBE_SIGNATURE_CIPHER_MANAGER_CLASS
             | LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CLASS
+            | LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CLASS
     )
 }
 
@@ -892,6 +896,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | YOUTUBE_TRACK_JSON_DATA_CLASS
             | LEGACY_ADAPTIVE_FORMATS_EXTRACTOR_CLASS
             | LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CLASS
+            | LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CLASS
     )
 }
 
@@ -1266,6 +1271,14 @@ fn replacement_body(
     }
     if class_name == LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CLASS {
         return legacy_dash_mpd_formats_extractor_replacement(
+            pool,
+            name,
+            descriptor,
+            required_locals,
+        );
+    }
+    if class_name == LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CLASS {
+        return legacy_stream_map_formats_extractor_replacement(
             pool,
             name,
             descriptor,
@@ -24313,6 +24326,449 @@ fn legacy_dash_mpd_formats_extractor_class_init(
     pool: &mut ConstantPool<'static>,
 ) -> Result<Attribute> {
     let owner = pool.add_class(LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CLASS)?;
+    let logger_factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        logger_factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn legacy_stream_map_formats_extractor_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        (
+            "extract",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData;)Ljava/util/List;",
+        ) => legacy_stream_map_formats_extractor_extract(pool),
+        ("loadTrackFormatsFromFormatStreamMap", "(Ljava/lang/String;)Ljava/util/List;") => {
+            legacy_stream_map_formats_extractor_load(pool)
+        }
+        ("qualityToBitrateValue", "(Ljava/lang/String;)J") => {
+            legacy_stream_map_formats_extractor_quality(pool)
+        }
+        ("<clinit>", "()V") => legacy_stream_map_formats_extractor_class_init(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn legacy_stream_map_formats_extractor_extract(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CLASS)?;
+    let data = pool.add_class(YOUTUBE_TRACK_JSON_DATA_CLASS)?;
+    let polymer_arguments = pool.add_field_ref(
+        data,
+        "polymerArguments",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let get = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let text = pool.add_method_ref(json, "text", "()Ljava/lang/String;")?;
+    let collections = pool.add_class("java/util/Collections")?;
+    let empty_list = pool.add_method_ref(collections, "emptyList", "()Ljava/util/List;")?;
+    let load = pool.add_method_ref(
+        owner,
+        "loadTrackFormatsFromFormatStreamMap",
+        "(Ljava/lang/String;)Ljava/util/List;",
+    )?;
+    let string = pool.add_class("java/lang/String")?;
+    let stream_map = pool.add_string("url_encoded_fmt_stream_map")?;
+    let mut body = code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Getfield(polymer_arguments),
+            Instruction::Ldc_w(stream_map),
+            Instruction::Invokevirtual(get),
+            Instruction::Invokevirtual(text),
+            Instruction::Astore_2,
+            Instruction::Aload_2,
+            Instruction::Ifnonnull(10),
+            Instruction::Invokestatic(empty_list),
+            Instruction::Areturn,
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(load),
+            Instruction::Areturn,
+        ],
+    )?;
+    let mut previous = None;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![youtube_full_frame(
+            &mut previous,
+            10,
+            vec![
+                VerificationType::Object { cpool_index: owner },
+                VerificationType::Object { cpool_index: data },
+                VerificationType::Object {
+                    cpool_index: string,
+                },
+            ],
+            vec![],
+        )?],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn legacy_stream_map_formats_extractor_load(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CLASS)?;
+    let string = pool.add_class("java/lang/String")?;
+    let string_array = pool.add_class("[Ljava/lang/String;")?;
+    let list = pool.add_class("java/util/List")?;
+    let array_list = pool.add_class("java/util/ArrayList")?;
+    let array_list_init = pool.add_method_ref(array_list, "<init>", "()V")?;
+    let split = pool.add_method_ref(string, "split", "(Ljava/lang/String;)[Ljava/lang/String;")?;
+    let data_format_tools =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/DataFormatTools")?;
+    let decode = pool.add_method_ref(
+        data_format_tools,
+        "decodeUrlEncodedItems",
+        "(Ljava/lang/String;Z)Ljava/util/Map;",
+    )?;
+    let extract_between = pool.add_method_ref(
+        data_format_tools,
+        "extractBetween",
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+    )?;
+    let map = pool.add_class("java/util/Map")?;
+    let get =
+        pool.add_interface_method_ref(map, "get", "(Ljava/lang/Object;)Ljava/lang/Object;")?;
+    let get_or_default = pool.add_interface_method_ref(
+        map,
+        "getOrDefault",
+        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+    )?;
+    let logger = pool.add_class("org/slf4j/Logger")?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let debug_one =
+        pool.add_interface_method_ref(logger, "debug", "(Ljava/lang/String;Ljava/lang/Object;)V")?;
+    let debug_two = pool.add_interface_method_ref(
+        logger,
+        "debug",
+        "(Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;)V",
+    )?;
+    let warn =
+        pool.add_interface_method_ref(logger, "warn", "(Ljava/lang/String;Ljava/lang/Object;)V")?;
+    let content_type = pool.add_class("org/apache/http/entity/ContentType")?;
+    let parse_content_type = pool.add_method_ref(
+        content_type,
+        "parse",
+        "(Ljava/lang/String;)Lorg/apache/http/entity/ContentType;",
+    )?;
+    let quality = pool.add_method_ref(owner, "qualityToBitrateValue", "(Ljava/lang/String;)J")?;
+    let long_class = pool.add_class("java/lang/Long")?;
+    let parse_long = pool.add_method_ref(long_class, "parseLong", "(Ljava/lang/String;)J")?;
+    let track_format = pool.add_class(YOUTUBE_TRACK_FORMAT_CLASS)?;
+    let track_format_init = pool.add_method_ref(
+        track_format,
+        "<init>",
+        "(Lorg/apache/http/entity/ContentType;JJJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V",
+    )?;
+    let add = pool.add_interface_method_ref(list, "add", "(Ljava/lang/Object;)Z")?;
+    let is_empty = pool.add_interface_method_ref(list, "isEmpty", "()Z")?;
+    let runtime = pool.add_class("java/lang/RuntimeException")?;
+    let comma = pool.add_string(",")?;
+    let url_key = pool.add_string("url")?;
+    let clen_start = pool.add_string("clen=")?;
+    let ampersand = pool.add_string("&")?;
+    let missing_length =
+        pool.add_string("Could not find content length from URL {}, skipping format")?;
+    let type_key = pool.add_string("type")?;
+    let quality_key = pool.add_string("quality")?;
+    let empty = pool.add_string("")?;
+    let signature_value = pool.add_string("s")?;
+    let signature_parameter = pool.add_string("sp")?;
+    let default_signature = pool.add_string("signature")?;
+    let parse_failure = pool.add_string("Failed to parse format {}, skipping.")?;
+    let all_failed = pool.add_string(
+        "In adaptive format map {}, all formats either failed to load or were skipped due to missing fields",
+    )?;
+    let two = pool.add_long(2)?;
+
+    let instructions = vec![
+        Instruction::New(array_list),
+        Instruction::Dup,
+        Instruction::Invokespecial(array_list_init),
+        Instruction::Astore_2,
+        Instruction::Iconst_0,
+        Instruction::Istore_3,
+        Instruction::Aload_1,
+        Instruction::Ldc_w(comma),
+        Instruction::Invokevirtual(split),
+        Instruction::Astore(4),
+        Instruction::Aload(4),
+        Instruction::Arraylength,
+        Instruction::Istore(5),
+        Instruction::Iconst_0,
+        Instruction::Istore(6),
+        Instruction::Iload(6),
+        Instruction::Iload(5),
+        Instruction::If_icmpge(89),
+        Instruction::Aload(4),
+        Instruction::Iload(6),
+        Instruction::Aaload,
+        Instruction::Astore(7),
+        Instruction::Aload(7),
+        Instruction::Iconst_0,
+        Instruction::Invokestatic(decode),
+        Instruction::Astore(8),
+        Instruction::Aload(8),
+        Instruction::Ldc_w(url_key),
+        Instruction::Invokeinterface(get, 2),
+        Instruction::Checkcast(string),
+        Instruction::Astore(9),
+        Instruction::Aload(9),
+        Instruction::Ifnonnull(34),
+        Instruction::Goto(87),
+        Instruction::Aload(9),
+        Instruction::Ldc_w(clen_start),
+        Instruction::Ldc_w(ampersand),
+        Instruction::Invokestatic(extract_between),
+        Instruction::Astore(10),
+        Instruction::Aload(10),
+        Instruction::Ifnonnull(46),
+        Instruction::Getstatic(log),
+        Instruction::Ldc_w(missing_length),
+        Instruction::Aload(9),
+        Instruction::Invokeinterface(debug_one, 3),
+        Instruction::Goto(87),
+        Instruction::Aload_2,
+        Instruction::New(track_format),
+        Instruction::Dup,
+        Instruction::Aload(8),
+        Instruction::Ldc_w(type_key),
+        Instruction::Invokeinterface(get, 2),
+        Instruction::Checkcast(string),
+        Instruction::Invokestatic(parse_content_type),
+        Instruction::Aload_0,
+        Instruction::Aload(8),
+        Instruction::Ldc_w(quality_key),
+        Instruction::Invokeinterface(get, 2),
+        Instruction::Checkcast(string),
+        Instruction::Invokevirtual(quality),
+        Instruction::Aload(10),
+        Instruction::Invokestatic(parse_long),
+        Instruction::Ldc2_w(two),
+        Instruction::Aload(9),
+        Instruction::Ldc_w(empty),
+        Instruction::Aload(8),
+        Instruction::Ldc_w(signature_value),
+        Instruction::Invokeinterface(get, 2),
+        Instruction::Checkcast(string),
+        Instruction::Aload(8),
+        Instruction::Ldc_w(signature_parameter),
+        Instruction::Ldc_w(default_signature),
+        Instruction::Invokeinterface(get_or_default, 3),
+        Instruction::Checkcast(string),
+        Instruction::Iconst_1,
+        Instruction::Invokespecial(track_format_init),
+        Instruction::Invokeinterface(add, 2),
+        Instruction::Pop,
+        Instruction::Goto(87),
+        Instruction::Astore(8),
+        Instruction::Iconst_1,
+        Instruction::Istore_3,
+        Instruction::Getstatic(log),
+        Instruction::Ldc_w(parse_failure),
+        Instruction::Aload(7),
+        Instruction::Aload(8),
+        Instruction::Invokeinterface(debug_two, 4),
+        Instruction::Iinc(6, 1),
+        Instruction::Goto(15),
+        Instruction::Aload_2,
+        Instruction::Invokeinterface(is_empty, 1),
+        Instruction::Ifeq(98),
+        Instruction::Iload_3,
+        Instruction::Ifeq(98),
+        Instruction::Getstatic(log),
+        Instruction::Ldc_w(all_failed),
+        Instruction::Aload_1,
+        Instruction::Invokeinterface(warn, 3),
+        Instruction::Aload_2,
+        Instruction::Areturn,
+    ];
+    let mut body = code_with_exceptions(
+        pool,
+        16,
+        11,
+        instructions,
+        vec![
+            ExceptionTableEntry {
+                range_pc: 22..33,
+                handler_pc: 79,
+                catch_type: runtime,
+            },
+            ExceptionTableEntry {
+                range_pc: 34..45,
+                handler_pc: 79,
+                catch_type: runtime,
+            },
+            ExceptionTableEntry {
+                range_pc: 46..78,
+                handler_pc: 79,
+                catch_type: runtime,
+            },
+        ],
+    )?;
+    let loop_locals = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Object {
+            cpool_index: string,
+        },
+        VerificationType::Object { cpool_index: list },
+        VerificationType::Integer,
+        VerificationType::Object {
+            cpool_index: string_array,
+        },
+        VerificationType::Integer,
+        VerificationType::Integer,
+    ];
+    let mut url_locals = loop_locals.clone();
+    url_locals.extend([
+        VerificationType::Object {
+            cpool_index: string,
+        },
+        VerificationType::Object { cpool_index: map },
+        VerificationType::Object {
+            cpool_index: string,
+        },
+    ]);
+    let mut content_locals = url_locals.clone();
+    content_locals.push(VerificationType::Object {
+        cpool_index: string,
+    });
+    let mut handler_locals = loop_locals.clone();
+    handler_locals.push(VerificationType::Object {
+        cpool_index: string,
+    });
+    let completed_locals = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Object {
+            cpool_index: string,
+        },
+        VerificationType::Object { cpool_index: list },
+        VerificationType::Integer,
+    ];
+    let mut previous = None;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            youtube_full_frame(&mut previous, 15, loop_locals.clone(), vec![])?,
+            youtube_full_frame(&mut previous, 34, url_locals, vec![])?,
+            youtube_full_frame(&mut previous, 46, content_locals, vec![])?,
+            youtube_full_frame(
+                &mut previous,
+                79,
+                handler_locals,
+                vec![VerificationType::Object {
+                    cpool_index: runtime,
+                }],
+            )?,
+            youtube_full_frame(&mut previous, 87, loop_locals, vec![])?,
+            youtube_full_frame(&mut previous, 89, completed_locals.clone(), vec![])?,
+            youtube_full_frame(&mut previous, 98, completed_locals, vec![])?,
+        ],
+    )?;
+    Ok(body)
+}
+
+fn legacy_stream_map_formats_extractor_quality(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CLASS)?;
+    let string = pool.add_class("java/lang/String")?;
+    let equals = pool.add_method_ref(string, "equals", "(Ljava/lang/Object;)Z")?;
+    let small = pool.add_string("small")?;
+    let medium = pool.add_string("medium")?;
+    let hd720 = pool.add_string("hd720")?;
+    let negative_ten = pool.add_long(-10)?;
+    let negative_five = pool.add_long(-5)?;
+    let negative_four = pool.add_long(-4)?;
+    let negative_one = pool.add_long(-1)?;
+    let mut body = code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Ldc_w(small),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(equals),
+            Instruction::Ifeq(6),
+            Instruction::Ldc2_w(negative_ten),
+            Instruction::Lreturn,
+            Instruction::Ldc_w(medium),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(equals),
+            Instruction::Ifeq(12),
+            Instruction::Ldc2_w(negative_five),
+            Instruction::Lreturn,
+            Instruction::Ldc_w(hd720),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(equals),
+            Instruction::Ifeq(18),
+            Instruction::Ldc2_w(negative_four),
+            Instruction::Lreturn,
+            Instruction::Ldc2_w(negative_one),
+            Instruction::Lreturn,
+        ],
+    )?;
+    let locals = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Object {
+            cpool_index: string,
+        },
+    ];
+    let mut previous = None;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            youtube_full_frame(&mut previous, 6, locals.clone(), vec![])?,
+            youtube_full_frame(&mut previous, 12, locals.clone(), vec![])?,
+            youtube_full_frame(&mut previous, 18, locals, vec![])?,
+        ],
+    )?;
+    Ok(body)
+}
+
+fn legacy_stream_map_formats_extractor_class_init(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CLASS)?;
     let logger_factory = pool.add_class("org/slf4j/LoggerFactory")?;
     let get_logger = pool.add_method_ref(
         logger_factory,
