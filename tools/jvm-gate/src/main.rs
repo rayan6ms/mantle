@@ -283,6 +283,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-legacy-adaptive-formats-extractor-consumer" => {
             Some(LEGACY_ADAPTIVE_FORMATS_EXTRACTOR_CONSUMER)
         }
+        "write-legacy-dash-mpd-formats-extractor-consumer" => {
+            Some(LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -22754,6 +22757,343 @@ public final class GateLegacyAdaptiveFormatsExtractor {
     check(type.getRawType() == List.class && type.getOwnerType() == null
         && type.getActualTypeArguments().length == 1
         && type.getActualTypeArguments()[0] == YoutubeTrackFormat.class, message);
+  }
+
+  private interface ThrowingSupplier { Object get() throws Exception; }
+
+  private static <T extends Throwable> T expect(
+      Class<T> expected, ThrowingSupplier operation, String message) {
+    try {
+      operation.get();
+      throw new AssertionError("expected " + expected.getName() + ": " + message);
+    } catch (Throwable error) {
+      if (!expected.isInstance(error)) throw new AssertionError(message, error);
+      return expected.cast(error);
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeFormatInfo;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSignatureCipher;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSignatureResolver;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackFormat;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackJsonData;
+import com.sedmelluq.discord.lavaplayer.source.youtube.format.LegacyDashMpdFormatsExtractor;
+import com.sedmelluq.discord.lavaplayer.source.youtube.format.YoutubeTrackFormatExtractor;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import org.apache.http.HttpEntity;
+import org.apache.http.StatusLine;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.protocol.HttpClientContext;
+import org.slf4j.Logger;
+
+public final class GateLegacyDashMpdFormatsExtractor {
+  public static void main(String[] args) throws Exception {
+    reflectionContract();
+    absentContract();
+    dashContract();
+    failureContract();
+    System.out.println("public-concrete-object,youtube-format-extractor,"
+        + "1-private-static-final-log,1-constructor,1-public-method,2-private-helpers;"
+        + "absent=shared-empty,no-io;resolution=argument-identity,http-get;"
+        + "response=status,utf8-xml,closed,suppressed;document=ordered,skip-missing-clen;"
+        + "format=type,longs,fixed-channels,url,empty-n,null-signature,default-key,default-audio;"
+        + "errors=url-context,cause-identity;reflection=exact");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<LegacyDashMpdFormatsExtractor> type = LegacyDashMpdFormatsExtractor.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getGenericSuperclass() == Object.class && type.getInterfaces().length == 1
+        && type.getInterfaces()[0] == YoutubeTrackFormatExtractor.class
+        && type.getGenericInterfaces().length == 1
+        && type.getGenericInterfaces()[0] == YoutubeTrackFormatExtractor.class
+        && type.getTypeParameters().length == 0 && !type.isInterface() && !type.isEnum()
+        && !type.isAnnotation() && !type.isSynthetic() && !type.isMemberClass(), "class metadata");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 3 && type.getDeclaredClasses().length == 0,
+        "declared shape");
+
+    Field log = type.getDeclaredField("log");
+    log.setAccessible(true);
+    check(log.getType() == Logger.class && log.getGenericType() == Logger.class
+        && log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && !log.isSynthetic() && log.get(null) instanceof Logger, "logger metadata");
+    Constructor<LegacyDashMpdFormatsExtractor> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getParameterCount() == 0
+        && constructor.getExceptionTypes().length == 0 && constructor.getTypeParameters().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
+
+    Class<?>[] extractParameters = {
+        YoutubeTrackJsonData.class, HttpInterface.class, YoutubeSignatureResolver.class};
+    Method extract = type.getDeclaredMethod("extract", extractParameters);
+    checkMethod(extract, Modifier.PUBLIC, extractParameters, new Class<?>[0]);
+    checkListType(extract.getGenericReturnType(), "extract return");
+    Class<?>[] loadParameters = {
+        String.class, HttpInterface.class, YoutubeSignatureResolver.class, String.class};
+    Method load = type.getDeclaredMethod("loadTrackFormatsFromDash", loadParameters);
+    checkMethod(load, Modifier.PRIVATE, loadParameters, new Class<?>[] {Exception.class});
+    checkListType(load.getGenericReturnType(), "load return");
+    Method document = type.getDeclaredMethod(
+        "loadTrackFormatsFromDashDocument", org.jsoup.nodes.Document.class);
+    checkMethod(document, Modifier.PRIVATE,
+        new Class<?>[] {org.jsoup.nodes.Document.class}, new Class<?>[0]);
+    checkListType(document.getGenericReturnType(), "document return");
+  }
+
+  private static void absentContract() throws Exception {
+    LegacyDashMpdFormatsExtractor extractor = new LegacyDashMpdFormatsExtractor();
+    List<YoutubeTrackFormat> absent = extractor.extract(data(null, null), null, null);
+    check(absent == Collections.<YoutubeTrackFormat>emptyList() && absent.isEmpty(),
+        "shared absent list");
+    expect(UnsupportedOperationException.class, () -> absent.add(null), "absent immutable");
+  }
+
+  private static void dashContract() throws Exception {
+    String dashUrl = new String("https://manifest.example.test/source.mpd");
+    String playerScript = new String("/player.js");
+    String resolved = "https://manifest.example.test/resolved.mpd";
+    String xml = "<MPD><Period>"
+        + "<AdaptationSet mimeType=\"audio/webm\">"
+        + "<Representation codecs=\"opus\" bandwidth=\"-9223372036854775808\">"
+        + "<BaseURL>https://media.example.test/a/clen/9223372036854775807/end</BaseURL>"
+        + "</Representation>"
+        + "<Representation codecs=\"opus\" bandwidth=\"2\">"
+        + "<BaseURL>https://media.example.test/no-length</BaseURL></Representation>"
+        + "</AdaptationSet>"
+        + "<AdaptationSet mimeType=\"audio/mp4\">"
+        + "<Representation codecs=\"mp4a.40.2\" bandwidth=\"0\">"
+        + "<BaseURL>relative/clen/-1/end</BaseURL></Representation>"
+        + "</AdaptationSet></Period></MPD>";
+    RecordingResponse response = new RecordingResponse(200, xml);
+    RecordingHttp http = new RecordingHttp(response);
+    RecordingResolver resolver = new RecordingResolver(resolved);
+    LegacyDashMpdFormatsExtractor extractor = new LegacyDashMpdFormatsExtractor();
+    List<YoutubeTrackFormat> formats = extractor.extract(
+        data(dashUrl, playerScript), http, resolver);
+
+    check(resolver.calls == 1 && resolver.http == http && resolver.playerScript == playerScript
+        && resolver.dashUrl.equals(dashUrl), "resolver arguments");
+    check(http.executes == 1 && http.request instanceof HttpGet
+        && http.request.getURI().toString().equals(resolved) && response.closes == 1,
+        "resolved request and response closure");
+    check(formats.getClass() == ArrayList.class && formats.size() == 2, "ordered formats");
+    checkFormat(formats.get(0), YoutubeFormatInfo.WEBM_OPUS, "audio/webm", "opus",
+        Long.MIN_VALUE, Long.MAX_VALUE,
+        "https://media.example.test/a/clen/9223372036854775807/end");
+    checkFormat(formats.get(1), YoutubeFormatInfo.MP4_AAC_LC, "audio/mp4", "mp4a.40.2",
+        0L, -1L, "relative/clen/-1/end");
+    formats.add(null);
+    check(formats.size() == 3, "result mutable");
+
+    RecordingResponse emptyResponse = new RecordingResponse(200, "<MPD/>");
+    List<YoutubeTrackFormat> empty = extractor.extract(data(dashUrl, playerScript),
+        new RecordingHttp(emptyResponse), new RecordingResolver(resolved));
+    check(empty.getClass() == ArrayList.class && empty.isEmpty() && emptyResponse.closes == 1,
+        "present empty document mutable");
+  }
+
+  private static void failureContract() throws Exception {
+    String dashUrl = "https://manifest.example.test/failure.mpd";
+    String playerScript = "/failure.js";
+    LegacyDashMpdFormatsExtractor extractor = new LegacyDashMpdFormatsExtractor();
+
+    Exception resolverFailure = new Exception("resolver");
+    RecordingResolver failingResolver = new RecordingResolver("unused");
+    failingResolver.failure = resolverFailure;
+    RuntimeException resolverError = expect(RuntimeException.class,
+        () -> extractor.extract(data(dashUrl, playerScript), null, failingResolver),
+        "resolver failure");
+    checkWrapped(resolverError, dashUrl, resolverFailure);
+
+    IOException executeFailure = new IOException("execute");
+    RecordingHttp failingHttp = new RecordingHttp(null);
+    failingHttp.failure = executeFailure;
+    RuntimeException executeError = expect(RuntimeException.class,
+        () -> extractor.extract(data(dashUrl, playerScript), failingHttp,
+            new RecordingResolver("https://resolved.example/fail.mpd")), "execute failure");
+    checkWrapped(executeError, dashUrl, executeFailure);
+
+    String invalid = "<MPD><AdaptationSet mimeType=\"audio/webm\">"
+        + "<Representation codecs=\"opus\" bandwidth=\"bad\">"
+        + "<BaseURL>x/clen/1/end</BaseURL></Representation></AdaptationSet></MPD>";
+    IOException closeFailure = new IOException("close");
+    RecordingResponse invalidResponse = new RecordingResponse(200, invalid);
+    invalidResponse.closeFailure = closeFailure;
+    RuntimeException invalidError = expect(RuntimeException.class,
+        () -> extractor.extract(data(dashUrl, playerScript), new RecordingHttp(invalidResponse),
+            new RecordingResolver("https://resolved.example/invalid.mpd")), "parse failure");
+    check(invalidError.getMessage().equals("Failed to extract formats from dash url " + dashUrl)
+        && invalidError.getCause() instanceof NumberFormatException
+        && invalidError.getCause().getSuppressed().length == 1
+        && invalidError.getCause().getSuppressed()[0] == closeFailure
+        && invalidResponse.closes == 1, "suppressed close failure");
+
+    RecordingResponse badStatus = new RecordingResponse(404, "<MPD/>");
+    RuntimeException statusError = expect(RuntimeException.class,
+        () -> extractor.extract(data(dashUrl, playerScript), new RecordingHttp(badStatus),
+            new RecordingResolver("https://resolved.example/status.mpd")), "bad status");
+    check(statusError.getMessage().equals("Failed to extract formats from dash url " + dashUrl)
+        && statusError.getCause() != null && badStatus.closes == 1, "status wrapping and close");
+
+    expect(NullPointerException.class, () -> extractor.extract(null, null, null), "null data");
+  }
+
+  private static void checkFormat(YoutubeTrackFormat format, YoutubeFormatInfo info,
+      String mime, String codec, long bitrate, long length, String url) {
+    check(format.getInfo() == info && format.getType().getMimeType().equals(mime)
+        && format.getType().getParameter("codecs").equals(codec)
+        && format.getBitrate() == bitrate && format.getContentLength() == length
+        && format.getAudioChannels() == 2L && format.getUrl().toString().equals(url)
+        && format.getNParameter().equals("") && format.getSignature() == null
+        && format.getSignatureKey().equals("signature") && format.isDefaultAudioTrack(),
+        "format mapping " + mime);
+  }
+
+  private static YoutubeTrackJsonData data(String dashUrl, String playerScript) throws Exception {
+    JsonBrowser arguments = JsonBrowser.newMap();
+    if (dashUrl != null) arguments.put("dashmpd", dashUrl);
+    return new YoutubeTrackJsonData(JsonBrowser.NULL_BROWSER, arguments, playerScript);
+  }
+
+  private static void checkWrapped(RuntimeException error, String dashUrl, Throwable cause) {
+    check(error.getClass() == RuntimeException.class
+        && error.getMessage().equals("Failed to extract formats from dash url " + dashUrl)
+        && error.getCause() == cause, "URL-context wrapper");
+  }
+
+  private static void checkMethod(Method method, int modifiers, Class<?>[] parameters,
+      Class<?>[] exceptions) {
+    check(method.getModifiers() == modifiers && method.getReturnType() == List.class
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getGenericParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.getTypeParameters().length == 0 && !method.isDefault() && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), method.getName() + " metadata");
+  }
+
+  private static void checkListType(java.lang.reflect.Type value, String message) {
+    check(value instanceof ParameterizedType, message + " parameterized");
+    ParameterizedType type = (ParameterizedType) value;
+    check(type.getRawType() == List.class && type.getOwnerType() == null
+        && type.getActualTypeArguments().length == 1
+        && type.getActualTypeArguments()[0] == YoutubeTrackFormat.class, message);
+  }
+
+  private static final class RecordingResolver implements YoutubeSignatureResolver {
+    private final String resolved;
+    private HttpInterface http;
+    private String playerScript;
+    private String dashUrl;
+    private Exception failure;
+    private int calls;
+
+    RecordingResolver(String resolved) { this.resolved = resolved; }
+
+    public String resolveDashUrl(HttpInterface http, String playerScript, String dashUrl)
+        throws Exception {
+      calls++;
+      this.http = http;
+      this.playerScript = playerScript;
+      this.dashUrl = dashUrl;
+      if (failure != null) throw failure;
+      return resolved;
+    }
+
+    public YoutubeSignatureCipher getExtractedScript(HttpInterface http, String script)
+        throws IOException { return null; }
+
+    public URI resolveFormatUrl(HttpInterface http, String script, YoutubeTrackFormat format)
+        throws Exception { return null; }
+  }
+
+  private static final class RecordingHttp extends HttpInterface {
+    private final RecordingResponse response;
+    private HttpUriRequest request;
+    private IOException failure;
+    private int executes;
+
+    RecordingHttp(RecordingResponse response) {
+      super(null, HttpClientContext.create(), false, null);
+      this.response = response;
+    }
+
+    public CloseableHttpResponse execute(HttpUriRequest request) throws IOException {
+      this.request = request;
+      executes++;
+      if (failure != null) throw failure;
+      return response.proxy;
+    }
+  }
+
+  private static final class RecordingResponse {
+    private final CloseableHttpResponse proxy;
+    private final InputStream content;
+    private IOException closeFailure;
+    private int closes;
+
+    RecordingResponse(int status, String payload) {
+      content = new ByteArrayInputStream(payload.getBytes(StandardCharsets.UTF_8));
+      StatusLine statusLine = proxy(StatusLine.class, (method, arguments) ->
+          method.getName().equals("getStatusCode") ? status : defaultValue(method.getReturnType()));
+      HttpEntity entity = proxy(HttpEntity.class, (method, arguments) ->
+          method.getName().equals("getContent") ? content : defaultValue(method.getReturnType()));
+      proxy = proxy(CloseableHttpResponse.class, (method, arguments) -> {
+        if (method.getName().equals("getStatusLine")) return statusLine;
+        if (method.getName().equals("getEntity")) return entity;
+        if (method.getName().equals("close")) {
+          closes++;
+          if (closeFailure != null) throw closeFailure;
+          return null;
+        }
+        return defaultValue(method.getReturnType());
+      });
+    }
+  }
+
+  private interface Invocation { Object invoke(Method method, Object[] arguments) throws Throwable; }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type, Invocation invocation) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type},
+        (instance, method, arguments) -> invocation.invoke(method, arguments));
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
   }
 
   private interface ThrowingSupplier { Object get() throws Exception; }

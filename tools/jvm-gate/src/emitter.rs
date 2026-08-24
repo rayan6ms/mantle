@@ -295,6 +295,8 @@ const YOUTUBE_TRACK_JSON_DATA_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData";
 const LEGACY_ADAPTIVE_FORMATS_EXTRACTOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/format/LegacyAdaptiveFormatsExtractor";
+const LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/format/LegacyDashMpdFormatsExtractor";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -419,6 +421,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_TRACK_FORMAT_CLASS,
     YOUTUBE_TRACK_JSON_DATA_CLASS,
     LEGACY_ADAPTIVE_FORMATS_EXTRACTOR_CLASS,
+    LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -830,6 +833,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | YOUTUBE_SEARCH_PROVIDER_CLASS
             | YOUTUBE_SIGNATURE_CIPHER_CLASS
             | YOUTUBE_SIGNATURE_CIPHER_MANAGER_CLASS
+            | LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CLASS
     )
 }
 
@@ -887,6 +891,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | YOUTUBE_SEARCH_PROVIDER_CLASS
             | YOUTUBE_TRACK_JSON_DATA_CLASS
             | LEGACY_ADAPTIVE_FORMATS_EXTRACTOR_CLASS
+            | LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CLASS
     )
 }
 
@@ -1253,6 +1258,14 @@ fn replacement_body(
     }
     if class_name == LEGACY_ADAPTIVE_FORMATS_EXTRACTOR_CLASS {
         return legacy_adaptive_formats_extractor_replacement(
+            pool,
+            name,
+            descriptor,
+            required_locals,
+        );
+    }
+    if class_name == LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CLASS {
+        return legacy_dash_mpd_formats_extractor_replacement(
             pool,
             name,
             descriptor,
@@ -23750,6 +23763,574 @@ fn legacy_adaptive_formats_extractor_load(pool: &mut ConstantPool<'static>) -> R
         ],
     )?;
     Ok(body)
+}
+
+fn legacy_dash_mpd_formats_extractor_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        (
+            "extract",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData;Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSignatureResolver;)Ljava/util/List;",
+        ) => legacy_dash_mpd_formats_extractor_extract(pool),
+        (
+            "loadTrackFormatsFromDash",
+            "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSignatureResolver;Ljava/lang/String;)Ljava/util/List;",
+        ) => legacy_dash_mpd_formats_extractor_load(pool),
+        ("loadTrackFormatsFromDashDocument", "(Lorg/jsoup/nodes/Document;)Ljava/util/List;") => {
+            legacy_dash_mpd_formats_extractor_load_document(pool)
+        }
+        ("<clinit>", "()V") => legacy_dash_mpd_formats_extractor_class_init(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+fn legacy_dash_mpd_formats_extractor_extract(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CLASS)?;
+    let data = pool.add_class(YOUTUBE_TRACK_JSON_DATA_CLASS)?;
+    let polymer_arguments = pool.add_field_ref(
+        data,
+        "polymerArguments",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let player_script_url = pool.add_field_ref(data, "playerScriptUrl", "Ljava/lang/String;")?;
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let get = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let text = pool.add_method_ref(json, "text", "()Ljava/lang/String;")?;
+    let collections = pool.add_class("java/util/Collections")?;
+    let empty_list = pool.add_method_ref(collections, "emptyList", "()Ljava/util/List;")?;
+    let load = pool.add_method_ref(
+        owner,
+        "loadTrackFormatsFromDash",
+        "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSignatureResolver;Ljava/lang/String;)Ljava/util/List;",
+    )?;
+    let string = pool.add_class("java/lang/String")?;
+    let concat = pool.add_method_ref(string, "concat", "(Ljava/lang/String;)Ljava/lang/String;")?;
+    let exception = pool.add_class("java/lang/Exception")?;
+    let runtime = pool.add_class("java/lang/RuntimeException")?;
+    let runtime_init = pool.add_method_ref(
+        runtime,
+        "<init>",
+        "(Ljava/lang/String;Ljava/lang/Throwable;)V",
+    )?;
+    let dashmpd = pool.add_string("dashmpd")?;
+    let failure = pool.add_string("Failed to extract formats from dash url ")?;
+
+    let instructions = vec![
+        Instruction::Aload_1,
+        Instruction::Getfield(polymer_arguments),
+        Instruction::Ldc_w(dashmpd),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text),
+        Instruction::Astore(4),
+        Instruction::Aload(4),
+        Instruction::Ifnonnull(10),
+        Instruction::Invokestatic(empty_list),
+        Instruction::Areturn,
+        Instruction::Aload_0,
+        Instruction::Aload(4),
+        Instruction::Aload_2,
+        Instruction::Aload_3,
+        Instruction::Aload_1,
+        Instruction::Getfield(player_script_url),
+        Instruction::Invokevirtual(load),
+        Instruction::Areturn,
+        Instruction::Astore(5),
+        Instruction::New(runtime),
+        Instruction::Dup,
+        Instruction::Ldc_w(failure),
+        Instruction::Aload(4),
+        Instruction::Invokevirtual(concat),
+        Instruction::Aload(5),
+        Instruction::Invokespecial(runtime_init),
+        Instruction::Athrow,
+    ];
+    let mut body = code_with_exceptions(
+        pool,
+        5,
+        6,
+        instructions,
+        vec![ExceptionTableEntry {
+            range_pc: 10..17,
+            handler_pc: 18,
+            catch_type: exception,
+        }],
+    )?;
+    let http = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpInterface")?;
+    let resolver = pool.add_class(YOUTUBE_SIGNATURE_RESOLVER_CLASS)?;
+    let mut previous = None;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            youtube_full_frame(
+                &mut previous,
+                10,
+                vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object { cpool_index: data },
+                    VerificationType::Object { cpool_index: http },
+                    VerificationType::Object {
+                        cpool_index: resolver,
+                    },
+                    VerificationType::Object {
+                        cpool_index: string,
+                    },
+                ],
+                vec![],
+            )?,
+            youtube_full_frame(
+                &mut previous,
+                18,
+                vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object { cpool_index: data },
+                    VerificationType::Object { cpool_index: http },
+                    VerificationType::Object {
+                        cpool_index: resolver,
+                    },
+                    VerificationType::Object {
+                        cpool_index: string,
+                    },
+                ],
+                vec![VerificationType::Object {
+                    cpool_index: exception,
+                }],
+            )?,
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn legacy_dash_mpd_formats_extractor_load(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CLASS)?;
+    let string = pool.add_class("java/lang/String")?;
+    let http = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpInterface")?;
+    let resolver = pool.add_class(YOUTUBE_SIGNATURE_RESOLVER_CLASS)?;
+    let resolve = pool.add_interface_method_ref(
+        resolver,
+        "resolveDashUrl",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+    )?;
+    let request = pool.add_class("org/apache/http/client/methods/HttpGet")?;
+    let request_init = pool.add_method_ref(request, "<init>", "(Ljava/lang/String;)V")?;
+    let execute = pool.add_method_ref(
+        http,
+        "execute",
+        "(Lorg/apache/http/client/methods/HttpUriRequest;)Lorg/apache/http/client/methods/CloseableHttpResponse;",
+    )?;
+    let response = pool.add_class("org/apache/http/client/methods/CloseableHttpResponse")?;
+    let get_entity =
+        pool.add_interface_method_ref(response, "getEntity", "()Lorg/apache/http/HttpEntity;")?;
+    let close = pool.add_interface_method_ref(response, "close", "()V")?;
+    let client_tools =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpClientTools")?;
+    let assert_success = pool.add_method_ref(
+        client_tools,
+        "assertSuccessWithContent",
+        "(Lorg/apache/http/HttpResponse;Ljava/lang/String;)V",
+    )?;
+    let entity = pool.add_class("org/apache/http/HttpEntity")?;
+    let get_content =
+        pool.add_interface_method_ref(entity, "getContent", "()Ljava/io/InputStream;")?;
+    let standard_charsets = pool.add_class("java/nio/charset/StandardCharsets")?;
+    let utf8 = pool.add_field_ref(standard_charsets, "UTF_8", "Ljava/nio/charset/Charset;")?;
+    let charset = pool.add_class("java/nio/charset/Charset")?;
+    let charset_name = pool.add_method_ref(charset, "name", "()Ljava/lang/String;")?;
+    let parser = pool.add_class("org/jsoup/parser/Parser")?;
+    let xml_parser = pool.add_method_ref(parser, "xmlParser", "()Lorg/jsoup/parser/Parser;")?;
+    let jsoup = pool.add_class("org/jsoup/Jsoup")?;
+    let parse = pool.add_method_ref(
+        jsoup,
+        "parse",
+        "(Ljava/io/InputStream;Ljava/lang/String;Ljava/lang/String;Lorg/jsoup/parser/Parser;)Lorg/jsoup/nodes/Document;",
+    )?;
+    let document = pool.add_class("org/jsoup/nodes/Document")?;
+    let load_document = pool.add_method_ref(
+        owner,
+        "loadTrackFormatsFromDashDocument",
+        "(Lorg/jsoup/nodes/Document;)Ljava/util/List;",
+    )?;
+    let list = pool.add_class("java/util/List")?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let add_suppressed =
+        pool.add_method_ref(throwable, "addSuppressed", "(Ljava/lang/Throwable;)V")?;
+    let response_description = pool.add_string("track info page response")?;
+    let empty = pool.add_string("")?;
+
+    let instructions = vec![
+        Instruction::Aload_3,
+        Instruction::Aload_2,
+        Instruction::Aload(4),
+        Instruction::Aload_1,
+        Instruction::Invokeinterface(resolve, 4),
+        Instruction::Astore(5),
+        Instruction::Aload_2,
+        Instruction::New(request),
+        Instruction::Dup,
+        Instruction::Aload(5),
+        Instruction::Invokespecial(request_init),
+        Instruction::Invokevirtual(execute),
+        Instruction::Astore(6),
+        Instruction::Aload(6),
+        Instruction::Ldc_w(response_description),
+        Instruction::Invokestatic(assert_success),
+        Instruction::Aload(6),
+        Instruction::Invokeinterface(get_entity, 1),
+        Instruction::Invokeinterface(get_content, 1),
+        Instruction::Getstatic(utf8),
+        Instruction::Invokevirtual(charset_name),
+        Instruction::Ldc_w(empty),
+        Instruction::Invokestatic(xml_parser),
+        Instruction::Invokestatic(parse),
+        Instruction::Astore(7),
+        Instruction::Aload_0,
+        Instruction::Aload(7),
+        Instruction::Invokevirtual(load_document),
+        Instruction::Astore(8),
+        Instruction::Aload(6),
+        Instruction::Ifnull(33),
+        Instruction::Aload(6),
+        Instruction::Invokeinterface(close, 1),
+        Instruction::Aload(8),
+        Instruction::Areturn,
+        Instruction::Astore(7),
+        Instruction::Aload(6),
+        Instruction::Ifnull(45),
+        Instruction::Aload(6),
+        Instruction::Invokeinterface(close, 1),
+        Instruction::Goto(45),
+        Instruction::Astore(8),
+        Instruction::Aload(7),
+        Instruction::Aload(8),
+        Instruction::Invokevirtual(add_suppressed),
+        Instruction::Aload(7),
+        Instruction::Athrow,
+    ];
+    let mut body = code_with_exceptions(
+        pool,
+        4,
+        9,
+        instructions,
+        vec![
+            ExceptionTableEntry {
+                range_pc: 13..29,
+                handler_pc: 35,
+                catch_type: throwable,
+            },
+            ExceptionTableEntry {
+                range_pc: 38..40,
+                handler_pc: 41,
+                catch_type: throwable,
+            },
+        ],
+    )?;
+    let base_locals = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Object {
+            cpool_index: string,
+        },
+        VerificationType::Object { cpool_index: http },
+        VerificationType::Object {
+            cpool_index: resolver,
+        },
+        VerificationType::Object {
+            cpool_index: string,
+        },
+        VerificationType::Object {
+            cpool_index: string,
+        },
+        VerificationType::Object {
+            cpool_index: response,
+        },
+    ];
+    let mut previous = None;
+    let mut normal_locals = base_locals.clone();
+    normal_locals.extend([
+        VerificationType::Object {
+            cpool_index: document,
+        },
+        VerificationType::Object { cpool_index: list },
+    ]);
+    let mut handler_locals = base_locals.clone();
+    handler_locals.push(VerificationType::Object {
+        cpool_index: throwable,
+    });
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            youtube_full_frame(&mut previous, 33, normal_locals, vec![])?,
+            youtube_full_frame(
+                &mut previous,
+                35,
+                base_locals,
+                vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            )?,
+            youtube_full_frame(
+                &mut previous,
+                41,
+                handler_locals.clone(),
+                vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            )?,
+            youtube_full_frame(&mut previous, 45, handler_locals, vec![])?,
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn legacy_dash_mpd_formats_extractor_load_document(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CLASS)?;
+    let document = pool.add_class("org/jsoup/nodes/Document")?;
+    let element = pool.add_class("org/jsoup/nodes/Element")?;
+    let elements = pool.add_class("org/jsoup/select/Elements")?;
+    let iterator = pool.add_class("java/util/Iterator")?;
+    let string = pool.add_class("java/lang/String")?;
+    let list = pool.add_class("java/util/List")?;
+    let array_list = pool.add_class("java/util/ArrayList")?;
+    let array_list_init = pool.add_method_ref(array_list, "<init>", "()V")?;
+    let document_select = pool.add_method_ref(
+        document,
+        "select",
+        "(Ljava/lang/String;)Lorg/jsoup/select/Elements;",
+    )?;
+    let element_select = pool.add_method_ref(
+        element,
+        "select",
+        "(Ljava/lang/String;)Lorg/jsoup/select/Elements;",
+    )?;
+    let elements_iterator = pool.add_method_ref(elements, "iterator", "()Ljava/util/Iterator;")?;
+    let elements_first = pool.add_method_ref(elements, "first", "()Lorg/jsoup/nodes/Element;")?;
+    let has_next = pool.add_interface_method_ref(iterator, "hasNext", "()Z")?;
+    let next = pool.add_interface_method_ref(iterator, "next", "()Ljava/lang/Object;")?;
+    let attr = pool.add_method_ref(element, "attr", "(Ljava/lang/String;)Ljava/lang/String;")?;
+    let element_text = pool.add_method_ref(element, "text", "()Ljava/lang/String;")?;
+    let data_format_tools =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/DataFormatTools")?;
+    let extract_between = pool.add_method_ref(
+        data_format_tools,
+        "extractBetween",
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+    )?;
+    let concat = pool.add_method_ref(string, "concat", "(Ljava/lang/String;)Ljava/lang/String;")?;
+    let logger = pool.add_class("org/slf4j/Logger")?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let debug =
+        pool.add_interface_method_ref(logger, "debug", "(Ljava/lang/String;Ljava/lang/Object;)V")?;
+    let content_type = pool.add_class("org/apache/http/entity/ContentType")?;
+    let parse_content_type = pool.add_method_ref(
+        content_type,
+        "parse",
+        "(Ljava/lang/String;)Lorg/apache/http/entity/ContentType;",
+    )?;
+    let long_class = pool.add_class("java/lang/Long")?;
+    let parse_long = pool.add_method_ref(long_class, "parseLong", "(Ljava/lang/String;)J")?;
+    let track_format = pool.add_class(YOUTUBE_TRACK_FORMAT_CLASS)?;
+    let track_format_init = pool.add_method_ref(
+        track_format,
+        "<init>",
+        "(Lorg/apache/http/entity/ContentType;JJJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V",
+    )?;
+    let add = pool.add_interface_method_ref(list, "add", "(Ljava/lang/Object;)Z")?;
+    let adaptation_set = pool.add_string("AdaptationSet")?;
+    let mime_type = pool.add_string("mimeType")?;
+    let representation = pool.add_string("Representation")?;
+    let base_url = pool.add_string("BaseURL")?;
+    let clen = pool.add_string("/clen/")?;
+    let slash = pool.add_string("/")?;
+    let codecs_prefix = pool.add_string("; codecs=")?;
+    let codecs = pool.add_string("codecs")?;
+    let missing = pool.add_string("Skipping format {} because the content length is missing")?;
+    let bandwidth = pool.add_string("bandwidth")?;
+    let empty = pool.add_string("")?;
+    let signature = pool.add_string("signature")?;
+    let two = pool.add_long(2)?;
+
+    let instructions = vec![
+        Instruction::New(array_list),
+        Instruction::Dup,
+        Instruction::Invokespecial(array_list_init),
+        Instruction::Astore_2,
+        Instruction::Aload_1,
+        Instruction::Ldc_w(adaptation_set),
+        Instruction::Invokevirtual(document_select),
+        Instruction::Invokevirtual(elements_iterator),
+        Instruction::Astore_3,
+        Instruction::Aload_3,
+        Instruction::Invokeinterface(has_next, 1),
+        Instruction::Ifeq(80),
+        Instruction::Aload_3,
+        Instruction::Invokeinterface(next, 1),
+        Instruction::Checkcast(element),
+        Instruction::Astore(4),
+        Instruction::Aload(4),
+        Instruction::Ldc_w(mime_type),
+        Instruction::Invokevirtual(attr),
+        Instruction::Astore(5),
+        Instruction::Aload(4),
+        Instruction::Ldc_w(representation),
+        Instruction::Invokevirtual(element_select),
+        Instruction::Invokevirtual(elements_iterator),
+        Instruction::Astore(6),
+        Instruction::Aload(6),
+        Instruction::Invokeinterface(has_next, 1),
+        Instruction::Ifeq(79),
+        Instruction::Aload(6),
+        Instruction::Invokeinterface(next, 1),
+        Instruction::Checkcast(element),
+        Instruction::Astore(7),
+        Instruction::Aload(7),
+        Instruction::Ldc_w(base_url),
+        Instruction::Invokevirtual(element_select),
+        Instruction::Invokevirtual(elements_first),
+        Instruction::Invokevirtual(element_text),
+        Instruction::Astore(8),
+        Instruction::Aload(8),
+        Instruction::Ldc_w(clen),
+        Instruction::Ldc_w(slash),
+        Instruction::Invokestatic(extract_between),
+        Instruction::Astore(9),
+        Instruction::Aload(5),
+        Instruction::Ldc_w(codecs_prefix),
+        Instruction::Invokevirtual(concat),
+        Instruction::Aload(7),
+        Instruction::Ldc_w(codecs),
+        Instruction::Invokevirtual(attr),
+        Instruction::Invokevirtual(concat),
+        Instruction::Astore(10),
+        Instruction::Aload(9),
+        Instruction::Ifnonnull(58),
+        Instruction::Getstatic(log),
+        Instruction::Ldc_w(missing),
+        Instruction::Aload(10),
+        Instruction::Invokeinterface(debug, 3),
+        Instruction::Goto(25),
+        Instruction::Aload_2,
+        Instruction::New(track_format),
+        Instruction::Dup,
+        Instruction::Aload(10),
+        Instruction::Invokestatic(parse_content_type),
+        Instruction::Aload(7),
+        Instruction::Ldc_w(bandwidth),
+        Instruction::Invokevirtual(attr),
+        Instruction::Invokestatic(parse_long),
+        Instruction::Aload(9),
+        Instruction::Invokestatic(parse_long),
+        Instruction::Ldc2_w(two),
+        Instruction::Aload(8),
+        Instruction::Ldc_w(empty),
+        Instruction::Aconst_null,
+        Instruction::Ldc_w(signature),
+        Instruction::Iconst_1,
+        Instruction::Invokespecial(track_format_init),
+        Instruction::Invokeinterface(add, 2),
+        Instruction::Pop,
+        Instruction::Goto(25),
+        Instruction::Goto(9),
+        Instruction::Aload_2,
+        Instruction::Areturn,
+    ];
+    let mut body = code(pool, 15, 11, instructions)?;
+    let base = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Object {
+            cpool_index: document,
+        },
+        VerificationType::Object { cpool_index: list },
+    ];
+    let mut outer = base.clone();
+    outer.push(VerificationType::Object {
+        cpool_index: iterator,
+    });
+    let mut inner = outer.clone();
+    inner.extend([
+        VerificationType::Object {
+            cpool_index: element,
+        },
+        VerificationType::Object {
+            cpool_index: string,
+        },
+        VerificationType::Object {
+            cpool_index: iterator,
+        },
+    ]);
+    let mut representation_locals = inner.clone();
+    representation_locals.extend([
+        VerificationType::Object {
+            cpool_index: element,
+        },
+        VerificationType::Object {
+            cpool_index: string,
+        },
+        VerificationType::Object {
+            cpool_index: string,
+        },
+        VerificationType::Object {
+            cpool_index: string,
+        },
+    ]);
+    let mut previous = None;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            youtube_full_frame(&mut previous, 9, outer.clone(), vec![])?,
+            youtube_full_frame(&mut previous, 25, inner, vec![])?,
+            youtube_full_frame(&mut previous, 58, representation_locals, vec![])?,
+            youtube_full_frame(&mut previous, 79, outer, vec![])?,
+            youtube_full_frame(&mut previous, 80, base, vec![])?,
+        ],
+    )?;
+    Ok(body)
+}
+
+fn legacy_dash_mpd_formats_extractor_class_init(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CLASS)?;
+    let logger_factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        logger_factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
 }
 
 #[allow(clippy::too_many_lines)]
