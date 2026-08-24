@@ -269,6 +269,8 @@ const YOUTUBE_PAYLOAD_HELPER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubePayloadHelper";
 const YOUTUBE_PERSISTENT_HTTP_STREAM_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubePersistentHttpStream";
+const YOUTUBE_PLAYLIST_LOADER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubePlaylistLoader";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -380,6 +382,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_MPEG_STREAM_AUDIO_TRACK_CLASS,
     YOUTUBE_PAYLOAD_HELPER_CLASS,
     YOUTUBE_PERSISTENT_HTTP_STREAM_CLASS,
+    YOUTUBE_PLAYLIST_LOADER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,

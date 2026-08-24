@@ -258,6 +258,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-youtube-persistent-http-stream-consumer" => {
             Some(YOUTUBE_PERSISTENT_HTTP_STREAM_CONSUMER)
         }
+        "write-youtube-playlist-loader-consumer" => Some(YOUTUBE_PLAYLIST_LOADER_CONSUMER),
         _ => None,
     }
 }
@@ -20534,6 +20535,141 @@ public final class GateYoutubePersistentHttpStream {
     } catch (Throwable error) {
       if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
       return type.cast(error);
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_PLAYLIST_LOADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubePlaylistLoader;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.Type;
+import java.util.Arrays;
+import java.util.function.Function;
+import org.apache.http.client.protocol.HttpClientContext;
+
+public final class GateYoutubePlaylistLoader {
+  public static void main(String[] args) throws Exception {
+    reflectionContract();
+    dispatchContract();
+    System.out.println("public-abstract-interface,0-fields,0-constructors,2-methods;"
+        + "set-page-count=int;load=http,playlist-id,selected-id,generic-track-factory,"
+        + "audio-playlist;identity=arguments,return,nulls,unchecked;factory=lazy;reflection=exact");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<YoutubePlaylistLoader> type = YoutubePlaylistLoader.class;
+    int modifiers = Modifier.PUBLIC | Modifier.INTERFACE | Modifier.ABSTRACT;
+    check(type.getModifiers() == modifiers && type.isInterface() && !type.isAnnotation()
+        && !type.isEnum() && !type.isSynthetic() && !type.isMemberClass(), "type metadata");
+    check(type.getSuperclass() == null && type.getGenericSuperclass() == null
+        && type.getInterfaces().length == 0 && type.getGenericInterfaces().length == 0
+        && type.getTypeParameters().length == 0, "type hierarchy");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 2 && type.getDeclaredClasses().length == 0,
+        "type shape");
+
+    Method setter = type.getDeclaredMethod("setPlaylistPageCount", int.class);
+    check(setter.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && setter.getReturnType() == void.class && setter.getGenericReturnType() == void.class
+        && Arrays.equals(setter.getParameterTypes(), new Class<?>[] {int.class})
+        && Arrays.equals(setter.getGenericParameterTypes(), new Type[] {int.class})
+        && setter.getExceptionTypes().length == 0 && setter.getTypeParameters().length == 0
+        && !setter.isDefault() && !setter.isBridge() && !setter.isSynthetic()
+        && !setter.isVarArgs(), "setter metadata");
+
+    Method load = type.getDeclaredMethod("load", HttpInterface.class, String.class, String.class,
+        Function.class);
+    check(load.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && load.getReturnType() == AudioPlaylist.class
+        && load.getGenericReturnType() == AudioPlaylist.class
+        && Arrays.equals(load.getParameterTypes(), new Class<?>[] {
+            HttpInterface.class, String.class, String.class, Function.class})
+        && load.getExceptionTypes().length == 0 && load.getTypeParameters().length == 0
+        && !load.isDefault() && !load.isBridge() && !load.isSynthetic() && !load.isVarArgs(),
+        "load metadata");
+    Type[] parameters = load.getGenericParameterTypes();
+    check(parameters[0] == HttpInterface.class && parameters[1] == String.class
+        && parameters[2] == String.class && parameters[3] instanceof ParameterizedType,
+        "load generic parameters");
+    ParameterizedType factory = (ParameterizedType) parameters[3];
+    check(factory.getRawType() == Function.class && factory.getOwnerType() == null
+        && Arrays.equals(factory.getActualTypeArguments(),
+            new Type[] {AudioTrackInfo.class, AudioTrack.class}), "factory signature");
+  }
+
+  private static void dispatchContract() {
+    RecordingLoader loader = new RecordingLoader();
+    loader.setPlaylistPageCount(Integer.MIN_VALUE);
+    check(loader.pageCount == Integer.MIN_VALUE && loader.setterCalls == 1,
+        "page count dispatch");
+
+    HttpInterface http = new HttpInterface(null, HttpClientContext.create(), false, null);
+    String playlistId = new String("playlist-id");
+    String selectedId = new String("selected-id");
+    Function<AudioTrackInfo, AudioTrack> factory = info -> {
+      throw new AssertionError("factory invoked");
+    };
+    AudioPlaylist playlist = (AudioPlaylist) Proxy.newProxyInstance(
+        GateYoutubePlaylistLoader.class.getClassLoader(), new Class<?>[] {AudioPlaylist.class},
+        (proxy, method, args) -> { throw new AssertionError("playlist invoked"); });
+
+    loader.result = playlist;
+    check(loader.load(http, playlistId, selectedId, factory) == playlist, "return identity");
+    check(loader.http == http && loader.playlistId == playlistId && loader.selectedId == selectedId
+        && loader.factory == factory && loader.loadCalls == 1, "argument identity");
+
+    loader.result = null;
+    check(loader.load(null, null, null, null) == null && loader.http == null
+        && loader.playlistId == null && loader.selectedId == null && loader.factory == null
+        && loader.loadCalls == 2, "null contract");
+
+    RuntimeException failure = new RuntimeException("unchecked-sentinel");
+    loader.failure = failure;
+    try {
+      loader.load(http, playlistId, selectedId, factory);
+      throw new AssertionError("expected unchecked failure");
+    } catch (RuntimeException error) {
+      check(error == failure && loader.loadCalls == 3, "unchecked identity");
+    }
+  }
+
+  private static final class RecordingLoader implements YoutubePlaylistLoader {
+    int pageCount;
+    int setterCalls;
+    HttpInterface http;
+    String playlistId;
+    String selectedId;
+    Function<AudioTrackInfo, AudioTrack> factory;
+    AudioPlaylist result;
+    RuntimeException failure;
+    int loadCalls;
+
+    @Override public void setPlaylistPageCount(int pageCount) {
+      this.pageCount = pageCount;
+      setterCalls++;
+    }
+
+    @Override public AudioPlaylist load(HttpInterface http, String playlistId, String selectedId,
+                                        Function<AudioTrackInfo, AudioTrack> factory) {
+      this.http = http;
+      this.playlistId = playlistId;
+      this.selectedId = selectedId;
+      this.factory = factory;
+      loadCalls++;
+      if (failure != null) throw failure;
+      return result;
     }
   }
 
