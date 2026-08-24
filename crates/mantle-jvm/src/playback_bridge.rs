@@ -9,20 +9,64 @@ use mantle_audio::{
     PcmOpusEncoder, PcmResampler, ResamplingQuality, VolumeLevel,
 };
 use mantle_media::{
-    HttpRangeOptions, MediaCancellation, MediaInfo, MediaLimits, NicoNicoPlaybackSession,
-    NicoNicoSourceManager, NicoNicoSourceOptions, NicoNicoSourceTrack, SoundCloudAuthentication,
-    SoundCloudPlaybackSession, SoundCloudSourceManager, SoundCloudSourceOptions,
-    TwitchAuthentication, TwitchLivePlaybackOptions, TwitchLivePlaybackPoll,
-    TwitchLivePlaybackSession, TwitchSourceManager, TwitchSourceOptions, TwitchSourceTrack,
-    VimeoAuthentication, VimeoPlaybackSession, VimeoSourceManager, VimeoSourceOptions,
-    VimeoSourceTrack, YandexMusicAuthentication, YandexMusicPlaybackSession,
+    BandcampPlaybackSession, BandcampRoute, BandcampSourceManager, BandcampSourceOptions,
+    BandcampSourceTrack, HttpRangeOptions, MediaCancellation, MediaInfo, MediaLimits,
+    NicoNicoPlaybackSession, NicoNicoSourceManager, NicoNicoSourceOptions, NicoNicoSourceTrack,
+    SoundCloudAuthentication, SoundCloudPlaybackSession, SoundCloudSourceManager,
+    SoundCloudSourceOptions, TwitchAuthentication, TwitchLivePlaybackOptions,
+    TwitchLivePlaybackPoll, TwitchLivePlaybackSession, TwitchSourceManager, TwitchSourceOptions,
+    TwitchSourceTrack, VimeoAuthentication, VimeoPlaybackSession, VimeoSourceManager,
+    VimeoSourceOptions, VimeoSourceTrack, YandexMusicAuthentication, YandexMusicPlaybackSession,
     YandexMusicSourceManager, YandexMusicSourceOptions, YoutubeAudioSourceManager,
     YoutubeAuthentication, YoutubeLivePlaybackOptions, YoutubeLivePlaybackPoll,
     YoutubeLivePlaybackSession, YoutubePlaybackSession, YoutubeSourceOptions,
-    route_twitch_identifier,
+    route_bandcamp_identifier, route_twitch_identifier,
 };
 
 const TRANSCODE_INPUT_CHUNK_FRAMES: usize = 1_024;
+
+pub(crate) fn process_bandcamp_track(
+    env: &mut Env<'_>,
+    track: &JObject<'_>,
+    executor: &JObject<'_>,
+) -> jni::errors::Result<()> {
+    let java_info = env
+        .get_field(
+            track,
+            jni_str!("trackInfo"),
+            jni_sig!("Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;"),
+        )?
+        .l()?;
+    let info = crate::track_info_from_java(env, &java_info)?;
+    let options = BandcampSourceOptions::default();
+    if !matches!(
+        route_bandcamp_identifier(&info.identifier, &options),
+        Some(BandcampRoute::Track(_))
+    ) {
+        return Err(failure("unsupported public Bandcamp track route"));
+    }
+    if executor.is_null() {
+        return Err(failure("native playback requires a local track executor"));
+    }
+    let manager = BandcampSourceManager::new(options)
+        .map_err(|_| failure("could not create current Bandcamp playback source"))?;
+    let source_track = BandcampSourceTrack {
+        info,
+        playback: None,
+    };
+    let cancellation = MediaCancellation::new();
+    let session = manager
+        .open_track_playback(
+            &source_track,
+            HttpRangeOptions::default(),
+            MediaLimits::default(),
+            cancellation.clone(),
+        )
+        .map_err(|_| failure("current Bandcamp playback handoff failed"))?
+        .ok_or_else(|| failure("current Bandcamp track has no compatible playback"))?;
+
+    process_playback_session(env, executor, session, &cancellation)
+}
 
 pub(crate) fn process_nico_track(
     env: &mut Env<'_>,
@@ -628,6 +672,17 @@ fn current_thread_interrupted(env: &mut Env<'_>) -> jni::errors::Result<bool> {
 trait PcmPlaybackSession {
     fn info(&self) -> &MediaInfo;
     fn read_pcm(&mut self, output: &mut PcmFrame) -> jni::errors::Result<bool>;
+}
+
+impl PcmPlaybackSession for BandcampPlaybackSession {
+    fn info(&self) -> &MediaInfo {
+        self.info()
+    }
+
+    fn read_pcm(&mut self, output: &mut PcmFrame) -> jni::errors::Result<bool> {
+        self.read_pcm(output)
+            .map_err(|_| failure("Bandcamp media decoding failed"))
+    }
 }
 
 impl PcmPlaybackSession for NicoNicoPlaybackSession {

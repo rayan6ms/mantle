@@ -117,6 +117,8 @@ const LOCAL_SEEKABLE_INPUT_STREAM_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/local/LocalSeekableInputStream";
 const BANDCAMP_AUDIO_SOURCE_MANAGER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/bandcamp/BandcampAudioSourceManager";
+const BANDCAMP_AUDIO_TRACK_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/bandcamp/BandcampAudioTrack";
 const HEARTBEATING_HTTP_STREAM_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/nico/HeartbeatingHttpStream";
 const NICO_AUDIO_SOURCE_MANAGER_CLASS: &str =
@@ -343,6 +345,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     LOCAL_AUDIO_TRACK_CLASS,
     LOCAL_SEEKABLE_INPUT_STREAM_CLASS,
     BANDCAMP_AUDIO_SOURCE_MANAGER_CLASS,
+    BANDCAMP_AUDIO_TRACK_CLASS,
     HEARTBEATING_HTTP_STREAM_CLASS,
     NICO_AUDIO_SOURCE_MANAGER_CLASS,
     NICO_AUDIO_TRACK_CLASS,
@@ -798,6 +801,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | LOCAL_AUDIO_TRACK_CLASS
             | LOCAL_SEEKABLE_INPUT_STREAM_CLASS
             | BANDCAMP_AUDIO_SOURCE_MANAGER_CLASS
+            | BANDCAMP_AUDIO_TRACK_CLASS
             | HEARTBEATING_HTTP_STREAM_CLASS
             | NICO_AUDIO_SOURCE_MANAGER_CLASS
             | NICO_AUDIO_TRACK_CLASS
@@ -862,6 +866,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
             | NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
             | LOCAL_SEEKABLE_INPUT_STREAM_CLASS
+            | BANDCAMP_AUDIO_TRACK_CLASS
             | HEARTBEATING_HTTP_STREAM_CLASS
             | NICO_AUDIO_SOURCE_MANAGER_CLASS
             | NICO_AUDIO_TRACK_CLASS
@@ -1002,6 +1007,9 @@ fn replacement_body(
     }
     if class_name == BANDCAMP_AUDIO_SOURCE_MANAGER_CLASS {
         return bandcamp_audio_source_manager_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == BANDCAMP_AUDIO_TRACK_CLASS {
+        return bandcamp_audio_track_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == HEARTBEATING_HTTP_STREAM_CLASS {
         return heartbeating_http_stream_replacement(pool, name, descriptor, required_locals);
@@ -3435,6 +3443,154 @@ fn bandcamp_audio_source_manager_clinit(pool: &mut ConstantPool<'static>) -> Res
             Instruction::Ldc_w(regex),
             Instruction::Invokestatic(compile),
             Instruction::Putstatic(field),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn bandcamp_audio_track_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/bandcamp/BandcampAudioSourceManager;)V",
+        ) => bandcamp_audio_track_constructor(pool),
+        (
+            "process",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+        ) => bandcamp_audio_track_process(pool),
+        ("makeShallowClone", "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;") => {
+            bandcamp_audio_track_shallow_clone(pool)
+        }
+        ("getSourceManager", "()Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;") => {
+            object_getter(
+                pool,
+                BANDCAMP_AUDIO_TRACK_CLASS,
+                "sourceManager",
+                "Lcom/sedmelluq/discord/lavaplayer/source/bandcamp/BandcampAudioSourceManager;",
+            )
+        }
+        ("<clinit>", "()V") => bandcamp_audio_track_clinit(pool),
+        (
+            "getTrackMediaUrl",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;)Ljava/lang/String;",
+        ) => unsupported_body(
+            pool,
+            "Legacy direct Bandcamp page parsing is unsupported; use Mantle's bounded native playback path.",
+            required_locals,
+        ),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {BANDCAMP_AUDIO_TRACK_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn bandcamp_audio_track_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let parent = pool.add_class(DELEGATED_AUDIO_TRACK_CLASS)?;
+    let parent_init = pool.add_method_ref(
+        parent,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V",
+    )?;
+    let owner = pool.add_class(BANDCAMP_AUDIO_TRACK_CLASS)?;
+    let source = pool.add_field_ref(
+        owner,
+        "sourceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/source/bandcamp/BandcampAudioSourceManager;",
+    )?;
+    code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(parent_init),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(source),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn bandcamp_audio_track_process(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let native = pool.add_class(NATIVE_CLASS)?;
+    let process = pool.add_method_ref(
+        native,
+        "processBandcampTrack",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/bandcamp/BandcampAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+    )?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokestatic(process),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn bandcamp_audio_track_shallow_clone(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BANDCAMP_AUDIO_TRACK_CLASS)?;
+    let track_info = pool.add_field_ref(
+        owner,
+        "trackInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let source = pool.add_field_ref(
+        owner,
+        "sourceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/source/bandcamp/BandcampAudioSourceManager;",
+    )?;
+    let init = pool.add_method_ref(
+        owner,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/bandcamp/BandcampAudioSourceManager;)V",
+    )?;
+    code(
+        pool,
+        4,
+        1,
+        vec![
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(track_info),
+            Instruction::Aload_0,
+            Instruction::Getfield(source),
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn bandcamp_audio_track_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BANDCAMP_AUDIO_TRACK_CLASS)?;
+    let factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
             Instruction::Return,
         ],
     )
@@ -28748,6 +28904,10 @@ fn native_class(expected_abi: u8) -> Result<ClassFile<'static>> {
         (
             "processNicoTrack",
             "(Lcom/sedmelluq/discord/lavaplayer/source/nico/NicoAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+        ),
+        (
+            "processBandcampTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/bandcamp/BandcampAudioTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
         ),
         (
             "processSoundCloudTrack",
