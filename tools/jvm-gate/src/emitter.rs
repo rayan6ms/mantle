@@ -71,6 +71,8 @@ const AUDIO_FRAME_BUFFER_FACTORY_CLASS: &str =
 const AUDIO_FILTER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilter";
 const AUDIO_POST_PROCESSOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/AudioPostProcessor";
+const BUFFERING_POST_PROCESSOR_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/filter/BufferingPostProcessor";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -357,6 +359,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/player/hook/AudioOutputHookFactory",
     AUDIO_FILTER_CLASS,
     AUDIO_POST_PROCESSOR_CLASS,
+    BUFFERING_POST_PROCESSOR_CLASS,
     AUDIO_FILTER_CHAIN_CLASS,
     AUDIO_PIPELINE_CLASS,
     AUDIO_PIPELINE_FACTORY_CLASS,
@@ -823,6 +826,7 @@ fn retain_private_fields(class_name: &str) -> bool {
         PLAYER_LIFECYCLE_MANAGER_CLASS
             | FUNCTIONAL_RESULT_HANDLER_CLASS
             | AUDIO_PIPELINE_CLASS
+            | BUFFERING_POST_PROCESSOR_CLASS
             | TRACK_MARKER_TRACKER_CLASS
             | BASE_AUDIO_TRACK_CLASS
             | DELEGATED_AUDIO_TRACK_CLASS
@@ -1048,6 +1052,9 @@ fn replacement_body(
     }
     if class_name == AUDIO_PIPELINE_FACTORY_CLASS {
         return audio_pipeline_factory_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == BUFFERING_POST_PROCESSOR_CLASS {
+        return buffering_post_processor_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PROBING_AUDIO_SOURCE_MANAGER_CLASS {
         return probing_audio_source_manager_replacement(pool, name, descriptor, required_locals);
@@ -2104,6 +2111,223 @@ fn audio_pipeline_factory_create_post_processors(
             Instruction::Aastore,
             Instruction::Invokestatic(as_list),
             Instruction::Areturn,
+        ],
+    )
+}
+
+fn buffering_post_processor_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;Lcom/sedmelluq/discord/lavaplayer/format/transcoder/AudioChunkEncoder;)V",
+        ) => buffering_post_processor_constructor(pool),
+        ("process", "(JLjava/nio/ShortBuffer;)V") => buffering_post_processor_process(pool),
+        ("close", "()V") => buffering_post_processor_close(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {BUFFERING_POST_PROCESSOR_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn buffering_post_processor_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BUFFERING_POST_PROCESSOR_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let context = pool.add_class(AUDIO_PROCESSING_CONTEXT_CLASS)?;
+    let encoder_field = pool.add_field_ref(
+        owner,
+        "encoder",
+        "Lcom/sedmelluq/discord/lavaplayer/format/transcoder/AudioChunkEncoder;",
+    )?;
+    let context_field = pool.add_field_ref(
+        owner,
+        "context",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;",
+    )?;
+    let offered_frame = pool.add_field_ref(
+        owner,
+        "offeredFrame",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;",
+    )?;
+    let output_buffer = pool.add_field_ref(owner, "outputBuffer", "Ljava/nio/ByteBuffer;")?;
+    let context_output_format = pool.add_field_ref(
+        context,
+        "outputFormat",
+        "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let mutable = pool.add_class(MUTABLE_FRAME_CLASS)?;
+    let mutable_init = pool.add_method_ref(mutable, "<init>", "()V")?;
+    let set_format = pool.add_method_ref(
+        mutable,
+        "setFormat",
+        "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V",
+    )?;
+    let format = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let maximum_chunk_size = pool.add_method_ref(format, "maximumChunkSize", "()I")?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let allocate_direct =
+        pool.add_method_ref(byte_buffer, "allocateDirect", "(I)Ljava/nio/ByteBuffer;")?;
+    code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(encoder_field),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(context_field),
+            Instruction::Aload_0,
+            Instruction::New(mutable),
+            Instruction::Dup,
+            Instruction::Invokespecial(mutable_init),
+            Instruction::Putfield(offered_frame),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Getfield(context_output_format),
+            Instruction::Invokevirtual(maximum_chunk_size),
+            Instruction::Invokestatic(allocate_direct),
+            Instruction::Putfield(output_buffer),
+            Instruction::Aload_0,
+            Instruction::Getfield(offered_frame),
+            Instruction::Aload_1,
+            Instruction::Getfield(context_output_format),
+            Instruction::Invokevirtual(set_format),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn buffering_post_processor_process(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BUFFERING_POST_PROCESSOR_CLASS)?;
+    let context = pool.add_class(AUDIO_PROCESSING_CONTEXT_CLASS)?;
+    let encoder_field = pool.add_field_ref(
+        owner,
+        "encoder",
+        "Lcom/sedmelluq/discord/lavaplayer/format/transcoder/AudioChunkEncoder;",
+    )?;
+    let context_field = pool.add_field_ref(
+        owner,
+        "context",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;",
+    )?;
+    let offered_frame = pool.add_field_ref(
+        owner,
+        "offeredFrame",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;",
+    )?;
+    let output_buffer = pool.add_field_ref(owner, "outputBuffer", "Ljava/nio/ByteBuffer;")?;
+    let player_options = pool.add_field_ref(
+        context,
+        "playerOptions",
+        "Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerOptions;",
+    )?;
+    let frame_buffer = pool.add_field_ref(
+        context,
+        "frameBuffer",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBuffer;",
+    )?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let clear = pool.add_method_ref(byte_buffer, "clear", "()Ljava/nio/ByteBuffer;")?;
+    let encoder =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/format/transcoder/AudioChunkEncoder")?;
+    let encode = pool.add_interface_method_ref(
+        encoder,
+        "encode",
+        "(Ljava/nio/ShortBuffer;Ljava/nio/ByteBuffer;)V",
+    )?;
+    let mutable = pool.add_class(MUTABLE_FRAME_CLASS)?;
+    let set_timecode = pool.add_method_ref(mutable, "setTimecode", "(J)V")?;
+    let set_volume = pool.add_method_ref(mutable, "setVolume", "(I)V")?;
+    let set_buffer = pool.add_method_ref(mutable, "setBuffer", "(Ljava/nio/ByteBuffer;)V")?;
+    let options = pool.add_class(AUDIO_PLAYER_OPTIONS_CLASS)?;
+    let volume_level = pool.add_field_ref(
+        options,
+        "volumeLevel",
+        "Ljava/util/concurrent/atomic/AtomicInteger;",
+    )?;
+    let atomic_integer = pool.add_class("java/util/concurrent/atomic/AtomicInteger")?;
+    let get_volume = pool.add_method_ref(atomic_integer, "get", "()I")?;
+    let buffer = pool.add_class(AUDIO_FRAME_BUFFER_CLASS)?;
+    let consume = pool.add_interface_method_ref(
+        buffer,
+        "consume",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;)V",
+    )?;
+    code(
+        pool,
+        3,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(output_buffer),
+            Instruction::Invokevirtual(clear),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(encoder_field),
+            Instruction::Aload_3,
+            Instruction::Aload_0,
+            Instruction::Getfield(output_buffer),
+            Instruction::Invokeinterface(encode, 3),
+            Instruction::Aload_0,
+            Instruction::Getfield(offered_frame),
+            Instruction::Lload_1,
+            Instruction::Invokevirtual(set_timecode),
+            Instruction::Aload_0,
+            Instruction::Getfield(offered_frame),
+            Instruction::Aload_0,
+            Instruction::Getfield(context_field),
+            Instruction::Getfield(player_options),
+            Instruction::Getfield(volume_level),
+            Instruction::Invokevirtual(get_volume),
+            Instruction::Invokevirtual(set_volume),
+            Instruction::Aload_0,
+            Instruction::Getfield(offered_frame),
+            Instruction::Aload_0,
+            Instruction::Getfield(output_buffer),
+            Instruction::Invokevirtual(set_buffer),
+            Instruction::Aload_0,
+            Instruction::Getfield(context_field),
+            Instruction::Getfield(frame_buffer),
+            Instruction::Aload_0,
+            Instruction::Getfield(offered_frame),
+            Instruction::Invokeinterface(consume, 2),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn buffering_post_processor_close(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BUFFERING_POST_PROCESSOR_CLASS)?;
+    let encoder_field = pool.add_field_ref(
+        owner,
+        "encoder",
+        "Lcom/sedmelluq/discord/lavaplayer/format/transcoder/AudioChunkEncoder;",
+    )?;
+    let encoder =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/format/transcoder/AudioChunkEncoder")?;
+    let close = pool.add_interface_method_ref(encoder, "close", "()V")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(encoder_field),
+            Instruction::Invokeinterface(close, 1),
+            Instruction::Return,
         ],
     )
 }

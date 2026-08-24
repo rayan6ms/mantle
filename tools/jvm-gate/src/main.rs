@@ -102,6 +102,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-audio-filter-interface-consumer" => Some(AUDIO_FILTER_INTERFACE_CONSUMER),
         "write-audio-post-processor-consumer" => Some(AUDIO_POST_PROCESSOR_CONSUMER),
+        "write-buffering-post-processor-consumer" => Some(BUFFERING_POST_PROCESSOR_CONSUMER),
         "write-audio-filter-chain-consumer" => Some(AUDIO_FILTER_CHAIN_CONSUMER),
         "write-audio-pipeline-consumer" => Some(AUDIO_PIPELINE_CONSUMER),
         "write-audio-pipeline-factory-consumer" => Some(AUDIO_PIPELINE_FACTORY_CONSUMER),
@@ -7390,6 +7391,374 @@ public final class GateAudioPostProcessor {
     }
 
     public void close() { closes++; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const BUFFERING_POST_PROCESSOR_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.AudioPostProcessor;
+import com.sedmelluq.discord.lavaplayer.filter.BufferingPostProcessor;
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkDecoder;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkEncoder;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerOptions;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.nio.ShortBuffer;
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
+
+public final class GateBufferingPostProcessor {
+  public static void main(String[] args) throws Exception {
+    construction();
+    processing();
+    failureOrdering();
+    closing();
+    reflection();
+    System.out.println(
+        "construction=identity,direct,capacity,format,nulls,ordering;"
+        + "process=clear,encode,input-identity,reuse,timecode,volume,format,data,consume;"
+        + "failures=encode,options,frame-buffer,interrupted,prefix,identity;"
+        + "close=repeat,failure,null-encoder;"
+        + "reflection=public-concrete-object,4-private-final-fields,1-interface,1-constructor,2-declared-methods,throws");
+  }
+
+  private static void construction() throws Exception {
+    Fixture fixture = new Fixture(8);
+    BufferingPostProcessor processor =
+        new BufferingPostProcessor(fixture.context, fixture.encoder);
+    check(field(processor, "context") == fixture.context
+        && field(processor, "encoder") == fixture.encoder,
+        "constructor identity");
+    MutableAudioFrame frame = (MutableAudioFrame) field(processor, "offeredFrame");
+    ByteBuffer output = (ByteBuffer) field(processor, "outputBuffer");
+    check(frame != null && frame.getFormat() == fixture.format,
+        "offered frame format identity");
+    check(output.isDirect() && output.capacity() == 8
+        && output.position() == 0 && output.limit() == 8,
+        "direct output allocation");
+    check(fixture.format.maximumCalls == 1, "maximum size queried once");
+
+    new BufferingPostProcessor(fixture.context, null);
+    expect(NullPointerException.class,
+        () -> new BufferingPostProcessor(null, fixture.encoder));
+    RuntimeException sentinel = new RuntimeException("maximum-sentinel");
+    Fixture failing = new Fixture(4);
+    failing.format.maximumFailure = sentinel;
+    expectRuntimeIdentity(sentinel,
+        () -> new BufferingPostProcessor(failing.context, failing.encoder));
+    check(failing.format.maximumCalls == 1 && failing.encoder.calls == 0,
+        "constructor failure ordering");
+  }
+
+  private static void processing() throws Exception {
+    Fixture fixture = new Fixture(8);
+    fixture.options.volumeLevel.set(73);
+    BufferingPostProcessor processor =
+        new BufferingPostProcessor(fixture.context, fixture.encoder);
+    MutableAudioFrame offered = (MutableAudioFrame) field(processor, "offeredFrame");
+    ByteBuffer output = (ByteBuffer) field(processor, "outputBuffer");
+    output.position(5);
+    output.limit(6);
+
+    ShortBuffer first = ShortBuffer.wrap(new short[] { 10, 20, 30, 40 });
+    first.position(1);
+    first.limit(3);
+    processor.process(Long.MIN_VALUE + 19L, first);
+    fixture.options.volumeLevel.set(141);
+    ShortBuffer second = ShortBuffer.wrap(new short[] { 50, 60 });
+    processor.process(Long.MAX_VALUE - 23L, second);
+
+    check(fixture.encoder.calls == 2 && fixture.encoder.firstInput == first
+        && fixture.encoder.lastInput == second, "encoder input identity");
+    check(fixture.encoder.firstPosition == 1 && fixture.encoder.firstLimit == 3,
+        "input buffer state");
+    check(fixture.encoder.firstOutput == output && fixture.encoder.lastOutput == output
+        && fixture.encoder.outputsCleared, "output clear and reuse");
+    check(fixture.frames.calls == 2 && fixture.frames.firstFrame == offered
+        && fixture.frames.lastFrame == offered, "offered frame reuse");
+    check(fixture.frames.timecodes[0] == Long.MIN_VALUE + 19L
+        && fixture.frames.timecodes[1] == Long.MAX_VALUE - 23L,
+        "timecode transport");
+    check(fixture.frames.volumes[0] == 73 && fixture.frames.volumes[1] == 141,
+        "live volume snapshot");
+    check(fixture.frames.formats[0] == fixture.format
+        && fixture.frames.formats[1] == fixture.format, "format identity");
+    check(Arrays.equals(fixture.frames.data[0], new byte[] { 1, 2, 3 })
+        && Arrays.equals(fixture.frames.data[1], new byte[] { 9, 8 }),
+        "encoded data snapshots");
+  }
+
+  private static void failureOrdering() throws Exception {
+    Fixture encode = new Fixture(8);
+    BufferingPostProcessor encodeProcessor =
+        new BufferingPostProcessor(encode.context, encode.encoder);
+    ByteBuffer encodeOutput = (ByteBuffer) field(encodeProcessor, "outputBuffer");
+    encodeOutput.position(4);
+    RuntimeException encodeFailure = new RuntimeException("encode-sentinel");
+    encode.encoder.encodeFailure = encodeFailure;
+    expectRuntimeIdentity(encodeFailure,
+        () -> encodeProcessor.process(41L, ShortBuffer.allocate(1)));
+    MutableAudioFrame encodeFrame =
+        (MutableAudioFrame) field(encodeProcessor, "offeredFrame");
+    check(encode.encoder.outputsCleared && encode.frames.calls == 0
+        && encodeFrame.getTimecode() == 0L, "encode failure prefix");
+
+    Fixture options = new Fixture(8);
+    AudioProcessingContext noOptions = new AudioProcessingContext(
+        options.configuration, options.frames, null, options.format);
+    BufferingPostProcessor optionsProcessor =
+        new BufferingPostProcessor(noOptions, options.encoder);
+    expect(NullPointerException.class,
+        () -> optionsProcessor.process(52L, ShortBuffer.allocate(1)));
+    MutableAudioFrame optionsFrame =
+        (MutableAudioFrame) field(optionsProcessor, "offeredFrame");
+    check(options.encoder.calls == 1 && optionsFrame.getTimecode() == 52L
+        && options.frames.calls == 0, "options failure prefix");
+
+    Fixture destination = new Fixture(8);
+    AudioProcessingContext noDestination = new AudioProcessingContext(
+        destination.configuration, null, destination.options, destination.format);
+    BufferingPostProcessor destinationProcessor =
+        new BufferingPostProcessor(noDestination, destination.encoder);
+    destination.options.volumeLevel.set(88);
+    expect(NullPointerException.class,
+        () -> destinationProcessor.process(63L, ShortBuffer.allocate(1)));
+    MutableAudioFrame destinationFrame =
+        (MutableAudioFrame) field(destinationProcessor, "offeredFrame");
+    check(destinationFrame.getTimecode() == 63L && destinationFrame.getVolume() == 88
+        && Arrays.equals(destinationFrame.getData(), new byte[] { 1, 2, 3 }),
+        "destination failure after complete frame");
+
+    Fixture interrupted = new Fixture(8);
+    InterruptedException sentinel = new InterruptedException("consume-sentinel");
+    interrupted.frames.failure = sentinel;
+    BufferingPostProcessor interruptedProcessor =
+        new BufferingPostProcessor(interrupted.context, interrupted.encoder);
+    expectInterruptedIdentity(sentinel,
+        () -> interruptedProcessor.process(74L, ShortBuffer.allocate(1)));
+    check(interrupted.frames.calls == 1 && interrupted.frames.timecodes[0] == 74L
+        && Arrays.equals(interrupted.frames.data[0], new byte[] { 1, 2, 3 }),
+        "consume interruption prefix");
+  }
+
+  private static void closing() {
+    Fixture fixture = new Fixture(8);
+    BufferingPostProcessor processor =
+        new BufferingPostProcessor(fixture.context, fixture.encoder);
+    processor.close();
+    processor.close();
+    check(fixture.encoder.closes == 2, "repeated close forwarding");
+
+    RuntimeException sentinel = new RuntimeException("close-sentinel");
+    fixture.encoder.closeFailure = sentinel;
+    expectRuntimeIdentity(sentinel, processor::close);
+    check(fixture.encoder.closes == 3, "close failure prefix");
+
+    BufferingPostProcessor noEncoder = new BufferingPostProcessor(fixture.context, null);
+    expect(NullPointerException.class, noEncoder::close);
+  }
+
+  private static void reflection() throws Exception {
+    Class<BufferingPostProcessor> type = BufferingPostProcessor.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers()) && !type.isInterface()
+        && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] { AudioPostProcessor.class }),
+        "class metadata");
+    check(type.getDeclaredFields().length == 4 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 2, "member counts");
+    checkField(type, "context", AudioProcessingContext.class);
+    checkField(type, "encoder", AudioChunkEncoder.class);
+    checkField(type, "offeredFrame", MutableAudioFrame.class);
+    checkField(type, "outputBuffer", ByteBuffer.class);
+
+    Constructor<BufferingPostProcessor> constructor = type.getDeclaredConstructor(
+        AudioProcessingContext.class, AudioChunkEncoder.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    Method process = type.getDeclaredMethod("process", long.class, ShortBuffer.class);
+    check(process.getModifiers() == Modifier.PUBLIC && process.getReturnType() == void.class
+        && Arrays.equals(process.getExceptionTypes(),
+            new Class<?>[] { InterruptedException.class })
+        && !process.isBridge() && !process.isSynthetic() && !process.isVarArgs(),
+        "process metadata");
+    Method close = type.getDeclaredMethod("close");
+    check(close.getModifiers() == Modifier.PUBLIC && close.getReturnType() == void.class
+        && close.getExceptionTypes().length == 0 && !close.isBridge()
+        && !close.isSynthetic() && !close.isVarArgs(), "close metadata");
+  }
+
+  private static void checkField(Class<?> type, String name, Class<?> fieldType)
+      throws Exception {
+    Field field = type.getDeclaredField(name);
+    check(field.getType() == fieldType
+        && field.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL),
+        name + " field metadata");
+  }
+
+  private static Object field(Object target, String name) throws Exception {
+    Field field = BufferingPostProcessor.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
+  }
+
+  private static void expect(Class<? extends Throwable> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
+  }
+
+  private static void expectRuntimeIdentity(RuntimeException expected, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("failure was swallowed");
+    } catch (RuntimeException error) {
+      check(error == expected, "runtime failure identity");
+    } catch (Exception error) {
+      throw new AssertionError("wrong checked exception", error);
+    }
+  }
+
+  private static void expectInterruptedIdentity(
+      InterruptedException expected, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("failure was swallowed");
+    } catch (InterruptedException error) {
+      check(error == expected, "interrupted failure identity");
+    } catch (Exception error) {
+      throw new AssertionError("wrong checked exception", error);
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static final class Fixture {
+    final AudioConfiguration configuration = new AudioConfiguration();
+    final AudioPlayerOptions options = new AudioPlayerOptions();
+    final SnapshotFrameBuffer frames = new SnapshotFrameBuffer();
+    final TestFormat format;
+    final RecordingEncoder encoder = new RecordingEncoder();
+    final AudioProcessingContext context;
+
+    Fixture(int maximumSize) {
+      format = new TestFormat(maximumSize);
+      context = new AudioProcessingContext(configuration, frames, options, format);
+    }
+  }
+
+  private static final class RecordingEncoder implements AudioChunkEncoder {
+    int calls;
+    int closes;
+    int firstPosition;
+    int firstLimit;
+    boolean outputsCleared = true;
+    ShortBuffer firstInput;
+    ShortBuffer lastInput;
+    ByteBuffer firstOutput;
+    ByteBuffer lastOutput;
+    RuntimeException encodeFailure;
+    RuntimeException closeFailure;
+
+    public byte[] encode(ShortBuffer buffer) { return new byte[0]; }
+
+    public void encode(ShortBuffer input, ByteBuffer output) {
+      calls++;
+      if (calls == 1) {
+        firstInput = input;
+        firstOutput = output;
+        firstPosition = input == null ? -1 : input.position();
+        firstLimit = input == null ? -1 : input.limit();
+      }
+      lastInput = input;
+      lastOutput = output;
+      outputsCleared &= output.position() == 0 && output.limit() == output.capacity();
+      if (encodeFailure != null) throw encodeFailure;
+      output.put(calls == 1 ? new byte[] { 1, 2, 3 } : new byte[] { 9, 8 });
+      output.flip();
+    }
+
+    public void close() {
+      closes++;
+      if (closeFailure != null) throw closeFailure;
+    }
+  }
+
+  private static final class SnapshotFrameBuffer implements AudioFrameBuffer {
+    int calls;
+    AudioFrame firstFrame;
+    AudioFrame lastFrame;
+    InterruptedException failure;
+    final long[] timecodes = new long[4];
+    final int[] volumes = new int[4];
+    final AudioDataFormat[] formats = new AudioDataFormat[4];
+    final byte[][] data = new byte[4][];
+
+    public void consume(AudioFrame frame) throws InterruptedException {
+      int index = calls++;
+      if (firstFrame == null) firstFrame = frame;
+      lastFrame = frame;
+      timecodes[index] = frame.getTimecode();
+      volumes[index] = frame.getVolume();
+      formats[index] = frame.getFormat();
+      data[index] = frame.getData();
+      if (failure != null) throw failure;
+    }
+
+    public int getRemainingCapacity() { return 0; }
+    public int getFullCapacity() { return 0; }
+    public void setClearOnInsert() {}
+    public void clear() {}
+    public void rebuild(com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameRebuilder rebuilder) {}
+    public AudioFrame provide() { return null; }
+    public AudioFrame provide(long timeout, TimeUnit unit) { return null; }
+    public boolean provide(MutableAudioFrame targetFrame) { return false; }
+    public boolean provide(MutableAudioFrame targetFrame, long timeout, TimeUnit unit) { return false; }
+    public boolean hasClearOnInsert() { return false; }
+    public boolean hasReceivedFrames() { return calls != 0; }
+    public Long getLastInputTimecode() { return calls == 0 ? null : timecodes[calls - 1]; }
+    public void waitForTermination() {}
+    public void setTerminateOnEmpty() {}
+    public void lockBuffer() {}
+  }
+
+  private static final class TestFormat extends AudioDataFormat {
+    final int maximumSize;
+    int maximumCalls;
+    RuntimeException maximumFailure;
+
+    TestFormat(int maximumSize) {
+      super(2, 48000, 960);
+      this.maximumSize = maximumSize;
+    }
+
+    public String codecName() { return "test"; }
+    public byte[] silenceBytes() { return new byte[0]; }
+    public int expectedChunkSize() { return maximumSize; }
+    public int maximumChunkSize() {
+      maximumCalls++;
+      if (maximumFailure != null) throw maximumFailure;
+      return maximumSize;
+    }
+    public AudioChunkDecoder createDecoder() { return null; }
+    public AudioChunkEncoder createEncoder(AudioConfiguration configuration) { return null; }
   }
 
   private static void check(boolean condition, String message) {
