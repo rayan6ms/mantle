@@ -106,6 +106,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-channel-count-pcm-audio-filter-consumer" => {
             Some(CHANNEL_COUNT_PCM_AUDIO_FILTER_CONSUMER)
         }
+        "write-composite-audio-filter-consumer" => Some(COMPOSITE_AUDIO_FILTER_CONSUMER),
         "write-audio-filter-chain-consumer" => Some(AUDIO_FILTER_CHAIN_CONSUMER),
         "write-audio-pipeline-consumer" => Some(AUDIO_PIPELINE_CONSUMER),
         "write-audio-pipeline-factory-consumer" => Some(AUDIO_PIPELINE_FACTORY_CONSUMER),
@@ -8140,6 +8141,259 @@ public final class GateChannelCountPcmAudioFilter {
     private void fail() throws InterruptedException {
       if (failure != null) throw failure;
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const COMPOSITE_AUDIO_FILTER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.AudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.CompositeAudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.UniversalPcmAudioFilter;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.nio.ShortBuffer;
+import java.util.AbstractList;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+
+public final class GateCompositeAudioFilter {
+  public static void main(String[] args) throws Exception {
+    lifecycle();
+    callbackFailures();
+    boundaryFailures();
+    reflection();
+    System.out.println(
+        "lifecycle=seek,flush,close,order,arguments,get-filters-once;"
+        + "callback-failures=runtime,checked,logged,continue,error-stops;"
+        + "boundaries=null-list,null-filter,iterator,get-filters,identity;"
+        + "reflection=public-abstract-object,1-private-static-final-field,1-interface,1-constructor,4-methods,protected-generic,throws");
+  }
+
+  private static void lifecycle() throws Exception {
+    List<String> events = new ArrayList<>();
+    RecordingFilter first = new RecordingFilter("first", events);
+    RecordingFilter second = new RecordingFilter("second", events);
+    Harness composite = new Harness(Arrays.asList(first, second));
+
+    composite.seekPerformed(Long.MIN_VALUE + 3L, Long.MAX_VALUE - 5L);
+    composite.flush();
+    composite.close();
+    check(events.equals(Arrays.asList(
+        "first.seek", "second.seek", "first.flush", "second.flush",
+        "first.close", "second.close")), "lifecycle order");
+    check(first.requested == Long.MIN_VALUE + 3L && first.provided == Long.MAX_VALUE - 5L
+        && second.requested == Long.MIN_VALUE + 3L && second.provided == Long.MAX_VALUE - 5L,
+        "seek arguments");
+    check(composite.getCalls == 3, "getFilters once per operation");
+  }
+
+  private static void callbackFailures() throws Exception {
+    List<String> events = new ArrayList<>();
+    RecordingFilter first = new RecordingFilter("first", events);
+    RecordingFilter failing = new RecordingFilter("failing", events);
+    RecordingFilter last = new RecordingFilter("last", events);
+    Harness composite = new Harness(Arrays.asList(first, failing, last));
+
+    failing.seekFailure = new RuntimeException("seek-sentinel");
+    composite.seekPerformed(11L, 13L);
+    check(events.equals(Arrays.asList("first.seek", "failing.seek", "last.seek")),
+        "seek runtime failure continuation");
+
+    events.clear();
+    failing.flushFailure = new InterruptedException("flush-sentinel");
+    composite.flush();
+    check(events.equals(Arrays.asList("first.flush", "failing.flush", "last.flush")),
+        "checked interruption swallowed and continued");
+
+    events.clear();
+    failing.closeFailure = new RuntimeException("close-sentinel");
+    composite.close();
+    check(events.equals(Arrays.asList("first.close", "failing.close", "last.close")),
+        "close runtime failure continuation");
+
+    events.clear();
+    failing.seekFailure = null;
+    failing.seekError = new AssertionError("error-sentinel");
+    expectErrorIdentity(failing.seekError, () -> composite.seekPerformed(17L, 19L));
+    check(events.equals(Arrays.asList("first.seek", "failing.seek")),
+        "errors stop fan-out");
+  }
+
+  private static void boundaryFailures() throws Exception {
+    Harness nullList = new Harness(null);
+    expect(NullPointerException.class, () -> nullList.seekPerformed(1L, 2L));
+    check(nullList.getCalls == 1, "null list ordering");
+
+    RuntimeException getFailure = new RuntimeException("get-filters-sentinel");
+    Harness failingGet = new Harness(new ArrayList<>());
+    failingGet.getFailure = getFailure;
+    expectRuntimeIdentity(getFailure, failingGet::close);
+    check(failingGet.getCalls == 1, "getFilters failure ordering");
+
+    RuntimeException iteratorFailure = new RuntimeException("iterator-sentinel");
+    Harness failingIterator = new Harness(new IteratorFailureList(iteratorFailure));
+    expectRuntimeIdentity(iteratorFailure, failingIterator::flush);
+    check(failingIterator.getCalls == 1, "iterator failure ordering");
+
+    List<String> events = new ArrayList<>();
+    RecordingFilter first = new RecordingFilter("first", events);
+    RecordingFilter last = new RecordingFilter("last", events);
+    Harness nullFilter = new Harness(Arrays.asList(first, null, last));
+    expect(NullPointerException.class, nullFilter::close);
+    check(events.equals(Arrays.asList("first.close")), "null filter logging failure");
+
+    Harness one = new Harness(new ArrayList<>());
+    Harness two = new Harness(new ArrayList<>());
+    check(field(one, "log") != null && field(one, "log") == field(two, "log"),
+        "static logger identity");
+  }
+
+  private static void reflection() throws Exception {
+    Class<CompositeAudioFilter> type = CompositeAudioFilter.class;
+    check(Modifier.isPublic(type.getModifiers()) && Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers()) && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] { UniversalPcmAudioFilter.class }),
+        "class metadata");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 4, "member counts");
+    Field log = type.getDeclaredField("log");
+    check(log.getType().getName().equals("org.slf4j.Logger")
+        && log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL),
+        "logger field metadata");
+
+    Constructor<CompositeAudioFilter> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    checkPublic(type, "seekPerformed", new Class<?>[] { long.class, long.class }, false);
+    checkPublic(type, "flush", new Class<?>[0], true);
+    checkPublic(type, "close", new Class<?>[0], false);
+    Method getFilters = type.getDeclaredMethod("getFilters");
+    check(getFilters.getModifiers() == (Modifier.PROTECTED | Modifier.ABSTRACT)
+        && getFilters.getReturnType() == List.class && getFilters.getExceptionTypes().length == 0,
+        "getFilters metadata");
+    ParameterizedType generic = (ParameterizedType) getFilters.getGenericReturnType();
+    check(generic.getRawType() == List.class
+        && Arrays.equals(generic.getActualTypeArguments(), new Object[] { AudioFilter.class }),
+        "getFilters generic return");
+  }
+
+  private static void checkPublic(Class<?> type, String name, Class<?>[] parameters,
+      boolean interrupted) throws Exception {
+    Method method = type.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == void.class
+        && Arrays.equals(method.getExceptionTypes(), interrupted
+            ? new Class<?>[] { InterruptedException.class } : new Class<?>[0])
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs(),
+        name + " metadata");
+  }
+
+  private static Object field(Object target, String name) throws Exception {
+    Field field = CompositeAudioFilter.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
+  }
+
+  private static void expect(Class<? extends Throwable> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
+  }
+
+  private static void expectRuntimeIdentity(RuntimeException expected, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("failure was swallowed");
+    } catch (RuntimeException error) {
+      check(error == expected, "runtime failure identity");
+    } catch (Exception error) {
+      throw new AssertionError("wrong checked exception", error);
+    }
+  }
+
+  private static void expectErrorIdentity(Error expected, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("error was swallowed");
+    } catch (Error error) {
+      check(error == expected, "error identity");
+    } catch (Exception error) {
+      throw new AssertionError("wrong checked exception", error);
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static final class Harness extends CompositeAudioFilter {
+    final List<AudioFilter> filters;
+    int getCalls;
+    RuntimeException getFailure;
+
+    Harness(List<AudioFilter> filters) { this.filters = filters; }
+
+    protected List<AudioFilter> getFilters() {
+      getCalls++;
+      if (getFailure != null) throw getFailure;
+      return filters;
+    }
+
+    public void process(short[] input, int offset, int length) { }
+    public void process(ShortBuffer input) { }
+    public void process(float[][] input, int offset, int length) { }
+    public void process(short[][] input, int offset, int length) { }
+  }
+
+  private static final class RecordingFilter implements AudioFilter {
+    final String name;
+    final List<String> events;
+    long requested;
+    long provided;
+    RuntimeException seekFailure;
+    Error seekError;
+    InterruptedException flushFailure;
+    RuntimeException closeFailure;
+
+    RecordingFilter(String name, List<String> events) {
+      this.name = name;
+      this.events = events;
+    }
+
+    public void seekPerformed(long requested, long provided) {
+      events.add(name + ".seek");
+      this.requested = requested;
+      this.provided = provided;
+      if (seekError != null) throw seekError;
+      if (seekFailure != null) throw seekFailure;
+    }
+
+    public void flush() throws InterruptedException {
+      events.add(name + ".flush");
+      if (flushFailure != null) throw flushFailure;
+    }
+
+    public void close() {
+      events.add(name + ".close");
+      if (closeFailure != null) throw closeFailure;
+    }
+  }
+
+  private static final class IteratorFailureList extends AbstractList<AudioFilter> {
+    final RuntimeException failure;
+    IteratorFailureList(RuntimeException failure) { this.failure = failure; }
+    public AudioFilter get(int index) { throw new AssertionError(); }
+    public int size() { return 0; }
+    public Iterator<AudioFilter> iterator() { throw failure; }
   }
 
   private static void check(boolean condition, String message) {

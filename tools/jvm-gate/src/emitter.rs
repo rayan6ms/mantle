@@ -75,6 +75,8 @@ const BUFFERING_POST_PROCESSOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/BufferingPostProcessor";
 const CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/ChannelCountPcmAudioFilter";
+const COMPOSITE_AUDIO_FILTER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/filter/CompositeAudioFilter";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -363,6 +365,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     AUDIO_POST_PROCESSOR_CLASS,
     BUFFERING_POST_PROCESSOR_CLASS,
     CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS,
+    COMPOSITE_AUDIO_FILTER_CLASS,
     AUDIO_FILTER_CHAIN_CLASS,
     AUDIO_PIPELINE_CLASS,
     AUDIO_PIPELINE_FACTORY_CLASS,
@@ -831,6 +834,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | AUDIO_PIPELINE_CLASS
             | BUFFERING_POST_PROCESSOR_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
+            | COMPOSITE_AUDIO_FILTER_CLASS
             | TRACK_MARKER_TRACKER_CLASS
             | BASE_AUDIO_TRACK_CLASS
             | DELEGATED_AUDIO_TRACK_CLASS
@@ -911,6 +915,7 @@ fn retain_private_methods(class_name: &str) -> bool {
         class_name,
         AUDIO_PIPELINE_FACTORY_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
+            | COMPOSITE_AUDIO_FILTER_CLASS
             | TRACK_INFO_BUILDER_CLASS
             | ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
             | NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
@@ -1063,6 +1068,9 @@ fn replacement_body(
     }
     if class_name == CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS {
         return channel_count_pcm_audio_filter_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == COMPOSITE_AUDIO_FILTER_CLASS {
+        return composite_audio_filter_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PROBING_AUDIO_SOURCE_MANAGER_CLASS {
         return probing_audio_source_manager_replacement(pool, name, descriptor, required_locals);
@@ -2338,6 +2346,222 @@ fn buffering_post_processor_close(pool: &mut ConstantPool<'static>) -> Result<At
             Instruction::Return,
         ],
     )
+}
+
+fn composite_audio_filter_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => composite_audio_filter_constructor(pool),
+        ("seekPerformed", "(JJ)V") => composite_audio_filter_lifecycle(
+            pool,
+            "seekPerformed",
+            "(JJ)V",
+            "Notifying filter {} of seek failed with exception.",
+            true,
+        ),
+        ("flush", "()V") => composite_audio_filter_lifecycle(
+            pool,
+            "flush",
+            "()V",
+            "Flushing filter {} failed with exception.",
+            false,
+        ),
+        ("close", "()V") => composite_audio_filter_lifecycle(
+            pool,
+            "close",
+            "()V",
+            "Closing filter {} failed with exception.",
+            false,
+        ),
+        ("<clinit>", "()V") => composite_audio_filter_static_initializer(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {COMPOSITE_AUDIO_FILTER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn composite_audio_filter_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn composite_audio_filter_static_initializer(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(COMPOSITE_AUDIO_FILTER_CLASS)?;
+    let logger_factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        logger_factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn composite_audio_filter_lifecycle(
+    pool: &mut ConstantPool<'static>,
+    callback_name: &str,
+    callback_descriptor: &str,
+    failure_message: &str,
+    seek: bool,
+) -> Result<Attribute> {
+    let owner = pool.add_class(COMPOSITE_AUDIO_FILTER_CLASS)?;
+    let audio_filter = pool.add_class(AUDIO_FILTER_CLASS)?;
+    let list = pool.add_class("java/util/List")?;
+    let iterator = pool.add_class("java/util/Iterator")?;
+    let exception = pool.add_class("java/lang/Exception")?;
+    let logger = pool.add_class("org/slf4j/Logger")?;
+    let object = pool.add_class("java/lang/Object")?;
+    let get_filters = pool.add_method_ref(owner, "getFilters", "()Ljava/util/List;")?;
+    let list_iterator =
+        pool.add_interface_method_ref(list, "iterator", "()Ljava/util/Iterator;")?;
+    let has_next = pool.add_interface_method_ref(iterator, "hasNext", "()Z")?;
+    let next = pool.add_interface_method_ref(iterator, "next", "()Ljava/lang/Object;")?;
+    let callback =
+        pool.add_interface_method_ref(audio_filter, callback_name, callback_descriptor)?;
+    let get_class = pool.add_method_ref(object, "getClass", "()Ljava/lang/Class;")?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let error = pool.add_interface_method_ref(
+        logger,
+        "error",
+        "(Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;)V",
+    )?;
+    let message = pool.add_string(failure_message)?;
+
+    let iterator_local = if seek { 5 } else { 1 };
+    let filter_local = if seek { 6 } else { 2 };
+    let exception_local = if seek { 7 } else { 3 };
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Invokevirtual(get_filters),
+        Instruction::Invokeinterface(list_iterator, 1),
+        Instruction::Astore(iterator_local),
+    ];
+    let loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload(iterator_local),
+        Instruction::Invokeinterface(has_next, 1),
+        Instruction::Ifeq(0),
+        Instruction::Aload(iterator_local),
+        Instruction::Invokeinterface(next, 1),
+        Instruction::Checkcast(audio_filter),
+        Instruction::Astore(filter_local),
+    ]);
+    let try_start = instructions.len();
+    instructions.push(Instruction::Aload(filter_local));
+    if seek {
+        instructions.extend([Instruction::Lload_1, Instruction::Lload(3)]);
+    }
+    instructions.push(Instruction::Invokeinterface(
+        callback,
+        if seek { 5 } else { 1 },
+    ));
+    let try_end = instructions.len();
+    let skip_handler_index = instructions.len();
+    instructions.push(Instruction::Goto(0));
+    let handler_target = instructions.len();
+    instructions.extend([
+        Instruction::Astore(exception_local),
+        Instruction::Getstatic(log),
+        Instruction::Ldc_w(message),
+        Instruction::Aload(filter_local),
+        Instruction::Invokevirtual(get_class),
+        Instruction::Aload(exception_local),
+        Instruction::Invokeinterface(error, 4),
+    ]);
+    let continue_target = instructions.len();
+    instructions.push(Instruction::Goto(u16::try_from(loop_target)?));
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[loop_target + 2] = Instruction::Ifeq(u16::try_from(return_target)?);
+    instructions[skip_handler_index] = Instruction::Goto(u16::try_from(continue_target)?);
+
+    let mut body = code_with_exceptions(
+        pool,
+        if seek { 5 } else { 4 },
+        if seek { 8 } else { 4 },
+        instructions,
+        vec![ExceptionTableEntry {
+            range_pc: u16::try_from(try_start)?..u16::try_from(try_end)?,
+            handler_pc: u16::try_from(handler_target)?,
+            catch_type: exception,
+        }],
+    )?;
+    let mut base_locals = vec![VerificationType::Object { cpool_index: owner }];
+    if seek {
+        base_locals.extend([VerificationType::Long, VerificationType::Long]);
+    }
+    let mut loop_locals = base_locals.clone();
+    loop_locals.push(VerificationType::Object {
+        cpool_index: iterator,
+    });
+    let mut handler_locals = loop_locals.clone();
+    handler_locals.push(VerificationType::Object {
+        cpool_index: audio_filter,
+    });
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: u16::try_from(loop_target)?,
+                locals: loop_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: u16::try_from(handler_target - loop_target - 1)?,
+                locals: handler_locals,
+                stack: vec![VerificationType::Object {
+                    cpool_index: exception,
+                }],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: u16::try_from(continue_target - handler_target - 1)?,
+                locals: loop_locals,
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: u16::try_from(return_target - continue_target - 1)?,
+                locals: base_locals,
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
 }
 
 fn channel_count_pcm_audio_filter_replacement(
