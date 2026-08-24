@@ -11,15 +11,15 @@ use mantle_core::{
 };
 use mantle_media::{
     BandcampSourceItem, BandcampSourceManager, BandcampSourceOptions, BandcampSourcePlaylist,
-    BandcampSourceTrack, NicoNicoSourceManager, NicoNicoSourceOptions, NicoNicoSourceTrack,
-    TwitchAuthentication, TwitchSourceManager, TwitchSourceOptions, TwitchSourceTrack,
-    VimeoAuthentication, VimeoSourceManager, VimeoSourceOptions, VimeoSourceTrack,
-    YandexMusicAuthentication, YandexMusicPlaylistKind, YandexMusicSourceItem,
-    YandexMusicSourceManager, YandexMusicSourceOptions, YandexMusicSourcePlaylist,
-    YandexMusicSourceTrack, YoutubeAudioSourceManager, YoutubeAuthentication, YoutubeSourceItem,
-    YoutubeSourceOptions, YoutubeSourcePlaylist, YoutubeSourceTrack, route_bandcamp_identifier,
-    route_twitch_identifier, route_vimeo_identifier, route_yandex_music_identifier,
-    route_youtube_identifier,
+    BandcampSourceTrack, BeamSourceManager, BeamSourceOptions, NicoNicoSourceManager,
+    NicoNicoSourceOptions, NicoNicoSourceTrack, TwitchAuthentication, TwitchSourceManager,
+    TwitchSourceOptions, TwitchSourceTrack, VimeoAuthentication, VimeoSourceManager,
+    VimeoSourceOptions, VimeoSourceTrack, YandexMusicAuthentication, YandexMusicPlaylistKind,
+    YandexMusicSourceItem, YandexMusicSourceManager, YandexMusicSourceOptions,
+    YandexMusicSourcePlaylist, YandexMusicSourceTrack, YoutubeAudioSourceManager,
+    YoutubeAuthentication, YoutubeSourceItem, YoutubeSourceOptions, YoutubeSourcePlaylist,
+    YoutubeSourceTrack, route_bandcamp_identifier, route_beam_identifier, route_twitch_identifier,
+    route_vimeo_identifier, route_yandex_music_identifier, route_youtube_identifier,
 };
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -1058,6 +1058,44 @@ pub(crate) fn load_bandcamp_item<'local>(
             create_bandcamp_playlist(env, &playlist, source)
         }
         Some(SourceLoad::Referral(_)) | None => Ok(JObject::null()),
+    }
+}
+
+pub(crate) fn load_beam_item<'local>(
+    env: &mut Env<'local>,
+    _source: &JObject<'local>,
+    reference: &JObject<'local>,
+) -> jni::errors::Result<JObject<'local>> {
+    let reference = source_reference_from_java(env, reference)?;
+    let options = BeamSourceOptions::default();
+    let Some(identifier) = reference.identifier() else {
+        return Ok(JObject::null());
+    };
+    if route_beam_identifier(identifier, &options).is_none() {
+        return Ok(JObject::null());
+    }
+
+    let manager = BeamSourceManager::new(options)
+        .map_err(|_| jni::errors::Error::NullPtr("could not create Beam compatibility source"))?;
+    let item = manager
+        .load(&reference)
+        .map_err(|_| jni::errors::Error::NullPtr("Beam compatibility routing failed"))?;
+    match item {
+        Some(SourceLoad::Referral(_)) => {
+            let reference_class = env.find_class(jni_str!(
+                "com/sedmelluq/discord/lavaplayer/track/AudioReference"
+            ))?;
+            env.get_static_field(
+                &reference_class,
+                jni::strings::JNIString::from("NO_TRACK"),
+                jni_sig!("Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;"),
+            )?
+            .l()
+        }
+        Some(SourceLoad::Item(_)) => Err(jni::errors::Error::NullPtr(
+            "retired Beam source unexpectedly produced an item",
+        )),
+        None => Ok(JObject::null()),
     }
 }
 
