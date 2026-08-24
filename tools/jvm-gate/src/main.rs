@@ -107,6 +107,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
             Some(CHANNEL_COUNT_PCM_AUDIO_FILTER_CONSUMER)
         }
         "write-composite-audio-filter-consumer" => Some(COMPOSITE_AUDIO_FILTER_CONSUMER),
+        "write-filter-chain-builder-consumer" => Some(FILTER_CHAIN_BUILDER_CONSUMER),
         "write-audio-filter-chain-consumer" => Some(AUDIO_FILTER_CHAIN_CONSUMER),
         "write-audio-pipeline-consumer" => Some(AUDIO_PIPELINE_CONSUMER),
         "write-audio-pipeline-factory-consumer" => Some(AUDIO_PIPELINE_FACTORY_CONSUMER),
@@ -8398,6 +8399,283 @@ public final class GateCompositeAudioFilter {
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const FILTER_CHAIN_BUILDER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.AudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.AudioFilterChain;
+import com.sedmelluq.discord.lavaplayer.filter.FilterChainBuilder;
+import com.sedmelluq.discord.lavaplayer.filter.FloatPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.ShortPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.SplitShortPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.UniversalPcmAudioFilter;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+public final class GateFilterChainBuilder {
+  public static void main(String[] args) throws Exception {
+    constructionAndOrder();
+    adapters();
+    build();
+    failures();
+    reflection();
+    System.out.println(
+        "construction=mutable-array-list,append,last,null,empty;"
+        + "adapters=float-identity,universal-identity,split,float,short,precedence,channel-count,zero;"
+        + "build=context,list,input,reuse,null;"
+        + "failures=unsupported,null-head,empty,negative,identity;"
+        + "reflection=public-concrete-object,1-private-final-generic-field,0-interfaces,1-constructor,6-methods,1-private,no-throws");
+  }
+
+  private static void constructionAndOrder() throws Exception {
+    FilterChainBuilder builder = new FilterChainBuilder();
+    List<AudioFilter> filters = filters(builder);
+    check(filters.getClass() == ArrayList.class && filters.isEmpty(), "initial array list");
+    expect(IndexOutOfBoundsException.class, builder::first);
+
+    AudioFilter first = proxy(AudioFilter.class);
+    AudioFilter second = proxy(AudioFilter.class);
+    builder.addFirst(first);
+    builder.addFirst(second);
+    check(filters.size() == 2 && filters.get(0) == first && filters.get(1) == second,
+        "append order");
+    check(builder.first() == second, "last element is first");
+    builder.addFirst(null);
+    check(builder.first() == null && filters.size() == 3, "null accepted");
+  }
+
+  private static void adapters() throws Exception {
+    FloatPcmAudioFilter floatFilter = proxy(FloatPcmAudioFilter.class);
+    FilterChainBuilder floatIdentity = builder(floatFilter);
+    check(floatIdentity.makeFirstFloat(-7) == floatFilter, "float identity");
+    check(filters(floatIdentity).size() == 1, "float identity no append");
+
+    UniversalPcmAudioFilter universal = proxy(UniversalPcmAudioFilter.class);
+    FilterChainBuilder universalIdentity = builder(universal);
+    check(universalIdentity.makeFirstUniversal(-11) == universal, "universal identity");
+    check(universalIdentity.makeFirstFloat(-13) == universal, "universal float identity");
+    check(filters(universalIdentity).size() == 1, "universal identity no append");
+
+    SplitShortPcmAudioFilter split = proxy(SplitShortPcmAudioFilter.class);
+    assertAdapter(builder(split), split, 2, "ToSplitShortAudioFilter");
+    assertAdapter(builder(floatFilter), floatFilter, 3, "ToFloatAudioFilter");
+    ShortPcmAudioFilter shortFilter = proxy(ShortPcmAudioFilter.class);
+    assertAdapter(builder(shortFilter), shortFilter, 4, "ToShortAudioFilter");
+
+    AudioFilter splitAndFloat = proxy(SplitShortPcmAudioFilter.class, FloatPcmAudioFilter.class);
+    assertAdapter(builder(splitAndFloat), splitAndFloat, 5, "ToSplitShortAudioFilter");
+
+    FilterChainBuilder zero = builder(shortFilter);
+    UniversalPcmAudioFilter zeroAdapter = zero.makeFirstUniversal(0);
+    check((int) field(zeroAdapter, "channelCount") == 0, "zero channels retained");
+    check(((short[]) field(zeroAdapter, "outputBuffer")).length == 0, "zero allocation");
+  }
+
+  private static void assertAdapter(FilterChainBuilder builder, AudioFilter downstream,
+      int channels, String simpleName) throws Exception {
+    List<AudioFilter> filters = filters(builder);
+    UniversalPcmAudioFilter adapter = builder.makeFirstUniversal(channels);
+    check(adapter.getClass().getSimpleName().equals(simpleName), simpleName + " class");
+    check(field(adapter, "downstream") == downstream, simpleName + " downstream");
+    check((int) field(adapter, "channelCount") == channels, simpleName + " channels");
+    check(filters.size() == 2 && filters.get(0) == downstream && filters.get(1) == adapter,
+        simpleName + " append");
+    check(builder.first() == adapter, simpleName + " first");
+  }
+
+  private static void build() throws Exception {
+    ShortPcmAudioFilter downstream = proxy(ShortPcmAudioFilter.class);
+    FilterChainBuilder builder = builder(downstream);
+    List<AudioFilter> filters = filters(builder);
+    Object context = new Object();
+    AudioFilterChain chain = builder.build(context, 2);
+    check(chain.input == builder.first(), "build input");
+    check(chain.filters == filters, "build list identity");
+    check(chain.context == context, "build context identity");
+    check(filters.size() == 2, "build adapter append");
+
+    AudioFilterChain repeated = builder.build(null, -1);
+    check(repeated.input == chain.input && repeated.filters == filters, "build reuse");
+    check(repeated.context == null && filters.size() == 2, "null context");
+
+    UniversalPcmAudioFilter universal = proxy(UniversalPcmAudioFilter.class);
+    FilterChainBuilder direct = builder(universal);
+    AudioFilterChain directChain = direct.build(context, -3);
+    check(directChain.input == universal && filters(direct).size() == 1,
+        "universal build bypasses channels");
+  }
+
+  private static void failures() throws Exception {
+    FilterChainBuilder unsupported = builder(proxy(AudioFilter.class));
+    RuntimeException unsupportedFailure = expect(RuntimeException.class,
+        () -> unsupported.makeFirstUniversal(2));
+    check("Filter must implement at least one data type.".equals(unsupportedFailure.getMessage()),
+        "unsupported message");
+    check(filters(unsupported).size() == 1, "unsupported transactional");
+
+    FilterChainBuilder nullHead = new FilterChainBuilder();
+    nullHead.addFirst(null);
+    RuntimeException nullFailure = expect(RuntimeException.class,
+        () -> nullHead.makeFirstFloat(2));
+    check("Filter must implement at least one data type.".equals(nullFailure.getMessage()),
+        "null head message");
+    check(filters(nullHead).size() == 1, "null head transactional");
+
+    FilterChainBuilder empty = new FilterChainBuilder();
+    expect(IndexOutOfBoundsException.class, () -> empty.makeFirstUniversal(2));
+    expect(IndexOutOfBoundsException.class, () -> empty.build(new Object(), 2));
+
+    FilterChainBuilder negative = builder(proxy(SplitShortPcmAudioFilter.class));
+    expect(NegativeArraySizeException.class, () -> negative.makeFirstUniversal(-1));
+    check(filters(negative).size() == 1, "negative transactional");
+
+    RuntimeException addFailure = new RuntimeException("add-sentinel");
+    FilterChainBuilder failingAdd = new FilterChainBuilder();
+    replaceFilters(failingAdd, new ThrowingList(addFailure));
+    expectRuntimeIdentity(addFailure, () -> failingAdd.addFirst(proxy(AudioFilter.class)));
+
+    RuntimeException sizeFailure = new RuntimeException("size-sentinel");
+    FilterChainBuilder failingFirst = new FilterChainBuilder();
+    replaceFilters(failingFirst, new ThrowingList(sizeFailure));
+    expectRuntimeIdentity(sizeFailure, failingFirst::first);
+  }
+
+  private static void reflection() throws Exception {
+    Class<FilterChainBuilder> type = FilterChainBuilder.class;
+    int modifiers = type.getModifiers();
+    check(Modifier.isPublic(modifiers) && !Modifier.isAbstract(modifiers)
+        && !Modifier.isFinal(modifiers) && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0, "class shape");
+
+    Field[] fields = type.getDeclaredFields();
+    check(fields.length == 1, "field count");
+    Field filters = type.getDeclaredField("filters");
+    check(Modifier.isPrivate(filters.getModifiers()) && Modifier.isFinal(filters.getModifiers())
+        && !Modifier.isStatic(filters.getModifiers()) && filters.getType() == List.class,
+        "field shape");
+    ParameterizedType generic = (ParameterizedType) filters.getGenericType();
+    check(generic.getRawType() == List.class
+        && Arrays.equals(generic.getActualTypeArguments(), new Object[] { AudioFilter.class }),
+        "field generic");
+
+    Constructor<FilterChainBuilder> constructor = type.getDeclaredConstructor();
+    check(type.getDeclaredConstructors().length == 1 && Modifier.isPublic(constructor.getModifiers())
+        && constructor.getExceptionTypes().length == 0, "constructor shape");
+    Method[] methods = type.getDeclaredMethods();
+    check(methods.length == 6, "method count");
+    checkMethod(type, "addFirst", void.class, true, AudioFilter.class);
+    checkMethod(type, "first", AudioFilter.class, true);
+    checkMethod(type, "makeFirstFloat", FloatPcmAudioFilter.class, true, int.class);
+    checkMethod(type, "makeFirstUniversal", UniversalPcmAudioFilter.class, true, int.class);
+    checkMethod(type, "build", AudioFilterChain.class, true, Object.class, int.class);
+    checkMethod(type, "prependUniversalFilter", UniversalPcmAudioFilter.class, false,
+        AudioFilter.class, int.class);
+    check(Arrays.stream(methods).filter(method -> Modifier.isPrivate(method.getModifiers())).count()
+        == 1, "one private method");
+    check(Arrays.stream(methods).allMatch(method -> method.getExceptionTypes().length == 0),
+        "no declared exceptions");
+  }
+
+  private static void checkMethod(Class<?> type, String name, Class<?> returnType,
+      boolean isPublic, Class<?>... parameters) throws Exception {
+    Method method = type.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && Modifier.isPublic(method.getModifiers()) == isPublic
+        && Modifier.isPrivate(method.getModifiers()) != isPublic
+        && !Modifier.isStatic(method.getModifiers()) && !Modifier.isFinal(method.getModifiers()),
+        name + " shape");
+  }
+
+  private static FilterChainBuilder builder(AudioFilter filter) {
+    FilterChainBuilder builder = new FilterChainBuilder();
+    builder.addFirst(filter);
+    return builder;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T extends AudioFilter> T proxy(Class<?>... interfaces) {
+    return (T) Proxy.newProxyInstance(GateFilterChainBuilder.class.getClassLoader(), interfaces,
+        (instance, method, arguments) -> {
+          if (method.getName().equals("toString")) {
+            return "filter-proxy";
+          }
+          return null;
+        });
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<AudioFilter> filters(FilterChainBuilder builder) throws Exception {
+    Field field = FilterChainBuilder.class.getDeclaredField("filters");
+    field.setAccessible(true);
+    return (List<AudioFilter>) field.get(builder);
+  }
+
+  private static void replaceFilters(FilterChainBuilder builder, List<AudioFilter> filters)
+      throws Exception {
+    Field field = FilterChainBuilder.class.getDeclaredField("filters");
+    field.setAccessible(true);
+    field.set(builder, filters);
+  }
+
+  private static Object field(Object target, String name) throws Exception {
+    Field field = target.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, ThrowingRunnable action)
+      throws Exception {
+    try {
+      action.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable failure) {
+      if (!type.isInstance(failure)) {
+        throw new AssertionError("wrong failure " + failure, failure);
+      }
+      return type.cast(failure);
+    }
+  }
+
+  private static void expectRuntimeIdentity(RuntimeException expected, ThrowingRunnable action)
+      throws Exception {
+    RuntimeException actual = expect(RuntimeException.class, action);
+    check(actual == expected, "runtime identity");
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) {
+      throw new AssertionError(message);
+    }
+  }
+
+  private interface ThrowingRunnable {
+    void run() throws Exception;
+  }
+
+  private static final class ThrowingList extends ArrayList<AudioFilter> {
+    private final RuntimeException failure;
+
+    private ThrowingList(RuntimeException failure) {
+      this.failure = failure;
+    }
+
+    @Override
+    public boolean add(AudioFilter filter) {
+      throw failure;
+    }
+
+    @Override
+    public int size() {
+      throw failure;
+    }
   }
 }
 "#;

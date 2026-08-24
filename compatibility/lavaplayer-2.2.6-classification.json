@@ -7961,63 +7961,70 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted public concrete Object shell retains one private final List<AudioFilter> field, one public constructor, five public methods, one private adapter method, and exact generic and reflection shape.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.FilterChainBuilder",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public constructor creates exactly one empty mutable ArrayList-backed filter list; the differential oracle proves concrete type, initial state, and per-instance identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.FilterChainBuilder",
       "symbol_kind": "METHOD",
       "member_name": "addFirst",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/filter/AudioFilter;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage proves append ordering, identity and null preservation, and direct propagation of backing-list add failures.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.FilterChainBuilder",
       "symbol_kind": "METHOD",
       "member_name": "first",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/filter/AudioFilter;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage proves that first returns the most recently appended element, preserves null, fails on an empty list, and propagates backing-list failures unchanged.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.FilterChainBuilder",
       "symbol_kind": "METHOD",
       "member_name": "makeFirstFloat",
       "descriptor": "(I)Lcom/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage proves compatible-head identity and channel-validation bypass, otherwise exact converter selection, append ordering, channel propagation, transactional failures, and empty/null/unsupported behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.FilterChainBuilder",
       "symbol_kind": "METHOD",
       "member_name": "makeFirstUniversal",
       "descriptor": "(I)Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage proves universal-head identity, SplitShort-before-Float-before-Short converter precedence, exact downstream and channel capture, zero-channel construction, and negative-channel failure ordering.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.FilterChainBuilder",
       "symbol_kind": "METHOD",
       "member_name": "build",
       "descriptor": "(Ljava/lang/Object;I)Lcom/sedmelluq/discord/lavaplayer/filter/AudioFilterChain;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage proves adapter insertion when required and exact AudioFilterChain input, mutable backing-list, context, null, repeated-build, and compatible-head identity contracts.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.FinalPcmAudioFilter",

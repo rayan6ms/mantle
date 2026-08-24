@@ -77,6 +77,8 @@ const CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/ChannelCountPcmAudioFilter";
 const COMPOSITE_AUDIO_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/CompositeAudioFilter";
+const FILTER_CHAIN_BUILDER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/filter/FilterChainBuilder";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -366,6 +368,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     BUFFERING_POST_PROCESSOR_CLASS,
     CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS,
     COMPOSITE_AUDIO_FILTER_CLASS,
+    FILTER_CHAIN_BUILDER_CLASS,
     AUDIO_FILTER_CHAIN_CLASS,
     AUDIO_PIPELINE_CLASS,
     AUDIO_PIPELINE_FACTORY_CLASS,
@@ -835,6 +838,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | BUFFERING_POST_PROCESSOR_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
+            | FILTER_CHAIN_BUILDER_CLASS
             | TRACK_MARKER_TRACKER_CLASS
             | BASE_AUDIO_TRACK_CLASS
             | DELEGATED_AUDIO_TRACK_CLASS
@@ -916,6 +920,7 @@ fn retain_private_methods(class_name: &str) -> bool {
         AUDIO_PIPELINE_FACTORY_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
+            | FILTER_CHAIN_BUILDER_CLASS
             | TRACK_INFO_BUILDER_CLASS
             | ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
             | NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
@@ -1071,6 +1076,9 @@ fn replacement_body(
     }
     if class_name == COMPOSITE_AUDIO_FILTER_CLASS {
         return composite_audio_filter_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == FILTER_CHAIN_BUILDER_CLASS {
+        return filter_chain_builder_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PROBING_AUDIO_SOURCE_MANAGER_CLASS {
         return probing_audio_source_manager_replacement(pool, name, descriptor, required_locals);
@@ -2558,6 +2566,331 @@ fn composite_audio_filter_lifecycle(
                 offset_delta: u16::try_from(return_target - continue_target - 1)?,
                 locals: base_locals,
                 stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn filter_chain_builder_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => filter_chain_builder_constructor(pool),
+        ("addFirst", "(Lcom/sedmelluq/discord/lavaplayer/filter/AudioFilter;)V") => {
+            filter_chain_builder_add_first(pool)
+        }
+        ("first", "()Lcom/sedmelluq/discord/lavaplayer/filter/AudioFilter;") => {
+            filter_chain_builder_first(pool)
+        }
+        ("makeFirstFloat", "(I)Lcom/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter;") => {
+            filter_chain_builder_make_first(pool, true)
+        }
+        (
+            "makeFirstUniversal",
+            "(I)Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;",
+        ) => filter_chain_builder_make_first(pool, false),
+        (
+            "build",
+            "(Ljava/lang/Object;I)Lcom/sedmelluq/discord/lavaplayer/filter/AudioFilterChain;",
+        ) => filter_chain_builder_build(pool),
+        (
+            "prependUniversalFilter",
+            "(Lcom/sedmelluq/discord/lavaplayer/filter/AudioFilter;I)Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;",
+        ) => filter_chain_builder_prepend_universal(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {FILTER_CHAIN_BUILDER_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn filter_chain_builder_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FILTER_CHAIN_BUILDER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let array_list = pool.add_class("java/util/ArrayList")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let array_list_init = pool.add_method_ref(array_list, "<init>", "()V")?;
+    let filters = pool.add_field_ref(owner, "filters", "Ljava/util/List;")?;
+    code(
+        pool,
+        3,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::New(array_list),
+            Instruction::Dup,
+            Instruction::Invokespecial(array_list_init),
+            Instruction::Putfield(filters),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn filter_chain_builder_add_first(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FILTER_CHAIN_BUILDER_CLASS)?;
+    let list = pool.add_class("java/util/List")?;
+    let filters = pool.add_field_ref(owner, "filters", "Ljava/util/List;")?;
+    let add = pool.add_interface_method_ref(list, "add", "(Ljava/lang/Object;)Z")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(filters),
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(add, 2),
+            Instruction::Pop,
+            Instruction::Return,
+        ],
+    )
+}
+
+fn filter_chain_builder_first(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FILTER_CHAIN_BUILDER_CLASS)?;
+    let audio_filter = pool.add_class(AUDIO_FILTER_CLASS)?;
+    let list = pool.add_class("java/util/List")?;
+    let filters = pool.add_field_ref(owner, "filters", "Ljava/util/List;")?;
+    let size = pool.add_interface_method_ref(list, "size", "()I")?;
+    let get = pool.add_interface_method_ref(list, "get", "(I)Ljava/lang/Object;")?;
+    code(
+        pool,
+        3,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(filters),
+            Instruction::Aload_0,
+            Instruction::Getfield(filters),
+            Instruction::Invokeinterface(size, 1),
+            Instruction::Iconst_1,
+            Instruction::Isub,
+            Instruction::Invokeinterface(get, 2),
+            Instruction::Checkcast(audio_filter),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn filter_chain_builder_make_first(
+    pool: &mut ConstantPool<'static>,
+    float: bool,
+) -> Result<Attribute> {
+    let owner = pool.add_class(FILTER_CHAIN_BUILDER_CLASS)?;
+    let audio_filter = pool.add_class(AUDIO_FILTER_CLASS)?;
+    let target = pool.add_class(if float {
+        "com/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter"
+    } else {
+        "com/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter"
+    })?;
+    let first = pool.add_method_ref(
+        owner,
+        "first",
+        "()Lcom/sedmelluq/discord/lavaplayer/filter/AudioFilter;",
+    )?;
+    let prepend = pool.add_method_ref(
+        owner,
+        "prependUniversalFilter",
+        "(Lcom/sedmelluq/discord/lavaplayer/filter/AudioFilter;I)Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;",
+    )?;
+    let adapter_target = 9;
+    let mut body = code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(first),
+            Instruction::Astore_2,
+            Instruction::Aload_2,
+            Instruction::Instanceof(target),
+            Instruction::Ifeq(adapter_target),
+            Instruction::Aload_2,
+            Instruction::Checkcast(target),
+            Instruction::Areturn,
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Iload_1,
+            Instruction::Invokevirtual(prepend),
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::AppendFrame {
+            frame_type: 252,
+            offset_delta: adapter_target,
+            locals: vec![VerificationType::Object {
+                cpool_index: audio_filter,
+            }],
+        }],
+    )?;
+    Ok(body)
+}
+
+fn filter_chain_builder_build(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FILTER_CHAIN_BUILDER_CLASS)?;
+    let chain = pool.add_class(AUDIO_FILTER_CHAIN_CLASS)?;
+    let filters = pool.add_field_ref(owner, "filters", "Ljava/util/List;")?;
+    let make_universal = pool.add_method_ref(
+        owner,
+        "makeFirstUniversal",
+        "(I)Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;",
+    )?;
+    let chain_init = pool.add_method_ref(
+        chain,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;Ljava/util/List;Ljava/lang/Object;)V",
+    )?;
+    code(
+        pool,
+        5,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Iload_2,
+            Instruction::Invokevirtual(make_universal),
+            Instruction::Astore_3,
+            Instruction::New(chain),
+            Instruction::Dup,
+            Instruction::Aload_3,
+            Instruction::Aload_0,
+            Instruction::Getfield(filters),
+            Instruction::Aload_1,
+            Instruction::Invokespecial(chain_init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn filter_chain_builder_prepend_universal(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FILTER_CHAIN_BUILDER_CLASS)?;
+    let universal =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter")?;
+    let split =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/filter/SplitShortPcmAudioFilter")?;
+    let float = pool.add_class("com/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter")?;
+    let short = pool.add_class("com/sedmelluq/discord/lavaplayer/filter/ShortPcmAudioFilter")?;
+    let split_converter = pool
+        .add_class("com/sedmelluq/discord/lavaplayer/filter/converter/ToSplitShortAudioFilter")?;
+    let float_converter =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/filter/converter/ToFloatAudioFilter")?;
+    let short_converter =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/filter/converter/ToShortAudioFilter")?;
+    let split_init = pool.add_method_ref(
+        split_converter,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/filter/SplitShortPcmAudioFilter;I)V",
+    )?;
+    let float_init = pool.add_method_ref(
+        float_converter,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter;I)V",
+    )?;
+    let short_init = pool.add_method_ref(
+        short_converter,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/filter/ShortPcmAudioFilter;I)V",
+    )?;
+    let runtime = pool.add_class("java/lang/RuntimeException")?;
+    let runtime_init = pool.add_method_ref(runtime, "<init>", "(Ljava/lang/String;)V")?;
+    let failure_message = pool.add_string("Filter must implement at least one data type.")?;
+    let add_first = pool.add_method_ref(
+        owner,
+        "addFirst",
+        "(Lcom/sedmelluq/discord/lavaplayer/filter/AudioFilter;)V",
+    )?;
+
+    let mut instructions = vec![
+        Instruction::Aload_1,
+        Instruction::Instanceof(split),
+        Instruction::Ifeq(0),
+        Instruction::New(split_converter),
+        Instruction::Dup,
+        Instruction::Aload_1,
+        Instruction::Checkcast(split),
+        Instruction::Iload_2,
+        Instruction::Invokespecial(split_init),
+        Instruction::Astore_3,
+    ];
+    let split_goto = instructions.len();
+    instructions.push(Instruction::Goto(0));
+    let float_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_1,
+        Instruction::Instanceof(float),
+        Instruction::Ifeq(0),
+        Instruction::New(float_converter),
+        Instruction::Dup,
+        Instruction::Aload_1,
+        Instruction::Checkcast(float),
+        Instruction::Iload_2,
+        Instruction::Invokespecial(float_init),
+        Instruction::Astore_3,
+    ]);
+    let float_goto = instructions.len();
+    instructions.push(Instruction::Goto(0));
+    let short_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_1,
+        Instruction::Instanceof(short),
+        Instruction::Ifeq(0),
+        Instruction::New(short_converter),
+        Instruction::Dup,
+        Instruction::Aload_1,
+        Instruction::Checkcast(short),
+        Instruction::Iload_2,
+        Instruction::Invokespecial(short_init),
+        Instruction::Astore_3,
+    ]);
+    let short_goto = instructions.len();
+    instructions.push(Instruction::Goto(0));
+    let unsupported_target = instructions.len();
+    instructions.extend([
+        Instruction::New(runtime),
+        Instruction::Dup,
+        Instruction::Ldc_w(failure_message),
+        Instruction::Invokespecial(runtime_init),
+        Instruction::Athrow,
+    ]);
+    let common_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Aload_3,
+        Instruction::Invokevirtual(add_first),
+        Instruction::Aload_3,
+        Instruction::Areturn,
+    ]);
+    instructions[2] = Instruction::Ifeq(u16::try_from(float_target)?);
+    instructions[split_goto] = Instruction::Goto(u16::try_from(common_target)?);
+    instructions[float_target + 2] = Instruction::Ifeq(u16::try_from(short_target)?);
+    instructions[float_goto] = Instruction::Goto(u16::try_from(common_target)?);
+    instructions[short_target + 2] = Instruction::Ifeq(u16::try_from(unsupported_target)?);
+    instructions[short_goto] = Instruction::Goto(u16::try_from(common_target)?);
+
+    let mut body = code(pool, 4, 4, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            same_stack_frame(u16::try_from(float_target)?),
+            same_stack_frame(u16::try_from(short_target - float_target - 1)?),
+            same_stack_frame(u16::try_from(unsupported_target - short_target - 1)?),
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(common_target - unsupported_target - 1)?,
+                locals: vec![VerificationType::Object {
+                    cpool_index: universal,
+                }],
             },
         ],
     )?;
