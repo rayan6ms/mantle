@@ -101,6 +101,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
             Some(NON_ALLOCATING_AUDIO_FRAME_BUFFER_CONSUMER)
         }
         "write-audio-filter-interface-consumer" => Some(AUDIO_FILTER_INTERFACE_CONSUMER),
+        "write-audio-post-processor-consumer" => Some(AUDIO_POST_PROCESSOR_CONSUMER),
         "write-audio-filter-chain-consumer" => Some(AUDIO_FILTER_CHAIN_CONSUMER),
         "write-audio-pipeline-consumer" => Some(AUDIO_PIPELINE_CONSUMER),
         "write-audio-pipeline-factory-consumer" => Some(AUDIO_PIPELINE_FACTORY_CONSUMER),
@@ -7257,6 +7258,135 @@ public final class GateAudioFilterInterface {
     public void flush() throws InterruptedException {
       if (flushFailure != null) throw flushFailure;
       flushes++;
+    }
+
+    public void close() { closes++; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_POST_PROCESSOR_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.AudioPostProcessor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ShortBuffer;
+import java.util.Arrays;
+
+public final class GateAudioPostProcessor {
+  public static void main(String[] args) throws Exception {
+    callerImplementation();
+    checkedFailure();
+    nullReceiver();
+    reflection();
+    System.out.println(
+        "implementation=process,close,timecode,buffer-identity,state;"
+        + "exceptions=process-interrupted,null-receiver;"
+        + "reflection=public-abstract-interface,0-fields,0-constructors,2-methods,throws");
+  }
+
+  private static void callerImplementation() throws Exception {
+    RecordingProcessor implementation = new RecordingProcessor();
+    AudioPostProcessor processor = implementation;
+    ShortBuffer buffer = ShortBuffer.wrap(new short[] { 10, 20, 30, 40 });
+    buffer.position(1);
+    buffer.limit(3);
+    processor.process(Long.MIN_VALUE + 17L, buffer);
+    processor.close();
+    processor.close();
+    check(implementation.processes == 1
+        && implementation.timecode == Long.MIN_VALUE + 17L,
+        "process dispatch and long value");
+    check(implementation.buffer == buffer
+        && implementation.position == 1 && implementation.limit == 3,
+        "buffer identity and state");
+    check(buffer.position() == 1 && buffer.limit() == 3,
+        "implementation did not mutate caller state");
+    check(implementation.closes == 2, "close dispatch");
+  }
+
+  private static void checkedFailure() {
+    RecordingProcessor processor = new RecordingProcessor();
+    InterruptedException sentinel = new InterruptedException("process-sentinel");
+    processor.failure = sentinel;
+    ShortBuffer buffer = ShortBuffer.allocate(1);
+    expectIdentity(sentinel, () -> processor.process(99L, buffer));
+    check(processor.processes == 0 && processor.timecode == 99L
+        && processor.buffer == buffer, "failure prefix and identity");
+  }
+
+  private static void nullReceiver() {
+    AudioPostProcessor processor = null;
+    expect(NullPointerException.class,
+        () -> processor.process(1L, ShortBuffer.allocate(1)));
+    expect(NullPointerException.class, () -> processor.close());
+  }
+
+  private static void reflection() throws Exception {
+    Class<AudioPostProcessor> type = AudioPostProcessor.class;
+    check(type.isInterface() && Modifier.isPublic(type.getModifiers())
+        && Modifier.isAbstract(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == null && type.getInterfaces().length == 0,
+        "interface metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 2, "member counts");
+
+    Method process = type.getDeclaredMethod("process", long.class, ShortBuffer.class);
+    checkMethod(process, new Class<?>[] { InterruptedException.class });
+    check(Arrays.equals(process.getParameterTypes(),
+        new Class<?>[] { long.class, ShortBuffer.class }), "process parameters");
+    checkMethod(type.getDeclaredMethod("close"), new Class<?>[0]);
+  }
+
+  private static void checkMethod(Method method, Class<?>[] exceptions) {
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == void.class
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), method.getName() + " metadata");
+  }
+
+  private static void expectIdentity(
+      InterruptedException expected, InterruptibleOperation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("failure was swallowed");
+    } catch (InterruptedException error) {
+      check(error == expected, "InterruptedException identity");
+    }
+  }
+
+  private static void expect(Class<? extends Throwable> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
+  }
+
+  private interface InterruptibleOperation { void run() throws InterruptedException; }
+  private interface Operation { void run() throws Exception; }
+
+  private static final class RecordingProcessor implements AudioPostProcessor {
+    long timecode;
+    ShortBuffer buffer;
+    int position;
+    int limit;
+    int processes;
+    int closes;
+    InterruptedException failure;
+
+    public void process(long timecode, ShortBuffer buffer) throws InterruptedException {
+      this.timecode = timecode;
+      this.buffer = buffer;
+      position = buffer.position();
+      limit = buffer.limit();
+      if (failure != null) throw failure;
+      processes++;
     }
 
     public void close() { closes++; }

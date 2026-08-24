@@ -69,6 +69,8 @@ const TERMINATOR_FRAME_CLASS: &str =
 const AUDIO_FRAME_BUFFER_FACTORY_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBufferFactory";
 const AUDIO_FILTER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilter";
+const AUDIO_POST_PROCESSOR_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/filter/AudioPostProcessor";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -354,6 +356,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/player/hook/AudioOutputHook",
     "com/sedmelluq/discord/lavaplayer/player/hook/AudioOutputHookFactory",
     AUDIO_FILTER_CLASS,
+    AUDIO_POST_PROCESSOR_CLASS,
     AUDIO_FILTER_CHAIN_CLASS,
     AUDIO_PIPELINE_CLASS,
     AUDIO_PIPELINE_FACTORY_CLASS,
