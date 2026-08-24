@@ -299,6 +299,8 @@ const LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/format/LegacyDashMpdFormatsExtractor";
 const LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/format/LegacyStreamMapFormatsExtractor";
+const OFFLINE_YOUTUBE_TRACK_FORMAT_EXTRACTOR_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/format/OfflineYoutubeTrackFormatExtractor";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -425,6 +427,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     LEGACY_ADAPTIVE_FORMATS_EXTRACTOR_CLASS,
     LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CLASS,
     LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CLASS,
+    OFFLINE_YOUTUBE_TRACK_FORMAT_EXTRACTOR_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -1279,6 +1282,14 @@ fn replacement_body(
     }
     if class_name == LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CLASS {
         return legacy_stream_map_formats_extractor_replacement(
+            pool,
+            name,
+            descriptor,
+            required_locals,
+        );
+    }
+    if class_name == OFFLINE_YOUTUBE_TRACK_FORMAT_EXTRACTOR_CLASS {
+        return offline_youtube_track_format_extractor_replacement(
             pool,
             name,
             descriptor,
@@ -24785,6 +24796,49 @@ fn legacy_stream_map_formats_extractor_class_init(
             Instruction::Invokestatic(get_logger),
             Instruction::Putstatic(log),
             Instruction::Return,
+        ],
+    )
+}
+
+fn offline_youtube_track_format_extractor_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "extract",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData;Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSignatureResolver;)Ljava/util/List;",
+        ) => offline_youtube_track_format_extractor_extract(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {OFFLINE_YOUTUBE_TRACK_FORMAT_EXTRACTOR_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn offline_youtube_track_format_extractor_extract(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(OFFLINE_YOUTUBE_TRACK_FORMAT_EXTRACTOR_CLASS)?;
+    let extract = pool.add_interface_method_ref(
+        owner,
+        "extract",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData;)Ljava/util/List;",
+    )?;
+    code(
+        pool,
+        2,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(extract, 2),
+            Instruction::Areturn,
         ],
     )
 }

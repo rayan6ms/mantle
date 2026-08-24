@@ -165,6 +165,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-legacy-dash-mpd-formats-extrac
   --output "$WORK/GateLegacyDashMpdFormatsExtractor.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-legacy-stream-map-formats-extractor-consumer \
   --output "$WORK/GateLegacyStreamMapFormatsExtractor.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-offline-youtube-track-format-extractor-consumer \
+  --output "$WORK/GateOfflineYoutubeTrackFormatExtractor.java"
 
 javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateSmoke.java" "$WORK/GateProbe.java" "$WORK/GateIntegration.java" \
@@ -304,7 +306,8 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateYoutubeTrackJsonData.java" \
   "$WORK/GateLegacyAdaptiveFormatsExtractor.java" \
   "$WORK/GateLegacyDashMpdFormatsExtractor.java" \
-  "$WORK/GateLegacyStreamMapFormatsExtractor.java"
+  "$WORK/GateLegacyStreamMapFormatsExtractor.java" \
+  "$WORK/GateOfflineYoutubeTrackFormatExtractor.java"
 
 readonly GATE_CLASSPATH="$classes_argument$classpath_separator$jar_argument"
 java -Xverify:all \
@@ -1822,6 +1825,16 @@ cmp "$WORK/legacy-stream-map-formats-reference.txt" \
 grep --fixed-strings \
   'public-concrete-object,offline-extractor,1-private-static-final-log,1-constructor,1-public-method,2-private-helpers;absent=shared-empty;stream-map=ordered,array-list,url-decoded,per-entry-isolation,skip-missing-fields;quality=small,medium,hd720,default-negative;format=type,length,fixed-channels,url,empty-n,signature,key,default-audio;errors=swallowed;reflection=exact' \
   "$WORK/legacy-stream-map-formats-candidate.txt" >/dev/null
+# A_EXACT preserves the offline extractor SPI and its default delegation bridge.
+java -Xverify:all -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOfflineYoutubeTrackFormatExtractor >"$WORK/offline-youtube-track-format-extractor-reference.txt"
+java -Xverify:all -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOfflineYoutubeTrackFormatExtractor >"$WORK/offline-youtube-track-format-extractor-candidate.txt"
+cmp "$WORK/offline-youtube-track-format-extractor-reference.txt" \
+  "$WORK/offline-youtube-track-format-extractor-candidate.txt"
+grep --fixed-strings \
+  'public-abstract-interface,youtube-format-extractor,0-fields,0-constructors,2-methods;offline=abstract-data-to-list;default=delegates-data,ignores-http-resolver;identity=argument,return,nulls,unchecked;generics=list-of-youtube-track-format;reflection=exact' \
+  "$WORK/offline-youtube-track-format-extractor-candidate.txt" >/dev/null
 java -Xverify:all -cp "$GATE_CLASSPATH" GateSmoke "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateIntegration "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" callbacks

@@ -289,6 +289,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-legacy-stream-map-formats-extractor-consumer" => {
             Some(LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CONSUMER)
         }
+        "write-offline-youtube-track-format-extractor-consumer" => {
+            Some(OFFLINE_YOUTUBE_TRACK_FORMAT_EXTRACTOR_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -23309,6 +23312,118 @@ public final class GateLegacyStreamMapFormatsExtractor {
       if (!expected.isInstance(error)) throw new AssertionError(message, error);
       return expected.cast(error);
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const OFFLINE_YOUTUBE_TRACK_FORMAT_EXTRACTOR_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSignatureResolver;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackFormat;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackJsonData;
+import com.sedmelluq.discord.lavaplayer.source.youtube.format.OfflineYoutubeTrackFormatExtractor;
+import com.sedmelluq.discord.lavaplayer.source.youtube.format.YoutubeTrackFormatExtractor;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.util.ArrayList;
+import java.util.List;
+
+public final class GateOfflineYoutubeTrackFormatExtractor {
+  public static void main(String[] args) throws Exception {
+    reflectionContract();
+    delegationContract();
+    nullAndFailureContract();
+    System.out.println("public-abstract-interface,youtube-format-extractor,0-fields,"
+        + "0-constructors,2-methods;offline=abstract-data-to-list;"
+        + "default=delegates-data,ignores-http-resolver;"
+        + "identity=argument,return,nulls,unchecked;"
+        + "generics=list-of-youtube-track-format;reflection=exact");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<OfflineYoutubeTrackFormatExtractor> type = OfflineYoutubeTrackFormatExtractor.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.INTERFACE | Modifier.ABSTRACT)
+        && type.getSuperclass() == null && type.getGenericSuperclass() == null
+        && type.getInterfaces().length == 1
+        && type.getInterfaces()[0] == YoutubeTrackFormatExtractor.class
+        && type.getGenericInterfaces().length == 1
+        && type.getGenericInterfaces()[0] == YoutubeTrackFormatExtractor.class
+        && type.getTypeParameters().length == 0 && type.isInterface() && !type.isEnum()
+        && !type.isAnnotation() && !type.isSynthetic() && !type.isMemberClass(), "class metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 2 && type.getDeclaredClasses().length == 0,
+        "declared shape");
+
+    Method offline = type.getDeclaredMethod("extract", YoutubeTrackJsonData.class);
+    check(offline.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && !offline.isDefault(), "offline modifiers");
+    checkMethod(offline, YoutubeTrackJsonData.class);
+    Method bridge = type.getDeclaredMethod("extract", YoutubeTrackJsonData.class,
+        HttpInterface.class, YoutubeSignatureResolver.class);
+    check(bridge.getModifiers() == Modifier.PUBLIC && bridge.isDefault(), "bridge modifiers");
+    checkMethod(bridge, YoutubeTrackJsonData.class, HttpInterface.class,
+        YoutubeSignatureResolver.class);
+  }
+
+  private static void delegationContract() throws Exception {
+    YoutubeTrackJsonData data = new YoutubeTrackJsonData(
+        JsonBrowser.NULL_BROWSER, JsonBrowser.NULL_BROWSER, "script");
+    List<YoutubeTrackFormat> marker = new ArrayList<>();
+    Object[] observed = new Object[1];
+    int[] calls = new int[1];
+    OfflineYoutubeTrackFormatExtractor extractor = value -> {
+      observed[0] = value;
+      calls[0]++;
+      return marker;
+    };
+    List<YoutubeTrackFormat> result = extractor.extract(data, null, null);
+    check(result == marker && observed[0] == data && calls[0] == 1,
+        "default delegates only data");
+    check(extractor.extract(data) == marker && observed[0] == data && calls[0] == 2,
+        "abstract method remains directly callable");
+  }
+
+  private static void nullAndFailureContract() {
+    Object[] observed = new Object[1];
+    OfflineYoutubeTrackFormatExtractor nulls = value -> {
+      observed[0] = value;
+      return null;
+    };
+    check(nulls.extract(null, null, null) == null && observed[0] == null,
+        "null identity");
+
+    RuntimeException marker = new RuntimeException("marker");
+    OfflineYoutubeTrackFormatExtractor failing = value -> { throw marker; };
+    try {
+      failing.extract(null, null, null);
+      throw new AssertionError("expected unchecked failure");
+    } catch (RuntimeException error) {
+      check(error == marker, "unchecked identity");
+    }
+  }
+
+  private static void checkMethod(Method method, Class<?>... parameters) {
+    check(method.getReturnType() == List.class && method.getParameterCount() == parameters.length
+        && java.util.Arrays.equals(method.getParameterTypes(), parameters)
+        && java.util.Arrays.equals(method.getGenericParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs(),
+        method.toString());
+    checkListType(method.getGenericReturnType(), method.getName() + " return");
+  }
+
+  private static void checkListType(java.lang.reflect.Type value, String message) {
+    check(value instanceof ParameterizedType, message + " parameterized");
+    ParameterizedType type = (ParameterizedType) value;
+    check(type.getRawType() == List.class && type.getOwnerType() == null
+        && type.getActualTypeArguments().length == 1
+        && type.getActualTypeArguments()[0] == YoutubeTrackFormat.class, message);
   }
 
   private static void check(boolean condition, String message) {

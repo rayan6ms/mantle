@@ -21016,27 +21016,42 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The generated public abstract interface retains the exact YoutubeTrackFormatExtractor parent, no fields or constructors, one abstract offline method, one default delegation bridge, and exact generic/reflection metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.format.OfflineYoutubeTrackFormatExtractor",
       "symbol_kind": "METHOD",
       "member_name": "extract",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData;)Ljava/util/List;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The exact public abstract method retains its YoutubeTrackJsonData parameter and generic List<YoutubeTrackFormat> return without declared exceptions.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.format.OfflineYoutubeTrackFormatExtractor",
       "symbol_kind": "METHOD",
       "member_name": "extract",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData;Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSignatureResolver;)Ljava/util/List;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The exact public default bridge delegates once to the offline method with data identity, ignores HTTP and resolver arguments, and preserves return identity, nulls, and unchecked-failure identity.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.format.StreamingDataFormatsExtractor",
