@@ -289,6 +289,8 @@ const YOUTUBE_TRACK_DETAILS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackDetails";
 const YOUTUBE_TRACK_DETAILS_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackDetailsLoader";
+const YOUTUBE_TRACK_FORMAT_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackFormat";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -410,6 +412,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_SIGNATURE_RESOLVER_CLASS,
     YOUTUBE_TRACK_DETAILS_CLASS,
     YOUTUBE_TRACK_DETAILS_LOADER_CLASS,
+    YOUTUBE_TRACK_FORMAT_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -812,6 +815,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | YOUTUBE_ANDROID_VERSION_CLASS
             | YOUTUBE_CONSTANTS_CLASS
             | YOUTUBE_FORMAT_INFO_CLASS
+            | YOUTUBE_TRACK_FORMAT_CLASS
             | YOUTUBE_HTTP_CONTEXT_FILTER_CLASS
             | YOUTUBE_MPEG_STREAM_AUDIO_TRACK_CLASS
             | YOUTUBE_PERSISTENT_HTTP_STREAM_CLASS
@@ -1231,6 +1235,9 @@ fn replacement_body(
     }
     if class_name == YOUTUBE_FORMAT_INFO_CLASS {
         return youtube_format_info_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == YOUTUBE_TRACK_FORMAT_CLASS {
+        return youtube_track_format_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -22826,6 +22833,180 @@ fn youtube_format_info_replacement(
             required_locals,
         ),
     }
+}
+
+fn youtube_track_format_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lorg/apache/http/entity/ContentType;JJJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V",
+        ) => youtube_track_format_constructor(pool),
+        ("getInfo", "()Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeFormatInfo;") => {
+            object_getter(
+                pool,
+                YOUTUBE_TRACK_FORMAT_CLASS,
+                "info",
+                "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeFormatInfo;",
+            )
+        }
+        ("getType", "()Lorg/apache/http/entity/ContentType;") => object_getter(
+            pool,
+            YOUTUBE_TRACK_FORMAT_CLASS,
+            "type",
+            "Lorg/apache/http/entity/ContentType;",
+        ),
+        ("getBitrate", "()J") => long_getter(pool, YOUTUBE_TRACK_FORMAT_CLASS, "bitrate"),
+        ("getAudioChannels", "()J") => {
+            long_getter(pool, YOUTUBE_TRACK_FORMAT_CLASS, "audioChannels")
+        }
+        ("getUrl", "()Ljava/net/URI;") => youtube_track_format_get_url(pool),
+        ("getContentLength", "()J") => {
+            long_getter(pool, YOUTUBE_TRACK_FORMAT_CLASS, "contentLength")
+        }
+        ("getNParameter", "()Ljava/lang/String;") => object_getter(
+            pool,
+            YOUTUBE_TRACK_FORMAT_CLASS,
+            "nParameter",
+            "Ljava/lang/String;",
+        ),
+        ("getSignature", "()Ljava/lang/String;") => object_getter(
+            pool,
+            YOUTUBE_TRACK_FORMAT_CLASS,
+            "signature",
+            "Ljava/lang/String;",
+        ),
+        ("getSignatureKey", "()Ljava/lang/String;") => object_getter(
+            pool,
+            YOUTUBE_TRACK_FORMAT_CLASS,
+            "signatureKey",
+            "Ljava/lang/String;",
+        ),
+        ("isDefaultAudioTrack", "()Z") => {
+            bool_getter(pool, YOUTUBE_TRACK_FORMAT_CLASS, "defaultAudioTrack")
+        }
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {YOUTUBE_TRACK_FORMAT_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn youtube_track_format_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(YOUTUBE_TRACK_FORMAT_CLASS)?;
+    let format_info = pool.add_class(YOUTUBE_FORMAT_INFO_CLASS)?;
+    let find_info = pool.add_method_ref(
+        format_info,
+        "get",
+        "(Lorg/apache/http/entity/ContentType;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeFormatInfo;",
+    )?;
+    let info = pool.add_field_ref(
+        owner,
+        "info",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeFormatInfo;",
+    )?;
+    let content_type = pool.add_field_ref(owner, "type", "Lorg/apache/http/entity/ContentType;")?;
+    let bitrate = pool.add_field_ref(owner, "bitrate", "J")?;
+    let content_length = pool.add_field_ref(owner, "contentLength", "J")?;
+    let audio_channels = pool.add_field_ref(owner, "audioChannels", "J")?;
+    let url = pool.add_field_ref(owner, "url", "Ljava/lang/String;")?;
+    let n_parameter = pool.add_field_ref(owner, "nParameter", "Ljava/lang/String;")?;
+    let signature = pool.add_field_ref(owner, "signature", "Ljava/lang/String;")?;
+    let signature_key = pool.add_field_ref(owner, "signatureKey", "Ljava/lang/String;")?;
+    let default_audio_track = pool.add_field_ref(owner, "defaultAudioTrack", "Z")?;
+    code(
+        pool,
+        3,
+        13,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokestatic(find_info),
+            Instruction::Putfield(info),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(content_type),
+            Instruction::Aload_0,
+            Instruction::Lload_2,
+            Instruction::Putfield(bitrate),
+            Instruction::Aload_0,
+            Instruction::Lload(4),
+            Instruction::Putfield(content_length),
+            Instruction::Aload_0,
+            Instruction::Lload(6),
+            Instruction::Putfield(audio_channels),
+            Instruction::Aload_0,
+            Instruction::Aload(8),
+            Instruction::Putfield(url),
+            Instruction::Aload_0,
+            Instruction::Aload(9),
+            Instruction::Putfield(n_parameter),
+            Instruction::Aload_0,
+            Instruction::Aload(10),
+            Instruction::Putfield(signature),
+            Instruction::Aload_0,
+            Instruction::Aload(11),
+            Instruction::Putfield(signature_key),
+            Instruction::Aload_0,
+            Instruction::Iload(12),
+            Instruction::Putfield(default_audio_track),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn youtube_track_format_get_url(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_TRACK_FORMAT_CLASS)?;
+    let url = pool.add_field_ref(owner, "url", "Ljava/lang/String;")?;
+    let uri = pool.add_class("java/net/URI")?;
+    let uri_init = pool.add_method_ref(uri, "<init>", "(Ljava/lang/String;)V")?;
+    let syntax = pool.add_class("java/net/URISyntaxException")?;
+    let runtime = pool.add_class("java/lang/RuntimeException")?;
+    let runtime_init = pool.add_method_ref(runtime, "<init>", "(Ljava/lang/Throwable;)V")?;
+    let mut body = code_with_exceptions(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::New(uri),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(url),
+            Instruction::Invokespecial(uri_init),
+            Instruction::Areturn,
+            Instruction::Astore_1,
+            Instruction::New(runtime),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(runtime_init),
+            Instruction::Athrow,
+        ],
+        vec![ExceptionTableEntry {
+            range_pc: 0..6,
+            handler_pc: 6,
+            catch_type: syntax,
+        }],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::SameLocals1StackItemFrame {
+            frame_type: 70,
+            stack: vec![VerificationType::Object {
+                cpool_index: syntax,
+            }],
+        }],
+    )?;
+    Ok(body)
 }
 
 #[allow(clippy::too_many_lines)]

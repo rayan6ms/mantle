@@ -155,6 +155,8 @@ for consumer in smoke probe integration classloader event track-value track-enum
   cargo run --locked -q -p mantle-jvm-gate -- "write-$consumer-consumer" \
     --output "$WORK/Gate${consumer_class}.java"
 done
+cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
+  --output "$WORK/GateYoutubeTrackFormat.java"
 
 javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateSmoke.java" "$WORK/GateProbe.java" "$WORK/GateIntegration.java" \
@@ -289,7 +291,8 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateYoutubeSignatureCipherManager.java" \
   "$WORK/GateYoutubeSignatureResolver.java" \
   "$WORK/GateYoutubeTrackDetails.java" \
-  "$WORK/GateYoutubeTrackDetailsLoader.java"
+  "$WORK/GateYoutubeTrackDetailsLoader.java" \
+  "$WORK/GateYoutubeTrackFormat.java"
 
 readonly GATE_CLASSPATH="$classes_argument$classpath_separator$jar_argument"
 java -Xverify:all \
@@ -1758,6 +1761,15 @@ cmp "$WORK/youtube-track-details-loader-reference.txt" \
 grep --fixed-strings \
   'public-abstract-interface,0-fields,0-constructors,1-method;details=http,id,boolean,source-manager-to-track-details;identity=arguments,primitive,return,nulls,unchecked;reflection=exact' \
   "$WORK/youtube-track-details-loader-candidate.txt" >/dev/null
+# A_EXACT preserves the immutable YouTube track-format value contract.
+java -Xverify:all -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateYoutubeTrackFormat >"$WORK/youtube-track-format-reference.txt"
+java -Xverify:all -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateYoutubeTrackFormat >"$WORK/youtube-track-format-candidate.txt"
+cmp "$WORK/youtube-track-format-reference.txt" "$WORK/youtube-track-format-candidate.txt"
+grep --fixed-strings \
+  'public-concrete-object,10-private-final-fields,1-constructor,10-getters;format-info=constructor-derived;capture=type,longs,strings,boolean;identity=type,n,signature,key;url=fresh-uri,syntax-wrapper,null-error;nullable=info,n,signature,key;reflection=exact' \
+  "$WORK/youtube-track-format-candidate.txt" >/dev/null
 java -Xverify:all -cp "$GATE_CLASSPATH" GateSmoke "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateIntegration "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" callbacks

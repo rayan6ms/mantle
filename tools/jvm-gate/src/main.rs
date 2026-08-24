@@ -278,6 +278,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-youtube-track-details-loader-consumer" => {
             Some(YOUTUBE_TRACK_DETAILS_LOADER_CONSUMER)
         }
+        "write-youtube-track-format-consumer" => Some(YOUTUBE_TRACK_FORMAT_CONSUMER),
         _ => None,
     }
 }
@@ -22249,6 +22250,169 @@ public final class GateYoutubeTrackDetailsLoader {
       throw new AssertionError("expected unchecked failure");
     } catch (RuntimeException error) {
       check(error == expected, "unchecked identity");
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_TRACK_FORMAT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeFormatInfo;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackFormat;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.Arrays;
+import org.apache.http.entity.ContentType;
+import org.apache.http.message.BasicNameValuePair;
+
+public final class GateYoutubeTrackFormat {
+  public static void main(String[] args) throws Exception {
+    reflectionContract();
+    valueContract();
+    edgeContract();
+    System.out.println("public-concrete-object,10-private-final-fields,1-constructor,10-getters;"
+        + "format-info=constructor-derived;capture=type,longs,strings,boolean;"
+        + "identity=type,n,signature,key;url=fresh-uri,syntax-wrapper,null-error;"
+        + "nullable=info,n,signature,key;reflection=exact");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<YoutubeTrackFormat> type = YoutubeTrackFormat.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getGenericSuperclass() == Object.class && type.getInterfaces().length == 0
+        && type.getGenericInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && !type.isInterface() && !type.isEnum() && !type.isAnnotation() && !type.isSynthetic()
+        && !type.isMemberClass(), "class metadata");
+    check(type.getDeclaredFields().length == 10 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 10 && type.getDeclaredClasses().length == 0,
+        "declared shape");
+
+    checkField("info", YoutubeFormatInfo.class);
+    checkField("type", ContentType.class);
+    checkField("bitrate", long.class);
+    checkField("contentLength", long.class);
+    checkField("audioChannels", long.class);
+    checkField("url", String.class);
+    checkField("nParameter", String.class);
+    checkField("signature", String.class);
+    checkField("signatureKey", String.class);
+    checkField("defaultAudioTrack", boolean.class);
+
+    Class<?>[] parameters = {ContentType.class, long.class, long.class, long.class,
+        String.class, String.class, String.class, String.class, boolean.class};
+    Constructor<YoutubeTrackFormat> constructor = type.getDeclaredConstructor(parameters);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && Arrays.equals(constructor.getParameterTypes(), parameters)
+        && Arrays.equals(constructor.getGenericParameterTypes(), parameters)
+        && constructor.getExceptionTypes().length == 0 && constructor.getTypeParameters().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
+
+    checkMethod("getInfo", YoutubeFormatInfo.class);
+    checkMethod("getType", ContentType.class);
+    checkMethod("getBitrate", long.class);
+    checkMethod("getAudioChannels", long.class);
+    checkMethod("getUrl", URI.class);
+    checkMethod("getContentLength", long.class);
+    checkMethod("getNParameter", String.class);
+    checkMethod("getSignature", String.class);
+    checkMethod("getSignatureKey", String.class);
+    checkMethod("isDefaultAudioTrack", boolean.class);
+  }
+
+  private static void valueContract() throws Exception {
+    ContentType type = ContentType.create("audio/webm",
+        new BasicNameValuePair("codecs", "opus"));
+    String url = new String("https://media.example.test/audio?x=1");
+    String n = new String("n-value");
+    String signature = new String("signature-value");
+    String key = new String("signature-key");
+    YoutubeTrackFormat format = new YoutubeTrackFormat(type, Long.MIN_VALUE, Long.MAX_VALUE, -1L,
+        url, n, signature, key, true);
+
+    check(format.getInfo() == YoutubeFormatInfo.WEBM_OPUS && format.getType() == type,
+        "derived info and type identity");
+    check(format.getBitrate() == Long.MIN_VALUE && format.getContentLength() == Long.MAX_VALUE
+        && format.getAudioChannels() == -1L && format.isDefaultAudioTrack(), "primitive capture");
+    check(format.getNParameter() == n && format.getSignature() == signature
+        && format.getSignatureKey() == key, "string identity");
+    URI first = format.getUrl();
+    URI second = format.getUrl();
+    check(first != second && first.equals(second) && first.toString().equals(url), "fresh URI");
+
+    check(field("info").get(format) == YoutubeFormatInfo.WEBM_OPUS
+        && field("type").get(format) == type && field("url").get(format) == url
+        && field("nParameter").get(format) == n && field("signature").get(format) == signature
+        && field("signatureKey").get(format) == key, "private identity capture");
+  }
+
+  private static void edgeContract() {
+    ContentType known = ContentType.create("audio/webm",
+        new BasicNameValuePair("codecs", "opus"));
+    ContentType unknown = ContentType.create("application/octet-stream");
+    YoutubeTrackFormat unknownFormat = new YoutubeTrackFormat(
+        unknown, 0L, -1L, Long.MAX_VALUE, "relative/path", null, null, null, false);
+    check(unknownFormat.getInfo() == null && unknownFormat.getType() == unknown
+        && unknownFormat.getBitrate() == 0L && unknownFormat.getContentLength() == -1L
+        && unknownFormat.getAudioChannels() == Long.MAX_VALUE
+        && unknownFormat.getNParameter() == null && unknownFormat.getSignature() == null
+        && unknownFormat.getSignatureKey() == null && !unknownFormat.isDefaultAudioTrack()
+        && unknownFormat.getUrl().equals(URI.create("relative/path")), "unknown and nullable values");
+
+    YoutubeTrackFormat nullUrl = new YoutubeTrackFormat(
+        known, 0L, 0L, 0L, null, null, null, null, false);
+    expect(NullPointerException.class, nullUrl::getUrl, "null URL");
+    YoutubeTrackFormat malformed = new YoutubeTrackFormat(
+        known, 0L, 0L, 0L, "https://[invalid", null, null, null, false);
+    RuntimeException syntax = expect(RuntimeException.class, malformed::getUrl, "syntax wrapper");
+    check(syntax.getClass() == RuntimeException.class
+        && syntax.getCause() instanceof URISyntaxException, "syntax cause");
+    expect(NullPointerException.class,
+        () -> new YoutubeTrackFormat(null, 0L, 0L, 0L, "url", null, null, null, false),
+        "null content type");
+    expect(NullPointerException.class,
+        () -> new YoutubeTrackFormat(ContentType.create("audio/webm"),
+            0L, 0L, 0L, "url", null, null, null, false), "missing codec");
+  }
+
+  private static void checkField(String name, Class<?> fieldType) throws Exception {
+    Field field = field(name);
+    check(field.getType() == fieldType && field.getGenericType() == fieldType
+        && field.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && !field.isSynthetic() && !field.isEnumConstant(), name + " metadata");
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = YoutubeTrackFormat.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static void checkMethod(String name, Class<?> result) throws Exception {
+    Method method = YoutubeTrackFormat.class.getDeclaredMethod(name);
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == result
+        && method.getGenericReturnType() == result && method.getParameterCount() == 0
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), name + " metadata");
+  }
+
+  private interface ThrowingSupplier { Object get() throws Exception; }
+
+  private static <T extends Throwable> T expect(
+      Class<T> expected, ThrowingSupplier operation, String message) {
+    try {
+      operation.get();
+      throw new AssertionError("expected " + expected.getName() + ": " + message);
+    } catch (Throwable error) {
+      if (!expected.isInstance(error)) throw new AssertionError(message, error);
+      return expected.cast(error);
     }
   }
 
