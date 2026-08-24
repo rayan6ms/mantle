@@ -115,6 +115,8 @@ const LOCAL_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/local/LocalAudioTrack";
 const LOCAL_SEEKABLE_INPUT_STREAM_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/local/LocalSeekableInputStream";
+const BANDCAMP_AUDIO_SOURCE_MANAGER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/bandcamp/BandcampAudioSourceManager";
 const HEARTBEATING_HTTP_STREAM_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/nico/HeartbeatingHttpStream";
 const NICO_AUDIO_SOURCE_MANAGER_CLASS: &str =
@@ -340,6 +342,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     LOCAL_AUDIO_SOURCE_MANAGER_CLASS,
     LOCAL_AUDIO_TRACK_CLASS,
     LOCAL_SEEKABLE_INPUT_STREAM_CLASS,
+    BANDCAMP_AUDIO_SOURCE_MANAGER_CLASS,
     HEARTBEATING_HTTP_STREAM_CLASS,
     NICO_AUDIO_SOURCE_MANAGER_CLASS,
     NICO_AUDIO_TRACK_CLASS,
@@ -794,6 +797,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | PROBING_AUDIO_SOURCE_MANAGER_CLASS
             | LOCAL_AUDIO_TRACK_CLASS
             | LOCAL_SEEKABLE_INPUT_STREAM_CLASS
+            | BANDCAMP_AUDIO_SOURCE_MANAGER_CLASS
             | HEARTBEATING_HTTP_STREAM_CLASS
             | NICO_AUDIO_SOURCE_MANAGER_CLASS
             | NICO_AUDIO_TRACK_CLASS
@@ -919,11 +923,16 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 .access_flags
                 .intersects(FieldAccessFlags::PUBLIC | FieldAccessFlags::PROTECTED)
     });
+    let class_pool = &class.constant_pool;
     class.methods.retain(|method| {
         retain_private_methods(&class_name)
             || method
                 .access_flags
                 .intersects(MethodAccessFlags::PUBLIC | MethodAccessFlags::PROTECTED)
+            || (class_name == BANDCAMP_AUDIO_SOURCE_MANAGER_CLASS
+                && class_pool
+                    .try_get_utf8(method.name_index)
+                    .is_ok_and(|name| name == "<clinit>"))
     });
 
     let pool = &mut class.constant_pool;
@@ -990,6 +999,9 @@ fn replacement_body(
     }
     if class_name == LOCAL_SEEKABLE_INPUT_STREAM_CLASS {
         return local_seekable_input_stream_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == BANDCAMP_AUDIO_SOURCE_MANAGER_CLASS {
+        return bandcamp_audio_source_manager_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == HEARTBEATING_HTTP_STREAM_CLASS {
         return heartbeating_http_stream_replacement(pool, name, descriptor, required_locals);
@@ -3165,6 +3177,264 @@ fn local_seekable_input_stream_clinit(pool: &mut ConstantPool<'static>) -> Resul
             Instruction::Ldc_w(owner),
             Instruction::Invokestatic(get_logger),
             Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn bandcamp_audio_source_manager_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => bandcamp_audio_source_manager_default_constructor(pool),
+        ("<init>", "(Z)V") => bandcamp_audio_source_manager_constructor(pool),
+        ("getSourceName", "()Ljava/lang/String;") => {
+            string_return(pool, "bandcamp", required_locals)
+        }
+        (
+            "loadItem",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+        ) => bandcamp_audio_source_manager_load_item(pool),
+        ("isTrackEncodable", "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)Z") => code(
+            pool,
+            1,
+            required_locals,
+            vec![Instruction::Iconst_1, Instruction::Ireturn],
+        ),
+        (
+            "encodeTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Ljava/io/DataOutput;)V",
+        ) => code(pool, 0, required_locals, vec![Instruction::Return]),
+        (
+            "decodeTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+        ) => bandcamp_audio_source_manager_decode_track(pool),
+        ("shutdown", "()V") => bandcamp_audio_source_manager_shutdown(pool),
+        ("getHttpInterface", "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;") => {
+            bandcamp_audio_source_manager_get_http_interface(pool)
+        }
+        ("configureRequests", "(Ljava/util/function/Function;)V") => {
+            bandcamp_audio_source_manager_configure(pool, true)
+        }
+        ("configureBuilder", "(Ljava/util/function/Consumer;)V") => {
+            bandcamp_audio_source_manager_configure(pool, false)
+        }
+        ("<clinit>", "()V") => bandcamp_audio_source_manager_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {BANDCAMP_AUDIO_SOURCE_MANAGER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn bandcamp_audio_source_manager_default_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(BANDCAMP_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let init = pool.add_method_ref(owner, "<init>", "(Z)V")?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Iconst_1,
+            Instruction::Invokespecial(init),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn bandcamp_audio_source_manager_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(BANDCAMP_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let allow_search = pool.add_field_ref(owner, "allowSearch", "Z")?;
+    let manager_field = pool.add_field_ref(
+        owner,
+        "httpInterfaceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let tools = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpClientTools")?;
+    let create = pool.add_method_ref(
+        tools,
+        "createDefaultThreadLocalManager",
+        "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Iload_1,
+            Instruction::Putfield(allow_search),
+            Instruction::Aload_0,
+            Instruction::Invokestatic(create),
+            Instruction::Putfield(manager_field),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn bandcamp_audio_source_manager_load_item(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let native = pool.add_class(NATIVE_CLASS)?;
+    let load = pool.add_method_ref(
+        native,
+        "loadBandcampItem",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/bandcamp/BandcampAudioSourceManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+    )?;
+    code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Invokestatic(load),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn bandcamp_audio_source_manager_decode_track(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let track =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/source/bandcamp/BandcampAudioTrack")?;
+    let init = pool.add_method_ref(
+        track,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/source/bandcamp/BandcampAudioSourceManager;)V",
+    )?;
+    code(
+        pool,
+        4,
+        3,
+        vec![
+            Instruction::New(track),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn bandcamp_audio_source_manager_get_http_interface(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(BANDCAMP_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let field = pool.add_field_ref(
+        owner,
+        "httpInterfaceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let manager =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager")?;
+    let get = pool.add_interface_method_ref(
+        manager,
+        "getInterface",
+        "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Invokeinterface(get, 1),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn bandcamp_audio_source_manager_configure(
+    pool: &mut ConstantPool<'static>,
+    requests: bool,
+) -> Result<Attribute> {
+    let owner = pool.add_class(BANDCAMP_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let field = pool.add_field_ref(
+        owner,
+        "httpInterfaceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let manager =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager")?;
+    let (name, descriptor) = if requests {
+        ("configureRequests", "(Ljava/util/function/Function;)V")
+    } else {
+        ("configureBuilder", "(Ljava/util/function/Consumer;)V")
+    };
+    let configure = pool.add_interface_method_ref(manager, name, descriptor)?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(configure, 2),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn bandcamp_audio_source_manager_shutdown(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BANDCAMP_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let field = pool.add_field_ref(
+        owner,
+        "httpInterfaceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let tools = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/ExceptionTools")?;
+    let close = pool.add_method_ref(tools, "closeWithWarnings", "(Ljava/lang/AutoCloseable;)V")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Invokestatic(close),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn bandcamp_audio_source_manager_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let pattern = pool.add_class("java/util/regex/Pattern")?;
+    let compile = pool.add_method_ref(
+        pattern,
+        "compile",
+        "(Ljava/lang/String;)Ljava/util/regex/Pattern;",
+    )?;
+    let regex = pool.add_string(
+        "^(https?://(?:[^.]+\\.|)bandcamp\\.com)/(track|album)/([a-zA-Z0-9-_]+)/?(?:\\?.*|)$",
+    )?;
+    let owner = pool.add_class(BANDCAMP_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let field = pool.add_field_ref(owner, "urlRegex", "Ljava/util/regex/Pattern;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(regex),
+            Instruction::Invokestatic(compile),
+            Instruction::Putstatic(field),
             Instruction::Return,
         ],
     )
@@ -28454,6 +28724,10 @@ fn native_class(expected_abi: u8) -> Result<ClassFile<'static>> {
         (
             "loadNicoItem",
             "(Lcom/sedmelluq/discord/lavaplayer/source/nico/NicoAudioSourceManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+        ),
+        (
+            "loadBandcampItem",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/bandcamp/BandcampAudioSourceManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
         ),
         (
             "loadTwitchItem",

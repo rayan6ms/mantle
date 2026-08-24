@@ -12853,108 +12853,174 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The exact public manager, source SPI, HTTP configuration, serialization, reconstruction, and lifecycle shell is retained while current track and album metadata uses Mantle's bounded public-page adapter and the legacy search scraper is retired.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-jvm/src/load_bridge.rs",
+        "crates/mantle-media/tests/phase12_bandcamp.rs",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0016-bounded-bandcamp-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.bandcamp.BandcampAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves delegation with search enabled, exact static constants and pattern initialization, and a fresh default thread-local HTTP manager.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.bandcamp.BandcampAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Z)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves the caller's search flag and a fresh default thread-local HTTP manager for both boolean values.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.bandcamp.BandcampAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getSourceName",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves the exact bandcamp serialized source name.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.bandcamp.BandcampAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "loadItem",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The synchronous SPI return contract remains, while strict current Bandcamp track and album routing crosses the bounded native public-page adapter, rejects foreign inputs before network access, and deterministically retires bcsearch scraping.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-jvm/src/load_bridge.rs",
+        "crates/mantle-media/tests/phase12_bandcamp.rs",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0016-bounded-bandcamp-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.bandcamp.BandcampAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "isTrackEncodable",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves unconditional track encodability, including null input.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.bandcamp.BandcampAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "encodeTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Ljava/io/DataOutput;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves the empty Bandcamp source-detail payload, argument non-use, and checked IOException declaration.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.bandcamp.BandcampAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "decodeTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves empty-detail reconstruction into a BandcampAudioTrack with exact track-info and source-manager identity without reading DataInput.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.bandcamp.BandcampAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "shutdown",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves repeatable shutdown delegation to the captured HTTP manager.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.bandcamp.BandcampAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "getHttpInterface",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves HTTP-interface delegation and return identity through the captured manager.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.bandcamp.BandcampAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "configureRequests",
       "descriptor": "(Ljava/util/function/Function;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves the Function<RequestConfig, RequestConfig> generic signature and exact configurator delegation identity.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.bandcamp.BandcampAudioSourceManager",
       "symbol_kind": "METHOD",
       "member_name": "configureBuilder",
       "descriptor": "(Ljava/util/function/Consumer;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves the Consumer<HttpClientBuilder> generic signature and exact configurator delegation identity.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.bandcamp.BandcampAudioTrack",
