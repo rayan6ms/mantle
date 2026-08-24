@@ -19774,54 +19774,102 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The generated public MpegAudioTrack shell retains its seven private fields, two private static nested state classes, nine private helpers, constants, and exact reflection metadata while current playback is owned by Mantle's bounded native YouTube pipeline.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-jvm/src/playback_bridge.rs",
+        "crates/mantle-media/tests/phase12_youtube.rs",
+        "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeMpegStreamAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/net/URI;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "Construction deterministically rejects the retired segmented-MPEG state machine after safe superclass initialization but before touching the supplied HTTP context or signed URI; current bounded HLS and finite-media playback remain native.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-jvm/src/playback_bridge.rs",
+        "crates/mantle-media/tests/phase12_youtube.rs",
+        "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeMpegStreamAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The public playback boundary remains structurally exact while the frozen persistent-MPEG executor loop is retired in favor of Mantle's bounded native HLS and finite-media delivery.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-jvm/src/playback_bridge.rs",
+        "crates/mantle-media/tests/phase12_youtube.rs",
+        "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeMpegStreamAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "setPosition",
       "descriptor": "(J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The exact public long-position signature is retained, while legacy wall-clock sequence refresh and 43,200-second rewind behavior are retired with the segmented-MPEG implementation.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-jvm/src/playback_bridge.rs",
+        "crates/mantle-media/tests/phase12_youtube.rs",
+        "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeMpegStreamAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "getDuration",
       "descriptor": "()J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The exact public long-return signature is retained, while duration now belongs to Mantle's bounded native media path instead of the legacy global MPEG sequence estimate.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-jvm/src/playback_bridge.rs",
+        "crates/mantle-media/tests/phase12_youtube.rs",
+        "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeMpegStreamAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "getPosition",
       "descriptor": "()J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The exact public long-return signature is retained, while position now belongs to Mantle's bounded native media path instead of the legacy absolute MPEG sequence estimate.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-jvm/src/playback_bridge.rs",
+        "crates/mantle-media/tests/phase12_youtube.rs",
+        "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubePayloadHelper",

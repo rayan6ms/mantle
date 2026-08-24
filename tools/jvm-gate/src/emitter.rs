@@ -263,6 +263,8 @@ const YOUTUBE_MIX_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeMixLoader";
 const YOUTUBE_MIX_PROVIDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeMixProvider";
+const YOUTUBE_MPEG_STREAM_AUDIO_TRACK_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeMpegStreamAudioTrack";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -371,6 +373,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_LINK_ROUTER_ROUTES_CLASS,
     YOUTUBE_MIX_LOADER_CLASS,
     YOUTUBE_MIX_PROVIDER_CLASS,
+    YOUTUBE_MPEG_STREAM_AUDIO_TRACK_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -774,6 +777,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | YOUTUBE_CONSTANTS_CLASS
             | YOUTUBE_FORMAT_INFO_CLASS
             | YOUTUBE_HTTP_CONTEXT_FILTER_CLASS
+            | YOUTUBE_MPEG_STREAM_AUDIO_TRACK_CLASS
     )
 }
 
@@ -824,6 +828,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | YOUTUBE_CLIENT_CONFIG_CLASS
             | YOUTUBE_HTTP_CONTEXT_FILTER_CLASS
             | YOUTUBE_MIX_PROVIDER_CLASS
+            | YOUTUBE_MPEG_STREAM_AUDIO_TRACK_CLASS
     )
 }
 
@@ -1114,6 +1119,14 @@ fn replacement_body(
     }
     if class_name == YOUTUBE_MIX_PROVIDER_CLASS {
         return youtube_mix_provider_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == YOUTUBE_MPEG_STREAM_AUDIO_TRACK_CLASS {
+        return youtube_mpeg_stream_audio_track_replacement(
+            pool,
+            name,
+            descriptor,
+            required_locals,
+        );
     }
     if class_name == YOUTUBE_CACHED_PLAYER_SCRIPT_CLASS {
         return youtube_cached_player_script_replacement(pool, name, descriptor, required_locals);
@@ -19341,6 +19354,59 @@ fn youtube_mix_provider_replacement(
             required_locals,
         ),
     }
+}
+
+fn youtube_mpeg_stream_audio_track_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/net/URI;)V",
+        ) => youtube_mpeg_stream_audio_track_constructor(pool),
+        ("<clinit>", "()V") => code(pool, 0, 0, vec![Instruction::Return]),
+        _ => unsupported_body(
+            pool,
+            "Legacy YouTube segmented MPEG playback is unsupported; use Mantle's bounded native YouTube pipeline.",
+            required_locals,
+        ),
+    }
+}
+
+fn youtube_mpeg_stream_audio_track_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let super_class =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/mpeg/MpegAudioTrack")?;
+    let super_init = pool.add_method_ref(
+        super_class,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)V",
+    )?;
+    let unsupported = pool.add_class("java/lang/UnsupportedOperationException")?;
+    let unsupported_init = pool.add_method_ref(unsupported, "<init>", "(Ljava/lang/String;)V")?;
+    let message = pool.add_string(
+        "Legacy YouTube segmented MPEG playback is unsupported; use Mantle's bounded native YouTube pipeline.",
+    )?;
+    code(
+        pool,
+        3,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Aconst_null,
+            Instruction::Invokespecial(super_init),
+            Instruction::New(unsupported),
+            Instruction::Dup,
+            Instruction::Ldc_w(message),
+            Instruction::Invokespecial(unsupported_init),
+            Instruction::Athrow,
+        ],
+    )
 }
 
 fn default_youtube_track_details_replacement(

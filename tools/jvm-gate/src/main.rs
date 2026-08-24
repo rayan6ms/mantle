@@ -251,6 +251,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-youtube-link-router-consumer" => Some(YOUTUBE_LINK_ROUTER_CONSUMER),
         "write-youtube-mix-loader-consumer" => Some(YOUTUBE_MIX_LOADER_CONSUMER),
         "write-youtube-mix-provider-consumer" => Some(YOUTUBE_MIX_PROVIDER_CONSUMER),
+        "write-youtube-mpeg-stream-audio-track-consumer" => {
+            Some(YOUTUBE_MPEG_STREAM_AUDIO_TRACK_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -20079,6 +20082,152 @@ public final class GateYoutubeMixProvider {
 
     RejectingHttpInterface() {
       super(null, HttpClientContext.create(), false, null);
+    }
+
+    @Override public CloseableHttpResponse execute(HttpUriRequest request) throws IOException {
+      calls++;
+      throw new AssertionError("HTTP invoked");
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_MPEG_STREAM_AUDIO_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegAudioTrack;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeMpegStreamAudioTrack;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.net.URI;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.TreeSet;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.protocol.HttpClientContext;
+
+public final class GateYoutubeMpegStreamAudioTrack {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "mode required");
+    Class<YoutubeMpegStreamAudioTrack> type = YoutubeMpegStreamAudioTrack.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == MpegAudioTrack.class
+        && type.getInterfaces().length == 0 && type.getGenericInterfaces().length == 0
+        && type.getTypeParameters().length == 0 && type.getDeclaredFields().length == 7
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredMethods().length == 13
+        && type.getDeclaredClasses().length == 2 && !type.isInterface() && !type.isEnum()
+        && !type.isAnnotation() && !type.isSynthetic(), "class shape");
+
+    checkField(type, "log", "org.slf4j.Logger", Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "streamingRequestConfig", "org.apache.http.client.config.RequestConfig",
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "httpInterface", HttpInterface.class.getName(),
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "state", type.getName() + "$TrackState", Modifier.PRIVATE | Modifier.FINAL);
+    checkLongConstant(type, "EMPTY_RETRY_THRESHOLD_MS", 400L);
+    checkLongConstant(type, "EMPTY_RETRY_INTERVAL_MS", 50L);
+    checkLongConstant(type, "MAX_REWIND_TIME", 43200L);
+
+    Set<String> nested = new TreeSet<>();
+    for (Class<?> member : type.getDeclaredClasses()) {
+      check(member.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC), "nested modifiers");
+      nested.add(member.getSimpleName());
+    }
+    check(nested.equals(new TreeSet<>(Arrays.asList("SequenceInfo", "TrackState"))),
+        "nested classes");
+
+    Constructor<YoutubeMpegStreamAudioTrack> constructor = type.getDeclaredConstructor(
+        AudioTrackInfo.class, HttpInterface.class, URI.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    checkMethod(type, "process", void.class, LocalAudioTrackExecutor.class);
+    checkMethod(type, "setPosition", void.class, long.class);
+    checkMethod(type, "getDuration", long.class);
+    checkMethod(type, "getPosition", long.class);
+    checkPrivateMethods(type);
+
+    if (args[0].equals("candidate")) {
+      RejectingHttpInterface http = new RejectingHttpInterface();
+      AudioTrackInfo info = new AudioTrackInfo("title", "author", 123L, "identifier", true,
+          "https://example.invalid/watch", null, null);
+      URI signed = URI.create("https://example.invalid/videoplayback?sig=secret");
+      try {
+        constructor.newInstance(info, http, signed);
+        throw new AssertionError("legacy segmented MPEG construction unexpectedly succeeded");
+      } catch (java.lang.reflect.InvocationTargetException error) {
+        check(error.getCause() instanceof UnsupportedOperationException
+            && error.getCause().getMessage().contains(
+                "Legacy YouTube segmented MPEG playback is unsupported"),
+            "stable unsupported disposition");
+      }
+      check(http.calls == 0, "failure precedes HTTP context mutation and requests");
+      System.out.println("common=public-concrete,mpeg-audio-track-super,0-exported-fields,"
+          + "1-constructor,5-exported-methods,7-private-fields,9-private-methods,2-private-static-"
+          + "nested;retry-400-50,rewind-43200,signatures,reflection;service=deterministic-no-http,"
+          + "bounded-native-hls-and-finite-media");
+    } else {
+      check(args[0].equals("reference"), "unknown mode");
+      System.out.println("common=public-concrete,mpeg-audio-track-super,0-exported-fields,"
+          + "1-constructor,5-exported-methods,7-private-fields,9-private-methods,2-private-static-"
+          + "nested;retry-400-50,rewind-43200,signatures,reflection;service=legacy-persistent-mpeg-"
+          + "segments,wall-clock-retry,43200-second-rewind");
+    }
+  }
+
+  private static void checkField(Class<?> owner, String name, String typeName, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getModifiers() == modifiers && field.getType().getName().equals(typeName),
+        name + " field");
+  }
+
+  private static void checkLongConstant(Class<?> owner, String name, long value) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && field.getType() == long.class, name + " metadata");
+    field.setAccessible(true);
+    check(field.getLong(null) == value, name + " value");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> result,
+                                  Class<?>... parameters) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == result
+        && method.getExceptionTypes().length == 0 && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), name + " metadata");
+  }
+
+  private static void checkPrivateMethods(Class<?> owner) {
+    Set<String> methods = new TreeSet<>();
+    for (Method method : owner.getDeclaredMethods()) {
+      if (Modifier.isPrivate(method.getModifiers())) {
+        methods.add(method.getName());
+      }
+    }
+    check(methods.equals(new TreeSet<>(Arrays.asList("execute", "extractAbsoluteSequenceFromEvent",
+        "getNextSegmentUrl", "lambda$process$0", "processNextSegment",
+        "processNextSegmentWithRetry", "processSegmentStream", "seek", "updateGlobalSequence"))),
+        "private methods");
+  }
+
+  private static final class RejectingHttpInterface extends HttpInterface {
+    int calls;
+
+    RejectingHttpInterface() {
+      super(null, HttpClientContext.create(), false, null);
+    }
+
+    @Override public HttpClientContext getContext() {
+      calls++;
+      throw new AssertionError("HTTP context invoked");
     }
 
     @Override public CloseableHttpResponse execute(HttpUriRequest request) throws IOException {
