@@ -167,6 +167,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-legacy-stream-map-formats-extr
   --output "$WORK/GateLegacyStreamMapFormatsExtractor.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-offline-youtube-track-format-extractor-consumer \
   --output "$WORK/GateOfflineYoutubeTrackFormatExtractor.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-streaming-data-formats-extractor-consumer \
+  --output "$WORK/GateStreamingDataFormatsExtractor.java"
 
 javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateSmoke.java" "$WORK/GateProbe.java" "$WORK/GateIntegration.java" \
@@ -307,7 +309,8 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateLegacyAdaptiveFormatsExtractor.java" \
   "$WORK/GateLegacyDashMpdFormatsExtractor.java" \
   "$WORK/GateLegacyStreamMapFormatsExtractor.java" \
-  "$WORK/GateOfflineYoutubeTrackFormatExtractor.java"
+  "$WORK/GateOfflineYoutubeTrackFormatExtractor.java" \
+  "$WORK/GateStreamingDataFormatsExtractor.java"
 
 readonly GATE_CLASSPATH="$classes_argument$classpath_separator$jar_argument"
 java -Xverify:all \
@@ -1835,6 +1838,16 @@ cmp "$WORK/offline-youtube-track-format-extractor-reference.txt" \
 grep --fixed-strings \
   'public-abstract-interface,youtube-format-extractor,0-fields,0-constructors,2-methods;offline=abstract-data-to-list;default=delegates-data,ignores-http-resolver;identity=argument,return,nulls,unchecked;generics=list-of-youtube-track-format;reflection=exact' \
   "$WORK/offline-youtube-track-format-extractor-candidate.txt" >/dev/null
+# A_EXACT preserves modern streaming-data extraction and its live-format rules.
+java -Xverify:all -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateStreamingDataFormatsExtractor >"$WORK/streaming-data-formats-reference.txt"
+java -Xverify:all -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateStreamingDataFormatsExtractor >"$WORK/streaming-data-formats-candidate.txt"
+cmp "$WORK/streaming-data-formats-reference.txt" \
+  "$WORK/streaming-data-formats-candidate.txt"
+grep --fixed-strings \
+  'public-concrete-object,offline-extractor,1-private-static-final-log,1-constructor,1-public-method,1-private-helper;absence=shared-empty;present=fresh-mutable,formats-before-adaptive;sources=direct-url,cipher,signature-cipher;format=type,bitrate,length,channels,url,n,signature,key,default-audio;live=video-details,ended-reason,missing-length;errors=skip-nonlive-missing-length,per-entry-isolation,outer-unchecked;reflection=exact' \
+  "$WORK/streaming-data-formats-candidate.txt" >/dev/null
 java -Xverify:all -cp "$GATE_CLASSPATH" GateSmoke "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateIntegration "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" callbacks

@@ -292,6 +292,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-offline-youtube-track-format-extractor-consumer" => {
             Some(OFFLINE_YOUTUBE_TRACK_FORMAT_EXTRACTOR_CONSUMER)
         }
+        "write-streaming-data-formats-extractor-consumer" => {
+            Some(STREAMING_DATA_FORMATS_EXTRACTOR_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -23424,6 +23427,237 @@ public final class GateOfflineYoutubeTrackFormatExtractor {
     check(type.getRawType() == List.class && type.getOwnerType() == null
         && type.getActualTypeArguments().length == 1
         && type.getActualTypeArguments()[0] == YoutubeTrackFormat.class, message);
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const STREAMING_DATA_FORMATS_EXTRACTOR_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeFormatInfo;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackFormat;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackJsonData;
+import com.sedmelluq.discord.lavaplayer.source.youtube.format.OfflineYoutubeTrackFormatExtractor;
+import com.sedmelluq.discord.lavaplayer.source.youtube.format.StreamingDataFormatsExtractor;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import org.slf4j.Logger;
+
+public final class GateStreamingDataFormatsExtractor {
+  public static void main(String[] args) throws Exception {
+    reflectionContract();
+    absenceContract();
+    mappingContract();
+    liveContract();
+    isolationContract();
+    failureContract();
+    System.out.println("public-concrete-object,offline-extractor,1-private-static-final-log,"
+        + "1-constructor,1-public-method,1-private-helper;"
+        + "absence=shared-empty;present=fresh-mutable,formats-before-adaptive;"
+        + "sources=direct-url,cipher,signature-cipher;"
+        + "format=type,bitrate,length,channels,url,n,signature,key,default-audio;"
+        + "live=video-details,ended-reason,missing-length;"
+        + "errors=skip-nonlive-missing-length,per-entry-isolation,outer-unchecked;"
+        + "reflection=exact");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<StreamingDataFormatsExtractor> type = StreamingDataFormatsExtractor.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getGenericSuperclass() == Object.class && type.getInterfaces().length == 1
+        && type.getInterfaces()[0] == OfflineYoutubeTrackFormatExtractor.class
+        && type.getGenericInterfaces().length == 1
+        && type.getGenericInterfaces()[0] == OfflineYoutubeTrackFormatExtractor.class
+        && type.getTypeParameters().length == 0 && !type.isInterface() && !type.isEnum()
+        && !type.isAnnotation() && !type.isSynthetic() && !type.isMemberClass(), "class metadata");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 2 && type.getDeclaredClasses().length == 0,
+        "declared shape");
+
+    Field log = type.getDeclaredField("log");
+    check(log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && log.getType() == Logger.class && log.getGenericType() == Logger.class
+        && !log.isEnumConstant() && !log.isSynthetic(), "logger metadata");
+    Constructor<StreamingDataFormatsExtractor> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getParameterCount() == 0
+        && constructor.getExceptionTypes().length == 0 && constructor.getTypeParameters().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
+
+    Method extract = type.getDeclaredMethod("extract", YoutubeTrackJsonData.class);
+    checkMethod(extract, Modifier.PUBLIC, YoutubeTrackJsonData.class);
+    Method helper = type.getDeclaredMethod(
+        "loadTrackFormatsFromStreamingData", JsonBrowser.class, boolean.class);
+    checkMethod(helper, Modifier.PRIVATE, JsonBrowser.class, boolean.class);
+  }
+
+  private static void absenceContract() throws Exception {
+    StreamingDataFormatsExtractor extractor = new StreamingDataFormatsExtractor();
+    List<YoutubeTrackFormat> absent = extractor.extract(data("{}"));
+    check(absent == Collections.<YoutubeTrackFormat>emptyList() && absent.isEmpty(),
+        "shared absent result");
+    expect(UnsupportedOperationException.class, () -> absent.add(null), "absent immutable");
+
+    List<YoutubeTrackFormat> present = extractor.extract(data(
+        "{\"streamingData\":{\"formats\":{},\"adaptiveFormats\":null}}"));
+    check(present.getClass() == ArrayList.class && present.isEmpty(), "present mutable empty");
+    present.add(null);
+    List<YoutubeTrackFormat> repeated = extractor.extract(data("{\"streamingData\":{}}"));
+    check(repeated.getClass() == ArrayList.class && repeated.isEmpty() && repeated != present,
+        "fresh present result");
+  }
+
+  private static void mappingContract() throws Exception {
+    String direct = "{\"mimeType\":\"audio/webm; codecs=\\\"opus\\\"\","
+        + "\"bitrate\":123,\"contentLength\":456,"
+        + "\"audioChannels\":6,"
+        + "\"url\":\"https://media.example.test/direct?x=1&n=first%2Bvalue\","
+        + "\"audioTrack\":{\"audioIsDefault\":false}}";
+    String cipher = "{\"mimeType\":\"audio/mp4; codecs=\\\"mp4a.40.2\\\"\","
+        + "\"bitrate\":0,\"contentLength\":-1,"
+        + "\"signatureCipher\":\"url=https%3A%2F%2Fmedia.example.test%2Fcipher%3Fx%3D2%26n%3DcipherN"
+        + "&s=%2B%2F%3D&sp=customSig\"}";
+    String precedence = "{\"mimeType\":\"audio/webm; codecs=\\\"vorbis\\\"\","
+        + "\"contentLength\":9,\"url\":\"https://ignored.example.test/direct?x=1&n=directN\","
+        + "\"cipher\":\"url=relative%2Fcipher%3Fx%3D1%26n%3DchosenN&s=chosen\","
+        + "\"signatureCipher\":\"url=relative%2Ffallback&s=fallback\"}";
+    StreamingDataFormatsExtractor extractor = new StreamingDataFormatsExtractor();
+    List<YoutubeTrackFormat> formats = extractor.extract(data(
+        "{\"streamingData\":{\"formats\":[" + direct + "],"
+            + "\"adaptiveFormats\":[" + cipher + "," + precedence + "]}}"));
+    check(formats.getClass() == ArrayList.class && formats.size() == 3,
+        "ordered mutable result");
+    checkFormat(formats.get(0), YoutubeFormatInfo.WEBM_OPUS, "audio/webm", "opus",
+        123L, 456L, 6L,
+        "https://media.example.test/direct?x=1&n=first%2Bvalue", "first+value",
+        null, "signature", false);
+    checkFormat(formats.get(1), YoutubeFormatInfo.MP4_AAC_LC, "audio/mp4", "mp4a.40.2",
+        0L, -1L, 2L, "https://media.example.test/cipher?x=2&n=cipherN", "cipherN",
+        "+/=", "customSig", true);
+    checkFormat(formats.get(2), YoutubeFormatInfo.WEBM_VORBIS, "audio/webm", "vorbis",
+        -1L, 9L, 2L, "relative/cipher?x=1&n=chosenN", "directN",
+        "chosen", "signature", true);
+    formats.add(null);
+    List<YoutubeTrackFormat> fresh = extractor.extract(data(
+        "{\"streamingData\":{\"formats\":[" + direct + "]}}"));
+    check(fresh != formats && fresh.size() == 1 && fresh.get(0) != formats.get(0),
+        "fresh list and formats");
+  }
+
+  private static void liveContract() throws Exception {
+    String missingLength = "{\"mimeType\":\"audio/webm; codecs=\\\"opus\\\"\","
+        + "\"url\":\"relative/live?x=1&n=liveN\"}";
+    StreamingDataFormatsExtractor extractor = new StreamingDataFormatsExtractor();
+    check(extractor.extract(data("{\"streamingData\":{\"formats\":[" + missingLength
+        + "]},\"videoDetails\":{\"isLive\":false}}" )).isEmpty(),
+        "non-live missing length skipped");
+
+    List<YoutubeTrackFormat> live = extractor.extract(data(
+        "{\"streamingData\":{\"formats\":[" + missingLength
+            + "]},\"videoDetails\":{\"isLive\":true}}"));
+    check(live.size() == 1 && live.get(0).getContentLength() == Long.MAX_VALUE,
+        "live missing length retained");
+
+    List<YoutubeTrackFormat> ended = extractor.extract(data(
+        "{\"streamingData\":{\"formats\":[" + missingLength + "]},"
+            + "\"videoDetails\":{\"isLive\":false},"
+            + "\"playabilityStatus\":{\"status\":\"OK\","
+            + "\"reason\":\"Notice: This live event has ended and is processing\"}}"));
+    check(ended.size() == 1 && ended.get(0).getContentLength() == Long.MAX_VALUE,
+        "ended event treated live");
+
+    List<YoutubeTrackFormat> wrongStatus = extractor.extract(data(
+        "{\"streamingData\":{\"formats\":[" + missingLength + "]},"
+            + "\"playabilityStatus\":{\"status\":\"ERROR\","
+            + "\"reason\":\"This live event has ended\"}}"));
+    check(wrongStatus.isEmpty(), "ended reason requires OK status");
+  }
+
+  private static void isolationContract() throws Exception {
+    String invalid = "{\"mimeType\":null,\"contentLength\":1,\"url\":\"relative/bad\"}";
+    String valid = "{\"mimeType\":\"audio/webm; codecs=\\\"opus\\\"\","
+        + "\"bitrate\":7,\"contentLength\":8,\"url\":\"relative/good\"}";
+    StreamingDataFormatsExtractor extractor = new StreamingDataFormatsExtractor();
+    List<YoutubeTrackFormat> isolated = extractor.extract(data(
+        "{\"streamingData\":{\"formats\":[" + invalid + "," + valid + "]}}"));
+    check(isolated.size() == 1 && isolated.get(0).getBitrate() == 7L,
+        "per-entry failure isolation");
+    List<YoutubeTrackFormat> failed = extractor.extract(data(
+        "{\"streamingData\":{\"formats\":[" + invalid + "]}}"));
+    check(failed.getClass() == ArrayList.class && failed.isEmpty(), "all failures swallowed");
+  }
+
+  private static void failureContract() throws Exception {
+    StreamingDataFormatsExtractor extractor = new StreamingDataFormatsExtractor();
+    expect(NullPointerException.class, () -> extractor.extract(null), "null data");
+    expect(NullPointerException.class,
+        () -> extractor.extract(new YoutubeTrackJsonData(null, JsonBrowser.NULL_BROWSER, null)),
+        "null player response");
+    List<YoutubeTrackFormat> missingUrl = extractor.extract(data(
+        "{\"streamingData\":{\"formats\":[{\"mimeType\":"
+            + "\"audio/webm; codecs=\\\"opus\\\"\","
+            + "\"contentLength\":1}]}}"));
+    check(missingUrl.size() == 1 && missingUrl.get(0).getNParameter() == null
+        && missingUrl.get(0).getSignature() == null
+        && missingUrl.get(0).getSignatureKey().equals("signature"), "missing URL retained");
+    expect(NullPointerException.class, missingUrl.get(0)::getUrl, "null URL fails lazily");
+  }
+
+  private static YoutubeTrackJsonData data(String player) throws Exception {
+    return new YoutubeTrackJsonData(JsonBrowser.parse(player), JsonBrowser.NULL_BROWSER, null);
+  }
+
+  private static void checkFormat(YoutubeTrackFormat format, YoutubeFormatInfo info,
+      String mime, String codec, long bitrate, long length, long channels, String url,
+      String n, String signature, String signatureKey, boolean defaultAudio) {
+    check(format.getInfo() == info && format.getType().getMimeType().equals(mime)
+        && format.getType().getParameter("codecs").equals(codec)
+        && format.getBitrate() == bitrate && format.getContentLength() == length
+        && format.getAudioChannels() == channels && format.getUrl().toString().equals(url)
+        && (n == null ? format.getNParameter() == null : format.getNParameter().equals(n))
+        && (signature == null ? format.getSignature() == null
+            : format.getSignature().equals(signature))
+        && format.getSignatureKey().equals(signatureKey)
+        && format.isDefaultAudioTrack() == defaultAudio, "format mapping " + url);
+  }
+
+  private static void checkMethod(Method method, int modifiers, Class<?>... parameters) {
+    check(method.getModifiers() == modifiers && method.getReturnType() == List.class
+        && java.util.Arrays.equals(method.getParameterTypes(), parameters)
+        && java.util.Arrays.equals(method.getGenericParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), method.getName() + " metadata");
+    checkListType(method.getGenericReturnType(), method.getName() + " return");
+  }
+
+  private static void checkListType(java.lang.reflect.Type value, String message) {
+    check(value instanceof ParameterizedType, message + " parameterized");
+    ParameterizedType type = (ParameterizedType) value;
+    check(type.getRawType() == List.class && type.getOwnerType() == null
+        && type.getActualTypeArguments().length == 1
+        && type.getActualTypeArguments()[0] == YoutubeTrackFormat.class, message);
+  }
+
+  private interface ThrowingSupplier { Object get() throws Exception; }
+
+  private static <T extends Throwable> T expect(
+      Class<T> expected, ThrowingSupplier operation, String message) {
+    try {
+      operation.get();
+      throw new AssertionError("expected " + expected.getName() + ": " + message);
+    } catch (Throwable error) {
+      if (!expected.isInstance(error)) throw new AssertionError(message, error);
+      return expected.cast(error);
+    }
   }
 
   private static void check(boolean condition, String message) {

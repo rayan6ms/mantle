@@ -301,6 +301,8 @@ const LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/format/LegacyStreamMapFormatsExtractor";
 const OFFLINE_YOUTUBE_TRACK_FORMAT_EXTRACTOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/format/OfflineYoutubeTrackFormatExtractor";
+const STREAMING_DATA_FORMATS_EXTRACTOR_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/format/StreamingDataFormatsExtractor";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -428,6 +430,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CLASS,
     LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CLASS,
     OFFLINE_YOUTUBE_TRACK_FORMAT_EXTRACTOR_CLASS,
+    STREAMING_DATA_FORMATS_EXTRACTOR_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -841,6 +844,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | YOUTUBE_SIGNATURE_CIPHER_MANAGER_CLASS
             | LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CLASS
             | LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CLASS
+            | STREAMING_DATA_FORMATS_EXTRACTOR_CLASS
     )
 }
 
@@ -900,6 +904,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | LEGACY_ADAPTIVE_FORMATS_EXTRACTOR_CLASS
             | LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CLASS
             | LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CLASS
+            | STREAMING_DATA_FORMATS_EXTRACTOR_CLASS
     )
 }
 
@@ -1290,6 +1295,14 @@ fn replacement_body(
     }
     if class_name == OFFLINE_YOUTUBE_TRACK_FORMAT_EXTRACTOR_CLASS {
         return offline_youtube_track_format_extractor_replacement(
+            pool,
+            name,
+            descriptor,
+            required_locals,
+        );
+    }
+    if class_name == STREAMING_DATA_FORMATS_EXTRACTOR_CLASS {
+        return streaming_data_formats_extractor_replacement(
             pool,
             name,
             descriptor,
@@ -24780,6 +24793,524 @@ fn legacy_stream_map_formats_extractor_class_init(
     pool: &mut ConstantPool<'static>,
 ) -> Result<Attribute> {
     let owner = pool.add_class(LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CLASS)?;
+    let logger_factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        logger_factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn streaming_data_formats_extractor_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        (
+            "extract",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData;)Ljava/util/List;",
+        ) => streaming_data_formats_extractor_extract(pool),
+        (
+            "loadTrackFormatsFromStreamingData",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Z)Ljava/util/List;",
+        ) => streaming_data_formats_extractor_load(pool),
+        ("<clinit>", "()V") => streaming_data_formats_extractor_class_init(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {STREAMING_DATA_FORMATS_EXTRACTOR_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+fn streaming_data_formats_extractor_extract(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(STREAMING_DATA_FORMATS_EXTRACTOR_CLASS)?;
+    let data = pool.add_class(YOUTUBE_TRACK_JSON_DATA_CLASS)?;
+    let player_response = pool.add_field_ref(
+        data,
+        "playerResponse",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let get = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let is_null = pool.add_method_ref(json, "isNull", "()Z")?;
+    let text = pool.add_method_ref(json, "text", "()Ljava/lang/String;")?;
+    let safe_text = pool.add_method_ref(json, "safeText", "()Ljava/lang/String;")?;
+    let as_boolean = pool.add_method_ref(json, "asBoolean", "(Z)Z")?;
+    let collections = pool.add_class("java/util/Collections")?;
+    let empty_list = pool.add_method_ref(collections, "emptyList", "()Ljava/util/List;")?;
+    let string = pool.add_class("java/lang/String")?;
+    let equals = pool.add_method_ref(string, "equals", "(Ljava/lang/Object;)Z")?;
+    let contains = pool.add_method_ref(string, "contains", "(Ljava/lang/CharSequence;)Z")?;
+    let load = pool.add_method_ref(
+        owner,
+        "loadTrackFormatsFromStreamingData",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Z)Ljava/util/List;",
+    )?;
+    let list = pool.add_class("java/util/List")?;
+    let add_all = pool.add_interface_method_ref(list, "addAll", "(Ljava/util/Collection;)Z")?;
+    let streaming_data = pool.add_string("streamingData")?;
+    let playability_status = pool.add_string("playabilityStatus")?;
+    let video_details = pool.add_string("videoDetails")?;
+    let is_live = pool.add_string("isLive")?;
+    let ok = pool.add_string("OK")?;
+    let status = pool.add_string("status")?;
+    let reason = pool.add_string("reason")?;
+    let ended = pool.add_string("This live event has ended")?;
+    let formats = pool.add_string("formats")?;
+    let adaptive_formats = pool.add_string("adaptiveFormats")?;
+
+    let mut instructions = vec![
+        Instruction::Aload_1,
+        Instruction::Getfield(player_response),
+        Instruction::Ldc_w(streaming_data),
+        Instruction::Invokevirtual(get),
+        Instruction::Astore_2,
+        Instruction::Aload_2,
+        Instruction::Invokevirtual(is_null),
+        Instruction::Ifeq(0),
+        Instruction::Invokestatic(empty_list),
+        Instruction::Areturn,
+        Instruction::Aload_1,
+        Instruction::Getfield(player_response),
+        Instruction::Ldc_w(playability_status),
+        Instruction::Invokevirtual(get),
+        Instruction::Astore_3,
+        Instruction::Aload_1,
+        Instruction::Getfield(player_response),
+        Instruction::Ldc_w(video_details),
+        Instruction::Invokevirtual(get),
+        Instruction::Ldc_w(is_live),
+        Instruction::Invokevirtual(get),
+        Instruction::Iconst_0,
+        Instruction::Invokevirtual(as_boolean),
+        Instruction::Istore(4),
+        Instruction::Ldc_w(ok),
+        Instruction::Aload_3,
+        Instruction::Ldc_w(status),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text),
+        Instruction::Invokevirtual(equals),
+        Instruction::Ifeq(0),
+        Instruction::Aload_3,
+        Instruction::Ldc_w(reason),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(safe_text),
+        Instruction::Ldc_w(ended),
+        Instruction::Invokevirtual(contains),
+        Instruction::Ifeq(0),
+        Instruction::Iconst_1,
+        Instruction::Istore(4),
+        Instruction::Aload_0,
+        Instruction::Aload_2,
+        Instruction::Ldc_w(formats),
+        Instruction::Invokevirtual(get),
+        Instruction::Iload(4),
+        Instruction::Invokevirtual(load),
+        Instruction::Astore(5),
+        Instruction::Aload(5),
+        Instruction::Aload_0,
+        Instruction::Aload_2,
+        Instruction::Ldc_w(adaptive_formats),
+        Instruction::Invokevirtual(get),
+        Instruction::Iload(4),
+        Instruction::Invokevirtual(load),
+        Instruction::Invokeinterface(add_all, 2),
+        Instruction::Pop,
+        Instruction::Aload(5),
+        Instruction::Areturn,
+    ];
+    let present_target = 10usize;
+    let extraction_target = 40usize;
+    instructions[7] = Instruction::Ifeq(u16::try_from(present_target)?);
+    instructions[30] = Instruction::Ifeq(u16::try_from(extraction_target)?);
+    instructions[37] = Instruction::Ifeq(u16::try_from(extraction_target)?);
+    let mut body = code(pool, 4, 6, instructions)?;
+    let mut previous = None;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            youtube_full_frame(
+                &mut previous,
+                present_target,
+                vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object { cpool_index: data },
+                    VerificationType::Object { cpool_index: json },
+                ],
+                vec![],
+            )?,
+            youtube_full_frame(
+                &mut previous,
+                extraction_target,
+                vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object { cpool_index: data },
+                    VerificationType::Object { cpool_index: json },
+                    VerificationType::Object { cpool_index: json },
+                    VerificationType::Integer,
+                ],
+                vec![],
+            )?,
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn streaming_data_formats_extractor_load(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(STREAMING_DATA_FORMATS_EXTRACTOR_CLASS)?;
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let get = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let text = pool.add_method_ref(json, "text", "()Ljava/lang/String;")?;
+    let is_null = pool.add_method_ref(json, "isNull", "()Z")?;
+    let is_list = pool.add_method_ref(json, "isList", "()Z")?;
+    let values = pool.add_method_ref(json, "values", "()Ljava/util/List;")?;
+    let as_long = pool.add_method_ref(json, "asLong", "(J)J")?;
+    let as_boolean = pool.add_method_ref(json, "asBoolean", "(Z)Z")?;
+    let format = pool.add_method_ref(json, "format", "()Ljava/lang/String;")?;
+    let array_list = pool.add_class("java/util/ArrayList")?;
+    let array_list_init = pool.add_method_ref(array_list, "<init>", "()V")?;
+    let list = pool.add_class("java/util/List")?;
+    let iterator_method =
+        pool.add_interface_method_ref(list, "iterator", "()Ljava/util/Iterator;")?;
+    let add = pool.add_interface_method_ref(list, "add", "(Ljava/lang/Object;)Z")?;
+    let is_empty = pool.add_interface_method_ref(list, "isEmpty", "()Z")?;
+    let iterator = pool.add_class("java/util/Iterator")?;
+    let has_next = pool.add_interface_method_ref(iterator, "hasNext", "()Z")?;
+    let next = pool.add_interface_method_ref(iterator, "next", "()Ljava/lang/Object;")?;
+    let data_format_tools =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/DataFormatTools")?;
+    let decode = pool.add_method_ref(
+        data_format_tools,
+        "decodeUrlEncodedItems",
+        "(Ljava/lang/String;Z)Ljava/util/Map;",
+    )?;
+    let is_null_or_empty =
+        pool.add_method_ref(data_format_tools, "isNullOrEmpty", "(Ljava/lang/String;)Z")?;
+    let collections = pool.add_class("java/util/Collections")?;
+    let empty_map = pool.add_method_ref(collections, "emptyMap", "()Ljava/util/Map;")?;
+    let map = pool.add_class("java/util/Map")?;
+    let map_get =
+        pool.add_interface_method_ref(map, "get", "(Ljava/lang/Object;)Ljava/lang/Object;")?;
+    let get_or_default = pool.add_interface_method_ref(
+        map,
+        "getOrDefault",
+        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+    )?;
+    let string = pool.add_class("java/lang/String")?;
+    let content_type = pool.add_class("org/apache/http/entity/ContentType")?;
+    let parse_content_type = pool.add_method_ref(
+        content_type,
+        "parse",
+        "(Ljava/lang/String;)Lorg/apache/http/entity/ContentType;",
+    )?;
+    let track_format = pool.add_class(YOUTUBE_TRACK_FORMAT_CLASS)?;
+    let track_format_init = pool.add_method_ref(
+        track_format,
+        "<init>",
+        "(Lorg/apache/http/entity/ContentType;JJJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V",
+    )?;
+    let logger = pool.add_class("org/slf4j/Logger")?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let debug_one =
+        pool.add_interface_method_ref(logger, "debug", "(Ljava/lang/String;Ljava/lang/Object;)V")?;
+    let debug_two = pool.add_interface_method_ref(
+        logger,
+        "debug",
+        "(Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;)V",
+    )?;
+    let warn =
+        pool.add_interface_method_ref(logger, "warn", "(Ljava/lang/String;Ljava/lang/Object;)V")?;
+    let runtime = pool.add_class("java/lang/RuntimeException")?;
+    let url_key = pool.add_string("url")?;
+    let cipher_key = pool.add_string("cipher")?;
+    let signature_cipher_key = pool.add_string("signatureCipher")?;
+    let content_length_key = pool.add_string("contentLength")?;
+    let missing_length =
+        pool.add_string("Track not a live stream, but no contentLength in format {}, skipping")?;
+    let mime_type_key = pool.add_string("mimeType")?;
+    let bitrate_key = pool.add_string("bitrate")?;
+    let audio_channels_key = pool.add_string("audioChannels")?;
+    let n_key = pool.add_string("n")?;
+    let signature_value_key = pool.add_string("s")?;
+    let signature_parameter_key = pool.add_string("sp")?;
+    let default_signature_key = pool.add_string("signature")?;
+    let audio_track_key = pool.add_string("audioTrack")?;
+    let audio_default_key = pool.add_string("audioIsDefault")?;
+    let parse_failure = pool.add_string("Failed to parse format {}, skipping")?;
+    let all_failed = pool.add_string(
+        "In streamingData adaptive formats {}, all formats either failed to load or were skipped due to missing fields",
+    )?;
+    let unknown_length = pool.add_long(i64::MAX)?;
+    let unknown_bitrate = pool.add_long(-1)?;
+    let two = pool.add_long(2)?;
+
+    let instructions = vec![
+        Instruction::New(array_list),
+        Instruction::Dup,
+        Instruction::Invokespecial(array_list_init),
+        Instruction::Astore_3,
+        Instruction::Iconst_0,
+        Instruction::Istore(4),
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(is_null),
+        Instruction::Ifne(137),
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(is_list),
+        Instruction::Ifeq(137),
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(values),
+        Instruction::Invokeinterface(iterator_method, 1),
+        Instruction::Astore(5),
+        Instruction::Aload(5),
+        Instruction::Invokeinterface(has_next, 1),
+        Instruction::Ifeq(137),
+        Instruction::Aload(5),
+        Instruction::Invokeinterface(next, 1),
+        Instruction::Checkcast(json),
+        Instruction::Astore(6),
+        Instruction::Aload(6),
+        Instruction::Ldc_w(url_key),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text),
+        Instruction::Astore(7),
+        Instruction::Aload(6),
+        Instruction::Ldc_w(cipher_key),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text),
+        Instruction::Astore(8),
+        Instruction::Aload(8),
+        Instruction::Ifnonnull(40),
+        Instruction::Aload(6),
+        Instruction::Ldc_w(signature_cipher_key),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text),
+        Instruction::Astore(8),
+        Instruction::Aload(8),
+        Instruction::Ifnull(46),
+        Instruction::Aload(8),
+        Instruction::Iconst_1,
+        Instruction::Invokestatic(decode),
+        Instruction::Goto(47),
+        Instruction::Invokestatic(empty_map),
+        Instruction::Astore(9),
+        Instruction::Aload(7),
+        Instruction::Invokestatic(is_null_or_empty),
+        Instruction::Ifeq(58),
+        Instruction::Aload(9),
+        Instruction::Ldc_w(url_key),
+        Instruction::Invokeinterface(map_get, 2),
+        Instruction::Checkcast(string),
+        Instruction::Iconst_0,
+        Instruction::Invokestatic(decode),
+        Instruction::Goto(61),
+        Instruction::Aload(7),
+        Instruction::Iconst_0,
+        Instruction::Invokestatic(decode),
+        Instruction::Astore(10),
+        Instruction::Aload(6),
+        Instruction::Ldc_w(content_length_key),
+        Instruction::Invokevirtual(get),
+        Instruction::Ldc2_w(unknown_length),
+        Instruction::Invokevirtual(as_long),
+        Instruction::Lstore(11),
+        Instruction::Lload(11),
+        Instruction::Ldc2_w(unknown_length),
+        Instruction::Lcmp,
+        Instruction::Ifne(80),
+        Instruction::Iload_2,
+        Instruction::Ifne(80),
+        Instruction::Getstatic(log),
+        Instruction::Ldc_w(missing_length),
+        Instruction::Aload(6),
+        Instruction::Invokevirtual(format),
+        Instruction::Invokeinterface(debug_one, 3),
+        Instruction::Goto(16),
+        Instruction::Aload_3,
+        Instruction::New(track_format),
+        Instruction::Dup,
+        Instruction::Aload(6),
+        Instruction::Ldc_w(mime_type_key),
+        Instruction::Invokevirtual(get),
+        Instruction::Invokevirtual(text),
+        Instruction::Invokestatic(parse_content_type),
+        Instruction::Aload(6),
+        Instruction::Ldc_w(bitrate_key),
+        Instruction::Invokevirtual(get),
+        Instruction::Ldc2_w(unknown_bitrate),
+        Instruction::Invokevirtual(as_long),
+        Instruction::Lload(11),
+        Instruction::Aload(6),
+        Instruction::Ldc_w(audio_channels_key),
+        Instruction::Invokevirtual(get),
+        Instruction::Ldc2_w(two),
+        Instruction::Invokevirtual(as_long),
+        Instruction::Aload(9),
+        Instruction::Ldc_w(url_key),
+        Instruction::Aload(7),
+        Instruction::Invokeinterface(get_or_default, 3),
+        Instruction::Checkcast(string),
+        Instruction::Aload(10),
+        Instruction::Ldc_w(n_key),
+        Instruction::Invokeinterface(map_get, 2),
+        Instruction::Checkcast(string),
+        Instruction::Aload(9),
+        Instruction::Ldc_w(signature_value_key),
+        Instruction::Invokeinterface(map_get, 2),
+        Instruction::Checkcast(string),
+        Instruction::Aload(9),
+        Instruction::Ldc_w(signature_parameter_key),
+        Instruction::Ldc_w(default_signature_key),
+        Instruction::Invokeinterface(get_or_default, 3),
+        Instruction::Checkcast(string),
+        Instruction::Aload(6),
+        Instruction::Ldc_w(audio_track_key),
+        Instruction::Invokevirtual(get),
+        Instruction::Ldc_w(audio_default_key),
+        Instruction::Invokevirtual(get),
+        Instruction::Iconst_1,
+        Instruction::Invokevirtual(as_boolean),
+        Instruction::Invokespecial(track_format_init),
+        Instruction::Invokeinterface(add, 2),
+        Instruction::Pop,
+        Instruction::Goto(136),
+        Instruction::Astore(11),
+        Instruction::Iconst_1,
+        Instruction::Istore(4),
+        Instruction::Getstatic(log),
+        Instruction::Ldc_w(parse_failure),
+        Instruction::Aload(6),
+        Instruction::Aload(11),
+        Instruction::Invokeinterface(debug_two, 4),
+        Instruction::Goto(16),
+        Instruction::Aload_3,
+        Instruction::Invokeinterface(is_empty, 1),
+        Instruction::Ifeq(147),
+        Instruction::Iload(4),
+        Instruction::Ifeq(147),
+        Instruction::Getstatic(log),
+        Instruction::Ldc_w(all_failed),
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(format),
+        Instruction::Invokeinterface(warn, 3),
+        Instruction::Aload_3,
+        Instruction::Areturn,
+    ];
+    let mut body = code_with_exceptions(
+        pool,
+        16,
+        13,
+        instructions,
+        vec![
+            ExceptionTableEntry {
+                range_pc: 62..80,
+                handler_pc: 128,
+                catch_type: runtime,
+            },
+            ExceptionTableEntry {
+                range_pc: 80..128,
+                handler_pc: 128,
+                catch_type: runtime,
+            },
+        ],
+    )?;
+    let base = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Object { cpool_index: json },
+        VerificationType::Integer,
+        VerificationType::Object { cpool_index: list },
+        VerificationType::Integer,
+    ];
+    let mut loop_locals = base.clone();
+    loop_locals.push(VerificationType::Object {
+        cpool_index: iterator,
+    });
+    let mut format_locals = loop_locals.clone();
+    format_locals.extend([
+        VerificationType::Object { cpool_index: json },
+        VerificationType::Object {
+            cpool_index: string,
+        },
+        VerificationType::Object {
+            cpool_index: string,
+        },
+    ]);
+    let mut cipher_locals = format_locals.clone();
+    cipher_locals.push(VerificationType::Object { cpool_index: map });
+    let mut mapped_locals = cipher_locals.clone();
+    mapped_locals.push(VerificationType::Object { cpool_index: map });
+    let mut content_locals = mapped_locals.clone();
+    content_locals.push(VerificationType::Long);
+    let mut previous = None;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            youtube_full_frame(&mut previous, 16, loop_locals.clone(), vec![])?,
+            youtube_full_frame(&mut previous, 40, format_locals.clone(), vec![])?,
+            youtube_full_frame(&mut previous, 46, format_locals.clone(), vec![])?,
+            youtube_full_frame(
+                &mut previous,
+                47,
+                format_locals,
+                vec![VerificationType::Object { cpool_index: map }],
+            )?,
+            youtube_full_frame(&mut previous, 58, cipher_locals.clone(), vec![])?,
+            youtube_full_frame(
+                &mut previous,
+                61,
+                cipher_locals,
+                vec![VerificationType::Object { cpool_index: map }],
+            )?,
+            youtube_full_frame(&mut previous, 80, content_locals, vec![])?,
+            youtube_full_frame(
+                &mut previous,
+                128,
+                mapped_locals.clone(),
+                vec![VerificationType::Object {
+                    cpool_index: runtime,
+                }],
+            )?,
+            youtube_full_frame(&mut previous, 136, mapped_locals, vec![])?,
+            youtube_full_frame(&mut previous, 137, base.clone(), vec![])?,
+            youtube_full_frame(&mut previous, 147, base, vec![])?,
+        ],
+    )?;
+    Ok(body)
+}
+
+fn streaming_data_formats_extractor_class_init(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(STREAMING_DATA_FORMATS_EXTRACTOR_CLASS)?;
     let logger_factory = pool.add_class("org/slf4j/LoggerFactory")?;
     let get_logger = pool.add_method_ref(
         logger_factory,
