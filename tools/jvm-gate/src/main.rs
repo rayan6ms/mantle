@@ -191,6 +191,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-bandcamp-audio-track-consumer" => Some(BANDCAMP_AUDIO_TRACK_CONSUMER),
         "write-beam-audio-source-manager-consumer" => Some(BEAM_AUDIO_SOURCE_MANAGER_CONSUMER),
         "write-beam-audio-track-consumer" => Some(BEAM_AUDIO_TRACK_CONSUMER),
+        "write-beam-segment-url-provider-consumer" => Some(BEAM_SEGMENT_URL_PROVIDER_CONSUMER),
         "write-vimeo-audio-source-manager-consumer" => Some(VIMEO_AUDIO_SOURCE_MANAGER_CONSUMER),
         "write-vimeo-playback-format-consumer" => Some(VIMEO_PLAYBACK_FORMAT_CONSUMER),
         "write-vimeo-audio-track-consumer" => Some(VIMEO_AUDIO_TRACK_CONSUMER),
@@ -16901,6 +16902,152 @@ public final class GateBeamAudioTrack {
   }
 }
 "#;
+
+const BEAM_SEGMENT_URL_PROVIDER_CONSUMER: &str = r##"
+import com.sedmelluq.discord.lavaplayer.container.playlists.ExtendedM3uParser;
+import com.sedmelluq.discord.lavaplayer.source.beam.BeamSegmentUrlProvider;
+import com.sedmelluq.discord.lavaplayer.source.stream.M3uStreamSegmentUrlProvider;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpUriRequest;
+
+public final class GateBeamSegmentUrlProvider {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "expected disposition");
+    boolean reference = args[0].equals("reference");
+    check(reference || args[0].equals("candidate"), "unknown disposition");
+    reflectionContract();
+    commonBehavior();
+    if (reference) referenceDisposition(); else currentDisposition();
+    System.out.println(
+        "common=public-concrete,m3u-provider-super,3-fields,1-constructor,3-exported-methods;"
+        + "construction,name-quality,cached-playlist,http-get,reflection;service="
+        + (reference ? "legacy-mixer-manifest-fetch" : "retired-stable-failure,no-network"));
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<BeamSegmentUrlProvider> type = BeamSegmentUrlProvider.class;
+    check(type.getModifiers() == Modifier.PUBLIC
+        && type.getSuperclass() == M3uStreamSegmentUrlProvider.class
+        && type.getInterfaces().length == 0, "class metadata");
+    check(type.getDeclaredFields().length == 3, "field count");
+    checkField(type, "log", Class.forName("org.slf4j.Logger"),
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "channelId", String.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "streamSegmentPlaylistUrl", String.class, Modifier.PRIVATE);
+    Constructor<?> constructor = type.getDeclaredConstructor(String.class);
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "constructor metadata");
+    check(type.getDeclaredMethods().length == 3, "declared method count");
+    long exported = Arrays.stream(type.getDeclaredMethods())
+        .filter(method -> Modifier.isPublic(method.getModifiers())
+            || Modifier.isProtected(method.getModifiers()))
+        .count();
+    check(exported == 3L, "exported method count");
+    checkMethod(type, "getQualityFromM3uDirective", String.class, Modifier.PROTECTED,
+        new Class<?>[] {ExtendedM3uParser.Line.class});
+    checkMethod(type, "fetchSegmentPlaylistUrl", String.class, Modifier.PROTECTED,
+        new Class<?>[] {HttpInterface.class}, java.io.IOException.class);
+    checkMethod(type, "createSegmentGetRequest", HttpUriRequest.class, Modifier.PROTECTED,
+        new Class<?>[] {String.class});
+  }
+
+  private static void commonBehavior() throws Exception {
+    String channelId = new String("424242");
+    ExposedProvider provider = new ExposedProvider(channelId);
+    check(field("log").get(null) != null, "static logger");
+    check(field("channelId").get(provider) == channelId
+        && field("streamSegmentPlaylistUrl").get(provider) == null
+        && provider.base() == null, "constructor state");
+    ExtendedM3uParser.Line quality = ExtendedM3uParser.parseLine(
+        "#EXT-X-STREAM-INF:BANDWIDTH=128000,NAME=source");
+    ExtendedM3uParser.Line missing = ExtendedM3uParser.parseLine(
+        "#EXT-X-STREAM-INF:BANDWIDTH=64000");
+    check(provider.quality(quality).equals("source") && provider.quality(missing) == null,
+        "NAME quality selection");
+    expect(NullPointerException.class, () -> provider.quality(null));
+    HttpUriRequest request = provider.request("https://example.invalid/live/segment.ts");
+    check(request instanceof HttpGet && request.getMethod().equals("GET")
+        && request.getURI().toString().equals("https://example.invalid/live/segment.ts")
+        && request.getAllHeaders().length == 0, "plain HTTP GET");
+    String cached = new String("https://example.invalid/live/index.m3u8");
+    field("streamSegmentPlaylistUrl").set(provider, cached);
+    check(provider.fetch(null) == cached, "cached playlist identity");
+    ExposedProvider nullChannel = new ExposedProvider(null);
+    check(field("channelId").get(nullChannel) == null, "null channel preserved");
+  }
+
+  private static void referenceDisposition() throws Exception {
+    ExposedProvider provider = new ExposedProvider("424242");
+    expect(NullPointerException.class, () -> provider.fetch(null));
+    check(field("streamSegmentPlaylistUrl").get(provider) == null,
+        "legacy fetch requires HTTP interface");
+  }
+
+  private static void currentDisposition() throws Exception {
+    ExposedProvider provider = new ExposedProvider("424242");
+    RuntimeException retired = expect(RuntimeException.class, () -> provider.fetch(null));
+    check(retired.getMessage().contains("Beam/Mixer service is closed")
+        && field("streamSegmentPlaylistUrl").get(provider) == null,
+        "retired provider fails before HTTP or cache mutation");
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = BeamSegmentUrlProvider.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> type, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == type && field.getGenericType() == type
+        && field.getModifiers() == modifiers && !field.isSynthetic(), name + " metadata");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+                                  int modifiers, Class<?>[] parameters,
+                                  Class<?>... exceptions) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.getTypeParameters().length == 0 && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), method + " metadata");
+  }
+
+  private static final class ExposedProvider extends BeamSegmentUrlProvider {
+    ExposedProvider(String channelId) { super(channelId); }
+    String quality(ExtendedM3uParser.Line line) { return super.getQualityFromM3uDirective(line); }
+    String fetch(HttpInterface http) throws Exception { return super.fetchSegmentPlaylistUrl(http); }
+    HttpUriRequest request(String url) { return super.createSegmentGetRequest(url); }
+    String base() { return super.baseUrl; }
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"##;
 
 const VIMEO_AUDIO_TRACK_CONSUMER: &str = r#"
 import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;

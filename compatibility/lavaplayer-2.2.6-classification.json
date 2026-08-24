@@ -13367,45 +13367,74 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "D_LEGACY",
+      "notes": "The exact public M3U provider shell and local behavior are emitted, while uncached playlist discovery now fails deterministically before contacting the retired Beam/Mixer service.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-media/tests/phase12_beam.rs",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0019-compatibility-only-beam-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.beam.BeamSegmentUrlProvider",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Ljava/lang/String;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves the public constructor, null base URL, channel identifier identity, null capture, and initial cache state.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.beam.BeamSegmentUrlProvider",
       "symbol_kind": "METHOD",
       "member_name": "getQualityFromM3uDirective",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/playlists/ExtendedM3uParser$Line;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves NAME directive lookup, missing-name null behavior, null-line failure, visibility, throws metadata, and reflection shape.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.beam.BeamSegmentUrlProvider",
       "symbol_kind": "METHOD",
       "member_name": "fetchSegmentPlaylistUrl",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "D_LEGACY",
+      "notes": "Cached playlist identity remains exact, while an uncached fetch returns a stable closed-service failure before dereferencing the HTTP interface or contacting Mixer.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "crates/mantle-media/tests/phase12_beam.rs",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "docs/architecture/ADR-0019-compatibility-only-beam-source.md"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.beam.BeamSegmentUrlProvider",
       "symbol_kind": "METHOD",
       "member_name": "createSegmentGetRequest",
       "descriptor": "(Ljava/lang/String;)Lorg/apache/http/client/methods/HttpUriRequest;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves plain HttpGet construction, request method and URI, header absence, and protected method metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.getyarn.GetyarnAudioSourceManager",

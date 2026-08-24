@@ -122,6 +122,8 @@ const BANDCAMP_AUDIO_TRACK_CLASS: &str =
 const BEAM_AUDIO_SOURCE_MANAGER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/beam/BeamAudioSourceManager";
 const BEAM_AUDIO_TRACK_CLASS: &str = "com/sedmelluq/discord/lavaplayer/source/beam/BeamAudioTrack";
+const BEAM_SEGMENT_URL_PROVIDER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/beam/BeamSegmentUrlProvider";
 const HEARTBEATING_HTTP_STREAM_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/nico/HeartbeatingHttpStream";
 const NICO_AUDIO_SOURCE_MANAGER_CLASS: &str =
@@ -351,6 +353,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     BANDCAMP_AUDIO_TRACK_CLASS,
     BEAM_AUDIO_SOURCE_MANAGER_CLASS,
     BEAM_AUDIO_TRACK_CLASS,
+    BEAM_SEGMENT_URL_PROVIDER_CLASS,
     HEARTBEATING_HTTP_STREAM_CLASS,
     NICO_AUDIO_SOURCE_MANAGER_CLASS,
     NICO_AUDIO_TRACK_CLASS,
@@ -809,6 +812,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | BANDCAMP_AUDIO_TRACK_CLASS
             | BEAM_AUDIO_SOURCE_MANAGER_CLASS
             | BEAM_AUDIO_TRACK_CLASS
+            | BEAM_SEGMENT_URL_PROVIDER_CLASS
             | HEARTBEATING_HTTP_STREAM_CLASS
             | NICO_AUDIO_SOURCE_MANAGER_CLASS
             | NICO_AUDIO_TRACK_CLASS
@@ -876,6 +880,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | BANDCAMP_AUDIO_TRACK_CLASS
             | BEAM_AUDIO_SOURCE_MANAGER_CLASS
             | BEAM_AUDIO_TRACK_CLASS
+            | BEAM_SEGMENT_URL_PROVIDER_CLASS
             | HEARTBEATING_HTTP_STREAM_CLASS
             | NICO_AUDIO_SOURCE_MANAGER_CLASS
             | NICO_AUDIO_TRACK_CLASS
@@ -1025,6 +1030,9 @@ fn replacement_body(
     }
     if class_name == BEAM_AUDIO_TRACK_CLASS {
         return beam_audio_track_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == BEAM_SEGMENT_URL_PROVIDER_CLASS {
+        return beam_segment_url_provider_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == HEARTBEATING_HTTP_STREAM_CLASS {
         return heartbeating_http_stream_replacement(pool, name, descriptor, required_locals);
@@ -4123,6 +4131,151 @@ fn beam_audio_track_channel_url(pool: &mut ConstantPool<'static>) -> Result<Attr
 
 fn beam_audio_track_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
     let owner = pool.add_class(BEAM_AUDIO_TRACK_CLASS)?;
+    let factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn beam_segment_url_provider_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(Ljava/lang/String;)V") => beam_segment_url_provider_constructor(pool),
+        (
+            "getQualityFromM3uDirective",
+            "(Lcom/sedmelluq/discord/lavaplayer/container/playlists/ExtendedM3uParser$Line;)Ljava/lang/String;",
+        ) => beam_segment_url_provider_quality(pool),
+        (
+            "fetchSegmentPlaylistUrl",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;)Ljava/lang/String;",
+        ) => beam_segment_url_provider_fetch(pool),
+        (
+            "createSegmentGetRequest",
+            "(Ljava/lang/String;)Lorg/apache/http/client/methods/HttpUriRequest;",
+        ) => beam_segment_url_provider_request(pool),
+        ("<clinit>", "()V") => beam_segment_url_provider_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {BEAM_SEGMENT_URL_PROVIDER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn beam_segment_url_provider_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let parent = pool.add_class(M3U_SEGMENT_URL_PROVIDER_CLASS)?;
+    let parent_init = pool.add_method_ref(parent, "<init>", "(Ljava/lang/String;)V")?;
+    let owner = pool.add_class(BEAM_SEGMENT_URL_PROVIDER_CLASS)?;
+    let channel = pool.add_field_ref(owner, "channelId", "Ljava/lang/String;")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aconst_null,
+            Instruction::Invokespecial(parent_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(channel),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn beam_segment_url_provider_quality(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let line = pool
+        .add_class("com/sedmelluq/discord/lavaplayer/container/playlists/ExtendedM3uParser$Line")?;
+    let arguments = pool.add_field_ref(line, "directiveArguments", "Ljava/util/Map;")?;
+    let map = pool.add_class("java/util/Map")?;
+    let get =
+        pool.add_interface_method_ref(map, "get", "(Ljava/lang/Object;)Ljava/lang/Object;")?;
+    let name = pool.add_string("NAME")?;
+    let string = pool.add_class("java/lang/String")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Getfield(arguments),
+            Instruction::Ldc_w(name),
+            Instruction::Invokeinterface(get, 2),
+            Instruction::Checkcast(string),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn beam_segment_url_provider_fetch(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BEAM_SEGMENT_URL_PROVIDER_CLASS)?;
+    let cached = pool.add_field_ref(owner, "streamSegmentPlaylistUrl", "Ljava/lang/String;")?;
+    let exception = pool.add_class("java/lang/UnsupportedOperationException")?;
+    let exception_init = pool.add_method_ref(exception, "<init>", "(Ljava/lang/String;)V")?;
+    let message = pool.add_string(
+        "Beam/Mixer service is closed; legacy segment playlist discovery is unavailable",
+    )?;
+    let mut body = code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(cached),
+            Instruction::Ifnull(6),
+            Instruction::Aload_0,
+            Instruction::Getfield(cached),
+            Instruction::Areturn,
+            Instruction::New(exception),
+            Instruction::Dup,
+            Instruction::Ldc_w(message),
+            Instruction::Invokespecial(exception_init),
+            Instruction::Athrow,
+        ],
+    )?;
+    add_same_frame(pool, &mut body, 6)?;
+    Ok(body)
+}
+
+fn beam_segment_url_provider_request(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let request = pool.add_class("org/apache/http/client/methods/HttpGet")?;
+    let request_init = pool.add_method_ref(request, "<init>", "(Ljava/lang/String;)V")?;
+    code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::New(request),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(request_init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn beam_segment_url_provider_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BEAM_SEGMENT_URL_PROVIDER_CLASS)?;
     let factory = pool.add_class("org/slf4j/LoggerFactory")?;
     let get_logger = pool.add_method_ref(
         factory,
