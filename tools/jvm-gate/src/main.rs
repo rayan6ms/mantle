@@ -250,6 +250,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-youtube-http-context-filter-consumer" => Some(YOUTUBE_HTTP_CONTEXT_FILTER_CONSUMER),
         "write-youtube-link-router-consumer" => Some(YOUTUBE_LINK_ROUTER_CONSUMER),
         "write-youtube-mix-loader-consumer" => Some(YOUTUBE_MIX_LOADER_CONSUMER),
+        "write-youtube-mix-provider-consumer" => Some(YOUTUBE_MIX_PROVIDER_CONSUMER),
         _ => None,
     }
 }
@@ -19953,6 +19954,136 @@ public final class GateYoutubeMixLoader {
       calls++;
       if (failure != null) throw failure;
       return result;
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_MIX_PROVIDER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeMixLoader;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeMixProvider;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.protocol.HttpClientContext;
+
+public final class GateYoutubeMixProvider {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "mode required");
+    Class<YoutubeMixProvider> type = YoutubeMixProvider.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {YoutubeMixLoader.class})
+        && Arrays.equals(type.getGenericInterfaces(), new Type[] {YoutubeMixLoader.class})
+        && type.getTypeParameters().length == 0 && type.getDeclaredFields().length == 0
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredMethods().length == 3
+        && type.getDeclaredClasses().length == 0 && !type.isInterface() && !type.isEnum()
+        && !type.isAnnotation() && !type.isSynthetic(), "class shape");
+
+    Constructor<YoutubeMixProvider> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    YoutubeMixProvider provider = constructor.newInstance();
+    check(provider != constructor.newInstance(), "fresh construction");
+
+    Method load = type.getDeclaredMethod("load", HttpInterface.class, String.class, String.class,
+        Function.class);
+    check(load.getModifiers() == Modifier.PUBLIC && load.getReturnType() == AudioPlaylist.class
+        && load.getGenericReturnType() == AudioPlaylist.class
+        && load.getExceptionTypes().length == 0 && load.getTypeParameters().length == 0
+        && !load.isBridge() && !load.isSynthetic() && !load.isVarArgs(), "load metadata");
+    checkGenericFactory(load.getGenericParameterTypes(), 3, "load factory signature");
+
+    Method extract = type.getDeclaredMethod("extractPlaylistTracks", JsonBrowser.class, List.class,
+        Function.class);
+    check(extract.getModifiers() == Modifier.PRIVATE && extract.getReturnType() == void.class
+        && extract.getExceptionTypes().length == 0 && !extract.isSynthetic(), "extract metadata");
+    Type[] extractParameters = extract.getGenericParameterTypes();
+    checkParameterized(extractParameters[1], List.class, new Type[] {AudioTrack.class},
+        "extract tracks signature");
+    checkGenericFactory(extractParameters, 2, "extract factory signature");
+
+    Method selected = type.getDeclaredMethod("findSelectedTrack", List.class, String.class);
+    check(selected.getModifiers() == Modifier.PRIVATE && selected.getReturnType() == AudioTrack.class
+        && selected.getExceptionTypes().length == 0 && !selected.isSynthetic(),
+        "selected metadata");
+    checkParameterized(selected.getGenericParameterTypes()[0], List.class,
+        new Type[] {AudioTrack.class}, "selected tracks signature");
+
+    if (args[0].equals("candidate")) {
+      AtomicInteger factoryCalls = new AtomicInteger();
+      Function<AudioTrackInfo, AudioTrack> factory = info -> {
+        factoryCalls.incrementAndGet();
+        return null;
+      };
+      RejectingHttpInterface http = new RejectingHttpInterface();
+      assertUnsupported(provider, null, null, null, factory);
+      assertUnsupported(provider, http, "RDfixture", "abcdefghijk", factory);
+      check(factoryCalls.get() == 0 && http.calls == 0,
+          "failure precedes HTTP and factory collaborators");
+      System.out.println("common=public-concrete,object-root,mix-loader-interface,0-fields,"
+          + "1-constructor,2-exported-methods,2-private-methods;fresh-construction,generic-factory,"
+          + "private-signatures,reflection;service=deterministic-no-network,"
+          + "current-bounded-native-source");
+    } else {
+      check(args[0].equals("reference"), "unknown mode");
+      System.out.println("common=public-concrete,object-root,mix-loader-interface,0-fields,"
+          + "1-constructor,2-exported-methods,2-private-methods;fresh-construction,generic-factory,"
+          + "private-signatures,reflection;service=legacy-single-android-next,unbounded-tracks");
+    }
+  }
+
+  private static void checkGenericFactory(Type[] parameters, int index, String message) {
+    checkParameterized(parameters[index], Function.class,
+        new Type[] {AudioTrackInfo.class, AudioTrack.class}, message);
+  }
+
+  private static void checkParameterized(Type value, Class<?> raw, Type[] arguments,
+                                         String message) {
+    check(value instanceof ParameterizedType, message);
+    ParameterizedType parameterized = (ParameterizedType) value;
+    check(parameterized.getRawType() == raw && parameterized.getOwnerType() == null
+        && Arrays.equals(parameterized.getActualTypeArguments(), arguments), message);
+  }
+
+  private static void assertUnsupported(YoutubeMixProvider provider, HttpInterface http,
+      String mixId, String selectedId, Function<AudioTrackInfo, AudioTrack> factory) {
+    try {
+      provider.load(http, mixId, selectedId, factory);
+      throw new AssertionError("legacy mix discovery unexpectedly succeeded");
+    } catch (UnsupportedOperationException error) {
+      check(error.getMessage().contains("Legacy YouTube mix discovery is unsupported"),
+          "stable unsupported disposition");
+    }
+  }
+
+  private static final class RejectingHttpInterface extends HttpInterface {
+    int calls;
+
+    RejectingHttpInterface() {
+      super(null, HttpClientContext.create(), false, null);
+    }
+
+    @Override public CloseableHttpResponse execute(HttpUriRequest request) throws IOException {
+      calls++;
+      throw new AssertionError("HTTP invoked");
     }
   }
 
