@@ -271,6 +271,8 @@ const YOUTUBE_PERSISTENT_HTTP_STREAM_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubePersistentHttpStream";
 const YOUTUBE_PLAYLIST_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubePlaylistLoader";
+const YOUTUBE_SEARCH_MUSIC_PROVIDER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSearchMusicProvider";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -383,6 +385,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_PAYLOAD_HELPER_CLASS,
     YOUTUBE_PERSISTENT_HTTP_STREAM_CLASS,
     YOUTUBE_PLAYLIST_LOADER_CLASS,
+    YOUTUBE_SEARCH_MUSIC_PROVIDER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -788,6 +791,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | YOUTUBE_HTTP_CONTEXT_FILTER_CLASS
             | YOUTUBE_MPEG_STREAM_AUDIO_TRACK_CLASS
             | YOUTUBE_PERSISTENT_HTTP_STREAM_CLASS
+            | YOUTUBE_SEARCH_MUSIC_PROVIDER_CLASS
     )
 }
 
@@ -840,6 +844,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | YOUTUBE_MIX_PROVIDER_CLASS
             | YOUTUBE_MPEG_STREAM_AUDIO_TRACK_CLASS
             | YOUTUBE_PERSISTENT_HTTP_STREAM_CLASS
+            | YOUTUBE_SEARCH_MUSIC_PROVIDER_CLASS
     )
 }
 
@@ -1144,6 +1149,9 @@ fn replacement_body(
     }
     if class_name == YOUTUBE_PERSISTENT_HTTP_STREAM_CLASS {
         return youtube_persistent_http_stream_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == YOUTUBE_SEARCH_MUSIC_PROVIDER_CLASS {
+        return youtube_search_music_provider_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == YOUTUBE_CACHED_PLAYER_SCRIPT_CLASS {
         return youtube_cached_player_script_replacement(pool, name, descriptor, required_locals);
@@ -19552,6 +19560,86 @@ fn youtube_persistent_http_stream_constructor(
 
 fn youtube_persistent_http_stream_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
     let owner = pool.add_class(YOUTUBE_PERSISTENT_HTTP_STREAM_CLASS)?;
+    let factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn youtube_search_music_provider_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => youtube_search_music_provider_constructor(pool),
+        (
+            "getHttpConfiguration",
+            "()Lcom/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable;",
+        ) => object_getter(
+            pool,
+            YOUTUBE_SEARCH_MUSIC_PROVIDER_CLASS,
+            "httpInterfaceManager",
+            "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+        ),
+        ("<clinit>", "()V") => youtube_search_music_provider_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            "Legacy YouTube Music endpoint search is unsupported; use Mantle's bounded native current-client search.",
+            required_locals,
+        ),
+    }
+}
+
+fn youtube_search_music_provider_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let tools = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpClientTools")?;
+    let create_manager = pool.add_method_ref(
+        tools,
+        "createCookielessThreadLocalManager",
+        "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let owner = pool.add_class(YOUTUBE_SEARCH_MUSIC_PROVIDER_CLASS)?;
+    let manager = pool.add_field_ref(
+        owner,
+        "httpInterfaceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Invokestatic(create_manager),
+            Instruction::Putfield(manager),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn youtube_search_music_provider_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_SEARCH_MUSIC_PROVIDER_CLASS)?;
     let factory = pool.add_class("org/slf4j/LoggerFactory")?;
     let get_logger = pool.add_method_ref(
         factory,

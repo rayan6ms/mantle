@@ -259,6 +259,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
             Some(YOUTUBE_PERSISTENT_HTTP_STREAM_CONSUMER)
         }
         "write-youtube-playlist-loader-consumer" => Some(YOUTUBE_PLAYLIST_LOADER_CONSUMER),
+        "write-youtube-search-music-provider-consumer" => {
+            Some(YOUTUBE_SEARCH_MUSIC_PROVIDER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -20670,6 +20673,222 @@ public final class GateYoutubePlaylistLoader {
       loadCalls++;
       if (failure != null) throw failure;
       return result;
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_SEARCH_MUSIC_PROVIDER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSearchMusicProvider;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSearchMusicResultLoader;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpConfigurable;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager;
+import com.sedmelluq.discord.lavaplayer.track.AudioItem;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.function.Function;
+
+public final class GateYoutubeSearchMusicProvider {
+  private static final String DISABLED =
+      "Legacy YouTube Music endpoint search is unsupported; use Mantle's bounded native "
+      + "current-client search.";
+
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1 && (args[0].equals("reference") || args[0].equals("candidate")),
+        "expected disposition");
+    reflectionContract();
+    constructionContract();
+    if (args[0].equals("reference")) {
+      referenceServiceContract();
+      System.out.println("common=public-concrete,object-root,search-music-result-loader,"
+          + "2-private-fields,1-constructor,2-exported-methods,4-private-methods;"
+          + "fresh-cookieless-manager,configuration-identity,generic-track-factory,logger,"
+          + "signatures,reflection;service=legacy-music-endpoint,manager-access-before-factory");
+    } else {
+      candidateServiceContract();
+      System.out.println("common=public-concrete,object-root,search-music-result-loader,"
+          + "2-private-fields,1-constructor,2-exported-methods,4-private-methods;"
+          + "fresh-cookieless-manager,configuration-identity,generic-track-factory,logger,"
+          + "signatures,reflection;service=deterministic-no-manager-access,"
+          + "bounded-native-current-client-search");
+    }
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<YoutubeSearchMusicProvider> type = YoutubeSearchMusicProvider.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {YoutubeSearchMusicResultLoader.class})
+        && type.getTypeParameters().length == 0 && !type.isSynthetic() && !type.isMemberClass(),
+        "class metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 6 && type.getDeclaredClasses().length == 0,
+        "class shape");
+
+    Field log = type.getDeclaredField("log");
+    log.setAccessible(true);
+    check(log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && log.getType().getName().equals("org.slf4j.Logger") && log.get(null) != null,
+        "logger field");
+    Field manager = type.getDeclaredField("httpInterfaceManager");
+    check(manager.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && manager.getType() == HttpInterfaceManager.class, "manager field");
+
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    Method configuration = type.getDeclaredMethod("getHttpConfiguration");
+    checkMethod(configuration, Modifier.PUBLIC, ExtendedHttpConfigurable.class, new Class<?>[0],
+        false);
+    Method load = type.getDeclaredMethod("loadSearchMusicResult", String.class, Function.class);
+    checkMethod(load, Modifier.PUBLIC, AudioItem.class,
+        new Class<?>[] {String.class, Function.class}, false);
+    Type[] parameters = load.getGenericParameterTypes();
+    check(parameters[0] == String.class && parameters[1] instanceof ParameterizedType,
+        "load generic parameters");
+    ParameterizedType factory = (ParameterizedType) parameters[1];
+    check(factory.getRawType() == Function.class && factory.getOwnerType() == null
+        && Arrays.equals(factory.getActualTypeArguments(),
+            new Type[] {AudioTrackInfo.class, AudioTrack.class}), "factory signature");
+
+    Set<String> privateNames = new TreeSet<>();
+    for (Method method : type.getDeclaredMethods()) {
+      if (Modifier.isPrivate(method.getModifiers())) privateNames.add(method.getName());
+    }
+    check(privateNames.equals(new TreeSet<>(Arrays.asList("extractMusicSearchPage",
+        "extractMusicTrack", "extractSearchResults", "lambda$extractMusicSearchPage$0"))),
+        "private methods");
+    Method page = type.getDeclaredMethod("extractMusicSearchPage", JsonBrowser.class,
+        Function.class);
+    checkMethod(page, Modifier.PRIVATE, List.class,
+        new Class<?>[] {JsonBrowser.class, Function.class}, true);
+    Method results = type.getDeclaredMethod("extractSearchResults", JsonBrowser.class,
+        String.class, Function.class);
+    checkMethod(results, Modifier.PRIVATE, AudioItem.class,
+        new Class<?>[] {JsonBrowser.class, String.class, Function.class}, false);
+    Method track = type.getDeclaredMethod("extractMusicTrack", JsonBrowser.class, Function.class);
+    checkMethod(track, Modifier.PRIVATE, AudioTrack.class,
+        new Class<?>[] {JsonBrowser.class, Function.class}, false);
+    Method lambda = type.getDeclaredMethod("lambda$extractMusicSearchPage$0", Function.class,
+        ArrayList.class, JsonBrowser.class);
+    check(lambda.getReturnType() == void.class && Modifier.isPrivate(lambda.getModifiers())
+        && lambda.isSynthetic(), "lambda metadata");
+  }
+
+  private static void constructionContract() throws Exception {
+    YoutubeSearchMusicProvider first = new YoutubeSearchMusicProvider();
+    YoutubeSearchMusicProvider second = new YoutubeSearchMusicProvider();
+    ExtendedHttpConfigurable firstConfig = first.getHttpConfiguration();
+    ExtendedHttpConfigurable secondConfig = second.getHttpConfiguration();
+    Field manager = managerField();
+    check(firstConfig != null && firstConfig instanceof HttpInterfaceManager
+        && firstConfig == manager.get(first), "first manager identity");
+    check(secondConfig != null && secondConfig instanceof HttpInterfaceManager
+        && secondConfig == manager.get(second) && secondConfig != firstConfig,
+        "fresh manager identity");
+    ((HttpInterfaceManager) firstConfig).close();
+    ((HttpInterfaceManager) secondConfig).close();
+  }
+
+  private static void referenceServiceContract() throws Exception {
+    Probe probe = installProbe();
+    RuntimeException error = expect(RuntimeException.class,
+        () -> probe.provider.loadSearchMusicResult(new String("music query"), probe.factory));
+    check(error.getCause() instanceof LegacyAccess && probe.managerCalls[0] == 1
+        && probe.factoryCalls[0] == 0,
+        "reference service order");
+  }
+
+  private static void candidateServiceContract() throws Exception {
+    Probe probe = installProbe();
+    UnsupportedOperationException error = expect(UnsupportedOperationException.class,
+        () -> probe.provider.loadSearchMusicResult(new String("music query"), probe.factory));
+    check(DISABLED.equals(error.getMessage()) && probe.managerCalls[0] == 0
+        && probe.factoryCalls[0] == 0, "candidate service fence");
+  }
+
+  private static Probe installProbe() throws Exception {
+    YoutubeSearchMusicProvider provider = new YoutubeSearchMusicProvider();
+    Field manager = managerField();
+    ((HttpInterfaceManager) manager.get(provider)).close();
+    int[] managerCalls = {0};
+    int[] factoryCalls = {0};
+    HttpInterfaceManager proxy = (HttpInterfaceManager) Proxy.newProxyInstance(
+        GateYoutubeSearchMusicProvider.class.getClassLoader(),
+        new Class<?>[] {HttpInterfaceManager.class}, (ignored, method, arguments) -> {
+          if (method.getName().equals("getInterface")) {
+            managerCalls[0]++;
+            throw new LegacyAccess();
+          }
+          throw new AssertionError("unexpected manager call: " + method.getName());
+        });
+    manager.set(provider, proxy);
+    Function<AudioTrackInfo, AudioTrack> factory = info -> {
+      factoryCalls[0]++;
+      throw new AssertionError("factory invoked");
+    };
+    return new Probe(provider, factory, managerCalls, factoryCalls);
+  }
+
+  private static Field managerField() throws Exception {
+    Field manager = YoutubeSearchMusicProvider.class.getDeclaredField("httpInterfaceManager");
+    manager.setAccessible(true);
+    return manager;
+  }
+
+  private static void checkMethod(Method method, int modifiers, Class<?> result,
+                                  Class<?>[] parameters, boolean throwsIo) {
+    check(method.getModifiers() == modifiers && method.getReturnType() == result
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), throwsIo
+            ? new Class<?>[] {IOException.class} : new Class<?>[0])
+        && method.getTypeParameters().length == 0 && !method.isBridge() && !method.isVarArgs(),
+        method.getName() + " metadata");
+  }
+
+  private static final class Probe {
+    final YoutubeSearchMusicProvider provider;
+    final Function<AudioTrackInfo, AudioTrack> factory;
+    final int[] managerCalls;
+    final int[] factoryCalls;
+
+    Probe(YoutubeSearchMusicProvider provider, Function<AudioTrackInfo, AudioTrack> factory,
+          int[] managerCalls, int[] factoryCalls) {
+      this.provider = provider;
+      this.factory = factory;
+      this.managerCalls = managerCalls;
+      this.factoryCalls = factoryCalls;
+    }
+  }
+
+  private static final class LegacyAccess extends RuntimeException {}
+  private interface ThrowingRunnable { void run() throws Exception; }
+
+  private static <T extends Throwable> T expect(
+      Class<T> type, ThrowingRunnable operation) throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
     }
   }
 
