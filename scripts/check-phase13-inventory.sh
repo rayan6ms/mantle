@@ -605,9 +605,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[0].completed_slices[].symbols] | add) == .cohorts[0].classified_symbols and
   (.cohorts[0].classified_symbols + .cohorts[0].remaining_symbols) == .cohorts[0].symbols and
   .cohorts[1].status == "IN_PROGRESS" and
-  .cohorts[1].classified_symbols == 559 and
-  .cohorts[1].remaining_symbols == 139 and
-  (.cohorts[1].completed_slices | length) == 81 and
+  .cohorts[1].classified_symbols == 562 and
+  .cohorts[1].remaining_symbols == 136 and
+  (.cohorts[1].completed_slices | length) == 82 and
   .cohorts[1].completed_slices[0] == {
     id: "audio-source-manager-interface-contracts",
     classes: 1,
@@ -1728,11 +1728,24 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
     ]
   } and
+  .cohorts[1].completed_slices[81] == {
+    id: "youtube-search-result-loader-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 2,
+    symbols: 3,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
   ([.cohorts[1].completed_slices[].symbols] | add) == .cohorts[1].classified_symbols and
   (.cohorts[1].classified_symbols + .cohorts[1].remaining_symbols) == .cohorts[1].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1094 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1097 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 984 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 987 and
   ([$classifications.symbols[] |
     select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 104 and
   ([$classifications.symbols[] |
@@ -1878,7 +1891,8 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubePlaylistLoader",
         "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSearchMusicProvider",
         "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSearchMusicResultLoader",
-        "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSearchProvider"
+        "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSearchProvider",
+        "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSearchResultLoader"
       ][]; . == $symbol.binary_name)) and
     (if $symbol.binary_name ==
         "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSearchProvider" and
@@ -2120,7 +2134,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "youtube-search-result-loader-contracts" and
+  .phase_entry.next_slice == "youtube-signature-cipher-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 ' "$PLAN" >/dev/null
@@ -2128,7 +2142,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '152 reference classes / 1,123 symbols' \
+  '153 reference classes / 1,126 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -2138,4 +2152,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 1,094 classified symbols and 1,668 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 1,097 classified symbols and 1,665 unassessed symbols.\n'
