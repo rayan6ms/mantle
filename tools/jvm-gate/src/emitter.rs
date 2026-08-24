@@ -68,6 +68,7 @@ const TERMINATOR_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/TerminatorAudioFrame";
 const AUDIO_FRAME_BUFFER_FACTORY_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBufferFactory";
+const AUDIO_FILTER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilter";
 const MARKER_STATE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState";
 const TRACK_STATE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/AudioTrackState";
@@ -348,6 +349,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     TRACK_STUCK_EVENT_CLASS,
     "com/sedmelluq/discord/lavaplayer/player/hook/AudioOutputHook",
     "com/sedmelluq/discord/lavaplayer/player/hook/AudioOutputHookFactory",
+    AUDIO_FILTER_CLASS,
     "com/sedmelluq/discord/lavaplayer/filter/PcmFilterFactory",
     "com/sedmelluq/discord/lavaplayer/format/AudioDataFormat",
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",

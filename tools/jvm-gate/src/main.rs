@@ -100,6 +100,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-non-allocating-audio-frame-buffer-consumer" => {
             Some(NON_ALLOCATING_AUDIO_FRAME_BUFFER_CONSUMER)
         }
+        "write-audio-filter-interface-consumer" => Some(AUDIO_FILTER_INTERFACE_CONSUMER),
         "write-audio-source-manager-interface-consumer" => {
             Some(AUDIO_SOURCE_MANAGER_INTERFACE_CONSUMER)
         }
@@ -7155,6 +7156,107 @@ public final class GateNonAllocatingAudioFrameBuffer {
     public int maximumChunkSize() { return 4; }
     public AudioChunkDecoder createDecoder() { return null; }
     public AudioChunkEncoder createEncoder(AudioConfiguration configuration) { return null; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_FILTER_INTERFACE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.AudioFilter;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateAudioFilterInterface {
+  public static void main(String[] args) throws Exception {
+    callerImplementation();
+    checkedFailure();
+    reflection();
+    System.out.println(
+        "implementation=seek,flush,close,identity;"
+        + "exceptions=flush-interrupted;"
+        + "reflection=public-abstract-interface,0-fields,0-constructors,3-methods");
+  }
+
+  private static void callerImplementation() throws Exception {
+    RecordingFilter filter = new RecordingFilter();
+    filter.seekPerformed(123L, 456L);
+    filter.flush();
+    filter.close();
+    filter.close();
+    check(filter.seeks == 1 && filter.requestedTimecode == 123L
+        && filter.providedTimecode == 456L, "seek dispatch");
+    check(filter.flushes == 1, "flush dispatch");
+    check(filter.closes == 2, "close dispatch");
+  }
+
+  private static void checkedFailure() {
+    RecordingFilter filter = new RecordingFilter();
+    InterruptedException sentinel = new InterruptedException("flush-sentinel");
+    filter.flushFailure = sentinel;
+    expectIdentity(sentinel, filter::flush);
+    check(filter.flushes == 0, "flush failure prefix");
+  }
+
+  private static void reflection() throws Exception {
+    Class<AudioFilter> type = AudioFilter.class;
+    check(type.isInterface() && Modifier.isPublic(type.getModifiers())
+        && Modifier.isAbstract(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == null && type.getInterfaces().length == 0,
+        "interface metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 3, "member counts");
+
+    checkMethod(type.getDeclaredMethod("seekPerformed", long.class, long.class),
+        new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("flush"),
+        new Class<?>[] { InterruptedException.class });
+    checkMethod(type.getDeclaredMethod("close"), new Class<?>[0]);
+  }
+
+  private static void checkMethod(Method method, Class<?>[] exceptions) {
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == void.class
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), method.getName() + " metadata");
+  }
+
+  private static void expectIdentity(
+      InterruptedException expected, InterruptibleOperation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("failure was swallowed");
+    } catch (InterruptedException error) {
+      check(error == expected, "InterruptedException identity");
+    }
+  }
+
+  private interface InterruptibleOperation { void run() throws InterruptedException; }
+
+  private static final class RecordingFilter implements AudioFilter {
+    long requestedTimecode;
+    long providedTimecode;
+    InterruptedException flushFailure;
+    int seeks;
+    int flushes;
+    int closes;
+
+    public void seekPerformed(long requestedTimecode, long providedTimecode) {
+      this.requestedTimecode = requestedTimecode;
+      this.providedTimecode = providedTimecode;
+      seeks++;
+    }
+
+    public void flush() throws InterruptedException {
+      if (flushFailure != null) throw flushFailure;
+      flushes++;
+    }
+
+    public void close() { closes++; }
   }
 
   private static void check(boolean condition, String message) {
