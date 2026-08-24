@@ -291,6 +291,8 @@ const YOUTUBE_TRACK_DETAILS_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackDetailsLoader";
 const YOUTUBE_TRACK_FORMAT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackFormat";
+const YOUTUBE_TRACK_JSON_DATA_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -413,6 +415,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_TRACK_DETAILS_CLASS,
     YOUTUBE_TRACK_DETAILS_LOADER_CLASS,
     YOUTUBE_TRACK_FORMAT_CLASS,
+    YOUTUBE_TRACK_JSON_DATA_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -816,6 +819,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | YOUTUBE_CONSTANTS_CLASS
             | YOUTUBE_FORMAT_INFO_CLASS
             | YOUTUBE_TRACK_FORMAT_CLASS
+            | YOUTUBE_TRACK_JSON_DATA_CLASS
             | YOUTUBE_HTTP_CONTEXT_FILTER_CLASS
             | YOUTUBE_MPEG_STREAM_AUDIO_TRACK_CLASS
             | YOUTUBE_PERSISTENT_HTTP_STREAM_CLASS
@@ -878,6 +882,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | YOUTUBE_PERSISTENT_HTTP_STREAM_CLASS
             | YOUTUBE_SEARCH_MUSIC_PROVIDER_CLASS
             | YOUTUBE_SEARCH_PROVIDER_CLASS
+            | YOUTUBE_TRACK_JSON_DATA_CLASS
     )
 }
 
@@ -1238,6 +1243,9 @@ fn replacement_body(
     }
     if class_name == YOUTUBE_TRACK_FORMAT_CLASS {
         return youtube_track_format_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == YOUTUBE_TRACK_JSON_DATA_CLASS {
+        return youtube_track_json_data_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -23007,6 +23015,491 @@ fn youtube_track_format_get_url(pool: &mut ConstantPool<'static>) -> Result<Attr
         }],
     )?;
     Ok(body)
+}
+
+fn youtube_track_json_data_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Ljava/lang/String;)V",
+        ) => youtube_track_json_data_constructor(pool),
+        (
+            "withPlayerScriptUrl",
+            "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData;",
+        ) => youtube_track_json_data_with_player_script_url(pool),
+        (
+            "fromMainResult",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData;",
+        ) => youtube_track_json_data_from_main_result(pool),
+        (
+            "fromPolymerPlayerInfo",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData;",
+        ) => youtube_track_json_data_from_polymer_player_info(pool),
+        (
+            "parsePlayerResponse",
+            "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+        ) => youtube_track_json_data_parse_player_response(pool),
+        ("<clinit>", "()V") => youtube_track_json_data_static_initializer(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {YOUTUBE_TRACK_JSON_DATA_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn youtube_track_json_data_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(YOUTUBE_TRACK_JSON_DATA_CLASS)?;
+    let player_response = pool.add_field_ref(
+        owner,
+        "playerResponse",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let polymer_arguments = pool.add_field_ref(
+        owner,
+        "polymerArguments",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let player_script_url = pool.add_field_ref(owner, "playerScriptUrl", "Ljava/lang/String;")?;
+    code(
+        pool,
+        2,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(player_response),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(polymer_arguments),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Putfield(player_script_url),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn youtube_track_json_data_with_player_script_url(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_TRACK_JSON_DATA_CLASS)?;
+    let init = pool.add_method_ref(
+        owner,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Ljava/lang/String;)V",
+    )?;
+    let player_response = pool.add_field_ref(
+        owner,
+        "playerResponse",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let polymer_arguments = pool.add_field_ref(
+        owner,
+        "polymerArguments",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    code(
+        pool,
+        5,
+        2,
+        vec![
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(player_response),
+            Instruction::Aload_0,
+            Instruction::Getfield(polymer_arguments),
+            Instruction::Aload_1,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn youtube_track_json_data_from_main_result(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_TRACK_JSON_DATA_CLASS)?;
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let null_browser = pool.add_field_ref(
+        json,
+        "NULL_BROWSER",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let values = pool.add_method_ref(json, "values", "()Ljava/util/List;")?;
+    let get_json = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let is_null = pool.add_method_ref(json, "isNull", "()Z")?;
+    let is_map = pool.add_method_ref(json, "isMap", "()Z")?;
+    let format_json = pool.add_method_ref(json, "format", "()Ljava/lang/String;")?;
+    let list = pool.add_class("java/util/List")?;
+    let size = pool.add_interface_method_ref(list, "size", "()I")?;
+    let list_get = pool.add_interface_method_ref(list, "get", "(I)Ljava/lang/Object;")?;
+    let iterator_method =
+        pool.add_interface_method_ref(list, "iterator", "()Ljava/util/Iterator;")?;
+    let iterator = pool.add_class("java/util/Iterator")?;
+    let has_next = pool.add_interface_method_ref(iterator, "hasNext", "()Z")?;
+    let next = pool.add_interface_method_ref(iterator, "next", "()Ljava/lang/Object;")?;
+    let from_polymer = pool.add_method_ref(
+        owner,
+        "fromPolymerPlayerInfo",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData;",
+    )?;
+    let init = pool.add_method_ref(
+        owner,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Ljava/lang/String;)V",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let exception = pool.add_class("java/lang/Exception")?;
+    let exception_tools =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/ExceptionTools")?;
+    let throw_with_debug_info = pool.add_method_ref(
+        exception_tools,
+        "throwWithDebugInfo",
+        "(Lorg/slf4j/Logger;Ljava/lang/Throwable;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/RuntimeException;",
+    )?;
+    let page = pool.add_string("page")?;
+    let player = pool.add_string("player")?;
+    let player_response_key = pool.add_string("playerResponse")?;
+    let parsing_error = pool.add_string("Error parsing result")?;
+    let json_key = pool.add_string("json")?;
+    let missing = pool.add_string("Neither player nor playerResponse in result")?;
+
+    let mut body = code_with_exceptions(
+        pool,
+        5,
+        7,
+        vec![
+            Instruction::Getstatic(null_browser),
+            Instruction::Astore_1,
+            Instruction::Getstatic(null_browser),
+            Instruction::Astore_2,
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(values),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(values),
+            Instruction::Invokeinterface(size, 1),
+            Instruction::Iconst_1,
+            Instruction::Isub,
+            Instruction::Invokeinterface(list_get, 2),
+            Instruction::Checkcast(json),
+            Instruction::Astore(4),
+            Instruction::Aload(4),
+            Instruction::Ldc_w(page),
+            Instruction::Invokevirtual(get_json),
+            Instruction::Invokevirtual(is_null),
+            Instruction::Ifne(50),
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(values),
+            Instruction::Invokeinterface(iterator_method, 1),
+            Instruction::Astore(5),
+            Instruction::Aload(5),
+            Instruction::Invokeinterface(has_next, 1),
+            Instruction::Ifeq(55),
+            Instruction::Aload(5),
+            Instruction::Invokeinterface(next, 1),
+            Instruction::Checkcast(json),
+            Instruction::Astore(6),
+            Instruction::Aload(6),
+            Instruction::Invokevirtual(is_map),
+            Instruction::Ifeq(49),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(is_null),
+            Instruction::Ifeq(42),
+            Instruction::Aload(6),
+            Instruction::Ldc_w(player),
+            Instruction::Invokevirtual(get_json),
+            Instruction::Astore_1,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(is_null),
+            Instruction::Ifeq(49),
+            Instruction::Aload(6),
+            Instruction::Ldc_w(player_response_key),
+            Instruction::Invokevirtual(get_json),
+            Instruction::Astore_2,
+            Instruction::Goto(25),
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(is_null),
+            Instruction::Ifeq(55),
+            Instruction::Aload_0,
+            Instruction::Astore_2,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(is_null),
+            Instruction::Ifne(62),
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Invokestatic(from_polymer),
+            Instruction::Areturn,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(is_null),
+            Instruction::Ifne(72),
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Getstatic(null_browser),
+            Instruction::Aconst_null,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+            Instruction::Goto(82),
+            Instruction::Astore_1,
+            Instruction::Getstatic(log),
+            Instruction::Aload_1,
+            Instruction::Ldc_w(parsing_error),
+            Instruction::Ldc_w(json_key),
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(format_json),
+            Instruction::Invokestatic(throw_with_debug_info),
+            Instruction::Athrow,
+            Instruction::Getstatic(log),
+            Instruction::Aconst_null,
+            Instruction::Ldc_w(missing),
+            Instruction::Ldc_w(json_key),
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(format_json),
+            Instruction::Invokestatic(throw_with_debug_info),
+            Instruction::Athrow,
+        ],
+        vec![ExceptionTableEntry {
+            range_pc: 0..72,
+            handler_pc: 73,
+            catch_type: exception,
+        }],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 25,
+                locals: vec![
+                    VerificationType::Object { cpool_index: json },
+                    VerificationType::Object { cpool_index: json },
+                    VerificationType::Object { cpool_index: json },
+                    VerificationType::Object { cpool_index: list },
+                    VerificationType::Object { cpool_index: json },
+                    VerificationType::Object {
+                        cpool_index: iterator,
+                    },
+                ],
+                stack: Vec::new(),
+            },
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: 16,
+                locals: vec![VerificationType::Object { cpool_index: json }],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: 6,
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: 0,
+            },
+            StackFrame::SameFrame { frame_type: 4 },
+            StackFrame::SameFrame { frame_type: 6 },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 9,
+                locals: vec![VerificationType::Object { cpool_index: json }],
+                stack: Vec::new(),
+            },
+            StackFrame::SameLocals1StackItemFrame {
+                frame_type: 64,
+                stack: vec![VerificationType::Object {
+                    cpool_index: exception,
+                }],
+            },
+            StackFrame::SameFrame { frame_type: 8 },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn youtube_track_json_data_from_polymer_player_info(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_TRACK_JSON_DATA_CLASS)?;
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let get_json = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let text = pool.add_method_ref(json, "text", "()Ljava/lang/String;")?;
+    let parse_player_response = pool.add_method_ref(
+        owner,
+        "parsePlayerResponse",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let init = pool.add_method_ref(
+        owner,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Ljava/lang/String;)V",
+    )?;
+    let args = pool.add_string("args")?;
+    let assets = pool.add_string("assets")?;
+    let js = pool.add_string("js")?;
+    let player_response = pool.add_string("player_response")?;
+    let string = pool.add_class("java/lang/String")?;
+    let mut body = code(
+        pool,
+        5,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Ldc_w(args),
+            Instruction::Invokevirtual(get_json),
+            Instruction::Astore_2,
+            Instruction::Aload_0,
+            Instruction::Ldc_w(assets),
+            Instruction::Invokevirtual(get_json),
+            Instruction::Ldc_w(js),
+            Instruction::Invokevirtual(get_json),
+            Instruction::Invokevirtual(text),
+            Instruction::Astore_3,
+            Instruction::Aload_2,
+            Instruction::Ldc_w(player_response),
+            Instruction::Invokevirtual(get_json),
+            Instruction::Invokevirtual(text),
+            Instruction::Astore(4),
+            Instruction::Aload(4),
+            Instruction::Ifnonnull(25),
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Aload_3,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Aload(4),
+            Instruction::Invokestatic(parse_player_response),
+            Instruction::Aload_2,
+            Instruction::Aload_3,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::AppendFrame {
+            frame_type: 254,
+            offset_delta: 25,
+            locals: vec![
+                VerificationType::Object { cpool_index: json },
+                VerificationType::Object {
+                    cpool_index: string,
+                },
+                VerificationType::Object {
+                    cpool_index: string,
+                },
+            ],
+        }],
+    )?;
+    Ok(body)
+}
+
+fn youtube_track_json_data_parse_player_response(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_TRACK_JSON_DATA_CLASS)?;
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let parse = pool.add_method_ref(
+        json,
+        "parse",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let exception = pool.add_class("java/lang/Exception")?;
+    let exception_tools =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/ExceptionTools")?;
+    let throw_with_debug_info = pool.add_method_ref(
+        exception_tools,
+        "throwWithDebugInfo",
+        "(Lorg/slf4j/Logger;Ljava/lang/Throwable;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/RuntimeException;",
+    )?;
+    let parsing_error = pool.add_string("Failed to parse player_response")?;
+    let value = pool.add_string("value")?;
+    let mut body = code_with_exceptions(
+        pool,
+        5,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokestatic(parse),
+            Instruction::Areturn,
+            Instruction::Astore_1,
+            Instruction::Getstatic(log),
+            Instruction::Aload_1,
+            Instruction::Ldc_w(parsing_error),
+            Instruction::Ldc_w(value),
+            Instruction::Aload_0,
+            Instruction::Invokestatic(throw_with_debug_info),
+            Instruction::Athrow,
+        ],
+        vec![ExceptionTableEntry {
+            range_pc: 0..2,
+            handler_pc: 3,
+            catch_type: exception,
+        }],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::SameLocals1StackItemFrame {
+            frame_type: 67,
+            stack: vec![VerificationType::Object {
+                cpool_index: exception,
+            }],
+        }],
+    )?;
+    Ok(body)
+}
+
+fn youtube_track_json_data_static_initializer(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_TRACK_JSON_DATA_CLASS)?;
+    let loader = pool.add_class(DEFAULT_YOUTUBE_TRACK_DETAILS_LOADER_CLASS)?;
+    let logger_factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        logger_factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(loader),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
 }
 
 #[allow(clippy::too_many_lines)]

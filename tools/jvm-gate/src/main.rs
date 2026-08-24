@@ -279,6 +279,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
             Some(YOUTUBE_TRACK_DETAILS_LOADER_CONSUMER)
         }
         "write-youtube-track-format-consumer" => Some(YOUTUBE_TRACK_FORMAT_CONSUMER),
+        "write-youtube-track-json-data-consumer" => Some(YOUTUBE_TRACK_JSON_DATA_CONSUMER),
         _ => None,
     }
 }
@@ -22398,6 +22399,194 @@ public final class GateYoutubeTrackFormat {
     Method method = YoutubeTrackFormat.class.getDeclaredMethod(name);
     check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == result
         && method.getGenericReturnType() == result && method.getParameterCount() == 0
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), name + " metadata");
+  }
+
+  private interface ThrowingSupplier { Object get() throws Exception; }
+
+  private static <T extends Throwable> T expect(
+      Class<T> expected, ThrowingSupplier operation, String message) {
+    try {
+      operation.get();
+      throw new AssertionError("expected " + expected.getName() + ": " + message);
+    } catch (Throwable error) {
+      if (!expected.isInstance(error)) throw new AssertionError(message, error);
+      return expected.cast(error);
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_TRACK_JSON_DATA_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackJsonData;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import org.slf4j.Logger;
+
+public final class GateYoutubeTrackJsonData {
+  public static void main(String[] args) throws Exception {
+    reflectionContract();
+    valueContract();
+    parsingContract();
+    failureContract();
+    System.out.println("public-concrete-object,1-private-static-final-log,3-public-final-fields,"
+        + "1-constructor,2-public-methods,2-private-methods;capture=identity,nulls;"
+        + "with-script=fresh,retains-browsers;"
+        + "main-result=direct,nested,polymer,embedded,fallback,first-non-null;"
+        + "errors=wrapped,redacted,cause-chain;reflection=exact");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<YoutubeTrackJsonData> type = YoutubeTrackJsonData.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getGenericSuperclass() == Object.class && type.getInterfaces().length == 0
+        && type.getGenericInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && !type.isInterface() && !type.isEnum() && !type.isAnnotation() && !type.isSynthetic()
+        && !type.isMemberClass(), "class metadata");
+    check(type.getDeclaredFields().length == 4 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 4 && type.getDeclaredClasses().length == 0,
+        "declared shape");
+
+    Field log = type.getDeclaredField("log");
+    log.setAccessible(true);
+    check(log.getType() == Logger.class && log.getGenericType() == Logger.class
+        && log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && !log.isSynthetic() && log.get(null) instanceof Logger, "logger metadata");
+    checkField("playerResponse", JsonBrowser.class);
+    checkField("polymerArguments", JsonBrowser.class);
+    checkField("playerScriptUrl", String.class);
+
+    Class<?>[] parameters = {JsonBrowser.class, JsonBrowser.class, String.class};
+    Constructor<YoutubeTrackJsonData> constructor = type.getDeclaredConstructor(parameters);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && Arrays.equals(constructor.getParameterTypes(), parameters)
+        && Arrays.equals(constructor.getGenericParameterTypes(), parameters)
+        && constructor.getExceptionTypes().length == 0 && constructor.getTypeParameters().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
+    checkMethod("withPlayerScriptUrl", YoutubeTrackJsonData.class, Modifier.PUBLIC, String.class);
+    checkMethod("fromMainResult", YoutubeTrackJsonData.class,
+        Modifier.PUBLIC | Modifier.STATIC, JsonBrowser.class);
+    checkMethod("fromPolymerPlayerInfo", YoutubeTrackJsonData.class,
+        Modifier.PRIVATE | Modifier.STATIC, JsonBrowser.class, JsonBrowser.class);
+    checkMethod("parsePlayerResponse", JsonBrowser.class,
+        Modifier.PRIVATE | Modifier.STATIC, String.class);
+  }
+
+  private static void valueContract() throws Exception {
+    JsonBrowser response = JsonBrowser.parse("{\"response\":1}");
+    JsonBrowser arguments = JsonBrowser.parse("{\"arguments\":2}");
+    String script = new String("/base.js");
+    YoutubeTrackJsonData data = new YoutubeTrackJsonData(response, arguments, script);
+    check(data.playerResponse == response && data.polymerArguments == arguments
+        && data.playerScriptUrl == script, "constructor identity");
+
+    String replacement = new String("/replacement.js");
+    YoutubeTrackJsonData replaced = data.withPlayerScriptUrl(replacement);
+    check(replaced != data && replaced.playerResponse == response
+        && replaced.polymerArguments == arguments && replaced.playerScriptUrl == replacement,
+        "script replacement");
+    YoutubeTrackJsonData nulled = replaced.withPlayerScriptUrl(null);
+    check(nulled != replaced && nulled.playerResponse == response
+        && nulled.polymerArguments == arguments && nulled.playerScriptUrl == null,
+        "null replacement");
+    YoutubeTrackJsonData nulls = new YoutubeTrackJsonData(null, null, null);
+    check(nulls.playerResponse == null && nulls.polymerArguments == null
+        && nulls.playerScriptUrl == null, "constructor nulls");
+  }
+
+  private static void parsingContract() throws Exception {
+    JsonBrowser direct = JsonBrowser.parse("{\"videoDetails\":{\"videoId\":\"direct\"}}");
+    YoutubeTrackJsonData directData = YoutubeTrackJsonData.fromMainResult(direct);
+    check(directData.playerResponse == direct
+        && directData.polymerArguments == JsonBrowser.NULL_BROWSER
+        && directData.playerScriptUrl == null, "direct response identity");
+
+    YoutubeTrackJsonData nested = YoutubeTrackJsonData.fromMainResult(JsonBrowser.parse(
+        "[0,{\"playerResponse\":{\"videoDetails\":{\"videoId\":\"nested\"}}},"
+            + "{\"page\":\"watch\"}]"));
+    check(nested.playerResponse.get("videoDetails").get("videoId").text().equals("nested")
+        && nested.polymerArguments == JsonBrowser.NULL_BROWSER
+        && nested.playerScriptUrl == null, "nested response");
+
+    YoutubeTrackJsonData embedded = YoutubeTrackJsonData.fromMainResult(JsonBrowser.parse(
+        "[{\"playerResponse\":{\"videoDetails\":{\"videoId\":\"outer\"}}},"
+            + "{\"player\":{\"args\":{\"player_response\":"
+            + "\"{\\\"videoDetails\\\":{\\\"videoId\\\":\\\"embedded\\\"}}\","
+            + "\"marker\":\"args\"},\"assets\":{\"js\":\"/player.js\"}}},"
+            + "{\"page\":\"watch\"}]"));
+    check(embedded.playerResponse.get("videoDetails").get("videoId").text().equals("embedded")
+        && embedded.polymerArguments.get("marker").text().equals("args")
+        && embedded.playerScriptUrl.equals("/player.js"), "embedded polymer response");
+
+    YoutubeTrackJsonData fallback = YoutubeTrackJsonData.fromMainResult(JsonBrowser.parse(
+        "[{\"playerResponse\":{\"videoDetails\":{\"videoId\":\"fallback\"}}},"
+            + "{\"player\":{\"args\":{\"marker\":\"fallback-args\"},"
+            + "\"assets\":{\"js\":\"/fallback.js\"}}},{\"page\":\"watch\"}]"));
+    check(fallback.playerResponse.get("videoDetails").get("videoId").text().equals("fallback")
+        && fallback.polymerArguments.get("marker").text().equals("fallback-args")
+        && fallback.playerScriptUrl.equals("/fallback.js"), "polymer fallback response");
+
+    YoutubeTrackJsonData first = YoutubeTrackJsonData.fromMainResult(JsonBrowser.parse(
+        "[{\"playerResponse\":{\"value\":\"first\"}},"
+            + "{\"playerResponse\":{\"value\":\"second\"}},{\"page\":\"watch\"}]"));
+    check(first.playerResponse.get("value").text().equals("first"), "first non-null response");
+  }
+
+  private static void failureContract() throws Exception {
+    RuntimeException empty = expect(RuntimeException.class,
+        () -> YoutubeTrackJsonData.fromMainResult(JsonBrowser.parse("[]")), "empty result");
+    checkDebug(empty, "Error parsing result", "json", IndexOutOfBoundsException.class);
+
+    RuntimeException missing = expect(RuntimeException.class,
+        () -> YoutubeTrackJsonData.fromMainResult(JsonBrowser.parse(
+            "[{\"other\":1},{\"page\":\"watch\"}]")), "missing response");
+    checkDebug(missing, "Neither player nor playerResponse in result", "json", null);
+
+    RuntimeException malformed = expect(RuntimeException.class,
+        () -> YoutubeTrackJsonData.fromMainResult(JsonBrowser.parse(
+            "[{\"player\":{\"args\":{\"player_response\":\"{bad\"},"
+                + "\"assets\":{\"js\":\"/bad.js\"}}},{\"page\":\"watch\"}]")),
+        "malformed embedded response");
+    checkDebug(malformed, "Error parsing result", "json", RuntimeException.class);
+    checkDebug((RuntimeException) malformed.getCause(),
+        "Failed to parse player_response", "value", java.io.IOException.class);
+
+    expect(NullPointerException.class,
+        () -> YoutubeTrackJsonData.fromMainResult(null), "null result formatting failure");
+  }
+
+  private static void checkDebug(RuntimeException error, String prefix, String field,
+      Class<? extends Throwable> cause) {
+    check(error.getClass() == RuntimeException.class && error.getMessage().startsWith(prefix + " EID: ")
+        && error.getMessage().endsWith(", " + field + "<redacted>")
+        && (cause == null ? error.getCause() == null : cause.isInstance(error.getCause())),
+        prefix + " debug wrapper");
+  }
+
+  private static void checkField(String name, Class<?> fieldType) throws Exception {
+    Field field = YoutubeTrackJsonData.class.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getGenericType() == fieldType
+        && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && !field.isSynthetic() && !field.isEnumConstant(), name + " metadata");
+  }
+
+  private static void checkMethod(String name, Class<?> result, int modifiers,
+      Class<?>... parameters) throws Exception {
+    Method method = YoutubeTrackJsonData.class.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == modifiers && method.getReturnType() == result
+        && method.getGenericReturnType() == result
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getGenericParameterTypes(), parameters)
         && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
         && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
         && !method.isVarArgs(), name + " metadata");

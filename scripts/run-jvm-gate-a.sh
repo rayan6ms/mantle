@@ -157,6 +157,8 @@ for consumer in smoke probe integration classloader event track-value track-enum
 done
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
+  --output "$WORK/GateYoutubeTrackJsonData.java"
 
 javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateSmoke.java" "$WORK/GateProbe.java" "$WORK/GateIntegration.java" \
@@ -292,7 +294,8 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateYoutubeSignatureResolver.java" \
   "$WORK/GateYoutubeTrackDetails.java" \
   "$WORK/GateYoutubeTrackDetailsLoader.java" \
-  "$WORK/GateYoutubeTrackFormat.java"
+  "$WORK/GateYoutubeTrackFormat.java" \
+  "$WORK/GateYoutubeTrackJsonData.java"
 
 readonly GATE_CLASSPATH="$classes_argument$classpath_separator$jar_argument"
 java -Xverify:all \
@@ -1770,6 +1773,16 @@ cmp "$WORK/youtube-track-format-reference.txt" "$WORK/youtube-track-format-candi
 grep --fixed-strings \
   'public-concrete-object,10-private-final-fields,1-constructor,10-getters;format-info=constructor-derived;capture=type,longs,strings,boolean;identity=type,n,signature,key;url=fresh-uri,syntax-wrapper,null-error;nullable=info,n,signature,key;reflection=exact' \
   "$WORK/youtube-track-format-candidate.txt" >/dev/null
+# A_EXACT preserves the immutable YouTube track-JSON parsing contract.
+java -Xverify:all -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateYoutubeTrackJsonData >"$WORK/youtube-track-json-data-reference.txt"
+java -Xverify:all -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateYoutubeTrackJsonData >"$WORK/youtube-track-json-data-candidate.txt"
+cmp "$WORK/youtube-track-json-data-reference.txt" \
+  "$WORK/youtube-track-json-data-candidate.txt"
+grep --fixed-strings \
+  'public-concrete-object,1-private-static-final-log,3-public-final-fields,1-constructor,2-public-methods,2-private-methods;capture=identity,nulls;with-script=fresh,retains-browsers;main-result=direct,nested,polymer,embedded,fallback,first-non-null;errors=wrapped,redacted,cause-chain;reflection=exact' \
+  "$WORK/youtube-track-json-data-candidate.txt" >/dev/null
 java -Xverify:all -cp "$GATE_CLASSPATH" GateSmoke "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateIntegration "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" callbacks
