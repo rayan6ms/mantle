@@ -280,6 +280,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-youtube-track-format-consumer" => Some(YOUTUBE_TRACK_FORMAT_CONSUMER),
         "write-youtube-track-json-data-consumer" => Some(YOUTUBE_TRACK_JSON_DATA_CONSUMER),
+        "write-legacy-adaptive-formats-extractor-consumer" => {
+            Some(LEGACY_ADAPTIVE_FORMATS_EXTRACTOR_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -22590,6 +22593,167 @@ public final class GateYoutubeTrackJsonData {
         && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
         && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
         && !method.isVarArgs(), name + " metadata");
+  }
+
+  private interface ThrowingSupplier { Object get() throws Exception; }
+
+  private static <T extends Throwable> T expect(
+      Class<T> expected, ThrowingSupplier operation, String message) {
+    try {
+      operation.get();
+      throw new AssertionError("expected " + expected.getName() + ": " + message);
+    } catch (Throwable error) {
+      if (!expected.isInstance(error)) throw new AssertionError(message, error);
+      return expected.cast(error);
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const LEGACY_ADAPTIVE_FORMATS_EXTRACTOR_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeFormatInfo;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackFormat;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackJsonData;
+import com.sedmelluq.discord.lavaplayer.source.youtube.format.LegacyAdaptiveFormatsExtractor;
+import com.sedmelluq.discord.lavaplayer.source.youtube.format.OfflineYoutubeTrackFormatExtractor;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateLegacyAdaptiveFormatsExtractor {
+  public static void main(String[] args) throws Exception {
+    reflectionContract();
+    emptyContract();
+    adaptiveContract();
+    failureContract();
+    System.out.println("public-concrete-object,offline-extractor,0-fields,1-constructor,"
+        + "1-public-method,1-private-helper;absent=shared-empty;"
+        + "adaptive=ordered-array-list,url-decoded;"
+        + "format=type,longs,fixed-channels,url,empty-n,signature,key,default-audio;"
+        + "defaults=signature-key;errors=unchecked;reflection=exact");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<LegacyAdaptiveFormatsExtractor> type = LegacyAdaptiveFormatsExtractor.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getGenericSuperclass() == Object.class
+        && type.getInterfaces().length == 1
+        && type.getInterfaces()[0] == OfflineYoutubeTrackFormatExtractor.class
+        && type.getGenericInterfaces().length == 1
+        && type.getGenericInterfaces()[0] == OfflineYoutubeTrackFormatExtractor.class
+        && type.getTypeParameters().length == 0 && !type.isInterface() && !type.isEnum()
+        && !type.isAnnotation() && !type.isSynthetic() && !type.isMemberClass(), "class metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 2 && type.getDeclaredClasses().length == 0,
+        "declared shape");
+
+    Constructor<LegacyAdaptiveFormatsExtractor> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getParameterCount() == 0
+        && constructor.getExceptionTypes().length == 0 && constructor.getTypeParameters().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
+    Method extract = type.getDeclaredMethod("extract", YoutubeTrackJsonData.class);
+    checkMethod(extract, Modifier.PUBLIC, YoutubeTrackJsonData.class);
+    checkListType(extract.getGenericReturnType(), "extract return");
+    Method load = type.getDeclaredMethod("loadTrackFormatsFromAdaptive", String.class);
+    checkMethod(load, Modifier.PRIVATE, String.class);
+    checkListType(load.getGenericReturnType(), "helper return");
+  }
+
+  private static void emptyContract() throws Exception {
+    LegacyAdaptiveFormatsExtractor extractor = new LegacyAdaptiveFormatsExtractor();
+    List<YoutubeTrackFormat> absent = extractor.extract(data(null));
+    check(absent == Collections.<YoutubeTrackFormat>emptyList() && absent.isEmpty(),
+        "shared empty list");
+    expect(UnsupportedOperationException.class,
+        () -> absent.add(null), "empty list immutable");
+  }
+
+  private static void adaptiveContract() throws Exception {
+    String first = "type=audio%2Fwebm%3B+codecs%3D%22opus%22"
+        + "&bitrate=-9223372036854775808&clen=9223372036854775807"
+        + "&url=https%3A%2F%2Fmedia.example.test%2Faudio%3Fx%3D1%26y%3Dtwo"
+        + "&s=%2B%2F%3D&sp=customSig";
+    String second = "type=audio%2Fmp4%3B+codecs%3D%22mp4a.40.2%22"
+        + "&bitrate=0&clen=-1&url=relative%2Faudio";
+    LegacyAdaptiveFormatsExtractor extractor = new LegacyAdaptiveFormatsExtractor();
+    List<YoutubeTrackFormat> formats = extractor.extract(data(first + "," + second));
+    check(formats.getClass() == ArrayList.class && formats.size() == 2,
+        "ordered mutable list");
+
+    YoutubeTrackFormat webm = formats.get(0);
+    check(webm.getInfo() == YoutubeFormatInfo.WEBM_OPUS
+        && webm.getType().getMimeType().equals("audio/webm")
+        && webm.getType().getParameter("codecs").equals("opus")
+        && webm.getBitrate() == Long.MIN_VALUE && webm.getContentLength() == Long.MAX_VALUE
+        && webm.getAudioChannels() == 2L
+        && webm.getUrl().toString().equals("https://media.example.test/audio?x=1&y=two")
+        && webm.getNParameter().equals("") && webm.getSignature().equals("+/=")
+        && webm.getSignatureKey().equals("customSig") && webm.isDefaultAudioTrack(),
+        "webm mapping");
+
+    YoutubeTrackFormat mp4 = formats.get(1);
+    check(mp4.getInfo() == YoutubeFormatInfo.MP4_AAC_LC
+        && mp4.getType().getMimeType().equals("audio/mp4")
+        && mp4.getType().getParameter("codecs").equals("mp4a.40.2")
+        && mp4.getBitrate() == 0L && mp4.getContentLength() == -1L
+        && mp4.getAudioChannels() == 2L && mp4.getUrl().toString().equals("relative/audio")
+        && mp4.getNParameter().equals("") && mp4.getSignature() == null
+        && mp4.getSignatureKey().equals("signature") && mp4.isDefaultAudioTrack(),
+        "mp4 mapping and defaults");
+
+    formats.add(null);
+    check(formats.size() == 3, "result list mutable");
+    List<YoutubeTrackFormat> repeated = extractor.extract(data(first));
+    check(repeated != formats && repeated.size() == 1 && repeated.get(0) != webm,
+        "fresh list and format instances");
+  }
+
+  private static void failureContract() throws Exception {
+    LegacyAdaptiveFormatsExtractor extractor = new LegacyAdaptiveFormatsExtractor();
+    expect(NullPointerException.class, () -> extractor.extract(null), "null data");
+    expect(NullPointerException.class,
+        () -> extractor.extract(new YoutubeTrackJsonData(JsonBrowser.NULL_BROWSER, null, null)),
+        "null polymer arguments");
+    String invalidLong = "type=audio%2Fwebm%3B+codecs%3D%22opus%22"
+        + "&bitrate=not-a-long&clen=1&url=relative";
+    expect(NumberFormatException.class, () -> extractor.extract(data(invalidLong)),
+        "invalid bitrate");
+    String missingLength = "type=audio%2Fwebm%3B+codecs%3D%22opus%22"
+        + "&bitrate=1&url=relative";
+    expect(NumberFormatException.class, () -> extractor.extract(data(missingLength)),
+        "missing content length");
+  }
+
+  private static YoutubeTrackJsonData data(String adaptive) throws Exception {
+    JsonBrowser arguments = JsonBrowser.newMap();
+    if (adaptive != null) arguments.put("adaptive_fmts", adaptive);
+    return new YoutubeTrackJsonData(JsonBrowser.NULL_BROWSER, arguments, null);
+  }
+
+  private static void checkMethod(Method method, int modifiers, Class<?> parameter) {
+    check(method.getModifiers() == modifiers && method.getReturnType() == List.class
+        && method.getParameterCount() == 1 && method.getParameterTypes()[0] == parameter
+        && method.getGenericParameterTypes()[0] == parameter
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), method.getName() + " metadata");
+  }
+
+  private static void checkListType(java.lang.reflect.Type value, String message) {
+    check(value instanceof ParameterizedType, message + " parameterized");
+    ParameterizedType type = (ParameterizedType) value;
+    check(type.getRawType() == List.class && type.getOwnerType() == null
+        && type.getActualTypeArguments().length == 1
+        && type.getActualTypeArguments()[0] == YoutubeTrackFormat.class, message);
   }
 
   private interface ThrowingSupplier { Object get() throws Exception; }

@@ -293,6 +293,8 @@ const YOUTUBE_TRACK_FORMAT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackFormat";
 const YOUTUBE_TRACK_JSON_DATA_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData";
+const LEGACY_ADAPTIVE_FORMATS_EXTRACTOR_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/format/LegacyAdaptiveFormatsExtractor";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -416,6 +418,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_TRACK_DETAILS_LOADER_CLASS,
     YOUTUBE_TRACK_FORMAT_CLASS,
     YOUTUBE_TRACK_JSON_DATA_CLASS,
+    LEGACY_ADAPTIVE_FORMATS_EXTRACTOR_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -883,6 +886,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | YOUTUBE_SEARCH_MUSIC_PROVIDER_CLASS
             | YOUTUBE_SEARCH_PROVIDER_CLASS
             | YOUTUBE_TRACK_JSON_DATA_CLASS
+            | LEGACY_ADAPTIVE_FORMATS_EXTRACTOR_CLASS
     )
 }
 
@@ -1246,6 +1250,14 @@ fn replacement_body(
     }
     if class_name == YOUTUBE_TRACK_JSON_DATA_CLASS {
         return youtube_track_json_data_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == LEGACY_ADAPTIVE_FORMATS_EXTRACTOR_CLASS {
+        return legacy_adaptive_formats_extractor_replacement(
+            pool,
+            name,
+            descriptor,
+            required_locals,
+        );
     }
     if class_name == SOUND_CLOUD_OPUS_SEGMENT_DECODER_CLASS {
         return sound_cloud_opus_segment_decoder_replacement(
@@ -23500,6 +23512,244 @@ fn youtube_track_json_data_static_initializer(
             Instruction::Return,
         ],
     )
+}
+
+fn legacy_adaptive_formats_extractor_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        (
+            "extract",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeTrackJsonData;)Ljava/util/List;",
+        ) => legacy_adaptive_formats_extractor_extract(pool),
+        ("loadTrackFormatsFromAdaptive", "(Ljava/lang/String;)Ljava/util/List;") => {
+            legacy_adaptive_formats_extractor_load(pool)
+        }
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {LEGACY_ADAPTIVE_FORMATS_EXTRACTOR_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn legacy_adaptive_formats_extractor_extract(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(LEGACY_ADAPTIVE_FORMATS_EXTRACTOR_CLASS)?;
+    let data = pool.add_class(YOUTUBE_TRACK_JSON_DATA_CLASS)?;
+    let polymer_arguments = pool.add_field_ref(
+        data,
+        "polymerArguments",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let json = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/JsonBrowser")?;
+    let get = pool.add_method_ref(
+        json,
+        "get",
+        "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;",
+    )?;
+    let text = pool.add_method_ref(json, "text", "()Ljava/lang/String;")?;
+    let collections = pool.add_class("java/util/Collections")?;
+    let empty_list = pool.add_method_ref(collections, "emptyList", "()Ljava/util/List;")?;
+    let load = pool.add_method_ref(
+        owner,
+        "loadTrackFormatsFromAdaptive",
+        "(Ljava/lang/String;)Ljava/util/List;",
+    )?;
+    let adaptive_formats = pool.add_string("adaptive_fmts")?;
+    let string = pool.add_class("java/lang/String")?;
+    let mut body = code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Getfield(polymer_arguments),
+            Instruction::Ldc_w(adaptive_formats),
+            Instruction::Invokevirtual(get),
+            Instruction::Invokevirtual(text),
+            Instruction::Astore_2,
+            Instruction::Aload_2,
+            Instruction::Ifnonnull(10),
+            Instruction::Invokestatic(empty_list),
+            Instruction::Areturn,
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(load),
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::AppendFrame {
+            frame_type: 252,
+            offset_delta: 10,
+            locals: vec![VerificationType::Object {
+                cpool_index: string,
+            }],
+        }],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn legacy_adaptive_formats_extractor_load(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(LEGACY_ADAPTIVE_FORMATS_EXTRACTOR_CLASS)?;
+    let array_list = pool.add_class("java/util/ArrayList")?;
+    let array_list_init = pool.add_method_ref(array_list, "<init>", "()V")?;
+    let string = pool.add_class("java/lang/String")?;
+    let string_array = pool.add_class("[Ljava/lang/String;")?;
+    let split = pool.add_method_ref(string, "split", "(Ljava/lang/String;)[Ljava/lang/String;")?;
+    let data_format_tools =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/DataFormatTools")?;
+    let decode = pool.add_method_ref(
+        data_format_tools,
+        "decodeUrlEncodedItems",
+        "(Ljava/lang/String;Z)Ljava/util/Map;",
+    )?;
+    let map = pool.add_class("java/util/Map")?;
+    let get =
+        pool.add_interface_method_ref(map, "get", "(Ljava/lang/Object;)Ljava/lang/Object;")?;
+    let get_or_default = pool.add_interface_method_ref(
+        map,
+        "getOrDefault",
+        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+    )?;
+    let content_type = pool.add_class("org/apache/http/entity/ContentType")?;
+    let parse_content_type = pool.add_method_ref(
+        content_type,
+        "parse",
+        "(Ljava/lang/String;)Lorg/apache/http/entity/ContentType;",
+    )?;
+    let long = pool.add_class("java/lang/Long")?;
+    let parse_long = pool.add_method_ref(long, "parseLong", "(Ljava/lang/String;)J")?;
+    let track_format = pool.add_class(YOUTUBE_TRACK_FORMAT_CLASS)?;
+    let track_format_init = pool.add_method_ref(
+        track_format,
+        "<init>",
+        "(Lorg/apache/http/entity/ContentType;JJJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V",
+    )?;
+    let list = pool.add_class("java/util/List")?;
+    let add = pool.add_interface_method_ref(list, "add", "(Ljava/lang/Object;)Z")?;
+    let comma = pool.add_string(",")?;
+    let type_key = pool.add_string("type")?;
+    let bitrate_key = pool.add_string("bitrate")?;
+    let content_length_key = pool.add_string("clen")?;
+    let url_key = pool.add_string("url")?;
+    let empty = pool.add_string("")?;
+    let signature_key = pool.add_string("s")?;
+    let signature_parameter_key = pool.add_string("sp")?;
+    let default_signature_key = pool.add_string("signature")?;
+    let two = pool.add_long(2)?;
+
+    let mut body = code(
+        pool,
+        16,
+        8,
+        vec![
+            Instruction::New(array_list),
+            Instruction::Dup,
+            Instruction::Invokespecial(array_list_init),
+            Instruction::Astore_2,
+            Instruction::Aload_1,
+            Instruction::Ldc_w(comma),
+            Instruction::Invokevirtual(split),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Arraylength,
+            Instruction::Istore(4),
+            Instruction::Iconst_0,
+            Instruction::Istore(5),
+            Instruction::Iload(5),
+            Instruction::Iload(4),
+            Instruction::If_icmpge(63),
+            Instruction::Aload_3,
+            Instruction::Iload(5),
+            Instruction::Aaload,
+            Instruction::Astore(6),
+            Instruction::Aload(6),
+            Instruction::Iconst_0,
+            Instruction::Invokestatic(decode),
+            Instruction::Astore(7),
+            Instruction::Aload_2,
+            Instruction::New(track_format),
+            Instruction::Dup,
+            Instruction::Aload(7),
+            Instruction::Ldc_w(type_key),
+            Instruction::Invokeinterface(get, 2),
+            Instruction::Checkcast(string),
+            Instruction::Invokestatic(parse_content_type),
+            Instruction::Aload(7),
+            Instruction::Ldc_w(bitrate_key),
+            Instruction::Invokeinterface(get, 2),
+            Instruction::Checkcast(string),
+            Instruction::Invokestatic(parse_long),
+            Instruction::Aload(7),
+            Instruction::Ldc_w(content_length_key),
+            Instruction::Invokeinterface(get, 2),
+            Instruction::Checkcast(string),
+            Instruction::Invokestatic(parse_long),
+            Instruction::Ldc2_w(two),
+            Instruction::Aload(7),
+            Instruction::Ldc_w(url_key),
+            Instruction::Invokeinterface(get, 2),
+            Instruction::Checkcast(string),
+            Instruction::Ldc_w(empty),
+            Instruction::Aload(7),
+            Instruction::Ldc_w(signature_key),
+            Instruction::Invokeinterface(get, 2),
+            Instruction::Checkcast(string),
+            Instruction::Aload(7),
+            Instruction::Ldc_w(signature_parameter_key),
+            Instruction::Ldc_w(default_signature_key),
+            Instruction::Invokeinterface(get_or_default, 3),
+            Instruction::Checkcast(string),
+            Instruction::Iconst_1,
+            Instruction::Invokespecial(track_format_init),
+            Instruction::Invokeinterface(add, 2),
+            Instruction::Pop,
+            Instruction::Iinc(5, 1),
+            Instruction::Goto(13),
+            Instruction::Aload_2,
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 13,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: string,
+                    },
+                    VerificationType::Object { cpool_index: list },
+                    VerificationType::Object {
+                        cpool_index: string_array,
+                    },
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                ],
+                stack: Vec::new(),
+            },
+            StackFrame::ChopFrame {
+                frame_type: 248,
+                offset_delta: 49,
+            },
+        ],
+    )?;
+    Ok(body)
 }
 
 #[allow(clippy::too_many_lines)]
