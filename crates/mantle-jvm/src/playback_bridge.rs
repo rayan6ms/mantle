@@ -12,13 +12,13 @@ use mantle_core::{SourceCancellation, SourceManager};
 use mantle_media::{
     BandcampPlaybackSession, BandcampRoute, BandcampSourceManager, BandcampSourceOptions,
     BandcampSourceTrack, BeamErrorKind, BeamSourceManager, GetyarnErrorKind, GetyarnSourceManager,
-    HttpRangeOptions, MediaCancellation, MediaInfo, MediaLimits, NicoNicoPlaybackSession,
-    NicoNicoSourceManager, NicoNicoSourceOptions, NicoNicoSourceTrack, SoundCloudAuthentication,
-    SoundCloudPlaybackSession, SoundCloudSourceManager, SoundCloudSourceOptions,
-    TwitchAuthentication, TwitchLivePlaybackOptions, TwitchLivePlaybackPoll,
-    TwitchLivePlaybackSession, TwitchSourceManager, TwitchSourceOptions, TwitchSourceTrack,
-    VimeoAuthentication, VimeoPlaybackSession, VimeoSourceManager, VimeoSourceOptions,
-    VimeoSourceTrack, YandexMusicAuthentication, YandexMusicPlaybackSession,
+    HttpRangeInput, HttpRangeOptions, MediaCancellation, MediaInfo, MediaLimits, MediaSession,
+    NicoNicoPlaybackSession, NicoNicoSourceManager, NicoNicoSourceOptions, NicoNicoSourceTrack,
+    SoundCloudAuthentication, SoundCloudPlaybackSession, SoundCloudSourceManager,
+    SoundCloudSourceOptions, TwitchAuthentication, TwitchLivePlaybackOptions,
+    TwitchLivePlaybackPoll, TwitchLivePlaybackSession, TwitchSourceManager, TwitchSourceOptions,
+    TwitchSourceTrack, VimeoAuthentication, VimeoPlaybackSession, VimeoSourceManager,
+    VimeoSourceOptions, VimeoSourceTrack, YandexMusicAuthentication, YandexMusicPlaybackSession,
     YandexMusicSourceManager, YandexMusicSourceOptions, YoutubeAudioSourceManager,
     YoutubeAuthentication, YoutubeLivePlaybackOptions, YoutubeLivePlaybackPoll,
     YoutubeLivePlaybackSession, YoutubePlaybackSession, YoutubeSourceOptions,
@@ -124,6 +124,37 @@ pub(crate) fn process_getyarn_track(
             "retired Getyarn playback unexpectedly became available",
         )),
     }
+}
+
+pub(crate) fn process_http_track(
+    env: &mut Env<'_>,
+    track: &JObject<'_>,
+    executor: &JObject<'_>,
+) -> jni::errors::Result<()> {
+    let java_info = env
+        .get_field(
+            track,
+            jni_str!("trackInfo"),
+            jni_sig!("Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;"),
+        )?
+        .l()?;
+    let info = crate::track_info_from_java(env, &java_info)?;
+    let extension = http_extension_hint(&info.identifier);
+    let cancellation = MediaCancellation::new();
+    let input = HttpRangeInput::open_with_cancellation(
+        &info.identifier,
+        HttpRangeOptions::default(),
+        cancellation.clone(),
+    )
+    .map_err(|_| failure("current HTTP track playback failed"))?;
+    let session = MediaSession::open_with_cancellation(
+        Box::new(input),
+        extension.as_deref(),
+        MediaLimits::default(),
+        cancellation.clone(),
+    )
+    .map_err(|_| failure("current HTTP track playback failed"))?;
+    process_playback_session(env, executor, session, &cancellation)
 }
 
 pub(crate) fn process_nico_track(
@@ -785,6 +816,24 @@ impl PcmPlaybackSession for YandexMusicPlaybackSession {
         self.read_pcm(output)
             .map_err(|_| failure("Yandex Music media decoding failed"))
     }
+}
+
+impl PcmPlaybackSession for MediaSession {
+    fn info(&self) -> &MediaInfo {
+        self.info()
+    }
+
+    fn read_pcm(&mut self, output: &mut PcmFrame) -> jni::errors::Result<bool> {
+        self.read_pcm(output)
+            .map_err(|_| failure("HTTP media decoding failed"))
+    }
+}
+
+fn http_extension_hint(identifier: &str) -> Option<String> {
+    let path = identifier.split(['?', '#']).next().unwrap_or(identifier);
+    let name = path.rsplit('/').next()?;
+    let (_, extension) = name.rsplit_once('.')?;
+    (!extension.is_empty()).then(|| extension.to_owned())
 }
 
 struct PcmTranscoder<S> {

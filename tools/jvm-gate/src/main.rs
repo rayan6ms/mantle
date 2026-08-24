@@ -197,6 +197,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-getyarn-audio-track-consumer" => Some(GETYARN_AUDIO_TRACK_CONSUMER),
         "write-http-audio-source-manager-consumer" => Some(HTTP_AUDIO_SOURCE_MANAGER_CONSUMER),
+        "write-http-audio-track-consumer" => Some(HTTP_AUDIO_TRACK_CONSUMER),
         "write-vimeo-audio-source-manager-consumer" => Some(VIMEO_AUDIO_SOURCE_MANAGER_CONSUMER),
         "write-vimeo-playback-format-consumer" => Some(VIMEO_PLAYBACK_FORMAT_CONSUMER),
         "write-vimeo-audio-track-consumer" => Some(VIMEO_AUDIO_TRACK_CONSUMER),
@@ -17798,6 +17799,271 @@ public final class GateHttpAudioSourceManager {
     AudioTrack create(AudioTrackInfo info, MediaContainerDescriptor descriptor) {
       return super.createTrack(info, descriptor);
     }
+  }
+
+  private interface Operation { void run() throws Exception; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const HTTP_AUDIO_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDescriptor;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerProbe;
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.http.HttpAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.http.HttpAudioTrack;
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager;
+import com.sedmelluq.discord.lavaplayer.tools.io.PersistentHttpStream;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.DelegatedAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.http.client.protocol.HttpClientContext;
+
+public final class GateHttpAudioTrack {
+  public static void main(String[] args) throws Exception {
+    check(args.length >= 1 && args.length <= 2, "expected disposition and optional native path");
+    boolean reference = args[0].equals("reference");
+    check(reference || args[0].equals("candidate"), "unknown disposition");
+    check(reference == (args.length == 1), "candidate requires native path");
+    reflectionContract();
+    commonBehavior();
+    if (reference) legacyDisposition(); else currentDisposition(args[1]);
+    System.out.println(
+        "common=public-concrete,delegated-audio-track-super,3-fields,1-constructor,"
+        + "4-exported-methods;construction,descriptor-identity,source-identity,"
+        + "shallow-clone,reflection;service="
+        + (reference ? "legacy-direct-http-delegate,resource-closing" :
+            "current-bounded-native-http,ssrf-guarded"));
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<HttpAudioTrack> type = HttpAudioTrack.class;
+    check(type.getModifiers() == Modifier.PUBLIC
+        && type.getSuperclass() == DelegatedAudioTrack.class
+        && type.getInterfaces().length == 0, "class metadata");
+    check(type.getDeclaredFields().length == 3, "field count");
+    checkField(type, "log", Class.forName("org.slf4j.Logger"),
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "containerTrackFactory", MediaContainerDescriptor.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "sourceManager", HttpAudioSourceManager.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        AudioTrackInfo.class, MediaContainerDescriptor.class, HttpAudioSourceManager.class);
+    check(type.getDeclaredConstructors().length == 1
+        && constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic()
+        && !constructor.isVarArgs(), "constructor metadata");
+    check(type.getDeclaredMethods().length == 4, "declared method count");
+    long exported = Arrays.stream(type.getDeclaredMethods())
+        .filter(method -> Modifier.isPublic(method.getModifiers())
+            || Modifier.isProtected(method.getModifiers()))
+        .count();
+    check(exported == 4L, "exported method count");
+    checkMethod(type, "getContainerTrackFactory", MediaContainerDescriptor.class,
+        Modifier.PUBLIC, new Class<?>[0]);
+    checkMethod(type, "process", void.class, Modifier.PUBLIC,
+        new Class<?>[] {LocalAudioTrackExecutor.class}, Exception.class);
+    checkMethod(type, "makeShallowClone", AudioTrack.class,
+        Modifier.PROTECTED, new Class<?>[0]);
+    checkMethod(type, "getSourceManager", AudioSourceManager.class,
+        Modifier.PUBLIC, new Class<?>[0]);
+  }
+
+  private static void commonBehavior() throws Exception {
+    AudioTrackInfo info = new AudioTrackInfo("title", "author", 4_000L,
+        "https://example.invalid/fixture.mp3", false,
+        "https://example.invalid/fixture.mp3", "art", null);
+    MediaContainerDescriptor descriptor = new MediaContainerDescriptor(probe(null), "settings");
+    HttpAudioSourceManager source = new HttpAudioSourceManager();
+    ExposedTrack track = new ExposedTrack(info, descriptor, source);
+    check(track.getInfo() == info && track.getContainerTrackFactory() == descriptor
+        && track.getSourceManager() == source
+        && field("containerTrackFactory").get(track) == descriptor
+        && field("sourceManager").get(track) == source, "captured identities");
+    HttpAudioTrack clone = (HttpAudioTrack) track.shallowClone();
+    check(clone != track && clone.getInfo() == info
+        && clone.getContainerTrackFactory() == descriptor
+        && clone.getSourceManager() == source, "shallow clone identities");
+    check(field("log").get(null) != null, "static logger");
+
+    HttpAudioTrack nulls = new HttpAudioTrack(info, null, null);
+    check(nulls.getInfo() == info && nulls.getContainerTrackFactory() == null
+        && nulls.getSourceManager() == null, "null identities preserved");
+    closeBaseManager(source);
+  }
+
+  private static void legacyDisposition() throws Exception {
+    RecordingDelegate delegate = new RecordingDelegate();
+    ProbeHandler probe = new ProbeHandler(delegate);
+    AtomicInteger closes = new AtomicInteger();
+    RecordingSource source = new RecordingSource(new RecordingHttpInterface(closes));
+    AudioTrackInfo info = new AudioTrackInfo("title", "author", 4_000L,
+        "https://example.invalid/fixture.mp3", false,
+        "https://example.invalid/fixture.mp3", null, null);
+    MediaContainerDescriptor descriptor =
+        new MediaContainerDescriptor(probe.proxy(), "fixture-parameters");
+    HttpAudioTrack track = new HttpAudioTrack(info, descriptor, source);
+    track.process(null);
+    check(source.interfaces.get() == 1 && closes.get() == 1,
+        "HTTP interface acquisition and closing");
+    check(probe.parameters.equals("fixture-parameters") && probe.info == info
+        && probe.input instanceof PersistentHttpStream,
+        "descriptor delegation identities");
+    check(delegate.processCalls.get() == 1 && delegate.executor == null,
+        "delegate processing identity");
+    closeBaseManager(source);
+  }
+
+  private static void currentDisposition(String nativeLibrary) throws Exception {
+    Class.forName("dev.mantle.internal.NativeLoader")
+        .getMethod("load", String.class).invoke(null, nativeLibrary);
+    Class<?> nativeType = Class.forName("dev.mantle.internal.MantleNative");
+    Method process = nativeType.getDeclaredMethod(
+        "processHttpTrack", HttpAudioTrack.class, LocalAudioTrackExecutor.class);
+    check(Modifier.isPublic(process.getModifiers()) && Modifier.isStatic(process.getModifiers())
+        && Modifier.isNative(process.getModifiers()), "current native route");
+    AudioTrackInfo info = new AudioTrackInfo("title", "author", 4_000L,
+        "http://127.0.0.1:9/fixture.mp3", false,
+        "http://127.0.0.1:9/fixture.mp3", null, null);
+    HttpAudioTrack track = new HttpAudioTrack(
+        info, new MediaContainerDescriptor(probe(null), null), null);
+    RuntimeException denied = expect(RuntimeException.class, () -> track.process(null));
+    check(denied.getMessage().contains("current HTTP track playback failed"),
+        "loopback denied before executor or service traffic");
+  }
+
+  private static MediaContainerProbe probe(AudioTrack track) {
+    return new ProbeHandler(track).proxy();
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = HttpAudioTrack.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static void closeBaseManager(HttpAudioSourceManager source) throws Exception {
+    Field field = HttpAudioSourceManager.class.getDeclaredField("httpInterfaceManager");
+    field.setAccessible(true);
+    ((HttpInterfaceManager) field.get(source)).close();
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> type, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == type && field.getGenericType() == type
+        && field.getModifiers() == modifiers && !field.isSynthetic(), name + " metadata");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+                                  int modifiers, Class<?>[] parameters,
+                                  Class<?>... exceptions) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.getTypeParameters().length == 0 && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), method + " metadata");
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private static final class RecordingSource extends HttpAudioSourceManager {
+    private final HttpInterface http;
+    private final AtomicInteger interfaces = new AtomicInteger();
+    RecordingSource(HttpInterface http) { this.http = http; }
+    @Override public HttpInterface getHttpInterface() {
+      interfaces.incrementAndGet();
+      return http;
+    }
+  }
+
+  private static final class RecordingHttpInterface extends HttpInterface {
+    RecordingHttpInterface(AtomicInteger closes) {
+      super(null, HttpClientContext.create(), false, filter(closes));
+    }
+    private static HttpContextFilter filter(AtomicInteger closes) {
+      return (HttpContextFilter) Proxy.newProxyInstance(
+          HttpContextFilter.class.getClassLoader(), new Class<?>[] {HttpContextFilter.class},
+          (instance, method, arguments) -> {
+            if (method.getName().equals("onContextClose")) closes.incrementAndGet();
+            if (method.getName().equals("toString")) return "RecordingHttpContextFilter";
+            if (method.getName().equals("hashCode")) return System.identityHashCode(instance);
+            if (method.getName().equals("equals")) return instance == arguments[0];
+            return method.getReturnType() == boolean.class ? false : null;
+          });
+    }
+  }
+
+  private static final class ProbeHandler implements InvocationHandler {
+    private final AudioTrack track;
+    private String parameters;
+    private AudioTrackInfo info;
+    private SeekableInputStream input;
+    ProbeHandler(AudioTrack track) { this.track = track; }
+    MediaContainerProbe proxy() {
+      return (MediaContainerProbe) Proxy.newProxyInstance(
+          MediaContainerProbe.class.getClassLoader(), new Class<?>[] {MediaContainerProbe.class},
+          this);
+    }
+    public Object invoke(Object instance, Method method, Object[] arguments) {
+      if (method.getName().equals("getName")) return "fixture";
+      if (method.getName().equals("createTrack")) {
+        parameters = (String) arguments[0];
+        info = (AudioTrackInfo) arguments[1];
+        input = (SeekableInputStream) arguments[2];
+        return track;
+      }
+      if (method.getName().equals("toString")) return "FixtureProbe";
+      if (method.getName().equals("hashCode")) return System.identityHashCode(instance);
+      if (method.getName().equals("equals")) return instance == arguments[0];
+      return method.getReturnType() == boolean.class ? false : null;
+    }
+  }
+
+  private static final class RecordingDelegate extends BaseAudioTrack {
+    private final AtomicInteger processCalls = new AtomicInteger();
+    private LocalAudioTrackExecutor executor;
+    RecordingDelegate() {
+      super(new AudioTrackInfo("delegate", "author", 1L, "delegate", false, null));
+    }
+    @Override public void process(LocalAudioTrackExecutor executor) {
+      this.executor = executor;
+      processCalls.incrementAndGet();
+    }
+    @Override protected AudioTrack makeShallowClone() { return this; }
+    @Override public AudioSourceManager getSourceManager() { return null; }
+  }
+
+  private static final class ExposedTrack extends HttpAudioTrack {
+    ExposedTrack(AudioTrackInfo info, MediaContainerDescriptor descriptor,
+                 HttpAudioSourceManager source) { super(info, descriptor, source); }
+    AudioTrack shallowClone() { return makeShallowClone(); }
   }
 
   private interface Operation { void run() throws Exception; }

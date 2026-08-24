@@ -604,10 +604,10 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   } and
   ([.cohorts[0].completed_slices[].symbols] | add) == .cohorts[0].classified_symbols and
   (.cohorts[0].classified_symbols + .cohorts[0].remaining_symbols) == .cohorts[0].symbols and
-  .cohorts[1].status == "IN_PROGRESS" and
-  .cohorts[1].classified_symbols == 692 and
-  .cohorts[1].remaining_symbols == 6 and
-  (.cohorts[1].completed_slices | length) == 103 and
+  .cohorts[1].status == "COMPLETE" and
+  .cohorts[1].classified_symbols == 698 and
+  .cohorts[1].remaining_symbols == 0 and
+  (.cohorts[1].completed_slices | length) == 104 and
   .cohorts[1].completed_slices[0] == {
     id: "audio-source-manager-interface-contracts",
     classes: 1,
@@ -2042,13 +2042,34 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "docs/architecture/ADR-0005-bounded-blocking-http-media-input.md"
     ]
   } and
+  .cohorts[1].completed_slices[103] == {
+    id: "http-audio-track-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 5,
+    symbols: 6,
+    classification: "MIXED_A_EXACT_C_SEMANTIC",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "crates/mantle-jvm/src/playback_bridge.rs",
+      "crates/mantle-media/tests/phase6_http.rs",
+      "crates/mantle-media/tests/phase11_sources.rs",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs",
+      "docs/architecture/ADR-0005-bounded-blocking-http-media-input.md"
+    ]
+  } and
   ([.cohorts[1].completed_slices[].symbols] | add) == .cohorts[1].classified_symbols and
   (.cohorts[1].classified_symbols + .cohorts[1].remaining_symbols) == .cohorts[1].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1227 and
+  .cohorts[2].status == "IN_PROGRESS" and
+  .cohorts[2].classified_symbols == 0 and
+  .cohorts[2].remaining_symbols == 219 and
+  .cohorts[2].completed_slices == [] and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1233 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1094 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1098 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 117 and
+    select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 119 and
   ([$classifications.symbols[] |
     select(.assessment == "CLASSIFIED" and .classification == "D_LEGACY")] | length) == 16 and
   ([$classifications.symbols[] |
@@ -2122,6 +2143,21 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
       (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
       (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 14 and
+  ([$classifications.symbols[] |
+    select(.binary_name ==
+      "com.sedmelluq.discord.lavaplayer.source.http.HttpAudioTrack" and
+      .assessment == "CLASSIFIED" and
+      (if .symbol_kind == "CLASS" or .member_name == "process"
+       then .classification == "C_SEMANTIC" and
+         (.tests | index("crates/mantle-jvm/src/playback_bridge.rs")) != null and
+         (.tests | index("crates/mantle-media/tests/phase6_http.rs")) != null and
+         (.tests | index("crates/mantle-media/tests/phase11_sources.rs")) != null and
+         (.tests | index("docs/architecture/ADR-0005-bounded-blocking-http-media-input.md")) != null
+       else .classification == "A_EXACT"
+       end) and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 6 and
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.source.beam.BeamAudioSourceManager" and
@@ -2296,6 +2332,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.source.getyarn.GetyarnAudioSourceManager",
         "com.sedmelluq.discord.lavaplayer.source.getyarn.GetyarnAudioTrack",
         "com.sedmelluq.discord.lavaplayer.source.http.HttpAudioSourceManager",
+        "com.sedmelluq.discord.lavaplayer.source.http.HttpAudioTrack",
         "com.sedmelluq.discord.lavaplayer.source.nico.HeartbeatingHttpStream",
         "com.sedmelluq.discord.lavaplayer.source.nico.NicoAudioSourceManager",
         "com.sedmelluq.discord.lavaplayer.source.nico.NicoAudioTrack",
@@ -2591,6 +2628,14 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         (.tests | index("crates/mantle-media/tests/phase12_remote_http.rs")) != null and
         (.tests | index("docs/architecture/ADR-0005-bounded-blocking-http-media-input.md")) != null
       elif $symbol.binary_name ==
+        "com.sedmelluq.discord.lavaplayer.source.http.HttpAudioTrack" and
+        ($symbol.symbol_kind == "CLASS" or $symbol.member_name == "process")
+      then .classification == "C_SEMANTIC" and
+        (.tests | index("crates/mantle-jvm/src/playback_bridge.rs")) != null and
+        (.tests | index("crates/mantle-media/tests/phase6_http.rs")) != null and
+        (.tests | index("crates/mantle-media/tests/phase11_sources.rs")) != null and
+        (.tests | index("docs/architecture/ADR-0005-bounded-blocking-http-media-input.md")) != null
+      elif $symbol.binary_name ==
         "com.sedmelluq.discord.lavaplayer.source.vimeo.VimeoAudioTrack" and
         ($symbol.symbol_kind == "CLASS" or $symbol.member_name == "process")
       then .classification == "C_SEMANTIC" and
@@ -2698,7 +2743,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "http-audio-track-contracts" and
+  .phase_entry.next_slice == "audio-filter-interface-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 ' "$PLAN" >/dev/null
@@ -2706,7 +2751,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '174 reference classes / 1,256 symbols' \
+  '175 reference classes / 1,262 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -2716,4 +2761,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 1,227 classified symbols and 1,535 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 1,233 classified symbols and 1,529 unassessed symbols.\n'
