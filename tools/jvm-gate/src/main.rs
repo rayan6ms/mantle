@@ -269,6 +269,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-youtube-search-result-loader-consumer" => {
             Some(YOUTUBE_SEARCH_RESULT_LOADER_CONSUMER)
         }
+        "write-youtube-signature-cipher-consumer" => Some(YOUTUBE_SIGNATURE_CIPHER_CONSUMER),
         _ => None,
     }
 }
@@ -21398,6 +21399,216 @@ public final class GateYoutubeSearchResultLoader {
       configurationCalls++;
       if (failure != null) throw failure;
       return configuration;
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_SIGNATURE_CIPHER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeCipherOperation;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeCipherOperationType;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSignatureCipher;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import javax.script.Invocable;
+import javax.script.ScriptEngine;
+import javax.script.ScriptException;
+
+public final class GateYoutubeSignatureCipher {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "mode");
+    reflectionContract();
+    stateContract();
+    operationContract();
+    String transform = transformContract(args[0]);
+    System.out.println("common=public-concrete,object-root,4-fields,1-constructor,7-methods;"
+        + "fresh-array-list,empty-script-state,setter-identity,ordered-operations,"
+        + "swap-reverse-slice-splice,edge-errors,signatures,reflection;transform=" + transform);
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<YoutubeSignatureCipher> type = YoutubeSignatureCipher.class;
+    check(type.getModifiers() == Modifier.PUBLIC && !type.isInterface() && !type.isAnnotation()
+        && !type.isEnum() && !type.isSynthetic() && !type.isMemberClass(), "type metadata");
+    check(type.getSuperclass() == Object.class && type.getGenericSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getGenericInterfaces().length == 0
+        && type.getTypeParameters().length == 0, "type hierarchy");
+    check(type.getDeclaredFields().length == 4 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 7 && type.getDeclaredClasses().length == 0,
+        "type shape");
+
+    Field operations = type.getDeclaredField("operations");
+    check(operations.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && operations.getType() == List.class, "operations field");
+    check(operations.getGenericType() instanceof ParameterizedType, "operations generic kind");
+    ParameterizedType list = (ParameterizedType) operations.getGenericType();
+    check(list.getRawType() == List.class && list.getOwnerType() == null
+        && Arrays.equals(list.getActualTypeArguments(), new Type[] {YoutubeCipherOperation.class}),
+        "operations generic signature");
+    checkField(type, "nFunction");
+    checkField(type, "scriptTimestamp");
+    checkField(type, "rawScript");
+
+    Constructor<YoutubeSignatureCipher> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0
+        && constructor.getTypeParameters().length == 0 && !constructor.isSynthetic()
+        && !constructor.isVarArgs(), "constructor metadata");
+    checkMethod(type, "apply", String.class, new Class<?>[] {String.class}, new Class<?>[0]);
+    checkMethod(type, "transform", String.class,
+        new Class<?>[] {String.class, ScriptEngine.class},
+        new Class<?>[] {ScriptException.class, NoSuchMethodException.class});
+    checkMethod(type, "addOperation", void.class,
+        new Class<?>[] {YoutubeCipherOperation.class}, new Class<?>[0]);
+    checkMethod(type, "isEmpty", boolean.class, new Class<?>[0], new Class<?>[0]);
+    checkMethod(type, "setNFunction", void.class,
+        new Class<?>[] {String.class}, new Class<?>[0]);
+    checkMethod(type, "setTimestamp", void.class,
+        new Class<?>[] {String.class}, new Class<?>[0]);
+    checkMethod(type, "setRawScript", void.class,
+        new Class<?>[] {String.class}, new Class<?>[0]);
+  }
+
+  private static void stateContract() throws Exception {
+    YoutubeSignatureCipher first = new YoutubeSignatureCipher();
+    YoutubeSignatureCipher second = new YoutubeSignatureCipher();
+    Object firstOperations = read(first, "operations");
+    Object secondOperations = read(second, "operations");
+    check(firstOperations instanceof ArrayList && secondOperations instanceof ArrayList
+        && firstOperations != secondOperations && ((List<?>) firstOperations).isEmpty(),
+        "fresh operation state");
+    check(read(first, "nFunction") == "" && read(first, "scriptTimestamp") == ""
+        && read(first, "rawScript") == "", "initial scripts");
+
+    String nFunction = new String("n-body");
+    String timestamp = new String("timestamp");
+    String rawScript = new String("raw-script");
+    first.setNFunction(nFunction);
+    first.setTimestamp(timestamp);
+    first.setRawScript(rawScript);
+    check(read(first, "nFunction") == nFunction && read(first, "scriptTimestamp") == timestamp
+        && read(first, "rawScript") == rawScript, "setter identity");
+    first.setNFunction(null);
+    first.setTimestamp(null);
+    first.setRawScript(null);
+    check(read(first, "nFunction") == null && read(first, "scriptTimestamp") == null
+        && read(first, "rawScript") == null, "setter nulls");
+  }
+
+  private static void operationContract() throws Exception {
+    YoutubeSignatureCipher cipher = new YoutubeSignatureCipher();
+    check(cipher.isEmpty() && "abcdef".equals(cipher.apply("abcdef")), "empty operations");
+    cipher.addOperation(new YoutubeCipherOperation(YoutubeCipherOperationType.SWAP, 2));
+    cipher.addOperation(new YoutubeCipherOperation(YoutubeCipherOperationType.REVERSE, 0));
+    cipher.addOperation(new YoutubeCipherOperation(YoutubeCipherOperationType.SLICE, 2));
+    cipher.addOperation(new YoutubeCipherOperation(YoutubeCipherOperationType.SPLICE, 1));
+    check(!cipher.isEmpty() && "abc".equals(cipher.apply("abcdef")), "ordered operations");
+
+    YoutubeSignatureCipher modulo = new YoutubeSignatureCipher();
+    modulo.addOperation(new YoutubeCipherOperation(YoutubeCipherOperationType.SWAP, 8));
+    check("cbadef".equals(modulo.apply("abcdef")), "swap modulo");
+    YoutubeSignatureCipher clamped = new YoutubeSignatureCipher();
+    clamped.addOperation(new YoutubeCipherOperation(YoutubeCipherOperationType.SLICE, 99));
+    check("".equals(clamped.apply("abcdef")), "slice clamp");
+
+    expect(NullPointerException.class, () -> new YoutubeSignatureCipher().apply(null));
+    YoutubeSignatureCipher emptySwap = new YoutubeSignatureCipher();
+    emptySwap.addOperation(new YoutubeCipherOperation(YoutubeCipherOperationType.SWAP, 1));
+    expect(ArithmeticException.class, () -> emptySwap.apply(""));
+    YoutubeSignatureCipher negativeSwap = new YoutubeSignatureCipher();
+    negativeSwap.addOperation(new YoutubeCipherOperation(YoutubeCipherOperationType.SWAP, -1));
+    expect(StringIndexOutOfBoundsException.class, () -> negativeSwap.apply("abc"));
+    YoutubeSignatureCipher nullOperation = new YoutubeSignatureCipher();
+    nullOperation.addOperation(null);
+    expect(NullPointerException.class, () -> nullOperation.apply("abc"));
+    YoutubeSignatureCipher nullType = new YoutubeSignatureCipher();
+    nullType.addOperation(new YoutubeCipherOperation(null, 0));
+    expect(NullPointerException.class, () -> nullType.apply("abc"));
+  }
+
+  private static String transformContract(String mode) throws Exception {
+    YoutubeSignatureCipher cipher = new YoutubeSignatureCipher();
+    String function = new String("function(value){return value + '-legacy';}");
+    String input = new String("input");
+    String output = new String("transformed");
+    cipher.setNFunction(function);
+    int[] evalCalls = {0};
+    int[] invokeCalls = {0};
+    Object proxy = Proxy.newProxyInstance(GateYoutubeSignatureCipher.class.getClassLoader(),
+        new Class<?>[] {ScriptEngine.class, Invocable.class}, (ignored, method, arguments) -> {
+          if (method.getName().equals("eval")) {
+            evalCalls[0]++;
+            check(arguments != null && arguments.length >= 1
+                && ("n=" + function).equals(arguments[0]), "eval script");
+            return null;
+          }
+          if (method.getName().equals("invokeFunction")) {
+            invokeCalls[0]++;
+            check(arguments != null && arguments.length == 2 && "n".equals(arguments[0])
+                && ((Object[]) arguments[1]).length == 1
+                && ((Object[]) arguments[1])[0] == input, "invoke arguments");
+            return output;
+          }
+          throw new AssertionError("unexpected engine call " + method.getName());
+        });
+    if (mode.equals("reference")) {
+      check(cipher.transform(input, (ScriptEngine) proxy) == output
+          && evalCalls[0] == 1 && invokeCalls[0] == 1, "legacy transform");
+      return "legacy-script-engine,eval-before-invoke";
+    }
+    check(mode.equals("candidate"), "unknown mode");
+    UnsupportedOperationException error = expect(UnsupportedOperationException.class,
+        () -> cipher.transform(input, (ScriptEngine) proxy));
+    check("Legacy YouTube JavaScript n transformation is unsupported; use Mantle's bounded native signature transformer."
+        .equals(error.getMessage()) && evalCalls[0] == 0 && invokeCalls[0] == 0,
+        "deterministic transform fence");
+    return "deterministic-no-script-engine,bounded-native-signature-and-n";
+  }
+
+  private static void checkField(Class<?> owner, String name) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getModifiers() == 0 && field.getType() == String.class
+        && field.getGenericType() == String.class && !field.isSynthetic(), name + " field");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> result,
+      Class<?>[] parameters, Class<?>[] exceptions) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == result
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.getTypeParameters().length == 0 && !method.isDefault() && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), name + " metadata");
+  }
+
+  private static Object read(Object owner, String name) throws Exception {
+    Field field = owner.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(owner);
+  }
+
+  private interface ThrowingRunnable { void run() throws Exception; }
+
+  private static <T extends Throwable> T expect(
+      Class<T> type, ThrowingRunnable operation) throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
     }
   }
 

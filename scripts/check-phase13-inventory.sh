@@ -605,9 +605,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[0].completed_slices[].symbols] | add) == .cohorts[0].classified_symbols and
   (.cohorts[0].classified_symbols + .cohorts[0].remaining_symbols) == .cohorts[0].symbols and
   .cohorts[1].status == "IN_PROGRESS" and
-  .cohorts[1].classified_symbols == 562 and
-  .cohorts[1].remaining_symbols == 136 and
-  (.cohorts[1].completed_slices | length) == 82 and
+  .cohorts[1].classified_symbols == 571 and
+  .cohorts[1].remaining_symbols == 127 and
+  (.cohorts[1].completed_slices | length) == 83 and
   .cohorts[1].completed_slices[0] == {
     id: "audio-source-manager-interface-contracts",
     classes: 1,
@@ -1741,13 +1741,28 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "tools/jvm-gate/src/main.rs"
     ]
   } and
+  .cohorts[1].completed_slices[82] == {
+    id: "youtube-signature-cipher-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 8,
+    symbols: 9,
+    classification: "MIXED_A_EXACT_C_SEMANTIC",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs",
+      "crates/mantle-media/tests/phase12_youtube.rs",
+      "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
+    ]
+  } and
   ([.cohorts[1].completed_slices[].symbols] | add) == .cohorts[1].classified_symbols and
   (.cohorts[1].classified_symbols + .cohorts[1].remaining_symbols) == .cohorts[1].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1097 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1106 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 987 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 994 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 104 and
+    select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 106 and
   ([$classifications.symbols[] |
     select(.assessment == "CLASSIFIED" and .classification == "D_LEGACY")] | length) == 6 and
   all($classifications.symbols[] | select(.assessment == "CLASSIFIED");
@@ -1892,9 +1907,16 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSearchMusicProvider",
         "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSearchMusicResultLoader",
         "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSearchProvider",
-        "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSearchResultLoader"
+        "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSearchResultLoader",
+        "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSignatureCipher"
       ][]; . == $symbol.binary_name)) and
     (if $symbol.binary_name ==
+        "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSignatureCipher" and
+        ($symbol.symbol_kind == "CLASS" or $symbol.member_name == "transform")
+      then .classification == "C_SEMANTIC" and
+        (.tests | index("crates/mantle-media/tests/phase12_youtube.rs")) != null and
+        (.tests | index("docs/architecture/ADR-0013-ordered-youtube-client-foundation.md")) != null
+      elif $symbol.binary_name ==
         "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSearchProvider" and
         ($symbol.symbol_kind == "CLASS" or $symbol.member_name == "loadSearchResult")
       then .classification == "C_SEMANTIC" and
@@ -2134,7 +2156,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "youtube-signature-cipher-contracts" and
+  .phase_entry.next_slice == "youtube-signature-cipher-manager-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 ' "$PLAN" >/dev/null
@@ -2142,7 +2164,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '153 reference classes / 1,126 symbols' \
+  '154 reference classes / 1,135 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -2152,4 +2174,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 1,097 classified symbols and 1,665 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 1,106 classified symbols and 1,656 unassessed symbols.\n'

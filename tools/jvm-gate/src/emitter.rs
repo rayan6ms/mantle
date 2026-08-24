@@ -279,6 +279,8 @@ const YOUTUBE_SEARCH_PROVIDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSearchProvider";
 const YOUTUBE_SEARCH_RESULT_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSearchResultLoader";
+const YOUTUBE_SIGNATURE_CIPHER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSignatureCipher";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -395,6 +397,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_SEARCH_MUSIC_RESULT_LOADER_CLASS,
     YOUTUBE_SEARCH_PROVIDER_CLASS,
     YOUTUBE_SEARCH_RESULT_LOADER_CLASS,
+    YOUTUBE_SIGNATURE_CIPHER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -802,6 +805,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | YOUTUBE_PERSISTENT_HTTP_STREAM_CLASS
             | YOUTUBE_SEARCH_MUSIC_PROVIDER_CLASS
             | YOUTUBE_SEARCH_PROVIDER_CLASS
+            | YOUTUBE_SIGNATURE_CIPHER_CLASS
     )
 }
 
@@ -1184,6 +1188,9 @@ fn replacement_body(
     }
     if class_name == YOUTUBE_CIPHER_OPERATION_CLASS {
         return youtube_cipher_operation_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == YOUTUBE_SIGNATURE_CIPHER_CLASS {
+        return youtube_signature_cipher_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == YOUTUBE_CLIENT_CONFIG_CLASS {
         return youtube_client_config_replacement(pool, name, descriptor, required_locals);
@@ -21784,6 +21791,312 @@ fn youtube_cipher_operation_replacement(
             required_locals,
         ),
     }
+}
+
+fn youtube_signature_cipher_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => youtube_signature_cipher_constructor(pool),
+        ("apply", "(Ljava/lang/String;)Ljava/lang/String;") => youtube_signature_cipher_apply(pool),
+        ("transform", "(Ljava/lang/String;Ljavax/script/ScriptEngine;)Ljava/lang/String;") => {
+            unsupported_body(
+                pool,
+                "Legacy YouTube JavaScript n transformation is unsupported; use Mantle's bounded native signature transformer.",
+                required_locals,
+            )
+        }
+        (
+            "addOperation",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeCipherOperation;)V",
+        ) => youtube_signature_cipher_add_operation(pool),
+        ("isEmpty", "()Z") => youtube_signature_cipher_is_empty(pool),
+        ("setNFunction", "(Ljava/lang/String;)V") => {
+            youtube_signature_cipher_string_setter(pool, "nFunction")
+        }
+        ("setTimestamp", "(Ljava/lang/String;)V") => {
+            youtube_signature_cipher_string_setter(pool, "scriptTimestamp")
+        }
+        ("setRawScript", "(Ljava/lang/String;)V") => {
+            youtube_signature_cipher_string_setter(pool, "rawScript")
+        }
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {YOUTUBE_SIGNATURE_CIPHER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn youtube_signature_cipher_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(YOUTUBE_SIGNATURE_CIPHER_CLASS)?;
+    let list = pool.add_class("java/util/ArrayList")?;
+    let list_init = pool.add_method_ref(list, "<init>", "()V")?;
+    let operations = pool.add_field_ref(owner, "operations", "Ljava/util/List;")?;
+    let n_function = pool.add_field_ref(owner, "nFunction", "Ljava/lang/String;")?;
+    let timestamp = pool.add_field_ref(owner, "scriptTimestamp", "Ljava/lang/String;")?;
+    let raw_script = pool.add_field_ref(owner, "rawScript", "Ljava/lang/String;")?;
+    let empty = pool.add_string("")?;
+    code(
+        pool,
+        3,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::New(list),
+            Instruction::Dup,
+            Instruction::Invokespecial(list_init),
+            Instruction::Putfield(operations),
+            Instruction::Aload_0,
+            Instruction::Ldc_w(empty),
+            Instruction::Putfield(n_function),
+            Instruction::Aload_0,
+            Instruction::Ldc_w(empty),
+            Instruction::Putfield(timestamp),
+            Instruction::Aload_0,
+            Instruction::Ldc_w(empty),
+            Instruction::Putfield(raw_script),
+            Instruction::Return,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn youtube_signature_cipher_apply(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_SIGNATURE_CIPHER_CLASS)?;
+    let operation = pool.add_class(YOUTUBE_CIPHER_OPERATION_CLASS)?;
+    let operation_type = pool.add_class(YOUTUBE_CIPHER_OPERATION_TYPE_CLASS)?;
+    let string = pool.add_class("java/lang/String")?;
+    let builder = pool.add_class("java/lang/StringBuilder")?;
+    let iterator = pool.add_class("java/util/Iterator")?;
+    let enum_class = pool.add_class("java/lang/Enum")?;
+    let illegal_state = pool.add_class("java/lang/IllegalStateException")?;
+    let operations = pool.add_field_ref(owner, "operations", "Ljava/util/List;")?;
+    let operation_type_field = pool.add_field_ref(
+        operation,
+        "type",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeCipherOperationType;",
+    )?;
+    let parameter = pool.add_field_ref(operation, "parameter", "I")?;
+    let swap = pool.add_field_ref(
+        operation_type,
+        "SWAP",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeCipherOperationType;",
+    )?;
+    let reverse_type = pool.add_field_ref(
+        operation_type,
+        "REVERSE",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeCipherOperationType;",
+    )?;
+    let slice_type = pool.add_field_ref(
+        operation_type,
+        "SLICE",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeCipherOperationType;",
+    )?;
+    let other_delete_type = pool.add_field_ref(
+        operation_type,
+        "SPLICE",
+        "Lcom/sedmelluq/discord/lavaplayer/source/youtube/YoutubeCipherOperationType;",
+    )?;
+    let builder_init = pool.add_method_ref(builder, "<init>", "(Ljava/lang/String;)V")?;
+    let list = pool.add_class("java/util/List")?;
+    let list_iterator =
+        pool.add_interface_method_ref(list, "iterator", "()Ljava/util/Iterator;")?;
+    let has_next = pool.add_interface_method_ref(iterator, "hasNext", "()Z")?;
+    let next = pool.add_interface_method_ref(iterator, "next", "()Ljava/lang/Object;")?;
+    let ordinal = pool.add_method_ref(enum_class, "ordinal", "()I")?;
+    let length = pool.add_method_ref(string, "length", "()I")?;
+    let char_at = pool.add_method_ref(builder, "charAt", "(I)C")?;
+    let set_char_at = pool.add_method_ref(builder, "setCharAt", "(IC)V")?;
+    let reverse = pool.add_method_ref(builder, "reverse", "()Ljava/lang/StringBuilder;")?;
+    let delete = pool.add_method_ref(builder, "delete", "(II)Ljava/lang/StringBuilder;")?;
+    let to_string = pool.add_method_ref(builder, "toString", "()Ljava/lang/String;")?;
+    let illegal_state_init =
+        pool.add_method_ref(illegal_state, "<init>", "(Ljava/lang/String;)V")?;
+    let branch_error = pool.add_string("All branches should be covered")?;
+
+    let mut body = code(
+        pool,
+        4,
+        7,
+        vec![
+            Instruction::New(builder),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(builder_init),
+            Instruction::Astore_2,
+            Instruction::Aload_0,
+            Instruction::Getfield(operations),
+            Instruction::Invokeinterface(list_iterator, 1),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(has_next, 1),
+            Instruction::Ifeq(73),
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(next, 1),
+            Instruction::Checkcast(operation),
+            Instruction::Astore(4),
+            Instruction::Aload(4),
+            Instruction::Getfield(operation_type_field),
+            Instruction::Invokevirtual(ordinal),
+            Instruction::Pop,
+            Instruction::Aload(4),
+            Instruction::Getfield(operation_type_field),
+            Instruction::Getstatic(swap),
+            Instruction::If_acmpne(45),
+            Instruction::Aload(4),
+            Instruction::Getfield(parameter),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(length),
+            Instruction::Irem,
+            Instruction::Istore(5),
+            Instruction::Aload_2,
+            Instruction::Iconst_0,
+            Instruction::Invokevirtual(char_at),
+            Instruction::Istore(6),
+            Instruction::Aload_2,
+            Instruction::Iconst_0,
+            Instruction::Aload_2,
+            Instruction::Iload(5),
+            Instruction::Invokevirtual(char_at),
+            Instruction::Invokevirtual(set_char_at),
+            Instruction::Aload_2,
+            Instruction::Iload(5),
+            Instruction::Iload(6),
+            Instruction::Invokevirtual(set_char_at),
+            Instruction::Goto(9),
+            Instruction::Aload(4),
+            Instruction::Getfield(operation_type_field),
+            Instruction::Getstatic(reverse_type),
+            Instruction::If_acmpne(53),
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(reverse),
+            Instruction::Pop,
+            Instruction::Goto(9),
+            Instruction::Aload(4),
+            Instruction::Getfield(operation_type_field),
+            Instruction::Getstatic(slice_type),
+            Instruction::If_acmpeq(61),
+            Instruction::Aload(4),
+            Instruction::Getfield(operation_type_field),
+            Instruction::Getstatic(other_delete_type),
+            Instruction::If_acmpne(68),
+            Instruction::Aload_2,
+            Instruction::Iconst_0,
+            Instruction::Aload(4),
+            Instruction::Getfield(parameter),
+            Instruction::Invokevirtual(delete),
+            Instruction::Pop,
+            Instruction::Goto(9),
+            Instruction::New(illegal_state),
+            Instruction::Dup,
+            Instruction::Ldc_w(branch_error),
+            Instruction::Invokespecial(illegal_state_init),
+            Instruction::Athrow,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(to_string),
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 253,
+                offset_delta: 9,
+                locals: vec![
+                    VerificationType::Object {
+                        cpool_index: builder,
+                    },
+                    VerificationType::Object {
+                        cpool_index: iterator,
+                    },
+                ],
+            },
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: 35,
+                locals: vec![VerificationType::Object {
+                    cpool_index: operation,
+                }],
+            },
+            StackFrame::SameFrame { frame_type: 7 },
+            StackFrame::SameFrame { frame_type: 7 },
+            StackFrame::SameFrame { frame_type: 6 },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: 4,
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn youtube_signature_cipher_add_operation(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_SIGNATURE_CIPHER_CLASS)?;
+    let list = pool.add_class("java/util/List")?;
+    let operations = pool.add_field_ref(owner, "operations", "Ljava/util/List;")?;
+    let add = pool.add_interface_method_ref(list, "add", "(Ljava/lang/Object;)Z")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(operations),
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(add, 2),
+            Instruction::Pop,
+            Instruction::Return,
+        ],
+    )
+}
+
+fn youtube_signature_cipher_is_empty(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_SIGNATURE_CIPHER_CLASS)?;
+    let list = pool.add_class("java/util/List")?;
+    let operations = pool.add_field_ref(owner, "operations", "Ljava/util/List;")?;
+    let is_empty = pool.add_interface_method_ref(list, "isEmpty", "()Z")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(operations),
+            Instruction::Invokeinterface(is_empty, 1),
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+fn youtube_signature_cipher_string_setter(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_SIGNATURE_CIPHER_CLASS)?;
+    let field = pool.add_field_ref(owner, name, "Ljava/lang/String;")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(field),
+            Instruction::Return,
+        ],
+    )
 }
 
 fn youtube_cipher_operation_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
