@@ -602,8 +602,8 @@
       "objective": "Expand source SPI, built-in manager shells, class lookup, and serialization-visible types.",
       "exit_evidence": "Source SPI extension tests, source lookup tests, per-symbol ledger entries, and Revapi diff.",
       "status": "IN_PROGRESS",
-      "classified_symbols": 576,
-      "remaining_symbols": 122,
+      "classified_symbols": 580,
+      "remaining_symbols": 118,
       "completed_slices": [
         {
           "id": "audio-source-manager-interface-contracts",
@@ -1767,6 +1767,19 @@
             "crates/mantle-media/tests/phase12_youtube.rs",
             "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
           ]
+        },
+        {
+          "id": "youtube-signature-resolver-contracts",
+          "classes": 1,
+          "fields": 0,
+          "methods": 3,
+          "symbols": 4,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
         }
       ]
     },
@@ -1888,7 +1901,7 @@
   "phase_entry": {
     "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
     "first_execution_cohort": "core-player-track",
-    "next_slice": "youtube-signature-resolver-contracts",
+    "next_slice": "youtube-track-details-contracts",
     "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
   }
 }

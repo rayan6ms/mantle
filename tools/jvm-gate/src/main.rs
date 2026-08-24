@@ -273,6 +273,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-youtube-signature-cipher-manager-consumer" => {
             Some(YOUTUBE_SIGNATURE_CIPHER_MANAGER_CONSUMER)
         }
+        "write-youtube-signature-resolver-consumer" => Some(YOUTUBE_SIGNATURE_RESOLVER_CONSUMER),
         _ => None,
     }
 }
@@ -21809,6 +21810,160 @@ public final class GateYoutubeSignatureCipherManager {
       throw new AssertionError("expected deterministic fence");
     } catch (UnsupportedOperationException error) {
       check(FENCE.equals(error.getMessage()), "fence message");
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_SIGNATURE_RESOLVER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSignatureCipher;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSignatureResolver;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackFormat;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.net.URI;
+import java.util.Arrays;
+
+public final class GateYoutubeSignatureResolver {
+  public static void main(String[] args) throws Exception {
+    reflectionContract();
+    dispatchContract();
+    System.out.println("public-abstract-interface,0-fields,0-constructors,3-methods;"
+        + "script=io-exception,cipher;format=exception,uri;dash=exception,string;"
+        + "identity=arguments,returns,nulls,checked;reflection=exact");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<YoutubeSignatureResolver> type = YoutubeSignatureResolver.class;
+    int modifiers = Modifier.PUBLIC | Modifier.INTERFACE | Modifier.ABSTRACT;
+    check(type.getModifiers() == modifiers && type.isInterface() && !type.isAnnotation()
+        && !type.isEnum() && !type.isSynthetic() && !type.isMemberClass(), "type metadata");
+    check(type.getSuperclass() == null && type.getGenericSuperclass() == null
+        && type.getInterfaces().length == 0 && type.getGenericInterfaces().length == 0
+        && type.getTypeParameters().length == 0, "type hierarchy");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 3 && type.getDeclaredClasses().length == 0,
+        "type shape");
+    checkMethod(type, "getExtractedScript", YoutubeSignatureCipher.class,
+        new Class<?>[] {HttpInterface.class, String.class}, new Class<?>[] {IOException.class});
+    checkMethod(type, "resolveFormatUrl", URI.class,
+        new Class<?>[] {HttpInterface.class, String.class, YoutubeTrackFormat.class},
+        new Class<?>[] {Exception.class});
+    checkMethod(type, "resolveDashUrl", String.class,
+        new Class<?>[] {HttpInterface.class, String.class, String.class},
+        new Class<?>[] {Exception.class});
+  }
+
+  private static void dispatchContract() throws Exception {
+    RecordingResolver resolver = new RecordingResolver();
+    String script = new String("player-script");
+    String dash = new String("dash-input");
+    YoutubeSignatureCipher cipher = new YoutubeSignatureCipher();
+    URI uri = new URI("https://example.invalid/audio");
+    String resolvedDash = new String("dash-output");
+    resolver.cipher = cipher;
+    resolver.uri = uri;
+    resolver.dashResult = resolvedDash;
+
+    check(resolver.getExtractedScript(null, script) == cipher && resolver.http == null
+        && resolver.script == script && resolver.scriptCalls == 1, "script identity");
+    check(resolver.resolveFormatUrl(null, script, null) == uri && resolver.http == null
+        && resolver.script == script && resolver.format == null && resolver.formatCalls == 1,
+        "format identity");
+    check(resolver.resolveDashUrl(null, script, dash) == resolvedDash && resolver.http == null
+        && resolver.script == script && resolver.dash == dash && resolver.dashCalls == 1,
+        "dash identity");
+
+    resolver.cipher = null;
+    resolver.uri = null;
+    resolver.dashResult = null;
+    check(resolver.getExtractedScript(null, null) == null && resolver.script == null
+        && resolver.scriptCalls == 2, "script nulls");
+    check(resolver.resolveFormatUrl(null, null, null) == null && resolver.script == null
+        && resolver.format == null && resolver.formatCalls == 2, "format nulls");
+    check(resolver.resolveDashUrl(null, null, null) == null && resolver.script == null
+        && resolver.dash == null && resolver.dashCalls == 2, "dash nulls");
+
+    IOException io = new IOException("io-sentinel");
+    resolver.failure = io;
+    try {
+      resolver.getExtractedScript(null, script);
+      throw new AssertionError("expected io failure");
+    } catch (IOException error) {
+      check(error == io && resolver.scriptCalls == 3, "io identity");
+    }
+    Exception checked = new Exception("checked-sentinel");
+    resolver.failure = checked;
+    try {
+      resolver.resolveFormatUrl(null, script, null);
+      throw new AssertionError("expected format failure");
+    } catch (Exception error) {
+      check(error == checked && resolver.formatCalls == 3, "format checked identity");
+    }
+    try {
+      resolver.resolveDashUrl(null, script, dash);
+      throw new AssertionError("expected dash failure");
+    } catch (Exception error) {
+      check(error == checked && resolver.dashCalls == 3, "dash checked identity");
+    }
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> result,
+      Class<?>[] parameters, Class<?>[] exceptions) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == result && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.getTypeParameters().length == 0 && !method.isDefault() && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), name + " metadata");
+  }
+
+  private static final class RecordingResolver implements YoutubeSignatureResolver {
+    HttpInterface http;
+    String script;
+    YoutubeTrackFormat format;
+    String dash;
+    YoutubeSignatureCipher cipher;
+    URI uri;
+    String dashResult;
+    Exception failure;
+    int scriptCalls;
+    int formatCalls;
+    int dashCalls;
+
+    @Override public YoutubeSignatureCipher getExtractedScript(
+        HttpInterface http, String script) throws IOException {
+      this.http = http;
+      this.script = script;
+      scriptCalls++;
+      if (failure != null) throw (IOException) failure;
+      return cipher;
+    }
+
+    @Override public URI resolveFormatUrl(
+        HttpInterface http, String script, YoutubeTrackFormat format) throws Exception {
+      this.http = http;
+      this.script = script;
+      this.format = format;
+      formatCalls++;
+      if (failure != null) throw failure;
+      return uri;
+    }
+
+    @Override public String resolveDashUrl(
+        HttpInterface http, String script, String dash) throws Exception {
+      this.http = http;
+      this.script = script;
+      this.dash = dash;
+      dashCalls++;
+      if (failure != null) throw failure;
+      return dashResult;
     }
   }
 
