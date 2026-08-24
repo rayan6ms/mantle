@@ -103,6 +103,9 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-audio-filter-interface-consumer" => Some(AUDIO_FILTER_INTERFACE_CONSUMER),
         "write-audio-post-processor-consumer" => Some(AUDIO_POST_PROCESSOR_CONSUMER),
         "write-buffering-post-processor-consumer" => Some(BUFFERING_POST_PROCESSOR_CONSUMER),
+        "write-channel-count-pcm-audio-filter-consumer" => {
+            Some(CHANNEL_COUNT_PCM_AUDIO_FILTER_CONSUMER)
+        }
         "write-audio-filter-chain-consumer" => Some(AUDIO_FILTER_CHAIN_CONSUMER),
         "write-audio-pipeline-consumer" => Some(AUDIO_PIPELINE_CONSUMER),
         "write-audio-pipeline-factory-consumer" => Some(AUDIO_PIPELINE_FACTORY_CONSUMER),
@@ -7759,6 +7762,384 @@ public final class GateBufferingPostProcessor {
     }
     public AudioChunkDecoder createDecoder() { return null; }
     public AudioChunkEncoder createEncoder(AudioConfiguration configuration) { return null; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const CHANNEL_COUNT_PCM_AUDIO_FILTER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.ChannelCountPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.UniversalPcmAudioFilter;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ShortBuffer;
+import java.util.Arrays;
+
+public final class GateChannelCountPcmAudioFilter {
+  public static void main(String[] args) throws Exception {
+    construction();
+    passThrough();
+    interleavedConversion();
+    splitConversion();
+    lifecycle();
+    failures();
+    reflection();
+    System.out.println(
+        "construction=layout,capacity,derived-state,null,invalid;"
+        + "passthrough=array,buffer,identity,state,complete-frames;"
+        + "interleaved=mono-stereo,downmix,upmix,partial,reuse;"
+        + "split=float,short,downmix,upmix,reuse,offset,length;"
+        + "lifecycle=seek-clears-output,preserves-input,flush-close-noop;"
+        + "failures=downstream-identity,prefix,null,overflow;"
+        + "reflection=public-concrete-object,10-fields,1-interface,1-constructor,10-methods,3-private,throws");
+  }
+
+  private static void construction() throws Exception {
+    RecordingFilter downstream = new RecordingFilter();
+    ChannelCountPcmAudioFilter filter = new ChannelCountPcmAudioFilter(3, 2, downstream);
+    check(field(filter, "downstream") == downstream, "downstream identity");
+    check(intField(filter, "inputChannels") == 3
+        && intField(filter, "outputChannels") == 2
+        && intField(filter, "commonChannels") == 2
+        && intField(filter, "channelsToAdd") == 0
+        && intField(filter, "inputIndex") == 0, "derived integer state");
+    ShortBuffer output = (ShortBuffer) field(filter, "outputBuffer");
+    check(output.capacity() == 6144 && output.position() == 0 && output.limit() == 6144
+        && output.hasArray(), "heap output buffer");
+    check(((short[]) field(filter, "inputSet")).length == 3
+        && ((float[][]) field(filter, "splitFloatOutput")).length == 2
+        && ((short[][]) field(filter, "splitShortOutput")).length == 2,
+        "scratch array lengths");
+    new ChannelCountPcmAudioFilter(1, 1, null);
+    expect(IllegalArgumentException.class,
+        () -> new ChannelCountPcmAudioFilter(-1, 1, downstream));
+    expect(NegativeArraySizeException.class,
+        () -> new ChannelCountPcmAudioFilter(1, -1, downstream));
+    ChannelCountPcmAudioFilter zero = new ChannelCountPcmAudioFilter(0, 0, downstream);
+    expect(ArithmeticException.class, () -> zero.process(new short[0], 0, 0));
+  }
+
+  private static void passThrough() throws Exception {
+    RecordingFilter downstream = new RecordingFilter();
+    ChannelCountPcmAudioFilter filter = new ChannelCountPcmAudioFilter(2, 2, downstream);
+    short[] array = { 3, 5, 7, 11, 13, 17 };
+    filter.process(array, 1, 4);
+    check(downstream.arrayCalls == 1 && downstream.lastArray == array
+        && downstream.lastOffset == 1 && downstream.lastLength == 4,
+        "array pass-through");
+    ShortBuffer buffer = ShortBuffer.wrap(array);
+    buffer.position(2);
+    buffer.limit(6);
+    filter.process(buffer);
+    check(downstream.bufferCalls == 1 && downstream.lastBuffer == buffer
+        && buffer.position() == 2 && buffer.limit() == 6, "buffer pass-through state");
+
+    filter.process(array, 0, 3);
+    check(downstream.arrayCalls == 1 && intField(filter, "inputIndex") == 1,
+        "incomplete frames are normalized");
+    filter.process(array, 3, 1);
+    check(intField(filter, "inputIndex") == 0 && downstream.bufferCalls == 1,
+        "partial frame carried between calls");
+  }
+
+  private static void interleavedConversion() throws Exception {
+    RecordingFilter stereo = new RecordingFilter();
+    ChannelCountPcmAudioFilter monoToStereo = new ChannelCountPcmAudioFilter(1, 2, stereo);
+    short[] mono = new short[1024];
+    for (int i = 0; i < mono.length; i++) mono[i] = (short) (i - 500);
+    monoToStereo.process(mono, 0, mono.length);
+    check(stereo.bufferCalls == 1 && stereo.bufferSnapshot.length == 2048,
+        "mono stereo dispatch boundary");
+    for (int i = 0; i < mono.length; i++) {
+      check(stereo.bufferSnapshot[i * 2] == mono[i]
+          && stereo.bufferSnapshot[i * 2 + 1] == mono[i], "mono duplication");
+    }
+    ShortBuffer monoOutput = (ShortBuffer) field(monoToStereo, "outputBuffer");
+    check(stereo.lastBuffer == monoOutput && monoOutput.position() == 0
+        && monoOutput.limit() == monoOutput.capacity(), "output reuse and clear");
+
+    RecordingFilter down = new RecordingFilter();
+    ChannelCountPcmAudioFilter downmix = new ChannelCountPcmAudioFilter(3, 2, down);
+    downmix.process(new short[] { 1, 2, 3, 4, 5, 6, 7, 8 }, 0, 8);
+    check(bufferPrefix(downmix).equals("1,2,4,5")
+        && intField(downmix, "inputIndex") == 2
+        && Arrays.equals((short[]) field(downmix, "inputSet"), new short[] { 7, 8, 6 }),
+        "downmix and partial state");
+    downmix.process(new short[] { 9, 10, 11, 12 }, 0, 4);
+    check(bufferPrefix(downmix).equals("1,2,4,5,7,8,10,11")
+        && intField(downmix, "inputIndex") == 0 && down.bufferCalls == 0,
+        "partial continuation");
+
+    ChannelCountPcmAudioFilter upmix =
+        new ChannelCountPcmAudioFilter(2, 4, new RecordingFilter());
+    upmix.process(new short[] { 21, 22, 31, 32 }, 0, 4);
+    check(bufferPrefix(upmix).equals("21,22,21,21,31,32,31,31"), "upmix channel fill");
+  }
+
+  private static void splitConversion() throws Exception {
+    RecordingFilter down = new RecordingFilter();
+    ChannelCountPcmAudioFilter downmix = new ChannelCountPcmAudioFilter(3, 2, down);
+    float[][] floats = { { 1 }, { 2 }, { 3 } };
+    downmix.process(floats, 7, 9);
+    check(down.floatCalls == 1 && down.lastFloats.length == 2
+        && down.lastFloats[0] == floats[0] && down.lastFloats[1] == floats[1]
+        && down.lastOffset == 7 && down.lastLength == 9, "split float downmix");
+    float[][] reusedFloats = down.lastFloats;
+    float[][] floats2 = { { 4 }, { 5 }, { 6 } };
+    downmix.process(floats2, -3, -5);
+    check(down.lastFloats == reusedFloats && down.lastFloats[0] == floats2[0]
+        && down.lastOffset == -3 && down.lastLength == -5, "split float reuse");
+
+    RecordingFilter up = new RecordingFilter();
+    ChannelCountPcmAudioFilter upmix = new ChannelCountPcmAudioFilter(1, 3, up);
+    short[][] shorts = { { 8, 9 } };
+    upmix.process(shorts, 2, 4);
+    check(up.shortCalls == 1 && up.lastShorts.length == 3
+        && up.lastShorts[0] == shorts[0] && up.lastShorts[1] == shorts[0]
+        && up.lastShorts[2] == shorts[0] && up.lastOffset == 2 && up.lastLength == 4,
+        "split short upmix");
+    short[][] reusedShorts = up.lastShorts;
+    short[][] shorts2 = { { 10 } };
+    upmix.process(shorts2, 0, 1);
+    check(up.lastShorts == reusedShorts && up.lastShorts[2] == shorts2[0],
+        "split short reuse");
+  }
+
+  private static void lifecycle() throws Exception {
+    RecordingFilter downstream = new RecordingFilter();
+    ChannelCountPcmAudioFilter filter = new ChannelCountPcmAudioFilter(3, 2, downstream);
+    filter.process(new short[] { 40, 41 }, 0, 2);
+    ShortBuffer output = (ShortBuffer) field(filter, "outputBuffer");
+    output.put((short) 99);
+    filter.seekPerformed(Long.MIN_VALUE, Long.MAX_VALUE);
+    check(output.position() == 0 && output.limit() == output.capacity()
+        && intField(filter, "inputIndex") == 2, "seek state");
+    filter.process(new short[] { 42 }, 0, 1);
+    check(bufferPrefix(filter).equals("40,41") && intField(filter, "inputIndex") == 0,
+        "seek preserves partial input");
+    downstream.lifecycleFailure = new AssertionError("must not forward lifecycle");
+    filter.flush();
+    filter.close();
+    check(downstream.seeks == 0 && downstream.flushes == 0 && downstream.closes == 0
+        && output.position() == 2, "flush close no-op");
+  }
+
+  private static void failures() throws Exception {
+    RecordingFilter pass = new RecordingFilter();
+    InterruptedException arrayFailure = new InterruptedException("array-sentinel");
+    pass.failure = arrayFailure;
+    ChannelCountPcmAudioFilter equal = new ChannelCountPcmAudioFilter(1, 1, pass);
+    expectInterruptedIdentity(arrayFailure, () -> equal.process(new short[] { 1 }, 0, 1));
+
+    RecordingFilter convert = new RecordingFilter();
+    InterruptedException bufferFailure = new InterruptedException("buffer-sentinel");
+    convert.failure = bufferFailure;
+    ChannelCountPcmAudioFilter mono = new ChannelCountPcmAudioFilter(1, 2, convert);
+    expectInterruptedIdentity(bufferFailure, () -> mono.process(new short[1024], 0, 1024));
+    ShortBuffer output = (ShortBuffer) field(mono, "outputBuffer");
+    check(output.position() == 0 && output.limit() == 2048, "failure before output clear");
+    convert.failure = null;
+    mono.process(new short[] { 1 }, 0, 1);
+    check(output.position() == 2, "conversion continues after downstream failure");
+
+    ChannelCountPcmAudioFilter uneven =
+        new ChannelCountPcmAudioFilter(2, 3, new RecordingFilter());
+    expect(java.nio.BufferOverflowException.class,
+        () -> uneven.process(new short[2732], 0, 2732));
+    check(((ShortBuffer) field(uneven, "outputBuffer")).position() == 4095,
+        "uneven expansion overflow prefix");
+
+    ChannelCountPcmAudioFilter nullDownstream = new ChannelCountPcmAudioFilter(1, 1, null);
+    expect(NullPointerException.class,
+        () -> nullDownstream.process(new short[] { 1 }, 0, 1));
+    expect(NullPointerException.class, () -> equal.process((ShortBuffer) null));
+  }
+
+  private static void reflection() throws Exception {
+    Class<ChannelCountPcmAudioFilter> type = ChannelCountPcmAudioFilter.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers()) && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] { UniversalPcmAudioFilter.class }),
+        "class metadata");
+    check(type.getDeclaredFields().length == 10 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 10, "member counts");
+    checkField(type, "downstream", UniversalPcmAudioFilter.class, true);
+    checkField(type, "outputChannels", int.class, true);
+    checkField(type, "outputBuffer", ShortBuffer.class, true);
+    checkField(type, "inputChannels", int.class, true);
+    checkField(type, "commonChannels", int.class, true);
+    checkField(type, "channelsToAdd", int.class, true);
+    checkField(type, "inputSet", short[].class, true);
+    checkField(type, "splitFloatOutput", float[][].class, true);
+    checkField(type, "splitShortOutput", short[][].class, true);
+    checkField(type, "inputIndex", int.class, false);
+
+    Constructor<ChannelCountPcmAudioFilter> constructor = type.getDeclaredConstructor(
+        int.class, int.class, UniversalPcmAudioFilter.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    checkPublic(type, "process", new Class<?>[] { short[].class, int.class, int.class }, true);
+    checkPublic(type, "process", new Class<?>[] { ShortBuffer.class }, true);
+    checkPublic(type, "process", new Class<?>[] { float[][].class, int.class, int.class }, true);
+    checkPublic(type, "process", new Class<?>[] { short[][].class, int.class, int.class }, true);
+    checkPublic(type, "seekPerformed", new Class<?>[] { long.class, long.class }, false);
+    checkPublic(type, "flush", new Class<?>[0], true);
+    checkPublic(type, "close", new Class<?>[0], false);
+    checkPrivate(type, "processNormalizer", ShortBuffer.class);
+    checkPrivate(type, "processMonoToStereo", ShortBuffer.class);
+    Method helper = type.getDeclaredMethod("canPassThrough", int.class);
+    check(helper.getModifiers() == Modifier.PRIVATE && helper.getReturnType() == boolean.class
+        && helper.getExceptionTypes().length == 0, "canPassThrough metadata");
+  }
+
+  private static void checkPublic(Class<?> type, String name, Class<?>[] parameters,
+      boolean interrupted) throws Exception {
+    Method method = type.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == void.class
+        && Arrays.equals(method.getExceptionTypes(), interrupted
+            ? new Class<?>[] { InterruptedException.class } : new Class<?>[0])
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs(),
+        name + " metadata");
+  }
+
+  private static void checkPrivate(Class<?> type, String name, Class<?> parameter)
+      throws Exception {
+    Method method = type.getDeclaredMethod(name, parameter);
+    check(method.getModifiers() == Modifier.PRIVATE && method.getReturnType() == void.class
+        && Arrays.equals(method.getExceptionTypes(), new Class<?>[] { InterruptedException.class }),
+        name + " metadata");
+  }
+
+  private static void checkField(Class<?> type, String name, Class<?> fieldType,
+      boolean isFinal) throws Exception {
+    Field field = type.getDeclaredField(name);
+    int modifiers = Modifier.PRIVATE | (isFinal ? Modifier.FINAL : 0);
+    check(field.getType() == fieldType && field.getModifiers() == modifiers,
+        name + " field metadata");
+  }
+
+  private static String bufferPrefix(ChannelCountPcmAudioFilter filter) throws Exception {
+    ShortBuffer output = (ShortBuffer) field(filter, "outputBuffer");
+    short[] values = new short[output.position()];
+    ShortBuffer view = output.duplicate();
+    view.flip();
+    view.get(values);
+    StringBuilder text = new StringBuilder();
+    for (short value : values) {
+      if (text.length() > 0) text.append(',');
+      text.append(value);
+    }
+    return text.toString();
+  }
+
+  private static Object field(Object target, String name) throws Exception {
+    Field field = ChannelCountPcmAudioFilter.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
+  }
+
+  private static int intField(Object target, String name) throws Exception {
+    return (Integer) field(target, name);
+  }
+
+  private static void expect(Class<? extends Throwable> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
+  }
+
+  private static void expectInterruptedIdentity(
+      InterruptedException expected, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("failure was swallowed");
+    } catch (InterruptedException error) {
+      check(error == expected, "interrupted failure identity");
+    } catch (Exception error) {
+      throw new AssertionError("wrong checked exception", error);
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static final class RecordingFilter implements UniversalPcmAudioFilter {
+    int arrayCalls;
+    int bufferCalls;
+    int floatCalls;
+    int shortCalls;
+    int seeks;
+    int flushes;
+    int closes;
+    int lastOffset;
+    int lastLength;
+    short[] lastArray;
+    ShortBuffer lastBuffer;
+    short[] bufferSnapshot;
+    float[][] lastFloats;
+    short[][] lastShorts;
+    InterruptedException failure;
+    Error lifecycleFailure;
+
+    public void process(short[] input, int offset, int length) throws InterruptedException {
+      arrayCalls++;
+      lastArray = input;
+      lastOffset = offset;
+      lastLength = length;
+      fail();
+    }
+
+    public void process(ShortBuffer input) throws InterruptedException {
+      bufferCalls++;
+      lastBuffer = input;
+      ShortBuffer view = input.duplicate();
+      bufferSnapshot = new short[view.remaining()];
+      view.get(bufferSnapshot);
+      fail();
+    }
+
+    public void process(float[][] input, int offset, int length) throws InterruptedException {
+      floatCalls++;
+      lastFloats = input;
+      lastOffset = offset;
+      lastLength = length;
+      fail();
+    }
+
+    public void process(short[][] input, int offset, int length) throws InterruptedException {
+      shortCalls++;
+      lastShorts = input;
+      lastOffset = offset;
+      lastLength = length;
+      fail();
+    }
+
+    public void seekPerformed(long requested, long provided) {
+      seeks++;
+      if (lifecycleFailure != null) throw lifecycleFailure;
+    }
+
+    public void flush() throws InterruptedException {
+      flushes++;
+      if (lifecycleFailure != null) throw lifecycleFailure;
+      fail();
+    }
+
+    public void close() {
+      closes++;
+      if (lifecycleFailure != null) throw lifecycleFailure;
+    }
+
+    private void fail() throws InterruptedException {
+      if (failure != null) throw failure;
+    }
   }
 
   private static void check(boolean condition, String message) {

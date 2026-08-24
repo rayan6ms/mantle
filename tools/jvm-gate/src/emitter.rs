@@ -73,6 +73,8 @@ const AUDIO_POST_PROCESSOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/AudioPostProcessor";
 const BUFFERING_POST_PROCESSOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/BufferingPostProcessor";
+const CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/filter/ChannelCountPcmAudioFilter";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -360,6 +362,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     AUDIO_FILTER_CLASS,
     AUDIO_POST_PROCESSOR_CLASS,
     BUFFERING_POST_PROCESSOR_CLASS,
+    CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS,
     AUDIO_FILTER_CHAIN_CLASS,
     AUDIO_PIPELINE_CLASS,
     AUDIO_PIPELINE_FACTORY_CLASS,
@@ -827,6 +830,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | FUNCTIONAL_RESULT_HANDLER_CLASS
             | AUDIO_PIPELINE_CLASS
             | BUFFERING_POST_PROCESSOR_CLASS
+            | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | TRACK_MARKER_TRACKER_CLASS
             | BASE_AUDIO_TRACK_CLASS
             | DELEGATED_AUDIO_TRACK_CLASS
@@ -906,6 +910,7 @@ fn retain_private_methods(class_name: &str) -> bool {
     matches!(
         class_name,
         AUDIO_PIPELINE_FACTORY_CLASS
+            | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | TRACK_INFO_BUILDER_CLASS
             | ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
             | NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
@@ -1055,6 +1060,9 @@ fn replacement_body(
     }
     if class_name == BUFFERING_POST_PROCESSOR_CLASS {
         return buffering_post_processor_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS {
+        return channel_count_pcm_audio_filter_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PROBING_AUDIO_SOURCE_MANAGER_CLASS {
         return probing_audio_source_manager_replacement(pool, name, descriptor, required_locals);
@@ -2327,6 +2335,658 @@ fn buffering_post_processor_close(pool: &mut ConstantPool<'static>) -> Result<At
             Instruction::Aload_0,
             Instruction::Getfield(encoder_field),
             Instruction::Invokeinterface(close, 1),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn channel_count_pcm_audio_filter_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(IILcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;)V") => {
+            channel_count_pcm_audio_filter_constructor(pool)
+        }
+        ("process", "([SII)V") => channel_count_pcm_audio_filter_process_array(pool),
+        ("process", "(Ljava/nio/ShortBuffer;)V") => {
+            channel_count_pcm_audio_filter_process_buffer(pool)
+        }
+        ("processNormalizer", "(Ljava/nio/ShortBuffer;)V") => {
+            channel_count_pcm_audio_filter_process_normalizer(pool)
+        }
+        ("processMonoToStereo", "(Ljava/nio/ShortBuffer;)V") => {
+            channel_count_pcm_audio_filter_process_mono_to_stereo(pool)
+        }
+        ("canPassThrough", "(I)Z") => channel_count_pcm_audio_filter_can_pass_through(pool),
+        ("process", "([[FII)V") => channel_count_pcm_audio_filter_process_split(pool, true),
+        ("process", "([[SII)V") => channel_count_pcm_audio_filter_process_split(pool, false),
+        ("seekPerformed", "(JJ)V") => channel_count_pcm_audio_filter_seek(pool),
+        ("flush" | "close", "()V") => code(pool, 0, 1, vec![Instruction::Return]),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn channel_count_pcm_audio_filter_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let universal =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter")?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;",
+    )?;
+    let input_channels = pool.add_field_ref(owner, "inputChannels", "I")?;
+    let output_channels = pool.add_field_ref(owner, "outputChannels", "I")?;
+    let output_buffer = pool.add_field_ref(owner, "outputBuffer", "Ljava/nio/ShortBuffer;")?;
+    let common_channels = pool.add_field_ref(owner, "commonChannels", "I")?;
+    let channels_to_add = pool.add_field_ref(owner, "channelsToAdd", "I")?;
+    let input_set = pool.add_field_ref(owner, "inputSet", "[S")?;
+    let split_float_output = pool.add_field_ref(owner, "splitFloatOutput", "[[F")?;
+    let split_short_output = pool.add_field_ref(owner, "splitShortOutput", "[[S")?;
+    let input_index = pool.add_field_ref(owner, "inputIndex", "I")?;
+    let short_buffer = pool.add_class("java/nio/ShortBuffer")?;
+    let allocate = pool.add_method_ref(short_buffer, "allocate", "(I)Ljava/nio/ShortBuffer;")?;
+    let math = pool.add_class("java/lang/Math")?;
+    let min = pool.add_method_ref(math, "min", "(II)I")?;
+    let float_array = pool.add_class("[F")?;
+    let short_array = pool.add_class("[S")?;
+    let _ = universal;
+
+    code(
+        pool,
+        4,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Putfield(downstream),
+            Instruction::Aload_0,
+            Instruction::Iload_1,
+            Instruction::Putfield(input_channels),
+            Instruction::Aload_0,
+            Instruction::Iload_2,
+            Instruction::Putfield(output_channels),
+            Instruction::Aload_0,
+            Instruction::Sipush(2048),
+            Instruction::Iload_1,
+            Instruction::Imul,
+            Instruction::Invokestatic(allocate),
+            Instruction::Putfield(output_buffer),
+            Instruction::Aload_0,
+            Instruction::Iload_2,
+            Instruction::Iload_1,
+            Instruction::Invokestatic(min),
+            Instruction::Putfield(common_channels),
+            Instruction::Aload_0,
+            Instruction::Iload_2,
+            Instruction::Aload_0,
+            Instruction::Getfield(common_channels),
+            Instruction::Isub,
+            Instruction::Putfield(channels_to_add),
+            Instruction::Aload_0,
+            Instruction::Iload_1,
+            Instruction::Newarray(ArrayType::Short),
+            Instruction::Putfield(input_set),
+            Instruction::Aload_0,
+            Instruction::Iload_2,
+            Instruction::Anewarray(float_array),
+            Instruction::Putfield(split_float_output),
+            Instruction::Aload_0,
+            Instruction::Iload_2,
+            Instruction::Anewarray(short_array),
+            Instruction::Putfield(split_short_output),
+            Instruction::Aload_0,
+            Instruction::Iconst_0,
+            Instruction::Putfield(input_index),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn channel_count_pcm_audio_filter_process_array(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS)?;
+    let universal =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter")?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;",
+    )?;
+    let input_channels = pool.add_field_ref(owner, "inputChannels", "I")?;
+    let output_channels = pool.add_field_ref(owner, "outputChannels", "I")?;
+    let can_pass = pool.add_method_ref(owner, "canPassThrough", "(I)Z")?;
+    let normalizer =
+        pool.add_method_ref(owner, "processNormalizer", "(Ljava/nio/ShortBuffer;)V")?;
+    let mono = pool.add_method_ref(owner, "processMonoToStereo", "(Ljava/nio/ShortBuffer;)V")?;
+    let process = pool.add_interface_method_ref(universal, "process", "([SII)V")?;
+    let short_buffer = pool.add_class("java/nio/ShortBuffer")?;
+    let wrap = pool.add_method_ref(short_buffer, "wrap", "([SII)Ljava/nio/ShortBuffer;")?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Iload_3,
+        Instruction::Invokespecial(can_pass),
+        Instruction::Ifeq(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(downstream),
+        Instruction::Aload_1,
+        Instruction::Iload_2,
+        Instruction::Iload_3,
+        Instruction::Invokeinterface(process, 4),
+        Instruction::Goto(0),
+    ];
+    let conversion_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Getfield(input_channels),
+        Instruction::Iconst_1,
+        Instruction::If_icmpne(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(output_channels),
+        Instruction::Iconst_2,
+        Instruction::If_icmpne(0),
+        Instruction::Aload_0,
+        Instruction::Aload_1,
+        Instruction::Iload_2,
+        Instruction::Iload_3,
+        Instruction::Invokestatic(wrap),
+        Instruction::Invokespecial(mono),
+        Instruction::Goto(0),
+    ]);
+    let normalizer_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Aload_1,
+        Instruction::Iload_2,
+        Instruction::Iload_3,
+        Instruction::Invokestatic(wrap),
+        Instruction::Invokespecial(normalizer),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[3] = Instruction::Ifeq(u16::try_from(conversion_target)?);
+    instructions[10] = Instruction::Goto(u16::try_from(return_target)?);
+    instructions[conversion_target + 3] = Instruction::If_icmpne(u16::try_from(normalizer_target)?);
+    instructions[conversion_target + 7] = Instruction::If_icmpne(u16::try_from(normalizer_target)?);
+    instructions[conversion_target + 14] = Instruction::Goto(u16::try_from(return_target)?);
+    let mut body = code(pool, 4, 4, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            same_stack_frame(u16::try_from(conversion_target)?),
+            same_stack_frame(u16::try_from(normalizer_target - conversion_target - 1)?),
+            same_stack_frame(u16::try_from(return_target - normalizer_target - 1)?),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn channel_count_pcm_audio_filter_process_buffer(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS)?;
+    let universal =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter")?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;",
+    )?;
+    let input_channels = pool.add_field_ref(owner, "inputChannels", "I")?;
+    let output_channels = pool.add_field_ref(owner, "outputChannels", "I")?;
+    let can_pass = pool.add_method_ref(owner, "canPassThrough", "(I)Z")?;
+    let normalizer =
+        pool.add_method_ref(owner, "processNormalizer", "(Ljava/nio/ShortBuffer;)V")?;
+    let mono = pool.add_method_ref(owner, "processMonoToStereo", "(Ljava/nio/ShortBuffer;)V")?;
+    let process =
+        pool.add_interface_method_ref(universal, "process", "(Ljava/nio/ShortBuffer;)V")?;
+    let short_buffer = pool.add_class("java/nio/ShortBuffer")?;
+    let remaining = pool.add_method_ref(short_buffer, "remaining", "()I")?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(remaining),
+        Instruction::Invokespecial(can_pass),
+        Instruction::Ifeq(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(downstream),
+        Instruction::Aload_1,
+        Instruction::Invokeinterface(process, 2),
+        Instruction::Goto(0),
+    ];
+    let conversion_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Getfield(input_channels),
+        Instruction::Iconst_1,
+        Instruction::If_icmpne(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(output_channels),
+        Instruction::Iconst_2,
+        Instruction::If_icmpne(0),
+        Instruction::Aload_0,
+        Instruction::Aload_1,
+        Instruction::Invokespecial(mono),
+        Instruction::Goto(0),
+    ]);
+    let normalizer_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Aload_1,
+        Instruction::Invokespecial(normalizer),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[4] = Instruction::Ifeq(u16::try_from(conversion_target)?);
+    instructions[9] = Instruction::Goto(u16::try_from(return_target)?);
+    instructions[conversion_target + 3] = Instruction::If_icmpne(u16::try_from(normalizer_target)?);
+    instructions[conversion_target + 7] = Instruction::If_icmpne(u16::try_from(normalizer_target)?);
+    instructions[conversion_target + 11] = Instruction::Goto(u16::try_from(return_target)?);
+    let mut body = code(pool, 2, 2, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            same_stack_frame(u16::try_from(conversion_target)?),
+            same_stack_frame(u16::try_from(normalizer_target - conversion_target - 1)?),
+            same_stack_frame(u16::try_from(return_target - normalizer_target - 1)?),
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn channel_count_pcm_audio_filter_process_normalizer(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS)?;
+    let universal =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter")?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;",
+    )?;
+    let input_channels = pool.add_field_ref(owner, "inputChannels", "I")?;
+    let common_channels = pool.add_field_ref(owner, "commonChannels", "I")?;
+    let channels_to_add = pool.add_field_ref(owner, "channelsToAdd", "I")?;
+    let output_buffer = pool.add_field_ref(owner, "outputBuffer", "Ljava/nio/ShortBuffer;")?;
+    let input_set = pool.add_field_ref(owner, "inputSet", "[S")?;
+    let input_index = pool.add_field_ref(owner, "inputIndex", "I")?;
+    let short_buffer = pool.add_class("java/nio/ShortBuffer")?;
+    let has_remaining = pool.add_method_ref(short_buffer, "hasRemaining", "()Z")?;
+    let get = pool.add_method_ref(short_buffer, "get", "()S")?;
+    let put_array = pool.add_method_ref(short_buffer, "put", "([SII)Ljava/nio/ShortBuffer;")?;
+    let put = pool.add_method_ref(short_buffer, "put", "(S)Ljava/nio/ShortBuffer;")?;
+    let flip = pool.add_method_ref(short_buffer, "flip", "()Ljava/nio/ShortBuffer;")?;
+    let clear = pool.add_method_ref(short_buffer, "clear", "()Ljava/nio/ShortBuffer;")?;
+    let process =
+        pool.add_interface_method_ref(universal, "process", "(Ljava/nio/ShortBuffer;)V")?;
+
+    let mut instructions = vec![Instruction::Goto(0)];
+    let sample_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Getfield(input_set),
+        Instruction::Aload_0,
+        Instruction::Dup,
+        Instruction::Getfield(input_index),
+        Instruction::Dup_x1,
+        Instruction::Iconst_1,
+        Instruction::Iadd,
+        Instruction::Putfield(input_index),
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(get),
+        Instruction::Sastore,
+        Instruction::Aload_0,
+        Instruction::Getfield(input_index),
+        Instruction::Aload_0,
+        Instruction::Getfield(input_channels),
+        Instruction::If_icmpne(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(output_buffer),
+        Instruction::Aload_0,
+        Instruction::Getfield(input_set),
+        Instruction::Iconst_0,
+        Instruction::Aload_0,
+        Instruction::Getfield(common_channels),
+        Instruction::Invokevirtual(put_array),
+        Instruction::Pop,
+        Instruction::Iconst_0,
+        Instruction::Istore_2,
+    ]);
+    let add_loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload_2,
+        Instruction::Aload_0,
+        Instruction::Getfield(channels_to_add),
+        Instruction::If_icmpge(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(output_buffer),
+        Instruction::Aload_0,
+        Instruction::Getfield(input_set),
+        Instruction::Iconst_0,
+        Instruction::Saload,
+        Instruction::Invokevirtual(put),
+        Instruction::Pop,
+        Instruction::Iinc(2, 1),
+        Instruction::Goto(u16::try_from(add_loop_target)?),
+    ]);
+    let add_end_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Getfield(output_buffer),
+        Instruction::Invokevirtual(has_remaining),
+        Instruction::Ifne(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(output_buffer),
+        Instruction::Invokevirtual(flip),
+        Instruction::Pop,
+        Instruction::Aload_0,
+        Instruction::Getfield(downstream),
+        Instruction::Aload_0,
+        Instruction::Getfield(output_buffer),
+        Instruction::Invokeinterface(process, 2),
+        Instruction::Aload_0,
+        Instruction::Getfield(output_buffer),
+        Instruction::Invokevirtual(clear),
+        Instruction::Pop,
+    ]);
+    let reset_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Iconst_0,
+        Instruction::Putfield(input_index),
+    ]);
+    let condition_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(has_remaining),
+        Instruction::Ifne(u16::try_from(sample_target)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[0] = Instruction::Goto(u16::try_from(condition_target)?);
+    instructions[sample_target + 16] = Instruction::If_icmpne(u16::try_from(condition_target)?);
+    instructions[add_loop_target + 3] = Instruction::If_icmpge(u16::try_from(add_end_target)?);
+    instructions[add_end_target + 3] = Instruction::Ifne(u16::try_from(reset_target)?);
+    let mut body = code(pool, 5, 3, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            same_stack_frame(u16::try_from(sample_target)?),
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(add_loop_target - sample_target - 1)?,
+                locals: vec![VerificationType::Integer],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: u16::try_from(add_end_target - add_loop_target - 1)?,
+            },
+            same_stack_frame(u16::try_from(reset_target - add_end_target - 1)?),
+            same_stack_frame(u16::try_from(condition_target - reset_target - 1)?),
+            same_stack_frame(u16::try_from(return_target - condition_target - 1)?),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn channel_count_pcm_audio_filter_process_mono_to_stereo(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS)?;
+    let universal =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter")?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;",
+    )?;
+    let output_buffer = pool.add_field_ref(owner, "outputBuffer", "Ljava/nio/ShortBuffer;")?;
+    let short_buffer = pool.add_class("java/nio/ShortBuffer")?;
+    let has_remaining = pool.add_method_ref(short_buffer, "hasRemaining", "()Z")?;
+    let get = pool.add_method_ref(short_buffer, "get", "()S")?;
+    let put = pool.add_method_ref(short_buffer, "put", "(S)Ljava/nio/ShortBuffer;")?;
+    let flip = pool.add_method_ref(short_buffer, "flip", "()Ljava/nio/ShortBuffer;")?;
+    let clear = pool.add_method_ref(short_buffer, "clear", "()Ljava/nio/ShortBuffer;")?;
+    let process =
+        pool.add_interface_method_ref(universal, "process", "(Ljava/nio/ShortBuffer;)V")?;
+    let mut instructions = vec![Instruction::Goto(0)];
+    let sample_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(get),
+        Instruction::Istore_2,
+        Instruction::Aload_0,
+        Instruction::Getfield(output_buffer),
+        Instruction::Iload_2,
+        Instruction::Invokevirtual(put),
+        Instruction::Pop,
+        Instruction::Aload_0,
+        Instruction::Getfield(output_buffer),
+        Instruction::Iload_2,
+        Instruction::Invokevirtual(put),
+        Instruction::Pop,
+        Instruction::Aload_0,
+        Instruction::Getfield(output_buffer),
+        Instruction::Invokevirtual(has_remaining),
+        Instruction::Ifne(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(output_buffer),
+        Instruction::Invokevirtual(flip),
+        Instruction::Pop,
+        Instruction::Aload_0,
+        Instruction::Getfield(downstream),
+        Instruction::Aload_0,
+        Instruction::Getfield(output_buffer),
+        Instruction::Invokeinterface(process, 2),
+        Instruction::Aload_0,
+        Instruction::Getfield(output_buffer),
+        Instruction::Invokevirtual(clear),
+        Instruction::Pop,
+    ]);
+    let condition_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(has_remaining),
+        Instruction::Ifne(u16::try_from(sample_target)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[0] = Instruction::Goto(u16::try_from(condition_target)?);
+    instructions[sample_target + 16] = Instruction::Ifne(u16::try_from(condition_target)?);
+    let mut body = code(pool, 2, 3, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            same_stack_frame(u16::try_from(sample_target)?),
+            same_stack_frame(u16::try_from(condition_target - sample_target - 1)?),
+            same_stack_frame(u16::try_from(return_target - condition_target - 1)?),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn channel_count_pcm_audio_filter_can_pass_through(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS)?;
+    let input_index = pool.add_field_ref(owner, "inputIndex", "I")?;
+    let input_channels = pool.add_field_ref(owner, "inputChannels", "I")?;
+    let output_channels = pool.add_field_ref(owner, "outputChannels", "I")?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Getfield(input_index),
+        Instruction::Ifne(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(input_channels),
+        Instruction::Aload_0,
+        Instruction::Getfield(output_channels),
+        Instruction::If_icmpne(0),
+        Instruction::Iload_1,
+        Instruction::Aload_0,
+        Instruction::Getfield(input_channels),
+        Instruction::Irem,
+        Instruction::Ifne(0),
+        Instruction::Iconst_1,
+        Instruction::Goto(0),
+    ];
+    let false_target = instructions.len();
+    instructions.push(Instruction::Iconst_0);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Ireturn);
+    instructions[2] = Instruction::Ifne(u16::try_from(false_target)?);
+    instructions[7] = Instruction::If_icmpne(u16::try_from(false_target)?);
+    instructions[12] = Instruction::Ifne(u16::try_from(false_target)?);
+    instructions[14] = Instruction::Goto(u16::try_from(return_target)?);
+    let mut body = code(pool, 2, 2, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            same_stack_frame(u16::try_from(false_target)?),
+            StackFrame::SameLocals1StackItemFrame {
+                frame_type: u8::try_from(64 + return_target - false_target - 1)?,
+                stack: vec![VerificationType::Integer],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn channel_count_pcm_audio_filter_process_split(
+    pool: &mut ConstantPool<'static>,
+    float_samples: bool,
+) -> Result<Attribute> {
+    let owner = pool.add_class(CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS)?;
+    let universal =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter")?;
+    let common_channels = pool.add_field_ref(owner, "commonChannels", "I")?;
+    let output_channels = pool.add_field_ref(owner, "outputChannels", "I")?;
+    let (split_descriptor, process_descriptor) = if float_samples {
+        ("[[F", "([[FII)V")
+    } else {
+        ("[[S", "([[SII)V")
+    };
+    let split_output = pool.add_field_ref(
+        owner,
+        if float_samples {
+            "splitFloatOutput"
+        } else {
+            "splitShortOutput"
+        },
+        split_descriptor,
+    )?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;",
+    )?;
+    let process = pool.add_interface_method_ref(universal, "process", process_descriptor)?;
+    let mut instructions = vec![Instruction::Iconst_0, Instruction::Istore(4)];
+    let common_loop = instructions.len();
+    instructions.extend([
+        Instruction::Iload(4),
+        Instruction::Aload_0,
+        Instruction::Getfield(common_channels),
+        Instruction::If_icmpge(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(split_output),
+        Instruction::Iload(4),
+        Instruction::Aload_1,
+        Instruction::Iload(4),
+        Instruction::Aaload,
+        Instruction::Aastore,
+        Instruction::Iinc(4, 1),
+        Instruction::Goto(u16::try_from(common_loop)?),
+    ]);
+    let added_init = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Getfield(common_channels),
+        Instruction::Istore(4),
+    ]);
+    let added_loop = instructions.len();
+    instructions.extend([
+        Instruction::Iload(4),
+        Instruction::Aload_0,
+        Instruction::Getfield(output_channels),
+        Instruction::If_icmpge(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(split_output),
+        Instruction::Iload(4),
+        Instruction::Aload_1,
+        Instruction::Iconst_0,
+        Instruction::Aaload,
+        Instruction::Aastore,
+        Instruction::Iinc(4, 1),
+        Instruction::Goto(u16::try_from(added_loop)?),
+    ]);
+    let delegate_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Getfield(downstream),
+        Instruction::Aload_0,
+        Instruction::Getfield(split_output),
+        Instruction::Iload_2,
+        Instruction::Iload_3,
+        Instruction::Invokeinterface(process, 4),
+        Instruction::Return,
+    ]);
+    instructions[common_loop + 3] = Instruction::If_icmpge(u16::try_from(added_init)?);
+    instructions[added_loop + 3] = Instruction::If_icmpge(u16::try_from(delegate_target)?);
+    let mut body = code(pool, 4, 5, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(common_loop)?,
+                locals: vec![VerificationType::Integer],
+            },
+            same_stack_frame(u16::try_from(added_init - common_loop - 1)?),
+            same_stack_frame(u16::try_from(added_loop - added_init - 1)?),
+            same_stack_frame(u16::try_from(delegate_target - added_loop - 1)?),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn channel_count_pcm_audio_filter_seek(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS)?;
+    let output_buffer = pool.add_field_ref(owner, "outputBuffer", "Ljava/nio/ShortBuffer;")?;
+    let short_buffer = pool.add_class("java/nio/ShortBuffer")?;
+    let clear = pool.add_method_ref(short_buffer, "clear", "()Ljava/nio/ShortBuffer;")?;
+    code(
+        pool,
+        1,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(output_buffer),
+            Instruction::Invokevirtual(clear),
+            Instruction::Pop,
             Instruction::Return,
         ],
     )
@@ -15069,6 +15729,18 @@ fn add_stack_map_table(
         frames,
     });
     Ok(())
+}
+
+fn same_stack_frame(offset_delta: u16) -> StackFrame {
+    if let Ok(frame_type) = u8::try_from(offset_delta)
+        && frame_type <= 63
+    {
+        return StackFrame::SameFrame { frame_type };
+    }
+    StackFrame::SameFrameExtended {
+        frame_type: 251,
+        offset_delta,
+    }
 }
 
 fn allocating_audio_frame_buffer_replacement(

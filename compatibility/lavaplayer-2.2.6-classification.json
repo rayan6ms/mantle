@@ -7811,81 +7811,90 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted public concrete Object shell retains the UniversalPcmAudioFilter interface, ten private fields with exact mutability, one public constructor, seven public methods, and three private helpers.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.ChannelCountPcmAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(IILcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves downstream identity, the fixed 2048-times-input-channel heap buffer capacity, derived channel counts, scratch-array sizing, initial state, null acceptance, and invalid channel-count failures.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.ChannelCountPcmAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "([SII)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves complete-frame array pass-through identity and bounds, mono-to-stereo duplication, general downmix/upmix normalization, cross-call partial frames, dispatch boundaries, uneven-expansion overflow, and checked-exception identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.ChannelCountPcmAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "(Ljava/nio/ShortBuffer;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves complete-frame ShortBuffer pass-through identity and state, conversion consumption, mono-to-stereo and general normalization paths, reusable output buffering, and null behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.ChannelCountPcmAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "([[FII)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves common float-channel identity, first-channel expansion, reusable outer-array identity, unchecked offset and length forwarding, and downstream checked-exception behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.ChannelCountPcmAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "([[SII)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves common split-short channel identity, first-channel expansion, reusable outer-array identity, unchecked offset and length forwarding, and downstream checked-exception behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.ChannelCountPcmAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "seekPerformed",
       "descriptor": "(JJ)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage proves that seek clears accumulated output without forwarding and deliberately preserves a partial input frame across the seek boundary.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.ChannelCountPcmAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "flush",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage proves flush is a no-op: it neither drains buffered samples nor forwards to downstream, while retaining the declared InterruptedException contract.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.ChannelCountPcmAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "close",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage proves close is a no-op that neither drains buffered samples nor forwards to downstream and declares no exceptions.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.CompositeAudioFilter",
