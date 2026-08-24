@@ -103,6 +103,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-audio-filter-interface-consumer" => Some(AUDIO_FILTER_INTERFACE_CONSUMER),
         "write-audio-filter-chain-consumer" => Some(AUDIO_FILTER_CHAIN_CONSUMER),
         "write-audio-pipeline-consumer" => Some(AUDIO_PIPELINE_CONSUMER),
+        "write-audio-pipeline-factory-consumer" => Some(AUDIO_PIPELINE_FACTORY_CONSUMER),
         "write-audio-source-manager-interface-consumer" => {
             Some(AUDIO_SOURCE_MANAGER_INTERFACE_CONSUMER)
         }
@@ -7623,6 +7624,353 @@ public final class GateAudioPipeline {
       events.append("close:").append(name).append(';');
       if (failing) throw new IllegalStateException("close-sentinel");
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_PIPELINE_FACTORY_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.AudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.AudioPipeline;
+import com.sedmelluq.discord.lavaplayer.filter.AudioPipelineFactory;
+import com.sedmelluq.discord.lavaplayer.filter.AudioPostProcessor;
+import com.sedmelluq.discord.lavaplayer.filter.PcmFilterFactory;
+import com.sedmelluq.discord.lavaplayer.filter.PcmFormat;
+import com.sedmelluq.discord.lavaplayer.filter.UniversalPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkDecoder;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkEncoder;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerOptions;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.nio.ShortBuffer;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateAudioPipelineFactory {
+  public static void main(String[] args) throws Exception {
+    processingRequired();
+    postProcessors();
+    chainShapes();
+    failureOrdering();
+    reflection();
+    System.out.println(
+        "required=format,volume,factory,short-circuit,nulls;"
+        + "post=volume,buffering,encoder,identity,fixed-list;"
+        + "create=base,hot-swap,user,channel,resample,combined,first,order;"
+        + "failures=context,input,output,options,encoder-order;"
+        + "reflection=public-concrete-object,0-fields,1-constructor,3-methods,static,private-generic");
+  }
+
+  private static void processingRequired() {
+    Fixture fixture = new Fixture(2, 48000, false);
+    AudioDataFormat input = new TestFormat(1, 22050, 120);
+    fixture.format.equalsResult = true;
+    check(!AudioPipelineFactory.isProcessingRequired(fixture.context, fixture.format),
+        "default processing state");
+    check(fixture.format.equalsCalls == 1 && fixture.format.equalsValue == fixture.format,
+        "format equals dispatch");
+
+    fixture.options.volumeLevel.set(99);
+    check(AudioPipelineFactory.isProcessingRequired(fixture.context, fixture.format),
+        "volume processing");
+    fixture.options.volumeLevel.set(100);
+    PcmFilterFactory factory = (track, format, output) -> Collections.emptyList();
+    fixture.options.filterFactory.set(factory);
+    check(AudioPipelineFactory.isProcessingRequired(fixture.context, fixture.format),
+        "factory processing");
+    fixture.options.filterFactory.set(null);
+
+    fixture.format.equalsResult = false;
+    AudioProcessingContext noOptions = new AudioProcessingContext(
+        fixture.configuration, fixture.frameBuffer, null, fixture.format);
+    check(AudioPipelineFactory.isProcessingRequired(noOptions, input),
+        "format short circuit");
+    check(fixture.format.equalsValue == input, "input identity to equals");
+    fixture.format.equalsResult = true;
+    expect(NullPointerException.class,
+        () -> AudioPipelineFactory.isProcessingRequired(noOptions, fixture.format));
+    expect(NullPointerException.class,
+        () -> AudioPipelineFactory.isProcessingRequired(null, fixture.format));
+
+    AudioProcessingContext noFormat = new AudioProcessingContext(
+        fixture.configuration, fixture.frameBuffer, fixture.options, null);
+    expect(NullPointerException.class,
+        () -> AudioPipelineFactory.isProcessingRequired(noFormat, null));
+  }
+
+  @SuppressWarnings("unchecked")
+  private static void postProcessors() throws Exception {
+    Fixture fixture = new Fixture(2, 48000, false);
+    Method helper = AudioPipelineFactory.class.getDeclaredMethod(
+        "createPostProcessors", AudioProcessingContext.class);
+    helper.setAccessible(true);
+    Collection<AudioPostProcessor> processors =
+        (Collection<AudioPostProcessor>) helper.invoke(null, fixture.context);
+    check(processors.size() == 2 && processors instanceof List,
+        "post-processor fixed list");
+    List<AudioPostProcessor> list = (List<AudioPostProcessor>) processors;
+    check(classNames(list).equals("VolumePostProcessor,BufferingPostProcessor"),
+        "post-processor order");
+    check(field(list.get(0), "context") == fixture.context
+        && field(list.get(1), "context") == fixture.context
+        && field(list.get(1), "encoder") == fixture.format.lastEncoder,
+        "post-processor identity");
+    check(fixture.format.encoderCalls == 1
+        && fixture.format.encoderConfiguration == fixture.configuration,
+        "encoder creation identity");
+    try {
+      list.add(list.get(0));
+      throw new AssertionError("fixed-size post list grew");
+    } catch (UnsupportedOperationException expected) {
+      // Arrays.asList is fixed-size.
+    }
+    list.get(1).close();
+    check(fixture.format.lastEncoder.closes == 1, "encoder close forwarding");
+  }
+
+  private static void chainShapes() throws Exception {
+    Fixture base = new Fixture(2, 48000, false);
+    AudioPipeline basePipeline = AudioPipelineFactory.create(base.context, new PcmFormat(2, 48000));
+    checkChain(basePipeline, "FinalPcmAudioFilter");
+    check(base.format.encoderCalls == 1, "base encoder count");
+    basePipeline.close();
+
+    Fixture hotSwap = new Fixture(2, 48000, true);
+    AudioPipeline hotSwapPipeline =
+        AudioPipelineFactory.create(hotSwap.context, new PcmFormat(2, 48000));
+    checkChain(hotSwapPipeline, "FinalPcmAudioFilter,UserProvidedAudioFilters");
+    hotSwapPipeline.close();
+
+    Fixture user = new Fixture(2, 48000, false);
+    Object[] factoryArguments = new Object[3];
+    int[] factoryCalls = new int[1];
+    user.options.filterFactory.set((track, format, output) -> {
+      factoryCalls[0]++;
+      factoryArguments[0] = track;
+      factoryArguments[1] = format;
+      factoryArguments[2] = output;
+      return Collections.emptyList();
+    });
+    AudioPipeline userPipeline = AudioPipelineFactory.create(user.context, new PcmFormat(2, 48000));
+    checkChain(userPipeline, "FinalPcmAudioFilter,UserProvidedAudioFilters");
+    List<AudioFilter> userFilters = pipelineFilters(userPipeline);
+    check(factoryCalls[0] == 1 && factoryArguments[0] == null
+        && factoryArguments[1] == user.format && factoryArguments[2] == userFilters.get(0),
+        "user factory arguments");
+    userPipeline.close();
+
+    Fixture channel = new Fixture(2, 48000, false);
+    AudioPipeline channelPipeline =
+        AudioPipelineFactory.create(channel.context, new PcmFormat(1, 48000));
+    checkChain(channelPipeline, "FinalPcmAudioFilter,ChannelCountPcmAudioFilter");
+    check(field(pipelineFirst(channelPipeline), "downstream")
+        == pipelineFilters(channelPipeline).get(0), "channel downstream identity");
+    channelPipeline.close();
+
+    Fixture resample = new Fixture(2, 48000, false);
+    AudioPipeline resamplePipeline =
+        AudioPipelineFactory.create(resample.context, new PcmFormat(2, 44100));
+    checkChain(resamplePipeline, "FinalPcmAudioFilter,ResamplingPcmAudioFilter,ToFloatAudioFilter");
+    resamplePipeline.close();
+
+    Fixture combined = new Fixture(2, 48000, false);
+    AudioPipeline combinedPipeline =
+        AudioPipelineFactory.create(combined.context, new PcmFormat(1, 44100));
+    checkChain(combinedPipeline,
+        "FinalPcmAudioFilter,ResamplingPcmAudioFilter,ToFloatAudioFilter,"
+        + "ChannelCountPcmAudioFilter");
+    check(pipelineFirst(combinedPipeline)
+        == pipelineFilters(combinedPipeline).get(3), "combined first identity");
+    combinedPipeline.close();
+  }
+
+  private static void failureOrdering() {
+    Fixture fixture = new Fixture(2, 48000, false);
+    expect(NullPointerException.class,
+        () -> AudioPipelineFactory.create(fixture.context, null));
+    expect(NullPointerException.class,
+        () -> AudioPipelineFactory.create(null, new PcmFormat(2, 48000)));
+    check(fixture.format.encoderCalls == 0, "pre-encoder null failures");
+
+    AudioProcessingContext noOutput = new AudioProcessingContext(
+        fixture.configuration, fixture.frameBuffer, fixture.options, null);
+    expect(NullPointerException.class,
+        () -> AudioPipelineFactory.create(noOutput, new PcmFormat(2, 48000)));
+    check(fixture.format.encoderCalls == 0, "null output before encoder");
+
+    AudioProcessingContext noOptions = new AudioProcessingContext(
+        fixture.configuration, fixture.frameBuffer, null, fixture.format);
+    expect(NullPointerException.class,
+        () -> AudioPipelineFactory.create(noOptions, new PcmFormat(2, 48000)));
+    check(fixture.format.encoderCalls == 1, "encoder precedes options failure");
+  }
+
+  private static void reflection() throws Exception {
+    Class<AudioPipelineFactory> type = AudioPipelineFactory.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && !Modifier.isAbstract(type.getModifiers()) && !type.isInterface()
+        && type.getSuperclass() == Object.class && type.getInterfaces().length == 0,
+        "class metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 3, "member counts");
+    Constructor<AudioPipelineFactory> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    check(new AudioPipelineFactory() != new AudioPipelineFactory(), "construction identity");
+
+    Method required = type.getDeclaredMethod(
+        "isProcessingRequired", AudioProcessingContext.class, AudioDataFormat.class);
+    checkStatic(required, boolean.class);
+    Method create = type.getDeclaredMethod("create", AudioProcessingContext.class, PcmFormat.class);
+    checkStatic(create, AudioPipeline.class);
+    Method helper = type.getDeclaredMethod("createPostProcessors", AudioProcessingContext.class);
+    check(helper.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC)
+        && helper.getReturnType() == Collection.class && !helper.isSynthetic()
+        && !helper.isBridge() && helper.getExceptionTypes().length == 0
+        && helper.getGenericReturnType().getTypeName().equals(
+            "java.util.Collection<com.sedmelluq.discord.lavaplayer.filter.AudioPostProcessor>"),
+        "private helper metadata");
+  }
+
+  private static void checkStatic(Method method, Class<?> returnType) {
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && method.getReturnType() == returnType && !method.isSynthetic()
+        && !method.isBridge() && !method.isVarArgs() && method.getExceptionTypes().length == 0,
+        method.toString());
+  }
+
+  private static void checkChain(AudioPipeline pipeline, String expected) throws Exception {
+    List<AudioFilter> filters = pipelineFilters(pipeline);
+    check(classNames(filters).equals(expected), "chain shape " + classNames(filters));
+    check(pipelineFirst(pipeline) == filters.get(filters.size() - 1), "first filter identity");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<AudioFilter> pipelineFilters(AudioPipeline pipeline) throws Exception {
+    return (List<AudioFilter>) field(pipeline, "filters");
+  }
+
+  private static UniversalPcmAudioFilter pipelineFirst(AudioPipeline pipeline) throws Exception {
+    return (UniversalPcmAudioFilter) field(pipeline, "first");
+  }
+
+  private static Object field(Object target, String name) throws Exception {
+    Field field = target.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
+  }
+
+  private static String classNames(Collection<?> values) {
+    StringBuilder result = new StringBuilder();
+    for (Object value : values) {
+      if (result.length() > 0) result.append(',');
+      result.append(value.getClass().getSimpleName());
+    }
+    return result.toString();
+  }
+
+  private static void expect(Class<? extends Throwable> type, CheckedCall call) {
+    try {
+      call.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
+  }
+
+  private interface CheckedCall {
+    void run() throws Exception;
+  }
+
+  private static final class Fixture {
+    final AudioConfiguration configuration = new AudioConfiguration();
+    final AudioPlayerOptions options = new AudioPlayerOptions();
+    final AudioFrameBuffer frameBuffer = new FrameBuffer();
+    final TestFormat format;
+    final AudioProcessingContext context;
+
+    Fixture(int channels, int sampleRate, boolean hotSwap) {
+      configuration.setFilterHotSwapEnabled(hotSwap);
+      format = new TestFormat(channels, sampleRate, 960);
+      configuration.setOutputFormat(format);
+      context = new AudioProcessingContext(configuration, frameBuffer, options, format);
+    }
+  }
+
+  private static final class FrameBuffer implements AudioFrameBuffer {
+    public void consume(com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame frame) {}
+    public int getRemainingCapacity() { return 0; }
+    public int getFullCapacity() { return 0; }
+    public void setClearOnInsert() {}
+    public void clear() {}
+    public void rebuild(com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameRebuilder rebuilder) {}
+    public com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame provide() { return null; }
+    public com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame provide(
+        long timeout, java.util.concurrent.TimeUnit unit) { return null; }
+    public boolean provide(com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame targetFrame) { return false; }
+    public boolean provide(com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame targetFrame,
+        long timeout, java.util.concurrent.TimeUnit unit) { return false; }
+    public boolean hasClearOnInsert() { return false; }
+    public boolean hasReceivedFrames() { return false; }
+    public Long getLastInputTimecode() { return null; }
+    public void waitForTermination() {}
+    public void setTerminateOnEmpty() {}
+    public void shutdown() {}
+    public void lockBuffer() {}
+  }
+
+  private static final class TestFormat extends AudioDataFormat {
+    boolean equalsResult = true;
+    int equalsCalls;
+    Object equalsValue;
+    int encoderCalls;
+    AudioConfiguration encoderConfiguration;
+    RecordingEncoder lastEncoder;
+
+    TestFormat(int channels, int sampleRate, int chunkSamples) {
+      super(channels, sampleRate, chunkSamples);
+    }
+
+    public boolean equals(Object value) {
+      equalsCalls++;
+      equalsValue = value;
+      return equalsResult;
+    }
+
+    public int hashCode() { return 1; }
+    public int totalSampleCount() { return channelCount * chunkSampleCount; }
+    public String codecName() { return "test"; }
+    public byte[] silenceBytes() { return new byte[0]; }
+    public int expectedChunkSize() { return 8; }
+    public int maximumChunkSize() { return 64; }
+    public AudioChunkDecoder createDecoder() { return null; }
+
+    public AudioChunkEncoder createEncoder(AudioConfiguration configuration) {
+      encoderCalls++;
+      encoderConfiguration = configuration;
+      lastEncoder = new RecordingEncoder();
+      return lastEncoder;
+    }
+  }
+
+  private static final class RecordingEncoder implements AudioChunkEncoder {
+    int closes;
+    public byte[] encode(ShortBuffer buffer) { return new byte[0]; }
+    public void encode(ShortBuffer buffer, ByteBuffer out) {}
+    public void close() { closes++; }
   }
 
   private static void check(boolean condition, String message) {

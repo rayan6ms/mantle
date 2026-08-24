@@ -7657,36 +7657,56 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted public concrete Object shell retains the exact zero-field shape, public constructor, two public static methods, and private generic post-processor helper.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.AudioPipelineFactory",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage proves the public stateless Object constructor and distinct instance identity.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.AudioPipelineFactory",
       "symbol_kind": "METHOD",
       "member_name": "isProcessingRequired",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves format-equality dispatch, volume and filter-factory decisions, argument identity, short-circuit order, and null failures.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.AudioPipelineFactory",
       "symbol_kind": "METHOD",
       "member_name": "create",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;Lcom/sedmelluq/discord/lavaplayer/filter/PcmFormat;)Lcom/sedmelluq/discord/lavaplayer/filter/AudioPipeline;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference-differential coverage preserves base, hot-swap, user, channel, resampling, and combined filter-chain order; first-filter, factory, context, encoder, and downstream identity; fixed post-processing order; and failure sequencing.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.AudioPostProcessor",
