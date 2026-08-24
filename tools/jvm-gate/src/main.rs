@@ -275,6 +275,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-youtube-signature-resolver-consumer" => Some(YOUTUBE_SIGNATURE_RESOLVER_CONSUMER),
         "write-youtube-track-details-consumer" => Some(YOUTUBE_TRACK_DETAILS_CONSUMER),
+        "write-youtube-track-details-loader-consumer" => {
+            Some(YOUTUBE_TRACK_DETAILS_LOADER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -22126,6 +22129,126 @@ public final class GateYoutubeTrackDetails {
       throw new AssertionError("expected unchecked failure");
     } catch (RuntimeException error) {
       check(error == expected, message);
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_TRACK_DETAILS_LOADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSignatureResolver;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackDetails;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackDetailsLoader;
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeTrackFormat;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.List;
+
+public final class GateYoutubeTrackDetailsLoader {
+  public static void main(String[] args) throws Exception {
+    reflectionContract();
+    dispatchContract();
+    System.out.println("public-abstract-interface,0-fields,0-constructors,1-method;"
+        + "details=http,id,boolean,source-manager-to-track-details;"
+        + "identity=arguments,primitive,return,nulls,unchecked;reflection=exact");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<YoutubeTrackDetailsLoader> type = YoutubeTrackDetailsLoader.class;
+    int modifiers = Modifier.PUBLIC | Modifier.INTERFACE | Modifier.ABSTRACT;
+    check(type.getModifiers() == modifiers && type.isInterface() && !type.isAnnotation()
+        && !type.isEnum() && !type.isSynthetic() && !type.isMemberClass(), "type metadata");
+    check(type.getSuperclass() == null && type.getGenericSuperclass() == null
+        && type.getInterfaces().length == 0 && type.getGenericInterfaces().length == 0
+        && type.getTypeParameters().length == 0, "type hierarchy");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 1 && type.getDeclaredClasses().length == 0,
+        "type shape");
+    Method method = type.getDeclaredMethod("loadDetails", HttpInterface.class, String.class,
+        boolean.class, YoutubeAudioSourceManager.class);
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == YoutubeTrackDetails.class
+        && Arrays.equals(method.getParameterTypes(), new Class<?>[] {
+            HttpInterface.class, String.class, boolean.class, YoutubeAudioSourceManager.class
+        })
+        && method.getGenericReturnType() == YoutubeTrackDetails.class
+        && Arrays.equals(method.getGenericParameterTypes(), method.getParameterTypes())
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), "loadDetails metadata");
+  }
+
+  private static void dispatchContract() {
+    RecordingLoader loader = new RecordingLoader();
+    HttpInterface http = new HttpInterface(null, null, false, null);
+    String identifier = new String("video-id");
+    YoutubeAudioSourceManager manager = new YoutubeAudioSourceManager();
+    YoutubeTrackDetails details = new EmptyDetails();
+    loader.details = details;
+
+    check(loader.loadDetails(http, identifier, true, manager) == details
+        && loader.http == http && loader.identifier == identifier && loader.requiresFormats
+        && loader.manager == manager && loader.calls == 1, "argument and return identity");
+
+    loader.details = null;
+    check(loader.loadDetails(null, null, false, null) == null && loader.http == null
+        && loader.identifier == null && !loader.requiresFormats && loader.manager == null
+        && loader.calls == 2, "null and false propagation");
+
+    RuntimeException failure = new RuntimeException("unchecked-sentinel");
+    loader.failure = failure;
+    expectSame(failure, () -> loader.loadDetails(http, identifier, true, manager));
+    check(loader.calls == 3 && loader.http == http && loader.identifier == identifier
+        && loader.requiresFormats && loader.manager == manager, "unchecked dispatch");
+  }
+
+  private static final class RecordingLoader implements YoutubeTrackDetailsLoader {
+    HttpInterface http;
+    String identifier;
+    boolean requiresFormats;
+    YoutubeAudioSourceManager manager;
+    YoutubeTrackDetails details;
+    RuntimeException failure;
+    int calls;
+
+    @Override public YoutubeTrackDetails loadDetails(HttpInterface http, String identifier,
+        boolean requiresFormats, YoutubeAudioSourceManager manager) {
+      this.http = http;
+      this.identifier = identifier;
+      this.requiresFormats = requiresFormats;
+      this.manager = manager;
+      calls++;
+      if (failure != null) throw failure;
+      return details;
+    }
+  }
+
+  private static final class EmptyDetails implements YoutubeTrackDetails {
+    @Override public AudioTrackInfo getTrackInfo() { return null; }
+
+    @Override public List<YoutubeTrackFormat> getFormats(
+        HttpInterface http, YoutubeSignatureResolver resolver) {
+      return null;
+    }
+
+    @Override public String getPlayerScript() { return null; }
+  }
+
+  private interface ThrowingSupplier { Object get(); }
+
+  private static void expectSame(RuntimeException expected, ThrowingSupplier operation) {
+    try {
+      operation.get();
+      throw new AssertionError("expected unchecked failure");
+    } catch (RuntimeException error) {
+      check(error == expected, "unchecked identity");
     }
   }
 
