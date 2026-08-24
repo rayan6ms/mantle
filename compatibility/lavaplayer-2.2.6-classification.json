@@ -19918,63 +19918,110 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The generated PersistentHttpStream shell retains all three private fields, both private helpers, the 11,862,014-byte constant, inherited state, and reflection metadata while legacy signed query-range delivery is fenced in favor of Mantle's bounded native HTTP/media path.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-media/src/http_input.rs",
+        "crates/mantle-media/tests/phase12_youtube.rs",
+        "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubePersistentHttpStream",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/net/URI;J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The public constructor exactly boxes the content length into the reference PersistentHttpStream superclass, preserving HTTP-interface and URI identity without performing HTTP.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubePersistentHttpStream",
       "symbol_kind": "METHOD",
       "member_name": "getConnectUrl",
       "descriptor": "()Ljava/net/URI;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The protected URI signature is retained, but candidate calls reject before legacy signed-URL range rewriting, logging, or HTTP access; bounded native request construction owns current playback.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-media/src/http_input.rs",
+        "crates/mantle-media/tests/phase12_youtube.rs",
+        "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubePersistentHttpStream",
       "symbol_kind": "METHOD",
       "member_name": "internalRead",
       "descriptor": "([BIIZ)I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The protected read signature and IOException metadata are retained, while the frozen query-range reconnect path is rejected before HTTP and current bounded reads remain native.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-media/src/http_input.rs",
+        "crates/mantle-media/tests/phase12_youtube.rs",
+        "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubePersistentHttpStream",
       "symbol_kind": "METHOD",
       "member_name": "internalSkip",
       "descriptor": "(JZ)J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The protected skip signature and IOException metadata are retained, while the frozen query-range reconnect path is rejected before HTTP and current bounded seeks remain native.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs",
+        "crates/mantle-media/src/http_input.rs",
+        "crates/mantle-media/tests/phase12_youtube.rs",
+        "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
+      ],
+      "classification": "C_SEMANTIC"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubePersistentHttpStream",
       "symbol_kind": "METHOD",
       "member_name": "useHeadersForRange",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The protected range-mode capability remains exactly false with the frozen signature and reflection behavior.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubePersistentHttpStream",
       "symbol_kind": "METHOD",
       "member_name": "canSeekHard",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "notes": "The public hard-seek capability remains exactly true with the frozen signature and reflection behavior.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ],
+      "classification": "A_EXACT"
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubePlaylistLoader",

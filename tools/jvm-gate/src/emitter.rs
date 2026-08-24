@@ -267,6 +267,8 @@ const YOUTUBE_MPEG_STREAM_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeMpegStreamAudioTrack";
 const YOUTUBE_PAYLOAD_HELPER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubePayloadHelper";
+const YOUTUBE_PERSISTENT_HTTP_STREAM_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubePersistentHttpStream";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -377,6 +379,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_MIX_PROVIDER_CLASS,
     YOUTUBE_MPEG_STREAM_AUDIO_TRACK_CLASS,
     YOUTUBE_PAYLOAD_HELPER_CLASS,
+    YOUTUBE_PERSISTENT_HTTP_STREAM_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -781,6 +784,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | YOUTUBE_FORMAT_INFO_CLASS
             | YOUTUBE_HTTP_CONTEXT_FILTER_CLASS
             | YOUTUBE_MPEG_STREAM_AUDIO_TRACK_CLASS
+            | YOUTUBE_PERSISTENT_HTTP_STREAM_CLASS
     )
 }
 
@@ -832,6 +836,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | YOUTUBE_HTTP_CONTEXT_FILTER_CLASS
             | YOUTUBE_MIX_PROVIDER_CLASS
             | YOUTUBE_MPEG_STREAM_AUDIO_TRACK_CLASS
+            | YOUTUBE_PERSISTENT_HTTP_STREAM_CLASS
     )
 }
 
@@ -1133,6 +1138,9 @@ fn replacement_body(
     }
     if class_name == YOUTUBE_PAYLOAD_HELPER_CLASS {
         return youtube_payload_helper_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == YOUTUBE_PERSISTENT_HTTP_STREAM_CLASS {
+        return youtube_persistent_http_stream_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == YOUTUBE_CACHED_PLAYER_SCRIPT_CLASS {
         return youtube_cached_player_script_replacement(pool, name, descriptor, required_locals);
@@ -19487,6 +19495,78 @@ fn youtube_payload_helper_put_once_and_join(pool: &mut ConstantPool<'static>) ->
         ],
     )?;
     Ok(body)
+}
+
+fn youtube_persistent_http_stream_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/net/URI;J)V",
+        ) => youtube_persistent_http_stream_constructor(pool),
+        ("useHeadersForRange", "()Z") => boolean_return(pool, false, required_locals),
+        ("canSeekHard", "()Z") => boolean_return(pool, true, required_locals),
+        ("<clinit>", "()V") => youtube_persistent_http_stream_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            "Legacy YouTube query-range HTTP streaming is unsupported; use Mantle's bounded native media pipeline.",
+            required_locals,
+        ),
+    }
+}
+
+fn youtube_persistent_http_stream_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let parent =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/PersistentHttpStream")?;
+    let parent_init = pool.add_method_ref(
+        parent,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Ljava/net/URI;Ljava/lang/Long;)V",
+    )?;
+    let long = pool.add_class("java/lang/Long")?;
+    let value_of = pool.add_method_ref(long, "valueOf", "(J)Ljava/lang/Long;")?;
+    code(
+        pool,
+        5,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Lload_3,
+            Instruction::Invokestatic(value_of),
+            Instruction::Invokespecial(parent_init),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn youtube_persistent_http_stream_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(YOUTUBE_PERSISTENT_HTTP_STREAM_CLASS)?;
+    let factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
 }
 
 fn default_youtube_track_details_replacement(

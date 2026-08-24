@@ -255,6 +255,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
             Some(YOUTUBE_MPEG_STREAM_AUDIO_TRACK_CONSUMER)
         }
         "write-youtube-payload-helper-consumer" => Some(YOUTUBE_PAYLOAD_HELPER_CONSUMER),
+        "write-youtube-persistent-http-stream-consumer" => {
+            Some(YOUTUBE_PERSISTENT_HTTP_STREAM_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -20314,6 +20317,223 @@ public final class GateYoutubePayloadHelper {
       throw new AssertionError("expected " + type.getName());
     } catch (Throwable error) {
       if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_PERSISTENT_HTTP_STREAM_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubePersistentHttpStream;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.tools.io.PersistentHttpStream;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.net.URI;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.TreeSet;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.protocol.HttpClientContext;
+
+public final class GateYoutubePersistentHttpStream {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "mode required");
+    boolean reference = args[0].equals("reference");
+    check(reference || args[0].equals("candidate"), "unknown mode");
+    reflectionContract();
+    constructionAndFlags();
+    if (reference) {
+      referenceServiceContract();
+    } else {
+      candidateServiceContract();
+    }
+    System.out.println("common=public-concrete,persistent-http-stream-super,3-private-fields,"
+        + "1-constructor,5-exported-methods,2-private-methods;buffer-11862014,constructor-capture,"
+        + "no-http-on-construction,headers-false,hard-seek-true,signatures,reflection;service="
+        + (reference ? "legacy-query-range-url,network-backed-read-skip"
+            : "deterministic-no-http,bounded-native-http-and-media"));
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<YoutubePersistentHttpStream> type = YoutubePersistentHttpStream.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == PersistentHttpStream.class
+        && type.getInterfaces().length == 0 && type.getGenericInterfaces().length == 0
+        && type.getTypeParameters().length == 0 && type.getDeclaredFields().length == 3
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredMethods().length == 7
+        && type.getDeclaredClasses().length == 0 && !type.isInterface() && !type.isEnum()
+        && !type.isAnnotation() && !type.isSynthetic(), "class shape");
+    checkField(type, "log", "org.slf4j.Logger",
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    Field buffer = checkField(type, "BUFFER_SIZE", long.class.getName(),
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    buffer.setAccessible(true);
+    check(buffer.getLong(null) == 11862014L, "buffer constant");
+    checkField(type, "rangeEnd", long.class.getName(), Modifier.PRIVATE);
+
+    Constructor<YoutubePersistentHttpStream> constructor = type.getDeclaredConstructor(
+        HttpInterface.class, URI.class, long.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0 && !constructor.isVarArgs(),
+        "constructor metadata");
+    checkMethod(type, "getConnectUrl", URI.class, Modifier.PROTECTED, new Class<?>[0], false);
+    checkMethod(type, "internalRead", int.class, Modifier.PROTECTED,
+        new Class<?>[] {byte[].class, int.class, int.class, boolean.class}, true);
+    checkMethod(type, "internalSkip", long.class, Modifier.PROTECTED,
+        new Class<?>[] {long.class, boolean.class}, true);
+    checkMethod(type, "useHeadersForRange", boolean.class, Modifier.PROTECTED,
+        new Class<?>[0], false);
+    checkMethod(type, "canSeekHard", boolean.class, Modifier.PUBLIC, new Class<?>[0], false);
+    Method next = type.getDeclaredMethod("getNextRangeUrl");
+    Method handle = type.getDeclaredMethod("handleRangeEnd", IOException.class, boolean.class);
+    check(next.getModifiers() == Modifier.PRIVATE && next.getReturnType() == URI.class
+        && next.getExceptionTypes().length == 0 && handle.getModifiers() == Modifier.PRIVATE
+        && handle.getReturnType() == void.class
+        && Arrays.equals(handle.getExceptionTypes(), new Class<?>[] {IOException.class}),
+        "private method metadata");
+    Set<String> privateMethods = new TreeSet<>();
+    for (Method method : type.getDeclaredMethods()) {
+      if (Modifier.isPrivate(method.getModifiers())) privateMethods.add(method.getName());
+    }
+    check(privateMethods.equals(new TreeSet<>(Arrays.asList("getNextRangeUrl", "handleRangeEnd"))),
+        "private method names");
+    Field log = type.getDeclaredField("log");
+    log.setAccessible(true);
+    check(log.get(null) != null, "logger initialized");
+  }
+
+  private static void constructionAndFlags() throws Exception {
+    RejectingHttpInterface http = new RejectingHttpInterface();
+    URI content = URI.create("https://media.invalid/audio?token=redacted");
+    Probe stream = new Probe(http, content, 500L);
+    check(stream.sameInterface(http) && stream.sameContentUrl(content)
+        && stream.getContentLength() == 500L && stream.getPosition() == 0L
+        && stream.headersForRange() == false && stream.hardSeek()
+        && rangeEnd(stream) == 0L && http.calls == 0, "constructor and capability flags");
+    stream.close();
+    check(http.calls == 0, "unused stream closes without HTTP");
+  }
+
+  private static void referenceServiceContract() throws Exception {
+    RejectingHttpInterface http = new RejectingHttpInterface();
+    Probe ranged = new Probe(http, URI.create("https://media.invalid/audio?token=redacted"), 500L);
+    URI connect = ranged.connectUrl();
+    check(connect != ranged.content() && connect.getQuery().contains("token=redacted")
+        && connect.getQuery().contains("range=0-500") && rangeEnd(ranged) == 500L
+        && http.calls == 0, "legacy query range URL");
+
+    URI direct = URI.create("https://media.invalid/audio?rn=7&range=legacy");
+    Probe numbered = new Probe(http, direct, 500L);
+    check(numbered.connectUrl() == direct && rangeEnd(numbered) == 0L,
+        "numbered URL bypasses range rewriting");
+
+    RejectingHttpInterface readHttp = new RejectingHttpInterface();
+    Probe read = new Probe(readHttp, URI.create("https://media.invalid/read"), 500L);
+    expect(HttpTouched.class, () -> read.directRead(new byte[4], 0, 4, true));
+    check(readHttp.calls == 1, "read reaches legacy HTTP");
+    RejectingHttpInterface skipHttp = new RejectingHttpInterface();
+    Probe skip = new Probe(skipHttp, URI.create("https://media.invalid/skip"), 500L);
+    expect(HttpTouched.class, () -> skip.directSkip(4L, true));
+    check(skipHttp.calls == 1, "skip reaches legacy HTTP");
+  }
+
+  private static void candidateServiceContract() throws Exception {
+    RejectingHttpInterface http = new RejectingHttpInterface();
+    Probe stream = new Probe(http, URI.create("https://media.invalid/audio?token=secret"), 500L);
+    assertUnsupported(stream::connectUrl);
+    assertUnsupported(() -> stream.directRead(new byte[4], 0, 4, true));
+    assertUnsupported(() -> stream.directSkip(4L, true));
+    check(http.calls == 0 && rangeEnd(stream) == 0L,
+        "legacy service rejected before HTTP or range mutation");
+  }
+
+  private static void assertUnsupported(ThrowingRunnable operation) throws Exception {
+    UnsupportedOperationException error = expect(UnsupportedOperationException.class, operation);
+    check(error.getMessage().contains("Legacy YouTube query-range HTTP streaming is unsupported"),
+        "stable unsupported disposition");
+  }
+
+  private static long rangeEnd(Probe stream) throws Exception {
+    Field field = YoutubePersistentHttpStream.class.getDeclaredField("rangeEnd");
+    field.setAccessible(true);
+    return field.getLong(stream);
+  }
+
+  private static Field checkField(Class<?> owner, String name, String typeName, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getModifiers() == modifiers && field.getType().getName().equals(typeName)
+        && !field.isSynthetic(), name + " field");
+    return field;
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> result, int modifiers,
+                                  Class<?>[] parameters, boolean throwsIo) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == modifiers && method.getReturnType() == result
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), throwsIo
+            ? new Class<?>[] {IOException.class} : new Class<?>[0])
+        && method.getTypeParameters().length == 0 && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), name + " metadata");
+  }
+
+  private static final class Probe extends YoutubePersistentHttpStream {
+    Probe(HttpInterface http, URI content, long length) {
+      super(http, content, length);
+    }
+
+    URI connectUrl() { return super.getConnectUrl(); }
+    int directRead(byte[] buffer, int offset, int length, boolean retry) throws IOException {
+      return super.internalRead(buffer, offset, length, retry);
+    }
+    long directSkip(long distance, boolean retry) throws IOException {
+      return super.internalSkip(distance, retry);
+    }
+    boolean headersForRange() { return super.useHeadersForRange(); }
+    boolean hardSeek() { return super.canSeekHard(); }
+    boolean sameInterface(HttpInterface expected) { return this.httpInterface == expected; }
+    boolean sameContentUrl(URI expected) { return this.contentUrl == expected; }
+    URI content() { return this.contentUrl; }
+  }
+
+  private static final class HttpTouched extends RuntimeException {}
+
+  private static final class RejectingHttpInterface extends HttpInterface {
+    int calls;
+
+    RejectingHttpInterface() {
+      super(null, HttpClientContext.create(), false, null);
+    }
+
+    @Override public HttpClientContext getContext() {
+      calls++;
+      throw new HttpTouched();
+    }
+
+    @Override public CloseableHttpResponse execute(HttpUriRequest request) throws IOException {
+      calls++;
+      throw new HttpTouched();
+    }
+  }
+
+  private interface ThrowingRunnable { void run() throws Exception; }
+
+  private static <T extends Throwable> T expect(
+      Class<T> type, ThrowingRunnable operation) throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
     }
   }
 
