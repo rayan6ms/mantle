@@ -70,6 +70,7 @@ const AUDIO_FRAME_BUFFER_FACTORY_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBufferFactory";
 const AUDIO_FILTER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilter";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
+const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const MARKER_STATE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler$MarkerState";
 const TRACK_STATE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/track/AudioTrackState";
@@ -352,6 +353,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/player/hook/AudioOutputHookFactory",
     AUDIO_FILTER_CLASS,
     AUDIO_FILTER_CHAIN_CLASS,
+    AUDIO_PIPELINE_CLASS,
     "com/sedmelluq/discord/lavaplayer/filter/PcmFilterFactory",
     "com/sedmelluq/discord/lavaplayer/format/AudioDataFormat",
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
@@ -814,6 +816,7 @@ fn retain_private_fields(class_name: &str) -> bool {
         class_name,
         PLAYER_LIFECYCLE_MANAGER_CLASS
             | FUNCTIONAL_RESULT_HANDLER_CLASS
+            | AUDIO_PIPELINE_CLASS
             | TRACK_MARKER_TRACKER_CLASS
             | BASE_AUDIO_TRACK_CLASS
             | DELEGATED_AUDIO_TRACK_CLASS
@@ -1032,6 +1035,9 @@ fn replacement_body(
     }
     if class_name == AUDIO_FILTER_CHAIN_CLASS {
         return audio_filter_chain_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == AUDIO_PIPELINE_CLASS {
+        return audio_pipeline_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PROBING_AUDIO_SOURCE_MANAGER_CLASS {
         return probing_audio_source_manager_replacement(pool, name, descriptor, required_locals);
@@ -1566,6 +1572,136 @@ fn audio_filter_chain_constructor(pool: &mut ConstantPool<'static>) -> Result<At
             Instruction::Aload_3,
             Instruction::Putfield(context),
             Instruction::Return,
+        ],
+    )
+}
+
+fn audio_pipeline_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(Lcom/sedmelluq/discord/lavaplayer/filter/AudioFilterChain;)V") => {
+            audio_pipeline_constructor(pool)
+        }
+        ("process", "([[FII)V" | "([SII)V" | "([[SII)V") => {
+            audio_pipeline_process_array(pool, descriptor)
+        }
+        ("process", "(Ljava/nio/ShortBuffer;)V") => audio_pipeline_process_buffer(pool),
+        ("getFilters", "()Ljava/util/List;") => audio_pipeline_get_filters(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {AUDIO_PIPELINE_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn audio_pipeline_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let composite =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/filter/CompositeAudioFilter")?;
+    let composite_init = pool.add_method_ref(composite, "<init>", "()V")?;
+    let chain = pool.add_class(AUDIO_FILTER_CHAIN_CLASS)?;
+    let chain_filters = pool.add_field_ref(chain, "filters", "Ljava/util/List;")?;
+    let chain_input = pool.add_field_ref(
+        chain,
+        "input",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;",
+    )?;
+    let owner = pool.add_class(AUDIO_PIPELINE_CLASS)?;
+    let filters = pool.add_field_ref(owner, "filters", "Ljava/util/List;")?;
+    let first = pool.add_field_ref(
+        owner,
+        "first",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;",
+    )?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(composite_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Getfield(chain_filters),
+            Instruction::Putfield(filters),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Getfield(chain_input),
+            Instruction::Putfield(first),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn audio_pipeline_process_array(
+    pool: &mut ConstantPool<'static>,
+    descriptor: &str,
+) -> Result<Attribute> {
+    let owner = pool.add_class(AUDIO_PIPELINE_CLASS)?;
+    let first = pool.add_field_ref(
+        owner,
+        "first",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;",
+    )?;
+    let universal =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter")?;
+    let process = pool.add_interface_method_ref(universal, "process", descriptor)?;
+    code(
+        pool,
+        4,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(first),
+            Instruction::Aload_1,
+            Instruction::Iload_2,
+            Instruction::Iload_3,
+            Instruction::Invokeinterface(process, 4),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn audio_pipeline_process_buffer(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(AUDIO_PIPELINE_CLASS)?;
+    let first = pool.add_field_ref(
+        owner,
+        "first",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;",
+    )?;
+    let universal =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter")?;
+    let process =
+        pool.add_interface_method_ref(universal, "process", "(Ljava/nio/ShortBuffer;)V")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(first),
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(process, 2),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn audio_pipeline_get_filters(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(AUDIO_PIPELINE_CLASS)?;
+    let filters = pool.add_field_ref(owner, "filters", "Ljava/util/List;")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(filters),
+            Instruction::Areturn,
         ],
     )
 }

@@ -102,6 +102,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-audio-filter-interface-consumer" => Some(AUDIO_FILTER_INTERFACE_CONSUMER),
         "write-audio-filter-chain-consumer" => Some(AUDIO_FILTER_CHAIN_CONSUMER),
+        "write-audio-pipeline-consumer" => Some(AUDIO_PIPELINE_CONSUMER),
         "write-audio-source-manager-interface-consumer" => {
             Some(AUDIO_SOURCE_MANAGER_INTERFACE_CONSUMER)
         }
@@ -7358,6 +7359,270 @@ public final class GateAudioFilterChain {
           if (method.getName().equals("equals")) return instance == arguments[0];
           return null;
         });
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_PIPELINE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.AudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.AudioFilterChain;
+import com.sedmelluq.discord.lavaplayer.filter.AudioPipeline;
+import com.sedmelluq.discord.lavaplayer.filter.CompositeAudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.UniversalPcmAudioFilter;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ShortBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+public final class GateAudioPipeline {
+  public static void main(String[] args) throws Exception {
+    construction();
+    processing();
+    processingFailures();
+    lifecycle();
+    reflection();
+    System.out.println(
+        "construction=identity,no-copy,null-chain;"
+        + "process=float,short,buffer,split,identity,offset,length,interrupted,null-input;"
+        + "lifecycle=seek,flush,close,order,continue-on-failure;"
+        + "reflection=public-concrete-composite,2-private-final-fields,1-constructor,5-methods,generics,throws");
+  }
+
+  private static void construction() throws Exception {
+    RecordingInput input = new RecordingInput();
+    List<AudioFilter> filters = new ArrayList<>();
+    Object context = new Object();
+    ExposedPipeline pipeline = new ExposedPipeline(new AudioFilterChain(input, filters, context));
+    check(pipeline.filters() == filters, "filter identity");
+    filters.add(input);
+    check(pipeline.filters().size() == 1, "filter list is not copied");
+
+    Field filtersField = AudioPipeline.class.getDeclaredField("filters");
+    Field firstField = AudioPipeline.class.getDeclaredField("first");
+    filtersField.setAccessible(true);
+    firstField.setAccessible(true);
+    check(filtersField.get(pipeline) == filters && firstField.get(pipeline) == input,
+        "private field identity");
+
+    try {
+      new AudioPipeline(null);
+      throw new AssertionError("null chain accepted");
+    } catch (NullPointerException expected) {
+      // Exact reference behavior.
+    }
+  }
+
+  private static void processing() throws Exception {
+    RecordingInput input = new RecordingInput();
+    AudioPipeline pipeline = new AudioPipeline(new AudioFilterChain(input, new ArrayList<>(), null));
+    float[][] floats = new float[][] {{1.0f}, {2.0f}};
+    short[] shorts = new short[] {3, 4, 5};
+    ShortBuffer buffer = ShortBuffer.wrap(new short[] {6, 7, 8});
+    short[][] split = new short[][] {{9}, {10}};
+
+    pipeline.process(floats, 2, 3);
+    input.checkCall("float", floats, 2, 3);
+    pipeline.process(shorts, 4, 5);
+    input.checkCall("short", shorts, 4, 5);
+    pipeline.process(buffer);
+    input.checkCall("buffer", buffer, -1, -1);
+    pipeline.process(split, 6, 7);
+    input.checkCall("split", split, 6, 7);
+    check(input.calls == 4, "process call count");
+  }
+
+  private static void processingFailures() throws Exception {
+    InterruptedException failure = new InterruptedException("process-sentinel");
+    RecordingInput input = new RecordingInput();
+    input.failure = failure;
+    AudioPipeline pipeline = new AudioPipeline(new AudioFilterChain(input, new ArrayList<>(), null));
+
+    assertInterrupted(failure, () -> pipeline.process(new float[0][], 1, 2));
+    assertInterrupted(failure, () -> pipeline.process(new short[0], 3, 4));
+    assertInterrupted(failure, () -> pipeline.process(ShortBuffer.allocate(0)));
+    assertInterrupted(failure, () -> pipeline.process(new short[0][], 5, 6));
+    check(input.calls == 4, "failed process call count");
+
+    AudioPipeline nullInput = new AudioPipeline(new AudioFilterChain(null, new ArrayList<>(), null));
+    try {
+      nullInput.process(new short[0], 0, 0);
+      throw new AssertionError("null input accepted");
+    } catch (NullPointerException expected) {
+      // Exact reference behavior.
+    }
+  }
+
+  private static void lifecycle() throws Exception {
+    StringBuilder events = new StringBuilder();
+    RecordingFilter first = new RecordingFilter("first", events, false);
+    RecordingFilter failing = new RecordingFilter("failing", events, true);
+    RecordingFilter last = new RecordingFilter("last", events, false);
+    List<AudioFilter> filters = Arrays.asList(first, failing, last);
+    AudioPipeline pipeline = new AudioPipeline(
+        new AudioFilterChain(new RecordingInput(), filters, null));
+
+    pipeline.seekPerformed(111L, 222L);
+    check(events.toString().equals("seek:first:111:222;seek:failing:111:222;seek:last:111:222;"),
+        "seek order and continuation");
+    events.setLength(0);
+    pipeline.flush();
+    check(events.toString().equals("flush:first;flush:failing;flush:last;"),
+        "flush order and continuation");
+    events.setLength(0);
+    pipeline.close();
+    check(events.toString().equals("close:first;close:failing;close:last;"),
+        "close order and continuation");
+  }
+
+  private static void reflection() throws Exception {
+    Class<AudioPipeline> type = AudioPipeline.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers()) && !type.isInterface()
+        && type.getSuperclass() == CompositeAudioFilter.class && type.getInterfaces().length == 0,
+        "class metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 5, "member counts");
+
+    checkField(type.getDeclaredField("filters"), List.class,
+        "java.util.List<com.sedmelluq.discord.lavaplayer.filter.AudioFilter>");
+    checkField(type.getDeclaredField("first"), UniversalPcmAudioFilter.class, null);
+
+    Constructor<AudioPipeline> constructor = type.getDeclaredConstructor(AudioFilterChain.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+
+    checkProcess(type.getDeclaredMethod("process", float[][].class, int.class, int.class));
+    checkProcess(type.getDeclaredMethod("process", short[].class, int.class, int.class));
+    checkProcess(type.getDeclaredMethod("process", ShortBuffer.class));
+    checkProcess(type.getDeclaredMethod("process", short[][].class, int.class, int.class));
+    Method getFilters = type.getDeclaredMethod("getFilters");
+    check(getFilters.getModifiers() == Modifier.PROTECTED && !getFilters.isSynthetic()
+        && !getFilters.isBridge() && getFilters.getReturnType() == List.class
+        && getFilters.getGenericReturnType().getTypeName().equals(
+            "java.util.List<com.sedmelluq.discord.lavaplayer.filter.AudioFilter>")
+        && getFilters.getExceptionTypes().length == 0, "getFilters metadata");
+  }
+
+  private static void checkField(Field field, Class<?> fieldType, String genericType) {
+    check(field.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && field.getType() == fieldType && !field.isSynthetic(), field.getName() + " metadata");
+    if (genericType == null) {
+      check(field.getGenericType() == fieldType, field.getName() + " raw type");
+    } else {
+      check(field.getGenericType().getTypeName().equals(genericType),
+          field.getName() + " generic signature");
+    }
+  }
+
+  private static void checkProcess(Method method) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == void.class
+        && !method.isSynthetic() && !method.isBridge() && !method.isVarArgs()
+        && Arrays.equals(method.getExceptionTypes(), new Class<?>[] {InterruptedException.class}),
+        method.toString());
+  }
+
+  private static void assertInterrupted(InterruptedException failure, CheckedCall call)
+      throws Exception {
+    try {
+      call.run();
+      throw new AssertionError("interruption not propagated");
+    } catch (InterruptedException actual) {
+      check(actual == failure, "interruption identity");
+    }
+  }
+
+  private interface CheckedCall {
+    void run() throws Exception;
+  }
+
+  private static final class ExposedPipeline extends AudioPipeline {
+    ExposedPipeline(AudioFilterChain chain) {
+      super(chain);
+    }
+
+    List<AudioFilter> filters() {
+      return getFilters();
+    }
+  }
+
+  private static final class RecordingInput implements UniversalPcmAudioFilter {
+    String kind;
+    Object value;
+    int offset;
+    int length;
+    int calls;
+    InterruptedException failure;
+
+    public void process(float[][] input, int offset, int length) throws InterruptedException {
+      record("float", input, offset, length);
+    }
+
+    public void process(short[] input, int offset, int length) throws InterruptedException {
+      record("short", input, offset, length);
+    }
+
+    public void process(ShortBuffer buffer) throws InterruptedException {
+      record("buffer", buffer, -1, -1);
+    }
+
+    public void process(short[][] input, int offset, int length) throws InterruptedException {
+      record("split", input, offset, length);
+    }
+
+    public void seekPerformed(long requestedTime, long providedTime) {}
+    public void flush() throws InterruptedException {}
+    public void close() {}
+
+    void record(String kind, Object value, int offset, int length) throws InterruptedException {
+      this.kind = kind;
+      this.value = value;
+      this.offset = offset;
+      this.length = length;
+      calls++;
+      if (failure != null) throw failure;
+    }
+
+    void checkCall(String kind, Object value, int offset, int length) {
+      check(this.kind.equals(kind) && this.value == value && this.offset == offset
+          && this.length == length, kind + " delegation");
+    }
+  }
+
+  private static final class RecordingFilter implements AudioFilter {
+    final String name;
+    final StringBuilder events;
+    final boolean failing;
+
+    RecordingFilter(String name, StringBuilder events, boolean failing) {
+      this.name = name;
+      this.events = events;
+      this.failing = failing;
+    }
+
+    public void seekPerformed(long requestedTime, long providedTime) {
+      events.append("seek:").append(name).append(':').append(requestedTime).append(':')
+          .append(providedTime).append(';');
+      if (failing) throw new IllegalStateException("seek-sentinel");
+    }
+
+    public void flush() throws InterruptedException {
+      events.append("flush:").append(name).append(';');
+      if (failing) throw new InterruptedException("flush-sentinel");
+    }
+
+    public void close() {
+      events.append("close:").append(name).append(';');
+      if (failing) throw new IllegalStateException("close-sentinel");
+    }
   }
 
   private static void check(boolean condition, String message) {
