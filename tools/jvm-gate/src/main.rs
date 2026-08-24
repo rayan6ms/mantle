@@ -248,6 +248,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-youtube-constants-consumer" => Some(YOUTUBE_CONSTANTS_CONSUMER),
         "write-youtube-format-info-consumer" => Some(YOUTUBE_FORMAT_INFO_CONSUMER),
         "write-youtube-http-context-filter-consumer" => Some(YOUTUBE_HTTP_CONTEXT_FILTER_CONSUMER),
+        "write-youtube-link-router-consumer" => Some(YOUTUBE_LINK_ROUTER_CONSUMER),
         _ => None,
     }
 }
@@ -19668,6 +19669,176 @@ public final class GateYoutubeAudioTrack {
   }
 
   private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_LINK_ROUTER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeLinkRouter;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
+import java.util.Arrays;
+
+public final class GateYoutubeLinkRouter {
+  public static void main(String[] args) throws Exception {
+    routerContract();
+    routesContract();
+    dispatchContract();
+    System.out.println("router=public-abstract-generic-interface,0-fields,0-constructors,1-method,"
+        + "1-public-static-nested;route=method-T,string,routes-T,erased-object;routes=public-static-"
+        + "generic-interface,0-fields,0-constructors,7-methods;callbacks=track,playlist,mix,search,"
+        + "searchMusic,anonymous,none;dispatch=ordered,identity,nulls,unchecked;reflection=exact");
+  }
+
+  private static void routerContract() throws Exception {
+    Class<YoutubeLinkRouter> type = YoutubeLinkRouter.class;
+    int modifiers = Modifier.PUBLIC | Modifier.INTERFACE | Modifier.ABSTRACT;
+    check(type.getModifiers() == modifiers && type.isInterface() && !type.isAnnotation()
+        && !type.isEnum() && !type.isSynthetic() && !type.isMemberClass(), "router metadata");
+    check(type.getSuperclass() == null && type.getGenericSuperclass() == null
+        && type.getInterfaces().length == 0 && type.getGenericInterfaces().length == 0
+        && type.getTypeParameters().length == 0, "router hierarchy");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 1
+        && Arrays.equals(type.getDeclaredClasses(), new Class<?>[] {YoutubeLinkRouter.Routes.class}),
+        "router shape");
+
+    Method route = type.getDeclaredMethod("route", String.class, YoutubeLinkRouter.Routes.class);
+    TypeVariable<Method>[] variables = route.getTypeParameters();
+    checkMethod(route, 2);
+    check(variables.length == 1 && variables[0].getName().equals("T")
+        && Arrays.equals(variables[0].getBounds(), new Type[] {Object.class})
+        && route.getGenericReturnType().equals(variables[0])
+        && route.getGenericParameterTypes()[0] == String.class,
+        "route generic method");
+    ParameterizedType routes = (ParameterizedType) route.getGenericParameterTypes()[1];
+    check(routes.getRawType() == YoutubeLinkRouter.Routes.class
+        && routes.getOwnerType() == YoutubeLinkRouter.class
+        && Arrays.equals(routes.getActualTypeArguments(), new Type[] {variables[0]}),
+        "route generic routes parameter");
+  }
+
+  private static void routesContract() throws Exception {
+    Class<YoutubeLinkRouter.Routes> type = YoutubeLinkRouter.Routes.class;
+    int modifiers = Modifier.PUBLIC | Modifier.STATIC | Modifier.INTERFACE | Modifier.ABSTRACT;
+    check(type.getModifiers() == modifiers && type.isInterface() && type.isMemberClass()
+        && !type.isAnnotation() && !type.isEnum() && !type.isSynthetic(), "routes metadata");
+    check(type.getDeclaringClass() == YoutubeLinkRouter.class
+        && type.getNestHost() == YoutubeLinkRouter.class
+        && type.getSimpleName().equals("Routes") && type.getSuperclass() == null
+        && type.getGenericSuperclass() == null && type.getInterfaces().length == 0
+        && type.getGenericInterfaces().length == 0, "routes hierarchy and nesting");
+    TypeVariable<Class<YoutubeLinkRouter.Routes>>[] variables = type.getTypeParameters();
+    check(variables.length == 1 && variables[0].getName().equals("T")
+        && Arrays.equals(variables[0].getBounds(), new Type[] {Object.class}),
+        "routes type variable");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 7 && type.getDeclaredClasses().length == 0,
+        "routes shape");
+    checkRouteMethod(type, variables[0], "track", String.class);
+    checkRouteMethod(type, variables[0], "playlist", String.class, String.class);
+    checkRouteMethod(type, variables[0], "mix", String.class, String.class);
+    checkRouteMethod(type, variables[0], "search", String.class);
+    checkRouteMethod(type, variables[0], "searchMusic", String.class);
+    checkRouteMethod(type, variables[0], "anonymous", String.class);
+    checkRouteMethod(type, variables[0], "none");
+  }
+
+  private static void dispatchContract() {
+    RecordingRoutes routes = new RecordingRoutes();
+    ForwardingRouter router = new ForwardingRouter();
+    String first = router.first;
+    String second = router.second;
+    check(router.route("track", routes).equals("track") && routes.first == first,
+        "track dispatch");
+    check(router.route("playlist", routes).equals("playlist") && routes.first == first
+        && routes.second == second, "playlist dispatch");
+    check(router.route("mix", routes).equals("mix") && routes.first == first
+        && routes.second == second, "mix dispatch");
+    check(router.route("search", routes).equals("search") && routes.first == first,
+        "search dispatch");
+    check(router.route("music", routes).equals("music") && routes.first == first,
+        "music dispatch");
+    check(router.route("anonymous", routes).equals("anonymous") && routes.first == first,
+        "anonymous dispatch");
+    check(router.route("none", routes).equals("none") && routes.first == null
+        && routes.second == null && routes.calls == 7, "none dispatch");
+    check(router.route(null, routes) == null && routes.calls == 7, "null link");
+    RuntimeException failure = new RuntimeException("unchecked-sentinel");
+    routes.failure = failure;
+    try {
+      router.route("none", routes);
+      throw new AssertionError("expected unchecked failure");
+    } catch (RuntimeException error) {
+      check(error == failure, "unchecked identity");
+    }
+  }
+
+  private static void checkRouteMethod(Class<?> owner, TypeVariable<?> variable, String name,
+                                       Class<?>... parameters) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    checkMethod(method, parameters.length);
+    check(method.getTypeParameters().length == 0 && method.getGenericReturnType().equals(variable)
+        && Arrays.equals(method.getGenericParameterTypes(), parameters), name + " generic metadata");
+  }
+
+  private static void checkMethod(Method method, int parameterCount) {
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == Object.class
+        && method.getParameterCount() == parameterCount && method.getExceptionTypes().length == 0
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), method.getName() + " metadata");
+  }
+
+  private static final class ForwardingRouter implements YoutubeLinkRouter {
+    private final String first = new String("first");
+    private final String second = new String("second");
+
+    @Override public <T> T route(String link, YoutubeLinkRouter.Routes<T> routes) {
+      if (link == null) return null;
+      switch (link) {
+        case "track": return routes.track(first);
+        case "playlist": return routes.playlist(first, second);
+        case "mix": return routes.mix(first, second);
+        case "search": return routes.search(first);
+        case "music": return routes.searchMusic(first);
+        case "anonymous": return routes.anonymous(first);
+        default: return routes.none();
+      }
+    }
+  }
+
+  private static final class RecordingRoutes implements YoutubeLinkRouter.Routes<String> {
+    String first;
+    String second;
+    int calls;
+    RuntimeException failure;
+
+    private String record(String result, String first, String second) {
+      if (failure != null) throw failure;
+      this.first = first;
+      this.second = second;
+      calls++;
+      return result;
+    }
+    @Override public String track(String value) { return record("track", value, null); }
+    @Override public String playlist(String id, String selected) {
+      return record("playlist", id, selected);
+    }
+    @Override public String mix(String id, String selected) {
+      return record("mix", id, selected);
+    }
+    @Override public String search(String value) { return record("search", value, null); }
+    @Override public String searchMusic(String value) { return record("music", value, null); }
+    @Override public String anonymous(String value) { return record("anonymous", value, null); }
+    @Override public String none() { return record("none", null, null); }
+  }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

@@ -1582,6 +1582,19 @@
             "crates/mantle-media/tests/phase12_youtube.rs",
             "docs/architecture/ADR-0013-ordered-youtube-client-foundation.md"
           ]
+        },
+        {
+          "id": "youtube-link-router-contracts",
+          "classes": 2,
+          "fields": 0,
+          "methods": 8,
+          "symbols": 10,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
         }
       ]
     },
@@ -1703,7 +1716,7 @@
   "phase_entry": {
     "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
     "first_execution_cohort": "core-player-track",
-    "next_slice": "youtube-link-router-contracts",
+    "next_slice": "youtube-mix-loader-contracts",
     "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
   }
 }
