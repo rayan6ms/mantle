@@ -262,6 +262,9 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-youtube-search-music-provider-consumer" => {
             Some(YOUTUBE_SEARCH_MUSIC_PROVIDER_CONSUMER)
         }
+        "write-youtube-search-music-result-loader-consumer" => {
+            Some(YOUTUBE_SEARCH_MUSIC_RESULT_LOADER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -20889,6 +20892,147 @@ public final class GateYoutubeSearchMusicProvider {
     } catch (Throwable error) {
       if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
       return type.cast(error);
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_SEARCH_MUSIC_RESULT_LOADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSearchMusicResultLoader;
+import com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpConfigurable;
+import com.sedmelluq.discord.lavaplayer.track.AudioItem;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.Type;
+import java.util.Arrays;
+import java.util.function.Function;
+
+public final class GateYoutubeSearchMusicResultLoader {
+  public static void main(String[] args) throws Exception {
+    reflectionContract();
+    dispatchContract();
+    System.out.println("public-abstract-interface,0-fields,0-constructors,2-methods;"
+        + "load=query,generic-track-factory,audio-item;configuration=extended-http-configurable;"
+        + "identity=arguments,returns,nulls,unchecked;factory=lazy;reflection=exact");
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<YoutubeSearchMusicResultLoader> type = YoutubeSearchMusicResultLoader.class;
+    int modifiers = Modifier.PUBLIC | Modifier.INTERFACE | Modifier.ABSTRACT;
+    check(type.getModifiers() == modifiers && type.isInterface() && !type.isAnnotation()
+        && !type.isEnum() && !type.isSynthetic() && !type.isMemberClass(), "type metadata");
+    check(type.getSuperclass() == null && type.getGenericSuperclass() == null
+        && type.getInterfaces().length == 0 && type.getGenericInterfaces().length == 0
+        && type.getTypeParameters().length == 0, "type hierarchy");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 2 && type.getDeclaredClasses().length == 0,
+        "type shape");
+
+    Method load = type.getDeclaredMethod("loadSearchMusicResult", String.class, Function.class);
+    checkMethod(load, AudioItem.class, new Class<?>[] {String.class, Function.class});
+    Type[] parameters = load.getGenericParameterTypes();
+    check(parameters[0] == String.class && parameters[1] instanceof ParameterizedType,
+        "load generic parameters");
+    ParameterizedType factory = (ParameterizedType) parameters[1];
+    check(factory.getRawType() == Function.class && factory.getOwnerType() == null
+        && Arrays.equals(factory.getActualTypeArguments(),
+            new Type[] {AudioTrackInfo.class, AudioTrack.class}), "factory signature");
+
+    Method configuration = type.getDeclaredMethod("getHttpConfiguration");
+    checkMethod(configuration, ExtendedHttpConfigurable.class, new Class<?>[0]);
+    check(configuration.getGenericReturnType() == ExtendedHttpConfigurable.class,
+        "configuration generic return");
+  }
+
+  private static void dispatchContract() {
+    RecordingLoader loader = new RecordingLoader();
+    String query = new String("music query");
+    int[] factoryCalls = {0};
+    Function<AudioTrackInfo, AudioTrack> factory = info -> {
+      factoryCalls[0]++;
+      throw new AssertionError("factory invoked");
+    };
+    AudioItem item = (AudioItem) Proxy.newProxyInstance(
+        GateYoutubeSearchMusicResultLoader.class.getClassLoader(),
+        new Class<?>[] {AudioItem.class},
+        (proxy, method, arguments) -> { throw new AssertionError("item invoked"); });
+    ExtendedHttpConfigurable configuration = (ExtendedHttpConfigurable) Proxy.newProxyInstance(
+        GateYoutubeSearchMusicResultLoader.class.getClassLoader(),
+        new Class<?>[] {ExtendedHttpConfigurable.class},
+        (proxy, method, arguments) -> { throw new AssertionError("configuration invoked"); });
+
+    loader.item = item;
+    loader.configuration = configuration;
+    check(loader.loadSearchMusicResult(query, factory) == item && loader.query == query
+        && loader.factory == factory && loader.loadCalls == 1 && factoryCalls[0] == 0,
+        "load identity and laziness");
+    check(loader.getHttpConfiguration() == configuration && loader.configurationCalls == 1,
+        "configuration identity");
+
+    loader.item = null;
+    loader.configuration = null;
+    check(loader.loadSearchMusicResult(null, null) == null && loader.query == null
+        && loader.factory == null && loader.loadCalls == 2, "load nulls");
+    check(loader.getHttpConfiguration() == null && loader.configurationCalls == 2,
+        "configuration null");
+
+    RuntimeException failure = new RuntimeException("unchecked-sentinel");
+    loader.failure = failure;
+    try {
+      loader.loadSearchMusicResult(query, factory);
+      throw new AssertionError("expected load failure");
+    } catch (RuntimeException error) {
+      check(error == failure && loader.loadCalls == 3 && factoryCalls[0] == 0,
+          "load unchecked identity");
+    }
+    try {
+      loader.getHttpConfiguration();
+      throw new AssertionError("expected configuration failure");
+    } catch (RuntimeException error) {
+      check(error == failure && loader.configurationCalls == 3,
+          "configuration unchecked identity");
+    }
+  }
+
+  private static void checkMethod(Method method, Class<?> result, Class<?>[] parameters) {
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == result
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), method.getName() + " metadata");
+  }
+
+  private static final class RecordingLoader implements YoutubeSearchMusicResultLoader {
+    String query;
+    Function<AudioTrackInfo, AudioTrack> factory;
+    AudioItem item;
+    ExtendedHttpConfigurable configuration;
+    RuntimeException failure;
+    int loadCalls;
+    int configurationCalls;
+
+    @Override public AudioItem loadSearchMusicResult(
+        String query, Function<AudioTrackInfo, AudioTrack> factory) {
+      this.query = query;
+      this.factory = factory;
+      loadCalls++;
+      if (failure != null) throw failure;
+      return item;
+    }
+
+    @Override public ExtendedHttpConfigurable getHttpConfiguration() {
+      configurationCalls++;
+      if (failure != null) throw failure;
+      return configuration;
     }
   }
 

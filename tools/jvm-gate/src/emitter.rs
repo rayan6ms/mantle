@@ -273,6 +273,8 @@ const YOUTUBE_PLAYLIST_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubePlaylistLoader";
 const YOUTUBE_SEARCH_MUSIC_PROVIDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSearchMusicProvider";
+const YOUTUBE_SEARCH_MUSIC_RESULT_LOADER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeSearchMusicResultLoader";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -386,6 +388,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_PERSISTENT_HTTP_STREAM_CLASS,
     YOUTUBE_PLAYLIST_LOADER_CLASS,
     YOUTUBE_SEARCH_MUSIC_PROVIDER_CLASS,
+    YOUTUBE_SEARCH_MUSIC_RESULT_LOADER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
