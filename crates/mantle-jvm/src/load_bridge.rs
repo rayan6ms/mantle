@@ -12,15 +12,16 @@ use mantle_core::{
 use mantle_media::{
     BandcampSourceItem, BandcampSourceManager, BandcampSourceOptions, BandcampSourcePlaylist,
     BandcampSourceTrack, BeamSourceManager, BeamSourceOptions, GetyarnSourceManager,
-    GetyarnSourceOptions, NicoNicoSourceManager, NicoNicoSourceOptions, NicoNicoSourceTrack,
-    TwitchAuthentication, TwitchSourceManager, TwitchSourceOptions, TwitchSourceTrack,
-    VimeoAuthentication, VimeoSourceManager, VimeoSourceOptions, VimeoSourceTrack,
-    YandexMusicAuthentication, YandexMusicPlaylistKind, YandexMusicSourceItem,
-    YandexMusicSourceManager, YandexMusicSourceOptions, YandexMusicSourcePlaylist,
-    YandexMusicSourceTrack, YoutubeAudioSourceManager, YoutubeAuthentication, YoutubeSourceItem,
-    YoutubeSourceOptions, YoutubeSourcePlaylist, YoutubeSourceTrack, route_bandcamp_identifier,
-    route_beam_identifier, route_getyarn_identifier, route_twitch_identifier,
-    route_vimeo_identifier, route_yandex_music_identifier, route_youtube_identifier,
+    GetyarnSourceOptions, HttpMediaSourceManager, MediaProbe, MediaSourceTrack,
+    NicoNicoSourceManager, NicoNicoSourceOptions, NicoNicoSourceTrack, TwitchAuthentication,
+    TwitchSourceManager, TwitchSourceOptions, TwitchSourceTrack, VimeoAuthentication,
+    VimeoSourceManager, VimeoSourceOptions, VimeoSourceTrack, YandexMusicAuthentication,
+    YandexMusicPlaylistKind, YandexMusicSourceItem, YandexMusicSourceManager,
+    YandexMusicSourceOptions, YandexMusicSourcePlaylist, YandexMusicSourceTrack,
+    YoutubeAudioSourceManager, YoutubeAuthentication, YoutubeSourceItem, YoutubeSourceOptions,
+    YoutubeSourcePlaylist, YoutubeSourceTrack, route_bandcamp_identifier, route_beam_identifier,
+    route_getyarn_identifier, route_twitch_identifier, route_vimeo_identifier,
+    route_yandex_music_identifier, route_youtube_identifier,
 };
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -1139,6 +1140,68 @@ pub(crate) fn load_getyarn_item<'local>(
     }
 }
 
+pub(crate) fn load_http_item<'local>(
+    env: &mut Env<'local>,
+    source: &JObject<'local>,
+    reference: &JObject<'local>,
+) -> jni::errors::Result<JObject<'local>> {
+    let container = env
+        .get_field(
+            reference,
+            jni_str!("containerDescriptor"),
+            jni_sig!("Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor;"),
+        )?
+        .l()?;
+    if !container.is_null() {
+        let builder = env
+            .call_static_method(
+                jni_str!("com/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder"),
+                jni_str!("create"),
+                jni_sig!("(Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;"),
+                &[JValue::Object(reference), JValue::Object(&JObject::null())],
+            )?
+            .l()?;
+        let info = env
+            .call_method(
+                &builder,
+                jni_str!("build"),
+                jni_sig!("()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;"),
+                &[],
+            )?
+            .l()?;
+        return env.new_object(
+            jni_str!("com/sedmelluq/discord/lavaplayer/source/http/HttpAudioTrack"),
+            jni_sig!("(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor;Lcom/sedmelluq/discord/lavaplayer/source/http/HttpAudioSourceManager;)V"),
+            &[
+                JValue::Object(&info),
+                JValue::Object(&container),
+                JValue::Object(source),
+            ],
+        );
+    }
+
+    let reference = source_reference_from_java(env, reference)?;
+    let manager = HttpMediaSourceManager::default();
+    let item = manager
+        .load(&reference)
+        .map_err(|_| jni::errors::Error::NullPtr("current HTTP source load failed"))?;
+    match item {
+        Some(SourceLoad::Item(track)) => create_http_track(env, &track, source),
+        Some(SourceLoad::Referral(reference)) => {
+            let identifier = optional_java_string(env, reference.identifier())?;
+            env.new_object(
+                jni_str!("com/sedmelluq/discord/lavaplayer/track/AudioReference"),
+                jni_sig!("(Ljava/lang/String;Ljava/lang/String;)V"),
+                &[
+                    JValue::Object(&identifier),
+                    JValue::Object(&JObject::null()),
+                ],
+            )
+        }
+        None => Ok(JObject::null()),
+    }
+}
+
 pub(crate) fn load_twitch_item<'local>(
     env: &mut Env<'local>,
     source: &JObject<'local>,
@@ -1802,6 +1865,84 @@ fn create_native_track<'local>(
     crate::with_engine(|engine| engine.replace_track_info(track_id, info.clone()))
         .map_err(|_| jni::errors::Error::NullPtr("could not apply native track metadata"))?;
     Ok(track)
+}
+
+fn create_http_track<'local>(
+    env: &mut Env<'local>,
+    track: &MediaSourceTrack,
+    source: &JObject<'_>,
+) -> jni::errors::Result<JObject<'local>> {
+    let probe_name = match track.probe {
+        MediaProbe::Wave => "wav",
+        MediaProbe::MatroskaWebM => "matroska/webm",
+        MediaProbe::Mp4 => "mp4",
+        MediaProbe::Flac => "flac",
+        MediaProbe::Ogg => "ogg",
+        MediaProbe::Mp3 => "mp3",
+        MediaProbe::Adts => "adts",
+        MediaProbe::HlsOuter => "m3u|hls-outer",
+    };
+    let registry = env
+        .get_field(
+            source,
+            jni_str!("containerRegistry"),
+            jni_sig!("Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;"),
+        )?
+        .l()?;
+    let probe_name = JObject::from(env.new_string(probe_name)?);
+    let probe = env
+        .call_method(
+            &registry,
+            jni_str!("find"),
+            jni_sig!("(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;"),
+            &[JValue::Object(&probe_name)],
+        )?
+        .l()?;
+    if probe.is_null() {
+        return Err(jni::errors::Error::NullPtr(
+            "current HTTP media probe is absent from the container registry",
+        ));
+    }
+    let descriptor = env.new_object(
+        jni_str!("com/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor"),
+        jni_sig!(
+            "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;Ljava/lang/String;)V"
+        ),
+        &[JValue::Object(&probe), JValue::Object(&JObject::null())],
+    )?;
+
+    let info = &track.info;
+    let duration = i64::try_from(info.duration.as_millis())
+        .map_err(|_| jni::errors::Error::NullPtr("HTTP duration exceeds JVM range"))?;
+    let title = JObject::from(env.new_string(&info.title)?);
+    let author = JObject::from(env.new_string(&info.author)?);
+    let identifier = JObject::from(env.new_string(&info.identifier)?);
+    let uri = optional_java_string(env, info.uri.as_deref())?;
+    let artwork = optional_java_string(env, info.artwork_url.as_deref())?;
+    let isrc = optional_java_string(env, info.isrc.as_deref())?;
+    let java_info = env.new_object(
+        jni_str!("com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo"),
+        jni_sig!("(Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V"),
+        &[
+            JValue::Object(&title),
+            JValue::Object(&author),
+            JValue::Long(duration),
+            JValue::Object(&identifier),
+            JValue::Bool(info.is_stream),
+            JValue::Object(&uri),
+            JValue::Object(&artwork),
+            JValue::Object(&isrc),
+        ],
+    )?;
+    env.new_object(
+        jni_str!("com/sedmelluq/discord/lavaplayer/source/http/HttpAudioTrack"),
+        jni_sig!("(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor;Lcom/sedmelluq/discord/lavaplayer/source/http/HttpAudioSourceManager;)V"),
+        &[
+            JValue::Object(&java_info),
+            JValue::Object(&descriptor),
+            JValue::Object(source),
+        ],
+    )
 }
 
 fn create_bandcamp_track<'local>(

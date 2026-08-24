@@ -196,6 +196,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
             Some(GETYARN_AUDIO_SOURCE_MANAGER_CONSUMER)
         }
         "write-getyarn-audio-track-consumer" => Some(GETYARN_AUDIO_TRACK_CONSUMER),
+        "write-http-audio-source-manager-consumer" => Some(HTTP_AUDIO_SOURCE_MANAGER_CONSUMER),
         "write-vimeo-audio-source-manager-consumer" => Some(VIMEO_AUDIO_SOURCE_MANAGER_CONSUMER),
         "write-vimeo-playback-format-consumer" => Some(VIMEO_PLAYBACK_FORMAT_CONSUMER),
         "write-vimeo-audio-track-consumer" => Some(VIMEO_AUDIO_TRACK_CONSUMER),
@@ -17443,6 +17444,360 @@ public final class GateGetyarnAudioTrack {
   private static final class ExposedTrack extends GetyarnAudioTrack {
     ExposedTrack(AudioTrackInfo info, GetyarnAudioSourceManager source) { super(info, source); }
     AudioTrack shallowClone() { return makeShallowClone(); }
+  }
+
+  private interface Operation { void run() throws Exception; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const HTTP_AUDIO_SOURCE_MANAGER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDescriptor;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerProbe;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerRegistry;
+import com.sedmelluq.discord.lavaplayer.source.ProbingAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.http.HttpAudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.source.http.HttpAudioTrack;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpConfigurable;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager;
+import com.sedmelluq.discord.lavaplayer.tools.io.ThreadLocalHttpInterfaceManager;
+import com.sedmelluq.discord.lavaplayer.track.AudioItem;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInput;
+import java.io.DataInputStream;
+import java.io.DataOutput;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.http.client.protocol.HttpClientContext;
+
+public final class GateHttpAudioSourceManager {
+  private static final Object UNSAFE = loadUnsafe();
+
+  public static void main(String[] args) throws Exception {
+    check(args.length >= 1 && args.length <= 2, "expected disposition and optional native path");
+    boolean reference = args[0].equals("reference");
+    check(reference || args[0].equals("candidate"), "unknown disposition");
+    check(reference == (args.length == 1), "candidate requires native path");
+    reflectionContract();
+    if (!reference) {
+      Class.forName("dev.mantle.internal.NativeLoader")
+          .getMethod("load", String.class).invoke(null, args[1]);
+    }
+    commonBehavior();
+    if (!reference) currentDisposition();
+    System.out.println(
+        "common=public-concrete,probing-super,http-configurable,1-field,2-constructors,"
+        + "11-exported-methods;construction,normalization,known-container,track-creation,"
+        + "http-config,serialization,no-op-shutdown,reflection;service="
+        + (reference ? "legacy-direct-http-probe" :
+            "current-bounded-native-http,ssrf-guarded"));
+  }
+
+  private static void reflectionContract() throws Exception {
+    Class<HttpAudioSourceManager> type = HttpAudioSourceManager.class;
+    check(type.getModifiers() == Modifier.PUBLIC
+        && type.getSuperclass() == ProbingAudioSourceManager.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {HttpConfigurable.class}),
+        "class metadata");
+    check(type.getDeclaredFields().length == 1, "field count");
+    checkField(type, "httpInterfaceManager", HttpInterfaceManager.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    check(type.getDeclaredConstructors().length == 2, "constructor count");
+    for (Constructor<?> constructor : type.getDeclaredConstructors()) {
+      check(constructor.getModifiers() == Modifier.PUBLIC
+          && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic()
+          && !constructor.isVarArgs(), "constructor metadata");
+    }
+    check(type.getDeclaredMethods().length == 13, "declared method count");
+    long exported = Arrays.stream(type.getDeclaredMethods())
+        .filter(method -> Modifier.isPublic(method.getModifiers())
+            || Modifier.isProtected(method.getModifiers()))
+        .count();
+    check(exported == 11L, "exported method count");
+    checkMethod(type, "getSourceName", String.class, Modifier.PUBLIC, new Class<?>[0]);
+    checkMethod(type, "loadItem", AudioItem.class, Modifier.PUBLIC,
+        new Class<?>[] {
+            com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager.class,
+            AudioReference.class});
+    checkMethod(type, "createTrack", AudioTrack.class, Modifier.PROTECTED,
+        new Class<?>[] {AudioTrackInfo.class, MediaContainerDescriptor.class});
+    checkMethod(type, "getHttpInterface", HttpInterface.class, Modifier.PUBLIC, new Class<?>[0]);
+    checkMethod(type, "configureRequests", void.class, Modifier.PUBLIC,
+        new Class<?>[] {java.util.function.Function.class});
+    checkMethod(type, "configureBuilder", void.class, Modifier.PUBLIC,
+        new Class<?>[] {java.util.function.Consumer.class});
+    checkMethod(type, "getAsHttpReference", AudioReference.class,
+        Modifier.PUBLIC | Modifier.STATIC, new Class<?>[] {AudioReference.class});
+    checkMethod(type, "isTrackEncodable", boolean.class, Modifier.PUBLIC,
+        new Class<?>[] {AudioTrack.class});
+    checkMethod(type, "encodeTrack", void.class, Modifier.PUBLIC,
+        new Class<?>[] {AudioTrack.class, DataOutput.class}, IOException.class);
+    checkMethod(type, "decodeTrack", AudioTrack.class, Modifier.PUBLIC,
+        new Class<?>[] {AudioTrackInfo.class, DataInput.class}, IOException.class);
+    checkMethod(type, "shutdown", void.class, Modifier.PUBLIC, new Class<?>[0]);
+    checkMethod(type, "detectContainer",
+        Class.forName("com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult"),
+        Modifier.PRIVATE, new Class<?>[] {AudioReference.class});
+    checkMethod(type, "detectContainerWithClient",
+        Class.forName("com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult"),
+        Modifier.PRIVATE, new Class<?>[] {HttpInterface.class, AudioReference.class},
+        IOException.class);
+    check(type.getDeclaredMethod("configureRequests", java.util.function.Function.class)
+            .getGenericParameterTypes()[0].getTypeName().equals(
+                "java.util.function.Function<org.apache.http.client.config.RequestConfig, org.apache.http.client.config.RequestConfig>")
+        && type.getDeclaredMethod("configureBuilder", java.util.function.Consumer.class)
+            .getGenericParameterTypes()[0].getTypeName().equals(
+                "java.util.function.Consumer<org.apache.http.impl.client.HttpClientBuilder>"),
+        "generic HTTP configuration metadata");
+  }
+
+  private static void commonBehavior() throws Exception {
+    ExposedManager defaults = new ExposedManager();
+    check(defaults.registry() == MediaContainerRegistry.DEFAULT_REGISTRY
+        && httpManager(defaults) instanceof ThreadLocalHttpInterfaceManager,
+        "default construction");
+    MediaContainerRegistry empty = new MediaContainerRegistry(Collections.emptyList());
+    ExposedManager custom = new ExposedManager(empty);
+    ExposedManager nullRegistry = new ExposedManager(null);
+    check(custom.registry() == empty && nullRegistry.registry() == null,
+        "custom and null registry identity");
+    closeHttp(defaults);
+    closeHttp(custom);
+    closeHttp(nullRegistry);
+
+    MediaContainerProbe probe = probe("probe");
+    MediaContainerRegistry registry =
+        new MediaContainerRegistry(Collections.singletonList(probe));
+    RecordingHttpInterface http = new RecordingHttpInterface();
+    ManagerHandler handler = new ManagerHandler(http);
+    ExposedManager manager = fabricated(registry, handler.proxy());
+    check(manager.getSourceName() == "http" && manager.isTrackEncodable(null),
+        "source name and encodability");
+
+    String httpsId = new String("https://example.invalid/audio.mp3");
+    String httpsTitle = new String("fixture title");
+    AudioReference https = new AudioReference(httpsId, httpsTitle);
+    check(HttpAudioSourceManager.getAsHttpReference(https) == https, "HTTPS identity");
+    AudioReference httpRef = new AudioReference("http://example.invalid/audio", null);
+    check(HttpAudioSourceManager.getAsHttpReference(httpRef) == httpRef, "HTTP identity");
+    AudioReference icy = HttpAudioSourceManager.getAsHttpReference(
+        new AudioReference("icy://radio.example.invalid/live", httpsTitle));
+    check(icy.identifier.equals("http://radio.example.invalid/live")
+        && icy.title == httpsTitle && icy.containerDescriptor == null,
+        "ICY normalization and title identity");
+    check(HttpAudioSourceManager.getAsHttpReference(
+        new AudioReference("ICY://radio.example.invalid/live", null)) == null
+        && HttpAudioSourceManager.getAsHttpReference(
+            new AudioReference("ftp://example.invalid/audio", null)) == null,
+        "strict scheme matching");
+    expect(NullPointerException.class, () -> HttpAudioSourceManager.getAsHttpReference(null));
+    expect(NullPointerException.class,
+        () -> HttpAudioSourceManager.getAsHttpReference(new AudioReference(null, null)));
+
+    AudioTrackInfo info = new AudioTrackInfo(
+        "title", "author", 23L, httpsId, false, httpsId, "art", null);
+    MediaContainerDescriptor descriptor = new MediaContainerDescriptor(probe, "settings");
+    HttpAudioTrack created = (HttpAudioTrack) manager.create(info, descriptor);
+    check(created.getInfo() == info && created.getContainerTrackFactory() == descriptor
+        && created.getSourceManager() == manager, "protected track creation identities");
+    AudioReference known = new AudioReference(httpsId, httpsTitle, descriptor);
+    HttpAudioTrack loaded = (HttpAudioTrack) manager.loadItem(null, known);
+    check(loaded.getInfo().identifier == httpsId && loaded.getInfo().title == httpsTitle
+        && loaded.getContainerTrackFactory() == descriptor
+        && loaded.getSourceManager() == manager, "known-container load shortcut");
+    check(manager.loadItem(null, new AudioReference("ftp://example.invalid/audio", null)) == null,
+        "unrecognized load route");
+
+    check(manager.getHttpInterface() == http, "HTTP identity");
+    java.util.function.Function<org.apache.http.client.config.RequestConfig,
+        org.apache.http.client.config.RequestConfig> requests = value -> value;
+    java.util.function.Consumer<org.apache.http.impl.client.HttpClientBuilder> builder = value -> {};
+    manager.configureRequests(requests);
+    manager.configureBuilder(builder);
+    check(handler.requestConfig == requests && handler.builderConfig == builder,
+        "HTTP configuration identity");
+
+    ByteArrayOutputStream encoded = new ByteArrayOutputStream();
+    manager.encodeTrack(created, new DataOutputStream(encoded));
+    check(new DataInputStream(new ByteArrayInputStream(encoded.toByteArray())).readUTF()
+        .equals("probe|settings"), "descriptor encoding");
+    HttpAudioTrack decoded = (HttpAudioTrack) manager.decodeTrack(info, input("probe|decoded"));
+    check(decoded.getInfo() == info && decoded.getSourceManager() == manager
+        && decoded.getContainerTrackFactory().probe == probe
+        && decoded.getContainerTrackFactory().parameters.equals("decoded"),
+        "descriptor decoding");
+    check(manager.decodeTrack(info, input("missing")) == null, "unknown descriptor");
+    expect(ClassCastException.class,
+        () -> manager.encodeTrack(proxy(AudioTrack.class), new DataOutputStream(encoded)));
+    expect(NullPointerException.class,
+        () -> manager.encodeTrack(null, new DataOutputStream(encoded)));
+    manager.shutdown();
+    manager.shutdown();
+    check(handler.closes.get() == 0, "shutdown is a no-op");
+  }
+
+  private static void currentDisposition() throws Exception {
+    Class<?> nativeType = Class.forName("dev.mantle.internal.MantleNative");
+    Method load = nativeType.getDeclaredMethod(
+        "loadHttpItem", HttpAudioSourceManager.class, AudioReference.class);
+    check(Modifier.isPublic(load.getModifiers()) && Modifier.isStatic(load.getModifiers())
+        && Modifier.isNative(load.getModifiers()), "current native route");
+    HttpAudioSourceManager manager = new HttpAudioSourceManager();
+    RuntimeException denied = expect(RuntimeException.class, () -> manager.loadItem(
+        null, new AudioReference("http://127.0.0.1:9/fixture.mp3", null)));
+    check(denied.getMessage().contains("current HTTP source load failed"),
+        "loopback denied before service traffic");
+    closeHttp(manager);
+  }
+
+  private static ExposedManager fabricated(
+      MediaContainerRegistry registry, HttpInterfaceManager http) throws Exception {
+    ExposedManager manager = allocate(ExposedManager.class);
+    Field registryField = ProbingAudioSourceManager.class.getDeclaredField("containerRegistry");
+    registryField.setAccessible(true);
+    registryField.set(manager, registry);
+    Field httpField = HttpAudioSourceManager.class.getDeclaredField("httpInterfaceManager");
+    httpField.setAccessible(true);
+    httpField.set(manager, http);
+    return manager;
+  }
+
+  private static HttpInterfaceManager httpManager(HttpAudioSourceManager manager)
+      throws Exception {
+    Field field = HttpAudioSourceManager.class.getDeclaredField("httpInterfaceManager");
+    field.setAccessible(true);
+    return (HttpInterfaceManager) field.get(manager);
+  }
+
+  private static void closeHttp(HttpAudioSourceManager manager) throws Exception {
+    httpManager(manager).close();
+  }
+
+  private static DataInput input(String value) throws IOException {
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    new DataOutputStream(bytes).writeUTF(value);
+    return new DataInputStream(new ByteArrayInputStream(bytes.toByteArray()));
+  }
+
+  private static MediaContainerProbe probe(String name) {
+    return (MediaContainerProbe) Proxy.newProxyInstance(
+        MediaContainerProbe.class.getClassLoader(), new Class<?>[] {MediaContainerProbe.class},
+        (instance, method, arguments) -> {
+          if (method.getName().equals("getName")) return name;
+          if (method.getName().equals("toString")) return "Probe(" + name + ")";
+          if (method.getName().equals("hashCode")) return System.identityHashCode(instance);
+          if (method.getName().equals("equals")) return instance == arguments[0];
+          if (method.getReturnType() == boolean.class) return false;
+          return null;
+        });
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type},
+        (instance, method, arguments) -> null);
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> type, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == type && field.getGenericType() == type
+        && field.getModifiers() == modifiers && !field.isSynthetic(), name + " metadata");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+                                  int modifiers, Class<?>[] parameters,
+                                  Class<?>... exceptions) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.getTypeParameters().length == 0 && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), method + " metadata");
+  }
+
+  private static <T> T allocate(Class<T> type) throws Exception {
+    return type.cast(UNSAFE.getClass().getMethod("allocateInstance", Class.class)
+        .invoke(UNSAFE, type));
+  }
+
+  private static Object loadUnsafe() {
+    try {
+      Class<?> type = Class.forName("sun.misc.Unsafe");
+      Field field = type.getDeclaredField("theUnsafe");
+      field.setAccessible(true);
+      return field.get(null);
+    } catch (Exception error) {
+      throw new ExceptionInInitializerError(error);
+    }
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private static final class RecordingHttpInterface extends HttpInterface {
+    RecordingHttpInterface() { super(null, HttpClientContext.create(), false, null); }
+  }
+
+  private static final class ManagerHandler implements InvocationHandler {
+    private final HttpInterface http;
+    private final AtomicInteger closes = new AtomicInteger();
+    private HttpInterfaceManager proxyValue;
+    private Object requestConfig;
+    private Object builderConfig;
+    ManagerHandler(HttpInterface http) { this.http = http; }
+    HttpInterfaceManager proxy() {
+      if (proxyValue == null) {
+        proxyValue = (HttpInterfaceManager) Proxy.newProxyInstance(
+            HttpInterfaceManager.class.getClassLoader(),
+            new Class<?>[] {HttpInterfaceManager.class}, this);
+      }
+      return proxyValue;
+    }
+    public Object invoke(Object instance, Method method, Object[] arguments) {
+      switch (method.getName()) {
+        case "getInterface": return http;
+        case "configureRequests": requestConfig = arguments[0]; return null;
+        case "configureBuilder": builderConfig = arguments[0]; return null;
+        case "close": closes.incrementAndGet(); return null;
+        case "toString": return "RecordingHttpInterfaceManager";
+        case "hashCode": return System.identityHashCode(instance);
+        case "equals": return instance == arguments[0];
+        default: return null;
+      }
+    }
+  }
+
+  private static final class ExposedManager extends HttpAudioSourceManager {
+    ExposedManager() { super(); }
+    ExposedManager(MediaContainerRegistry registry) { super(registry); }
+    MediaContainerRegistry registry() { return containerRegistry; }
+    AudioTrack create(AudioTrackInfo info, MediaContainerDescriptor descriptor) {
+      return super.createTrack(info, descriptor);
+    }
   }
 
   private interface Operation { void run() throws Exception; }

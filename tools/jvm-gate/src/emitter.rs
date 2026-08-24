@@ -128,6 +128,8 @@ const GETYARN_AUDIO_SOURCE_MANAGER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/getyarn/GetyarnAudioSourceManager";
 const GETYARN_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/getyarn/GetyarnAudioTrack";
+const HTTP_AUDIO_SOURCE_MANAGER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/http/HttpAudioSourceManager";
 const HEARTBEATING_HTTP_STREAM_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/nico/HeartbeatingHttpStream";
 const NICO_AUDIO_SOURCE_MANAGER_CLASS: &str =
@@ -360,6 +362,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     BEAM_SEGMENT_URL_PROVIDER_CLASS,
     GETYARN_AUDIO_SOURCE_MANAGER_CLASS,
     GETYARN_AUDIO_TRACK_CLASS,
+    HTTP_AUDIO_SOURCE_MANAGER_CLASS,
     HEARTBEATING_HTTP_STREAM_CLASS,
     NICO_AUDIO_SOURCE_MANAGER_CLASS,
     NICO_AUDIO_TRACK_CLASS,
@@ -821,6 +824,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | BEAM_SEGMENT_URL_PROVIDER_CLASS
             | GETYARN_AUDIO_SOURCE_MANAGER_CLASS
             | GETYARN_AUDIO_TRACK_CLASS
+            | HTTP_AUDIO_SOURCE_MANAGER_CLASS
             | HEARTBEATING_HTTP_STREAM_CLASS
             | NICO_AUDIO_SOURCE_MANAGER_CLASS
             | NICO_AUDIO_TRACK_CLASS
@@ -891,6 +895,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | BEAM_SEGMENT_URL_PROVIDER_CLASS
             | GETYARN_AUDIO_SOURCE_MANAGER_CLASS
             | GETYARN_AUDIO_TRACK_CLASS
+            | HTTP_AUDIO_SOURCE_MANAGER_CLASS
             | HEARTBEATING_HTTP_STREAM_CLASS
             | NICO_AUDIO_SOURCE_MANAGER_CLASS
             | NICO_AUDIO_TRACK_CLASS
@@ -1049,6 +1054,9 @@ fn replacement_body(
     }
     if class_name == GETYARN_AUDIO_TRACK_CLASS {
         return getyarn_audio_track_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == HTTP_AUDIO_SOURCE_MANAGER_CLASS {
+        return http_audio_source_manager_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == HEARTBEATING_HTTP_STREAM_CLASS {
         return heartbeating_http_stream_replacement(pool, name, descriptor, required_locals);
@@ -4695,6 +4703,415 @@ fn getyarn_audio_track_clinit(pool: &mut ConstantPool<'static>) -> Result<Attrib
             Instruction::Return,
         ],
     )
+}
+
+fn http_audio_source_manager_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => http_audio_source_manager_default_constructor(pool),
+        ("<init>", "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;)V") => {
+            http_audio_source_manager_registry_constructor(pool)
+        }
+        ("getSourceName", "()Ljava/lang/String;") => string_return(pool, "http", required_locals),
+        (
+            "loadItem",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+        ) => http_audio_source_manager_load_item(pool),
+        (
+            "createTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+        ) => http_audio_source_manager_create_track(pool),
+        ("getHttpInterface", "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;") => {
+            http_audio_source_manager_get_http_interface(pool)
+        }
+        ("configureRequests", "(Ljava/util/function/Function;)V") => {
+            http_audio_source_manager_configure(pool, true)
+        }
+        ("configureBuilder", "(Ljava/util/function/Consumer;)V") => {
+            http_audio_source_manager_configure(pool, false)
+        }
+        (
+            "getAsHttpReference",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;",
+        ) => http_audio_source_manager_http_reference(pool),
+        ("isTrackEncodable", "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)Z") => code(
+            pool,
+            1,
+            required_locals,
+            vec![Instruction::Iconst_1, Instruction::Ireturn],
+        ),
+        (
+            "encodeTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Ljava/io/DataOutput;)V",
+        ) => http_audio_source_manager_encode_track(pool),
+        (
+            "decodeTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+        ) => http_audio_source_manager_decode_track(pool),
+        ("shutdown", "()V") => code(pool, 0, required_locals, vec![Instruction::Return]),
+        ("detectContainer" | "detectContainerWithClient", _) => unsupported_body(
+            pool,
+            "Legacy direct Java HTTP probing is replaced by Mantle's bounded native HTTP source.",
+            required_locals,
+        ),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {HTTP_AUDIO_SOURCE_MANAGER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn http_audio_source_manager_default_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let registry =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry")?;
+    let default_registry = pool.add_field_ref(
+        registry,
+        "DEFAULT_REGISTRY",
+        "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;",
+    )?;
+    let owner = pool.add_class(HTTP_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let init = pool.add_method_ref(
+        owner,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;)V",
+    )?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getstatic(default_registry),
+            Instruction::Invokespecial(init),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn http_audio_source_manager_registry_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let parent = pool.add_class(PROBING_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let parent_init = pool.add_method_ref(
+        parent,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;)V",
+    )?;
+    let owner = pool.add_class(HTTP_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let manager_field = pool.add_field_ref(
+        owner,
+        "httpInterfaceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let manager = pool
+        .add_class("com/sedmelluq/discord/lavaplayer/tools/io/ThreadLocalHttpInterfaceManager")?;
+    let manager_init = pool.add_method_ref(
+        manager,
+        "<init>",
+        "(Lorg/apache/http/impl/client/HttpClientBuilder;Lorg/apache/http/client/config/RequestConfig;)V",
+    )?;
+    let tools = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpClientTools")?;
+    let create_builder = pool.add_method_ref(
+        tools,
+        "createSharedCookiesHttpBuilder",
+        "()Lorg/apache/http/impl/client/HttpClientBuilder;",
+    )?;
+    let default_config = pool.add_field_ref(
+        tools,
+        "DEFAULT_REQUEST_CONFIG",
+        "Lorg/apache/http/client/config/RequestConfig;",
+    )?;
+    let no_redirects = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/tools/io/HttpClientTools$NoRedirectsStrategy",
+    )?;
+    let no_redirects_init = pool.add_method_ref(no_redirects, "<init>", "()V")?;
+    let builder = pool.add_class("org/apache/http/impl/client/HttpClientBuilder")?;
+    let set_redirects = pool.add_method_ref(
+        builder,
+        "setRedirectStrategy",
+        "(Lorg/apache/http/client/RedirectStrategy;)Lorg/apache/http/impl/client/HttpClientBuilder;",
+    )?;
+    code(
+        pool,
+        6,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(parent_init),
+            Instruction::Aload_0,
+            Instruction::New(manager),
+            Instruction::Dup,
+            Instruction::Invokestatic(create_builder),
+            Instruction::New(no_redirects),
+            Instruction::Dup,
+            Instruction::Invokespecial(no_redirects_init),
+            Instruction::Invokevirtual(set_redirects),
+            Instruction::Getstatic(default_config),
+            Instruction::Invokespecial(manager_init),
+            Instruction::Putfield(manager_field),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn http_audio_source_manager_load_item(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let native = pool.add_class(NATIVE_CLASS)?;
+    let load = pool.add_method_ref(
+        native,
+        "loadHttpItem",
+        "(Lcom/sedmelluq/discord/lavaplayer/source/http/HttpAudioSourceManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+    )?;
+    code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Invokestatic(load),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn http_audio_source_manager_create_track(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let track = pool.add_class("com/sedmelluq/discord/lavaplayer/source/http/HttpAudioTrack")?;
+    let init = pool.add_method_ref(
+        track,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor;Lcom/sedmelluq/discord/lavaplayer/source/http/HttpAudioSourceManager;)V",
+    )?;
+    code(
+        pool,
+        5,
+        3,
+        vec![
+            Instruction::New(track),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Aload_0,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn http_audio_source_manager_get_http_interface(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(HTTP_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let field = pool.add_field_ref(
+        owner,
+        "httpInterfaceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let manager =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager")?;
+    let get = pool.add_interface_method_ref(
+        manager,
+        "getInterface",
+        "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Invokeinterface(get, 1),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn http_audio_source_manager_configure(
+    pool: &mut ConstantPool<'static>,
+    requests: bool,
+) -> Result<Attribute> {
+    let owner = pool.add_class(HTTP_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let field = pool.add_field_ref(
+        owner,
+        "httpInterfaceManager",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;",
+    )?;
+    let manager =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager")?;
+    let (name, descriptor) = if requests {
+        ("configureRequests", "(Ljava/util/function/Function;)V")
+    } else {
+        ("configureBuilder", "(Ljava/util/function/Consumer;)V")
+    };
+    let configure = pool.add_interface_method_ref(manager, name, descriptor)?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(configure, 2),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn http_audio_source_manager_http_reference(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let reference = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioReference")?;
+    let identifier = pool.add_field_ref(reference, "identifier", "Ljava/lang/String;")?;
+    let title = pool.add_field_ref(reference, "title", "Ljava/lang/String;")?;
+    let reference_init = pool.add_method_ref(
+        reference,
+        "<init>",
+        "(Ljava/lang/String;Ljava/lang/String;)V",
+    )?;
+    let string = pool.add_class("java/lang/String")?;
+    let starts_with = pool.add_method_ref(string, "startsWith", "(Ljava/lang/String;)Z")?;
+    let substring = pool.add_method_ref(string, "substring", "(I)Ljava/lang/String;")?;
+    let concat = pool.add_method_ref(string, "concat", "(Ljava/lang/String;)Ljava/lang/String;")?;
+    let https = pool.add_string("https://")?;
+    let http = pool.add_string("http://")?;
+    let icy = pool.add_string("icy://")?;
+    let mut body = code(
+        pool,
+        5,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(identifier),
+            Instruction::Ldc_w(https),
+            Instruction::Invokevirtual(starts_with),
+            Instruction::Ifne(10),
+            Instruction::Aload_0,
+            Instruction::Getfield(identifier),
+            Instruction::Ldc_w(http),
+            Instruction::Invokevirtual(starts_with),
+            Instruction::Ifeq(12),
+            Instruction::Aload_0,
+            Instruction::Areturn,
+            Instruction::Aload_0,
+            Instruction::Getfield(identifier),
+            Instruction::Ldc_w(icy),
+            Instruction::Invokevirtual(starts_with),
+            Instruction::Ifeq(29),
+            Instruction::New(reference),
+            Instruction::Dup,
+            Instruction::Ldc_w(http),
+            Instruction::Aload_0,
+            Instruction::Getfield(identifier),
+            Instruction::Bipush(6),
+            Instruction::Invokevirtual(substring),
+            Instruction::Invokevirtual(concat),
+            Instruction::Aload_0,
+            Instruction::Getfield(title),
+            Instruction::Invokespecial(reference_init),
+            Instruction::Areturn,
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::SameFrame { frame_type: 10 },
+            StackFrame::SameFrame { frame_type: 1 },
+            StackFrame::SameFrame { frame_type: 16 },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn http_audio_source_manager_encode_track(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let track = pool.add_class("com/sedmelluq/discord/lavaplayer/source/http/HttpAudioTrack")?;
+    let descriptor = pool.add_method_ref(
+        track,
+        "getContainerTrackFactory",
+        "()Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor;",
+    )?;
+    let owner = pool.add_class(HTTP_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let encode = pool.add_method_ref(
+        owner,
+        "encodeTrackFactory",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor;Ljava/io/DataOutput;)V",
+    )?;
+    code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Checkcast(track),
+            Instruction::Invokevirtual(descriptor),
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(encode),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn http_audio_source_manager_decode_track(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(HTTP_AUDIO_SOURCE_MANAGER_CLASS)?;
+    let decode = pool.add_method_ref(
+        owner,
+        "decodeTrackFactory",
+        "(Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor;",
+    )?;
+    let descriptor =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor")?;
+    let track = pool.add_class("com/sedmelluq/discord/lavaplayer/source/http/HttpAudioTrack")?;
+    let init = pool.add_method_ref(
+        track,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor;Lcom/sedmelluq/discord/lavaplayer/source/http/HttpAudioSourceManager;)V",
+    )?;
+    let mut body = code(
+        pool,
+        5,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(decode),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Ifnull(13),
+            Instruction::New(track),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Aload_3,
+            Instruction::Aload_0,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::AppendFrame {
+            frame_type: 252,
+            offset_delta: 13,
+            locals: vec![VerificationType::Object {
+                cpool_index: descriptor,
+            }],
+        }],
+    )?;
+    Ok(body)
 }
 
 fn heartbeating_http_stream_replacement(
@@ -29993,6 +30410,10 @@ fn native_class(expected_abi: u8) -> Result<ClassFile<'static>> {
         (
             "loadGetyarnItem",
             "(Lcom/sedmelluq/discord/lavaplayer/source/getyarn/GetyarnAudioSourceManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
+        ),
+        (
+            "loadHttpItem",
+            "(Lcom/sedmelluq/discord/lavaplayer/source/http/HttpAudioSourceManager;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/track/AudioItem;",
         ),
         (
             "loadTwitchItem",
