@@ -265,6 +265,8 @@ const YOUTUBE_MIX_PROVIDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeMixProvider";
 const YOUTUBE_MPEG_STREAM_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubeMpegStreamAudioTrack";
+const YOUTUBE_PAYLOAD_HELPER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/source/youtube/YoutubePayloadHelper";
 const TRACK_EXCEPTION_EVENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/player/event/TrackExceptionEvent";
 const TRACK_STUCK_EVENT_CLASS: &str =
@@ -374,6 +376,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_MIX_LOADER_CLASS,
     YOUTUBE_MIX_PROVIDER_CLASS,
     YOUTUBE_MPEG_STREAM_AUDIO_TRACK_CLASS,
+    YOUTUBE_PAYLOAD_HELPER_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
@@ -1127,6 +1130,9 @@ fn replacement_body(
             descriptor,
             required_locals,
         );
+    }
+    if class_name == YOUTUBE_PAYLOAD_HELPER_CLASS {
+        return youtube_payload_helper_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == YOUTUBE_CACHED_PLAYER_SCRIPT_CLASS {
         return youtube_cached_player_script_replacement(pool, name, descriptor, required_locals);
@@ -19407,6 +19413,80 @@ fn youtube_mpeg_stream_audio_track_constructor(
             Instruction::Athrow,
         ],
     )
+}
+
+fn youtube_payload_helper_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        ("putOnceAndJoin", "(Lorg/json/JSONObject;Ljava/lang/String;)Lorg/json/JSONObject;") => {
+            youtube_payload_helper_put_once_and_join(pool)
+        }
+        _ => unsupported_body(
+            pool,
+            "Phase 13 does not implement this YoutubePayloadHelper method.",
+            required_locals,
+        ),
+    }
+}
+
+fn youtube_payload_helper_put_once_and_join(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let json = pool.add_class("org/json/JSONObject")?;
+    let json_init = pool.add_method_ref(json, "<init>", "()V")?;
+    let opt = pool.add_method_ref(json, "opt", "(Ljava/lang/String;)Ljava/lang/Object;")?;
+    let put = pool.add_method_ref(
+        json,
+        "put",
+        "(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;",
+    )?;
+    let get = pool.add_method_ref(
+        json,
+        "getJSONObject",
+        "(Ljava/lang/String;)Lorg/json/JSONObject;",
+    )?;
+    let mut body = code(
+        pool,
+        4,
+        2,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Ifnull(19),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(opt),
+            Instruction::Ifnull(10),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(get),
+            Instruction::Areturn,
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::New(json),
+            Instruction::Dup,
+            Instruction::Invokespecial(json_init),
+            Instruction::Invokevirtual(put),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(get),
+            Instruction::Areturn,
+            Instruction::Aload_0,
+            Instruction::Aconst_null,
+            Instruction::Invokevirtual(get),
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::SameFrame { frame_type: 10 },
+            StackFrame::SameFrame { frame_type: 8 },
+        ],
+    )?;
+    Ok(body)
 }
 
 fn default_youtube_track_details_replacement(

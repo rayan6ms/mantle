@@ -254,6 +254,7 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
         "write-youtube-mpeg-stream-audio-track-consumer" => {
             Some(YOUTUBE_MPEG_STREAM_AUDIO_TRACK_CONSUMER)
         }
+        "write-youtube-payload-helper-consumer" => Some(YOUTUBE_PAYLOAD_HELPER_CONSUMER),
         _ => None,
     }
 }
@@ -20233,6 +20234,86 @@ public final class GateYoutubeMpegStreamAudioTrack {
     @Override public CloseableHttpResponse execute(HttpUriRequest request) throws IOException {
       calls++;
       throw new AssertionError("HTTP invoked");
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const YOUTUBE_PAYLOAD_HELPER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.source.youtube.YoutubePayloadHelper;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+public final class GateYoutubePayloadHelper {
+  public static void main(String[] args) throws Exception {
+    Class<YoutubePayloadHelper> type = YoutubePayloadHelper.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getGenericInterfaces().length == 0
+        && type.getTypeParameters().length == 0 && type.getDeclaredFields().length == 0
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredMethods().length == 1
+        && type.getDeclaredClasses().length == 0 && !type.isInterface() && !type.isEnum()
+        && !type.isAnnotation() && !type.isSynthetic(), "class shape");
+
+    Constructor<YoutubePayloadHelper> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0
+        && constructor.newInstance() != constructor.newInstance(), "constructor metadata");
+    Method method = type.getDeclaredMethod("putOnceAndJoin", JSONObject.class, String.class);
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && method.getReturnType() == JSONObject.class
+        && Arrays.equals(method.getParameterTypes(), new Class<?>[] {JSONObject.class, String.class})
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs(), "method metadata");
+
+    JSONObject root = new JSONObject();
+    JSONObject created = YoutubePayloadHelper.putOnceAndJoin(root, "child");
+    check(created == root.getJSONObject("child") && created.length() == 0 && root.length() == 1,
+        "absent key inserts fresh child");
+    created.put("value", 7);
+    check(YoutubePayloadHelper.putOnceAndJoin(root, "child") == created
+        && root.length() == 1 && created.getInt("value") == 7,
+        "existing child retained by identity");
+
+    JSONObject supplied = new JSONObject().put("marker", true);
+    JSONObject existing = new JSONObject().put("child", supplied);
+    check(YoutubePayloadHelper.putOnceAndJoin(existing, "child") == supplied
+        && existing.getJSONObject("child") == supplied && supplied.getBoolean("marker"),
+        "supplied child retained");
+    JSONObject empty = YoutubePayloadHelper.putOnceAndJoin(root, "");
+    check(empty == root.getJSONObject("") && root.length() == 2,
+        "empty non-null key supported");
+
+    JSONObject collision = new JSONObject().put("child", "text");
+    expect(JSONException.class, () -> YoutubePayloadHelper.putOnceAndJoin(collision, "child"));
+    check(collision.length() == 1 && collision.getString("child").equals("text"),
+        "non-object collision is not overwritten");
+    JSONObject jsonNull = new JSONObject().put("child", JSONObject.NULL);
+    expect(JSONException.class, () -> YoutubePayloadHelper.putOnceAndJoin(jsonNull, "child"));
+    check(jsonNull.length() == 1 && jsonNull.isNull("child"), "JSON null is not overwritten");
+    expect(JSONException.class, () -> YoutubePayloadHelper.putOnceAndJoin(root, null));
+    expect(NullPointerException.class,
+        () -> YoutubePayloadHelper.putOnceAndJoin(null, "child"));
+
+    System.out.println("public-concrete,object-root,0-fields,1-public-constructor,"
+        + "1-public-static-method;absent-inserts-fresh-child,existing-child-identity,no-overwrite,"
+        + "empty-key,mutation-visible;errors=null-root-npe,null-key-json,non-object-json,"
+        + "json-null-json;reflection");
+  }
+
+  private static void expect(Class<? extends Throwable> type, Runnable operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
     }
   }
 
