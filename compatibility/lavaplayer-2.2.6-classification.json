@@ -8461,54 +8461,60 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted concrete ConverterAudioFilter subclass preserves its three private final fields, public constructor, four checked PCM entry points, private signed-short conversion helper, reusable 4,096-frame planar storage, complete-frame consumption, and direct float identity forwarding. Differential coverage proves exact interleaved, split, ShortBuffer, chunking, tail, interruption, null, zero-channel, negative-channel, bounds, state, and metadata behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.converter.ToFloatAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter;I)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted concrete ConverterAudioFilter subclass preserves its three private final fields, public constructor, four checked PCM entry points, private signed-short conversion helper, reusable 4,096-frame planar storage, complete-frame consumption, and direct float identity forwarding. Differential coverage proves exact interleaved, split, ShortBuffer, chunking, tail, interruption, null, zero-channel, negative-channel, bounds, state, and metadata behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.converter.ToFloatAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "([[FII)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted concrete ConverterAudioFilter subclass preserves its three private final fields, public constructor, four checked PCM entry points, private signed-short conversion helper, reusable 4,096-frame planar storage, complete-frame consumption, and direct float identity forwarding. Differential coverage proves exact interleaved, split, ShortBuffer, chunking, tail, interruption, null, zero-channel, negative-channel, bounds, state, and metadata behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.converter.ToFloatAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "([SII)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted concrete ConverterAudioFilter subclass preserves its three private final fields, public constructor, four checked PCM entry points, private signed-short conversion helper, reusable 4,096-frame planar storage, complete-frame consumption, and direct float identity forwarding. Differential coverage proves exact interleaved, split, ShortBuffer, chunking, tail, interruption, null, zero-channel, negative-channel, bounds, state, and metadata behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.converter.ToFloatAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "(Ljava/nio/ShortBuffer;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted concrete ConverterAudioFilter subclass preserves its three private final fields, public constructor, four checked PCM entry points, private signed-short conversion helper, reusable 4,096-frame planar storage, complete-frame consumption, and direct float identity forwarding. Differential coverage proves exact interleaved, split, ShortBuffer, chunking, tail, interruption, null, zero-channel, negative-channel, bounds, state, and metadata behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.converter.ToFloatAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "([[SII)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted concrete ConverterAudioFilter subclass preserves its three private final fields, public constructor, four checked PCM entry points, private signed-short conversion helper, reusable 4,096-frame planar storage, complete-frame consumption, and direct float identity forwarding. Differential coverage proves exact interleaved, split, ShortBuffer, chunking, tail, interruption, null, zero-channel, negative-channel, bounds, state, and metadata behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.converter.ToShortAudioFilter",
