@@ -142,6 +142,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-formats-consumer" => Some(FORMATS_CONSUMER),
         "write-media-container-consumer" => Some(MEDIA_CONTAINER_CONSUMER),
         "write-media-container-descriptor-consumer" => Some(MEDIA_CONTAINER_DESCRIPTOR_CONSUMER),
+        "write-media-container-detection-consumer" => Some(MEDIA_CONTAINER_DETECTION_CONSUMER),
         _ => {
             filter_format_consumer_source(command).or_else(|| sound_cloud_consumer_source(command))
         }
@@ -12382,6 +12383,363 @@ public final class GateMediaContainerDescriptor {
 
   private static final class Derived extends MediaContainerDescriptor {
     Derived(MediaContainerProbe probe, String parameters) { super(probe, parameters); }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MEDIA_CONTAINER_DETECTION_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDetection;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerHints;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerProbe;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerRegistry;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.tools.io.SavedHeadSeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.regex.Pattern;
+
+public final class GateMediaContainerDetection {
+  public static void main(String[] args) throws Exception {
+    constantsAndConstruction();
+    nextBytes();
+    regex();
+    detectionPasses();
+    detectionFailures();
+    reflection();
+    System.out.println(
+        "contracts=constant-values,constant-identity,constructor-identity,byte-match,wildcard,eof,rewind,no-rewind,read-seek-failures,greedy-regex,partial-read,charset,regex-rewind,hint-first,fallback-pass,probe-order,probe-seek-zero,probe-failure-suppression,result-identity,unknown-singleton,saved-head,outer-friendly-wrap,private-state,reflection");
+  }
+
+  private static void constantsAndConstruction() throws Exception {
+    check(MediaContainerDetection.UNKNOWN_TITLE == "Unknown title"
+        && MediaContainerDetection.UNKNOWN_ARTIST == "Unknown artist"
+        && MediaContainerDetection.STREAM_SCAN_DISTANCE == 1000, "compile-time constants");
+    check(MediaContainerDetection.class.getField("UNKNOWN_TITLE").get(null) == "Unknown title"
+        && MediaContainerDetection.class.getField("UNKNOWN_ARTIST").get(null) == "Unknown artist"
+        && MediaContainerDetection.class.getField("STREAM_SCAN_DISTANCE").getInt(null) == 1000,
+        "constant values and interned identities");
+
+    MediaContainerRegistry registry = new MediaContainerRegistry(Collections.emptyList());
+    AudioReference reference = new AudioReference("identifier", "title");
+    MemoryStream stream = new MemoryStream(bytes(1, 2));
+    MediaContainerHints hints = MediaContainerHints.from("audio/test", "test");
+    MediaContainerDetection detection =
+        new MediaContainerDetection(registry, reference, stream, hints);
+    check(field(detection, "containerRegistry") == registry
+        && field(detection, "reference") == reference
+        && field(detection, "inputStream") == stream && field(detection, "hints") == hints,
+        "constructor retains exact identities");
+    MediaContainerDetection nullable = new MediaContainerDetection(null, null, null, null);
+    check(field(nullable, "containerRegistry") == null && field(nullable, "reference") == null
+        && field(nullable, "inputStream") == null && field(nullable, "hints") == null,
+        "constructor accepts null state");
+  }
+
+  private static void nextBytes() throws Exception {
+    MemoryStream stream = new MemoryStream(bytes(10, 20, 30, 40));
+    stream.seek(1);
+    check(MediaContainerDetection.checkNextBytes(stream, new int[] {20, -1, 40})
+        && stream.getPosition() == 1, "wildcard match and default rewind");
+    check(!MediaContainerDetection.checkNextBytes(stream, new int[] {20, 99, 40})
+        && stream.getPosition() == 1, "mismatch rewinds");
+    check(MediaContainerDetection.checkNextBytes(stream, new int[] {20, 30}, false)
+        && stream.getPosition() == 3, "no-rewind success consumes bytes");
+    stream.seek(1);
+    check(!MediaContainerDetection.checkNextBytes(stream, new int[] {20, 99, 40}, false)
+        && stream.getPosition() == 3, "no-rewind mismatch consumes through mismatch");
+    stream.seek(4);
+    check(!MediaContainerDetection.checkNextBytes(stream, new int[] {-1}, false)
+        && stream.getPosition() == 4, "EOF never matches wildcard");
+    check(MediaContainerDetection.checkNextBytes(stream, new int[0], false)
+        && stream.getPosition() == 4, "empty match succeeds without reading");
+
+    IOException readFailure = new IOException("read");
+    MemoryStream unreadable = new MemoryStream(bytes(1));
+    unreadable.readFailure = readFailure;
+    expectSame(readFailure,
+        () -> MediaContainerDetection.checkNextBytes(unreadable, new int[] {1}));
+    IOException seekFailure = new IOException("seek");
+    MemoryStream unseekable = new MemoryStream(bytes(1));
+    unseekable.seekFailure = seekFailure;
+    expectSame(seekFailure,
+        () -> MediaContainerDetection.checkNextBytes(unseekable, new int[] {1}));
+    expect(NullPointerException.class,
+        () -> MediaContainerDetection.checkNextBytes(null, new int[0]));
+  }
+
+  private static void regex() throws Exception {
+    MemoryStream stream = new MemoryStream("xx-héllo-yy".getBytes(StandardCharsets.UTF_8));
+    stream.seek(2);
+    check(MediaContainerDetection.matchNextBytesAsRegex(stream, 20,
+        Pattern.compile("héllo"), StandardCharsets.UTF_8) && stream.getPosition() == 2,
+        "regex uses supplied charset and rewinds");
+    check(!MediaContainerDetection.matchNextBytesAsRegex(stream, 4,
+        Pattern.compile("absent"), StandardCharsets.UTF_8) && stream.getPosition() == 2,
+        "missing regex rewinds");
+
+    MemoryStream partial = new MemoryStream(bytes('a', 'b', 'c'));
+    check(MediaContainerDetection.matchNextBytesAsRegex(partial, 20,
+        Pattern.compile("bc$"), StandardCharsets.US_ASCII) && partial.getPosition() == 0
+        && partial.readCalls >= 3, "greedy partial read includes all bytes and rewinds");
+    partial.seek(3);
+    check(!MediaContainerDetection.matchNextBytesAsRegex(partial, 2,
+        Pattern.compile(".*"), StandardCharsets.US_ASCII) && partial.getPosition() == 3,
+        "initial EOF is false and rewinds");
+    expect(NegativeArraySizeException.class, () -> MediaContainerDetection.matchNextBytesAsRegex(
+        partial, -1, Pattern.compile("x"), StandardCharsets.US_ASCII));
+    partial.seek(0);
+    expect(NullPointerException.class,
+        () -> MediaContainerDetection.matchNextBytesAsRegex(partial, 1, null,
+            StandardCharsets.US_ASCII));
+    check(partial.getPosition() == 0, "null pattern fails after rewind");
+    expect(NullPointerException.class,
+        () -> MediaContainerDetection.matchNextBytesAsRegex(partial, 1,
+            Pattern.compile("a"), null));
+    check(partial.getPosition() == 0, "null charset fails after rewind");
+  }
+
+  private static void detectionPasses() throws Exception {
+    List<String> events = new ArrayList<>();
+    ProbeState hintedMiss = new ProbeState("hinted-miss", true, events);
+    ProbeState fallbackHit = new ProbeState("fallback-hit", false, events);
+    ProbeState hintedFailure = new ProbeState("hinted-failure", true, events);
+    MediaContainerProbe hintedProbe = hintedMiss.proxy();
+    MediaContainerProbe fallbackProbe = fallbackHit.proxy();
+    MediaContainerProbe failureProbe = hintedFailure.proxy();
+    AudioTrackInfo info = new AudioTrackInfo("title", "author", 1, "id", false, "uri");
+    MediaContainerDetectionResult expected =
+        MediaContainerDetectionResult.supportedFormat(fallbackProbe, "settings", info);
+    fallbackHit.result = expected;
+    hintedFailure.failure = new RuntimeException("ignored-probe-failure");
+    MediaContainerRegistry registry = new MediaContainerRegistry(
+        Arrays.asList(hintedProbe, fallbackProbe, failureProbe));
+    AudioReference reference = new AudioReference("identifier", "title");
+    MemoryStream stream = new MemoryStream(bytes(1, 2, 3, 4));
+
+    MediaContainerDetectionResult actual = new MediaContainerDetection(registry, reference, stream,
+        MediaContainerHints.from("audio/hinted", "hinted")).detectContainer();
+    check(actual == expected, "result identity and fallback short-circuit");
+    check(events.equals(Arrays.asList("hinted-miss:match", "hinted-miss:probe",
+        "fallback-hit:match", "hinted-failure:match", "hinted-failure:probe",
+        "hinted-failure:name", "hinted-miss:match", "fallback-hit:match",
+        "fallback-hit:probe")), "hint-first then fallback ordering and failure suppression");
+    for (ProbeState state : Arrays.asList(hintedMiss, fallbackHit, hintedFailure)) {
+      if (state.probeCalls > 0) {
+        check(state.reference == reference && state.position == 0
+            && state.streamClass == SavedHeadSeekableInputStream.class,
+            "probes receive exact reference and saved-head stream positioned at zero");
+      }
+    }
+    check(stream.getPosition() == stream.getContentLength(), "saved head consumes underlying input");
+
+    MediaContainerDetectionResult unknown = new MediaContainerDetection(
+        new MediaContainerRegistry(Collections.emptyList()), reference,
+        new MemoryStream(bytes(8)), MediaContainerHints.from(null, null)).detectContainer();
+    check(unknown == MediaContainerDetectionResult.unknownFormat(), "unknown singleton identity");
+  }
+
+  private static void detectionFailures() {
+    IOException failure = new IOException("head-read");
+    MemoryStream stream = new MemoryStream(bytes(1));
+    stream.readFailure = failure;
+    expectFriendly(failure, () -> new MediaContainerDetection(
+        new MediaContainerRegistry(Collections.emptyList()), null, stream, null).detectContainer());
+    expectFriendly(NullPointerException.class, () -> new MediaContainerDetection(
+        new MediaContainerRegistry(Collections.emptyList()), null, null, null).detectContainer());
+  }
+
+  private static void reflection() throws Exception {
+    Class<MediaContainerDetection> type = MediaContainerDetection.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0, "class metadata");
+    check(type.getDeclaredFields().length == 9 && type.getDeclaredMethods().length == 6
+        && type.getDeclaredConstructors().length == 1, "exact declared member counts");
+    checkField(type, "UNKNOWN_TITLE", String.class,
+        Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "UNKNOWN_ARTIST", String.class,
+        Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "STREAM_SCAN_DISTANCE", int.class,
+        Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
+    Field log = type.getDeclaredField("log");
+    check(log.getType().getName().equals("org.slf4j.Logger")
+        && log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && !log.isSynthetic(), "log field metadata");
+    checkField(type, "HEAD_MARK_LIMIT", int.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "containerRegistry", MediaContainerRegistry.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "reference", AudioReference.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "inputStream", SeekableInputStream.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "hints", MediaContainerHints.class, Modifier.PRIVATE | Modifier.FINAL);
+
+    Constructor<MediaContainerDetection> constructor = type.getDeclaredConstructor(
+        MediaContainerRegistry.class, AudioReference.class, SeekableInputStream.class,
+        MediaContainerHints.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "constructor metadata");
+    Method detect = type.getDeclaredMethod("detectContainer");
+    check(detect.getModifiers() == Modifier.PUBLIC
+        && detect.getReturnType() == MediaContainerDetectionResult.class
+        && detect.getExceptionTypes().length == 0, "detect metadata");
+    checkHelper(type.getDeclaredMethod("checkNextBytes", SeekableInputStream.class, int[].class));
+    checkHelper(type.getDeclaredMethod(
+        "checkNextBytes", SeekableInputStream.class, int[].class, boolean.class));
+    Method regex = type.getDeclaredMethod("matchNextBytesAsRegex", SeekableInputStream.class,
+        int.class, Pattern.class, java.nio.charset.Charset.class);
+    check(regex.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && regex.getReturnType() == boolean.class
+        && Arrays.equals(regex.getExceptionTypes(), new Class<?>[] {IOException.class}),
+        "regex helper metadata");
+  }
+
+  private static void checkHelper(Method method) {
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && method.getReturnType() == boolean.class
+        && Arrays.equals(method.getExceptionTypes(), new Class<?>[] {IOException.class})
+        && !method.isSynthetic() && !method.isBridge(), "byte helper metadata");
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> fieldType, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getGenericType() == fieldType
+        && field.getModifiers() == modifiers && !field.isSynthetic(), name + " field metadata");
+  }
+
+  private static Object field(Object owner, String name) throws Exception {
+    Field field = owner.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(owner);
+  }
+
+  private static byte[] bytes(int... values) {
+    byte[] result = new byte[values.length];
+    for (int i = 0; i < values.length; i++) result[i] = (byte) values[i];
+    return result;
+  }
+
+  private static void expectFriendly(Object expectedCause, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected friendly failure");
+    } catch (Throwable throwable) {
+      check(throwable instanceof FriendlyException, "friendly wrapper type");
+      FriendlyException friendly = (FriendlyException) throwable;
+      check(friendly.getMessage().equals("Could not read the file for detecting file type.")
+          && friendly.severity == FriendlyException.Severity.SUSPICIOUS,
+          "friendly wrapper message and severity");
+      if (expectedCause instanceof Class<?>) {
+        check(((Class<?>) expectedCause).isInstance(friendly.getCause()), "wrapped cause type");
+      } else {
+        check(friendly.getCause() == expectedCause, "wrapped cause identity");
+      }
+    }
+  }
+
+  private static void expect(Class<? extends Throwable> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable throwable) {
+      check(type.isInstance(throwable),
+          "expected " + type.getName() + " but got " + throwable.getClass().getName());
+    }
+  }
+
+  private static void expectSame(Throwable expected, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected failure");
+    } catch (Throwable throwable) {
+      check(throwable == expected, "exception identity");
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static final class ProbeState {
+    final String name;
+    final boolean match;
+    final List<String> events;
+    MediaContainerProbe probe;
+    MediaContainerDetectionResult result;
+    RuntimeException failure;
+    AudioReference reference;
+    Class<?> streamClass;
+    long position;
+    int probeCalls;
+
+    ProbeState(String name, boolean match, List<String> events) {
+      this.name = name;
+      this.match = match;
+      this.events = events;
+    }
+
+    MediaContainerProbe proxy() {
+      probe = (MediaContainerProbe) Proxy.newProxyInstance(MediaContainerProbe.class.getClassLoader(),
+          new Class<?>[] {MediaContainerProbe.class}, (instance, method, arguments) -> {
+            switch (method.getName()) {
+              case "getName": events.add(name + ":name"); return name;
+              case "matchesHints": events.add(name + ":match"); return match;
+              case "probe":
+                events.add(name + ":probe");
+                probeCalls++;
+                reference = (AudioReference) arguments[0];
+                SeekableInputStream stream = (SeekableInputStream) arguments[1];
+                streamClass = stream.getClass();
+                position = stream.getPosition();
+                if (failure != null) throw failure;
+                return result;
+              case "createTrack": return null;
+              default: throw new AssertionError("unexpected probe call " + method.getName());
+            }
+          });
+      return probe;
+    }
+  }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    final byte[] data;
+    long position;
+    int readCalls;
+    IOException readFailure;
+    IOException seekFailure;
+
+    MemoryStream(byte[] data) { super(data.length, 0); this.data = data; }
+    @Override public long getPosition() { return position; }
+    @Override protected void seekHard(long target) throws IOException {
+      if (seekFailure != null) throw seekFailure;
+      position = target;
+    }
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      return Collections.emptyList();
+    }
+    @Override public int read() throws IOException {
+      readCalls++;
+      if (readFailure != null) throw readFailure;
+      return position < data.length ? data[(int) position++] & 0xFF : -1;
+    }
   }
 
   private static void check(boolean condition, String message) {

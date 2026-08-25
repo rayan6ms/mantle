@@ -215,6 +215,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-media-container-consumer \
   --output "$WORK/GateMediaContainer.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-media-container-descriptor-consumer \
   --output "$WORK/GateMediaContainerDescriptor.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-media-container-detection-consumer \
+  --output "$WORK/GateMediaContainerDetection.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -278,6 +280,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateFormats.java" \
   "$WORK/GateMediaContainer.java" \
   "$WORK/GateMediaContainerDescriptor.java" \
+  "$WORK/GateMediaContainerDetection.java" \
   "$WORK/GatePcmFilterFactory.java" \
   "$WORK/GatePcmFormat.java" \
   "$WORK/GateResamplingPcmAudioFilter.java" \
@@ -1118,6 +1121,17 @@ cmp "$WORK/media-container-descriptor-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor-identity,null-construction,argument-order,return-identity,repeated-delegation,null-forwarding,exception-identity,null-probe-failure,subclassable,no-private-state,reflection' \
   "$WORK/media-container-descriptor-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMediaContainerDetection \
+  >"$WORK/media-container-detection-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMediaContainerDetection >"$WORK/media-container-detection-candidate.txt"
+cmp "$WORK/media-container-detection-reference.txt" \
+  "$WORK/media-container-detection-candidate.txt"
+grep --fixed-strings \
+  'contracts=constant-values,constant-identity,constructor-identity,byte-match,wildcard,eof,rewind,no-rewind,read-seek-failures,greedy-regex,partial-read,charset,regex-rewind,hint-first,fallback-pass,probe-order,probe-seek-zero,probe-failure-suppression,result-identity,unknown-singleton,saved-head,outer-friendly-wrap,private-state,reflection' \
+  "$WORK/media-container-detection-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"

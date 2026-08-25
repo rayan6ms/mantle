@@ -433,85 +433,130 @@
       ]
     },
     {
-      "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetection",
-      "symbol_kind": "CLASS",
+    "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetection",
+    "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+    "assessment": "CLASSIFIED",
+    "classification": "A_EXACT",
+    "notes": "Generated class structure, constants, retained private state, detection control flow, stream positioning, exception behavior, byte and regex helpers, and reflection match the frozen reference.",
+    "tests": [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetection",
-      "symbol_kind": "FIELD",
-      "member_name": "UNKNOWN_TITLE",
+    "symbol_kind": "FIELD",
+    "member_name": "UNKNOWN_TITLE",
       "descriptor": "Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+    "assessment": "CLASSIFIED",
+    "classification": "A_EXACT",
+    "notes": "Public static final constant value, descriptor, modifiers, and interned identity match the frozen reference.",
+    "tests": [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetection",
-      "symbol_kind": "FIELD",
-      "member_name": "UNKNOWN_ARTIST",
+    "symbol_kind": "FIELD",
+    "member_name": "UNKNOWN_ARTIST",
       "descriptor": "Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+    "assessment": "CLASSIFIED",
+    "classification": "A_EXACT",
+    "notes": "Public static final constant value, descriptor, modifiers, and interned identity match the frozen reference.",
+    "tests": [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetection",
-      "symbol_kind": "FIELD",
-      "member_name": "STREAM_SCAN_DISTANCE",
+    "symbol_kind": "FIELD",
+    "member_name": "STREAM_SCAN_DISTANCE",
       "descriptor": "I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+    "assessment": "CLASSIFIED",
+    "classification": "A_EXACT",
+    "notes": "Public static final constant value, descriptor, and modifiers match the frozen reference.",
+    "tests": [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetection",
-      "symbol_kind": "METHOD",
-      "member_name": "<init>",
+    "symbol_kind": "METHOD",
+    "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerHints;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+    "assessment": "CLASSIFIED",
+    "classification": "A_EXACT",
+    "notes": "Public constructor descriptor, modifiers, null acceptance, and exact retention of all four state references match the frozen reference.",
+    "tests": [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetection",
       "symbol_kind": "METHOD",
-      "member_name": "detectContainer",
+    "member_name": "detectContainer",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+    "assessment": "CLASSIFIED",
+    "classification": "A_EXACT",
+    "notes": "Saved-head loading, hint-first and fallback probing, per-probe rewind, failure suppression, result identity, unknown singleton, and suspicious exception wrapping match the frozen reference.",
+    "tests": [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetection",
       "symbol_kind": "METHOD",
-      "member_name": "checkNextBytes",
-      "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;[I)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+    "member_name": "checkNextBytes",
+    "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;[I)Z",
+    "assessment": "CLASSIFIED",
+    "classification": "A_EXACT",
+    "notes": "Default rewind delegation, wildcard and EOF semantics, stream positioning, and failure propagation match the frozen reference.",
+    "tests": [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetection",
       "symbol_kind": "METHOD",
-      "member_name": "checkNextBytes",
-      "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;[IZ)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+    "member_name": "checkNextBytes",
+    "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;[IZ)Z",
+    "assessment": "CLASSIFIED",
+    "classification": "A_EXACT",
+    "notes": "Byte matching, wildcard and EOF semantics, optional rewind, partial consumption, and read and seek failure identity match the frozen reference.",
+    "tests": [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetection",
       "symbol_kind": "METHOD",
-      "member_name": "matchNextBytesAsRegex",
+    "member_name": "matchNextBytesAsRegex",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;ILjava/util/regex/Pattern;Ljava/nio/charset/Charset;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+    "assessment": "CLASSIFIED",
+    "classification": "A_EXACT",
+    "notes": "Greedy bounded reading, partial and EOF behavior, charset decoding, regex find semantics, rewind timing, and failure ordering match the frozen reference.",
+    "tests": [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult",

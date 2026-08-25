@@ -144,6 +144,8 @@ const FORMATS_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/Formats"
 const MEDIA_CONTAINER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/MediaContainer";
 const MEDIA_CONTAINER_DESCRIPTOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor";
+const MEDIA_CONTAINER_DETECTION_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/MediaContainerDetection";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -471,6 +473,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     FORMATS_CLASS,
     MEDIA_CONTAINER_CLASS,
     MEDIA_CONTAINER_DESCRIPTOR_CLASS,
+    MEDIA_CONTAINER_DETECTION_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -938,6 +941,7 @@ fn retain_private_fields(class_name: &str) -> bool {
         class_name,
         AUDIO_PLAYER_INPUT_STREAM_CLASS
             | MEDIA_CONTAINER_CLASS
+            | MEDIA_CONTAINER_DETECTION_CLASS
             | OPUS_AUDIO_DATA_FORMAT_CLASS
             | PCM16_AUDIO_DATA_FORMAT_CLASS
             | OPUS_CHUNK_DECODER_CLASS
@@ -1043,6 +1047,7 @@ fn retain_private_methods(class_name: &str) -> bool {
         class_name,
         AUDIO_PLAYER_INPUT_STREAM_CLASS
             | MEDIA_CONTAINER_CLASS
+            | MEDIA_CONTAINER_DETECTION_CLASS
             | AUDIO_PIPELINE_FACTORY_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
@@ -1293,6 +1298,9 @@ fn replacement_body(
     }
     if class_name == MEDIA_CONTAINER_DESCRIPTOR_CLASS {
         return media_container_descriptor_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == MEDIA_CONTAINER_DETECTION_CLASS {
+        return media_container_detection_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -3327,6 +3335,654 @@ fn media_container_descriptor_create_track(pool: &mut ConstantPool<'static>) -> 
             Instruction::Aload_2,
             Instruction::Invokeinterface(create_track, 4),
             Instruction::Areturn,
+        ],
+    )
+}
+
+fn media_container_detection_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerHints;)V",
+        ) => media_container_detection_constructor(pool),
+        (
+            "detectContainer",
+            "()Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
+        ) => media_container_detection_detect(pool),
+        (
+            "detectContainer",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;Z)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
+        ) => media_container_detection_detect_pass(pool),
+        (
+            "checkContainer",
+            "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
+        ) => media_container_detection_check_container(pool),
+        (
+            "checkNextBytes",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;[I)Z",
+        ) => media_container_detection_check_next_bytes_default(pool),
+        (
+            "checkNextBytes",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;[IZ)Z",
+        ) => media_container_detection_check_next_bytes(pool),
+        (
+            "matchNextBytesAsRegex",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;ILjava/util/regex/Pattern;Ljava/nio/charset/Charset;)Z",
+        ) => media_container_detection_match_regex(pool),
+        ("<clinit>", "()V") => media_container_detection_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {MEDIA_CONTAINER_DETECTION_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn media_container_detection_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(MEDIA_CONTAINER_DETECTION_CLASS)?;
+    let registry = pool.add_field_ref(
+        owner,
+        "containerRegistry",
+        "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;",
+    )?;
+    let reference = pool.add_field_ref(
+        owner,
+        "reference",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;",
+    )?;
+    let input_stream = pool.add_field_ref(
+        owner,
+        "inputStream",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;",
+    )?;
+    let hints = pool.add_field_ref(
+        owner,
+        "hints",
+        "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerHints;",
+    )?;
+    code(
+        pool,
+        2,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(registry),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(reference),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Putfield(input_stream),
+            Instruction::Aload_0,
+            Instruction::Aload(4),
+            Instruction::Putfield(hints),
+            Instruction::Return,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn media_container_detection_detect(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MEDIA_CONTAINER_DETECTION_CLASS)?;
+    let input_stream = pool.add_field_ref(
+        owner,
+        "inputStream",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;",
+    )?;
+    let saved =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/SavedHeadSeekableInputStream")?;
+    let saved_init = pool.add_method_ref(
+        saved,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;I)V",
+    )?;
+    let load_head = pool.add_method_ref(saved, "loadHead", "()V")?;
+    let detect = pool.add_method_ref(
+        owner,
+        "detectContainer",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;Z)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
+    )?;
+    let severity =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity")?;
+    let suspicious = pool.add_field_ref(
+        severity,
+        "SUSPICIOUS",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity;",
+    )?;
+    let exception_tools =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/ExceptionTools")?;
+    let wrap = pool.add_method_ref(
+        exception_tools,
+        "wrapUnfriendlyExceptions",
+        "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity;Ljava/lang/Throwable;)Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException;",
+    )?;
+    let message = pool.add_string("Could not read the file for detecting file type.")?;
+    let result_class =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult")?;
+    let unknown = pool.add_method_ref(
+        result_class,
+        "unknownFormat",
+        "()Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
+    )?;
+    let exception = pool.add_class("java/lang/Exception")?;
+    let handler_target = 22;
+    let return_target = 28;
+    let unknown_target = 32;
+    let mut body = code_with_exceptions(
+        pool,
+        4,
+        3,
+        vec![
+            Instruction::New(saved),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(input_stream),
+            Instruction::Sipush(1024),
+            Instruction::Invokespecial(saved_init),
+            Instruction::Astore_2,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(load_head),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Iconst_1,
+            Instruction::Invokevirtual(detect),
+            Instruction::Astore_1,
+            Instruction::Aload_1,
+            Instruction::Ifnonnull(return_target),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Iconst_0,
+            Instruction::Invokevirtual(detect),
+            Instruction::Astore_1,
+            Instruction::Goto(return_target),
+            Instruction::Astore_2,
+            Instruction::Ldc_w(message),
+            Instruction::Getstatic(suspicious),
+            Instruction::Aload_2,
+            Instruction::Invokestatic(wrap),
+            Instruction::Athrow,
+            Instruction::Aload_1,
+            Instruction::Ifnull(unknown_target),
+            Instruction::Aload_1,
+            Instruction::Areturn,
+            Instruction::Invokestatic(unknown),
+            Instruction::Areturn,
+        ],
+        vec![ExceptionTableEntry {
+            range_pc: 0..handler_target,
+            handler_pc: handler_target,
+            catch_type: exception,
+        }],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: handler_target,
+                locals: vec![VerificationType::Object { cpool_index: owner }],
+                stack: vec![VerificationType::Object {
+                    cpool_index: exception,
+                }],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: return_target - handler_target - 1,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: result_class,
+                    },
+                    VerificationType::Object { cpool_index: saved },
+                ],
+                stack: vec![],
+            },
+            same_stack_frame(unknown_target - return_target - 1),
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn media_container_detection_detect_pass(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MEDIA_CONTAINER_DETECTION_CLASS)?;
+    let registry_field = pool.add_field_ref(
+        owner,
+        "containerRegistry",
+        "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;",
+    )?;
+    let reference_field = pool.add_field_ref(
+        owner,
+        "reference",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;",
+    )?;
+    let hints_field = pool.add_field_ref(
+        owner,
+        "hints",
+        "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerHints;",
+    )?;
+    let registry =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry")?;
+    let get_all = pool.add_method_ref(registry, "getAll", "()Ljava/util/List;")?;
+    let list = pool.add_class("java/util/List")?;
+    let iterator_method =
+        pool.add_interface_method_ref(list, "iterator", "()Ljava/util/Iterator;")?;
+    let iterator = pool.add_class("java/util/Iterator")?;
+    let has_next = pool.add_interface_method_ref(iterator, "hasNext", "()Z")?;
+    let next = pool.add_interface_method_ref(iterator, "next", "()Ljava/lang/Object;")?;
+    let probe = pool.add_class("com/sedmelluq/discord/lavaplayer/container/MediaContainerProbe")?;
+    let matches_hints = pool.add_interface_method_ref(
+        probe,
+        "matchesHints",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerHints;)Z",
+    )?;
+    let stream = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream")?;
+    let seek = pool.add_method_ref(stream, "seek", "(J)V")?;
+    let check = pool.add_method_ref(
+        owner,
+        "checkContainer",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
+    )?;
+    let loop_target = 5;
+    let continue_target = 31;
+    let return_target = 32;
+    let mut body = code(
+        pool,
+        3,
+        6,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(registry_field),
+            Instruction::Invokevirtual(get_all),
+            Instruction::Invokeinterface(iterator_method, 1),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(has_next, 1),
+            Instruction::Ifeq(return_target),
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(next, 1),
+            Instruction::Checkcast(probe),
+            Instruction::Astore(4),
+            Instruction::Iload_2,
+            Instruction::Aload(4),
+            Instruction::Aload_0,
+            Instruction::Getfield(hints_field),
+            Instruction::Invokeinterface(matches_hints, 2),
+            Instruction::If_icmpne(continue_target),
+            Instruction::Aload_1,
+            Instruction::Lconst_0,
+            Instruction::Invokevirtual(seek),
+            Instruction::Aload(4),
+            Instruction::Aload_0,
+            Instruction::Getfield(reference_field),
+            Instruction::Aload_1,
+            Instruction::Invokestatic(check),
+            Instruction::Astore(5),
+            Instruction::Aload(5),
+            Instruction::Ifnull(continue_target),
+            Instruction::Aload(5),
+            Instruction::Areturn,
+            Instruction::Goto(loop_target),
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+        ],
+    )?;
+    let base_locals = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Object {
+            cpool_index: stream,
+        },
+        VerificationType::Integer,
+    ];
+    let mut loop_locals = base_locals.clone();
+    loop_locals.push(VerificationType::Object {
+        cpool_index: iterator,
+    });
+    let mut probe_locals = loop_locals.clone();
+    probe_locals.push(VerificationType::Object { cpool_index: probe });
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: loop_target,
+                locals: loop_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: continue_target - loop_target - 1,
+                locals: probe_locals,
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: return_target - continue_target - 1,
+                locals: loop_locals,
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn media_container_detection_check_container(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let probe = pool.add_class("com/sedmelluq/discord/lavaplayer/container/MediaContainerProbe")?;
+    let probe_method = pool.add_interface_method_ref(
+        probe,
+        "probe",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
+    )?;
+    let get_name = pool.add_interface_method_ref(probe, "getName", "()Ljava/lang/String;")?;
+    let owner = pool.add_class(MEDIA_CONTAINER_DETECTION_CLASS)?;
+    let logger = pool.add_class("org/slf4j/Logger")?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let warn = pool.add_interface_method_ref(
+        logger,
+        "warn",
+        "(Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;)V",
+    )?;
+    let message = pool.add_string("Attempting to detect file with container {} failed.")?;
+    let exception = pool.add_class("java/lang/Exception")?;
+    let handler_target = 5;
+    let mut body = code_with_exceptions(
+        pool,
+        4,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(probe_method, 3),
+            Instruction::Areturn,
+            Instruction::Astore_3,
+            Instruction::Getstatic(log),
+            Instruction::Ldc_w(message),
+            Instruction::Aload_0,
+            Instruction::Invokeinterface(get_name, 1),
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(warn, 4),
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+        ],
+        vec![ExceptionTableEntry {
+            range_pc: 0..4,
+            handler_pc: handler_target,
+            catch_type: exception,
+        }],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::SameLocals1StackItemFrame {
+            frame_type: u8::try_from(64 + handler_target)?,
+            stack: vec![VerificationType::Object {
+                cpool_index: exception,
+            }],
+        }],
+    )?;
+    Ok(body)
+}
+
+fn media_container_detection_check_next_bytes_default(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(MEDIA_CONTAINER_DETECTION_CLASS)?;
+    let check = pool.add_method_ref(
+        owner,
+        "checkNextBytes",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;[IZ)Z",
+    )?;
+    code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Iconst_1,
+            Instruction::Invokestatic(check),
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn media_container_detection_check_next_bytes(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let stream = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream")?;
+    let get_position = pool.add_method_ref(stream, "getPosition", "()J")?;
+    let read = pool.add_method_ref(stream, "read", "()I")?;
+    let seek = pool.add_method_ref(stream, "seek", "(J)V")?;
+    let integer_array = pool.add_class("[I")?;
+    let loop_target = 7;
+    let next_target = 27;
+    let mismatch_target = 29;
+    let done_target = 31;
+    let return_target = 36;
+    let mut body = code(
+        pool,
+        3,
+        9,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(get_position),
+            Instruction::Lstore_3,
+            Instruction::Iconst_1,
+            Instruction::Istore(5),
+            Instruction::Iconst_0,
+            Instruction::Istore(6),
+            Instruction::Iload(6),
+            Instruction::Aload_1,
+            Instruction::Arraylength,
+            Instruction::If_icmpge(done_target),
+            Instruction::Aload_1,
+            Instruction::Iload(6),
+            Instruction::Iaload,
+            Instruction::Istore(7),
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(read),
+            Instruction::Istore(8),
+            Instruction::Iload(8),
+            Instruction::Iconst_m1,
+            Instruction::If_icmpeq(mismatch_target),
+            Instruction::Iload(7),
+            Instruction::Iconst_m1,
+            Instruction::If_icmpeq(next_target),
+            Instruction::Iload(7),
+            Instruction::Iload(8),
+            Instruction::If_icmpne(mismatch_target),
+            Instruction::Iinc(6, 1),
+            Instruction::Goto(loop_target),
+            Instruction::Iconst_0,
+            Instruction::Istore(5),
+            Instruction::Iload_2,
+            Instruction::Ifeq(return_target),
+            Instruction::Aload_0,
+            Instruction::Lload_3,
+            Instruction::Invokevirtual(seek),
+            Instruction::Iload(5),
+            Instruction::Ireturn,
+        ],
+    )?;
+    let base_locals = vec![
+        VerificationType::Object {
+            cpool_index: stream,
+        },
+        VerificationType::Object {
+            cpool_index: integer_array,
+        },
+        VerificationType::Integer,
+        VerificationType::Long,
+        VerificationType::Integer,
+        VerificationType::Integer,
+    ];
+    let mut iteration_locals = base_locals.clone();
+    iteration_locals.extend([VerificationType::Integer, VerificationType::Integer]);
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: loop_target,
+                locals: base_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: next_target - loop_target - 1,
+                locals: iteration_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: mismatch_target - next_target - 1,
+                locals: iteration_locals,
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: done_target - mismatch_target - 1,
+                locals: base_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: return_target - done_target - 1,
+                locals: base_locals,
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn media_container_detection_match_regex(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let stream = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream")?;
+    let get_position = pool.add_method_ref(stream, "getPosition", "()J")?;
+    let seek = pool.add_method_ref(stream, "seek", "(J)V")?;
+    let greedy = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/GreedyInputStream")?;
+    let greedy_init = pool.add_method_ref(greedy, "<init>", "(Ljava/io/InputStream;)V")?;
+    let greedy_read = pool.add_method_ref(greedy, "read", "([B)I")?;
+    let string = pool.add_class("java/lang/String")?;
+    let string_init = pool.add_method_ref(string, "<init>", "([BIILjava/nio/charset/Charset;)V")?;
+    let pattern = pool.add_class("java/util/regex/Pattern")?;
+    let matcher_method = pool.add_method_ref(
+        pattern,
+        "matcher",
+        "(Ljava/lang/CharSequence;)Ljava/util/regex/Matcher;",
+    )?;
+    let matcher = pool.add_class("java/util/regex/Matcher")?;
+    let find = pool.add_method_ref(matcher, "find", "()Z")?;
+    let charset = pool.add_class("java/nio/charset/Charset")?;
+    let byte_array = pool.add_class("[B")?;
+    let text_target = 21;
+    let mut body = code(
+        pool,
+        6,
+        9,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(get_position),
+            Instruction::Lstore(4),
+            Instruction::Iload_1,
+            Instruction::Newarray(ArrayType::Byte),
+            Instruction::Astore(6),
+            Instruction::New(greedy),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Invokespecial(greedy_init),
+            Instruction::Aload(6),
+            Instruction::Invokevirtual(greedy_read),
+            Instruction::Istore(7),
+            Instruction::Aload_0,
+            Instruction::Lload(4),
+            Instruction::Invokevirtual(seek),
+            Instruction::Iload(7),
+            Instruction::Iconst_m1,
+            Instruction::If_icmpne(text_target),
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+            Instruction::New(string),
+            Instruction::Dup,
+            Instruction::Aload(6),
+            Instruction::Iconst_0,
+            Instruction::Iload(7),
+            Instruction::Aload_3,
+            Instruction::Invokespecial(string_init),
+            Instruction::Astore(8),
+            Instruction::Aload_2,
+            Instruction::Aload(8),
+            Instruction::Invokevirtual(matcher_method),
+            Instruction::Invokevirtual(find),
+            Instruction::Ireturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::FullFrame {
+            frame_type: 255,
+            offset_delta: text_target,
+            locals: vec![
+                VerificationType::Object {
+                    cpool_index: stream,
+                },
+                VerificationType::Integer,
+                VerificationType::Object {
+                    cpool_index: pattern,
+                },
+                VerificationType::Object {
+                    cpool_index: charset,
+                },
+                VerificationType::Long,
+                VerificationType::Object {
+                    cpool_index: byte_array,
+                },
+                VerificationType::Integer,
+            ],
+            stack: vec![],
+        }],
+    )?;
+    Ok(body)
+}
+
+fn media_container_detection_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MEDIA_CONTAINER_DETECTION_CLASS)?;
+    let factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
         ],
     )
 }
