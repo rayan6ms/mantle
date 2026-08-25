@@ -252,6 +252,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-flac-file-loader-consumer \
   --output "$WORK/GateFlacFileLoader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-file-loader-support-consumer \
   --output "$WORK/FlacLoaderGateSupport.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-flac-metadata-header-consumer \
+  --output "$WORK/GateFlacMetadataHeader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -321,6 +323,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateMediaContainerProbe.java" \
   "$WORK/GateMediaContainerRegistry.java" \
   "$WORK/GateAdtsAudioTrack.java" \
+  "$WORK/GateFlacMetadataHeader.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GateAdtsStreamReader.java" \
@@ -1339,6 +1342,17 @@ cmp "$WORK/flac-file-loader-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor-input,data-input-wrapper,null-construction,static-fourcc,header-consumption,no-rewind,initial-position,invalid-header,short-header,stream-info,builder-order,metadata-flag,metadata-loop,block-results,data-input-identity,input-identity,builder-identity,first-frame-position,build-identity,load-order,context-identity,provider-info,provider-input,null-context,read-failure,stream-info-failure,builder-failure,get-stream-failure,block-failure,position-failure,set-position-failure,build-failure,provider-failure,subclassable,private-helper,private-state,throws,reflection' \
   "$WORK/flac-file-loader-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateFlacMetadataHeader \
+  >"$WORK/flac-metadata-header-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateFlacMetadataHeader >"$WORK/flac-metadata-header-candidate.txt"
+cmp "$WORK/flac-metadata-header-reference.txt" \
+  "$WORK/flac-metadata-header-candidate.txt"
+grep --fixed-strings \
+  'contracts=constants,last-flag,block-type,unsigned-length,big-endian,all-first-bytes,length-edges,minimum-input,trailing-input,input-snapshot,null-input,short-input,identity-semantics,subclassable,public-final-fields,constant-values,reflection' \
+  "$WORK/flac-metadata-header-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"

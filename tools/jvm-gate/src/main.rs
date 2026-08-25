@@ -169,6 +169,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-flac-container-probe-consumer" => Some(FLAC_CONTAINER_PROBE_CONSUMER),
         "write-flac-file-loader-consumer" => Some(FLAC_FILE_LOADER_CONSUMER),
         "write-flac-file-loader-support-consumer" => Some(FLAC_FILE_LOADER_SUPPORT_CONSUMER),
+        "write-flac-metadata-header-consumer" => Some(FLAC_METADATA_HEADER_CONSUMER),
         _ => None,
     }
 }
@@ -15369,6 +15370,173 @@ public final class GateFlacFileLoader {
   private static final class Derived extends FlacFileLoader {
     Derived(SeekableInputStream input) {
       super(input);
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const FLAC_METADATA_HEADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacMetadataHeader;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.nio.BufferUnderflowException;
+import java.util.Arrays;
+
+public final class GateFlacMetadataHeader {
+  public static void main(String[] args) throws Exception {
+    constantsAndEdges();
+    exhaustiveFirstByte();
+    lengthDecoding();
+    inputBoundaries();
+    identityAndSubclassing();
+    reflection();
+    System.out.println(
+        "contracts=constants,last-flag,block-type,unsigned-length,big-endian,all-first-bytes,length-edges,minimum-input,trailing-input,input-snapshot,null-input,short-input,identity-semantics,subclassable,public-final-fields,constant-values,reflection");
+  }
+
+  private static void constantsAndEdges() {
+    check(FlacMetadataHeader.LENGTH == 4
+        && FlacMetadataHeader.BLOCK_SEEKTABLE == 3
+        && FlacMetadataHeader.BLOCK_COMMENT == 4,
+        "public format constants retain exact values");
+
+    checkHeader(new byte[] {0, 0, 0, 0}, false, 0, 0, "all-zero header");
+    checkHeader(new byte[] {(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF},
+        true, 127, 0xFF_FFFF, "all-one header");
+    checkHeader(new byte[] {3, 0x12, 0x34, 0x56},
+        false, 3, 0x12_3456, "seek-table header");
+    checkHeader(new byte[] {(byte) 0x84, 0x65, 0x43, 0x21},
+        true, 4, 0x65_4321, "last comment header");
+  }
+
+  private static void exhaustiveFirstByte() {
+    for (int value = 0; value <= 0xFF; value++) {
+      byte[] data = {(byte) value, 0x23, 0x45, 0x67};
+      FlacMetadataHeader header = new FlacMetadataHeader(data);
+      check(header.isLastBlock == ((value & 0x80) != 0)
+          && header.blockType == (value & 0x7F)
+          && header.blockLength == 0x23_4567,
+          "every first-byte bit partition");
+    }
+  }
+
+  private static void lengthDecoding() {
+    int[] lengths = {
+        0, 1, 0xFF, 0x100, 0xFFFF, 0x1_0000, 0x7F_FFFF, 0x80_0000, 0xFF_FFFF
+    };
+    for (int length : lengths) {
+      byte[] data = {
+          0x2A,
+          (byte) (length >>> 16),
+          (byte) (length >>> 8),
+          (byte) length
+      };
+      checkHeader(data, false, 42, length, "unsigned 24-bit length edge");
+    }
+  }
+
+  private static void inputBoundaries() {
+    byte[] extended = {(byte) 0x81, 1, 2, 3, 99, 100};
+    FlacMetadataHeader header = new FlacMetadataHeader(extended);
+    check(header.isLastBlock && header.blockType == 1 && header.blockLength == 0x01_0203,
+        "trailing bytes are ignored");
+    Arrays.fill(extended, (byte) 0);
+    check(header.isLastBlock && header.blockType == 1 && header.blockLength == 0x01_0203,
+        "decoded fields are independent of later input mutation");
+
+    Throwable nullFailure = catchThrowable(() -> new FlacMetadataHeader(null));
+    check(nullFailure instanceof NullPointerException,
+        "null input fails through ByteBuffer wrapping");
+    for (int length = 0; length < FlacMetadataHeader.LENGTH; length++) {
+      int shortLength = length;
+      Throwable failure = catchThrowable(
+          () -> new FlacMetadataHeader(new byte[shortLength]));
+      check(failure instanceof BufferUnderflowException,
+          "every short input fails through the bit reader");
+    }
+  }
+
+  private static void identityAndSubclassing() {
+    byte[] data = {(byte) 0x85, 0, 0, 7};
+    FlacMetadataHeader first = new FlacMetadataHeader(data);
+    FlacMetadataHeader second = new FlacMetadataHeader(data);
+    check(first != second && !first.equals(second) && first.equals(first),
+        "headers retain Object identity equality");
+
+    Derived derived = new Derived(new byte[] {(byte) 0xFE, 0x12, 0x34, 0x56});
+    check(derived.isLastBlock && derived.blockType == 126
+        && derived.blockLength == 0x12_3456,
+        "ordinary subclass inherits construction and fields");
+  }
+
+  private static void reflection() throws Exception {
+    Class<FlacMetadataHeader> type = FlacMetadataHeader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete non-final class metadata");
+    check(type.getDeclaredFields().length == 6 && type.getDeclaredMethods().length == 0
+        && type.getDeclaredConstructors().length == 1,
+        "exact declared member counts");
+
+    checkConstant(type.getDeclaredField("LENGTH"), 4);
+    checkConstant(type.getDeclaredField("BLOCK_SEEKTABLE"), 3);
+    checkConstant(type.getDeclaredField("BLOCK_COMMENT"), 4);
+    checkField(type.getDeclaredField("isLastBlock"), boolean.class);
+    checkField(type.getDeclaredField("blockType"), int.class);
+    checkField(type.getDeclaredField("blockLength"), int.class);
+
+    Constructor<FlacMetadataHeader> constructor = type.getDeclaredConstructor(byte[].class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0
+        && Arrays.equals(constructor.getParameterTypes(), new Class<?>[] {byte[].class}),
+        "constructor descriptor and metadata");
+  }
+
+  private static void checkConstant(Field field, int expected) throws Exception {
+    check(field.getType() == int.class
+        && field.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL)
+        && field.getInt(null) == expected && !field.isSynthetic()
+        && field.getDeclaredAnnotations().length == 0,
+        field.getName() + " constant metadata and value");
+  }
+
+  private static void checkField(Field field, Class<?> fieldType) {
+    check(field.getType() == fieldType
+        && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && !field.isSynthetic() && field.getDeclaredAnnotations().length == 0,
+        field.getName() + " instance field metadata");
+  }
+
+  private static void checkHeader(byte[] data, boolean last, int type, int length,
+      String message) {
+    FlacMetadataHeader header = new FlacMetadataHeader(data);
+    check(header.isLastBlock == last && header.blockType == type
+        && header.blockLength == length, message);
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try {
+      action.run();
+      return null;
+    } catch (Throwable throwable) {
+      return throwable;
+    }
+  }
+
+  @FunctionalInterface
+  private interface ThrowingRunnable {
+    void run() throws Throwable;
+  }
+
+  private static final class Derived extends FlacMetadataHeader {
+    Derived(byte[] data) {
+      super(data);
     }
   }
 

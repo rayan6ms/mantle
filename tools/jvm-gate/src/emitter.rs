@@ -174,6 +174,8 @@ const FLAC_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/FlacContainerProbe";
 const FLAC_FILE_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/FlacFileLoader";
+const FLAC_METADATA_HEADER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/flac/FlacMetadataHeader";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -516,6 +518,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     FLAC_AUDIO_TRACK_CLASS,
     FLAC_CONTAINER_PROBE_CLASS,
     FLAC_FILE_LOADER_CLASS,
+    FLAC_METADATA_HEADER_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -1411,6 +1414,9 @@ fn replacement_body(
     }
     if class_name == FLAC_FILE_LOADER_CLASS {
         return flac_file_loader_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == FLAC_METADATA_HEADER_CLASS {
+        return flac_metadata_header_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -5688,6 +5694,105 @@ fn flac_file_loader_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute
             Instruction::Return,
         ],
     )
+}
+
+fn flac_metadata_header_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "([B)V") => flac_metadata_header_constructor(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {FLAC_METADATA_HEADER_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn flac_metadata_header_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_METADATA_HEADER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let wrap = pool.add_method_ref(byte_buffer, "wrap", "([B)Ljava/nio/ByteBuffer;")?;
+    let bit_reader = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/BitBufferReader")?;
+    let bit_reader_init = pool.add_method_ref(bit_reader, "<init>", "(Ljava/nio/ByteBuffer;)V")?;
+    let as_integer = pool.add_method_ref(bit_reader, "asInteger", "(I)I")?;
+    let is_last_block = pool.add_field_ref(owner, "isLastBlock", "Z")?;
+    let block_type = pool.add_field_ref(owner, "blockType", "I")?;
+    let block_length = pool.add_field_ref(owner, "blockLength", "I")?;
+    let false_target = 16;
+    let put_target = 17;
+    let mut body = code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::New(bit_reader),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Invokestatic(wrap),
+            Instruction::Invokespecial(bit_reader_init),
+            Instruction::Astore_2,
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Iconst_1,
+            Instruction::Invokevirtual(as_integer),
+            Instruction::Iconst_1,
+            Instruction::If_icmpne(false_target),
+            Instruction::Iconst_1,
+            Instruction::Goto(put_target),
+            Instruction::Iconst_0,
+            Instruction::Putfield(is_last_block),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Bipush(7),
+            Instruction::Invokevirtual(as_integer),
+            Instruction::Putfield(block_type),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Bipush(24),
+            Instruction::Invokevirtual(as_integer),
+            Instruction::Putfield(block_length),
+            Instruction::Return,
+        ],
+    )?;
+    let locals = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Object {
+            cpool_index: pool.add_class("[B")?,
+        },
+        VerificationType::Object {
+            cpool_index: bit_reader,
+        },
+    ];
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: false_target,
+                locals: locals.clone(),
+                stack: vec![VerificationType::Object { cpool_index: owner }],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: put_target - false_target - 1,
+                locals,
+                stack: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Integer,
+                ],
+            },
+        ],
+    )?;
+    Ok(body)
 }
 
 fn adts_container_probe_replacement(
