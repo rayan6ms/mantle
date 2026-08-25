@@ -176,6 +176,8 @@ const FLAC_FILE_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/FlacFileLoader";
 const FLAC_METADATA_HEADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/FlacMetadataHeader";
+const FLAC_METADATA_READER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/flac/FlacMetadataReader";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -519,6 +521,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     FLAC_CONTAINER_PROBE_CLASS,
     FLAC_FILE_LOADER_CLASS,
     FLAC_METADATA_HEADER_CLASS,
+    FLAC_METADATA_READER_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -999,6 +1002,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | FLAC_AUDIO_TRACK_CLASS
             | FLAC_CONTAINER_PROBE_CLASS
             | FLAC_FILE_LOADER_CLASS
+            | FLAC_METADATA_READER_CLASS
             | OPUS_AUDIO_DATA_FORMAT_CLASS
             | PCM16_AUDIO_DATA_FORMAT_CLASS
             | OPUS_CHUNK_DECODER_CLASS
@@ -1117,6 +1121,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | FLAC_AUDIO_TRACK_CLASS
             | FLAC_CONTAINER_PROBE_CLASS
             | FLAC_FILE_LOADER_CLASS
+            | FLAC_METADATA_READER_CLASS
             | AUDIO_PIPELINE_FACTORY_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
@@ -1417,6 +1422,9 @@ fn replacement_body(
     }
     if class_name == FLAC_METADATA_HEADER_CLASS {
         return flac_metadata_header_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == FLAC_METADATA_READER_CLASS {
+        return flac_metadata_reader_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -5793,6 +5801,571 @@ fn flac_metadata_header_constructor(pool: &mut ConstantPool<'static>) -> Result<
         ],
     )?;
     Ok(body)
+}
+
+fn flac_metadata_reader_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => flac_metadata_reader_constructor(pool),
+        (
+            "readStreamInfoBlock",
+            "(Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;",
+        ) => flac_metadata_reader_read_stream_info(pool),
+        (
+            "readMetadataHeader",
+            "(Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacMetadataHeader;",
+        ) => flac_metadata_reader_read_header(pool),
+        (
+            "readMetadataBlock",
+            "(Ljava/io/DataInput;Ljava/io/InputStream;Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfoBuilder;)Z",
+        ) => flac_metadata_reader_read_block(pool),
+        (
+            "readCommentBlock",
+            "(Ljava/io/DataInput;Ljava/io/InputStream;Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfoBuilder;)V",
+        ) => flac_metadata_reader_read_comment(pool),
+        (
+            "readSeekTableBlock",
+            "(Ljava/io/DataInput;Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfoBuilder;I)V",
+        ) => flac_metadata_reader_read_seek_table(pool),
+        ("<clinit>", "()V") => flac_metadata_reader_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {FLAC_METADATA_READER_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn flac_metadata_reader_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn flac_metadata_reader_read_header(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let data_input = pool.add_class("java/io/DataInput")?;
+    let read_fully = pool.add_interface_method_ref(data_input, "readFully", "([B)V")?;
+    let header = pool.add_class(FLAC_METADATA_HEADER_CLASS)?;
+    let header_init = pool.add_method_ref(header, "<init>", "([B)V")?;
+    code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Iconst_4,
+            Instruction::Newarray(ArrayType::Byte),
+            Instruction::Astore_1,
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(read_fully, 2),
+            Instruction::New(header),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(header_init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn flac_metadata_reader_read_stream_info(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_METADATA_READER_CLASS)?;
+    let data_input = pool.add_class("java/io/DataInput")?;
+    let read_fully = pool.add_interface_method_ref(data_input, "readFully", "([B)V")?;
+    let header = pool.add_class(FLAC_METADATA_HEADER_CLASS)?;
+    let read_header = pool.add_method_ref(
+        owner,
+        "readMetadataHeader",
+        "(Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacMetadataHeader;",
+    )?;
+    let block_type = pool.add_field_ref(header, "blockType", "I")?;
+    let block_length = pool.add_field_ref(header, "blockLength", "I")?;
+    let is_last_block = pool.add_field_ref(header, "isLastBlock", "Z")?;
+    let illegal_state = pool.add_class("java/lang/IllegalStateException")?;
+    let illegal_state_init =
+        pool.add_method_ref(illegal_state, "<init>", "(Ljava/lang/String;)V")?;
+    let wrong_type = pool.add_string("Wrong metadata block, should be stream info.")?;
+    let wrong_size = pool.add_string("Invalid stream info block size.")?;
+    let stream_info =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo")?;
+    let stream_info_init = pool.add_method_ref(stream_info, "<init>", "([BZ)V")?;
+    let type_valid_target = 11;
+    let size_valid_target = 20;
+    let mut body = code(
+        pool,
+        5,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokestatic(read_header),
+            Instruction::Astore_1,
+            Instruction::Aload_1,
+            Instruction::Getfield(block_type),
+            Instruction::Ifeq(type_valid_target),
+            Instruction::New(illegal_state),
+            Instruction::Dup,
+            Instruction::Ldc_w(wrong_type),
+            Instruction::Invokespecial(illegal_state_init),
+            Instruction::Athrow,
+            Instruction::Aload_1,
+            Instruction::Getfield(block_length),
+            Instruction::Bipush(34),
+            Instruction::If_icmpeq(size_valid_target),
+            Instruction::New(illegal_state),
+            Instruction::Dup,
+            Instruction::Ldc_w(wrong_size),
+            Instruction::Invokespecial(illegal_state_init),
+            Instruction::Athrow,
+            Instruction::Bipush(34),
+            Instruction::Newarray(ArrayType::Byte),
+            Instruction::Astore_2,
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(read_fully, 2),
+            Instruction::New(stream_info),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Aload_1,
+            Instruction::Getfield(is_last_block),
+            Instruction::Iconst_1,
+            Instruction::Ixor,
+            Instruction::Invokespecial(stream_info_init),
+            Instruction::Areturn,
+        ],
+    )?;
+    let locals = vec![
+        VerificationType::Object {
+            cpool_index: data_input,
+        },
+        VerificationType::Object {
+            cpool_index: header,
+        },
+    ];
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: type_valid_target,
+                locals: locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: size_valid_target - type_valid_target - 1,
+                locals,
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn flac_metadata_reader_read_block(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_METADATA_READER_CLASS)?;
+    let data_input = pool.add_class("java/io/DataInput")?;
+    let input_stream = pool.add_class("java/io/InputStream")?;
+    let builder =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfoBuilder")?;
+    let header = pool.add_class(FLAC_METADATA_HEADER_CLASS)?;
+    let read_header = pool.add_method_ref(
+        owner,
+        "readMetadataHeader",
+        "(Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacMetadataHeader;",
+    )?;
+    let block_type = pool.add_field_ref(header, "blockType", "I")?;
+    let block_length = pool.add_field_ref(header, "blockLength", "I")?;
+    let is_last_block = pool.add_field_ref(header, "isLastBlock", "Z")?;
+    let read_seek_table = pool.add_method_ref(
+        owner,
+        "readSeekTableBlock",
+        "(Ljava/io/DataInput;Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfoBuilder;I)V",
+    )?;
+    let read_comment = pool.add_method_ref(
+        owner,
+        "readCommentBlock",
+        "(Ljava/io/DataInput;Ljava/io/InputStream;Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfoBuilder;)V",
+    )?;
+    let io_utils = pool.add_class("org/apache/commons/io/IOUtils")?;
+    let skip_fully = pool.add_method_ref(io_utils, "skipFully", "(Ljava/io/InputStream;J)V")?;
+    let comment_target = 13;
+    let unknown_target = 22;
+    let return_target = 27;
+    let mut body = code(
+        pool,
+        3,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokestatic(read_header),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Getfield(block_type),
+            Instruction::Iconst_3,
+            Instruction::If_icmpne(comment_target),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Aload_3,
+            Instruction::Getfield(block_length),
+            Instruction::Invokestatic(read_seek_table),
+            Instruction::Goto(return_target),
+            Instruction::Aload_3,
+            Instruction::Getfield(block_type),
+            Instruction::Iconst_4,
+            Instruction::If_icmpne(unknown_target),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Invokestatic(read_comment),
+            Instruction::Goto(return_target),
+            Instruction::Aload_1,
+            Instruction::Aload_3,
+            Instruction::Getfield(block_length),
+            Instruction::I2l,
+            Instruction::Invokestatic(skip_fully),
+            Instruction::Aload_3,
+            Instruction::Getfield(is_last_block),
+            Instruction::Iconst_1,
+            Instruction::Ixor,
+            Instruction::Ireturn,
+        ],
+    )?;
+    let locals = vec![
+        VerificationType::Object {
+            cpool_index: data_input,
+        },
+        VerificationType::Object {
+            cpool_index: input_stream,
+        },
+        VerificationType::Object {
+            cpool_index: builder,
+        },
+        VerificationType::Object {
+            cpool_index: header,
+        },
+    ];
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: comment_target,
+                locals: locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: unknown_target - comment_target - 1,
+                locals: locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: return_target - unknown_target - 1,
+                locals,
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn flac_metadata_reader_read_comment(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_METADATA_READER_CLASS)?;
+    let data_input = pool.add_class("java/io/DataInput")?;
+    let input_stream = pool.add_class("java/io/InputStream")?;
+    let builder =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfoBuilder")?;
+    let read_int = pool.add_interface_method_ref(data_input, "readInt", "()I")?;
+    let read_fully = pool.add_interface_method_ref(data_input, "readFully", "([B)V")?;
+    let integer = pool.add_class("java/lang/Integer")?;
+    let reverse_bytes = pool.add_method_ref(integer, "reverseBytes", "(I)I")?;
+    let io_utils = pool.add_class("org/apache/commons/io/IOUtils")?;
+    let skip_fully = pool.add_method_ref(io_utils, "skipFully", "(Ljava/io/InputStream;J)V")?;
+    let string = pool.add_class("java/lang/String")?;
+    let string_init = pool.add_method_ref(string, "<init>", "([BIILjava/nio/charset/Charset;)V")?;
+    let split = pool.add_method_ref(string, "split", "(Ljava/lang/String;I)[Ljava/lang/String;")?;
+    let uppercase = pool.add_method_ref(string, "toUpperCase", "()Ljava/lang/String;")?;
+    let charset = pool.add_field_ref(owner, "CHARSET", "Ljava/nio/charset/Charset;")?;
+    let equals = pool.add_string("=")?;
+    let add_tag =
+        pool.add_method_ref(builder, "addTag", "(Ljava/lang/String;Ljava/lang/String;)V")?;
+    let byte_array = pool.add_class("[B")?;
+    let string_array = pool.add_class("[Ljava/lang/String;")?;
+    let loop_target = 14;
+    let continue_target = 54;
+    let return_target = 56;
+    let mut body = code(
+        pool,
+        6,
+        10,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokeinterface(read_int, 1),
+            Instruction::Invokestatic(reverse_bytes),
+            Instruction::Istore_3,
+            Instruction::Aload_1,
+            Instruction::Iload_3,
+            Instruction::I2l,
+            Instruction::Invokestatic(skip_fully),
+            Instruction::Aload_0,
+            Instruction::Invokeinterface(read_int, 1),
+            Instruction::Invokestatic(reverse_bytes),
+            Instruction::Istore(4),
+            Instruction::Iconst_0,
+            Instruction::Istore(5),
+            Instruction::Iload(5),
+            Instruction::Iload(4),
+            Instruction::If_icmpge(return_target),
+            Instruction::Aload_0,
+            Instruction::Invokeinterface(read_int, 1),
+            Instruction::Invokestatic(reverse_bytes),
+            Instruction::Istore(6),
+            Instruction::Iload(6),
+            Instruction::Newarray(ArrayType::Byte),
+            Instruction::Astore(7),
+            Instruction::Aload_0,
+            Instruction::Aload(7),
+            Instruction::Invokeinterface(read_fully, 2),
+            Instruction::New(string),
+            Instruction::Dup,
+            Instruction::Aload(7),
+            Instruction::Iconst_0,
+            Instruction::Aload(7),
+            Instruction::Arraylength,
+            Instruction::Getstatic(charset),
+            Instruction::Invokespecial(string_init),
+            Instruction::Astore(8),
+            Instruction::Aload(8),
+            Instruction::Ldc_w(equals),
+            Instruction::Iconst_2,
+            Instruction::Invokevirtual(split),
+            Instruction::Astore(9),
+            Instruction::Aload(9),
+            Instruction::Arraylength,
+            Instruction::Iconst_1,
+            Instruction::If_icmple(continue_target),
+            Instruction::Aload_2,
+            Instruction::Aload(9),
+            Instruction::Iconst_0,
+            Instruction::Aaload,
+            Instruction::Invokevirtual(uppercase),
+            Instruction::Aload(9),
+            Instruction::Iconst_1,
+            Instruction::Aaload,
+            Instruction::Invokevirtual(add_tag),
+            Instruction::Iinc(5, 1),
+            Instruction::Goto(loop_target),
+            Instruction::Return,
+        ],
+    )?;
+    let loop_locals = vec![
+        VerificationType::Object {
+            cpool_index: data_input,
+        },
+        VerificationType::Object {
+            cpool_index: input_stream,
+        },
+        VerificationType::Object {
+            cpool_index: builder,
+        },
+        VerificationType::Integer,
+        VerificationType::Integer,
+        VerificationType::Integer,
+    ];
+    let mut body_locals = loop_locals.clone();
+    body_locals.extend([
+        VerificationType::Integer,
+        VerificationType::Object {
+            cpool_index: byte_array,
+        },
+        VerificationType::Object {
+            cpool_index: string,
+        },
+        VerificationType::Object {
+            cpool_index: string_array,
+        },
+    ]);
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: loop_target,
+                locals: loop_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: continue_target - loop_target - 1,
+                locals: body_locals,
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: return_target - continue_target - 1,
+                locals: loop_locals,
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn flac_metadata_reader_read_seek_table(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let data_input = pool.add_class("java/io/DataInput")?;
+    let builder =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfoBuilder")?;
+    let seek_point =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/flac/FlacSeekPoint")?;
+    let read_long = pool.add_interface_method_ref(data_input, "readLong", "()J")?;
+    let read_unsigned_short =
+        pool.add_interface_method_ref(data_input, "readUnsignedShort", "()I")?;
+    let seek_point_init = pool.add_method_ref(seek_point, "<init>", "(JJI)V")?;
+    let set_seek_points = pool.add_method_ref(
+        builder,
+        "setSeekPoints",
+        "([Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacSeekPoint;I)V",
+    )?;
+    let minus_one = pool.add_long(-1)?;
+    let seek_point_array =
+        pool.add_class("[Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacSeekPoint;")?;
+    let loop_target = 9;
+    let continue_target = 39;
+    let end_target = 41;
+    let mut body = code(
+        pool,
+        9,
+        11,
+        vec![
+            Instruction::Iload_2,
+            Instruction::Bipush(18),
+            Instruction::Idiv,
+            Instruction::Anewarray(seek_point),
+            Instruction::Astore_3,
+            Instruction::Iconst_0,
+            Instruction::Istore(4),
+            Instruction::Iconst_0,
+            Instruction::Istore(5),
+            Instruction::Iload(5),
+            Instruction::Aload_3,
+            Instruction::Arraylength,
+            Instruction::If_icmpge(end_target),
+            Instruction::Aload_0,
+            Instruction::Invokeinterface(read_long, 1),
+            Instruction::Lstore(6),
+            Instruction::Aload_0,
+            Instruction::Invokeinterface(read_long, 1),
+            Instruction::Lstore(8),
+            Instruction::Aload_0,
+            Instruction::Invokeinterface(read_unsigned_short, 1),
+            Instruction::Istore(10),
+            Instruction::Aload_3,
+            Instruction::Iload(5),
+            Instruction::New(seek_point),
+            Instruction::Dup,
+            Instruction::Lload(6),
+            Instruction::Lload(8),
+            Instruction::Iload(10),
+            Instruction::Invokespecial(seek_point_init),
+            Instruction::Aastore,
+            Instruction::Lload(6),
+            Instruction::Ldc2_w(minus_one),
+            Instruction::Lcmp,
+            Instruction::Ifeq(continue_target),
+            Instruction::Iload(5),
+            Instruction::Iconst_1,
+            Instruction::Iadd,
+            Instruction::Istore(4),
+            Instruction::Iinc(5, 1),
+            Instruction::Goto(loop_target),
+            Instruction::Aload_1,
+            Instruction::Aload_3,
+            Instruction::Iload(4),
+            Instruction::Invokevirtual(set_seek_points),
+            Instruction::Return,
+        ],
+    )?;
+    let loop_locals = vec![
+        VerificationType::Object {
+            cpool_index: data_input,
+        },
+        VerificationType::Object {
+            cpool_index: builder,
+        },
+        VerificationType::Integer,
+        VerificationType::Object {
+            cpool_index: seek_point_array,
+        },
+        VerificationType::Integer,
+        VerificationType::Integer,
+    ];
+    let mut body_locals = loop_locals.clone();
+    body_locals.extend([
+        VerificationType::Long,
+        VerificationType::Long,
+        VerificationType::Integer,
+    ]);
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: loop_target,
+                locals: loop_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: continue_target - loop_target - 1,
+                locals: body_locals,
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: end_target - continue_target - 1,
+                locals: loop_locals,
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn flac_metadata_reader_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_METADATA_READER_CLASS)?;
+    let standard_charsets = pool.add_class("java/nio/charset/StandardCharsets")?;
+    let utf8 = pool.add_field_ref(standard_charsets, "UTF_8", "Ljava/nio/charset/Charset;")?;
+    let charset = pool.add_field_ref(owner, "CHARSET", "Ljava/nio/charset/Charset;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Getstatic(utf8),
+            Instruction::Putstatic(charset),
+            Instruction::Return,
+        ],
+    )
 }
 
 fn adts_container_probe_replacement(

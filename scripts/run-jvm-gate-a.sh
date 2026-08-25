@@ -8,6 +8,7 @@ readonly WORK="$ROOT/target/gate-a"
 readonly CLASSES="$WORK/consumer-classes"
 readonly FLAC_CLASSES="$WORK/flac-consumer-classes"
 readonly FLAC_LOADER_CLASSES="$WORK/flac-loader-consumer-classes"
+readonly FLAC_METADATA_READER_CLASSES="$WORK/flac-metadata-reader-consumer-classes"
 readonly JAR="$WORK/mantle-gate-a.jar"
 readonly MISMATCH_JAR="$WORK/mantle-gate-a-mismatch.jar"
 
@@ -16,8 +17,10 @@ if [[ ! -f "$REFERENCE_JAR" ]]; then
   exit 1
 fi
 
-rm -rf -- "$CLASSES" "$FLAC_CLASSES" "$FLAC_LOADER_CLASSES"
-mkdir -p "$CLASSES" "$FLAC_CLASSES" "$FLAC_LOADER_CLASSES"
+rm -rf -- "$CLASSES" "$FLAC_CLASSES" "$FLAC_LOADER_CLASSES" \
+  "$FLAC_METADATA_READER_CLASSES"
+mkdir -p "$CLASSES" "$FLAC_CLASSES" "$FLAC_LOADER_CLASSES" \
+  "$FLAC_METADATA_READER_CLASSES"
 cargo build --locked -p mantle-jvm --features gate-a-direct-attachment
 cargo run --locked -q -p mantle-jvm-gate -- emit \
   --reference-jar "$REFERENCE_JAR" --output "$JAR" --expected-abi 1 \
@@ -254,6 +257,10 @@ cargo run --locked -q -p mantle-jvm-gate -- write-flac-file-loader-support-consu
   --output "$WORK/FlacLoaderGateSupport.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-metadata-header-consumer \
   --output "$WORK/GateFlacMetadataHeader.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-flac-metadata-reader-consumer \
+  --output "$WORK/GateFlacMetadataReader.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-flac-metadata-reader-support-consumer \
+  --output "$WORK/FlacMetadataReaderGateSupport.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -359,6 +366,7 @@ if command -v cygpath >/dev/null 2>&1; then
   classes_argument="$(cygpath -w "$CLASSES")"
   flac_classes_argument="$(cygpath -w "$FLAC_CLASSES")"
   flac_loader_classes_argument="$(cygpath -w "$FLAC_LOADER_CLASSES")"
+  flac_metadata_reader_classes_argument="$(cygpath -w "$FLAC_METADATA_READER_CLASSES")"
   jar_argument="$(cygpath -w "$JAR")"
   reference_argument="$(cygpath -w "$REFERENCE_JAR")"
 else
@@ -366,6 +374,7 @@ else
   classes_argument="$CLASSES"
   flac_classes_argument="$FLAC_CLASSES"
   flac_loader_classes_argument="$FLAC_LOADER_CLASSES"
+  flac_metadata_reader_classes_argument="$FLAC_METADATA_READER_CLASSES"
   jar_argument="$JAR"
   reference_argument="$REFERENCE_JAR"
 fi
@@ -389,6 +398,10 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   -d "$FLAC_LOADER_CLASSES" \
   "$WORK/GateFlacFileLoader.java" \
   "$WORK/FlacLoaderGateSupport.java"
+javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -d "$FLAC_METADATA_READER_CLASSES" \
+  "$WORK/GateFlacMetadataReader.java" \
+  "$WORK/FlacMetadataReaderGateSupport.java"
 
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateAdtsStreamProvider.java" \
@@ -1353,6 +1366,19 @@ cmp "$WORK/flac-metadata-header-reference.txt" \
 grep --fixed-strings \
   'contracts=constants,last-flag,block-type,unsigned-length,big-endian,all-first-bytes,length-edges,minimum-input,trailing-input,input-snapshot,null-input,short-input,identity-semantics,subclassable,public-final-fields,constant-values,reflection' \
   "$WORK/flac-metadata-header-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$flac_metadata_reader_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  com.sedmelluq.discord.lavaplayer.container.flac.GateFlacMetadataReader \
+  >"$WORK/flac-metadata-reader-reference.txt"
+java -Xverify:all \
+  -cp "$flac_metadata_reader_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  com.sedmelluq.discord.lavaplayer.container.flac.GateFlacMetadataReader \
+  >"$WORK/flac-metadata-reader-candidate.txt"
+cmp "$WORK/flac-metadata-reader-reference.txt" \
+  "$WORK/flac-metadata-reader-candidate.txt"
+grep --fixed-strings \
+  'contracts=construction,charset,stream-header,stream-type,stream-size,stream-payload,last-inversion,read-order,unknown-skip,zero-skip,short-skip,block-continuation,seek-division,seek-remainder,seek-values,placeholder-count,seek-array-identity,comment-vendor-skip,little-endian,comment-count,utf8,split-limit,uppercase-locale,ignored-comments,declared-length-ignored,nulls,header-failure,payload-failure,stream-info-failure,seek-failure,builder-failure,tag-failure,private-helpers,static-methods,throws,subclassable,reflection' \
+  "$WORK/flac-metadata-reader-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"

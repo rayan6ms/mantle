@@ -2527,9 +2527,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[2].completed_slices[].symbols] | add) == .cohorts[2].classified_symbols and
   (.cohorts[2].classified_symbols + .cohorts[2].remaining_symbols) == .cohorts[2].symbols and
   .cohorts[3].status == "IN_PROGRESS" and
-  .cohorts[3].classified_symbols == 128 and
-  .cohorts[3].remaining_symbols == 696 and
-  (.cohorts[3].completed_slices | length) == 19 and
+  .cohorts[3].classified_symbols == 132 and
+  .cohorts[3].remaining_symbols == 692 and
+  (.cohorts[3].completed_slices | length) == 20 and
   .cohorts[3].completed_slices[0] == {
     id: "formats-contracts",
     classes: 1,
@@ -2777,11 +2777,24 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "tools/jvm-gate/src/main.rs"
     ]
   } and
+  .cohorts[3].completed_slices[19] == {
+    id: "flac-metadata-reader-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 3,
+    symbols: 4,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
   ([.cohorts[3].completed_slices[].symbols] | add) == .cohorts[3].classified_symbols and
   (.cohorts[3].classified_symbols + .cohorts[3].remaining_symbols) == .cohorts[3].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1580 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1584 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1435 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1439 and
   ([$classifications.symbols[] |
     select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 129 and
   ([$classifications.symbols[] |
@@ -2828,6 +2841,13 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
       (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
       (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 8 and
+  ([$classifications.symbols[] |
+    select(.binary_name ==
+      "com.sedmelluq.discord.lavaplayer.container.flac.FlacMetadataReader" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 4 and
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.container.Formats" and
@@ -3447,6 +3467,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.container.flac.FlacContainerProbe",
         "com.sedmelluq.discord.lavaplayer.container.flac.FlacFileLoader",
         "com.sedmelluq.discord.lavaplayer.container.flac.FlacMetadataHeader",
+        "com.sedmelluq.discord.lavaplayer.container.flac.FlacMetadataReader",
         "com.sedmelluq.discord.lavaplayer.filter.AudioFilterChain",
         "com.sedmelluq.discord.lavaplayer.filter.AudioPipeline",
         "com.sedmelluq.discord.lavaplayer.filter.AudioPipelineFactory",
@@ -3924,7 +3945,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "flac-metadata-reader-contracts" and
+  .phase_entry.next_slice == "flac-seek-point-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 JQ
@@ -3932,7 +3953,7 @@ JQ
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '232 reference classes / 1,592 symbols' \
+  '233 reference classes / 1,596 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -3942,4 +3963,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 1,580 classified symbols and 1,182 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 1,584 classified symbols and 1,178 unassessed symbols.\n'

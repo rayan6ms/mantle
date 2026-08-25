@@ -170,6 +170,10 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-flac-file-loader-consumer" => Some(FLAC_FILE_LOADER_CONSUMER),
         "write-flac-file-loader-support-consumer" => Some(FLAC_FILE_LOADER_SUPPORT_CONSUMER),
         "write-flac-metadata-header-consumer" => Some(FLAC_METADATA_HEADER_CONSUMER),
+        "write-flac-metadata-reader-consumer" => Some(FLAC_METADATA_READER_CONSUMER),
+        "write-flac-metadata-reader-support-consumer" => {
+            Some(FLAC_METADATA_READER_SUPPORT_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -15539,6 +15543,466 @@ public final class GateFlacMetadataHeader {
       super(data);
     }
   }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const FLAC_METADATA_READER_SUPPORT_CONSUMER: &str = r#"
+package com.sedmelluq.discord.lavaplayer.container.flac;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public final class FlacMetadataReaderGateSupport {
+  public static byte[] streamInfoData;
+  public static boolean streamInfoHasMetadata;
+  public static Object seekPoints;
+  public static int seekPointCount;
+  public static int seekPointConstructions;
+  public static final List<Long> sampleIndexes = new ArrayList<>();
+  public static final List<Long> byteOffsets = new ArrayList<>();
+  public static final List<Integer> sampleCounts = new ArrayList<>();
+  public static final List<String> tags = new ArrayList<>();
+  public static final StringBuilder events = new StringBuilder();
+  public static RuntimeException streamInfoFailure;
+  public static RuntimeException seekPointFailure;
+  public static int seekPointFailureAt;
+  public static RuntimeException setSeekPointsFailure;
+  public static RuntimeException addTagFailure;
+
+  private FlacMetadataReaderGateSupport() {}
+
+  public static void reset() {
+    streamInfoData = null;
+    streamInfoHasMetadata = false;
+    seekPoints = null;
+    seekPointCount = Integer.MIN_VALUE;
+    seekPointConstructions = 0;
+    sampleIndexes.clear();
+    byteOffsets.clear();
+    sampleCounts.clear();
+    tags.clear();
+    events.setLength(0);
+    streamInfoFailure = null;
+    seekPointFailure = null;
+    seekPointFailureAt = -1;
+    setSeekPointsFailure = null;
+    addTagFailure = null;
+  }
+
+  static void event(String value) {
+    if (events.length() > 0) events.append(',');
+    events.append(value);
+  }
+}
+
+class FlacStreamInfo {
+  FlacStreamInfo(byte[] data, boolean hasMetadataBlocks) {
+    FlacMetadataReaderGateSupport.event("stream-info");
+    FlacMetadataReaderGateSupport.streamInfoData = data;
+    FlacMetadataReaderGateSupport.streamInfoHasMetadata = hasMetadataBlocks;
+    if (FlacMetadataReaderGateSupport.streamInfoFailure != null) {
+      throw FlacMetadataReaderGateSupport.streamInfoFailure;
+    }
+  }
+}
+
+class FlacSeekPoint {
+  final long sampleIndex;
+  final long byteOffset;
+  final int sampleCount;
+
+  FlacSeekPoint(long sampleIndex, long byteOffset, int sampleCount) {
+    int call = FlacMetadataReaderGateSupport.seekPointConstructions++;
+    FlacMetadataReaderGateSupport.event("seek-point-" + call);
+    if (FlacMetadataReaderGateSupport.seekPointFailure != null
+        && call == FlacMetadataReaderGateSupport.seekPointFailureAt) {
+      throw FlacMetadataReaderGateSupport.seekPointFailure;
+    }
+    this.sampleIndex = sampleIndex;
+    this.byteOffset = byteOffset;
+    this.sampleCount = sampleCount;
+    FlacMetadataReaderGateSupport.sampleIndexes.add(sampleIndex);
+    FlacMetadataReaderGateSupport.byteOffsets.add(byteOffset);
+    FlacMetadataReaderGateSupport.sampleCounts.add(sampleCount);
+  }
+}
+
+class FlacTrackInfoBuilder {
+  void setSeekPoints(FlacSeekPoint[] points, int count) {
+    FlacMetadataReaderGateSupport.event("set-seek-points");
+    FlacMetadataReaderGateSupport.seekPoints = points;
+    FlacMetadataReaderGateSupport.seekPointCount = count;
+    if (FlacMetadataReaderGateSupport.setSeekPointsFailure != null) {
+      throw FlacMetadataReaderGateSupport.setSeekPointsFailure;
+    }
+  }
+
+  void addTag(String key, String value) {
+    FlacMetadataReaderGateSupport.event("tag-" + key);
+    FlacMetadataReaderGateSupport.tags.add(key + "=" + value);
+    if (FlacMetadataReaderGateSupport.addTagFailure != null) {
+      throw FlacMetadataReaderGateSupport.addTagFailure;
+    }
+  }
+}
+"#;
+
+const FLAC_METADATA_READER_CONSUMER: &str = r#"
+package com.sedmelluq.discord.lavaplayer.container.flac;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInput;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Locale;
+
+public final class GateFlacMetadataReader {
+  public static void main(String[] args) throws Exception {
+    constructionAndStreamInfo();
+    streamInfoFailures();
+    unknownBlocks();
+    seekTables();
+    comments();
+    downstreamFailures();
+    reflection();
+    System.out.println(
+        "contracts=construction,charset,stream-header,stream-type,stream-size,stream-payload,last-inversion,read-order,unknown-skip,zero-skip,short-skip,block-continuation,seek-division,seek-remainder,seek-values,placeholder-count,seek-array-identity,comment-vendor-skip,little-endian,comment-count,utf8,split-limit,uppercase-locale,ignored-comments,declared-length-ignored,nulls,header-failure,payload-failure,stream-info-failure,seek-failure,builder-failure,tag-failure,private-helpers,static-methods,throws,subclassable,reflection");
+  }
+
+  private static void constructionAndStreamInfo() throws Exception {
+    FlacMetadataReader first = new FlacMetadataReader();
+    FlacMetadataReader second = new FlacMetadataReader();
+    check(first != second && !first.equals(second) && first.equals(first),
+        "reader retains ordinary Object identity semantics");
+    Derived derived = new Derived();
+    check(derived instanceof FlacMetadataReader, "reader is ordinarily subclassable");
+
+    for (boolean last : new boolean[] {false, true}) {
+      FlacMetadataReaderGateSupport.reset();
+      byte[] payload = new byte[34];
+      for (int index = 0; index < payload.length; index++) payload[index] = (byte) (index * 7);
+      DataInputStream input = input(concat(header(last, 0, 34), payload));
+      Object info = FlacMetadataReader.readStreamInfoBlock(input);
+      check(info != null && Arrays.equals(FlacMetadataReaderGateSupport.streamInfoData, payload)
+          && FlacMetadataReaderGateSupport.streamInfoData != payload
+          && FlacMetadataReaderGateSupport.streamInfoHasMetadata == !last
+          && input.available() == 0
+          && FlacMetadataReaderGateSupport.events.toString().equals("stream-info"),
+          "stream info header, payload, and last-block inversion");
+    }
+  }
+
+  private static void streamInfoFailures() throws Exception {
+    FlacMetadataReaderGateSupport.reset();
+    DataInputStream wrongType = input(concat(header(false, 1, 34), new byte[34]));
+    Throwable typeFailure = catchThrowable(
+        () -> FlacMetadataReader.readStreamInfoBlock(wrongType));
+    check(typeFailure instanceof IllegalStateException
+        && "Wrong metadata block, should be stream info.".equals(typeFailure.getMessage())
+        && wrongType.available() == 34 && FlacMetadataReaderGateSupport.streamInfoData == null,
+        "wrong stream-info type fails before payload consumption");
+
+    DataInputStream wrongSize = input(concat(header(false, 0, 33), new byte[34]));
+    Throwable sizeFailure = catchThrowable(
+        () -> FlacMetadataReader.readStreamInfoBlock(wrongSize));
+    check(sizeFailure instanceof IllegalStateException
+        && "Invalid stream info block size.".equals(sizeFailure.getMessage())
+        && wrongSize.available() == 34,
+        "wrong stream-info size fails before payload consumption");
+
+    check(catchThrowable(() -> FlacMetadataReader.readStreamInfoBlock(
+        input(new byte[3]))) instanceof EOFException, "short metadata header propagates EOF");
+    check(catchThrowable(() -> FlacMetadataReader.readStreamInfoBlock(
+        input(concat(header(false, 0, 34), new byte[33])))) instanceof EOFException,
+        "short stream-info payload propagates EOF");
+    check(catchThrowable(() -> FlacMetadataReader.readStreamInfoBlock(null))
+        instanceof NullPointerException, "null data input fails before allocation escapes");
+  }
+
+  private static void unknownBlocks() throws Exception {
+    FlacMetadataReaderGateSupport.reset();
+    DataInputStream ordinary = input(concat(header(false, 2, 5), new byte[] {1, 2, 3, 4, 5, 9}));
+    check(FlacMetadataReader.readMetadataBlock(ordinary, ordinary, null)
+        && ordinary.readUnsignedByte() == 9,
+        "unknown block skips exact declared length and returns continuation");
+
+    DataInputStream last = input(header(true, 127, 0));
+    check(!FlacMetadataReader.readMetadataBlock(last, last, null) && last.available() == 0,
+        "zero-length last unknown block returns false");
+
+    DataInputStream shortBody = input(concat(header(false, 2, 4), new byte[3]));
+    check(catchThrowable(() -> FlacMetadataReader.readMetadataBlock(
+        shortBody, shortBody, null)) instanceof EOFException,
+        "short unknown block skip propagates EOF");
+    check(catchThrowable(() -> FlacMetadataReader.readMetadataBlock(
+        null, new ByteArrayInputStream(new byte[0]), null)) instanceof NullPointerException,
+        "null data input fails while reading the header");
+    check(FlacMetadataReader.readMetadataBlock(
+        input(header(false, 2, 0)), null, null),
+        "zero-length unknown block accepts a null input stream");
+  }
+
+  private static void seekTables() throws Exception {
+    FlacMetadataReaderGateSupport.reset();
+    byte[] points = seekPoints(
+        new long[] {10, -1, 30}, new long[] {20, 40, Long.MAX_VALUE},
+        new int[] {30, 50, 65_535});
+    DataInputStream input = input(concat(header(false, 3, points.length + 1), points,
+        new byte[] {77}));
+    FlacTrackInfoBuilder builder = new FlacTrackInfoBuilder();
+    check(FlacMetadataReader.readMetadataBlock(input, input, builder)
+        && FlacMetadataReaderGateSupport.seekPointConstructions == 3
+        && FlacMetadataReaderGateSupport.seekPointCount == 3
+        && FlacMetadataReaderGateSupport.sampleIndexes.equals(Arrays.asList(10L, -1L, 30L))
+        && FlacMetadataReaderGateSupport.byteOffsets.equals(
+            Arrays.asList(20L, 40L, Long.MAX_VALUE))
+        && FlacMetadataReaderGateSupport.sampleCounts.equals(Arrays.asList(30, 50, 65_535))
+        && ((Object[]) FlacMetadataReaderGateSupport.seekPoints).length == 3
+        && input.readUnsignedByte() == 77,
+        "seek table truncates remainder and preserves exact entries");
+
+    FlacMetadataReaderGateSupport.reset();
+    byte[] trailingPlaceholders = seekPoints(
+        new long[] {9, -1, -1}, new long[] {1, 2, 3}, new int[] {4, 5, 6});
+    DataInputStream placeholderInput = input(concat(
+        header(true, 3, trailingPlaceholders.length), trailingPlaceholders));
+    check(!FlacMetadataReader.readMetadataBlock(
+        placeholderInput, placeholderInput, new FlacTrackInfoBuilder())
+        && FlacMetadataReaderGateSupport.seekPointCount == 1,
+        "seek-point count is the last non-placeholder index plus one");
+
+    FlacMetadataReaderGateSupport.reset();
+    DataInputStream tiny = input(concat(header(false, 3, 17), new byte[17]));
+    check(FlacMetadataReader.readMetadataBlock(tiny, tiny, new FlacTrackInfoBuilder())
+        && ((Object[]) FlacMetadataReaderGateSupport.seekPoints).length == 0
+        && FlacMetadataReaderGateSupport.seekPointCount == 0 && tiny.available() == 17,
+        "sub-entry seek-table length reads zero points and leaves bytes untouched");
+  }
+
+  private static void comments() throws Exception {
+    Locale previous = Locale.getDefault();
+    Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+    try {
+      FlacMetadataReaderGateSupport.reset();
+      byte[] vendor = "vendor".getBytes(StandardCharsets.UTF_8);
+      String[] comments = {
+          "title=Hello=World", "artist=", "ignored", "=blank", "mixi=value", "mötley=Crüe"
+      };
+      byte[] body = commentBody(vendor, comments);
+      DataInputStream input = input(concat(header(false, 4, 0), body));
+      check(FlacMetadataReader.readMetadataBlock(input, input, new FlacTrackInfoBuilder())
+          && input.available() == 0
+          && FlacMetadataReaderGateSupport.tags.equals(Arrays.asList(
+              "TİTLE=Hello=World", "ARTİST=", "=blank", "MİXİ=value", "MÖTLEY=Crüe")),
+          "comment parsing uses UTF-8, split limit two, and default-locale uppercase");
+    } finally {
+      Locale.setDefault(previous);
+    }
+
+    FlacMetadataReaderGateSupport.reset();
+    byte[] dataSide = concat(header(true, 4, 1), littleInt(3), littleInt(1),
+        littleInt(3), "x=y".getBytes(StandardCharsets.UTF_8));
+    DataInputStream dataInput = input(dataSide);
+    ByteArrayInputStream vendorInput = new ByteArrayInputStream(new byte[] {7, 8, 9});
+    check(!FlacMetadataReader.readMetadataBlock(
+        dataInput, vendorInput, new FlacTrackInfoBuilder())
+        && vendorInput.available() == 0
+        && FlacMetadataReaderGateSupport.tags.equals(Arrays.asList("X=y")),
+        "vendor skip uses the separate InputStream identity and ignores declared block length");
+
+    FlacMetadataReaderGateSupport.reset();
+    DataInputStream negativeCount = input(concat(
+        header(false, 4, 0), littleInt(0), littleInt(-1), new byte[] {99}));
+    check(FlacMetadataReader.readMetadataBlock(
+        negativeCount, negativeCount, new FlacTrackInfoBuilder())
+        && negativeCount.readUnsignedByte() == 99
+        && FlacMetadataReaderGateSupport.tags.isEmpty(),
+        "negative comment count executes zero iterations");
+
+    FlacMetadataReaderGateSupport.reset();
+    DataInputStream negativeLength = input(concat(
+        header(false, 4, 0), littleInt(0), littleInt(1), littleInt(-1)));
+    check(catchThrowable(() -> FlacMetadataReader.readMetadataBlock(
+        negativeLength, negativeLength, new FlacTrackInfoBuilder()))
+        instanceof NegativeArraySizeException, "negative comment length fails at allocation");
+  }
+
+  private static void downstreamFailures() throws Exception {
+    RuntimeException streamFailure = new RuntimeException("stream-info-failure");
+    FlacMetadataReaderGateSupport.reset();
+    FlacMetadataReaderGateSupport.streamInfoFailure = streamFailure;
+    check(catchThrowable(() -> FlacMetadataReader.readStreamInfoBlock(input(concat(
+        header(false, 0, 34), new byte[34])))) == streamFailure,
+        "stream-info constructor failure identity propagates");
+
+    RuntimeException pointFailure = new RuntimeException("seek-point-failure");
+    FlacMetadataReaderGateSupport.reset();
+    FlacMetadataReaderGateSupport.seekPointFailure = pointFailure;
+    FlacMetadataReaderGateSupport.seekPointFailureAt = 1;
+    byte[] points = seekPoints(new long[] {1, 2}, new long[] {3, 4}, new int[] {5, 6});
+    DataInputStream pointInput = input(concat(header(false, 3, points.length), points));
+    check(catchThrowable(() -> FlacMetadataReader.readMetadataBlock(
+        pointInput, pointInput, new FlacTrackInfoBuilder())) == pointFailure
+        && FlacMetadataReaderGateSupport.seekPointConstructions == 2
+        && FlacMetadataReaderGateSupport.seekPoints == null,
+        "seek-point failure stops before builder publication");
+
+    RuntimeException seekBuilderFailure = new RuntimeException("set-seek-failure");
+    FlacMetadataReaderGateSupport.reset();
+    FlacMetadataReaderGateSupport.setSeekPointsFailure = seekBuilderFailure;
+    DataInputStream setInput = input(header(false, 3, 0));
+    check(catchThrowable(() -> FlacMetadataReader.readMetadataBlock(
+        setInput, setInput, new FlacTrackInfoBuilder())) == seekBuilderFailure,
+        "seek builder failure identity propagates");
+
+    RuntimeException tagFailure = new RuntimeException("tag-failure");
+    FlacMetadataReaderGateSupport.reset();
+    FlacMetadataReaderGateSupport.addTagFailure = tagFailure;
+    byte[] comment = commentBody(new byte[0], new String[] {"a=b", "c=d"});
+    DataInputStream tagInput = input(concat(header(false, 4, comment.length), comment));
+    check(catchThrowable(() -> FlacMetadataReader.readMetadataBlock(
+        tagInput, tagInput, new FlacTrackInfoBuilder())) == tagFailure
+        && FlacMetadataReaderGateSupport.tags.equals(Arrays.asList("A=b")),
+        "tag failure stops the comment loop and propagates identity");
+
+    byte[] onePoint = seekPoints(new long[] {1}, new long[] {2}, new int[] {3});
+    DataInputStream nullBuilder = input(concat(header(false, 3, 18), onePoint));
+    check(catchThrowable(() -> FlacMetadataReader.readMetadataBlock(
+        nullBuilder, nullBuilder, null)) instanceof NullPointerException,
+        "seek block dereferences null builder after consuming entries");
+  }
+
+  private static void reflection() throws Exception {
+    Class<FlacMetadataReader> type = FlacMetadataReader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete non-final reader metadata");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredMethods().length == 5
+        && type.getDeclaredConstructors().length == 1,
+        "exact declared member counts");
+
+    Field charset = type.getDeclaredField("CHARSET");
+    charset.setAccessible(true);
+    check(charset.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && charset.getType() == java.nio.charset.Charset.class
+        && charset.get(null) == StandardCharsets.UTF_8 && !charset.isSynthetic(),
+        "private UTF-8 charset identity and metadata");
+
+    Constructor<FlacMetadataReader> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    checkMethod(type.getDeclaredMethod("readStreamInfoBlock", DataInput.class),
+        Modifier.PUBLIC | Modifier.STATIC,
+        "com.sedmelluq.discord.lavaplayer.container.flac.FlacStreamInfo");
+    checkMethod(type.getDeclaredMethod("readMetadataBlock", DataInput.class,
+        InputStream.class, FlacTrackInfoBuilder.class), Modifier.PUBLIC | Modifier.STATIC,
+        "boolean");
+    checkMethod(type.getDeclaredMethod("readMetadataHeader", DataInput.class),
+        Modifier.PRIVATE | Modifier.STATIC,
+        "com.sedmelluq.discord.lavaplayer.container.flac.FlacMetadataHeader");
+    checkMethod(type.getDeclaredMethod("readCommentBlock", DataInput.class,
+        InputStream.class, FlacTrackInfoBuilder.class), Modifier.PRIVATE | Modifier.STATIC,
+        "void");
+    checkMethod(type.getDeclaredMethod("readSeekTableBlock", DataInput.class,
+        FlacTrackInfoBuilder.class, int.class), Modifier.PRIVATE | Modifier.STATIC, "void");
+  }
+
+  private static void checkMethod(Method method, int modifiers, String returnType) {
+    check(method.getModifiers() == modifiers && method.getReturnType().getTypeName().equals(returnType)
+        && Arrays.equals(method.getExceptionTypes(), new Class<?>[] {IOException.class})
+        && !method.isSynthetic() && !method.isBridge() && !method.isDefault()
+        && !method.isVarArgs() && method.getTypeParameters().length == 0,
+        method.getName() + " method metadata");
+  }
+
+  private static byte[] header(boolean last, int type, int length) {
+    return new byte[] {
+        (byte) ((last ? 0x80 : 0) | type),
+        (byte) (length >>> 16), (byte) (length >>> 8), (byte) length
+    };
+  }
+
+  private static byte[] seekPoints(long[] samples, long[] offsets, int[] counts)
+      throws IOException {
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    DataOutputStream output = new DataOutputStream(bytes);
+    for (int index = 0; index < samples.length; index++) {
+      output.writeLong(samples[index]);
+      output.writeLong(offsets[index]);
+      output.writeShort(counts[index]);
+    }
+    return bytes.toByteArray();
+  }
+
+  private static byte[] commentBody(byte[] vendor, String[] comments) throws IOException {
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    DataOutputStream output = new DataOutputStream(bytes);
+    output.writeInt(Integer.reverseBytes(vendor.length));
+    output.write(vendor);
+    output.writeInt(Integer.reverseBytes(comments.length));
+    for (String comment : comments) {
+      byte[] encoded = comment.getBytes(StandardCharsets.UTF_8);
+      output.writeInt(Integer.reverseBytes(encoded.length));
+      output.write(encoded);
+    }
+    return bytes.toByteArray();
+  }
+
+  private static byte[] littleInt(int value) {
+    int reversed = Integer.reverseBytes(value);
+    return new byte[] {
+        (byte) (reversed >>> 24), (byte) (reversed >>> 16),
+        (byte) (reversed >>> 8), (byte) reversed
+    };
+  }
+
+  private static byte[] concat(byte[]... values) {
+    int length = 0;
+    for (byte[] value : values) length += value.length;
+    byte[] result = new byte[length];
+    int offset = 0;
+    for (byte[] value : values) {
+      System.arraycopy(value, 0, result, offset, value.length);
+      offset += value.length;
+    }
+    return result;
+  }
+
+  private static DataInputStream input(byte[] data) {
+    return new DataInputStream(new ByteArrayInputStream(data));
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try {
+      action.run();
+      return null;
+    } catch (Throwable throwable) {
+      return throwable;
+    }
+  }
+
+  @FunctionalInterface
+  private interface ThrowingRunnable {
+    void run() throws Throwable;
+  }
+
+  private static final class Derived extends FlacMetadataReader {}
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

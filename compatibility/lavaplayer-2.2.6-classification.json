@@ -1809,36 +1809,56 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Generated public concrete non-final Object subclass preserves the private static final UTF-8 charset, three private parsing helpers, static dispatch, identity semantics, subclassing, modifiers, descriptors, member counts, checked exceptions, and reflection.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.FlacMetadataReader",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves the public no-argument Object constructor with no eager instance state or validation.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.FlacMetadataReader",
       "symbol_kind": "METHOD",
       "member_name": "readStreamInfoBlock",
       "descriptor": "(Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reads the exact four-byte header before validating type zero and length 34, consumes a fresh 34-byte payload, inverts the last-block flag for stream-info continuation, and preserves exact messages, ordering, identities, nulls, EOFs, and downstream failures.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.FlacMetadataReader",
       "symbol_kind": "METHOD",
       "member_name": "readMetadataBlock",
       "descriptor": "(Ljava/io/DataInput;Ljava/io/InputStream;Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfoBuilder;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Dispatches seek tables, Vorbis comments, and unknown-block skips exactly; preserves separate input identities, little-endian comment lengths, UTF-8 split and default-locale uppercase behavior, seek placeholder counts and truncated remainders, continuation inversion, checked failures, nulls, and downstream call ordering.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.FlacSeekPoint",
