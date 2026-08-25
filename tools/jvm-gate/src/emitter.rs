@@ -37,6 +37,7 @@ const TRACK_MARKER_TRACKER_HELPER_CLASS: &str = "dev/mantle/internal/NativeTrack
 const BASE_AUDIO_TRACK_HELPER_CLASS: &str = "dev/mantle/internal/NativeBaseAudioTrack";
 const TRACK_INFO_BUILDER_HELPER_CLASS: &str = "dev/mantle/internal/NativeAudioTrackInfoBuilder";
 const YOUTUBE_CLIENT_CONFIG_HELPER_CLASS: &str = "dev/mantle/internal/NativeYoutubeClientConfig";
+const BOUNDED_PCM_RESAMPLER_CLASS: &str = "dev/mantle/internal/BoundedPcmResampler";
 const MANAGER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayerManager";
 const DEFAULT_PLAYER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayer";
 const AUDIO_PLAYER_MANAGER_CLASS: &str =
@@ -84,6 +85,8 @@ const FINAL_PCM_AUDIO_FILTER_CLASS: &str =
 const FLOAT_PCM_AUDIO_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter";
 const PCM_FORMAT_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/PcmFormat";
+const RESAMPLING_PCM_AUDIO_FILTER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/filter/ResamplingPcmAudioFilter";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -381,6 +384,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     AUDIO_PIPELINE_FACTORY_CLASS,
     "com/sedmelluq/discord/lavaplayer/filter/PcmFilterFactory",
     PCM_FORMAT_CLASS,
+    RESAMPLING_PCM_AUDIO_FILTER_CLASS,
     "com/sedmelluq/discord/lavaplayer/format/AudioDataFormat",
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
@@ -674,6 +678,7 @@ fn internal_classes(expected_abi: u8) -> Result<Vec<ClassFile<'static>>> {
         native_base_audio_track_class()?,
         native_audio_track_info_builder_class()?,
         native_youtube_client_config_class()?,
+        bounded_pcm_resampler_class()?,
         m3u_stream_provider_class()?,
         m3u_segment_tools_class()?,
     ])
@@ -1095,6 +1100,9 @@ fn replacement_body(
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == RESAMPLING_PCM_AUDIO_FILTER_CLASS {
+        return resampling_pcm_audio_filter_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PROBING_AUDIO_SOURCE_MANAGER_CLASS {
         return probing_audio_source_manager_replacement(pool, name, descriptor, required_locals);
@@ -1623,6 +1631,102 @@ fn pcm_format_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute>
             Instruction::Return,
         ],
     )
+}
+
+fn resampling_pcm_audio_filter_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;ILcom/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter;II)V",
+        ) => resampling_pcm_audio_filter_constructor(pool),
+        ("seekPerformed", "(JJ)V") => {
+            resampling_pcm_audio_filter_delegate(pool, name, descriptor, 5)
+        }
+        ("flush" | "close", "()V") => {
+            resampling_pcm_audio_filter_delegate(pool, name, descriptor, 1)
+        }
+        ("process", "([[FII)V") => resampling_pcm_audio_filter_delegate(pool, name, descriptor, 4),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {RESAMPLING_PCM_AUDIO_FILTER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn resampling_pcm_audio_filter_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(RESAMPLING_PCM_AUDIO_FILTER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let helper = pool.add_class(BOUNDED_PCM_RESAMPLER_CLASS)?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let descriptor = "(Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;ILcom/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter;II)V";
+    let helper_init = pool.add_method_ref(helper, "<init>", descriptor)?;
+    let delegate = pool.add_field_ref(
+        owner,
+        "mantleDelegate",
+        &format!("L{BOUNDED_PCM_RESAMPLER_CLASS};"),
+    )?;
+    code(
+        pool,
+        8,
+        6,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::New(helper),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Iload_2,
+            Instruction::Aload_3,
+            Instruction::Iload(4),
+            Instruction::Iload(5),
+            Instruction::Invokespecial(helper_init),
+            Instruction::Putfield(delegate),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn resampling_pcm_audio_filter_delegate(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    max_stack: u16,
+) -> Result<Attribute> {
+    let owner = pool.add_class(RESAMPLING_PCM_AUDIO_FILTER_CLASS)?;
+    let helper = pool.add_class(BOUNDED_PCM_RESAMPLER_CLASS)?;
+    let delegate = pool.add_field_ref(
+        owner,
+        "mantleDelegate",
+        &format!("L{BOUNDED_PCM_RESAMPLER_CLASS};"),
+    )?;
+    let target = pool.add_method_ref(helper, name, descriptor)?;
+    let mut instructions = vec![Instruction::Aload_0, Instruction::Getfield(delegate)];
+    match descriptor {
+        "(JJ)V" => instructions.extend([
+            Instruction::Lload_1,
+            Instruction::Lload_3,
+            Instruction::Invokevirtual(target),
+        ]),
+        "([[FII)V" => instructions.extend([
+            Instruction::Aload_1,
+            Instruction::Iload_2,
+            Instruction::Iload_3,
+            Instruction::Invokevirtual(target),
+        ]),
+        "()V" => instructions.push(Instruction::Invokevirtual(target)),
+        _ => return Err(format!("unsupported resampling delegate descriptor {descriptor}").into()),
+    }
+    instructions.push(Instruction::Return);
+    code(pool, max_stack, max_stack, instructions)
 }
 
 fn audio_filter_chain_replacement(
@@ -20767,6 +20871,14 @@ fn add_reference_implementation_state(
             )?;
         }
     }
+    if class_name == RESAMPLING_PCM_AUDIO_FILTER_CLASS {
+        add_field(
+            class,
+            FieldAccessFlags::PRIVATE | FieldAccessFlags::FINAL,
+            "mantleDelegate",
+            &format!("L{BOUNDED_PCM_RESAMPLER_CLASS};"),
+        )?;
+    }
     if class_name == MANAGER_CLASS {
         add_field(
             class,
@@ -33514,6 +33626,419 @@ fn m3u_close_failed_response_body(pool: &mut ConstantPool<'static>) -> Result<At
             Instruction::Return,
         ],
     )
+}
+
+#[allow(clippy::too_many_lines)]
+fn bounded_pcm_resampler_class() -> Result<ClassFile<'static>> {
+    let mut class = new_class(
+        BOUNDED_PCM_RESAMPLER_CLASS,
+        "java/lang/Object",
+        ClassAccessFlags::PUBLIC | ClassAccessFlags::FINAL | ClassAccessFlags::SUPER,
+        &[],
+    )?;
+    for (name, descriptor, flags) in [
+        (
+            "downstream",
+            "Lcom/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter;",
+            FieldAccessFlags::PRIVATE | FieldAccessFlags::FINAL,
+        ),
+        (
+            "outputSegments",
+            "[[F",
+            FieldAccessFlags::PRIVATE | FieldAccessFlags::FINAL,
+        ),
+        (
+            "sourceRate",
+            "I",
+            FieldAccessFlags::PRIVATE | FieldAccessFlags::FINAL,
+        ),
+        (
+            "targetRate",
+            "I",
+            FieldAccessFlags::PRIVATE | FieldAccessFlags::FINAL,
+        ),
+        ("remainder", "J", FieldAccessFlags::PRIVATE),
+        ("closed", "Z", FieldAccessFlags::PRIVATE),
+    ] {
+        add_field(&mut class, flags, name, descriptor)?;
+    }
+
+    let constructor = bounded_pcm_resampler_constructor(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;ILcom/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter;II)V",
+        Some(constructor),
+    )?;
+    let ensure_open = bounded_pcm_resampler_ensure_open(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PRIVATE,
+        "ensureOpen",
+        "()V",
+        Some(ensure_open),
+    )?;
+    let seek = bounded_pcm_resampler_seek(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC,
+        "seekPerformed",
+        "(JJ)V",
+        Some(seek),
+    )?;
+    let flush = code(&mut class.constant_pool, 0, 1, vec![Instruction::Return])?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC,
+        "flush",
+        "()V",
+        Some(flush),
+    )?;
+    let close = bounded_pcm_resampler_close(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC,
+        "close",
+        "()V",
+        Some(close),
+    )?;
+    let process = bounded_pcm_resampler_process(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC,
+        "process",
+        "([[FII)V",
+        Some(process),
+    )?;
+    Ok(class)
+}
+
+fn bounded_pcm_resampler_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BOUNDED_PCM_RESAMPLER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let float_array = pool.add_class("[F")?;
+    let configuration = pool.add_class(CONFIGURATION_CLASS)?;
+    let quality = pool.add_class(RESAMPLING_CLASS)?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let get_quality = pool.add_method_ref(
+        configuration,
+        "getResamplingQuality",
+        &format!("()L{RESAMPLING_CLASS};"),
+    )?;
+    let ordinal = pool.add_method_ref(quality, "ordinal", "()I")?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter;",
+    )?;
+    let output_segments = pool.add_field_ref(owner, "outputSegments", "[[F")?;
+    let source_rate = pool.add_field_ref(owner, "sourceRate", "I")?;
+    let target_rate = pool.add_field_ref(owner, "targetRate", "I")?;
+    let remainder = pool.add_field_ref(owner, "remainder", "J")?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Invokespecial(object_init),
+        Instruction::Aload_0,
+        Instruction::Aload_3,
+        Instruction::Putfield(downstream),
+        Instruction::Aload_0,
+        Instruction::Iload_2,
+        Instruction::Anewarray(float_array),
+        Instruction::Putfield(output_segments),
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(get_quality),
+        Instruction::Invokevirtual(ordinal),
+        Instruction::Pop,
+        Instruction::Iconst_0,
+        Instruction::Istore(6),
+    ];
+    let loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(6),
+        Instruction::Iload_2,
+        Instruction::If_icmpge(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(output_segments),
+        Instruction::Iload(6),
+        Instruction::Sipush(4096),
+        Instruction::Newarray(ArrayType::Float),
+        Instruction::Aastore,
+        Instruction::Iinc(6, 1),
+        Instruction::Goto(u16::try_from(loop_target)?),
+    ]);
+    let fields_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Iload(4),
+        Instruction::Putfield(source_rate),
+        Instruction::Aload_0,
+        Instruction::Iload(5),
+        Instruction::Putfield(target_rate),
+        Instruction::Aload_0,
+        Instruction::Iload(4),
+        Instruction::I2l,
+        Instruction::Lconst_1,
+        Instruction::Lsub,
+        Instruction::Putfield(remainder),
+        Instruction::Return,
+    ]);
+    instructions[loop_target + 2] = Instruction::If_icmpge(u16::try_from(fields_target)?);
+    code(pool, 8, 7, instructions)
+}
+
+fn bounded_pcm_resampler_ensure_open(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BOUNDED_PCM_RESAMPLER_CLASS)?;
+    let illegal_state = pool.add_class("java/lang/IllegalStateException")?;
+    let init = pool.add_method_ref(illegal_state, "<init>", "(Ljava/lang/String;)V")?;
+    let closed = pool.add_field_ref(owner, "closed", "Z")?;
+    let message = pool.add_string("Cannot use the decoder after closing it.")?;
+    code(
+        pool,
+        3,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(closed),
+            Instruction::Ifeq(8),
+            Instruction::New(illegal_state),
+            Instruction::Dup,
+            Instruction::Ldc_w(message),
+            Instruction::Invokespecial(init),
+            Instruction::Athrow,
+            Instruction::Return,
+        ],
+    )
+}
+
+fn bounded_pcm_resampler_seek(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BOUNDED_PCM_RESAMPLER_CLASS)?;
+    let ensure_open = pool.add_method_ref(owner, "ensureOpen", "()V")?;
+    let source_rate = pool.add_field_ref(owner, "sourceRate", "I")?;
+    let remainder = pool.add_field_ref(owner, "remainder", "J")?;
+    code(
+        pool,
+        6,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(ensure_open),
+            Instruction::Aload_0,
+            Instruction::Aload_0,
+            Instruction::Getfield(source_rate),
+            Instruction::I2l,
+            Instruction::Lconst_1,
+            Instruction::Lsub,
+            Instruction::Putfield(remainder),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn bounded_pcm_resampler_close(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BOUNDED_PCM_RESAMPLER_CLASS)?;
+    let closed = pool.add_field_ref(owner, "closed", "Z")?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Iconst_1,
+            Instruction::Putfield(closed),
+            Instruction::Return,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn bounded_pcm_resampler_process(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(BOUNDED_PCM_RESAMPLER_CLASS)?;
+    let float_filter = pool.add_class(FLOAT_PCM_AUDIO_FILTER_CLASS)?;
+    let objects = pool.add_class("java/util/Objects")?;
+    let math = pool.add_class("java/lang/Math")?;
+    let illegal_argument = pool.add_class("java/lang/IllegalArgumentException")?;
+    let ensure_open = pool.add_method_ref(owner, "ensureOpen", "()V")?;
+    let check_range = pool.add_method_ref(objects, "checkFromIndexSize", "(III)I")?;
+    let min = pool.add_method_ref(math, "min", "(II)I")?;
+    let invalid_init = pool.add_method_ref(illegal_argument, "<init>", "(Ljava/lang/String;)V")?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter;",
+    )?;
+    let output_segments = pool.add_field_ref(owner, "outputSegments", "[[F")?;
+    let source_rate = pool.add_field_ref(owner, "sourceRate", "I")?;
+    let target_rate = pool.add_field_ref(owner, "targetRate", "I")?;
+    let remainder = pool.add_field_ref(owner, "remainder", "J")?;
+    let process = pool.add_interface_method_ref(float_filter, "process", "([[FII)V")?;
+    let output_limit = pool.add_long(32_768)?;
+    let invalid_message =
+        pool.add_string("Resampler output exceeds Mantle's per-call frame limit.")?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Invokevirtual(ensure_open),
+        Instruction::Iconst_0,
+        Instruction::Istore(12),
+    ];
+    let validation_loop = instructions.len();
+    instructions.extend([
+        Instruction::Iload(12),
+        Instruction::Aload_1,
+        Instruction::Arraylength,
+        Instruction::If_icmpge(0),
+        Instruction::Iload_2,
+        Instruction::Iload_3,
+        Instruction::Aload_1,
+        Instruction::Iload(12),
+        Instruction::Aaload,
+        Instruction::Arraylength,
+        Instruction::Invokestatic(check_range),
+        Instruction::Pop,
+        Instruction::Aload_0,
+        Instruction::Getfield(output_segments),
+        Instruction::Iload(12),
+        Instruction::Aaload,
+        Instruction::Pop,
+        Instruction::Iinc(12, 1),
+        Instruction::Goto(u16::try_from(validation_loop)?),
+    ]);
+    let calculation_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload_3,
+        Instruction::I2l,
+        Instruction::Aload_0,
+        Instruction::Getfield(target_rate),
+        Instruction::I2l,
+        Instruction::Lmul,
+        Instruction::Aload_0,
+        Instruction::Getfield(remainder),
+        Instruction::Ladd,
+        Instruction::Lstore(4),
+        Instruction::Aload_0,
+        Instruction::Lload(4),
+        Instruction::Aload_0,
+        Instruction::Getfield(source_rate),
+        Instruction::I2l,
+        Instruction::Lrem,
+        Instruction::Putfield(remainder),
+        Instruction::Lload(4),
+        Instruction::Aload_0,
+        Instruction::Getfield(source_rate),
+        Instruction::I2l,
+        Instruction::Ldiv,
+        Instruction::Lstore(6),
+        Instruction::Lload(6),
+        Instruction::Lconst_0,
+        Instruction::Lcmp,
+        Instruction::Ifle(0),
+        Instruction::Lload(6),
+        Instruction::Ldc2_w(output_limit),
+        Instruction::Lcmp,
+        Instruction::Ifle(0),
+        Instruction::New(illegal_argument),
+        Instruction::Dup,
+        Instruction::Ldc_w(invalid_message),
+        Instruction::Invokespecial(invalid_init),
+        Instruction::Athrow,
+    ]);
+    let within_limit_target = instructions.len();
+    instructions.extend([
+        Instruction::Lload(6),
+        Instruction::L2i,
+        Instruction::Istore(8),
+        Instruction::Iload(8),
+        Instruction::Istore(9),
+        Instruction::Iconst_0,
+        Instruction::Istore(10),
+    ]);
+    let output_loop = instructions.len();
+    instructions.extend([
+        Instruction::Iload(9),
+        Instruction::Ifle(0),
+        Instruction::Iload(9),
+        Instruction::Sipush(4096),
+        Instruction::Invokestatic(min),
+        Instruction::Istore(11),
+        Instruction::Iconst_0,
+        Instruction::Istore(12),
+    ]);
+    let channel_loop = instructions.len();
+    instructions.extend([
+        Instruction::Iload(12),
+        Instruction::Aload_1,
+        Instruction::Arraylength,
+        Instruction::If_icmpge(0),
+        Instruction::Iconst_0,
+        Instruction::Istore(13),
+    ]);
+    let sample_loop = instructions.len();
+    instructions.extend([
+        Instruction::Iload(13),
+        Instruction::Iload(11),
+        Instruction::If_icmpge(0),
+        Instruction::Iload(10),
+        Instruction::Iload(13),
+        Instruction::Iadd,
+        Instruction::I2l,
+        Instruction::Iload_3,
+        Instruction::I2l,
+        Instruction::Lmul,
+        Instruction::Iload(8),
+        Instruction::I2l,
+        Instruction::Ldiv,
+        Instruction::L2i,
+        Instruction::Istore(14),
+        Instruction::Aload_0,
+        Instruction::Getfield(output_segments),
+        Instruction::Iload(12),
+        Instruction::Aaload,
+        Instruction::Iload(13),
+        Instruction::Aload_1,
+        Instruction::Iload(12),
+        Instruction::Aaload,
+        Instruction::Iload_2,
+        Instruction::Iload(14),
+        Instruction::Iadd,
+        Instruction::Faload,
+        Instruction::Fastore,
+        Instruction::Iinc(13, 1),
+        Instruction::Goto(u16::try_from(sample_loop)?),
+    ]);
+    let next_channel_target = instructions.len();
+    instructions.extend([
+        Instruction::Iinc(12, 1),
+        Instruction::Goto(u16::try_from(channel_loop)?),
+    ]);
+    let delegate_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Getfield(downstream),
+        Instruction::Aload_0,
+        Instruction::Getfield(output_segments),
+        Instruction::Iconst_0,
+        Instruction::Iload(11),
+        Instruction::Invokeinterface(process, 4),
+        Instruction::Iload(10),
+        Instruction::Iload(11),
+        Instruction::Iadd,
+        Instruction::Istore(10),
+        Instruction::Iload(9),
+        Instruction::Iload(11),
+        Instruction::Isub,
+        Instruction::Istore(9),
+        Instruction::Goto(u16::try_from(output_loop)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+
+    instructions[validation_loop + 3] = Instruction::If_icmpge(u16::try_from(calculation_target)?);
+    instructions[calculation_target + 26] = Instruction::Ifle(u16::try_from(return_target)?);
+    instructions[calculation_target + 30] = Instruction::Ifle(u16::try_from(within_limit_target)?);
+    instructions[output_loop + 1] = Instruction::Ifle(u16::try_from(return_target)?);
+    instructions[channel_loop + 3] = Instruction::If_icmpge(u16::try_from(delegate_target)?);
+    instructions[sample_loop + 2] = Instruction::If_icmpge(u16::try_from(next_channel_target)?);
+    code(pool, 10, 15, instructions)
 }
 
 #[allow(clippy::too_many_lines)]

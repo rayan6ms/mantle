@@ -8201,54 +8201,60 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The public concrete FloatPcmAudioFilter shape and streaming/lifecycle contracts are preserved, while Mantle deliberately replaces the legacy libsamplerate backend with bounded deterministic rate conversion and a 32,768-frame per-call output ceiling.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-audio/src/resample.rs", "docs/architecture/ADR-0007-bounded-pcm-transforms.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.ResamplingPcmAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;ILcom/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter;II)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Constructor metadata, channel buffer geometry, quality acceptance, null/negative failure ordering, zero-channel construction, and null-downstream acceptance match the reference; backend state is bounded and implementation-private.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-audio/src/resample.rs", "docs/architecture/ADR-0007-bounded-pcm-transforms.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.ResamplingPcmAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "seekPerformed",
       "descriptor": "(JJ)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Seek ignores the supplied timestamps, resets cumulative rate state, forwards nothing downstream, and rejects use after close as the reference does; Mantle resets its bounded replacement state rather than legacy converter handles.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-audio/src/resample.rs", "docs/architecture/ADR-0007-bounded-pcm-transforms.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.ResamplingPcmAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "flush",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Flush remains a declared-InterruptedException no-op before and after close and never forwards downstream, exactly preserving the observable reference contract.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-audio/src/resample.rs", "docs/architecture/ADR-0007-bounded-pcm-transforms.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.ResamplingPcmAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "close",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Close remains idempotent, forwards nothing downstream, and makes subsequent seek/process calls fail; no legacy native converter handle survives in the bounded replacement.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-audio/src/resample.rs", "docs/architecture/ADR-0007-bounded-pcm-transforms.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.ResamplingPcmAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "([[FII)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Process preserves offset handling, channel isolation, cumulative up/downsample frame accounting, 4,096-frame downstream blocks, checked interruption propagation, and post-close rejection. Exact sample kernels and latency intentionally differ from legacy libsamplerate, and oversized per-call output is rejected before dispatch.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "crates/mantle-audio/src/resample.rs", "docs/architecture/ADR-0007-bounded-pcm-transforms.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.ShortPcmAudioFilter",

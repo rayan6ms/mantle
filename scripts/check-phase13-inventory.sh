@@ -2062,9 +2062,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[1].completed_slices[].symbols] | add) == .cohorts[1].classified_symbols and
   (.cohorts[1].classified_symbols + .cohorts[1].remaining_symbols) == .cohorts[1].symbols and
   .cohorts[2].status == "IN_PROGRESS" and
-  .cohorts[2].classified_symbols == 66 and
-  .cohorts[2].remaining_symbols == 153 and
-  (.cohorts[2].completed_slices | length) == 13 and
+  .cohorts[2].classified_symbols == 72 and
+  .cohorts[2].remaining_symbols == 147 and
+  (.cohorts[2].completed_slices | length) == 14 and
   .cohorts[2].completed_slices[0] == {
     id: "audio-filter-interface-contracts",
     classes: 1,
@@ -2234,13 +2234,28 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "tools/jvm-gate/src/main.rs"
     ]
   } and
+  .cohorts[2].completed_slices[13] == {
+    id: "resampling-pcm-audio-filter-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 5,
+    symbols: 6,
+    classification: "C_SEMANTIC",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs",
+      "crates/mantle-audio/src/resample.rs",
+      "docs/architecture/ADR-0007-bounded-pcm-transforms.md"
+    ]
+  } and
   ([.cohorts[2].completed_slices[].symbols] | add) == .cohorts[2].classified_symbols and
   (.cohorts[2].classified_symbols + .cohorts[2].remaining_symbols) == .cohorts[2].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1299 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1305 and
   ([$classifications.symbols[] |
     select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1164 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 119 and
+    select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 125 and
   ([$classifications.symbols[] |
     select(.assessment == "CLASSIFIED" and .classification == "D_LEGACY")] | length) == 16 and
   ([$classifications.symbols[] |
@@ -2306,6 +2321,16 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
       (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
       (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 4 and
+  ([$classifications.symbols[] |
+    select(.binary_name ==
+      "com.sedmelluq.discord.lavaplayer.filter.ResamplingPcmAudioFilter" and
+      .assessment == "CLASSIFIED" and .classification == "C_SEMANTIC" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null and
+      (.tests | index("crates/mantle-audio/src/resample.rs")) != null and
+      (.tests | index("docs/architecture/ADR-0007-bounded-pcm-transforms.md")) != null)] |
+    length) == 6 and
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.filter.PcmFilterFactory" and
@@ -2593,6 +2618,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.filter.FloatPcmAudioFilter",
         "com.sedmelluq.discord.lavaplayer.filter.PcmFilterFactory",
         "com.sedmelluq.discord.lavaplayer.filter.PcmFormat",
+        "com.sedmelluq.discord.lavaplayer.filter.ResamplingPcmAudioFilter",
         "com.sedmelluq.discord.lavaplayer.source.AudioSourceManager",
         "com.sedmelluq.discord.lavaplayer.source.AudioSourceManagers",
         "com.sedmelluq.discord.lavaplayer.source.ProbingAudioSourceManager",
@@ -2704,6 +2730,11 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.source.youtube.format.YoutubeTrackFormatExtractor"
       ][]; . == $symbol.binary_name)) and
     (if $symbol.binary_name ==
+        "com.sedmelluq.discord.lavaplayer.filter.ResamplingPcmAudioFilter"
+      then .classification == "C_SEMANTIC" and
+        (.tests | index("crates/mantle-audio/src/resample.rs")) != null and
+        (.tests | index("docs/architecture/ADR-0007-bounded-pcm-transforms.md")) != null
+      elif $symbol.binary_name ==
         "com.sedmelluq.discord.lavaplayer.source.youtube.YoutubeSignatureCipherManager"
       then .classification == "C_SEMANTIC" and
         (.tests | index("crates/mantle-media/tests/phase12_youtube.rs")) != null and
@@ -3018,7 +3049,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "resampling-pcm-audio-filter-contracts" and
+  .phase_entry.next_slice == "short-pcm-audio-filter-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 ' "$PLAN" >/dev/null
@@ -3026,7 +3057,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '187 reference classes / 1,326 symbols' \
+  '188 reference classes / 1,332 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -3036,4 +3067,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 1,299 classified symbols and 1,463 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 1,305 classified symbols and 1,457 unassessed symbols.\n'

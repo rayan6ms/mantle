@@ -104,6 +104,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-float-pcm-audio-filter-consumer" => Some(FLOAT_PCM_AUDIO_FILTER_CONSUMER),
         "write-pcm-filter-factory-consumer" => Some(PCM_FILTER_FACTORY_CONSUMER),
         "write-pcm-format-consumer" => Some(PCM_FORMAT_CONSUMER),
+        "write-resampling-pcm-audio-filter-consumer" => Some(RESAMPLING_PCM_AUDIO_FILTER_CONSUMER),
         "write-audio-post-processor-consumer" => Some(AUDIO_POST_PROCESSOR_CONSUMER),
         "write-buffering-post-processor-consumer" => Some(BUFFERING_POST_PROCESSOR_CONSUMER),
         "write-channel-count-pcm-audio-filter-consumer" => {
@@ -7640,6 +7641,256 @@ public final class GatePcmFormat {
 
   private static final class DerivedFormat extends PcmFormat {
     DerivedFormat(int channelCount, int sampleRate) { super(channelCount, sampleRate); }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const RESAMPLING_PCM_AUDIO_FILTER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.FloatPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.ResamplingPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateResamplingPcmAudioFilter {
+  public static void main(String[] args) throws Exception {
+    if (args.length == 1 && "--bounded-policy".equals(args[0])) {
+      boundedPolicy();
+      System.out.println("bounded-policy=32768-output-frames,pre-dispatch-rejection");
+      return;
+    }
+    construction();
+    streaming();
+    qualityAndBounds();
+    lifecycle();
+    failures();
+    reflection();
+    System.out.println(
+        "construction=configuration,channels,zero,null-downstream;"
+        + "streaming=upsample,downsample,offset,channel-isolation,4096-blocks,seek-reset;"
+        + "quality=low,medium,high,finite,bounded;"
+        + "lifecycle=flush-noop,close-idempotent,closed-rejection;"
+        + "failures=null-config,negative-channels,null-quality,downstream-interruption;"
+        + "reflection=public-concrete-object,float-filter,0-public-fields,1-constructor,4-public-methods,throws");
+  }
+
+  private static void construction() throws Exception {
+    AudioConfiguration configuration = configuration(AudioConfiguration.ResamplingQuality.LOW);
+    RecordingFilter downstream = new RecordingFilter();
+    ResamplingPcmAudioFilter filter =
+        new ResamplingPcmAudioFilter(configuration, 2, downstream, 24_000, 48_000);
+    filter.flush();
+    check(downstream.calls == 0 && downstream.total == 0, "constructor or flush forwarded");
+    filter.close();
+
+    ResamplingPcmAudioFilter zero =
+        new ResamplingPcmAudioFilter(configuration, 0, downstream, 0, 0);
+    zero.seekPerformed(Long.MIN_VALUE, Long.MAX_VALUE);
+    zero.flush();
+    zero.close();
+
+    ResamplingPcmAudioFilter nullDownstream =
+        new ResamplingPcmAudioFilter(configuration, 1, null, 24_000, 48_000);
+    expect(NullPointerException.class,
+        () -> nullDownstream.process(ramp(1, 0, 16), 0, 16));
+    nullDownstream.close();
+  }
+
+  private static void streaming() throws Exception {
+    RecordingFilter up = new RecordingFilter();
+    ResamplingPcmAudioFilter upsampler = new ResamplingPcmAudioFilter(
+        configuration(AudioConfiguration.ResamplingQuality.LOW), 2, up, 24_000, 48_000);
+    float[][] input = ramp(2, 4, 32);
+    upsampler.process(input, 4, 32);
+    check(up.total == 64 && up.calls == 1 && up.maxBlock <= 4096
+        && up.lastChannels == 2 && up.allFinite
+        && up.firstChannel0 < 100.0f && up.firstChannel1 > 500.0f,
+        "bounded upsample or channel isolation");
+    upsampler.close();
+
+    RecordingFilter down = new RecordingFilter();
+    ResamplingPcmAudioFilter downsampler = new ResamplingPcmAudioFilter(
+        configuration(AudioConfiguration.ResamplingQuality.LOW), 1, down, 3, 2);
+    float[][] downInput = ramp(1, 0, 10);
+    downsampler.process(downInput, 0, 3);
+    check(down.total == 2, "first downsample block");
+    downsampler.process(downInput, 3, 7);
+    check(down.total == 7, "cumulative downsample accounting");
+    downsampler.seekPerformed(-1, Long.MAX_VALUE);
+    downsampler.process(downInput, 0, 3);
+    check(down.total == 9, "seek reset");
+    downsampler.close();
+
+    RecordingFilter large = new RecordingFilter();
+    ResamplingPcmAudioFilter chunked = new ResamplingPcmAudioFilter(
+        configuration(AudioConfiguration.ResamplingQuality.LOW), 1, large, 24_000, 48_000);
+    chunked.process(ramp(1, 0, 5_000), 0, 5_000);
+    check(large.total == 10_000 && large.calls == 3 && large.maxBlock == 4096,
+        "fixed output blocks");
+    chunked.close();
+  }
+
+  private static void qualityAndBounds() throws Exception {
+    for (AudioConfiguration.ResamplingQuality quality
+        : AudioConfiguration.ResamplingQuality.values()) {
+      RecordingFilter downstream = new RecordingFilter();
+      ResamplingPcmAudioFilter filter = new ResamplingPcmAudioFilter(
+          configuration(quality), 1, downstream, 24_000, 48_000);
+      filter.process(ramp(1, 0, 8_192), 0, 8_192);
+      check(downstream.calls > 0 && downstream.total > 0
+          && downstream.maxBlock <= 4096 && downstream.allFinite,
+          quality + " bounded finite output");
+      filter.close();
+    }
+  }
+
+  private static void boundedPolicy() throws Exception {
+    RecordingFilter downstream = new RecordingFilter();
+    ResamplingPcmAudioFilter filter = new ResamplingPcmAudioFilter(
+        configuration(AudioConfiguration.ResamplingQuality.HIGH), 1, downstream, 1, 8);
+    expect(IllegalArgumentException.class,
+        () -> filter.process(ramp(1, 0, 4_097), 0, 4_097));
+    check(downstream.calls == 0 && downstream.total == 0, "limit must reject before dispatch");
+    filter.close();
+  }
+
+  private static void lifecycle() throws Exception {
+    RecordingFilter downstream = new RecordingFilter();
+    ResamplingPcmAudioFilter filter = new ResamplingPcmAudioFilter(
+        configuration(AudioConfiguration.ResamplingQuality.LOW), 1, downstream, 24_000, 48_000);
+    filter.flush();
+    check(downstream.calls == 0, "flush must not forward");
+    filter.close();
+    filter.close();
+    filter.flush();
+    expect(IllegalStateException.class, () -> filter.seekPerformed(0, 0));
+    expect(IllegalStateException.class, () -> filter.process(ramp(1, 0, 1), 0, 1));
+  }
+
+  private static void failures() throws Exception {
+    RecordingFilter downstream = new RecordingFilter();
+    expect(NullPointerException.class,
+        () -> new ResamplingPcmAudioFilter(null, 1, downstream, 24_000, 48_000));
+    expect(NegativeArraySizeException.class,
+        () -> new ResamplingPcmAudioFilter(configuration(
+            AudioConfiguration.ResamplingQuality.LOW), -1, downstream, 24_000, 48_000));
+    AudioConfiguration nullQuality =
+        configuration(AudioConfiguration.ResamplingQuality.LOW);
+    nullQuality.setResamplingQuality(null);
+    expect(NullPointerException.class,
+        () -> new ResamplingPcmAudioFilter(nullQuality, 1, downstream, 24_000, 48_000));
+
+    RecordingFilter interrupted = new RecordingFilter();
+    interrupted.interrupt = true;
+    ResamplingPcmAudioFilter filter = new ResamplingPcmAudioFilter(
+        configuration(AudioConfiguration.ResamplingQuality.LOW), 1, interrupted, 24_000, 48_000);
+    expect(InterruptedException.class, () -> filter.process(ramp(1, 0, 8), 0, 8));
+    filter.close();
+  }
+
+  private static void reflection() throws Exception {
+    Class<ResamplingPcmAudioFilter> type = ResamplingPcmAudioFilter.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers()) && !type.isInterface()
+        && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] { FloatPcmAudioFilter.class }),
+        "class metadata");
+    check(type.getFields().length == 0, "public fields");
+    Constructor<ResamplingPcmAudioFilter> constructor = type.getConstructor(
+        AudioConfiguration.class, int.class, FloatPcmAudioFilter.class, int.class, int.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isVarArgs()
+        && !constructor.isSynthetic(), "constructor metadata");
+    Method[] methods = Arrays.stream(type.getDeclaredMethods())
+        .filter(method -> Modifier.isPublic(method.getModifiers()))
+        .toArray(Method[]::new);
+    check(methods.length == 4, "public method count");
+    checkMethod(type, "seekPerformed", new Class<?>[] { long.class, long.class }, new Class<?>[0]);
+    checkMethod(type, "flush", new Class<?>[0], new Class<?>[] { InterruptedException.class });
+    checkMethod(type, "close", new Class<?>[0], new Class<?>[0]);
+    checkMethod(type, "process", new Class<?>[] { float[][].class, int.class, int.class },
+        new Class<?>[] { InterruptedException.class });
+  }
+
+  private static void checkMethod(Class<?> type, String name, Class<?>[] parameters,
+      Class<?>[] exceptions) throws Exception {
+    Method method = type.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == void.class
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isBridge() && !method.isDefault() && !method.isSynthetic()
+        && !method.isVarArgs(), name + " metadata");
+  }
+
+  private static AudioConfiguration configuration(
+      AudioConfiguration.ResamplingQuality quality) {
+    AudioConfiguration configuration = new AudioConfiguration();
+    configuration.setResamplingQuality(quality);
+    return configuration;
+  }
+
+  private static float[][] ramp(int channels, int prefix, int length) {
+    float[][] values = new float[channels][prefix + length];
+    for (int channel = 0; channel < channels; channel++) {
+      for (int index = 0; index < values[channel].length; index++) {
+        values[channel][index] = channel * 1_000.0f + index;
+      }
+    }
+    return values;
+  }
+
+  private static void expect(Class<? extends Throwable> expected, ThrowingRunnable action) {
+    try {
+      action.run();
+      throw new AssertionError("Expected " + expected.getName());
+    } catch (Throwable throwable) {
+      if (!expected.isInstance(throwable)) {
+        throw new AssertionError("Expected " + expected.getName() + " but got " + throwable,
+            throwable);
+      }
+    }
+  }
+
+  private interface ThrowingRunnable { void run() throws Exception; }
+
+  private static final class RecordingFilter implements FloatPcmAudioFilter {
+    int calls;
+    int total;
+    int maxBlock;
+    int lastChannels;
+    float firstChannel0;
+    float firstChannel1;
+    boolean first = true;
+    boolean allFinite = true;
+    boolean interrupt;
+
+    @Override
+    public void process(float[][] input, int offset, int length) throws InterruptedException {
+      if (interrupt) throw new InterruptedException("downstream");
+      calls++;
+      total += length;
+      maxBlock = Math.max(maxBlock, length);
+      lastChannels = input.length;
+      if (first && length > 0) {
+        firstChannel0 = input[0][offset];
+        if (input.length > 1) firstChannel1 = input[1][offset];
+        first = false;
+      }
+      for (float[] channel : input) {
+        for (int index = offset; index < offset + length; index++) {
+          allFinite &= Float.isFinite(channel[index]);
+        }
+      }
+    }
+
+    @Override public void seekPerformed(long requestedTime, long providedTime) { }
+    @Override public void flush() { }
+    @Override public void close() { }
   }
 
   private static void check(boolean condition, String message) {
