@@ -174,6 +174,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-flac-metadata-reader-support-consumer" => {
             Some(FLAC_METADATA_READER_SUPPORT_CONSUMER)
         }
+        "write-flac-seek-point-consumer" => Some(FLAC_SEEK_POINT_CONSUMER),
         _ => None,
     }
 }
@@ -15647,6 +15648,101 @@ class FlacTrackInfoBuilder {
     if (FlacMetadataReaderGateSupport.addTagFailure != null) {
       throw FlacMetadataReaderGateSupport.addTagFailure;
     }
+  }
+}
+"#;
+
+const FLAC_SEEK_POINT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacSeekPoint;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateFlacSeekPoint {
+  public static void main(String[] args) throws Exception {
+    constantsAndValues();
+    identityAndSubclassing();
+    reflection();
+    System.out.println(
+        "contracts=constant,zero-values,edge-values,raw-values,assignment-order,identity-semantics,subclassable,public-final-fields,constructor-descriptor,no-throws,member-counts,reflection");
+  }
+
+  private static void constantsAndValues() {
+    check(FlacSeekPoint.LENGTH == 18, "seek point length constant");
+    checkPoint(new FlacSeekPoint(0L, 0L, 0), 0L, 0L, 0, "zero values");
+    checkPoint(new FlacSeekPoint(Long.MIN_VALUE, Long.MAX_VALUE, Integer.MIN_VALUE),
+        Long.MIN_VALUE, Long.MAX_VALUE, Integer.MIN_VALUE, "minimum and maximum values");
+    checkPoint(new FlacSeekPoint(Long.MAX_VALUE, Long.MIN_VALUE, Integer.MAX_VALUE),
+        Long.MAX_VALUE, Long.MIN_VALUE, Integer.MAX_VALUE, "opposite edge values");
+    checkPoint(new FlacSeekPoint(-1L, 0x0102_0304_0506_0708L, -18),
+        -1L, 0x0102_0304_0506_0708L, -18, "raw values and assignment order");
+  }
+
+  private static void identityAndSubclassing() {
+    FlacSeekPoint first = new FlacSeekPoint(1L, 2L, 3);
+    FlacSeekPoint second = new FlacSeekPoint(1L, 2L, 3);
+    check(first != second && !first.equals(second) && first.equals(first),
+        "seek points retain Object identity equality");
+
+    Derived derived = new Derived(11L, 22L, 33);
+    checkPoint(derived, 11L, 22L, 33,
+        "ordinary subclass inherits construction and final fields");
+  }
+
+  private static void reflection() throws Exception {
+    Class<FlacSeekPoint> type = FlacSeekPoint.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete non-final class metadata");
+    check(type.getDeclaredFields().length == 4 && type.getDeclaredMethods().length == 0
+        && type.getDeclaredConstructors().length == 1,
+        "exact declared member counts");
+
+    checkConstant(type.getDeclaredField("LENGTH"), 18);
+    checkField(type.getDeclaredField("sampleIndex"), long.class);
+    checkField(type.getDeclaredField("byteOffset"), long.class);
+    checkField(type.getDeclaredField("sampleCount"), int.class);
+
+    Constructor<FlacSeekPoint> constructor =
+        type.getDeclaredConstructor(long.class, long.class, int.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0
+        && Arrays.equals(constructor.getParameterTypes(),
+            new Class<?>[] {long.class, long.class, int.class}),
+        "constructor descriptor and metadata");
+  }
+
+  private static void checkConstant(Field field, int expected) throws Exception {
+    check(field.getType() == int.class
+        && field.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL)
+        && field.getInt(null) == expected && !field.isSynthetic()
+        && field.getDeclaredAnnotations().length == 0,
+        field.getName() + " constant metadata and value");
+  }
+
+  private static void checkField(Field field, Class<?> fieldType) {
+    check(field.getType() == fieldType
+        && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && !field.isSynthetic() && field.getDeclaredAnnotations().length == 0,
+        field.getName() + " instance field metadata");
+  }
+
+  private static void checkPoint(FlacSeekPoint point, long sampleIndex,
+      long byteOffset, int sampleCount, String message) {
+    check(point.sampleIndex == sampleIndex && point.byteOffset == byteOffset
+        && point.sampleCount == sampleCount, message);
+  }
+
+  private static final class Derived extends FlacSeekPoint {
+    Derived(long sampleIndex, long byteOffset, int sampleCount) {
+      super(sampleIndex, byteOffset, sampleCount);
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
   }
 }
 "#;

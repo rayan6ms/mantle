@@ -261,6 +261,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-flac-metadata-reader-consumer 
   --output "$WORK/GateFlacMetadataReader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-metadata-reader-support-consumer \
   --output "$WORK/FlacMetadataReaderGateSupport.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-flac-seek-point-consumer \
+  --output "$WORK/GateFlacSeekPoint.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -331,6 +333,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateMediaContainerRegistry.java" \
   "$WORK/GateAdtsAudioTrack.java" \
   "$WORK/GateFlacMetadataHeader.java" \
+  "$WORK/GateFlacSeekPoint.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GateAdtsStreamReader.java" \
@@ -1379,6 +1382,17 @@ cmp "$WORK/flac-metadata-reader-reference.txt" \
 grep --fixed-strings \
   'contracts=construction,charset,stream-header,stream-type,stream-size,stream-payload,last-inversion,read-order,unknown-skip,zero-skip,short-skip,block-continuation,seek-division,seek-remainder,seek-values,placeholder-count,seek-array-identity,comment-vendor-skip,little-endian,comment-count,utf8,split-limit,uppercase-locale,ignored-comments,declared-length-ignored,nulls,header-failure,payload-failure,stream-info-failure,seek-failure,builder-failure,tag-failure,private-helpers,static-methods,throws,subclassable,reflection' \
   "$WORK/flac-metadata-reader-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateFlacSeekPoint \
+  >"$WORK/flac-seek-point-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateFlacSeekPoint >"$WORK/flac-seek-point-candidate.txt"
+cmp "$WORK/flac-seek-point-reference.txt" \
+  "$WORK/flac-seek-point-candidate.txt"
+grep --fixed-strings \
+  'contracts=constant,zero-values,edge-values,raw-values,assignment-order,identity-semantics,subclassable,public-final-fields,constructor-descriptor,no-throws,member-counts,reflection' \
+  "$WORK/flac-seek-point-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"

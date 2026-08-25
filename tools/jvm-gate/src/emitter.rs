@@ -178,6 +178,7 @@ const FLAC_METADATA_HEADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/FlacMetadataHeader";
 const FLAC_METADATA_READER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/FlacMetadataReader";
+const FLAC_SEEK_POINT_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/flac/FlacSeekPoint";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -522,6 +523,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     FLAC_FILE_LOADER_CLASS,
     FLAC_METADATA_HEADER_CLASS,
     FLAC_METADATA_READER_CLASS,
+    FLAC_SEEK_POINT_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -1425,6 +1427,9 @@ fn replacement_body(
     }
     if class_name == FLAC_METADATA_READER_CLASS {
         return flac_metadata_reader_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == FLAC_SEEK_POINT_CLASS {
+        return flac_seek_point_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -5850,6 +5855,50 @@ fn flac_metadata_reader_constructor(pool: &mut ConstantPool<'static>) -> Result<
         vec![
             Instruction::Aload_0,
             Instruction::Invokespecial(object_init),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn flac_seek_point_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(JJI)V") => flac_seek_point_constructor(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {FLAC_SEEK_POINT_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn flac_seek_point_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_SEEK_POINT_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let sample_index = pool.add_field_ref(owner, "sampleIndex", "J")?;
+    let byte_offset = pool.add_field_ref(owner, "byteOffset", "J")?;
+    let sample_count = pool.add_field_ref(owner, "sampleCount", "I")?;
+    code(
+        pool,
+        3,
+        6,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Lload_1,
+            Instruction::Putfield(sample_index),
+            Instruction::Aload_0,
+            Instruction::Lload_3,
+            Instruction::Putfield(byte_offset),
+            Instruction::Aload_0,
+            Instruction::Iload(5),
+            Instruction::Putfield(sample_count),
             Instruction::Return,
         ],
     )
