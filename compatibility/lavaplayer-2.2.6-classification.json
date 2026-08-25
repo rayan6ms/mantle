@@ -9111,63 +9111,70 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-player-input-stream contract exactly, with structural, differential read, timeout, silence, interruption, lifecycle, private-state, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioPlayerInputStream",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;JZ)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-player-input-stream contract exactly, with structural, differential read, timeout, silence, interruption, lifecycle, private-state, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioPlayerInputStream",
       "symbol_kind": "METHOD",
       "member_name": "read",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-player-input-stream contract exactly, with structural, differential read, timeout, silence, interruption, lifecycle, private-state, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioPlayerInputStream",
       "symbol_kind": "METHOD",
       "member_name": "read",
       "descriptor": "([BII)I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-player-input-stream contract exactly, with structural, differential read, timeout, silence, interruption, lifecycle, private-state, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioPlayerInputStream",
       "symbol_kind": "METHOD",
       "member_name": "available",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-player-input-stream contract exactly, with structural, differential read, timeout, silence, interruption, lifecycle, private-state, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioPlayerInputStream",
       "symbol_kind": "METHOD",
       "member_name": "close",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-player-input-stream contract exactly, with structural, differential read, timeout, silence, interruption, lifecycle, private-state, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioPlayerInputStream",
       "symbol_kind": "METHOD",
       "member_name": "createStream",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;JZ)Ljavax/sound/sampled/AudioInputStream;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-player-input-stream contract exactly, with structural, differential read, timeout, silence, interruption, lifecycle, private-state, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.OpusAudioDataFormat",

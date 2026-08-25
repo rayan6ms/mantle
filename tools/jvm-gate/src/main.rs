@@ -113,6 +113,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-volume-consumer" => Some(VOLUME_CONSUMER),
         "write-audio-data-format-consumer" => Some(AUDIO_DATA_FORMAT_CONSUMER),
         "write-audio-data-format-tools-consumer" => Some(AUDIO_DATA_FORMAT_TOOLS_CONSUMER),
+        "write-audio-player-input-stream-consumer" => Some(AUDIO_PLAYER_INPUT_STREAM_CONSUMER),
         "write-pcm-filter-factory-consumer" => Some(PCM_FILTER_FACTORY_CONSUMER),
         "write-pcm-format-consumer" => Some(PCM_FORMAT_CONSUMER),
         "write-resampling-pcm-audio-filter-consumer" => Some(RESAMPLING_PCM_AUDIO_FILTER_CONSUMER),
@@ -10162,6 +10163,323 @@ public final class GateAudioDataFormatTools {
     public int maximumChunkSize() { return 0; }
     public AudioChunkDecoder createDecoder() { return null; }
     public AudioChunkEncoder createEncoder(AudioConfiguration configuration) { return null; }
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong failure", error);
+      return type.cast(error);
+    }
+  }
+  private interface Operation { void run() throws Exception; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_PLAYER_INPUT_STREAM_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.PcmFilterFactory;
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.AudioPlayerInputStream;
+import com.sedmelluq.discord.lavaplayer.format.Pcm16AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
+import com.sedmelluq.discord.lavaplayer.player.event.AudioEventListener;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.TrackStateListener;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InterruptedIOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+
+public final class GateAudioPlayerInputStream {
+  public static void main(String[] args) throws Exception {
+    signedReadsAndClose();
+    bulkReads();
+    retryAndSilence();
+    timeoutNotification();
+    interruption();
+    failures();
+    streamFactory();
+    reflection();
+    System.out.println(
+        "contracts=signed-read,availability,bulk-offset,frame-crossing,null-retry,silence,timeout-listener,interrupt,format-check,close,factory,private-state,reflection");
+  }
+
+  private static void signedReadsAndClose() throws Exception {
+    Pcm16AudioDataFormat format = format();
+    PlayerState state = new PlayerState(frame(format, new byte[] {(byte) 0xff, 0x7f}));
+    AudioPlayerInputStream stream = new AudioPlayerInputStream(format, state.player(false), 31L, false);
+    check(stream.available() == 0 && state.provideCalls == 0, "available is non-retrieving");
+    check(stream.read() == -1 && stream.available() == 1 && stream.read() == 127
+        && stream.available() == 0, "signed reads and availability");
+    check(state.provideCalls == 1 && state.lastTimeout == 31L
+        && state.lastUnit == TimeUnit.MILLISECONDS, "timed provide arguments");
+    stream.close();
+    stream.close();
+    check(state.stopCalls == 2, "close delegates every time");
+  }
+
+  private static void bulkReads() throws Exception {
+    Pcm16AudioDataFormat format = format();
+    PlayerState state = new PlayerState(
+        frame(format, new byte[] {1, 2}), frame(format, new byte[] {3, 4}));
+    AudioPlayerInputStream stream = new AudioPlayerInputStream(format, state.player(false), 7L, false);
+    byte[] output = new byte[8];
+    Arrays.fill(output, (byte) 9);
+    check(stream.read(output, 2, 5) == 3
+        && Arrays.equals(output, new byte[] {9, 9, 1, 2, 3, 9, 9, 9})
+        && stream.available() == 1 && state.provideCalls == 2,
+        "bulk offset is compared directly to length and crosses frames");
+    check(stream.read(null, 5, 2) == 0 && state.provideCalls == 2,
+        "empty bulk path skips receiver validation and retrieval");
+    check(stream.read(output, 0, 1) == 1 && output[0] == 4 && stream.available() == 0,
+        "bulk tail consumption");
+  }
+
+  private static void retryAndSilence() throws Exception {
+    Pcm16AudioDataFormat format = format();
+    PlayerState retry = new PlayerState(null, frame(format, new byte[] {5}));
+    AudioPlayerInputStream stream = new AudioPlayerInputStream(format, retry.player(false), 9L, false);
+    check(stream.read() == 5 && retry.provideCalls == 2, "null frame retry");
+
+    PlayerState silence = new PlayerState((Object) null);
+    AudioPlayerInputStream silent = new AudioPlayerInputStream(format, silence.player(false), 11L, true);
+    check(silent.read() == 0 && silent.available() == 3 && silence.provideCalls == 1,
+        "null frame supplies exact format silence");
+
+    PlayerState emptyThenFrame = new PlayerState(
+        frame(format, new byte[0]), frame(format, new byte[] {6}));
+    AudioPlayerInputStream empty =
+        new AudioPlayerInputStream(format, emptyThenFrame.player(false), 13L, true);
+    check(empty.read() == 0 && empty.available() == 3 && emptyThenFrame.provideCalls == 1,
+        "empty frame falls back to silence before another retrieval");
+  }
+
+  private static void timeoutNotification() throws Exception {
+    Pcm16AudioDataFormat format = format();
+    PlayerState state = new PlayerState(new TimeoutException("timeout"));
+    AudioPlayer listenerPlayer = state.player(true);
+    AudioPlayerInputStream stream = new AudioPlayerInputStream(format, listenerPlayer, 37L, true);
+    check(stream.read() == 0 && state.provideCalls == 1 && state.stuckCalls == 1
+        && state.stuckTrack == state.track && state.stuckTimeout == 37L,
+        "timeout notification precedes silence");
+
+    PlayerState retry = new PlayerState(
+        new TimeoutException("retry"), frame(format, new byte[] {8}));
+    AudioPlayerInputStream retryStream =
+        new AudioPlayerInputStream(format, retry.player(true), 41L, false);
+    check(retryStream.read() == 8 && retry.provideCalls == 2 && retry.stuckCalls == 1
+        && retry.stuckTimeout == 41L, "timeout without silence retries immediately");
+  }
+
+  private static void interruption() throws Exception {
+    Thread.interrupted();
+    PlayerState state = new PlayerState(new InterruptedException("interrupted"));
+    AudioPlayerInputStream stream =
+        new AudioPlayerInputStream(format(), state.player(false), 17L, false);
+    InterruptedIOException error = expect(InterruptedIOException.class, stream::read);
+    check(error.getMessage() == null && error.getCause() == null
+        && Thread.currentThread().isInterrupted() && state.provideCalls == 1,
+        "interruption restoration and fresh failure");
+    check(Thread.interrupted(), "interrupt flag cleanup");
+  }
+
+  private static void failures() throws Exception {
+    Pcm16AudioDataFormat format = format();
+    Pcm16AudioDataFormat mismatch = new Pcm16AudioDataFormat(2, 8_000, 2, false);
+    PlayerState wrong = new PlayerState(frame(mismatch, new byte[] {1}));
+    IllegalStateException mismatchError = expect(IllegalStateException.class,
+        () -> new AudioPlayerInputStream(format, wrong.player(false), 1L, false).read());
+    check("Frame read from the player uses a different format than expected."
+        .equals(mismatchError.getMessage()), "format mismatch failure");
+
+    PlayerState nullData = new PlayerState(frame(format, null));
+    expect(NullPointerException.class,
+        () -> new AudioPlayerInputStream(format, nullData.player(false), 1L, false).read());
+
+    RuntimeException stopFailure = new RuntimeException("stop-sentinel");
+    PlayerState close = new PlayerState();
+    close.stopFailure = stopFailure;
+    try {
+      new AudioPlayerInputStream(format, close.player(false), 1L, false).close();
+      throw new AssertionError("missing close failure");
+    } catch (RuntimeException error) {
+      check(error == stopFailure && close.stopCalls == 1, "close failure identity");
+    }
+    expect(NullPointerException.class,
+        () -> new AudioPlayerInputStream(format, null, 0L, false).close());
+  }
+
+  private static void streamFactory() throws Exception {
+    Pcm16AudioDataFormat format = format();
+    PlayerState state = new PlayerState();
+    AudioInputStream stream = AudioPlayerInputStream.createStream(state.player(false), format, 23L, true);
+    check(stream.getFrameLength() == AudioSystem.NOT_SPECIFIED
+        && stream.getFormat().getSampleRate() == 8_000.0f
+        && stream.getFormat().getChannels() == 1
+        && stream.getFormat().getFrameSize() == 2
+        && stream.getFormat().isBigEndian(), "factory Java Sound geometry");
+    stream.close();
+    check(state.stopCalls == 1, "factory wraps the player stream");
+  }
+
+  private static void reflection() throws Exception {
+    Class<AudioPlayerInputStream> type = AudioPlayerInputStream.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == InputStream.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 5
+        && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 9, "class metadata");
+    for (String name : new String[] {"player", "format", "timeout", "provideSilence", "current"}) {
+      Field field = type.getDeclaredField(name);
+      int expected = Modifier.PRIVATE | (name.equals("current") ? 0 : Modifier.FINAL);
+      check(field.getModifiers() == expected, "field modifiers " + name);
+    }
+    check(type.getDeclaredField("player").getType() == AudioPlayer.class
+        && type.getDeclaredField("format").getType() == AudioDataFormat.class
+        && type.getDeclaredField("timeout").getType() == long.class
+        && type.getDeclaredField("provideSilence").getType() == boolean.class
+        && type.getDeclaredField("current").getType() == ByteBuffer.class, "field types");
+
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        AudioDataFormat.class, AudioPlayer.class, long.class, boolean.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    for (Method method : type.getDeclaredMethods()) {
+      if (Modifier.isPublic(method.getModifiers()) && !Modifier.isStatic(method.getModifiers())) {
+        check(Arrays.equals(method.getExceptionTypes(), new Class<?>[] {IOException.class}),
+            "public stream exception metadata " + method);
+      }
+    }
+    Method factory = type.getDeclaredMethod(
+        "createStream", AudioPlayer.class, AudioDataFormat.class, long.class, boolean.class);
+    check(factory.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && factory.getReturnType() == AudioInputStream.class
+        && factory.getExceptionTypes().length == 0, "factory metadata");
+    check(type.getDeclaredMethod("ensureAvailable").getModifiers() == Modifier.PRIVATE
+        && Arrays.equals(type.getDeclaredMethod("ensureAvailable").getExceptionTypes(),
+            new Class<?>[] {IOException.class}), "private ensure metadata");
+    check(type.getDeclaredMethod("attemptRetrieveFrame").getModifiers() == Modifier.PRIVATE
+        && Arrays.equals(type.getDeclaredMethod("attemptRetrieveFrame").getExceptionTypes(),
+            new Class<?>[] {TimeoutException.class, InterruptedException.class}),
+        "private retrieval metadata");
+
+    Pcm16AudioDataFormat format = format();
+    PlayerState state = new PlayerState();
+    AudioPlayer player = state.player(false);
+    AudioPlayerInputStream stream = new AudioPlayerInputStream(format, player, -5L, true);
+    check(readField(type, stream, "format") == format
+        && readField(type, stream, "player") == player
+        && ((Long) readField(type, stream, "timeout")) == -5L
+        && (Boolean) readField(type, stream, "provideSilence")
+        && readField(type, stream, "current") == null, "constructor private state");
+  }
+
+  private static Object readField(Class<?> type, Object instance, String name) throws Exception {
+    Field field = type.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(instance);
+  }
+
+  private static Pcm16AudioDataFormat format() {
+    return new Pcm16AudioDataFormat(1, 8_000, 2, false);
+  }
+
+  private static AudioFrame frame(AudioDataFormat format, byte[] data) {
+    return new AudioFrame() {
+      public long getTimecode() { return 0L; }
+      public int getVolume() { return 100; }
+      public int getDataLength() { return data == null ? 0 : data.length; }
+      public byte[] getData() { return data; }
+      public void getData(byte[] target, int offset) {
+        System.arraycopy(data, 0, target, offset, data.length);
+      }
+      public AudioDataFormat getFormat() { return format; }
+      public boolean isTerminator() { return false; }
+    };
+  }
+
+  private static final class PlayerState implements InvocationHandler {
+    final Object[] outcomes;
+    int outcomeIndex;
+    int provideCalls;
+    long lastTimeout;
+    TimeUnit lastUnit;
+    int stopCalls;
+    RuntimeException stopFailure;
+    int stuckCalls;
+    AudioTrack stuckTrack;
+    long stuckTimeout;
+    final AudioTrack track;
+
+    PlayerState(Object... outcomes) {
+      this.outcomes = outcomes;
+      track = (AudioTrack) Proxy.newProxyInstance(
+          GateAudioPlayerInputStream.class.getClassLoader(),
+          new Class<?>[] {AudioTrack.class}, this::invokeDefaults);
+    }
+
+    AudioPlayer player(boolean listener) {
+      Class<?>[] interfaces = listener
+          ? new Class<?>[] {AudioPlayer.class, TrackStateListener.class}
+          : new Class<?>[] {AudioPlayer.class};
+      return (AudioPlayer) Proxy.newProxyInstance(
+          GateAudioPlayerInputStream.class.getClassLoader(), interfaces, this);
+    }
+
+    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+      String name = method.getName();
+      if (name.equals("provide") && args != null && args.length == 2
+          && args[0] instanceof Long) {
+        provideCalls++;
+        lastTimeout = (Long) args[0];
+        lastUnit = (TimeUnit) args[1];
+        Object outcome = outcomeIndex < outcomes.length ? outcomes[outcomeIndex++] : null;
+        if (outcome instanceof Throwable) throw (Throwable) outcome;
+        return outcome;
+      }
+      if (name.equals("stopTrack")) {
+        stopCalls++;
+        if (stopFailure != null) throw stopFailure;
+        return null;
+      }
+      if (name.equals("getPlayingTrack")) return track;
+      if (name.equals("onTrackStuck")) {
+        stuckCalls++;
+        stuckTrack = (AudioTrack) args[0];
+        stuckTimeout = (Long) args[1];
+        return null;
+      }
+      return invokeDefaults(proxy, method, args);
+    }
+
+    private Object invokeDefaults(Object proxy, Method method, Object[] args) {
+      if (method.getName().equals("toString")) return "GatePlayer";
+      if (method.getName().equals("hashCode")) return System.identityHashCode(proxy);
+      if (method.getName().equals("equals")) return proxy == args[0];
+      Class<?> type = method.getReturnType();
+      if (type == boolean.class) return false;
+      if (type == int.class) return 0;
+      if (type == long.class) return 0L;
+      return null;
+    }
   }
 
   private static <T extends Throwable> T expect(Class<T> type, Operation operation) {

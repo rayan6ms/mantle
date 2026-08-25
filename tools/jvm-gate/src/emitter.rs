@@ -120,6 +120,8 @@ const VOLUME_POST_PROCESSOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/volume/VolumePostProcessor";
 const AUDIO_DATA_FORMAT_TOOLS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/format/AudioDataFormatTools";
+const AUDIO_PLAYER_INPUT_STREAM_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/format/AudioPlayerInputStream";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -434,6 +436,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     VOLUME_POST_PROCESSOR_CLASS,
     "com/sedmelluq/discord/lavaplayer/format/AudioDataFormat",
     AUDIO_DATA_FORMAT_TOOLS_CLASS,
+    AUDIO_PLAYER_INPUT_STREAM_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -898,7 +901,8 @@ fn method_key(class: &ClassFile<'_>, method: &Method) -> Result<(String, String)
 fn retain_private_fields(class_name: &str) -> bool {
     matches!(
         class_name,
-        PLAYER_LIFECYCLE_MANAGER_CLASS
+        AUDIO_PLAYER_INPUT_STREAM_CLASS
+            | PLAYER_LIFECYCLE_MANAGER_CLASS
             | FUNCTIONAL_RESULT_HANDLER_CLASS
             | AUDIO_PIPELINE_CLASS
             | BUFFERING_POST_PROCESSOR_CLASS
@@ -995,7 +999,8 @@ fn retain_private_fields(class_name: &str) -> bool {
 fn retain_private_methods(class_name: &str) -> bool {
     matches!(
         class_name,
-        AUDIO_PIPELINE_FACTORY_CLASS
+        AUDIO_PLAYER_INPUT_STREAM_CLASS
+            | AUDIO_PIPELINE_FACTORY_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
             | FILTER_CHAIN_BUILDER_CLASS
@@ -1204,6 +1209,9 @@ fn replacement_body(
     }
     if class_name == AUDIO_DATA_FORMAT_TOOLS_CLASS {
         return audio_data_format_tools_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == AUDIO_PLAYER_INPUT_STREAM_CLASS {
+        return audio_player_input_stream_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -1794,6 +1802,540 @@ fn audio_data_format_tools_to_audio_format(pool: &mut ConstantPool<'static>) -> 
         ],
     )?;
     add_stack_map_table(pool, &mut body, vec![same_stack_frame(unsupported_target)])?;
+    Ok(body)
+}
+
+fn audio_player_input_stream_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;JZ)V",
+        ) => audio_player_input_stream_constructor(pool),
+        ("read", "()I") => audio_player_input_stream_read_one(pool),
+        ("read", "([BII)I") => audio_player_input_stream_read_bulk(pool),
+        ("available", "()I") => audio_player_input_stream_available(pool),
+        ("close", "()V") => audio_player_input_stream_close(pool),
+        (
+            "createStream",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;JZ)Ljavax/sound/sampled/AudioInputStream;",
+        ) => audio_player_input_stream_create(pool),
+        ("ensureAvailable", "()V") => audio_player_input_stream_ensure_available(pool),
+        ("attemptRetrieveFrame", "()V") => audio_player_input_stream_attempt_retrieve(pool),
+        ("addFrame", "([B)V") => audio_player_input_stream_add_frame(pool),
+        ("notifyTrackStuck", "()V") => audio_player_input_stream_notify_stuck(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {AUDIO_PLAYER_INPUT_STREAM_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn audio_player_input_stream_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(AUDIO_PLAYER_INPUT_STREAM_CLASS)?;
+    let input_stream = pool.add_class("java/io/InputStream")?;
+    let input_stream_init = pool.add_method_ref(input_stream, "<init>", "()V")?;
+    let format = pool.add_field_ref(
+        owner,
+        "format",
+        "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let player = pool.add_field_ref(
+        owner,
+        "player",
+        "Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;",
+    )?;
+    let timeout = pool.add_field_ref(owner, "timeout", "J")?;
+    let provide_silence = pool.add_field_ref(owner, "provideSilence", "Z")?;
+    code(
+        pool,
+        3,
+        6,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(input_stream_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(format),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(player),
+            Instruction::Aload_0,
+            Instruction::Lload(3),
+            Instruction::Putfield(timeout),
+            Instruction::Aload_0,
+            Instruction::Iload(5),
+            Instruction::Putfield(provide_silence),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn audio_player_input_stream_read_one(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(AUDIO_PLAYER_INPUT_STREAM_CLASS)?;
+    let ensure_available = pool.add_method_ref(owner, "ensureAvailable", "()V")?;
+    let current = pool.add_field_ref(owner, "current", "Ljava/nio/ByteBuffer;")?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let get = pool.add_method_ref(byte_buffer, "get", "()B")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(ensure_available),
+            Instruction::Aload_0,
+            Instruction::Getfield(current),
+            Instruction::Invokevirtual(get),
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+fn audio_player_input_stream_read_bulk(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(AUDIO_PLAYER_INPUT_STREAM_CLASS)?;
+    let ensure_available = pool.add_method_ref(owner, "ensureAvailable", "()V")?;
+    let current = pool.add_field_ref(owner, "current", "Ljava/nio/ByteBuffer;")?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let remaining = pool.add_method_ref(byte_buffer, "remaining", "()I")?;
+    let get = pool.add_method_ref(byte_buffer, "get", "([BII)Ljava/nio/ByteBuffer;")?;
+    let math = pool.add_class("java/lang/Math")?;
+    let min = pool.add_method_ref(math, "min", "(II)I")?;
+    let loop_target = 2;
+    let return_target = 27;
+    let mut body = code(
+        pool,
+        4,
+        6,
+        vec![
+            Instruction::Iload_2,
+            Instruction::Istore(4),
+            Instruction::Iload(4),
+            Instruction::Iload_3,
+            Instruction::If_icmpge(return_target),
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(ensure_available),
+            Instruction::Aload_0,
+            Instruction::Getfield(current),
+            Instruction::Invokevirtual(remaining),
+            Instruction::Iload_3,
+            Instruction::Iload(4),
+            Instruction::Isub,
+            Instruction::Invokestatic(min),
+            Instruction::Istore(5),
+            Instruction::Aload_0,
+            Instruction::Getfield(current),
+            Instruction::Aload_1,
+            Instruction::Iload(4),
+            Instruction::Iload(5),
+            Instruction::Invokevirtual(get),
+            Instruction::Pop,
+            Instruction::Iload(4),
+            Instruction::Iload(5),
+            Instruction::Iadd,
+            Instruction::Istore(4),
+            Instruction::Goto(loop_target),
+            Instruction::Iload(4),
+            Instruction::Iload_2,
+            Instruction::Isub,
+            Instruction::Ireturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: loop_target,
+                locals: vec![VerificationType::Integer],
+            },
+            StackFrame::SameFrame {
+                frame_type: u8::try_from(return_target - loop_target - 1)?,
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn audio_player_input_stream_available(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(AUDIO_PLAYER_INPUT_STREAM_CLASS)?;
+    let current = pool.add_field_ref(owner, "current", "Ljava/nio/ByteBuffer;")?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let remaining = pool.add_method_ref(byte_buffer, "remaining", "()I")?;
+    let mut body = code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(current),
+            Instruction::Ifnull(7),
+            Instruction::Aload_0,
+            Instruction::Getfield(current),
+            Instruction::Invokevirtual(remaining),
+            Instruction::Goto(8),
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            same_stack_frame(7),
+            StackFrame::SameLocals1StackItemFrame {
+                frame_type: 64,
+                stack: vec![VerificationType::Integer],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn audio_player_input_stream_close(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(AUDIO_PLAYER_INPUT_STREAM_CLASS)?;
+    let player_field = pool.add_field_ref(
+        owner,
+        "player",
+        "Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;",
+    )?;
+    let player = pool.add_class("com/sedmelluq/discord/lavaplayer/player/AudioPlayer")?;
+    let stop = pool.add_interface_method_ref(player, "stopTrack", "()V")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(player_field),
+            Instruction::Invokeinterface(stop, 1),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn audio_player_input_stream_create(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(AUDIO_PLAYER_INPUT_STREAM_CLASS)?;
+    let tools = pool.add_class(AUDIO_DATA_FORMAT_TOOLS_CLASS)?;
+    let to_audio_format = pool.add_method_ref(
+        tools,
+        "toAudioFormat",
+        "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)Ljavax/sound/sampled/AudioFormat;",
+    )?;
+    let owner_init = pool.add_method_ref(
+        owner,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;JZ)V",
+    )?;
+    let audio_input_stream = pool.add_class("javax/sound/sampled/AudioInputStream")?;
+    let audio_input_stream_init = pool.add_method_ref(
+        audio_input_stream,
+        "<init>",
+        "(Ljava/io/InputStream;Ljavax/sound/sampled/AudioFormat;J)V",
+    )?;
+    let unknown_length = pool.add_long(-1)?;
+    code(
+        pool,
+        9,
+        6,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Invokestatic(to_audio_format),
+            Instruction::Astore(5),
+            Instruction::New(audio_input_stream),
+            Instruction::Dup,
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Lload_2,
+            Instruction::Iload(4),
+            Instruction::Invokespecial(owner_init),
+            Instruction::Aload(5),
+            Instruction::Ldc2_w(unknown_length),
+            Instruction::Invokespecial(audio_input_stream_init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn audio_player_input_stream_ensure_available(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(AUDIO_PLAYER_INPUT_STREAM_CLASS)?;
+    let available = pool.add_method_ref(owner, "available", "()I")?;
+    let attempt = pool.add_method_ref(owner, "attemptRetrieveFrame", "()V")?;
+    let notify = pool.add_method_ref(owner, "notifyTrackStuck", "()V")?;
+    let add_frame = pool.add_method_ref(owner, "addFrame", "([B)V")?;
+    let provide_silence = pool.add_field_ref(owner, "provideSilence", "Z")?;
+    let format_field = pool.add_field_ref(
+        owner,
+        "format",
+        "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let format = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let silence = pool.add_method_ref(format, "silenceBytes", "()[B")?;
+    let timeout = pool.add_class("java/util/concurrent/TimeoutException")?;
+    let interrupted = pool.add_class("java/lang/InterruptedException")?;
+    let exception_tools =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/ExceptionTools")?;
+    let keep_interrupted = pool.add_method_ref(
+        exception_tools,
+        "keepInterrupted",
+        "(Ljava/lang/Throwable;)V",
+    )?;
+    let interrupted_io = pool.add_class("java/io/InterruptedIOException")?;
+    let interrupted_io_init = pool.add_method_ref(interrupted_io, "<init>", "()V")?;
+    let loop_target = 1;
+    let timeout_handler = 7;
+    let interrupted_handler = 11;
+    let after_attempt = 18;
+    let return_target = 30;
+    let mut body = code_with_exceptions(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Goto(loop_target),
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(available),
+            Instruction::Ifne(return_target),
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(attempt),
+            Instruction::Goto(after_attempt),
+            Instruction::Astore_1,
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(notify),
+            Instruction::Goto(after_attempt),
+            Instruction::Astore_1,
+            Instruction::Aload_1,
+            Instruction::Invokestatic(keep_interrupted),
+            Instruction::New(interrupted_io),
+            Instruction::Dup,
+            Instruction::Invokespecial(interrupted_io_init),
+            Instruction::Athrow,
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(available),
+            Instruction::Ifne(loop_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(provide_silence),
+            Instruction::Ifeq(loop_target),
+            Instruction::Aload_0,
+            Instruction::Aload_0,
+            Instruction::Getfield(format_field),
+            Instruction::Invokevirtual(silence),
+            Instruction::Invokevirtual(add_frame),
+            Instruction::Goto(return_target),
+            Instruction::Return,
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 4..6,
+                handler_pc: timeout_handler,
+                catch_type: timeout,
+            },
+            ExceptionTableEntry {
+                range_pc: 4..6,
+                handler_pc: interrupted_handler,
+                catch_type: interrupted,
+            },
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            same_stack_frame(loop_target),
+            StackFrame::SameLocals1StackItemFrame {
+                frame_type: 69,
+                stack: vec![VerificationType::Object {
+                    cpool_index: timeout,
+                }],
+            },
+            StackFrame::SameLocals1StackItemFrame {
+                frame_type: 67,
+                stack: vec![VerificationType::Object {
+                    cpool_index: interrupted,
+                }],
+            },
+            same_stack_frame(after_attempt - interrupted_handler - 1),
+            same_stack_frame(return_target - after_attempt - 1),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn audio_player_input_stream_attempt_retrieve(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(AUDIO_PLAYER_INPUT_STREAM_CLASS)?;
+    let player_field = pool.add_field_ref(
+        owner,
+        "player",
+        "Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;",
+    )?;
+    let format_field = pool.add_field_ref(
+        owner,
+        "format",
+        "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let timeout_field = pool.add_field_ref(owner, "timeout", "J")?;
+    let provide_silence = pool.add_field_ref(owner, "provideSilence", "Z")?;
+    let add_frame = pool.add_method_ref(owner, "addFrame", "([B)V")?;
+    let player = pool.add_class("com/sedmelluq/discord/lavaplayer/player/AudioPlayer")?;
+    let provide = pool.add_interface_method_ref(
+        player,
+        "provide",
+        "(JLjava/util/concurrent/TimeUnit;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;",
+    )?;
+    let time_unit = pool.add_class("java/util/concurrent/TimeUnit")?;
+    let milliseconds =
+        pool.add_field_ref(time_unit, "MILLISECONDS", "Ljava/util/concurrent/TimeUnit;")?;
+    let frame = pool.add_class("com/sedmelluq/discord/lavaplayer/track/playback/AudioFrame")?;
+    let get_format = pool.add_interface_method_ref(
+        frame,
+        "getFormat",
+        "()Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let get_data = pool.add_interface_method_ref(frame, "getData", "()[B")?;
+    let format = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let equals = pool.add_method_ref(format, "equals", "(Ljava/lang/Object;)Z")?;
+    let illegal_state = pool.add_class("java/lang/IllegalStateException")?;
+    let illegal_state_init =
+        pool.add_method_ref(illegal_state, "<init>", "(Ljava/lang/String;)V")?;
+    let mismatch_message =
+        pool.add_string("Frame read from the player uses a different format than expected.")?;
+    let ten = pool.add_long(10)?;
+    let thread = pool.add_class("java/lang/Thread")?;
+    let sleep = pool.add_method_ref(thread, "sleep", "(J)V")?;
+    let valid_target = 20;
+    let null_target = 25;
+    let return_target = 30;
+    let mut body = code(
+        pool,
+        4,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(player_field),
+            Instruction::Aload_0,
+            Instruction::Getfield(timeout_field),
+            Instruction::Getstatic(milliseconds),
+            Instruction::Invokeinterface(provide, 4),
+            Instruction::Astore_1,
+            Instruction::Aload_1,
+            Instruction::Ifnull(null_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(format_field),
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(get_format, 1),
+            Instruction::Invokevirtual(equals),
+            Instruction::Ifne(valid_target),
+            Instruction::New(illegal_state),
+            Instruction::Dup,
+            Instruction::Ldc_w(mismatch_message),
+            Instruction::Invokespecial(illegal_state_init),
+            Instruction::Athrow,
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(get_data, 1),
+            Instruction::Invokevirtual(add_frame),
+            Instruction::Goto(return_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(provide_silence),
+            Instruction::Ifne(return_target),
+            Instruction::Ldc2_w(ten),
+            Instruction::Invokestatic(sleep),
+            Instruction::Return,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: valid_target,
+                locals: vec![VerificationType::Object { cpool_index: frame }],
+            },
+            same_stack_frame(null_target - valid_target - 1),
+            same_stack_frame(return_target - null_target - 1),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn audio_player_input_stream_add_frame(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(AUDIO_PLAYER_INPUT_STREAM_CLASS)?;
+    let current = pool.add_field_ref(owner, "current", "Ljava/nio/ByteBuffer;")?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let wrap = pool.add_method_ref(byte_buffer, "wrap", "([B)Ljava/nio/ByteBuffer;")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokestatic(wrap),
+            Instruction::Putfield(current),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn audio_player_input_stream_notify_stuck(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(AUDIO_PLAYER_INPUT_STREAM_CLASS)?;
+    let player_field = pool.add_field_ref(
+        owner,
+        "player",
+        "Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayer;",
+    )?;
+    let timeout = pool.add_field_ref(owner, "timeout", "J")?;
+    let player = pool.add_class("com/sedmelluq/discord/lavaplayer/player/AudioPlayer")?;
+    let get_playing_track = pool.add_interface_method_ref(
+        player,
+        "getPlayingTrack",
+        "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+    )?;
+    let listener = pool.add_class("com/sedmelluq/discord/lavaplayer/track/TrackStateListener")?;
+    let on_stuck = pool.add_interface_method_ref(
+        listener,
+        "onTrackStuck",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;J)V",
+    )?;
+    let return_target = 13;
+    let mut body = code(
+        pool,
+        4,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(player_field),
+            Instruction::Instanceof(listener),
+            Instruction::Ifeq(return_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(player_field),
+            Instruction::Checkcast(listener),
+            Instruction::Aload_0,
+            Instruction::Getfield(player_field),
+            Instruction::Invokeinterface(get_playing_track, 1),
+            Instruction::Aload_0,
+            Instruction::Getfield(timeout),
+            Instruction::Invokeinterface(on_stuck, 4),
+            Instruction::Return,
+        ],
+    )?;
+    add_stack_map_table(pool, &mut body, vec![same_stack_frame(return_target)])?;
     Ok(body)
 }
 
