@@ -79,6 +79,8 @@ const COMPOSITE_AUDIO_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/CompositeAudioFilter";
 const FILTER_CHAIN_BUILDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/FilterChainBuilder";
+const FINAL_PCM_AUDIO_FILTER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/filter/FinalPcmAudioFilter";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -369,6 +371,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS,
     COMPOSITE_AUDIO_FILTER_CLASS,
     FILTER_CHAIN_BUILDER_CLASS,
+    FINAL_PCM_AUDIO_FILTER_CLASS,
     AUDIO_FILTER_CHAIN_CLASS,
     AUDIO_PIPELINE_CLASS,
     AUDIO_PIPELINE_FACTORY_CLASS,
@@ -839,6 +842,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
             | FILTER_CHAIN_BUILDER_CLASS
+            | FINAL_PCM_AUDIO_FILTER_CLASS
             | TRACK_MARKER_TRACKER_CLASS
             | BASE_AUDIO_TRACK_CLASS
             | DELEGATED_AUDIO_TRACK_CLASS
@@ -921,6 +925,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
             | FILTER_CHAIN_BUILDER_CLASS
+            | FINAL_PCM_AUDIO_FILTER_CLASS
             | TRACK_INFO_BUILDER_CLASS
             | ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
             | NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
@@ -1079,6 +1084,9 @@ fn replacement_body(
     }
     if class_name == FILTER_CHAIN_BUILDER_CLASS {
         return filter_chain_builder_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == FINAL_PCM_AUDIO_FILTER_CLASS {
+        return final_pcm_audio_filter_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PROBING_AUDIO_SOURCE_MANAGER_CLASS {
         return probing_audio_source_manager_replacement(pool, name, descriptor, required_locals);
@@ -1552,6 +1560,9 @@ fn replacement_body(
         }
         ("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat", "frameDuration", "()J") => {
             audio_data_format_frame_duration(pool)?
+        }
+        ("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat", "totalSampleCount", "()I") => {
+            audio_data_format_total_sample_count(pool)?
         }
         (
             "com/sedmelluq/discord/lavaplayer/track/TrackMarker",
@@ -2895,6 +2906,875 @@ fn filter_chain_builder_prepend_universal(pool: &mut ConstantPool<'static>) -> R
         ],
     )?;
     Ok(body)
+}
+
+fn final_pcm_audio_filter_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;Ljava/util/Collection;)V",
+        ) => final_pcm_audio_filter_constructor(pool),
+        ("decodeSample", "(F)S") => final_pcm_audio_filter_decode_sample(pool),
+        ("seekPerformed", "(JJ)V") => final_pcm_audio_filter_seek(pool),
+        ("flush", "()V") => final_pcm_audio_filter_flush(pool),
+        ("close", "()V") => final_pcm_audio_filter_close(pool),
+        ("fillFrameBuffer", "()V") => final_pcm_audio_filter_fill(pool),
+        ("process", "([SII)V") => final_pcm_audio_filter_process_short(pool),
+        ("process", "([[SII)V") => final_pcm_audio_filter_process_split(pool, false),
+        ("process", "(Ljava/nio/ShortBuffer;)V") => final_pcm_audio_filter_process_buffer(pool),
+        ("process", "([[FII)V") => final_pcm_audio_filter_process_split(pool, true),
+        ("dispatch", "()V") => final_pcm_audio_filter_dispatch(pool),
+        ("<clinit>", "()V") => final_pcm_audio_filter_static_initializer(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {FINAL_PCM_AUDIO_FILTER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn final_pcm_audio_filter_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FINAL_PCM_AUDIO_FILTER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let context = pool.add_class(AUDIO_PROCESSING_CONTEXT_CLASS)?;
+    let format_class = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let byte_order = pool.add_class("java/nio/ByteOrder")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let output_format = pool.add_field_ref(
+        context,
+        "outputFormat",
+        "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let format = pool.add_field_ref(
+        owner,
+        "format",
+        "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let frame_buffer = pool.add_field_ref(owner, "frameBuffer", "Ljava/nio/ShortBuffer;")?;
+    let post_processors = pool.add_field_ref(owner, "postProcessors", "Ljava/util/Collection;")?;
+    let timecode_base = pool.add_field_ref(owner, "timecodeBase", "J")?;
+    let timecode_sample_offset = pool.add_field_ref(owner, "timecodeSampleOffset", "J")?;
+    let total_sample_count = pool.add_method_ref(format_class, "totalSampleCount", "()I")?;
+    let allocate_direct =
+        pool.add_method_ref(byte_buffer, "allocateDirect", "(I)Ljava/nio/ByteBuffer;")?;
+    let native_order = pool.add_method_ref(byte_order, "nativeOrder", "()Ljava/nio/ByteOrder;")?;
+    let order = pool.add_method_ref(
+        byte_buffer,
+        "order",
+        "(Ljava/nio/ByteOrder;)Ljava/nio/ByteBuffer;",
+    )?;
+    let as_short_buffer =
+        pool.add_method_ref(byte_buffer, "asShortBuffer", "()Ljava/nio/ShortBuffer;")?;
+    code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Getfield(output_format),
+            Instruction::Putfield(format),
+            Instruction::Aload_0,
+            Instruction::Aload_0,
+            Instruction::Getfield(format),
+            Instruction::Invokevirtual(total_sample_count),
+            Instruction::Iconst_2,
+            Instruction::Imul,
+            Instruction::Invokestatic(allocate_direct),
+            Instruction::Invokestatic(native_order),
+            Instruction::Invokevirtual(order),
+            Instruction::Invokevirtual(as_short_buffer),
+            Instruction::Putfield(frame_buffer),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(post_processors),
+            Instruction::Aload_0,
+            Instruction::Lconst_0,
+            Instruction::Putfield(timecode_base),
+            Instruction::Aload_0,
+            Instruction::Lconst_0,
+            Instruction::Putfield(timecode_sample_offset),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn final_pcm_audio_filter_decode_sample(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let math = pool.add_class("java/lang/Math")?;
+    let max = pool.add_method_ref(math, "max", "(II)I")?;
+    let min = pool.add_method_ref(math, "min", "(II)I")?;
+    let scale = pool.add_float(32_768.0)?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Fload_1,
+            Instruction::Ldc_w(scale),
+            Instruction::Fmul,
+            Instruction::F2i,
+            Instruction::Sipush(-32_768),
+            Instruction::Invokestatic(max),
+            Instruction::Sipush(32_767),
+            Instruction::Invokestatic(min),
+            Instruction::I2s,
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn final_pcm_audio_filter_seek(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FINAL_PCM_AUDIO_FILTER_CLASS)?;
+    let format_class = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let short_buffer = pool.add_class("java/nio/ShortBuffer")?;
+    let math = pool.add_class("java/lang/Math")?;
+    let object = pool.add_class("java/lang/Object")?;
+    let long_class = pool.add_class("java/lang/Long")?;
+    let logger = pool.add_class("org/slf4j/Logger")?;
+    let frame_buffer = pool.add_field_ref(owner, "frameBuffer", "Ljava/nio/ShortBuffer;")?;
+    let format = pool.add_field_ref(
+        owner,
+        "format",
+        "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let ignored_frames = pool.add_field_ref(owner, "ignoredFrames", "J")?;
+    let timecode_base = pool.add_field_ref(owner, "timecodeBase", "J")?;
+    let timecode_sample_offset = pool.add_field_ref(owner, "timecodeSampleOffset", "J")?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let channel_count = pool.add_field_ref(format_class, "channelCount", "I")?;
+    let sample_rate = pool.add_field_ref(format_class, "sampleRate", "I")?;
+    let clear = pool.add_method_ref(short_buffer, "clear", "()Ljava/nio/ShortBuffer;")?;
+    let max = pool.add_method_ref(math, "max", "(JJ)J")?;
+    let value_of = pool.add_method_ref(long_class, "valueOf", "(J)Ljava/lang/Long;")?;
+    let debug =
+        pool.add_interface_method_ref(logger, "debug", "(Ljava/lang/String;[Ljava/lang/Object;)V")?;
+    let ignore_message =
+        pool.add_string("Ignoring {} frames due to inaccurate seek (requested {}, provided {}).")?;
+    let thousand = pool.add_long(1_000)?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Getfield(frame_buffer),
+        Instruction::Invokevirtual(clear),
+        Instruction::Pop,
+        Instruction::Aload_0,
+        Instruction::Lload_1,
+        Instruction::Lload_3,
+        Instruction::Lcmp,
+        Instruction::Ifle(0),
+        Instruction::Lload_1,
+        Instruction::Lload_3,
+        Instruction::Lsub,
+        Instruction::Aload_0,
+        Instruction::Getfield(format),
+        Instruction::Getfield(channel_count),
+        Instruction::I2l,
+        Instruction::Lmul,
+        Instruction::Aload_0,
+        Instruction::Getfield(format),
+        Instruction::Getfield(sample_rate),
+        Instruction::I2l,
+        Instruction::Lmul,
+        Instruction::Ldc2_w(thousand),
+        Instruction::Ldiv,
+    ];
+    let calculated_goto = instructions.len();
+    instructions.push(Instruction::Goto(0));
+    let zero_target = instructions.len();
+    instructions.push(Instruction::Lconst_0);
+    let store_target = instructions.len();
+    instructions.extend([
+        Instruction::Putfield(ignored_frames),
+        Instruction::Aload_0,
+        Instruction::Lload_1,
+        Instruction::Lload_3,
+        Instruction::Invokestatic(max),
+        Instruction::Putfield(timecode_base),
+        Instruction::Aload_0,
+        Instruction::Lconst_0,
+        Instruction::Putfield(timecode_sample_offset),
+        Instruction::Aload_0,
+        Instruction::Getfield(ignored_frames),
+        Instruction::Lconst_0,
+        Instruction::Lcmp,
+        Instruction::Ifle(0),
+        Instruction::Getstatic(log),
+        Instruction::Ldc_w(ignore_message),
+        Instruction::Iconst_3,
+        Instruction::Anewarray(object),
+        Instruction::Dup,
+        Instruction::Iconst_0,
+        Instruction::Aload_0,
+        Instruction::Getfield(ignored_frames),
+        Instruction::Invokestatic(value_of),
+        Instruction::Aastore,
+        Instruction::Dup,
+        Instruction::Iconst_1,
+        Instruction::Lload_1,
+        Instruction::Invokestatic(value_of),
+        Instruction::Aastore,
+        Instruction::Dup,
+        Instruction::Iconst_2,
+        Instruction::Lload_3,
+        Instruction::Invokestatic(value_of),
+        Instruction::Aastore,
+        Instruction::Invokeinterface(debug, 3),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[8] = Instruction::Ifle(u16::try_from(zero_target)?);
+    instructions[calculated_goto] = Instruction::Goto(u16::try_from(store_target)?);
+    instructions[store_target + 13] = Instruction::Ifle(u16::try_from(return_target)?);
+    let mut body = code(pool, 7, 5, instructions)?;
+    let locals = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Long,
+        VerificationType::Long,
+    ];
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: u16::try_from(zero_target)?,
+                locals: locals.clone(),
+                stack: vec![VerificationType::Object { cpool_index: owner }],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: u16::try_from(store_target - zero_target - 1)?,
+                locals,
+                stack: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Long,
+                ],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: u16::try_from(return_target - store_target - 1)?,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Long,
+                    VerificationType::Long,
+                ],
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn final_pcm_audio_filter_flush(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FINAL_PCM_AUDIO_FILTER_CLASS)?;
+    let short_buffer = pool.add_class("java/nio/ShortBuffer")?;
+    let frame_buffer = pool.add_field_ref(owner, "frameBuffer", "Ljava/nio/ShortBuffer;")?;
+    let position = pool.add_method_ref(short_buffer, "position", "()I")?;
+    let fill = pool.add_method_ref(owner, "fillFrameBuffer", "()V")?;
+    let dispatch = pool.add_method_ref(owner, "dispatch", "()V")?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Getfield(frame_buffer),
+        Instruction::Invokevirtual(position),
+        Instruction::Ifle(0),
+        Instruction::Aload_0,
+        Instruction::Invokevirtual(fill),
+        Instruction::Aload_0,
+        Instruction::Invokevirtual(dispatch),
+    ];
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[3] = Instruction::Ifle(u16::try_from(return_target)?);
+    let mut body = code(pool, 1, 1, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![same_stack_frame(u16::try_from(return_target)?)],
+    )?;
+    Ok(body)
+}
+
+fn final_pcm_audio_filter_close(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FINAL_PCM_AUDIO_FILTER_CLASS)?;
+    let collection = pool.add_class("java/util/Collection")?;
+    let iterator = pool.add_class("java/util/Iterator")?;
+    let processor = pool.add_class(AUDIO_POST_PROCESSOR_CLASS)?;
+    let post_processors = pool.add_field_ref(owner, "postProcessors", "Ljava/util/Collection;")?;
+    let iterator_method =
+        pool.add_interface_method_ref(collection, "iterator", "()Ljava/util/Iterator;")?;
+    let has_next = pool.add_interface_method_ref(iterator, "hasNext", "()Z")?;
+    let next = pool.add_interface_method_ref(iterator, "next", "()Ljava/lang/Object;")?;
+    let close = pool.add_interface_method_ref(processor, "close", "()V")?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Getfield(post_processors),
+        Instruction::Invokeinterface(iterator_method, 1),
+        Instruction::Astore_1,
+    ];
+    let loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_1,
+        Instruction::Invokeinterface(has_next, 1),
+        Instruction::Ifeq(0),
+        Instruction::Aload_1,
+        Instruction::Invokeinterface(next, 1),
+        Instruction::Checkcast(processor),
+        Instruction::Astore_2,
+        Instruction::Aload_2,
+        Instruction::Invokeinterface(close, 1),
+        Instruction::Goto(u16::try_from(loop_target)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[loop_target + 2] = Instruction::Ifeq(u16::try_from(return_target)?);
+    let mut body = code(pool, 1, 3, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(loop_target)?,
+                locals: vec![VerificationType::Object {
+                    cpool_index: iterator,
+                }],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: u16::try_from(return_target - loop_target - 1)?,
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn final_pcm_audio_filter_fill(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FINAL_PCM_AUDIO_FILTER_CLASS)?;
+    let short_buffer = pool.add_class("java/nio/ShortBuffer")?;
+    let frame_buffer = pool.add_field_ref(owner, "frameBuffer", "Ljava/nio/ShortBuffer;")?;
+    let zero_padding = pool.add_field_ref(owner, "zeroPadding", "[S")?;
+    let remaining = pool.add_method_ref(short_buffer, "remaining", "()I")?;
+    let put_array = pool.add_method_ref(short_buffer, "put", "([S)Ljava/nio/ShortBuffer;")?;
+    let put_short = pool.add_method_ref(short_buffer, "put", "(S)Ljava/nio/ShortBuffer;")?;
+    // Keep the first explicit frame away from bytecode offset zero. Ristretto's
+    // instruction-to-byte StackMap conversion uses zero as its initial sentinel.
+    let large_loop: usize = 1;
+    let mut instructions = vec![
+        Instruction::Nop,
+        Instruction::Aload_0,
+        Instruction::Getfield(frame_buffer),
+        Instruction::Invokevirtual(remaining),
+        Instruction::Getstatic(zero_padding),
+        Instruction::Arraylength,
+        Instruction::If_icmplt(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(frame_buffer),
+        Instruction::Getstatic(zero_padding),
+        Instruction::Invokevirtual(put_array),
+        Instruction::Pop,
+        Instruction::Goto(u16::try_from(large_loop)?),
+    ];
+    let small_loop = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Getfield(frame_buffer),
+        Instruction::Invokevirtual(remaining),
+        Instruction::Ifle(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(frame_buffer),
+        Instruction::Iconst_0,
+        Instruction::Invokevirtual(put_short),
+        Instruction::Pop,
+        Instruction::Goto(u16::try_from(small_loop)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[6] = Instruction::If_icmplt(u16::try_from(small_loop)?);
+    instructions[small_loop + 3] = Instruction::Ifle(u16::try_from(return_target)?);
+    let mut body = code(pool, 2, 1, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            same_stack_frame(u16::try_from(large_loop)?),
+            same_stack_frame(u16::try_from(small_loop - large_loop - 1)?),
+            same_stack_frame(u16::try_from(return_target - small_loop - 1)?),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn final_pcm_audio_filter_process_short(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FINAL_PCM_AUDIO_FILTER_CLASS)?;
+    let short_buffer = pool.add_class("java/nio/ShortBuffer")?;
+    let frame_buffer = pool.add_field_ref(owner, "frameBuffer", "Ljava/nio/ShortBuffer;")?;
+    let ignored_frames = pool.add_field_ref(owner, "ignoredFrames", "J")?;
+    let put_short = pool.add_method_ref(short_buffer, "put", "(S)Ljava/nio/ShortBuffer;")?;
+    let dispatch = pool.add_method_ref(owner, "dispatch", "()V")?;
+    let mut instructions = vec![Instruction::Iconst_0, Instruction::Istore(4)];
+    let loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(4),
+        Instruction::Iload_3,
+        Instruction::If_icmpge(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(ignored_frames),
+        Instruction::Lconst_0,
+        Instruction::Lcmp,
+        Instruction::Ifle(0),
+        Instruction::Aload_0,
+        Instruction::Dup,
+        Instruction::Getfield(ignored_frames),
+        Instruction::Lconst_1,
+        Instruction::Lsub,
+        Instruction::Putfield(ignored_frames),
+    ]);
+    let ignored_goto = instructions.len();
+    instructions.push(Instruction::Goto(0));
+    let sample_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Getfield(frame_buffer),
+        Instruction::Aload_1,
+        Instruction::Iload_2,
+        Instruction::Iload(4),
+        Instruction::Iadd,
+        Instruction::Saload,
+        Instruction::Invokevirtual(put_short),
+        Instruction::Pop,
+        Instruction::Aload_0,
+        Instruction::Invokevirtual(dispatch),
+    ]);
+    let continue_target = instructions.len();
+    instructions.extend([
+        Instruction::Iinc(4, 1),
+        Instruction::Goto(u16::try_from(loop_target)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[loop_target + 2] = Instruction::If_icmpge(u16::try_from(return_target)?);
+    instructions[loop_target + 7] = Instruction::Ifle(u16::try_from(sample_target)?);
+    instructions[ignored_goto] = Instruction::Goto(u16::try_from(continue_target)?);
+    let mut body = code(pool, 5, 5, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(loop_target)?,
+                locals: vec![VerificationType::Integer],
+            },
+            same_stack_frame(u16::try_from(sample_target - loop_target - 1)?),
+            same_stack_frame(u16::try_from(continue_target - sample_target - 1)?),
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: u16::try_from(return_target - continue_target - 1)?,
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn final_pcm_audio_filter_process_split(
+    pool: &mut ConstantPool<'static>,
+    float_samples: bool,
+) -> Result<Attribute> {
+    let owner = pool.add_class(FINAL_PCM_AUDIO_FILTER_CLASS)?;
+    let format_class = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let short_buffer = pool.add_class("java/nio/ShortBuffer")?;
+    let math = pool.add_class("java/lang/Math")?;
+    let frame_buffer = pool.add_field_ref(owner, "frameBuffer", "Ljava/nio/ShortBuffer;")?;
+    let format = pool.add_field_ref(
+        owner,
+        "format",
+        "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let ignored_frames = pool.add_field_ref(owner, "ignoredFrames", "J")?;
+    let channel_count = pool.add_field_ref(format_class, "channelCount", "I")?;
+    let min = pool.add_method_ref(math, "min", "(II)I")?;
+    let put_short = pool.add_method_ref(short_buffer, "put", "(S)Ljava/nio/ShortBuffer;")?;
+    let decode = pool.add_method_ref(owner, "decodeSample", "(F)S")?;
+    let dispatch = pool.add_method_ref(owner, "dispatch", "()V")?;
+    let two = pool.add_long(2)?;
+    let mut instructions = vec![
+        Instruction::Iconst_1,
+        Instruction::Aload_1,
+        Instruction::Arraylength,
+        Instruction::Iconst_1,
+        Instruction::Isub,
+        Instruction::Invokestatic(min),
+        Instruction::Istore(4),
+        Instruction::Iconst_0,
+        Instruction::Istore(5),
+    ];
+    let loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(5),
+        Instruction::Iload_3,
+        Instruction::If_icmpge(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(ignored_frames),
+        Instruction::Lconst_0,
+        Instruction::Lcmp,
+        Instruction::Ifle(0),
+        Instruction::Aload_0,
+        Instruction::Dup,
+        Instruction::Getfield(ignored_frames),
+    ]);
+    if float_samples {
+        instructions.push(Instruction::Ldc2_w(two));
+    } else {
+        instructions.extend([
+            Instruction::Aload_0,
+            Instruction::Getfield(format),
+            Instruction::Getfield(channel_count),
+            Instruction::I2l,
+        ]);
+    }
+    instructions.extend([Instruction::Lsub, Instruction::Putfield(ignored_frames)]);
+    let ignored_goto = instructions.len();
+    instructions.push(Instruction::Goto(0));
+    let sample_target = instructions.len();
+    for channel_local in [None, Some(4_u8)] {
+        instructions.extend([Instruction::Aload_0, Instruction::Getfield(frame_buffer)]);
+        if float_samples {
+            instructions.push(Instruction::Aload_0);
+        }
+        instructions.push(Instruction::Aload_1);
+        match channel_local {
+            None => instructions.push(Instruction::Iconst_0),
+            Some(local) => instructions.push(Instruction::Iload(local)),
+        }
+        instructions.extend([
+            Instruction::Aaload,
+            Instruction::Iload_2,
+            Instruction::Iload(5),
+            Instruction::Iadd,
+        ]);
+        instructions.push(if float_samples {
+            Instruction::Faload
+        } else {
+            Instruction::Saload
+        });
+        if float_samples {
+            instructions.push(Instruction::Invokevirtual(decode));
+        }
+        instructions.extend([Instruction::Invokevirtual(put_short), Instruction::Pop]);
+    }
+    instructions.extend([Instruction::Aload_0, Instruction::Invokevirtual(dispatch)]);
+    let continue_target = instructions.len();
+    instructions.extend([
+        Instruction::Iinc(5, 1),
+        Instruction::Goto(u16::try_from(loop_target)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[loop_target + 2] = Instruction::If_icmpge(u16::try_from(return_target)?);
+    instructions[loop_target + 7] = Instruction::Ifle(u16::try_from(sample_target)?);
+    instructions[ignored_goto] = Instruction::Goto(u16::try_from(continue_target)?);
+    let mut body = code(pool, 5, 6, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 253,
+                offset_delta: u16::try_from(loop_target)?,
+                locals: vec![VerificationType::Integer, VerificationType::Integer],
+            },
+            same_stack_frame(u16::try_from(sample_target - loop_target - 1)?),
+            same_stack_frame(u16::try_from(continue_target - sample_target - 1)?),
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: u16::try_from(return_target - continue_target - 1)?,
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn final_pcm_audio_filter_process_buffer(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FINAL_PCM_AUDIO_FILTER_CLASS)?;
+    let short_buffer = pool.add_class("java/nio/ShortBuffer")?;
+    let math = pool.add_class("java/lang/Math")?;
+    let frame_buffer = pool.add_field_ref(owner, "frameBuffer", "Ljava/nio/ShortBuffer;")?;
+    let ignored_frames = pool.add_field_ref(owner, "ignoredFrames", "J")?;
+    let remaining = pool.add_method_ref(short_buffer, "remaining", "()I")?;
+    let position_get = pool.add_method_ref(short_buffer, "position", "()I")?;
+    let position_set =
+        pool.add_method_ref(short_buffer, "position", "(I)Ljava/nio/ShortBuffer;")?;
+    let duplicate = pool.add_method_ref(short_buffer, "duplicate", "()Ljava/nio/ShortBuffer;")?;
+    let limit = pool.add_method_ref(short_buffer, "limit", "(I)Ljava/nio/ShortBuffer;")?;
+    let put_buffer = pool.add_method_ref(
+        short_buffer,
+        "put",
+        "(Ljava/nio/ShortBuffer;)Ljava/nio/ShortBuffer;",
+    )?;
+    let min_long = pool.add_method_ref(math, "min", "(JJ)J")?;
+    let min_int = pool.add_method_ref(math, "min", "(II)I")?;
+    let dispatch = pool.add_method_ref(owner, "dispatch", "()V")?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Getfield(ignored_frames),
+        Instruction::Lconst_0,
+        Instruction::Lcmp,
+        Instruction::Ifle(0),
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(remaining),
+        Instruction::I2l,
+        Instruction::Aload_0,
+        Instruction::Getfield(ignored_frames),
+        Instruction::Invokestatic(min_long),
+        Instruction::Lstore(4),
+        Instruction::Aload_1,
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(position_get),
+        Instruction::Lload(4),
+        Instruction::L2i,
+        Instruction::Iadd,
+        Instruction::Invokevirtual(position_set),
+        Instruction::Pop,
+        Instruction::Aload_0,
+        Instruction::Dup,
+        Instruction::Getfield(ignored_frames),
+        Instruction::Lload(4),
+        Instruction::Lsub,
+        Instruction::Putfield(ignored_frames),
+    ];
+    let after_skip = instructions.len();
+    instructions.extend([
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(duplicate),
+        Instruction::Astore_2,
+    ]);
+    let loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(remaining),
+        Instruction::Ifle(0),
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(remaining),
+        Instruction::Aload_0,
+        Instruction::Getfield(frame_buffer),
+        Instruction::Invokevirtual(remaining),
+        Instruction::Invokestatic(min_int),
+        Instruction::Istore_3,
+        Instruction::Aload_2,
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(position_get),
+        Instruction::Invokevirtual(position_set),
+        Instruction::Pop,
+        Instruction::Aload_2,
+        Instruction::Aload_2,
+        Instruction::Invokevirtual(position_get),
+        Instruction::Iload_3,
+        Instruction::Iadd,
+        Instruction::Invokevirtual(limit),
+        Instruction::Pop,
+        Instruction::Aload_0,
+        Instruction::Getfield(frame_buffer),
+        Instruction::Aload_2,
+        Instruction::Invokevirtual(put_buffer),
+        Instruction::Pop,
+        Instruction::Aload_0,
+        Instruction::Invokevirtual(dispatch),
+        Instruction::Aload_1,
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(position_get),
+        Instruction::Iload_3,
+        Instruction::Iadd,
+        Instruction::Invokevirtual(position_set),
+        Instruction::Pop,
+        Instruction::Goto(u16::try_from(loop_target)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[4] = Instruction::Ifle(u16::try_from(after_skip)?);
+    instructions[loop_target + 2] = Instruction::Ifle(u16::try_from(return_target)?);
+    let mut body = code(pool, 5, 6, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            same_stack_frame(u16::try_from(after_skip)?),
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(loop_target - after_skip - 1)?,
+                locals: vec![VerificationType::Object {
+                    cpool_index: short_buffer,
+                }],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: u16::try_from(return_target - loop_target - 1)?,
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn final_pcm_audio_filter_dispatch(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FINAL_PCM_AUDIO_FILTER_CLASS)?;
+    let format_class = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let short_buffer = pool.add_class("java/nio/ShortBuffer")?;
+    let collection = pool.add_class("java/util/Collection")?;
+    let iterator = pool.add_class("java/util/Iterator")?;
+    let processor = pool.add_class(AUDIO_POST_PROCESSOR_CLASS)?;
+    let frame_buffer = pool.add_field_ref(owner, "frameBuffer", "Ljava/nio/ShortBuffer;")?;
+    let format = pool.add_field_ref(
+        owner,
+        "format",
+        "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let post_processors = pool.add_field_ref(owner, "postProcessors", "Ljava/util/Collection;")?;
+    let timecode_base = pool.add_field_ref(owner, "timecodeBase", "J")?;
+    let timecode_sample_offset = pool.add_field_ref(owner, "timecodeSampleOffset", "J")?;
+    let sample_rate = pool.add_field_ref(format_class, "sampleRate", "I")?;
+    let chunk_sample_count = pool.add_field_ref(format_class, "chunkSampleCount", "I")?;
+    let has_remaining = pool.add_method_ref(short_buffer, "hasRemaining", "()Z")?;
+    let clear = pool.add_method_ref(short_buffer, "clear", "()Ljava/nio/ShortBuffer;")?;
+    let iterator_method =
+        pool.add_interface_method_ref(collection, "iterator", "()Ljava/util/Iterator;")?;
+    let has_next = pool.add_interface_method_ref(iterator, "hasNext", "()Z")?;
+    let next = pool.add_interface_method_ref(iterator, "next", "()Ljava/lang/Object;")?;
+    let process =
+        pool.add_interface_method_ref(processor, "process", "(JLjava/nio/ShortBuffer;)V")?;
+    let thousand = pool.add_long(1_000)?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Getfield(frame_buffer),
+        Instruction::Invokevirtual(has_remaining),
+        Instruction::Ifne(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(timecode_base),
+        Instruction::Aload_0,
+        Instruction::Getfield(timecode_sample_offset),
+        Instruction::Ldc2_w(thousand),
+        Instruction::Lmul,
+        Instruction::Aload_0,
+        Instruction::Getfield(format),
+        Instruction::Getfield(sample_rate),
+        Instruction::I2l,
+        Instruction::Ldiv,
+        Instruction::Ladd,
+        Instruction::Lstore_1,
+        Instruction::Aload_0,
+        Instruction::Getfield(frame_buffer),
+        Instruction::Invokevirtual(clear),
+        Instruction::Pop,
+        Instruction::Aload_0,
+        Instruction::Getfield(post_processors),
+        Instruction::Invokeinterface(iterator_method, 1),
+        Instruction::Astore_3,
+    ];
+    let loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_3,
+        Instruction::Invokeinterface(has_next, 1),
+        Instruction::Ifeq(0),
+        Instruction::Aload_3,
+        Instruction::Invokeinterface(next, 1),
+        Instruction::Checkcast(processor),
+        Instruction::Astore(4),
+        Instruction::Aload(4),
+        Instruction::Lload_1,
+        Instruction::Aload_0,
+        Instruction::Getfield(frame_buffer),
+        Instruction::Invokeinterface(process, 4),
+        Instruction::Goto(u16::try_from(loop_target)?),
+    ]);
+    let after_loop = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Getfield(frame_buffer),
+        Instruction::Invokevirtual(clear),
+        Instruction::Pop,
+        Instruction::Aload_0,
+        Instruction::Dup,
+        Instruction::Getfield(timecode_sample_offset),
+        Instruction::Aload_0,
+        Instruction::Getfield(format),
+        Instruction::Getfield(chunk_sample_count),
+        Instruction::I2l,
+        Instruction::Ladd,
+        Instruction::Putfield(timecode_sample_offset),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[3] = Instruction::Ifne(u16::try_from(return_target)?);
+    instructions[loop_target + 2] = Instruction::Ifeq(u16::try_from(after_loop)?);
+    let mut body = code(pool, 6, 5, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: u16::try_from(loop_target)?,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Long,
+                    VerificationType::Object {
+                        cpool_index: iterator,
+                    },
+                ],
+                stack: vec![],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: u16::try_from(after_loop - loop_target - 1)?,
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: u16::try_from(return_target - after_loop - 1)?,
+                locals: vec![VerificationType::Object { cpool_index: owner }],
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn final_pcm_audio_filter_static_initializer(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(FINAL_PCM_AUDIO_FILTER_CLASS)?;
+    let logger_factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        logger_factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let zero_padding = pool.add_field_ref(owner, "zeroPadding", "[S")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Sipush(128),
+            Instruction::Newarray(ArrayType::Short),
+            Instruction::Putstatic(zero_padding),
+            Instruction::Return,
+        ],
+    )
 }
 
 fn channel_count_pcm_audio_filter_replacement(
@@ -41884,6 +42764,25 @@ fn audio_data_format_frame_duration(pool: &mut ConstantPool<'static>) -> Result<
             Instruction::I2l,
             Instruction::Ldiv,
             Instruction::Lreturn,
+        ],
+    )
+}
+
+fn audio_data_format_total_sample_count(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let channels = pool.add_field_ref(owner, "channelCount", "I")?;
+    let chunk_samples = pool.add_field_ref(owner, "chunkSampleCount", "I")?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(chunk_samples),
+            Instruction::Aload_0,
+            Instruction::Getfield(channels),
+            Instruction::Imul,
+            Instruction::Ireturn,
         ],
     )
 }

@@ -108,6 +108,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-composite-audio-filter-consumer" => Some(COMPOSITE_AUDIO_FILTER_CONSUMER),
         "write-filter-chain-builder-consumer" => Some(FILTER_CHAIN_BUILDER_CONSUMER),
+        "write-final-pcm-audio-filter-consumer" => Some(FINAL_PCM_AUDIO_FILTER_CONSUMER),
         "write-audio-filter-chain-consumer" => Some(AUDIO_FILTER_CHAIN_CONSUMER),
         "write-audio-pipeline-consumer" => Some(AUDIO_PIPELINE_CONSUMER),
         "write-audio-pipeline-factory-consumer" => Some(AUDIO_PIPELINE_FACTORY_CONSUMER),
@@ -8676,6 +8677,389 @@ public final class GateFilterChainBuilder {
     public int size() {
       throw failure;
     }
+  }
+}
+"#;
+
+const FINAL_PCM_AUDIO_FILTER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.AudioPostProcessor;
+import com.sedmelluq.discord.lavaplayer.filter.FinalPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.UniversalPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkDecoder;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkEncoder;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerOptions;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.nio.ShortBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateFinalPcmAudioFilter {
+  public static void main(String[] args) throws Exception {
+    construction();
+    shortArrayAndFlush();
+    splitShortAndMono();
+    shortBufferPath();
+    floatPath();
+    seekPaths();
+    lifecycleAndFailures();
+    reflection();
+    System.out.println(
+        "construction=format,direct-capacity,processor-identity,initial-state,nulls;"
+        + "process=short-array,split-short,short-buffer,float,offset,length,mono,clamp,chunking,timecodes,shared-buffer;"
+        + "seek=clear,skip,base,reset,path-units;flush=padding,empty;"
+        + "lifecycle=close-order,repeat;failures=process-interrupted,close-prefix,identity;"
+        + "reflection=public-concrete-object,8-private-fields,1-interface,1-constructor,10-methods,3-private,throws");
+  }
+
+  private static void construction() throws Exception {
+    RecordingProcessor first = new RecordingProcessor("first", new ArrayList<>());
+    RecordingProcessor second = new RecordingProcessor("second", new ArrayList<>());
+    List<AudioPostProcessor> processors = new ArrayList<>(Arrays.asList(first, second));
+    Fixture fixture = new Fixture(2, 1000, 3, processors);
+    check(field(fixture.filter, "format") == fixture.format, "format identity");
+    check(field(fixture.filter, "postProcessors") == processors, "processor identity");
+    ShortBuffer frame = (ShortBuffer) field(fixture.filter, "frameBuffer");
+    check(frame.isDirect() && frame.capacity() == 6 && frame.position() == 0
+        && frame.limit() == 6, "direct frame buffer");
+    check((long) field(fixture.filter, "ignoredFrames") == 0L
+        && (long) field(fixture.filter, "timecodeBase") == 0L
+        && (long) field(fixture.filter, "timecodeSampleOffset") == 0L,
+        "initial state");
+    check(((short[]) staticField("zeroPadding")).length == 128, "zero padding");
+
+    expect(NullPointerException.class,
+        () -> new FinalPcmAudioFilter(null, processors));
+    AudioProcessingContext noFormat = context(null);
+    expect(NullPointerException.class,
+        () -> new FinalPcmAudioFilter(noFormat, processors));
+    FinalPcmAudioFilter nullProcessors =
+        new FinalPcmAudioFilter(context(new TestFormat(2, 1000, 1)), null);
+    expect(NullPointerException.class, nullProcessors::close);
+  }
+
+  private static void shortArrayAndFlush() throws Exception {
+    RecordingProcessor first = new RecordingProcessor("first", new ArrayList<>());
+    RecordingProcessor second = new RecordingProcessor("second", new ArrayList<>());
+    Fixture fixture = new Fixture(2, 1000, 3, Arrays.asList(first, second));
+    short[] input = {99, 1, 2, 3, 4, 5, 6, 7, 8, 88};
+    fixture.filter.process(input, 1, 8);
+    checkFrames(first, new long[] {0}, new short[][] {{1, 2, 3, 4, 5, 6}});
+    check(second.buffers.get(0) == first.buffers.get(0), "shared frame buffer");
+    check(first.direct.get(0) && second.direct.get(0), "direct dispatch buffer");
+    fixture.filter.flush();
+    checkFrames(first, new long[] {0, 3}, new short[][] {
+        {1, 2, 3, 4, 5, 6}, {7, 8, 0, 0, 0, 0}
+    });
+    fixture.filter.flush();
+    check(first.frames.size() == 2, "empty flush no-op");
+  }
+
+  private static void splitShortAndMono() throws Exception {
+    RecordingProcessor stereo = new RecordingProcessor("stereo", new ArrayList<>());
+    Fixture fixture = new Fixture(2, 1000, 2, Collections.singletonList(stereo));
+    fixture.filter.process(new short[][] {{9, 1, 2, 8}, {7, 10, 20, 6}}, 1, 2);
+    checkFrames(stereo, new long[] {0}, new short[][] {{1, 10, 2, 20}});
+
+    RecordingProcessor mono = new RecordingProcessor("mono", new ArrayList<>());
+    Fixture monoFixture = new Fixture(2, 1000, 2, Collections.singletonList(mono));
+    monoFixture.filter.process(new short[][] {{9, 3, 4, 8}}, 1, 2);
+    checkFrames(mono, new long[] {0}, new short[][] {{3, 3, 4, 4}});
+  }
+
+  private static void shortBufferPath() throws Exception {
+    RecordingProcessor processor = new RecordingProcessor("buffer", new ArrayList<>());
+    Fixture fixture = new Fixture(2, 1000, 2, Collections.singletonList(processor));
+    fixture.filter.process(new short[] {1, 2}, 0, 2);
+    ShortBuffer input = ShortBuffer.wrap(new short[] {99, 3, 4, 5, 6, 88});
+    input.position(1);
+    input.limit(5);
+    fixture.filter.process(input);
+    check(input.position() == 5 && input.limit() == 5, "input consumed to limit");
+    fixture.filter.flush();
+    checkFrames(processor, new long[] {0, 2}, new short[][] {
+        {1, 2, 3, 4}, {5, 6, 0, 0}
+    });
+  }
+
+  private static void floatPath() throws Exception {
+    RecordingProcessor processor = new RecordingProcessor("float", new ArrayList<>());
+    Fixture fixture = new Fixture(2, 1000, 4, Collections.singletonList(processor));
+    float[][] input = {
+      {9f, -2f, -1f, -0.5f, Float.NaN, 8f},
+      {7f, 0.5f, 0.99999f, 1f, 2f, 6f}
+    };
+    fixture.filter.process(input, 1, 4);
+    checkFrames(processor, new long[] {0}, new short[][] {{
+        -32768, 16384, -32768, 32767, -16384, 32767, 0, 32767
+    }});
+
+    RecordingProcessor mono = new RecordingProcessor("float-mono", new ArrayList<>());
+    Fixture monoFixture = new Fixture(2, 1000, 1, Collections.singletonList(mono));
+    monoFixture.filter.process(new float[][] {{0.25f}}, 0, 1);
+    checkFrames(mono, new long[] {0}, new short[][] {{8192, 8192}});
+  }
+
+  private static void seekPaths() throws Exception {
+    RecordingProcessor array = new RecordingProcessor("seek-array", new ArrayList<>());
+    Fixture arrayFixture = new Fixture(2, 1000, 2, Collections.singletonList(array));
+    arrayFixture.filter.process(new short[] {90, 91}, 0, 2);
+    arrayFixture.filter.seekPerformed(12, 10);
+    arrayFixture.filter.process(new short[] {1, 2, 3, 4, 5, 6}, 0, 6);
+    arrayFixture.filter.flush();
+    checkFrames(array, new long[] {12}, new short[][] {{5, 6, 0, 0}});
+    check((long) field(arrayFixture.filter, "ignoredFrames") == 0L
+        && (long) field(arrayFixture.filter, "timecodeBase") == 12L
+        && (long) field(arrayFixture.filter, "timecodeSampleOffset") == 2L,
+        "seek array state");
+
+    RecordingProcessor split = new RecordingProcessor("seek-split", new ArrayList<>());
+    Fixture splitFixture = new Fixture(2, 1000, 1, Collections.singletonList(split));
+    splitFixture.filter.seekPerformed(8, 6);
+    splitFixture.filter.process(new short[][] {{1, 2, 3}, {10, 20, 30}}, 0, 3);
+    splitFixture.filter.flush();
+    checkFrames(split, new long[] {8}, new short[][] {{3, 30}});
+
+    RecordingProcessor floats = new RecordingProcessor("seek-float", new ArrayList<>());
+    Fixture floatFixture = new Fixture(2, 1000, 1, Collections.singletonList(floats));
+    floatFixture.filter.seekPerformed(8, 6);
+    floatFixture.filter.process(new float[][] {{.1f, .2f, .5f}, {.3f, .4f, -.5f}}, 0, 3);
+    floatFixture.filter.flush();
+    checkFrames(floats, new long[] {8}, new short[][] {{16384, -16384}});
+
+    RecordingProcessor buffers = new RecordingProcessor("seek-buffer", new ArrayList<>());
+    Fixture bufferFixture = new Fixture(2, 1000, 1, Collections.singletonList(buffers));
+    bufferFixture.filter.seekPerformed(7, 6);
+    ShortBuffer input = ShortBuffer.wrap(new short[] {1, 2, 7, 8});
+    bufferFixture.filter.process(input);
+    check(input.position() == 4, "seek buffer consumed");
+    checkFrames(buffers, new long[] {7}, new short[][] {{7, 8}});
+
+    RecordingProcessor base = new RecordingProcessor("base", new ArrayList<>());
+    Fixture baseFixture = new Fixture(2, 1000, 1, Collections.singletonList(base));
+    baseFixture.filter.process(new short[] {1, 2}, 0, 2);
+    baseFixture.filter.seekPerformed(5, 20);
+    baseFixture.filter.process(new short[] {3, 4}, 0, 2);
+    checkFrames(base, new long[] {0, 20}, new short[][] {{1, 2}, {3, 4}});
+  }
+
+  private static void lifecycleAndFailures() throws Exception {
+    List<String> events = new ArrayList<>();
+    RecordingProcessor first = new RecordingProcessor("first", events);
+    RecordingProcessor second = new RecordingProcessor("second", events);
+    Fixture fixture = new Fixture(2, 1000, 1, Arrays.asList(first, second));
+    fixture.filter.close();
+    fixture.filter.close();
+    check(events.equals(Arrays.asList("first.close", "second.close", "first.close", "second.close")),
+        "close order and repeat");
+
+    events.clear();
+    RuntimeException closeFailure = new RuntimeException("close-sentinel");
+    first.closeFailure = closeFailure;
+    expectIdentity(closeFailure, fixture.filter::close);
+    check(events.equals(Collections.singletonList("first.close")), "close failure prefix");
+
+    events.clear();
+    InterruptedException processFailure = new InterruptedException("process-sentinel");
+    first.closeFailure = null;
+    first.processFailure = processFailure;
+    expectInterruptedIdentity(processFailure,
+        () -> fixture.filter.process(new short[] {1, 2}, 0, 2));
+    check(events.equals(Collections.singletonList("first.process"))
+        && second.frames.isEmpty(), "process failure prefix");
+  }
+
+  private static void reflection() throws Exception {
+    Class<FinalPcmAudioFilter> type = FinalPcmAudioFilter.class;
+    int modifiers = type.getModifiers();
+    check(Modifier.isPublic(modifiers) && !Modifier.isAbstract(modifiers)
+        && !Modifier.isFinal(modifiers) && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {UniversalPcmAudioFilter.class}),
+        "class shape");
+    Field[] fields = type.getDeclaredFields();
+    check(fields.length == 8
+        && Arrays.stream(fields).allMatch(field -> Modifier.isPrivate(field.getModifiers())),
+        "private field count");
+    Field log = type.getDeclaredField("log");
+    check(log.getType().getName().equals("org.slf4j.Logger")
+        && Modifier.isPrivate(log.getModifiers()) && Modifier.isStatic(log.getModifiers())
+        && Modifier.isFinal(log.getModifiers()), "log field shape");
+    checkField(type, "zeroPadding", short[].class, true, true);
+    checkField(type, "format", AudioDataFormat.class, false, true);
+    checkField(type, "frameBuffer", ShortBuffer.class, false, true);
+    Field processors = checkField(type, "postProcessors", Collection.class, false, true);
+    ParameterizedType generic = (ParameterizedType) processors.getGenericType();
+    check(generic.getRawType() == Collection.class
+        && Arrays.equals(generic.getActualTypeArguments(), new Object[] {AudioPostProcessor.class}),
+        "processor generic");
+    checkField(type, "ignoredFrames", long.class, false, false);
+    checkField(type, "timecodeBase", long.class, false, false);
+    checkField(type, "timecodeSampleOffset", long.class, false, false);
+
+    Constructor<FinalPcmAudioFilter> constructor =
+        type.getDeclaredConstructor(AudioProcessingContext.class, Collection.class);
+    check(type.getDeclaredConstructors().length == 1 && Modifier.isPublic(constructor.getModifiers())
+        && constructor.getExceptionTypes().length == 0, "constructor shape");
+    check(type.getDeclaredMethods().length == 10, "method count");
+    checkMethod(type, "decodeSample", short.class, false, new Class<?>[0], float.class);
+    checkMethod(type, "seekPerformed", void.class, true, new Class<?>[0], long.class, long.class);
+    checkMethod(type, "flush", void.class, true,
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type, "close", void.class, true, new Class<?>[0]);
+    checkMethod(type, "fillFrameBuffer", void.class, false, new Class<?>[0]);
+    checkMethod(type, "process", void.class, true,
+        new Class<?>[] {InterruptedException.class}, short[].class, int.class, int.class);
+    checkMethod(type, "process", void.class, true,
+        new Class<?>[] {InterruptedException.class}, short[][].class, int.class, int.class);
+    checkMethod(type, "process", void.class, true,
+        new Class<?>[] {InterruptedException.class}, ShortBuffer.class);
+    checkMethod(type, "process", void.class, true,
+        new Class<?>[] {InterruptedException.class}, float[][].class, int.class, int.class);
+    checkMethod(type, "dispatch", void.class, false,
+        new Class<?>[] {InterruptedException.class});
+  }
+
+  private static Field checkField(Class<?> type, String name, Class<?> fieldType,
+      boolean isStatic, boolean isFinal) throws Exception {
+    Field field = type.getDeclaredField(name);
+    int modifiers = field.getModifiers();
+    check(field.getType() == fieldType && Modifier.isPrivate(modifiers)
+        && Modifier.isStatic(modifiers) == isStatic && Modifier.isFinal(modifiers) == isFinal,
+        name + " field shape");
+    return field;
+  }
+
+  private static void checkMethod(Class<?> type, String name, Class<?> returnType,
+      boolean isPublic, Class<?>[] exceptions, Class<?>... parameters) throws Exception {
+    Method method = type.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && Modifier.isPublic(method.getModifiers()) == isPublic
+        && Modifier.isPrivate(method.getModifiers()) != isPublic
+        && !Modifier.isStatic(method.getModifiers()) && !Modifier.isFinal(method.getModifiers())
+        && Arrays.equals(method.getExceptionTypes(), exceptions), name + " method shape");
+  }
+
+  private static void checkFrames(RecordingProcessor processor, long[] timecodes,
+      short[][] frames) {
+    check(processor.frames.size() == frames.length, processor.name + " frame count");
+    for (int i = 0; i < frames.length; i++) {
+      check(processor.timecodes.get(i) == timecodes[i], processor.name + " timecode " + i);
+      check(Arrays.equals(processor.frames.get(i), frames[i]), processor.name + " frame " + i);
+      check(processor.positions.get(i) == 0 && processor.limits.get(i) == frames[i].length,
+          processor.name + " buffer state " + i);
+    }
+  }
+
+  private static Object field(Object target, String name) throws Exception {
+    Field field = FinalPcmAudioFilter.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
+  }
+
+  private static Object staticField(String name) throws Exception {
+    Field field = FinalPcmAudioFilter.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(null);
+  }
+
+  private static AudioProcessingContext context(AudioDataFormat format) {
+    return new AudioProcessingContext(
+        new AudioConfiguration(), null, new AudioPlayerOptions(), format);
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable failure) {
+      if (!type.isInstance(failure)) throw new AssertionError("wrong failure", failure);
+      return type.cast(failure);
+    }
+  }
+
+  private static void expectIdentity(RuntimeException expected, Operation operation)
+      throws Exception {
+    check(expect(RuntimeException.class, operation) == expected, "runtime identity");
+  }
+
+  private static void expectInterruptedIdentity(
+      InterruptedException expected, Operation operation) throws Exception {
+    check(expect(InterruptedException.class, operation) == expected, "interrupted identity");
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static final class Fixture {
+    final TestFormat format;
+    final FinalPcmAudioFilter filter;
+
+    Fixture(int channels, int sampleRate, int chunkSamples,
+        Collection<AudioPostProcessor> processors) {
+      format = new TestFormat(channels, sampleRate, chunkSamples);
+      filter = new FinalPcmAudioFilter(context(format), processors);
+    }
+  }
+
+  private static final class RecordingProcessor implements AudioPostProcessor {
+    final String name;
+    final List<String> events;
+    final List<Long> timecodes = new ArrayList<>();
+    final List<short[]> frames = new ArrayList<>();
+    final List<ShortBuffer> buffers = new ArrayList<>();
+    final List<Integer> positions = new ArrayList<>();
+    final List<Integer> limits = new ArrayList<>();
+    final List<Boolean> direct = new ArrayList<>();
+    InterruptedException processFailure;
+    RuntimeException closeFailure;
+
+    RecordingProcessor(String name, List<String> events) {
+      this.name = name;
+      this.events = events;
+    }
+
+    public void process(long timecode, ShortBuffer buffer) throws InterruptedException {
+      events.add(name + ".process");
+      if (processFailure != null) throw processFailure;
+      timecodes.add(timecode);
+      buffers.add(buffer);
+      positions.add(buffer.position());
+      limits.add(buffer.limit());
+      direct.add(buffer.isDirect());
+      ShortBuffer copy = buffer.duplicate();
+      short[] values = new short[copy.remaining()];
+      copy.get(values);
+      frames.add(values);
+    }
+
+    public void close() {
+      events.add(name + ".close");
+      if (closeFailure != null) throw closeFailure;
+    }
+  }
+
+  private static final class TestFormat extends AudioDataFormat {
+    TestFormat(int channels, int sampleRate, int chunkSamples) {
+      super(channels, sampleRate, chunkSamples);
+    }
+    public String codecName() { return "test"; }
+    public byte[] silenceBytes() { return new byte[0]; }
+    public int expectedChunkSize() { return 0; }
+    public int maximumChunkSize() { return 0; }
+    public AudioChunkDecoder createDecoder() { return null; }
+    public AudioChunkEncoder createEncoder(AudioConfiguration configuration) { return null; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
   }
 }
 "#;
