@@ -231,6 +231,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-adts-container-probe-consumer 
   --output "$WORK/GateAdtsContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-packet-header-consumer \
   --output "$WORK/GateAdtsPacketHeader.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-adts-stream-provider-consumer \
+  --output "$WORK/GateAdtsStreamProvider.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -353,6 +355,7 @@ done < <(find "$(dirname "$REFERENCE_JAR")/dependencies" -maxdepth 1 -type f -na
 readonly REFERENCE_PROVIDER_TOOLS_CLASSPATH="$reference_provider_tools_classpath"
 
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
+  "$WORK/GateAdtsStreamProvider.java" \
   "$WORK/GateDefaultSoundCloudDataLoader.java" \
   "$WORK/GateDefaultSoundCloudPlaylistLoader.java" \
   "$WORK/GateSoundCloudAudioSourceManager.java" \
@@ -1225,6 +1228,16 @@ cmp "$WORK/adts-packet-header-reference.txt" "$WORK/adts-packet-header-candidate
 grep --fixed-strings \
   'contracts=constructor,protection,profile,sample-rate,channels,payload-length,raw-values,null-comparison,decoder-key,ignored-protection,ignored-payload,self-comparison,identity-semantics,subclassable,public-final-fields,reflection' \
   "$WORK/adts-packet-header-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateAdtsStreamProvider \
+  >"$WORK/adts-stream-provider-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateAdtsStreamProvider >"$WORK/adts-stream-provider-candidate.txt"
+cmp "$WORK/adts-stream-provider-reference.txt" "$WORK/adts-stream-provider-candidate.txt"
+grep --fixed-strings \
+  'contracts=construction,input-identity,context-identity,private-state,initial-seek,seek-overwrite,empty-stream,io-wrapping,runtime-identity,packet-bounds,truncated-packet,complete-packet,decoder-configuration,decoder-reuse,reconfiguration,downstream-reset,decode-fill,decode-loop,interruption-identity,pipeline-creation,delayed-seek,native-output-buffer,close-order,close-finally,repeated-close,subclassable,throws,reflection' \
+  "$WORK/adts-stream-provider-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"

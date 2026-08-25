@@ -160,6 +160,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-adts-audio-track-consumer" => Some(ADTS_AUDIO_TRACK_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
         "write-adts-packet-header-consumer" => Some(ADTS_PACKET_HEADER_CONSUMER),
+        "write-adts-stream-provider-consumer" => Some(ADTS_STREAM_PROVIDER_CONSUMER),
         _ => None,
     }
 }
@@ -14270,6 +14271,589 @@ public final class GateAdtsPacketHeader {
       calls++;
       return super.canUseSameDecoder(packetHeader);
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const ADTS_STREAM_PROVIDER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.adts.AdtsPacketHeader;
+import com.sedmelluq.discord.lavaplayer.container.adts.AdtsStreamProvider;
+import com.sedmelluq.discord.lavaplayer.container.adts.AdtsStreamReader;
+import com.sedmelluq.discord.lavaplayer.filter.AudioPipeline;
+import com.sedmelluq.discord.lavaplayer.filter.FinalPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.Pcm16AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.natives.aac.AacDecoder;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerOptions;
+import com.sedmelluq.discord.lavaplayer.tools.io.DirectBufferStreamBroker;
+import com.sedmelluq.discord.lavaplayer.tools.io.ResettableBoundedInputStream;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameRebuilder;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.ShortBuffer;
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
+
+public final class GateAdtsStreamProvider {
+  private static final Object UNSAFE = loadUnsafe();
+  private static final byte[] HEADER = {
+      (byte) 0xFF, (byte) 0xF1, 0x4C, (byte) 0x80, 0x27, 0x3F, (byte) 0xFC};
+
+  public static void main(String[] args) throws Exception {
+    constructionAndSeek();
+    emptyAndFailures();
+    packetBoundaries();
+    decodeLoopAndSeek();
+    reconfiguration();
+    closing();
+    subclassingAndReflection();
+    System.out.println(
+        "contracts=construction,input-identity,context-identity,private-state,initial-seek,seek-overwrite,empty-stream,io-wrapping,runtime-identity,packet-bounds,truncated-packet,complete-packet,decoder-configuration,decoder-reuse,reconfiguration,downstream-reset,decode-fill,decode-loop,interruption-identity,pipeline-creation,delayed-seek,native-output-buffer,close-order,close-finally,repeated-close,subclassable,throws,reflection");
+  }
+
+  private static void constructionAndSeek() throws Exception {
+    CountingInputStream input = new CountingInputStream(new byte[0]);
+    AudioProcessingContext context = context();
+    AdtsStreamProvider provider = new AdtsStreamProvider(input, context);
+    check(field(provider, "context") == context,
+        "constructor retains exact processing context identity");
+    Object reader = field(provider, "streamReader");
+    Object bounded = field(provider, "packetBoundedStream");
+    Object broker = field(provider, "directBufferBroker");
+    check(reader.getClass() == AdtsStreamReader.class
+        && field(reader, AdtsStreamReader.class, "inputStream") == input,
+        "stream reader retains exact caller input identity");
+    check(bounded.getClass() == ResettableBoundedInputStream.class
+        && field(bounded, ResettableBoundedInputStream.class, "delegate") == input,
+        "packet-bounded stream retains exact caller input identity");
+    check(broker.getClass() == DirectBufferStreamBroker.class
+        && intField(broker, DirectBufferStreamBroker.class, "initialSize") == 2_048
+        && ((ByteBuffer) field(broker, DirectBufferStreamBroker.class, "currentBuffer"))
+            .isDirect(), "direct broker uses the frozen initial capacity");
+    check(field(provider, "decoder").getClass() == AacDecoder.class
+        && field(provider, "outputBuffer") == null && field(provider, "previousHeader") == null
+        && field(provider, "downstream") == null && field(provider, "requestedTimecode") == null
+        && field(provider, "providedTimecode") == null,
+        "constructor initializes exact eager and lazy private state");
+
+    provider.setInitialSeek(Long.MIN_VALUE + 7L, Long.MAX_VALUE - 11L);
+    check(((Long) field(provider, "requestedTimecode")) == Long.MIN_VALUE + 7L
+        && ((Long) field(provider, "providedTimecode")) == Long.MAX_VALUE - 11L,
+        "initial seek boxes and retains both signed timecodes");
+    provider.setInitialSeek(91L, -37L);
+    check(((Long) field(provider, "requestedTimecode")) == 91L
+        && ((Long) field(provider, "providedTimecode")) == -37L,
+        "later initial seek overwrites both pending values");
+    provider.close();
+
+    AdtsStreamProvider nulls = new AdtsStreamProvider(null, null);
+    check(field(nulls, "context") == null
+        && field(field(nulls, "streamReader"), AdtsStreamReader.class, "inputStream") == null
+        && field(field(nulls, "packetBoundedStream"),
+            ResettableBoundedInputStream.class, "delegate") == null,
+        "constructor accepts null input and context without eager reads");
+    nulls.close();
+  }
+
+  private static void emptyAndFailures() throws Exception {
+    CountingInputStream empty = new CountingInputStream(new byte[0]);
+    AdtsStreamProvider provider = new AdtsStreamProvider(empty, null);
+    RecordingDecoder decoder = installDecoder(provider);
+    provider.provideFrames();
+    check(empty.singleReads == 1 && empty.bulkReads == 0 && empty.closes == 0
+        && decoder.configureCalls == 0 && decoder.fillCalls == 0
+        && field(provider, "previousHeader") == null,
+        "empty stream returns after one header-scan read without taking input ownership");
+    provider.close();
+
+    IOException ioFailure = new IOException("io-sentinel");
+    CountingInputStream io = new CountingInputStream(new byte[0]);
+    io.ioFailure = ioFailure;
+    AdtsStreamProvider ioProvider = new AdtsStreamProvider(io, null);
+    installDecoder(ioProvider);
+    Throwable wrapped = catchThrowable(ioProvider::provideFrames);
+    check(wrapped != null && wrapped.getClass() == RuntimeException.class
+        && wrapped.getCause() == ioFailure && io.singleReads == 1,
+        "input IOException is wrapped once with exact cause identity");
+    ioProvider.close();
+
+    RuntimeException runtimeFailure = new RuntimeException("runtime-sentinel");
+    CountingInputStream runtime = new CountingInputStream(new byte[0]);
+    runtime.runtimeFailure = runtimeFailure;
+    AdtsStreamProvider runtimeProvider = new AdtsStreamProvider(runtime, null);
+    installDecoder(runtimeProvider);
+    check(catchThrowable(runtimeProvider::provideFrames) == runtimeFailure,
+        "arbitrary input runtime failure propagates with exact identity");
+    runtimeProvider.close();
+  }
+
+  private static void packetBoundaries() throws Exception {
+    CountingInputStream truncated = new CountingInputStream(HEADER.clone());
+    AdtsStreamProvider truncatedProvider = new AdtsStreamProvider(truncated, null);
+    RecordingDecoder truncatedDecoder = installDecoder(truncatedProvider);
+    truncatedProvider.provideFrames();
+    AdtsPacketHeader truncatedHeader =
+        (AdtsPacketHeader) field(truncatedProvider, "previousHeader");
+    check(truncatedHeader != null && truncatedHeader.profile == 2
+        && truncatedHeader.sampleRate == 48_000 && truncatedHeader.channels == 2
+        && truncatedHeader.payloadLength == 306 && truncatedDecoder.configureCalls == 1
+        && truncatedDecoder.fillCalls == 0 && truncated.position == HEADER.length,
+        "truncated payload configures from its header then returns before decode");
+    truncatedProvider.close();
+
+    CountingInputStream complete = new CountingInputStream(packet());
+    AdtsStreamProvider completeProvider = new AdtsStreamProvider(complete, null);
+    RecordingDecoder completeDecoder = installDecoder(completeProvider);
+    completeProvider.provideFrames();
+    check(completeDecoder.configureCalls == 1 && completeDecoder.fillCalls == 1
+        && completeDecoder.resolveCalls == 1 && completeDecoder.decodeCalls == 0
+        && completeDecoder.fillBuffer != null && completeDecoder.fillBuffer.isDirect()
+        && completeDecoder.fillPosition == 0 && completeDecoder.fillLimit == 306
+        && complete.position == complete.data.length && complete.closes == 0,
+        "complete bounded payload is copied exactly once into a direct decoder buffer");
+    completeProvider.close();
+  }
+
+  private static void decodeLoopAndSeek() throws Exception {
+    AdtsStreamProvider provider = new AdtsStreamProvider(new CountingInputStream(new byte[0]), null);
+    RecordingDecoder decoder = installDecoder(provider);
+    RecordingPipeline pipeline = allocate(RecordingPipeline.class);
+    pipeline.buffersCleared = true;
+    ShortBuffer output = ByteBuffer.allocateDirect(16)
+        .order(ByteOrder.nativeOrder()).asShortBuffer();
+    putObject(provider, "downstream", pipeline);
+    putObject(provider, "outputBuffer", output);
+    decoder.successfulDecodes = 2;
+    ByteBuffer input = ByteBuffer.allocateDirect(5);
+    invokeDecode(provider, input);
+    check(decoder.fillCalls == 1 && decoder.fillBuffer == input
+        && decoder.decodeCalls == 3 && pipeline.processCalls == 2
+        && pipeline.firstBuffer == output && pipeline.lastBuffer == output
+        && pipeline.buffersCleared && output.position() == 0 && output.limit() == output.capacity(),
+        "decode loop clears and reuses one output buffer until the decoder needs more input: "
+            + decoder.fillCalls + "," + decoder.decodeCalls + "," + pipeline.processCalls + ","
+            + pipeline.buffersCleared + "," + output.position() + "," + output.limit() + ","
+            + output.capacity());
+
+    InterruptedException interrupted = new InterruptedException("process-sentinel");
+    pipeline.processFailure = interrupted;
+    decoder.successfulDecodes = decoder.decodeCalls + 1;
+    Throwable failure = invokeDecodeFailure(provider, ByteBuffer.allocateDirect(1));
+    check(failure == interrupted && pipeline.processCalls == 3,
+        "downstream interruption propagates with exact identity");
+    pipeline.processFailure = null;
+    provider.close();
+
+    AudioProcessingContext context = context();
+    AdtsStreamProvider seeking =
+        new AdtsStreamProvider(new CountingInputStream(new byte[0]), context);
+    RecordingDecoder seekDecoder = installDecoder(seeking);
+    seekDecoder.streamInfo = new AacDecoder.StreamInfo(48_000, 2, 1_024);
+    seeking.setInitialSeek(5_000L, 1_000L);
+    invokeDecode(seeking, ByteBuffer.allocateDirect(0));
+    Object downstream = field(seeking, "downstream");
+    ShortBuffer seekOutput = (ShortBuffer) field(seeking, "outputBuffer");
+    Object first = field(downstream, AudioPipeline.class, "first");
+    check(downstream.getClass() == AudioPipeline.class && first.getClass() == FinalPcmAudioFilter.class
+        && seekOutput.isDirect() && seekOutput.capacity() == 2_048
+        && seekOutput.order() == ByteOrder.nativeOrder()
+        && ((Long) field(first, FinalPcmAudioFilter.class, "timecodeBase")) == 5_000L
+        && ((Long) field(first, FinalPcmAudioFilter.class, "ignoredFrames")) == 384_000L
+        && field(seeking, "requestedTimecode") == null
+        && ((Long) field(seeking, "providedTimecode")) == 1_000L,
+        "first resolved stream creates the pipeline and applies one delayed seek");
+    seeking.close();
+  }
+
+  private static void reconfiguration() throws Exception {
+    AdtsStreamProvider provider = new AdtsStreamProvider(new CountingInputStream(new byte[0]), null);
+    RecordingDecoder decoder = installDecoder(provider);
+    Method configure = configureMethod();
+    AdtsPacketHeader first = new AdtsPacketHeader(true, 2, 48_000, 2, 10);
+    configure.invoke(provider, first);
+    check(decoder.configureCalls == 1 && decoder.profile == 2
+        && decoder.sampleRate == 48_000 && decoder.channels == 2
+        && field(provider, "previousHeader") == first,
+        "first header configures the decoder and becomes previous header");
+
+    RecordingPipeline pipeline = allocate(RecordingPipeline.class);
+    ShortBuffer output = ShortBuffer.allocate(4);
+    putObject(provider, "downstream", pipeline);
+    putObject(provider, "outputBuffer", output);
+    AdtsPacketHeader compatible = new AdtsPacketHeader(false, 2, 48_000, 2, 999);
+    configure.invoke(provider, compatible);
+    check(decoder.configureCalls == 1 && pipeline.closeCalls == 0
+        && field(provider, "downstream") == pipeline && field(provider, "outputBuffer") == output
+        && field(provider, "previousHeader") == compatible,
+        "compatible header reuses decoder, pipeline, and output despite CRC and payload changes");
+
+    AdtsPacketHeader changed = new AdtsPacketHeader(true, 3, 44_100, 1, 7);
+    configure.invoke(provider, changed);
+    check(decoder.configureCalls == 2 && decoder.profile == 3
+        && decoder.sampleRate == 44_100 && decoder.channels == 1
+        && pipeline.closeCalls == 1 && field(provider, "downstream") == null
+        && field(provider, "outputBuffer") == null && field(provider, "previousHeader") == changed,
+        "decoder-key change configures first, closes downstream, and clears processing state");
+
+    RecordingPipeline failing = allocate(RecordingPipeline.class);
+    RuntimeException closeFailure = new RuntimeException("reconfigure-close-sentinel");
+    failing.closeFailure = closeFailure;
+    ShortBuffer retained = ShortBuffer.allocate(2);
+    putObject(provider, "downstream", failing);
+    putObject(provider, "outputBuffer", retained);
+    AdtsPacketHeader failed = new AdtsPacketHeader(true, 4, 32_000, 2, 3);
+    Throwable failure = invocationFailure(() -> configure.invoke(provider, failed));
+    check(failure == closeFailure && decoder.configureCalls == 3
+        && field(provider, "downstream") == failing
+        && field(provider, "outputBuffer") == retained
+        && field(provider, "previousHeader") == changed,
+        "reconfiguration failure preserves the exact prefix and failure identity");
+    failing.closeFailure = null;
+    provider.close();
+  }
+
+  private static void closing() throws Exception {
+    AdtsStreamProvider provider = new AdtsStreamProvider(new CountingInputStream(new byte[0]), null);
+    RecordingDecoder decoder = installDecoder(provider);
+    RecordingPipeline pipeline = allocate(RecordingPipeline.class);
+    putObject(provider, "downstream", pipeline);
+    provider.close();
+    provider.close();
+    check(pipeline.closeCalls == 2 && decoder.closeCalls == 2,
+        "repeated close forwards to both retained resources in order");
+
+    RuntimeException pipelineFailure = new RuntimeException("pipeline-close-sentinel");
+    pipeline.closeFailure = pipelineFailure;
+    check(catchThrowable(provider::close) == pipelineFailure
+        && pipeline.closeCalls == 3 && decoder.closeCalls == 3,
+        "decoder closes in finally when downstream close fails");
+    pipeline.closeFailure = null;
+
+    RuntimeException decoderFailure = new RuntimeException("decoder-close-sentinel");
+    decoder.closeFailure = decoderFailure;
+    check(catchThrowable(provider::close) == decoderFailure
+        && pipeline.closeCalls == 4 && decoder.closeCalls == 4,
+        "decoder close failure propagates after downstream close");
+    decoder.closeFailure = null;
+  }
+
+  private static void subclassingAndReflection() throws Exception {
+    Derived derived = new Derived(new CountingInputStream(new byte[0]), null);
+    AdtsStreamProvider dynamic = derived;
+    dynamic.provideFrames();
+    check(derived.provideCalls == 1, "ordinary subclass participates in virtual dispatch");
+    derived.close();
+
+    Class<AdtsStreamProvider> type = AdtsStreamProvider.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete non-final provider metadata");
+    check(type.getDeclaredFields().length == 10 && type.getDeclaredMethods().length == 5
+        && type.getDeclaredConstructors().length == 1,
+        "exact declared member counts");
+    checkField(type, "context", AudioProcessingContext.class, true);
+    checkField(type, "streamReader", AdtsStreamReader.class, true);
+    checkField(type, "decoder", AacDecoder.class, true);
+    checkField(type, "packetBoundedStream", ResettableBoundedInputStream.class, true);
+    checkField(type, "directBufferBroker", DirectBufferStreamBroker.class, true);
+    checkField(type, "outputBuffer", ShortBuffer.class, false);
+    checkField(type, "previousHeader", AdtsPacketHeader.class, false);
+    checkField(type, "downstream", AudioPipeline.class, false);
+    checkField(type, "requestedTimecode", Long.class, false);
+    checkField(type, "providedTimecode", Long.class, false);
+
+    Constructor<AdtsStreamProvider> constructor =
+        type.getDeclaredConstructor(InputStream.class, AudioProcessingContext.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    checkMethod(type.getDeclaredMethod("setInitialSeek", long.class, long.class),
+        Modifier.PUBLIC, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("provideFrames"), Modifier.PUBLIC,
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("decodeAndSend", ByteBuffer.class), Modifier.PRIVATE,
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("configureProcessing", AdtsPacketHeader.class),
+        Modifier.PRIVATE, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("close"), Modifier.PUBLIC, new Class<?>[0]);
+  }
+
+  private static AudioProcessingContext context() {
+    AudioConfiguration configuration = new AudioConfiguration();
+    AudioDataFormat format = new Pcm16AudioDataFormat(2, 48_000, 960, false);
+    configuration.setOutputFormat(format);
+    return new AudioProcessingContext(
+        configuration, new FrameBuffer(), new AudioPlayerOptions(), format);
+  }
+
+  private static RecordingDecoder installDecoder(AdtsStreamProvider provider) throws Exception {
+    ((AacDecoder) field(provider, "decoder")).close();
+    RecordingDecoder decoder = allocate(RecordingDecoder.class);
+    putObject(provider, "decoder", decoder);
+    return decoder;
+  }
+
+  private static byte[] packet() {
+    byte[] packet = new byte[HEADER.length + 306];
+    System.arraycopy(HEADER, 0, packet, 0, HEADER.length);
+    return packet;
+  }
+
+  private static Method configureMethod() throws Exception {
+    Method method = AdtsStreamProvider.class.getDeclaredMethod(
+        "configureProcessing", AdtsPacketHeader.class);
+    method.setAccessible(true);
+    return method;
+  }
+
+  private static void invokeDecode(AdtsStreamProvider provider, ByteBuffer buffer)
+      throws Exception {
+    Throwable failure = invokeDecodeFailure(provider, buffer);
+    if (failure != null) throw new AssertionError("unexpected decode failure", failure);
+  }
+
+  private static Throwable invokeDecodeFailure(
+      AdtsStreamProvider provider, ByteBuffer buffer) throws Exception {
+    Method method = AdtsStreamProvider.class.getDeclaredMethod("decodeAndSend", ByteBuffer.class);
+    method.setAccessible(true);
+    return invocationFailure(() -> method.invoke(provider, buffer));
+  }
+
+  private static Throwable invocationFailure(ThrowingRunnable operation) throws Exception {
+    try {
+      operation.run();
+      return null;
+    } catch (InvocationTargetException error) {
+      return error.getCause();
+    } catch (Throwable error) {
+      return error;
+    }
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable operation) {
+    try {
+      operation.run();
+      return null;
+    } catch (Throwable error) {
+      return error;
+    }
+  }
+
+  private static Object field(Object target, String name) throws Exception {
+    return field(target, AdtsStreamProvider.class, name);
+  }
+
+  private static Object field(Object target, Class<?> owner, String name) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
+  }
+
+  private static int intField(Object target, Class<?> owner, String name) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.getInt(target);
+  }
+
+  private static void putObject(Object target, String name, Object value) throws Exception {
+    Field field = AdtsStreamProvider.class.getDeclaredField(name);
+    long offset = (Long) UNSAFE.getClass().getMethod("objectFieldOffset", Field.class)
+        .invoke(UNSAFE, field);
+    UNSAFE.getClass().getMethod("putObject", Object.class, long.class, Object.class)
+        .invoke(UNSAFE, target, offset, value);
+  }
+
+  private static <T> T allocate(Class<T> type) throws Exception {
+    return type.cast(UNSAFE.getClass().getMethod("allocateInstance", Class.class)
+        .invoke(UNSAFE, type));
+  }
+
+  private static Object loadUnsafe() {
+    try {
+      Class<?> type = Class.forName("sun.misc.Unsafe");
+      Field field = type.getDeclaredField("theUnsafe");
+      field.setAccessible(true);
+      return field.get(null);
+    } catch (ReflectiveOperationException error) {
+      throw new ExceptionInInitializerError(error);
+    }
+  }
+
+  private static void checkField(
+      Class<?> owner, String name, Class<?> fieldType, boolean isFinal) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    int expected = Modifier.PRIVATE | (isFinal ? Modifier.FINAL : 0);
+    check(field.getType() == fieldType && field.getModifiers() == expected
+        && !field.isSynthetic() && field.getDeclaredAnnotations().length == 0,
+        name + " field metadata");
+  }
+
+  private static void checkMethod(Method method, int modifiers, Class<?>[] failures) {
+    check(method.getModifiers() == modifiers && method.getReturnType() == void.class
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isDefault() && !method.isVarArgs(),
+        method.getName() + " method metadata");
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class CountingInputStream extends InputStream {
+    final byte[] data;
+    int position;
+    int singleReads;
+    int bulkReads;
+    int closes;
+    IOException ioFailure;
+    RuntimeException runtimeFailure;
+
+    CountingInputStream(byte[] data) { this.data = data; }
+
+    @Override public int read() throws IOException {
+      singleReads++;
+      fail();
+      return position < data.length ? data[position++] & 0xFF : -1;
+    }
+
+    @Override public int read(byte[] target, int offset, int length) throws IOException {
+      bulkReads++;
+      fail();
+      if (position >= data.length) return -1;
+      int count = Math.min(length, data.length - position);
+      System.arraycopy(data, position, target, offset, count);
+      position += count;
+      return count;
+    }
+
+    @Override public int available() { return data.length - position; }
+    @Override public void close() { closes++; }
+
+    private void fail() throws IOException {
+      if (ioFailure != null) throw ioFailure;
+      if (runtimeFailure != null) throw runtimeFailure;
+    }
+  }
+
+  private static final class RecordingDecoder extends AacDecoder {
+    int configureCalls;
+    int profile;
+    int sampleRate;
+    int channels;
+    int fillCalls;
+    ByteBuffer fillBuffer;
+    int fillPosition;
+    int fillLimit;
+    int resolveCalls;
+    AacDecoder.StreamInfo streamInfo;
+    int decodeCalls;
+    int successfulDecodes;
+    int closeCalls;
+    RuntimeException closeFailure;
+
+    @Override public int configure(int profile, int sampleRate, int channels) {
+      configureCalls++;
+      this.profile = profile;
+      this.sampleRate = sampleRate;
+      this.channels = channels;
+      return -123;
+    }
+
+    @Override public synchronized int fill(ByteBuffer buffer) {
+      fillCalls++;
+      fillBuffer = buffer;
+      fillPosition = buffer.position();
+      fillLimit = buffer.limit();
+      return buffer.remaining();
+    }
+
+    @Override public synchronized AacDecoder.StreamInfo resolveStreamInfo() {
+      resolveCalls++;
+      return streamInfo;
+    }
+
+    @Override public synchronized boolean decode(ShortBuffer buffer, boolean flush) {
+      decodeCalls++;
+      check(!flush && buffer.position() == 0 && buffer.limit() == buffer.capacity(),
+          "decoder receives a cleared output buffer and non-flush mode");
+      for (int index = 0; index < buffer.capacity(); index++) {
+        buffer.put(index, (short) (decodeCalls + index));
+      }
+      return decodeCalls <= successfulDecodes;
+    }
+
+    @Override public void close() {
+      closeCalls++;
+      if (closeFailure != null) throw closeFailure;
+    }
+  }
+
+  private static final class RecordingPipeline extends AudioPipeline {
+    int processCalls;
+    ShortBuffer firstBuffer;
+    ShortBuffer lastBuffer;
+    boolean buffersCleared = true;
+    InterruptedException processFailure;
+    int closeCalls;
+    RuntimeException closeFailure;
+
+    RecordingPipeline() { super(null); }
+
+    @Override public void process(ShortBuffer buffer) throws InterruptedException {
+      processCalls++;
+      if (firstBuffer == null) firstBuffer = buffer;
+      lastBuffer = buffer;
+      buffersCleared &= buffer.position() == 0 && buffer.limit() == buffer.capacity();
+      if (processFailure != null) throw processFailure;
+    }
+
+    @Override public void close() {
+      closeCalls++;
+      if (closeFailure != null) throw closeFailure;
+    }
+  }
+
+  private static final class FrameBuffer implements AudioFrameBuffer {
+    public void consume(AudioFrame frame) {}
+    public int getRemainingCapacity() { return 0; }
+    public int getFullCapacity() { return 0; }
+    public void setClearOnInsert() {}
+    public void clear() {}
+    public void rebuild(AudioFrameRebuilder rebuilder) {}
+    public AudioFrame provide() { return null; }
+    public AudioFrame provide(long timeout, TimeUnit unit) { return null; }
+    public boolean provide(MutableAudioFrame targetFrame) { return false; }
+    public boolean provide(MutableAudioFrame targetFrame, long timeout, TimeUnit unit) {
+      return false;
+    }
+    public boolean hasClearOnInsert() { return false; }
+    public boolean hasReceivedFrames() { return false; }
+    public Long getLastInputTimecode() { return null; }
+    public void waitForTermination() {}
+    public void setTerminateOnEmpty() {}
+    public void shutdown() {}
+    public void lockBuffer() {}
+  }
+
+  private static final class Derived extends AdtsStreamProvider {
+    int provideCalls;
+    Derived(InputStream input, AudioProcessingContext context) { super(input, context); }
+    @Override public void provideFrames() { provideCalls++; }
   }
 
   private static void check(boolean condition, String message) {

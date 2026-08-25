@@ -160,6 +160,8 @@ const ADTS_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/adts/AdtsContainerProbe";
 const ADTS_PACKET_HEADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader";
+const ADTS_STREAM_PROVIDER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/adts/AdtsStreamProvider";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -495,6 +497,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     ADTS_AUDIO_TRACK_CLASS,
     ADTS_CONTAINER_PROBE_CLASS,
     ADTS_PACKET_HEADER_CLASS,
+    ADTS_STREAM_PROVIDER_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -968,6 +971,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | MEDIA_CONTAINER_REGISTRY_CLASS
             | ADTS_AUDIO_TRACK_CLASS
             | ADTS_CONTAINER_PROBE_CLASS
+            | ADTS_STREAM_PROVIDER_CLASS
             | OPUS_AUDIO_DATA_FORMAT_CLASS
             | PCM16_AUDIO_DATA_FORMAT_CLASS
             | OPUS_CHUNK_DECODER_CLASS
@@ -1079,6 +1083,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | MEDIA_CONTAINER_REGISTRY_CLASS
             | ADTS_AUDIO_TRACK_CLASS
             | ADTS_CONTAINER_PROBE_CLASS
+            | ADTS_STREAM_PROVIDER_CLASS
             | AUDIO_PIPELINE_FACTORY_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
@@ -1355,6 +1360,9 @@ fn replacement_body(
     }
     if class_name == ADTS_PACKET_HEADER_CLASS {
         return adts_packet_header_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == ADTS_STREAM_PROVIDER_CLASS {
+        return adts_stream_provider_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -5273,6 +5281,650 @@ fn adts_packet_header_can_use_same_decoder(pool: &mut ConstantPool<'static>) -> 
                 offset_delta: return_target - false_target - 1,
                 locals,
                 stack: vec![VerificationType::Integer],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn adts_stream_provider_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Ljava/io/InputStream;Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;)V",
+        ) => adts_stream_provider_constructor(pool),
+        ("setInitialSeek", "(JJ)V") => adts_stream_provider_set_initial_seek(pool),
+        ("provideFrames", "()V") => adts_stream_provider_provide_frames(pool),
+        ("decodeAndSend", "(Ljava/nio/ByteBuffer;)V") => adts_stream_provider_decode_and_send(pool),
+        (
+            "configureProcessing",
+            "(Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;)V",
+        ) => adts_stream_provider_configure_processing(pool),
+        ("close", "()V") => adts_stream_provider_close(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {ADTS_STREAM_PROVIDER_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn adts_stream_provider_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(ADTS_STREAM_PROVIDER_CLASS)?;
+    let context = pool.add_field_ref(
+        owner,
+        "context",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;",
+    )?;
+    let reader =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/adts/AdtsStreamReader")?;
+    let reader_init = pool.add_method_ref(reader, "<init>", "(Ljava/io/InputStream;)V")?;
+    let reader_field = pool.add_field_ref(
+        owner,
+        "streamReader",
+        "Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsStreamReader;",
+    )?;
+    let decoder = pool.add_class("com/sedmelluq/discord/lavaplayer/natives/aac/AacDecoder")?;
+    let decoder_init = pool.add_method_ref(decoder, "<init>", "()V")?;
+    let decoder_field = pool.add_field_ref(
+        owner,
+        "decoder",
+        "Lcom/sedmelluq/discord/lavaplayer/natives/aac/AacDecoder;",
+    )?;
+    let bounded =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/ResettableBoundedInputStream")?;
+    let bounded_init = pool.add_method_ref(bounded, "<init>", "(Ljava/io/InputStream;)V")?;
+    let bounded_field = pool.add_field_ref(
+        owner,
+        "packetBoundedStream",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/ResettableBoundedInputStream;",
+    )?;
+    let broker =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/DirectBufferStreamBroker")?;
+    let broker_init = pool.add_method_ref(broker, "<init>", "(I)V")?;
+    let broker_field = pool.add_field_ref(
+        owner,
+        "directBufferBroker",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/DirectBufferStreamBroker;",
+    )?;
+    code(
+        pool,
+        4,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(context),
+            Instruction::Aload_0,
+            Instruction::New(reader),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(reader_init),
+            Instruction::Putfield(reader_field),
+            Instruction::Aload_0,
+            Instruction::New(decoder),
+            Instruction::Dup,
+            Instruction::Invokespecial(decoder_init),
+            Instruction::Putfield(decoder_field),
+            Instruction::Aload_0,
+            Instruction::New(bounded),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(bounded_init),
+            Instruction::Putfield(bounded_field),
+            Instruction::Aload_0,
+            Instruction::New(broker),
+            Instruction::Dup,
+            Instruction::Sipush(2048),
+            Instruction::Invokespecial(broker_init),
+            Instruction::Putfield(broker_field),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn adts_stream_provider_set_initial_seek(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(ADTS_STREAM_PROVIDER_CLASS)?;
+    let long = pool.add_class("java/lang/Long")?;
+    let value_of = pool.add_method_ref(long, "valueOf", "(J)Ljava/lang/Long;")?;
+    let requested = pool.add_field_ref(owner, "requestedTimecode", "Ljava/lang/Long;")?;
+    let provided = pool.add_field_ref(owner, "providedTimecode", "Ljava/lang/Long;")?;
+    code(
+        pool,
+        3,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Lload_1,
+            Instruction::Invokestatic(value_of),
+            Instruction::Putfield(requested),
+            Instruction::Aload_0,
+            Instruction::Lload_3,
+            Instruction::Invokestatic(value_of),
+            Instruction::Putfield(provided),
+            Instruction::Return,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn adts_stream_provider_provide_frames(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(ADTS_STREAM_PROVIDER_CLASS)?;
+    let reader =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/adts/AdtsStreamReader")?;
+    let reader_field = pool.add_field_ref(
+        owner,
+        "streamReader",
+        "Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsStreamReader;",
+    )?;
+    let find_header = pool.add_method_ref(
+        reader,
+        "findPacketHeader",
+        "()Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;",
+    )?;
+    let header = pool.add_class(ADTS_PACKET_HEADER_CLASS)?;
+    let configure = pool.add_method_ref(
+        owner,
+        "configureProcessing",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;)V",
+    )?;
+    let bounded =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/ResettableBoundedInputStream")?;
+    let bounded_field = pool.add_field_ref(
+        owner,
+        "packetBoundedStream",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/ResettableBoundedInputStream;",
+    )?;
+    let payload = pool.add_field_ref(header, "payloadLength", "I")?;
+    let reset_limit = pool.add_method_ref(bounded, "resetLimit", "(J)V")?;
+    let broker =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/DirectBufferStreamBroker")?;
+    let broker_field = pool.add_field_ref(
+        owner,
+        "directBufferBroker",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/DirectBufferStreamBroker;",
+    )?;
+    let consume = pool.add_method_ref(broker, "consumeNext", "(Ljava/io/InputStream;II)Z")?;
+    let get_buffer = pool.add_method_ref(broker, "getBuffer", "()Ljava/nio/ByteBuffer;")?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let limit = pool.add_method_ref(byte_buffer, "limit", "()I")?;
+    let decode = pool.add_method_ref(owner, "decodeAndSend", "(Ljava/nio/ByteBuffer;)V")?;
+    let next_packet = pool.add_method_ref(reader, "nextPacket", "()V")?;
+    let maximum = pool.add_integer(i32::MAX)?;
+    let io_error = pool.add_class("java/io/IOException")?;
+    let runtime = pool.add_class("java/lang/RuntimeException")?;
+    let runtime_init = pool.add_method_ref(runtime, "<init>", "(Ljava/lang/Throwable;)V")?;
+    let loop_target = 1;
+    let header_target = 8;
+    let decode_target = 35;
+    let handler_target = 42;
+    let mut body = code_with_exceptions(
+        pool,
+        4,
+        3,
+        vec![
+            Instruction::Nop,
+            Instruction::Aload_0,
+            Instruction::Getfield(reader_field),
+            Instruction::Invokevirtual(find_header),
+            Instruction::Astore_1,
+            Instruction::Aload_1,
+            Instruction::Ifnonnull(header_target),
+            Instruction::Return,
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(configure),
+            Instruction::Aload_0,
+            Instruction::Getfield(bounded_field),
+            Instruction::Aload_1,
+            Instruction::Getfield(payload),
+            Instruction::I2l,
+            Instruction::Invokevirtual(reset_limit),
+            Instruction::Aload_0,
+            Instruction::Getfield(broker_field),
+            Instruction::Aload_0,
+            Instruction::Getfield(bounded_field),
+            Instruction::Ldc_w(maximum),
+            Instruction::Ldc_w(maximum),
+            Instruction::Invokevirtual(consume),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(broker_field),
+            Instruction::Invokevirtual(get_buffer),
+            Instruction::Astore_2,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(limit),
+            Instruction::Aload_1,
+            Instruction::Getfield(payload),
+            Instruction::If_icmpge(decode_target),
+            Instruction::Return,
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(decode),
+            Instruction::Aload_0,
+            Instruction::Getfield(reader_field),
+            Instruction::Invokevirtual(next_packet),
+            Instruction::Goto(loop_target),
+            Instruction::Astore_1,
+            Instruction::New(runtime),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(runtime_init),
+            Instruction::Athrow,
+        ],
+        vec![ExceptionTableEntry {
+            range_pc: loop_target..handler_target,
+            handler_pc: handler_target,
+            catch_type: io_error,
+        }],
+    )?;
+    let owner_local = VerificationType::Object { cpool_index: owner };
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: loop_target,
+                locals: vec![owner_local.clone()],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: header_target - loop_target - 1,
+                locals: vec![
+                    owner_local.clone(),
+                    VerificationType::Object {
+                        cpool_index: header,
+                    },
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: decode_target - header_target - 1,
+                locals: vec![
+                    owner_local.clone(),
+                    VerificationType::Object {
+                        cpool_index: header,
+                    },
+                    VerificationType::Object {
+                        cpool_index: byte_buffer,
+                    },
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: handler_target - decode_target - 1,
+                locals: vec![owner_local],
+                stack: vec![VerificationType::Object {
+                    cpool_index: io_error,
+                }],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn adts_stream_provider_decode_and_send(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(ADTS_STREAM_PROVIDER_CLASS)?;
+    let decoder = pool.add_class("com/sedmelluq/discord/lavaplayer/natives/aac/AacDecoder")?;
+    let decoder_field = pool.add_field_ref(
+        owner,
+        "decoder",
+        "Lcom/sedmelluq/discord/lavaplayer/natives/aac/AacDecoder;",
+    )?;
+    let fill = pool.add_method_ref(decoder, "fill", "(Ljava/nio/ByteBuffer;)I")?;
+    let pipeline = pool.add_class("com/sedmelluq/discord/lavaplayer/filter/AudioPipeline")?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/AudioPipeline;",
+    )?;
+    let stream_info =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/natives/aac/AacDecoder$StreamInfo")?;
+    let resolve = pool.add_method_ref(
+        decoder,
+        "resolveStreamInfo",
+        "()Lcom/sedmelluq/discord/lavaplayer/natives/aac/AacDecoder$StreamInfo;",
+    )?;
+    let context = pool.add_field_ref(
+        owner,
+        "context",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;",
+    )?;
+    let pcm = pool.add_class("com/sedmelluq/discord/lavaplayer/filter/PcmFormat")?;
+    let info_channels = pool.add_field_ref(stream_info, "channels", "I")?;
+    let info_rate = pool.add_field_ref(stream_info, "sampleRate", "I")?;
+    let info_frame_size = pool.add_field_ref(stream_info, "frameSize", "I")?;
+    let pcm_init = pool.add_method_ref(pcm, "<init>", "(II)V")?;
+    let pipeline_factory =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/filter/AudioPipelineFactory")?;
+    let create = pool.add_method_ref(
+        pipeline_factory,
+        "create",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;Lcom/sedmelluq/discord/lavaplayer/filter/PcmFormat;)Lcom/sedmelluq/discord/lavaplayer/filter/AudioPipeline;",
+    )?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let allocate_direct =
+        pool.add_method_ref(byte_buffer, "allocateDirect", "(I)Ljava/nio/ByteBuffer;")?;
+    let byte_order = pool.add_class("java/nio/ByteOrder")?;
+    let native_order = pool.add_method_ref(byte_order, "nativeOrder", "()Ljava/nio/ByteOrder;")?;
+    let order = pool.add_method_ref(
+        byte_buffer,
+        "order",
+        "(Ljava/nio/ByteOrder;)Ljava/nio/ByteBuffer;",
+    )?;
+    let as_short = pool.add_method_ref(byte_buffer, "asShortBuffer", "()Ljava/nio/ShortBuffer;")?;
+    let output = pool.add_field_ref(owner, "outputBuffer", "Ljava/nio/ShortBuffer;")?;
+    let requested = pool.add_field_ref(owner, "requestedTimecode", "Ljava/lang/Long;")?;
+    let provided = pool.add_field_ref(owner, "providedTimecode", "Ljava/lang/Long;")?;
+    let long = pool.add_class("java/lang/Long")?;
+    let long_value = pool.add_method_ref(long, "longValue", "()J")?;
+    let seek = pool.add_method_ref(pipeline, "seekPerformed", "(JJ)V")?;
+    let short_buffer = pool.add_class("java/nio/ShortBuffer")?;
+    let clear = pool.add_method_ref(short_buffer, "clear", "()Ljava/nio/ShortBuffer;")?;
+    let decode = pool.add_method_ref(decoder, "decode", "(Ljava/nio/ShortBuffer;Z)Z")?;
+    let process = pool.add_method_ref(pipeline, "process", "(Ljava/nio/ShortBuffer;)V")?;
+    let stream_info_target = 15;
+    let downstream_target = 55;
+    let decode_target = 59;
+    let return_target = 76;
+    let mut body = code(
+        pool,
+        6,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(decoder_field),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(fill),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(downstream),
+            Instruction::Ifnonnull(downstream_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(decoder_field),
+            Instruction::Invokevirtual(resolve),
+            Instruction::Astore_2,
+            Instruction::Aload_2,
+            Instruction::Ifnonnull(stream_info_target),
+            Instruction::Return,
+            Instruction::Aload_0,
+            Instruction::Aload_0,
+            Instruction::Getfield(context),
+            Instruction::New(pcm),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Getfield(info_channels),
+            Instruction::Aload_2,
+            Instruction::Getfield(info_rate),
+            Instruction::Invokespecial(pcm_init),
+            Instruction::Invokestatic(create),
+            Instruction::Putfield(downstream),
+            Instruction::Aload_0,
+            Instruction::Iconst_2,
+            Instruction::Aload_2,
+            Instruction::Getfield(info_frame_size),
+            Instruction::Imul,
+            Instruction::Aload_2,
+            Instruction::Getfield(info_channels),
+            Instruction::Imul,
+            Instruction::Invokestatic(allocate_direct),
+            Instruction::Invokestatic(native_order),
+            Instruction::Invokevirtual(order),
+            Instruction::Invokevirtual(as_short),
+            Instruction::Putfield(output),
+            Instruction::Aload_0,
+            Instruction::Getfield(requested),
+            Instruction::Ifnull(downstream_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(downstream),
+            Instruction::Aload_0,
+            Instruction::Getfield(requested),
+            Instruction::Invokevirtual(long_value),
+            Instruction::Aload_0,
+            Instruction::Getfield(provided),
+            Instruction::Invokevirtual(long_value),
+            Instruction::Invokevirtual(seek),
+            Instruction::Aload_0,
+            Instruction::Aconst_null,
+            Instruction::Putfield(requested),
+            Instruction::Aload_0,
+            Instruction::Getfield(output),
+            Instruction::Invokevirtual(clear),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(decoder_field),
+            Instruction::Aload_0,
+            Instruction::Getfield(output),
+            Instruction::Iconst_0,
+            Instruction::Invokevirtual(decode),
+            Instruction::Ifeq(return_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(downstream),
+            Instruction::Aload_0,
+            Instruction::Getfield(output),
+            Instruction::Invokevirtual(process),
+            Instruction::Aload_0,
+            Instruction::Getfield(output),
+            Instruction::Invokevirtual(clear),
+            Instruction::Pop,
+            Instruction::Goto(decode_target),
+            Instruction::Return,
+        ],
+    )?;
+    let owner_type = VerificationType::Object { cpool_index: owner };
+    let input_type = VerificationType::Object {
+        cpool_index: byte_buffer,
+    };
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: stream_info_target,
+                locals: vec![
+                    owner_type.clone(),
+                    input_type.clone(),
+                    VerificationType::Object {
+                        cpool_index: stream_info,
+                    },
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: downstream_target - stream_info_target - 1,
+                locals: vec![owner_type.clone(), input_type.clone()],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: decode_target - downstream_target - 1,
+                locals: vec![owner_type.clone(), input_type.clone()],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: return_target - decode_target - 1,
+                locals: vec![owner_type, input_type],
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn adts_stream_provider_configure_processing(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(ADTS_STREAM_PROVIDER_CLASS)?;
+    let header = pool.add_class(ADTS_PACKET_HEADER_CLASS)?;
+    let previous = pool.add_field_ref(
+        owner,
+        "previousHeader",
+        "Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;",
+    )?;
+    let same_decoder = pool.add_method_ref(
+        header,
+        "canUseSameDecoder",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;)Z",
+    )?;
+    let decoder = pool.add_class("com/sedmelluq/discord/lavaplayer/natives/aac/AacDecoder")?;
+    let decoder_field = pool.add_field_ref(
+        owner,
+        "decoder",
+        "Lcom/sedmelluq/discord/lavaplayer/natives/aac/AacDecoder;",
+    )?;
+    let profile = pool.add_field_ref(header, "profile", "I")?;
+    let sample_rate = pool.add_field_ref(header, "sampleRate", "I")?;
+    let channels = pool.add_field_ref(header, "channels", "I")?;
+    let configure = pool.add_method_ref(decoder, "configure", "(III)I")?;
+    let pipeline = pool.add_class("com/sedmelluq/discord/lavaplayer/filter/AudioPipeline")?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/AudioPipeline;",
+    )?;
+    let close = pool.add_method_ref(pipeline, "close", "()V")?;
+    let output = pool.add_field_ref(owner, "outputBuffer", "Ljava/nio/ShortBuffer;")?;
+    let close_done_target = 21;
+    let previous_target = 27;
+    let mut body = code(
+        pool,
+        4,
+        2,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(previous),
+            Instruction::Invokevirtual(same_decoder),
+            Instruction::Ifne(previous_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(decoder_field),
+            Instruction::Aload_1,
+            Instruction::Getfield(profile),
+            Instruction::Aload_1,
+            Instruction::Getfield(sample_rate),
+            Instruction::Aload_1,
+            Instruction::Getfield(channels),
+            Instruction::Invokevirtual(configure),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(downstream),
+            Instruction::Ifnull(close_done_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(downstream),
+            Instruction::Invokevirtual(close),
+            Instruction::Aload_0,
+            Instruction::Aconst_null,
+            Instruction::Putfield(downstream),
+            Instruction::Aload_0,
+            Instruction::Aconst_null,
+            Instruction::Putfield(output),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(previous),
+            Instruction::Return,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            same_stack_frame(close_done_target),
+            same_stack_frame(previous_target - close_done_target - 1),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn adts_stream_provider_close(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(ADTS_STREAM_PROVIDER_CLASS)?;
+    let pipeline = pool.add_class("com/sedmelluq/discord/lavaplayer/filter/AudioPipeline")?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/AudioPipeline;",
+    )?;
+    let pipeline_close = pool.add_method_ref(pipeline, "close", "()V")?;
+    let decoder = pool.add_class("com/sedmelluq/discord/lavaplayer/natives/aac/AacDecoder")?;
+    let decoder_field = pool.add_field_ref(
+        owner,
+        "decoder",
+        "Lcom/sedmelluq/discord/lavaplayer/natives/aac/AacDecoder;",
+    )?;
+    let decoder_close = pool.add_method_ref(decoder, "close", "()V")?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let finally_target = 6;
+    let handler_target = 10;
+    let return_target = 16;
+    let mut body = code_with_exceptions(
+        pool,
+        1,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(downstream),
+            Instruction::Ifnull(finally_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(downstream),
+            Instruction::Invokevirtual(pipeline_close),
+            Instruction::Aload_0,
+            Instruction::Getfield(decoder_field),
+            Instruction::Invokevirtual(decoder_close),
+            Instruction::Goto(return_target),
+            Instruction::Astore_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(decoder_field),
+            Instruction::Invokevirtual(decoder_close),
+            Instruction::Aload_1,
+            Instruction::Athrow,
+            Instruction::Return,
+        ],
+        vec![ExceptionTableEntry {
+            range_pc: 0..finally_target,
+            handler_pc: handler_target,
+            catch_type: 0,
+        }],
+    )?;
+    let locals = vec![VerificationType::Object { cpool_index: owner }];
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: finally_target,
+                locals: locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: handler_target - finally_target - 1,
+                locals: locals.clone(),
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: return_target - handler_target - 1,
+                locals,
+                stack: vec![],
             },
         ],
     )?;
