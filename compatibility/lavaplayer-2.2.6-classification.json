@@ -8261,45 +8261,50 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted public abstract interface is byte-for-byte identical to the reference: it has AudioFilter as its sole parent, no fields or constructors, and exactly the two declared short-PCM process overloads.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.ShortPcmAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "([SII)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Array processing preserves caller-implementation dispatch, short-array identity and state, full-width signed offset and length values, null-receiver behavior, and exact checked InterruptedException identity and metadata.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.ShortPcmAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "(Ljava/nio/ShortBuffer;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "ShortBuffer processing preserves object identity, incoming position and limit, implementation-visible buffer mutation and position changes, null-receiver behavior, and exact checked InterruptedException identity and metadata.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.SplitShortPcmAudioFilter",
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted public abstract interface is byte-for-byte identical to the reference: it has AudioFilter as its sole parent, no fields or constructors, and exactly one declared planar-short process method.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.SplitShortPcmAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "([[SII)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Planar-short processing preserves caller-implementation dispatch, outer and jagged row identity, null rows, array state, full-width signed offset and length values, null-receiver behavior, and exact checked InterruptedException identity and metadata.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.UniversalPcmAudioFilter",

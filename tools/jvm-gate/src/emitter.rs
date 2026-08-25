@@ -87,6 +87,10 @@ const FLOAT_PCM_AUDIO_FILTER_CLASS: &str =
 const PCM_FORMAT_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/PcmFormat";
 const RESAMPLING_PCM_AUDIO_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/ResamplingPcmAudioFilter";
+const SHORT_PCM_AUDIO_FILTER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/filter/ShortPcmAudioFilter";
+const SPLIT_SHORT_PCM_AUDIO_FILTER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/filter/SplitShortPcmAudioFilter";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -385,6 +389,8 @@ const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/filter/PcmFilterFactory",
     PCM_FORMAT_CLASS,
     RESAMPLING_PCM_AUDIO_FILTER_CLASS,
+    SHORT_PCM_AUDIO_FILTER_CLASS,
+    SPLIT_SHORT_PCM_AUDIO_FILTER_CLASS,
     "com/sedmelluq/discord/lavaplayer/format/AudioDataFormat",
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,

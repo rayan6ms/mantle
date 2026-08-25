@@ -102,6 +102,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-audio-filter-interface-consumer" => Some(AUDIO_FILTER_INTERFACE_CONSUMER),
         "write-float-pcm-audio-filter-consumer" => Some(FLOAT_PCM_AUDIO_FILTER_CONSUMER),
+        "write-short-pcm-audio-filter-consumer" => Some(SHORT_PCM_AUDIO_FILTER_CONSUMER),
         "write-pcm-filter-factory-consumer" => Some(PCM_FILTER_FACTORY_CONSUMER),
         "write-pcm-format-consumer" => Some(PCM_FORMAT_CONSUMER),
         "write-resampling-pcm-audio-filter-consumer" => Some(RESAMPLING_PCM_AUDIO_FILTER_CONSUMER),
@@ -7396,6 +7397,245 @@ public final class GateFloatPcmAudioFilter {
       this.length = length;
       if (failure != null) throw failure;
       processes++;
+    }
+
+    public void seekPerformed(long requestedTimecode, long providedTimecode) { }
+    public void flush() throws InterruptedException { }
+    public void close() { }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const SHORT_PCM_AUDIO_FILTER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.AudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.ShortPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.SplitShortPcmAudioFilter;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.ShortBuffer;
+import java.util.Arrays;
+
+public final class GateShortPcmAudioFilter {
+  public static void main(String[] args) throws Exception {
+    shortDispatch();
+    splitDispatch();
+    checkedFailures();
+    nullReceivers();
+    reflection();
+    System.out.println(
+        "short=array,buffer,identity,state,offset,length;"
+        + "split=jagged-identity,state,offset,length;"
+        + "failures=array-interrupted,buffer-interrupted,split-interrupted,null-receivers;"
+        + "reflection=2-public-abstract-interfaces,0-fields,0-constructors,3-methods,"
+        + "audio-filter-parent,throws");
+  }
+
+  private static void shortDispatch() throws Exception {
+    RecordingShort implementation = new RecordingShort();
+    ShortPcmAudioFilter filter = implementation;
+    short[] input = new short[] { Short.MIN_VALUE, -1, 0, 1, Short.MAX_VALUE };
+    filter.process(input, Integer.MIN_VALUE, Integer.MAX_VALUE);
+    check(implementation.arrayCalls == 1 && implementation.input == input,
+        "short array dispatch and identity");
+    check(implementation.offset == Integer.MIN_VALUE
+        && implementation.length == Integer.MAX_VALUE,
+        "short full-width offset and length");
+    check(Arrays.equals(input,
+        new short[] { Short.MIN_VALUE, -1, 0, 1, Short.MAX_VALUE }),
+        "short array state");
+
+    ShortBuffer buffer = ByteBuffer.allocateDirect(16).order(ByteOrder.LITTLE_ENDIAN)
+        .asShortBuffer();
+    buffer.put(new short[] { 3, 5, 8, 13, 21 });
+    buffer.position(1).limit(4);
+    filter.process(buffer);
+    check(implementation.bufferCalls == 1 && implementation.buffer == buffer,
+        "short buffer dispatch and identity");
+    check(implementation.bufferPosition == 1 && implementation.bufferLimit == 4,
+        "short buffer incoming window");
+    check(buffer.position() == 2 && buffer.limit() == 4 && buffer.get(1) == 34,
+        "short buffer implementation state visibility");
+  }
+
+  private static void splitDispatch() throws Exception {
+    RecordingSplit implementation = new RecordingSplit();
+    SplitShortPcmAudioFilter filter = implementation;
+    short[][] input = new short[][] {
+        new short[] { Short.MIN_VALUE, -7, 0 },
+        null,
+        new short[] { 11, Short.MAX_VALUE }
+    };
+    filter.process(input, Integer.MAX_VALUE, Integer.MIN_VALUE);
+    check(implementation.calls == 1 && implementation.input == input,
+        "split dispatch and outer identity");
+    check(implementation.first == input[0] && implementation.second == null
+        && implementation.third == input[2], "split row identity");
+    check(implementation.offset == Integer.MAX_VALUE
+        && implementation.length == Integer.MIN_VALUE,
+        "split full-width offset and length");
+    check(input[0][1] == -7 && input[2][1] == Short.MAX_VALUE, "split input state");
+  }
+
+  private static void checkedFailures() {
+    RecordingShort shortFilter = new RecordingShort();
+    InterruptedException arraySentinel = new InterruptedException("short-array-sentinel");
+    shortFilter.failure = arraySentinel;
+    short[] input = new short[] { 9 };
+    expectIdentity(arraySentinel, () -> shortFilter.process(input, -7, 13));
+    check(shortFilter.arrayCalls == 0 && shortFilter.input == input
+        && shortFilter.offset == -7 && shortFilter.length == 13,
+        "short array failure prefix");
+
+    InterruptedException bufferSentinel = new InterruptedException("short-buffer-sentinel");
+    shortFilter.failure = bufferSentinel;
+    ShortBuffer buffer = ShortBuffer.wrap(new short[] { 1, 2, 3 });
+    buffer.position(1);
+    expectIdentity(bufferSentinel, () -> shortFilter.process(buffer));
+    check(shortFilter.bufferCalls == 0 && shortFilter.buffer == buffer
+        && buffer.position() == 1, "short buffer failure prefix");
+
+    RecordingSplit splitFilter = new RecordingSplit();
+    InterruptedException splitSentinel = new InterruptedException("split-sentinel");
+    splitFilter.failure = splitSentinel;
+    short[][] split = new short[][] { null };
+    expectIdentity(splitSentinel, () -> splitFilter.process(split, -11, 17));
+    check(splitFilter.calls == 0 && splitFilter.input == split
+        && splitFilter.offset == -11 && splitFilter.length == 17,
+        "split failure prefix");
+  }
+
+  private static void nullReceivers() {
+    ShortPcmAudioFilter shortFilter = null;
+    expect(NullPointerException.class, () -> shortFilter.process((short[]) null, 0, 0));
+    expect(NullPointerException.class, () -> shortFilter.process((ShortBuffer) null));
+    SplitShortPcmAudioFilter splitFilter = null;
+    expect(NullPointerException.class, () -> splitFilter.process(null, 0, 0));
+  }
+
+  private static void reflection() throws Exception {
+    Class<ShortPcmAudioFilter> shortType = ShortPcmAudioFilter.class;
+    checkInterface(shortType, 2);
+    checkMethod(shortType.getDeclaredMethod("process", short[].class, int.class, int.class),
+        new Class<?>[] { short[].class, int.class, int.class });
+    checkMethod(shortType.getDeclaredMethod("process", ShortBuffer.class),
+        new Class<?>[] { ShortBuffer.class });
+
+    Class<SplitShortPcmAudioFilter> splitType = SplitShortPcmAudioFilter.class;
+    checkInterface(splitType, 1);
+    checkMethod(splitType.getDeclaredMethod("process", short[][].class, int.class, int.class),
+        new Class<?>[] { short[][].class, int.class, int.class });
+
+    for (Class<?> type : new Class<?>[] { shortType, splitType }) {
+      check(type.getMethod("seekPerformed", long.class, long.class).getDeclaringClass()
+              == AudioFilter.class
+          && type.getMethod("flush").getDeclaringClass() == AudioFilter.class
+          && type.getMethod("close").getDeclaringClass() == AudioFilter.class,
+          "inherited AudioFilter contract");
+    }
+  }
+
+  private static void checkInterface(Class<?> type, int methods) {
+    check(type.isInterface() && Modifier.isPublic(type.getModifiers())
+        && Modifier.isAbstract(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == null
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] { AudioFilter.class }),
+        type.getSimpleName() + " interface metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == methods,
+        type.getSimpleName() + " member counts");
+  }
+
+  private static void checkMethod(Method method, Class<?>[] parameters) {
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == void.class
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(),
+            new Class<?>[] { InterruptedException.class })
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), method.toString() + " metadata");
+  }
+
+  private static void expectIdentity(
+      InterruptedException expected, InterruptibleOperation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("failure was swallowed");
+    } catch (InterruptedException error) {
+      check(error == expected, "InterruptedException identity");
+    }
+  }
+
+  private static void expect(Class<? extends Throwable> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
+  }
+
+  private interface InterruptibleOperation { void run() throws InterruptedException; }
+  private interface Operation { void run() throws Exception; }
+
+  private static final class RecordingShort implements ShortPcmAudioFilter {
+    short[] input;
+    ShortBuffer buffer;
+    int offset;
+    int length;
+    int arrayCalls;
+    int bufferCalls;
+    int bufferPosition;
+    int bufferLimit;
+    InterruptedException failure;
+
+    public void process(short[] input, int offset, int length) throws InterruptedException {
+      this.input = input;
+      this.offset = offset;
+      this.length = length;
+      if (failure != null) throw failure;
+      arrayCalls++;
+    }
+
+    public void process(ShortBuffer buffer) throws InterruptedException {
+      this.buffer = buffer;
+      if (failure != null) throw failure;
+      bufferPosition = buffer.position();
+      bufferLimit = buffer.limit();
+      buffer.put(buffer.position(), (short) 34);
+      buffer.position(buffer.position() + 1);
+      bufferCalls++;
+    }
+
+    public void seekPerformed(long requestedTimecode, long providedTimecode) { }
+    public void flush() throws InterruptedException { }
+    public void close() { }
+  }
+
+  private static final class RecordingSplit implements SplitShortPcmAudioFilter {
+    short[][] input;
+    short[] first;
+    short[] second;
+    short[] third;
+    int offset;
+    int length;
+    int calls;
+    InterruptedException failure;
+
+    public void process(short[][] input, int offset, int length) throws InterruptedException {
+      this.input = input;
+      this.first = input == null || input.length < 1 ? null : input[0];
+      this.second = input == null || input.length < 2 ? null : input[1];
+      this.third = input == null || input.length < 3 ? null : input[2];
+      this.offset = offset;
+      this.length = length;
+      if (failure != null) throw failure;
+      calls++;
     }
 
     public void seekPerformed(long requestedTimecode, long providedTimecode) { }
