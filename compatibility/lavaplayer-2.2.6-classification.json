@@ -871,54 +871,84 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Generated as the exact public concrete non-final registry with eager default state, one private final generic probe-list field, public construction, and exact reflected member shape.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerRegistry",
       "symbol_kind": "FIELD",
       "member_name": "DEFAULT_REGISTRY",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Retains the eager public static final registry singleton with a distinct mutable list containing the eleven canonical probe identities in declaration order.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerRegistry",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Ljava/util/List;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Retains the exact List<MediaContainerProbe> identity, including null, without validation, copying, or wrapping, and preserves the generic constructor signature.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerRegistry",
       "symbol_kind": "METHOD",
       "member_name": "find",
       "descriptor": "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Performs live linear list-order lookup using name.equals(probe.getName()), returns the first exact probe identity, and preserves null and callback failure ordering.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerRegistry",
       "symbol_kind": "METHOD",
       "member_name": "getAll",
       "descriptor": "()Ljava/util/List;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Returns the exact retained mutable or immutable list reference, including null, with the frozen List<MediaContainerProbe> generic return signature.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerRegistry",
       "symbol_kind": "METHOD",
       "member_name": "extended",
       "descriptor": "([Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Creates a fresh registry and mutable canonical-probe list on every call, appends each additional identity including null in order, copies the varargs elements, and preserves null-array failure and ACC_VARARGS metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.adts.AdtsAudioTrack",

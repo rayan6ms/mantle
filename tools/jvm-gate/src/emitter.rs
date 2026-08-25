@@ -152,6 +152,8 @@ const MEDIA_CONTAINER_HINTS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/MediaContainerHints";
 const MEDIA_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/MediaContainerProbe";
+const MEDIA_CONTAINER_REGISTRY_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -483,6 +485,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MEDIA_CONTAINER_DETECTION_RESULT_CLASS,
     MEDIA_CONTAINER_HINTS_CLASS,
     MEDIA_CONTAINER_PROBE_CLASS,
+    MEDIA_CONTAINER_REGISTRY_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -953,6 +956,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | MEDIA_CONTAINER_DETECTION_CLASS
             | MEDIA_CONTAINER_DETECTION_RESULT_CLASS
             | MEDIA_CONTAINER_HINTS_CLASS
+            | MEDIA_CONTAINER_REGISTRY_CLASS
             | OPUS_AUDIO_DATA_FORMAT_CLASS
             | PCM16_AUDIO_DATA_FORMAT_CLASS
             | OPUS_CHUNK_DECODER_CLASS
@@ -1061,6 +1065,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | MEDIA_CONTAINER_DETECTION_CLASS
             | MEDIA_CONTAINER_DETECTION_RESULT_CLASS
             | MEDIA_CONTAINER_HINTS_CLASS
+            | MEDIA_CONTAINER_REGISTRY_CLASS
             | AUDIO_PIPELINE_FACTORY_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
@@ -1325,6 +1330,9 @@ fn replacement_body(
     }
     if class_name == MEDIA_CONTAINER_HINTS_CLASS {
         return media_container_hints_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == MEDIA_CONTAINER_REGISTRY_CLASS {
+        return media_container_registry_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -4476,6 +4484,197 @@ fn media_container_hints_clinit(pool: &mut ConstantPool<'static>) -> Result<Attr
             Instruction::Aconst_null,
             Instruction::Invokespecial(init),
             Instruction::Putstatic(no_information),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn media_container_registry_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(Ljava/util/List;)V") => media_container_registry_constructor(pool),
+        (
+            "find",
+            "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;",
+        ) => media_container_registry_find(pool),
+        ("getAll", "()Ljava/util/List;") => media_container_registry_get_all(pool),
+        (
+            "extended",
+            "([Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;",
+        ) => media_container_registry_extended(pool),
+        ("<clinit>", "()V") => media_container_registry_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {MEDIA_CONTAINER_REGISTRY_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn media_container_registry_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(MEDIA_CONTAINER_REGISTRY_CLASS)?;
+    let probes = pool.add_field_ref(owner, "probes", "Ljava/util/List;")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(probes),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn media_container_registry_find(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MEDIA_CONTAINER_REGISTRY_CLASS)?;
+    let probes = pool.add_field_ref(owner, "probes", "Ljava/util/List;")?;
+    let list = pool.add_class("java/util/List")?;
+    let list_iterator =
+        pool.add_interface_method_ref(list, "iterator", "()Ljava/util/Iterator;")?;
+    let iterator = pool.add_class("java/util/Iterator")?;
+    let has_next = pool.add_interface_method_ref(iterator, "hasNext", "()Z")?;
+    let next = pool.add_interface_method_ref(iterator, "next", "()Ljava/lang/Object;")?;
+    let probe = pool.add_class(MEDIA_CONTAINER_PROBE_CLASS)?;
+    let get_name = pool.add_interface_method_ref(probe, "getName", "()Ljava/lang/String;")?;
+    let string = pool.add_class("java/lang/String")?;
+    let equals = pool.add_method_ref(string, "equals", "(Ljava/lang/Object;)Z")?;
+    let loop_target = 4;
+    let return_null_target = 18;
+    let mut body = code(
+        pool,
+        2,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(probes),
+            Instruction::Invokeinterface(list_iterator, 1),
+            Instruction::Astore_2,
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(has_next, 1),
+            Instruction::Ifeq(return_null_target),
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(next, 1),
+            Instruction::Checkcast(probe),
+            Instruction::Astore_3,
+            Instruction::Aload_1,
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(get_name, 1),
+            Instruction::Invokevirtual(equals),
+            Instruction::Ifeq(loop_target),
+            Instruction::Aload_3,
+            Instruction::Areturn,
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+        ],
+    )?;
+    let locals = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Object {
+            cpool_index: string,
+        },
+        VerificationType::Object {
+            cpool_index: iterator,
+        },
+    ];
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: loop_target,
+                locals: locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: return_null_target - loop_target - 1,
+                locals,
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn media_container_registry_get_all(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MEDIA_CONTAINER_REGISTRY_CLASS)?;
+    let probes = pool.add_field_ref(owner, "probes", "Ljava/util/List;")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(probes),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn media_container_registry_extended(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let container = pool.add_class(MEDIA_CONTAINER_CLASS)?;
+    let as_list = pool.add_method_ref(container, "asList", "()Ljava/util/List;")?;
+    let collections = pool.add_class("java/util/Collections")?;
+    let add_all = pool.add_method_ref(
+        collections,
+        "addAll",
+        "(Ljava/util/Collection;[Ljava/lang/Object;)Z",
+    )?;
+    let owner = pool.add_class(MEDIA_CONTAINER_REGISTRY_CLASS)?;
+    let init = pool.add_method_ref(owner, "<init>", "(Ljava/util/List;)V")?;
+    code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Invokestatic(as_list),
+            Instruction::Astore_1,
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Invokestatic(add_all),
+            Instruction::Pop,
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn media_container_registry_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let container = pool.add_class(MEDIA_CONTAINER_CLASS)?;
+    let as_list = pool.add_method_ref(container, "asList", "()Ljava/util/List;")?;
+    let owner = pool.add_class(MEDIA_CONTAINER_REGISTRY_CLASS)?;
+    let init = pool.add_method_ref(owner, "<init>", "(Ljava/util/List;)V")?;
+    let default_registry = pool.add_field_ref(
+        owner,
+        "DEFAULT_REGISTRY",
+        "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry;",
+    )?;
+    code(
+        pool,
+        3,
+        0,
+        vec![
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Invokestatic(as_list),
+            Instruction::Invokespecial(init),
+            Instruction::Putstatic(default_registry),
             Instruction::Return,
         ],
     )

@@ -156,6 +156,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-media-container-hints-consumer" => Some(MEDIA_CONTAINER_HINTS_CONSUMER),
         "write-media-container-probe-consumer" => Some(MEDIA_CONTAINER_PROBE_CONSUMER),
+        "write-media-container-registry-consumer" => Some(MEDIA_CONTAINER_REGISTRY_CONSUMER),
         _ => None,
     }
 }
@@ -13303,6 +13304,284 @@ public final class GateMediaContainerProbe {
       return Collections.emptyList();
     }
     @Override public int read() { return -1; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MEDIA_CONTAINER_REGISTRY_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainer;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerHints;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerProbe;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerRegistry;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+public final class GateMediaContainerRegistry {
+  public static void main(String[] args) throws Exception {
+    constructorAliasingAndLookup();
+    lookupFailuresAndOrder();
+    defaultRegistry();
+    extensions();
+    subclassUse();
+    reflection();
+    System.out.println(
+        "contracts=constructor-alias,list-identity,live-mutation,linear-find,first-match,short-circuit,null-list,null-name,null-probe,failure-identity,eager-default,default-order,default-mutability,fresh-extension,additional-order,array-copy,null-additional,null-varargs,subclassable,generic-signatures,varargs,reflection");
+  }
+
+  private static void constructorAliasingAndLookup() throws Exception {
+    ProbeState alphaState = new ProbeState(new String("alpha"));
+    ProbeState betaState = new ProbeState(new String("beta"));
+    MediaContainerProbe alpha = alphaState.proxy();
+    MediaContainerProbe beta = betaState.proxy();
+    List<MediaContainerProbe> probes = new ArrayList<>();
+    probes.add(alpha);
+    probes.add(beta);
+    MediaContainerRegistry registry = new MediaContainerRegistry(probes);
+    check(registry.getAll() == probes && field(registry, "probes") == probes,
+        "constructor and getter retain the exact list identity");
+    check(registry.find(new String("alpha")) == alpha
+        && registry.find(new String("beta")) == beta && registry.find("missing") == null,
+        "find uses value equality and returns exact probe identities");
+
+    ProbeState duplicateState = new ProbeState(new String("alpha"));
+    MediaContainerProbe duplicate = duplicateState.proxy();
+    probes.add(0, duplicate);
+    check(registry.find("alpha") == duplicate, "first equal probe wins in live list order");
+    probes.remove(0);
+    ProbeState gammaState = new ProbeState("gamma");
+    MediaContainerProbe gamma = gammaState.proxy();
+    probes.add(gamma);
+    check(registry.find("gamma") == gamma, "post-construction list mutation is visible");
+
+    MediaContainerRegistry nullRegistry = new MediaContainerRegistry(null);
+    check(nullRegistry.getAll() == null && field(nullRegistry, "probes") == null,
+        "null list is retained without constructor validation");
+    check(catchThrowable(() -> nullRegistry.find("anything")) instanceof NullPointerException,
+        "find on a null list fails only when lookup begins");
+  }
+
+  private static void lookupFailuresAndOrder() {
+    MediaContainerRegistry empty = new MediaContainerRegistry(new ArrayList<>());
+    check(empty.find(null) == null, "null name over an empty list returns null");
+
+    ProbeState namedState = new ProbeState("named");
+    MediaContainerProbe named = namedState.proxy();
+    MediaContainerRegistry namedRegistry = registry(named);
+    check(catchThrowable(() -> namedRegistry.find(null)) instanceof NullPointerException
+        && namedState.nameCalls == 1,
+        "null receiver still evaluates the first probe name before equals fails");
+
+    MediaContainerRegistry nullProbeRegistry = registry((MediaContainerProbe) null);
+    check(catchThrowable(() -> nullProbeRegistry.find("named")) instanceof NullPointerException,
+        "null list element fails at getName");
+
+    RuntimeException failure = new RuntimeException("name-failure");
+    ProbeState failureState = new ProbeState("ignored");
+    failureState.failure = failure;
+    check(catchThrowable(() -> registry(failureState.proxy()).find("ignored")) == failure,
+        "probe name failure propagates with exact identity");
+
+    ProbeState firstState = new ProbeState("target");
+    ProbeState laterState = new ProbeState("target");
+    check(registry(firstState.proxy(), laterState.proxy()).find("target") != null
+        && firstState.nameCalls == 1 && laterState.nameCalls == 0,
+        "matching probe short-circuits later probes");
+
+    ProbeState nullNameState = new ProbeState(null);
+    check(registry(nullNameState.proxy()).find("target") == null
+        && nullNameState.nameCalls == 1, "null probe name is an ordinary non-match");
+  }
+
+  private static void defaultRegistry() throws Exception {
+    MediaContainerRegistry registry = MediaContainerRegistry.DEFAULT_REGISTRY;
+    check(registry != null && registry == MediaContainerRegistry.DEFAULT_REGISTRY,
+        "default registry is one eager static singleton");
+    List<MediaContainerProbe> actual = registry.getAll();
+    List<MediaContainerProbe> expected = MediaContainer.asList();
+    check(actual != expected && actual.size() == expected.size() && actual.size() == 11,
+        "default registry owns a distinct eleven-probe list");
+    for (int index = 0; index < expected.size(); index++) {
+      check(actual.get(index) == expected.get(index), "default probe identity and order " + index);
+    }
+    check(field(registry, "probes") == actual, "default private state aliases public getter");
+
+    ProbeState addedState = new ProbeState("default-added");
+    MediaContainerProbe added = addedState.proxy();
+    actual.add(added);
+    check(registry.find("default-added") == added, "default registry list is mutable and live");
+    actual.remove(actual.size() - 1);
+    check(registry.find("default-added") == null, "default list mutation can be restored");
+  }
+
+  private static void extensions() {
+    MediaContainerRegistry emptyFirst = MediaContainerRegistry.extended();
+    MediaContainerRegistry emptySecond = MediaContainerRegistry.extended();
+    List<MediaContainerProbe> defaults = MediaContainer.asList();
+    check(emptyFirst != emptySecond && emptyFirst.getAll() != emptySecond.getAll()
+        && emptyFirst.getAll() != MediaContainerRegistry.DEFAULT_REGISTRY.getAll(),
+        "every extension call creates a fresh registry and list");
+    check(emptyFirst.getAll().size() == defaults.size(), "empty extension starts with defaults");
+    for (int index = 0; index < defaults.size(); index++) {
+      check(emptyFirst.getAll().get(index) == defaults.get(index),
+          "extended default probe identity and order " + index);
+    }
+
+    ProbeState firstState = new ProbeState("additional-first");
+    ProbeState secondState = new ProbeState("additional-second");
+    MediaContainerProbe first = firstState.proxy();
+    MediaContainerProbe second = secondState.proxy();
+    MediaContainerProbe[] additional = {first, null, second};
+    MediaContainerRegistry extended = MediaContainerRegistry.extended(additional);
+    List<MediaContainerProbe> all = extended.getAll();
+    int offset = defaults.size();
+    check(all.size() == offset + 3 && all.get(offset) == first && all.get(offset + 1) == null
+        && all.get(offset + 2) == second, "additional probes append in exact order with nulls");
+    additional[0] = second;
+    check(all.get(offset) == first, "additional varargs array is copied element-by-element");
+    all.remove(offset + 1);
+    check(extended.find("additional-second") == second,
+        "returned extension list is mutable and lookup observes mutation");
+    check(MediaContainerRegistry.DEFAULT_REGISTRY.getAll().size() == defaults.size(),
+        "extensions do not mutate the default registry");
+    check(catchThrowable(() -> MediaContainerRegistry.extended((MediaContainerProbe[]) null))
+        instanceof NullPointerException, "null varargs array fails after default-list creation");
+  }
+
+  private static void subclassUse() {
+    ProbeState state = new ProbeState("derived");
+    MediaContainerProbe probe = state.proxy();
+    List<MediaContainerProbe> probes = new ArrayList<>();
+    probes.add(probe);
+    Derived derived = new Derived(probes);
+    check(derived.getAll() == probes && derived.find("derived") == probe,
+        "non-final registry supports ordinary subclass construction and inherited behavior");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MediaContainerRegistry> type = MediaContainerRegistry.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0, "public concrete non-final class metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredMethods().length == 3
+        && type.getDeclaredConstructors().length == 1, "exact declared member counts");
+
+    Field defaultRegistry = type.getDeclaredField("DEFAULT_REGISTRY");
+    check(defaultRegistry.getType() == type && defaultRegistry.getGenericType() == type
+        && defaultRegistry.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL)
+        && !defaultRegistry.isSynthetic(), "default registry field metadata");
+    Field probes = type.getDeclaredField("probes");
+    check(probes.getType() == List.class
+        && probes.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && !probes.isSynthetic(), "private probes field metadata");
+    checkProbeListType(probes.getGenericType());
+
+    Constructor<MediaContainerRegistry> constructor = type.getDeclaredConstructor(List.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    checkProbeListType(constructor.getGenericParameterTypes()[0]);
+
+    Method find = type.getDeclaredMethod("find", String.class);
+    checkMethod(find, MediaContainerProbe.class, Modifier.PUBLIC,
+        new Class<?>[] {String.class}, false);
+    Method getAll = type.getDeclaredMethod("getAll");
+    checkMethod(getAll, List.class, Modifier.PUBLIC, new Class<?>[0], false);
+    checkProbeListType(getAll.getGenericReturnType());
+    Method extended = type.getDeclaredMethod("extended", MediaContainerProbe[].class);
+    checkMethod(extended, type, Modifier.PUBLIC | Modifier.STATIC | 0x80,
+        new Class<?>[] {MediaContainerProbe[].class}, true);
+
+    Set<String> names = new HashSet<>();
+    for (Method method : type.getDeclaredMethods()) names.add(method.getName());
+    check(names.size() == 3, "no overloads, bridges, or synthetic methods");
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, int modifiers,
+      Class<?>[] parameters, boolean varargs) {
+    check(method.getModifiers() == modifiers && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && method.isVarArgs() == varargs
+        && !method.isSynthetic() && !method.isBridge() && !method.isDefault(),
+        method.getName() + " method metadata");
+  }
+
+  private static void checkProbeListType(Type type) {
+    check(type instanceof ParameterizedType, "probe list retains parameterized type");
+    ParameterizedType parameterized = (ParameterizedType) type;
+    check(parameterized.getRawType() == List.class
+        && Arrays.equals(parameterized.getActualTypeArguments(),
+            new Type[] {MediaContainerProbe.class}), "exact List<MediaContainerProbe> signature");
+  }
+
+  private static MediaContainerRegistry registry(MediaContainerProbe... probes) {
+    return new MediaContainerRegistry(new ArrayList<>(Arrays.asList(probes)));
+  }
+
+  private static Object field(Object owner, String name) throws Exception {
+    Field field = owner.getClass().getSuperclass() == MediaContainerRegistry.class
+        ? MediaContainerRegistry.class.getDeclaredField(name)
+        : owner.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(owner);
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try {
+      action.run();
+      return null;
+    } catch (Throwable throwable) {
+      return throwable;
+    }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class ProbeState {
+    final String name;
+    int nameCalls;
+    RuntimeException failure;
+
+    ProbeState(String name) { this.name = name; }
+
+    MediaContainerProbe proxy() {
+      return (MediaContainerProbe) Proxy.newProxyInstance(
+          MediaContainerProbe.class.getClassLoader(), new Class<?>[] {MediaContainerProbe.class},
+          (instance, method, arguments) -> {
+            switch (method.getName()) {
+              case "getName":
+                nameCalls++;
+                if (failure != null) throw failure;
+                return name;
+              case "matchesHints": return false;
+              case "probe": return null;
+              case "createTrack": return null;
+              default: throw new AssertionError("unexpected probe method " + method.getName());
+            }
+          });
+    }
+  }
+
+  private static final class Derived extends MediaContainerRegistry {
+    Derived(List<MediaContainerProbe> probes) { super(probes); }
   }
 
   private static void check(boolean condition, String message) {
