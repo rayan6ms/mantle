@@ -164,6 +164,8 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-adts-stream-reader-consumer" => Some(ADTS_STREAM_READER_CONSUMER),
         "write-aac-packet-router-consumer" => Some(AAC_PACKET_ROUTER_CONSUMER),
         "write-opus-packet-router-consumer" => Some(OPUS_PACKET_ROUTER_CONSUMER),
+        "write-flac-audio-track-consumer" => Some(FLAC_AUDIO_TRACK_CONSUMER),
+        "write-flac-audio-track-support-consumer" => Some(FLAC_AUDIO_TRACK_SUPPORT_CONSUMER),
         _ => None,
     }
 }
@@ -13860,6 +13862,485 @@ public final class GateAdtsAudioTrack {
     @Override
     public String getIdentifier() {
       identifierCalls++;
+      if (identifierFailure != null) throw identifierFailure;
+      return super.getIdentifier();
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const FLAC_AUDIO_TRACK_SUPPORT_CONSUMER: &str = r#"
+package com.sedmelluq.discord.lavaplayer.container.flac;
+
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.io.IOException;
+
+public final class FlacGateSupport {
+  public static SeekableInputStream constructorInput;
+  public static AudioProcessingContext loadContext;
+  public static int loaderConstructions;
+  public static int loadCalls;
+  public static int providerCreations;
+  public static int readCalls;
+  public static int seekCalls;
+  public static int closeCalls;
+  public static long seekTimecode;
+  public static RuntimeException loadFailure;
+  public static InterruptedException readFailure;
+  public static RuntimeException seekFailure;
+  public static RuntimeException closeFailure;
+  public static boolean returnNull;
+  public static final StringBuilder events = new StringBuilder();
+
+  private FlacGateSupport() {}
+
+  public static void reset() {
+    constructorInput = null;
+    loadContext = null;
+    loaderConstructions = 0;
+    loadCalls = 0;
+    providerCreations = 0;
+    readCalls = 0;
+    seekCalls = 0;
+    closeCalls = 0;
+    seekTimecode = 0L;
+    loadFailure = null;
+    readFailure = null;
+    seekFailure = null;
+    closeFailure = null;
+    returnNull = false;
+    events.setLength(0);
+  }
+
+  public static void event(String value) {
+    if (events.length() > 0) events.append(',');
+    events.append(value);
+  }
+}
+
+class FlacFileLoader {
+  FlacFileLoader(SeekableInputStream inputStream) {
+    FlacGateSupport.loaderConstructions++;
+    FlacGateSupport.constructorInput = inputStream;
+    FlacGateSupport.event("loader");
+  }
+
+  FlacTrackProvider loadTrack(AudioProcessingContext context) throws IOException {
+    FlacGateSupport.loadCalls++;
+    FlacGateSupport.loadContext = context;
+    FlacGateSupport.event("load");
+    if (FlacGateSupport.loadFailure != null) throw FlacGateSupport.loadFailure;
+    if (FlacGateSupport.returnNull) return null;
+    return new FlacTrackProvider();
+  }
+}
+
+class FlacTrackProvider {
+  FlacTrackProvider() {
+    FlacGateSupport.providerCreations++;
+    FlacGateSupport.event("provider");
+  }
+
+  public void provideFrames() throws InterruptedException {
+    FlacGateSupport.readCalls++;
+    FlacGateSupport.event("read");
+    if (FlacGateSupport.readFailure != null) throw FlacGateSupport.readFailure;
+  }
+
+  public void seekToTimecode(long timecode) {
+    FlacGateSupport.seekCalls++;
+    FlacGateSupport.seekTimecode = timecode;
+    FlacGateSupport.event("seek");
+    if (FlacGateSupport.seekFailure != null) throw FlacGateSupport.seekFailure;
+  }
+
+  public void close() {
+    FlacGateSupport.closeCalls++;
+    FlacGateSupport.event("close");
+    if (FlacGateSupport.closeFailure != null) throw FlacGateSupport.closeFailure;
+  }
+}
+"#;
+
+const FLAC_AUDIO_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacAudioTrack;
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacGateSupport;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateFlacAudioTrack {
+  private static final Object UNSAFE = loadUnsafe();
+
+  public static void main(String[] args) throws Exception {
+    construction();
+    processing();
+    failures();
+    subclassUse();
+    reflection();
+    System.out.println(
+        "contracts=track-info,input-identity,null-construction,loader-order,processing-context,read-callback,seek-callback,full-timecode,executor-control,input-ownership,load-failure,context-failure,null-executor,null-provider,identifier-dispatch,loop-failure,callback-failure,close-finally,close-replacement,subclassable,eager-logger,private-state,throws,reflection");
+  }
+
+  private static void construction() throws Exception {
+    AudioTrackInfo info = info("constructor-id");
+    MemoryStream input = new MemoryStream();
+    FlacAudioTrack track = new FlacAudioTrack(info, input);
+    check(track.getInfo() == info && track.getIdentifier() == info.identifier,
+        "base constructor retains exact track info identity");
+    check(field(track, "inputStream") == input,
+        "constructor retains exact seekable input identity");
+
+    FlacAudioTrack nullInput = new FlacAudioTrack(info, null);
+    FlacAudioTrack nullInfo = new FlacAudioTrack(null, input);
+    check(field(nullInput, "inputStream") == null && nullInfo.getInfo() == null,
+        "constructor accepts null input and track info");
+  }
+
+  private static void processing() throws Exception {
+    FlacGateSupport.reset();
+    MemoryStream input = new MemoryStream();
+    Derived track = new Derived(info("process-id"), input, null);
+    RecordingExecutor executor = executor();
+    executor.context = allocate(AudioProcessingContext.class);
+    executor.invokeRead = true;
+    executor.invokeSeek = true;
+    executor.seekTimecode = Long.MIN_VALUE + 37L;
+    track.process(executor);
+    check(FlacGateSupport.constructorInput == input
+        && FlacGateSupport.loadContext == executor.context,
+        "loader receives exact input and processing context identities");
+    check(executor.contextCalls == 1 && executor.loopCalls == 1
+        && executor.readExecutor != null && executor.seekExecutor != null,
+        "processing acquires context once and publishes both callbacks");
+    check(FlacGateSupport.readCalls == 1 && FlacGateSupport.seekCalls == 1
+        && FlacGateSupport.seekTimecode == Long.MIN_VALUE + 37L,
+        "callbacks delegate read and full-width seek to one provider");
+    check(FlacGateSupport.closeCalls == 1 && input.readCalls == 0
+        && input.seekCalls == 0 && input.closeCalls == 0,
+        "provider is closed without taking ownership of caller input");
+    check(FlacGateSupport.events.toString().equals(
+        "loader,context,load,provider,identifier,loop,read,seek,close"),
+        "loader, context, logging, loop, callbacks, and cleanup retain exact order");
+
+    FlacGateSupport.reset();
+    RecordingExecutor passive = executor();
+    passive.context = allocate(AudioProcessingContext.class);
+    new FlacAudioTrack(info("passive-id"), input).process(passive);
+    check(passive.loopCalls == 1 && passive.readExecutor != null
+        && passive.seekExecutor != null && FlacGateSupport.readCalls == 0
+        && FlacGateSupport.seekCalls == 0 && FlacGateSupport.closeCalls == 1,
+        "executor exclusively controls callback invocation");
+  }
+
+  private static void failures() throws Exception {
+    MemoryStream input = new MemoryStream();
+    RuntimeException contextFailure = new RuntimeException("context-failure");
+    FlacGateSupport.reset();
+    RecordingExecutor context = executor();
+    context.contextFailure = contextFailure;
+    check(catchThrowable(() -> new FlacAudioTrack(info("context-id"), input).process(context))
+        == contextFailure && FlacGateSupport.loaderConstructions == 1
+        && FlacGateSupport.loadCalls == 0 && FlacGateSupport.closeCalls == 0
+        && FlacGateSupport.events.toString().equals("loader,context"),
+        "loader construction precedes context failure and no provider is published");
+
+    FlacGateSupport.reset();
+    check(catchThrowable(() -> new FlacAudioTrack(info("null-executor-id"), input).process(null))
+        instanceof NullPointerException && FlacGateSupport.loaderConstructions == 1
+        && FlacGateSupport.loadCalls == 0 && FlacGateSupport.closeCalls == 0,
+        "null executor fails after loader construction but before loading");
+
+    RuntimeException loadFailure = new RuntimeException("load-failure");
+    FlacGateSupport.reset();
+    FlacGateSupport.loadFailure = loadFailure;
+    RecordingExecutor load = executor();
+    load.context = allocate(AudioProcessingContext.class);
+    check(catchThrowable(() -> new FlacAudioTrack(info("load-id"), input).process(load))
+        == loadFailure && load.contextCalls == 1 && load.loopCalls == 0
+        && FlacGateSupport.providerCreations == 0 && FlacGateSupport.closeCalls == 0,
+        "load failure propagates before provider publication and cleanup");
+
+    RuntimeException identifierFailure = new RuntimeException("identifier-failure");
+    FlacGateSupport.reset();
+    RecordingExecutor identifier = executor();
+    identifier.context = allocate(AudioProcessingContext.class);
+    Derived failingIdentifier = new Derived(info("identifier-id"), input, identifierFailure);
+    check(catchThrowable(() -> failingIdentifier.process(identifier)) == identifierFailure
+        && failingIdentifier.identifierCalls == 1 && identifier.loopCalls == 0
+        && FlacGateSupport.closeCalls == 1,
+        "virtual identifier failure propagates through provider cleanup");
+
+    RuntimeException loopFailure = new RuntimeException("loop-failure");
+    FlacGateSupport.reset();
+    RecordingExecutor loop = executor();
+    loop.context = allocate(AudioProcessingContext.class);
+    loop.loopFailure = loopFailure;
+    check(catchThrowable(() -> new FlacAudioTrack(info("loop-id"), input).process(loop))
+        == loopFailure && loop.loopCalls == 1 && FlacGateSupport.closeCalls == 1,
+        "loop failure preserves exact identity through finally cleanup");
+
+    InterruptedException readFailure = new InterruptedException("read-failure");
+    FlacGateSupport.reset();
+    FlacGateSupport.readFailure = readFailure;
+    RecordingExecutor read = executor();
+    read.context = allocate(AudioProcessingContext.class);
+    read.invokeRead = true;
+    check(catchThrowable(() -> new FlacAudioTrack(info("read-id"), input).process(read))
+        == readFailure && FlacGateSupport.readCalls == 1
+        && FlacGateSupport.closeCalls == 1,
+        "checked read callback failure keeps identity and still closes provider");
+
+    RuntimeException seekFailure = new RuntimeException("seek-failure");
+    FlacGateSupport.reset();
+    FlacGateSupport.seekFailure = seekFailure;
+    RecordingExecutor seek = executor();
+    seek.context = allocate(AudioProcessingContext.class);
+    seek.invokeSeek = true;
+    check(catchThrowable(() -> new FlacAudioTrack(info("seek-id"), input).process(seek))
+        == seekFailure && FlacGateSupport.seekCalls == 1
+        && FlacGateSupport.closeCalls == 1,
+        "seek callback failure keeps identity and still closes provider");
+
+    RuntimeException replacedLoop = new RuntimeException("replaced-loop");
+    RuntimeException closeFailure = new RuntimeException("close-failure");
+    FlacGateSupport.reset();
+    FlacGateSupport.closeFailure = closeFailure;
+    RecordingExecutor replacing = executor();
+    replacing.context = allocate(AudioProcessingContext.class);
+    replacing.loopFailure = replacedLoop;
+    Throwable replacement = catchThrowable(
+        () -> new FlacAudioTrack(info("close-id"), input).process(replacing));
+    check(replacement == closeFailure && replacement.getSuppressed().length == 0
+        && FlacGateSupport.closeCalls == 1,
+        "finally close failure replaces the active failure without suppression");
+
+    FlacGateSupport.reset();
+    FlacGateSupport.returnNull = true;
+    RecordingExecutor nullProvider = executor();
+    nullProvider.context = allocate(AudioProcessingContext.class);
+    Derived nullProviderTrack = new Derived(info("null-provider-id"), input, null);
+    check(catchThrowable(() -> nullProviderTrack.process(nullProvider))
+        instanceof NullPointerException && nullProviderTrack.identifierCalls == 1
+        && nullProvider.loopCalls == 0 && FlacGateSupport.closeCalls == 0,
+        "null provider fails after identifier dispatch and before loop execution");
+  }
+
+  private static void subclassUse() throws Exception {
+    FlacGateSupport.reset();
+    Derived derived = new Derived(info("derived-id"), new MemoryStream(), null);
+    RecordingExecutor executor = executor();
+    executor.context = allocate(AudioProcessingContext.class);
+    BaseAudioTrack dynamic = derived;
+    dynamic.process(executor);
+    check(derived.processCalls == 1 && derived.identifierCalls == 1
+        && executor.loopCalls == 1 && FlacGateSupport.closeCalls == 1,
+        "ordinary subclass participates in process and identifier virtual dispatch");
+  }
+
+  private static void reflection() throws Exception {
+    Class<FlacAudioTrack> type = FlacAudioTrack.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == BaseAudioTrack.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete non-final class metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredMethods().length == 1
+        && type.getDeclaredConstructors().length == 1, "exact declared member counts");
+
+    Field log = type.getDeclaredField("log");
+    log.setAccessible(true);
+    Object expectedLogger = Class.forName("org.slf4j.LoggerFactory")
+        .getMethod("getLogger", Class.class).invoke(null, type);
+    check(log.getType().getName().equals("org.slf4j.Logger")
+        && log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && !log.isSynthetic() && log.get(null) != null && log.get(null) == expectedLogger,
+        "eager class logger identity and metadata");
+    Field input = type.getDeclaredField("inputStream");
+    check(input.getType() == SeekableInputStream.class
+        && input.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && !input.isSynthetic(), "private seekable input field metadata");
+
+    Constructor<FlacAudioTrack> constructor =
+        type.getDeclaredConstructor(AudioTrackInfo.class, SeekableInputStream.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    Method process = type.getDeclaredMethod("process", LocalAudioTrackExecutor.class);
+    check(process.getModifiers() == Modifier.PUBLIC && process.getReturnType() == void.class
+        && Arrays.equals(process.getParameterTypes(),
+            new Class<?>[] {LocalAudioTrackExecutor.class})
+        && Arrays.equals(process.getExceptionTypes(), new Class<?>[] {Exception.class})
+        && !process.isSynthetic() && !process.isBridge() && !process.isDefault()
+        && !process.isVarArgs(), "process descriptor and checked exception metadata");
+  }
+
+  private static AudioTrackInfo info(String identifier) {
+    return new AudioTrackInfo("title", "author", 123L, identifier, true,
+        "uri", "artwork", "isrc");
+  }
+
+  private static Object field(Object owner, String name) throws Exception {
+    Field field = FlacAudioTrack.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(owner);
+  }
+
+  private static RecordingExecutor executor() throws Exception {
+    return allocate(RecordingExecutor.class);
+  }
+
+  private static <T> T allocate(Class<T> type) throws Exception {
+    return type.cast(UNSAFE.getClass().getMethod("allocateInstance", Class.class)
+        .invoke(UNSAFE, type));
+  }
+
+  private static Object loadUnsafe() {
+    try {
+      Class<?> type = Class.forName("sun.misc.Unsafe");
+      Field field = type.getDeclaredField("theUnsafe");
+      field.setAccessible(true);
+      return field.get(null);
+    } catch (ReflectiveOperationException error) {
+      throw new ExceptionInInitializerError(error);
+    }
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try {
+      action.run();
+      return null;
+    } catch (Throwable throwable) {
+      return throwable;
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <E extends Throwable> void sneakyThrow(Throwable failure) throws E {
+    throw (E) failure;
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    long position;
+    int readCalls;
+    int seekCalls;
+    int closeCalls;
+
+    MemoryStream() {
+      super(0L, 0L);
+    }
+
+    @Override
+    public int read() {
+      readCalls++;
+      return -1;
+    }
+
+    @Override
+    public long getPosition() {
+      return position;
+    }
+
+    @Override
+    protected void seekHard(long position) {
+      seekCalls++;
+      this.position = position;
+    }
+
+    @Override
+    public boolean canSeekHard() {
+      return true;
+    }
+
+    @Override
+    public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      return Collections.emptyList();
+    }
+
+    @Override
+    public void close() {
+      closeCalls++;
+    }
+  }
+
+  private static final class RecordingExecutor extends LocalAudioTrackExecutor {
+    AudioProcessingContext context;
+    int contextCalls;
+    int loopCalls;
+    boolean invokeRead;
+    boolean invokeSeek;
+    long seekTimecode;
+    RuntimeException contextFailure;
+    RuntimeException loopFailure;
+    ReadExecutor readExecutor;
+    SeekExecutor seekExecutor;
+
+    private RecordingExecutor() {
+      super(null, null, null, false, 0);
+    }
+
+    @Override
+    public AudioProcessingContext getProcessingContext() {
+      contextCalls++;
+      FlacGateSupport.event("context");
+      if (contextFailure != null) throw contextFailure;
+      return context;
+    }
+
+    @Override
+    public void executeProcessingLoop(ReadExecutor read, SeekExecutor seek) {
+      loopCalls++;
+      readExecutor = read;
+      seekExecutor = seek;
+      FlacGateSupport.event("loop");
+      if (loopFailure != null) throw loopFailure;
+      try {
+        if (invokeRead) read.performRead();
+        if (invokeSeek) seek.performSeek(seekTimecode);
+      } catch (Throwable failure) {
+        GateFlacAudioTrack.<RuntimeException>sneakyThrow(failure);
+      }
+    }
+  }
+
+  private static final class Derived extends FlacAudioTrack {
+    final RuntimeException identifierFailure;
+    int processCalls;
+    int identifierCalls;
+
+    Derived(AudioTrackInfo info, SeekableInputStream input,
+        RuntimeException identifierFailure) {
+      super(info, input);
+      this.identifierFailure = identifierFailure;
+    }
+
+    @Override
+    public void process(LocalAudioTrackExecutor executor) throws Exception {
+      processCalls++;
+      super.process(executor);
+    }
+
+    @Override
+    public String getIdentifier() {
+      identifierCalls++;
+      FlacGateSupport.event("identifier");
       if (identifierFailure != null) throw identifierFailure;
       return super.getIdentifier();
     }

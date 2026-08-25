@@ -168,6 +168,8 @@ const AAC_PACKET_ROUTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/common/AacPacketRouter";
 const OPUS_PACKET_ROUTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/common/OpusPacketRouter";
+const FLAC_AUDIO_TRACK_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/flac/FlacAudioTrack";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -507,6 +509,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     ADTS_STREAM_READER_CLASS,
     AAC_PACKET_ROUTER_CLASS,
     OPUS_PACKET_ROUTER_CLASS,
+    FLAC_AUDIO_TRACK_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -984,6 +987,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | ADTS_STREAM_READER_CLASS
             | AAC_PACKET_ROUTER_CLASS
             | OPUS_PACKET_ROUTER_CLASS
+            | FLAC_AUDIO_TRACK_CLASS
             | OPUS_AUDIO_DATA_FORMAT_CLASS
             | PCM16_AUDIO_DATA_FORMAT_CLASS
             | OPUS_CHUNK_DECODER_CLASS
@@ -1099,6 +1103,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | ADTS_STREAM_READER_CLASS
             | AAC_PACKET_ROUTER_CLASS
             | OPUS_PACKET_ROUTER_CLASS
+            | FLAC_AUDIO_TRACK_CLASS
             | AUDIO_PIPELINE_FACTORY_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
@@ -1387,6 +1392,9 @@ fn replacement_body(
     }
     if class_name == OPUS_PACKET_ROUTER_CLASS {
         return opus_packet_router_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == FLAC_AUDIO_TRACK_CLASS {
+        return flac_audio_track_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -4898,6 +4906,227 @@ fn adts_audio_track_process(pool: &mut ConstantPool<'static>) -> Result<Attribut
 
 fn adts_audio_track_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
     let owner = pool.add_class(ADTS_AUDIO_TRACK_CLASS)?;
+    let logger_factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        logger_factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn flac_audio_track_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)V",
+        ) => flac_audio_track_constructor(pool),
+        (
+            "process",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+        ) => flac_audio_track_process(pool),
+        ("<clinit>", "()V") => flac_audio_track_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {FLAC_AUDIO_TRACK_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn flac_audio_track_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let parent = pool.add_class(BASE_AUDIO_TRACK_CLASS)?;
+    let parent_init = pool.add_method_ref(
+        parent,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V",
+    )?;
+    let owner = pool.add_class(FLAC_AUDIO_TRACK_CLASS)?;
+    let input_stream = pool.add_field_ref(
+        owner,
+        "inputStream",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;",
+    )?;
+    code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(parent_init),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(input_stream),
+            Instruction::Return,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn flac_audio_track_process(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_AUDIO_TRACK_CLASS)?;
+    let input_stream = pool.add_field_ref(
+        owner,
+        "inputStream",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;",
+    )?;
+    let loader =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/flac/FlacFileLoader")?;
+    let loader_init = pool.add_method_ref(
+        loader,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)V",
+    )?;
+    let executor = pool.add_class(LOCAL_TRACK_EXECUTOR_CLASS)?;
+    let get_context = pool.add_method_ref(
+        executor,
+        "getProcessingContext",
+        "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;",
+    )?;
+    let provider =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/flac/FlacTrackProvider")?;
+    let load_track = pool.add_method_ref(
+        loader,
+        "loadTrack",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;)Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackProvider;",
+    )?;
+    let get_identifier = pool.add_method_ref(owner, "getIdentifier", "()Ljava/lang/String;")?;
+    let logger = pool.add_class("org/slf4j/Logger")?;
+    let debug =
+        pool.add_interface_method_ref(logger, "debug", "(Ljava/lang/String;Ljava/lang/Object;)V")?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let message = pool.add_string("Starting to play FLAC track {}")?;
+    let objects = pool.add_class("java/util/Objects")?;
+    let require_non_null = pool.add_method_ref(
+        objects,
+        "requireNonNull",
+        "(Ljava/lang/Object;)Ljava/lang/Object;",
+    )?;
+    let provide_frames = pool.add_invoke_dynamic(
+        0,
+        "performRead",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackProvider;)Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor$ReadExecutor;",
+    )?;
+    let seek_to_timecode = pool.add_invoke_dynamic(
+        1,
+        "performSeek",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackProvider;)Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor$SeekExecutor;",
+    )?;
+    let execute_loop = pool.add_method_ref(
+        executor,
+        "executeProcessingLoop",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor$ReadExecutor;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor$SeekExecutor;)V",
+    )?;
+    let close = pool.add_method_ref(provider, "close", "()V")?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let handler_target = 31;
+    let return_target = 36;
+    let mut body = code_with_exceptions(
+        pool,
+        4,
+        5,
+        vec![
+            Instruction::New(loader),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(input_stream),
+            Instruction::Invokespecial(loader_init),
+            Instruction::Astore_2,
+            Instruction::Aload_2,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(get_context),
+            Instruction::Invokevirtual(load_track),
+            Instruction::Astore_3,
+            Instruction::Getstatic(log),
+            Instruction::Ldc_w(message),
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(get_identifier),
+            Instruction::Invokeinterface(debug, 3),
+            Instruction::Aload_1,
+            Instruction::Aload_3,
+            Instruction::Dup,
+            Instruction::Invokestatic(require_non_null),
+            Instruction::Pop,
+            Instruction::Invokedynamic(provide_frames),
+            Instruction::Aload_3,
+            Instruction::Dup,
+            Instruction::Invokestatic(require_non_null),
+            Instruction::Pop,
+            Instruction::Invokedynamic(seek_to_timecode),
+            Instruction::Invokevirtual(execute_loop),
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(close),
+            Instruction::Goto(return_target),
+            Instruction::Astore(4),
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(close),
+            Instruction::Aload(4),
+            Instruction::Athrow,
+            Instruction::Return,
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 11..28,
+                handler_pc: handler_target,
+                catch_type: throwable,
+            },
+            ExceptionTableEntry {
+                range_pc: 31..32,
+                handler_pc: handler_target,
+                catch_type: throwable,
+            },
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: handler_target,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: executor,
+                    },
+                    VerificationType::Object {
+                        cpool_index: loader,
+                    },
+                    VerificationType::Object {
+                        cpool_index: provider,
+                    },
+                ],
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+            StackFrame::SameFrame {
+                frame_type: u8::try_from(return_target - handler_target - 1)?,
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn flac_audio_track_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_AUDIO_TRACK_CLASS)?;
     let logger_factory = pool.add_class("org/slf4j/LoggerFactory")?;
     let get_logger = pool.add_method_ref(
         logger_factory,

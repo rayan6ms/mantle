@@ -239,6 +239,10 @@ cargo run --locked -q -p mantle-jvm-gate -- write-aac-packet-router-consumer \
   --output "$WORK/GateAacPacketRouter.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-opus-packet-router-consumer \
   --output "$WORK/GateOpusPacketRouter.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-flac-audio-track-consumer \
+  --output "$WORK/GateFlacAudioTrack.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-flac-audio-track-support-consumer \
+  --output "$WORK/FlacGateSupport.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -308,6 +312,8 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateMediaContainerProbe.java" \
   "$WORK/GateMediaContainerRegistry.java" \
   "$WORK/GateAdtsAudioTrack.java" \
+  "$WORK/GateFlacAudioTrack.java" \
+  "$WORK/FlacGateSupport.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GateAdtsStreamReader.java" \
@@ -1277,6 +1283,16 @@ cmp "$WORK/opus-packet-router-reference.txt" "$WORK/opus-packet-router-candidate
 grep --fixed-strings \
   'contracts=construction,context-identity,input-geometry,header-state,offered-frame,output-format,volume,private-state,eager-logger,heap-header,direct-header,position-preservation,direct-underflow,zero-frame,frame-size,format-rebuild,format-reuse,duration,timecode,seek-state,seek-forwarding,seek-failure-prefix,strict-seek-threshold,passthrough,input-window,frame-reuse,heap-staging,staging-growth,direct-identity,native-output,decode-limit,decode-order,interruption-identity,reencode-mode,passthrough-mode,mode-cleanup,volume-application,pipeline-creation,initial-seek,initialisation-cleanup,flush-noop,flush-forwarding,close-order,close-failure-prefix,buffer-cleanup,repeated-close,subclassable,private-helpers,throws,reflection' \
   "$WORK/opus-packet-router-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateFlacAudioTrack \
+  >"$WORK/flac-audio-track-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateFlacAudioTrack >"$WORK/flac-audio-track-candidate.txt"
+cmp "$WORK/flac-audio-track-reference.txt" "$WORK/flac-audio-track-candidate.txt"
+grep --fixed-strings \
+  'contracts=track-info,input-identity,null-construction,loader-order,processing-context,read-callback,seek-callback,full-timecode,executor-control,input-ownership,load-failure,context-failure,null-executor,null-provider,identifier-dispatch,loop-failure,callback-failure,close-finally,close-replacement,subclassable,eager-logger,private-state,throws,reflection' \
+  "$WORK/flac-audio-track-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"
