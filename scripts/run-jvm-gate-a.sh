@@ -6,6 +6,8 @@ readonly ROOT
 readonly REFERENCE_JAR="${MANTLE_REFERENCE_JAR:-$ROOT/.cache/reference/lavaplayer-2.2.6/lavaplayer-2.2.6.jar}"
 readonly WORK="$ROOT/target/gate-a"
 readonly CLASSES="$WORK/consumer-classes"
+readonly FLAC_CLASSES="$WORK/flac-consumer-classes"
+readonly FLAC_LOADER_CLASSES="$WORK/flac-loader-consumer-classes"
 readonly JAR="$WORK/mantle-gate-a.jar"
 readonly MISMATCH_JAR="$WORK/mantle-gate-a-mismatch.jar"
 
@@ -14,7 +16,8 @@ if [[ ! -f "$REFERENCE_JAR" ]]; then
   exit 1
 fi
 
-mkdir -p "$CLASSES"
+rm -rf -- "$CLASSES" "$FLAC_CLASSES" "$FLAC_LOADER_CLASSES"
+mkdir -p "$CLASSES" "$FLAC_CLASSES" "$FLAC_LOADER_CLASSES"
 cargo build --locked -p mantle-jvm --features gate-a-direct-attachment
 cargo run --locked -q -p mantle-jvm-gate -- emit \
   --reference-jar "$REFERENCE_JAR" --output "$JAR" --expected-abi 1 \
@@ -245,6 +248,10 @@ cargo run --locked -q -p mantle-jvm-gate -- write-flac-audio-track-support-consu
   --output "$WORK/FlacGateSupport.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-container-probe-consumer \
   --output "$WORK/GateFlacContainerProbe.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-flac-file-loader-consumer \
+  --output "$WORK/GateFlacFileLoader.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-flac-file-loader-support-consumer \
+  --output "$WORK/FlacLoaderGateSupport.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -314,9 +321,6 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateMediaContainerProbe.java" \
   "$WORK/GateMediaContainerRegistry.java" \
   "$WORK/GateAdtsAudioTrack.java" \
-  "$WORK/GateFlacAudioTrack.java" \
-  "$WORK/GateFlacContainerProbe.java" \
-  "$WORK/FlacGateSupport.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GateAdtsStreamReader.java" \
@@ -350,11 +354,15 @@ classpath_separator="${classpath_separator:-:}"
 if command -v cygpath >/dev/null 2>&1; then
   native="$(cygpath -w "$native")"
   classes_argument="$(cygpath -w "$CLASSES")"
+  flac_classes_argument="$(cygpath -w "$FLAC_CLASSES")"
+  flac_loader_classes_argument="$(cygpath -w "$FLAC_LOADER_CLASSES")"
   jar_argument="$(cygpath -w "$JAR")"
   reference_argument="$(cygpath -w "$REFERENCE_JAR")"
 else
   native="$(cd "$(dirname "$native")" && pwd)/$(basename "$native")"
   classes_argument="$CLASSES"
+  flac_classes_argument="$FLAC_CLASSES"
+  flac_loader_classes_argument="$FLAC_LOADER_CLASSES"
   jar_argument="$JAR"
   reference_argument="$REFERENCE_JAR"
 fi
@@ -369,6 +377,15 @@ while IFS= read -r dependency; do
   reference_provider_tools_classpath+="$classpath_separator$dependency_argument"
 done < <(find "$(dirname "$REFERENCE_JAR")/dependencies" -maxdepth 1 -type f -name '*.jar' -print | sort)
 readonly REFERENCE_PROVIDER_TOOLS_CLASSPATH="$reference_provider_tools_classpath"
+
+javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$FLAC_CLASSES" \
+  "$WORK/GateFlacAudioTrack.java" \
+  "$WORK/GateFlacContainerProbe.java" \
+  "$WORK/FlacGateSupport.java"
+javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -d "$FLAC_LOADER_CLASSES" \
+  "$WORK/GateFlacFileLoader.java" \
+  "$WORK/FlacLoaderGateSupport.java"
 
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateAdtsStreamProvider.java" \
@@ -1287,26 +1304,41 @@ grep --fixed-strings \
   'contracts=construction,context-identity,input-geometry,header-state,offered-frame,output-format,volume,private-state,eager-logger,heap-header,direct-header,position-preservation,direct-underflow,zero-frame,frame-size,format-rebuild,format-reuse,duration,timecode,seek-state,seek-forwarding,seek-failure-prefix,strict-seek-threshold,passthrough,input-window,frame-reuse,heap-staging,staging-growth,direct-identity,native-output,decode-limit,decode-order,interruption-identity,reencode-mode,passthrough-mode,mode-cleanup,volume-application,pipeline-creation,initial-seek,initialisation-cleanup,flush-noop,flush-forwarding,close-order,close-failure-prefix,buffer-cleanup,repeated-close,subclassable,private-helpers,throws,reflection' \
   "$WORK/opus-packet-router-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateFlacAudioTrack \
+  -cp "$flac_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateFlacAudioTrack \
   >"$WORK/flac-audio-track-reference.txt"
 java -Xverify:all \
-  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$flac_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateFlacAudioTrack >"$WORK/flac-audio-track-candidate.txt"
 cmp "$WORK/flac-audio-track-reference.txt" "$WORK/flac-audio-track-candidate.txt"
 grep --fixed-strings \
   'contracts=track-info,input-identity,null-construction,loader-order,processing-context,read-callback,seek-callback,full-timecode,executor-control,input-ownership,load-failure,context-failure,null-executor,null-provider,identifier-dispatch,loop-failure,callback-failure,close-finally,close-replacement,subclassable,eager-logger,private-state,throws,reflection' \
   "$WORK/flac-audio-track-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateFlacContainerProbe \
+  -cp "$flac_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateFlacContainerProbe \
   >"$WORK/flac-container-probe-reference.txt"
 java -Xverify:all \
-  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$flac_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateFlacContainerProbe >"$WORK/flac-container-probe-candidate.txt"
 cmp "$WORK/flac-container-probe-reference.txt" \
   "$WORK/flac-container-probe-candidate.txt"
 grep --fixed-strings \
   'contracts=name,ignored-hints,null-hints,fourcc,case-sensitive,rewind-match,rewind-miss,initial-position,logging-order,loader-input,parse-order,provider-order,tag-overlay,exact-tag-keys,duration,metadata-fallback,supported-result,self-probe,null-settings,miss,null-reference,read-failure,seek-failure,parse-failure,provider-failure,null-tags,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,constant-fields,private-state,throws,reflection' \
   "$WORK/flac-container-probe-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$flac_loader_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  com.sedmelluq.discord.lavaplayer.container.flac.GateFlacFileLoader \
+  >"$WORK/flac-file-loader-reference.txt"
+java -Xverify:all \
+  -cp "$flac_loader_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  com.sedmelluq.discord.lavaplayer.container.flac.GateFlacFileLoader \
+  >"$WORK/flac-file-loader-candidate.txt"
+cmp "$WORK/flac-file-loader-reference.txt" \
+  "$WORK/flac-file-loader-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor-input,data-input-wrapper,null-construction,static-fourcc,header-consumption,no-rewind,initial-position,invalid-header,short-header,stream-info,builder-order,metadata-flag,metadata-loop,block-results,data-input-identity,input-identity,builder-identity,first-frame-position,build-identity,load-order,context-identity,provider-info,provider-input,null-context,read-failure,stream-info-failure,builder-failure,get-stream-failure,block-failure,position-failure,set-position-failure,build-failure,provider-failure,subclassable,private-helper,private-state,throws,reflection' \
+  "$WORK/flac-file-loader-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"

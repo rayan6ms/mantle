@@ -167,6 +167,8 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-flac-audio-track-consumer" => Some(FLAC_AUDIO_TRACK_CONSUMER),
         "write-flac-audio-track-support-consumer" => Some(FLAC_AUDIO_TRACK_SUPPORT_CONSUMER),
         "write-flac-container-probe-consumer" => Some(FLAC_CONTAINER_PROBE_CONSUMER),
+        "write-flac-file-loader-consumer" => Some(FLAC_FILE_LOADER_CONSUMER),
+        "write-flac-file-loader-support-consumer" => Some(FLAC_FILE_LOADER_SUPPORT_CONSUMER),
         _ => None,
     }
 }
@@ -14799,6 +14801,574 @@ public final class GateFlacContainerProbe {
     @Override
     public String getName() {
       return "derived-flac";
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const FLAC_FILE_LOADER_SUPPORT_CONSUMER: &str = r#"
+package com.sedmelluq.discord.lavaplayer.container.flac;
+
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.io.DataInput;
+import java.io.IOException;
+import java.io.InputStream;
+
+public final class FlacLoaderGateSupport {
+  public static Object streamInfo;
+  public static Object builtInfo;
+  public static Object streamInfoDataInput;
+  public static Object blockDataInput;
+  public static Object blockInputStream;
+  public static Object blockBuilder;
+  public static Object providerContext;
+  public static Object providerInfo;
+  public static Object providerInput;
+  public static int streamInfoCalls;
+  public static int builderConstructions;
+  public static int getStreamInfoCalls;
+  public static int blockCalls;
+  public static int setPositionCalls;
+  public static int buildCalls;
+  public static int providerConstructions;
+  public static long firstFramePosition;
+  public static IOException streamInfoFailure;
+  public static RuntimeException builderFailure;
+  public static RuntimeException getStreamInfoFailure;
+  public static IOException blockFailure;
+  public static RuntimeException setPositionFailure;
+  public static RuntimeException buildFailure;
+  public static RuntimeException providerFailure;
+  public static boolean[] blockResults;
+  public static final StringBuilder events = new StringBuilder();
+
+  private FlacLoaderGateSupport() {}
+
+  public static void reset(boolean hasMetadataBlocks) {
+    streamInfo = new FlacStreamInfo(hasMetadataBlocks);
+    builtInfo = new FlacTrackInfo();
+    streamInfoDataInput = null;
+    blockDataInput = null;
+    blockInputStream = null;
+    blockBuilder = null;
+    providerContext = null;
+    providerInfo = null;
+    providerInput = null;
+    streamInfoCalls = 0;
+    builderConstructions = 0;
+    getStreamInfoCalls = 0;
+    blockCalls = 0;
+    setPositionCalls = 0;
+    buildCalls = 0;
+    providerConstructions = 0;
+    firstFramePosition = Long.MIN_VALUE;
+    streamInfoFailure = null;
+    builderFailure = null;
+    getStreamInfoFailure = null;
+    blockFailure = null;
+    setPositionFailure = null;
+    buildFailure = null;
+    providerFailure = null;
+    blockResults = new boolean[0];
+    events.setLength(0);
+  }
+
+  public static void setBlockResults(boolean... values) {
+    blockResults = values;
+  }
+
+  public static Object builtInfo() {
+    return builtInfo;
+  }
+
+  static void event(String value) {
+    if (events.length() > 0) events.append(',');
+    events.append(value);
+  }
+}
+
+class FlacStreamInfo {
+  public final boolean hasMetadataBlocks;
+
+  FlacStreamInfo(boolean hasMetadataBlocks) {
+    this.hasMetadataBlocks = hasMetadataBlocks;
+  }
+}
+
+class FlacTrackInfo {
+}
+
+class FlacTrackInfoBuilder {
+  private final FlacStreamInfo streamInfo;
+
+  FlacTrackInfoBuilder(FlacStreamInfo streamInfo) {
+    FlacLoaderGateSupport.builderConstructions++;
+    FlacLoaderGateSupport.event("builder");
+    if (FlacLoaderGateSupport.builderFailure != null) {
+      throw FlacLoaderGateSupport.builderFailure;
+    }
+    this.streamInfo = streamInfo;
+  }
+
+  FlacStreamInfo getStreamInfo() {
+    FlacLoaderGateSupport.getStreamInfoCalls++;
+    FlacLoaderGateSupport.event("get-stream");
+    if (FlacLoaderGateSupport.getStreamInfoFailure != null) {
+      throw FlacLoaderGateSupport.getStreamInfoFailure;
+    }
+    return streamInfo;
+  }
+
+  void setFirstFramePosition(long position) {
+    FlacLoaderGateSupport.setPositionCalls++;
+    FlacLoaderGateSupport.firstFramePosition = position;
+    FlacLoaderGateSupport.event("set-position");
+    if (FlacLoaderGateSupport.setPositionFailure != null) {
+      throw FlacLoaderGateSupport.setPositionFailure;
+    }
+  }
+
+  FlacTrackInfo build() {
+    FlacLoaderGateSupport.buildCalls++;
+    FlacLoaderGateSupport.event("build");
+    if (FlacLoaderGateSupport.buildFailure != null) {
+      throw FlacLoaderGateSupport.buildFailure;
+    }
+    return (FlacTrackInfo) FlacLoaderGateSupport.builtInfo;
+  }
+}
+
+class FlacMetadataReader {
+  static FlacStreamInfo readStreamInfoBlock(DataInput input) throws IOException {
+    FlacLoaderGateSupport.streamInfoCalls++;
+    FlacLoaderGateSupport.streamInfoDataInput = input;
+    FlacLoaderGateSupport.event("stream-info");
+    if (FlacLoaderGateSupport.streamInfoFailure != null) {
+      throw FlacLoaderGateSupport.streamInfoFailure;
+    }
+    return (FlacStreamInfo) FlacLoaderGateSupport.streamInfo;
+  }
+
+  static boolean readMetadataBlock(DataInput dataInput, InputStream inputStream,
+      FlacTrackInfoBuilder builder) throws IOException {
+    int index = FlacLoaderGateSupport.blockCalls++;
+    FlacLoaderGateSupport.blockDataInput = dataInput;
+    FlacLoaderGateSupport.blockInputStream = inputStream;
+    FlacLoaderGateSupport.blockBuilder = builder;
+    FlacLoaderGateSupport.event("block");
+    if (FlacLoaderGateSupport.blockFailure != null) {
+      throw FlacLoaderGateSupport.blockFailure;
+    }
+    return index < FlacLoaderGateSupport.blockResults.length
+        && FlacLoaderGateSupport.blockResults[index];
+  }
+}
+
+class FlacTrackProvider {
+  FlacTrackProvider(AudioProcessingContext context, FlacTrackInfo info,
+      SeekableInputStream inputStream) {
+    FlacLoaderGateSupport.providerConstructions++;
+    FlacLoaderGateSupport.providerContext = context;
+    FlacLoaderGateSupport.providerInfo = info;
+    FlacLoaderGateSupport.providerInput = inputStream;
+    FlacLoaderGateSupport.event("provider");
+    if (FlacLoaderGateSupport.providerFailure != null) {
+      throw FlacLoaderGateSupport.providerFailure;
+    }
+  }
+}
+"#;
+
+const FLAC_FILE_LOADER_CONSUMER: &str = r#"
+package com.sedmelluq.discord.lavaplayer.container.flac;
+
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.io.DataInput;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateFlacFileLoader {
+  private static final Object UNSAFE = loadUnsafe();
+  private static final byte[] FLAC = {0x66, 0x4C, 0x61, 0x43};
+
+  public static void main(String[] args) throws Exception {
+    construction();
+    headerParsing();
+    metadataBlocks();
+    failures();
+    trackLoading();
+    subclassUse();
+    reflection();
+    System.out.println(
+        "contracts=constructor-input,data-input-wrapper,null-construction,static-fourcc,header-consumption,no-rewind,initial-position,invalid-header,short-header,stream-info,builder-order,metadata-flag,metadata-loop,block-results,data-input-identity,input-identity,builder-identity,first-frame-position,build-identity,load-order,context-identity,provider-info,provider-input,null-context,read-failure,stream-info-failure,builder-failure,get-stream-failure,block-failure,position-failure,set-position-failure,build-failure,provider-failure,subclassable,private-helper,private-state,throws,reflection");
+  }
+
+  private static void construction() throws Exception {
+    MemoryStream input = new MemoryStream(FLAC, 0);
+    FlacFileLoader loader = new FlacFileLoader(input);
+    Object dataInput = field(loader, "dataInput");
+    check(field(loader, "inputStream") == input
+        && dataInput instanceof DataInputStream && dataInput instanceof DataInput,
+        "constructor retains input identity and creates a DataInputStream wrapper");
+    FlacFileLoader second = new FlacFileLoader(input);
+    check(field(second, "dataInput") != dataInput,
+        "each loader creates a distinct data-input wrapper");
+    FlacFileLoader nullInput = new FlacFileLoader(null);
+    check(field(nullInput, "inputStream") == null
+        && field(nullInput, "dataInput") instanceof DataInputStream,
+        "constructor accepts null input and still creates its wrapper");
+  }
+
+  private static void headerParsing() throws Exception {
+    FlacLoaderGateSupport.reset(false);
+    byte[] prefixed = {9, 8, 0x66, 0x4C, 0x61, 0x43, 7};
+    MemoryStream input = new MemoryStream(prefixed, 2);
+    FlacFileLoader loader = new FlacFileLoader(input);
+    Object dataInput = field(loader, "dataInput");
+    Object info = loader.parseHeaders();
+    check(info == FlacLoaderGateSupport.builtInfo()
+        && input.readCalls == 4 && input.getPosition() == 6L && input.seekHardCalls == 0,
+        "valid FourCC is consumed from the initial position without rewind");
+    check(FlacLoaderGateSupport.streamInfoCalls == 1
+        && FlacLoaderGateSupport.builderConstructions == 1
+        && FlacLoaderGateSupport.getStreamInfoCalls == 1
+        && FlacLoaderGateSupport.blockCalls == 0
+        && FlacLoaderGateSupport.setPositionCalls == 1
+        && FlacLoaderGateSupport.firstFramePosition == 6L
+        && FlacLoaderGateSupport.buildCalls == 1,
+        "stream info, metadata flag, first-frame position, and build execute once");
+    check(FlacLoaderGateSupport.streamInfoDataInput == dataInput
+        && FlacLoaderGateSupport.events.toString().equals(
+            "stream-info,builder,get-stream,set-position,build"),
+        "data-input identity and no-metadata parse order");
+
+    FlacLoaderGateSupport.reset(false);
+    MemoryStream wrong = new MemoryStream(new byte[] {0x66, 0x00, 0x61, 0x43}, 0);
+    Throwable invalid = catchThrowable(() -> new FlacFileLoader(wrong).parseHeaders());
+    check(invalid instanceof IllegalStateException
+        && invalid.getMessage().equals("Not a FLAC file")
+        && wrong.readCalls == 2 && wrong.getPosition() == 2L && wrong.seekHardCalls == 0
+        && FlacLoaderGateSupport.streamInfoCalls == 0,
+        "invalid header stops at mismatch, does not rewind, and has exact message");
+
+    FlacLoaderGateSupport.reset(false);
+    MemoryStream shortInput = new MemoryStream(new byte[] {0x66, 0x4C}, 0);
+    check(catchThrowable(() -> new FlacFileLoader(shortInput).parseHeaders())
+        instanceof IllegalStateException && shortInput.readCalls == 3
+        && shortInput.getPosition() == 2L && shortInput.seekHardCalls == 0,
+        "short header consumes through one EOF read without rewind");
+  }
+
+  private static void metadataBlocks() throws Exception {
+    FlacLoaderGateSupport.reset(true);
+    FlacLoaderGateSupport.setBlockResults(true, true, false);
+    MemoryStream input = new MemoryStream(FLAC, 0);
+    FlacFileLoader loader = new FlacFileLoader(input);
+    Object dataInput = field(loader, "dataInput");
+    Object info = loader.parseHeaders();
+    check(info == FlacLoaderGateSupport.builtInfo()
+        && FlacLoaderGateSupport.blockCalls == 3
+        && FlacLoaderGateSupport.blockDataInput == dataInput
+        && FlacLoaderGateSupport.blockInputStream == input
+        && FlacLoaderGateSupport.blockBuilder != null,
+        "metadata loop follows each returned continuation flag with exact identities");
+    check(FlacLoaderGateSupport.firstFramePosition == 4L
+        && FlacLoaderGateSupport.events.toString().equals(
+            "stream-info,builder,get-stream,block,block,block,set-position,build"),
+        "first-frame position is captured only after all metadata blocks");
+
+    FlacLoaderGateSupport.reset(false);
+    FlacLoaderGateSupport.setBlockResults(true, true, true);
+    new FlacFileLoader(new MemoryStream(FLAC, 0)).parseHeaders();
+    check(FlacLoaderGateSupport.blockCalls == 0,
+        "false stream-info metadata flag bypasses configured block results");
+  }
+
+  private static void failures() throws Exception {
+    IOException readFailure = new IOException("read-failure");
+    FlacLoaderGateSupport.reset(false);
+    MemoryStream read = new MemoryStream(FLAC, 0);
+    read.readFailure = readFailure;
+    check(catchThrowable(() -> new FlacFileLoader(read).parseHeaders()) == readFailure
+        && read.readCalls == 1 && FlacLoaderGateSupport.streamInfoCalls == 0,
+        "header read failure keeps exact checked identity");
+
+    FlacLoaderGateSupport.reset(false);
+    check(catchThrowable(() -> new FlacFileLoader(null).parseHeaders())
+        instanceof NullPointerException && FlacLoaderGateSupport.streamInfoCalls == 0,
+        "null input fails at initial position access");
+
+    IOException streamInfoFailure = new IOException("stream-info-failure");
+    FlacLoaderGateSupport.reset(false);
+    FlacLoaderGateSupport.streamInfoFailure = streamInfoFailure;
+    check(catchThrowable(() -> new FlacFileLoader(
+        new MemoryStream(FLAC, 0)).parseHeaders()) == streamInfoFailure
+        && FlacLoaderGateSupport.streamInfoCalls == 1
+        && FlacLoaderGateSupport.builderConstructions == 0,
+        "stream-info failure precedes builder construction");
+
+    RuntimeException builderFailure = new RuntimeException("builder-failure");
+    FlacLoaderGateSupport.reset(false);
+    FlacLoaderGateSupport.builderFailure = builderFailure;
+    check(catchThrowable(() -> new FlacFileLoader(
+        new MemoryStream(FLAC, 0)).parseHeaders()) == builderFailure
+        && FlacLoaderGateSupport.streamInfoCalls == 1
+        && FlacLoaderGateSupport.builderConstructions == 1
+        && FlacLoaderGateSupport.getStreamInfoCalls == 0,
+        "builder failure follows stream-info publication");
+
+    RuntimeException getStreamFailure = new RuntimeException("get-stream-failure");
+    FlacLoaderGateSupport.reset(true);
+    FlacLoaderGateSupport.getStreamInfoFailure = getStreamFailure;
+    check(catchThrowable(() -> new FlacFileLoader(
+        new MemoryStream(FLAC, 0)).parseHeaders()) == getStreamFailure
+        && FlacLoaderGateSupport.blockCalls == 0
+        && FlacLoaderGateSupport.setPositionCalls == 0,
+        "metadata-flag failure precedes block reads and position capture");
+
+    IOException blockFailure = new IOException("block-failure");
+    FlacLoaderGateSupport.reset(true);
+    FlacLoaderGateSupport.blockFailure = blockFailure;
+    check(catchThrowable(() -> new FlacFileLoader(
+        new MemoryStream(FLAC, 0)).parseHeaders()) == blockFailure
+        && FlacLoaderGateSupport.blockCalls == 1
+        && FlacLoaderGateSupport.setPositionCalls == 0,
+        "metadata block failure keeps exact checked identity and prefix");
+
+    RuntimeException positionFailure = new RuntimeException("position-failure");
+    FlacLoaderGateSupport.reset(false);
+    MemoryStream position = new MemoryStream(FLAC, 0);
+    position.positionFailure = positionFailure;
+    position.positionFailureCall = 2;
+    check(catchThrowable(() -> new FlacFileLoader(position).parseHeaders()) == positionFailure
+        && FlacLoaderGateSupport.getStreamInfoCalls == 1
+        && FlacLoaderGateSupport.setPositionCalls == 0,
+        "final position failure follows metadata processing and precedes setter");
+
+    RuntimeException setFailure = new RuntimeException("set-position-failure");
+    FlacLoaderGateSupport.reset(false);
+    FlacLoaderGateSupport.setPositionFailure = setFailure;
+    check(catchThrowable(() -> new FlacFileLoader(
+        new MemoryStream(FLAC, 0)).parseHeaders()) == setFailure
+        && FlacLoaderGateSupport.setPositionCalls == 1
+        && FlacLoaderGateSupport.buildCalls == 0,
+        "first-frame setter failure precedes build");
+
+    RuntimeException buildFailure = new RuntimeException("build-failure");
+    FlacLoaderGateSupport.reset(false);
+    FlacLoaderGateSupport.buildFailure = buildFailure;
+    check(catchThrowable(() -> new FlacFileLoader(
+        new MemoryStream(FLAC, 0)).parseHeaders()) == buildFailure
+        && FlacLoaderGateSupport.setPositionCalls == 1
+        && FlacLoaderGateSupport.buildCalls == 1,
+        "build failure keeps exact identity after first-frame assignment");
+  }
+
+  private static void trackLoading() throws Exception {
+    FlacLoaderGateSupport.reset(false);
+    MemoryStream input = new MemoryStream(FLAC, 0);
+    FlacFileLoader loader = new FlacFileLoader(input);
+    AudioProcessingContext context = allocate(AudioProcessingContext.class);
+    Object provider = loader.loadTrack(context);
+    check(provider != null && provider.getClass().getName().equals(
+        "com.sedmelluq.discord.lavaplayer.container.flac.FlacTrackProvider")
+        && FlacLoaderGateSupport.providerConstructions == 1
+        && FlacLoaderGateSupport.providerContext == context
+        && FlacLoaderGateSupport.providerInfo == FlacLoaderGateSupport.builtInfo()
+        && FlacLoaderGateSupport.providerInput == input,
+        "load constructs provider with exact context, parsed info, and input identities");
+    check(FlacLoaderGateSupport.events.toString().equals(
+        "stream-info,builder,get-stream,set-position,build,provider"),
+        "provider construction follows complete header parsing");
+
+    FlacLoaderGateSupport.reset(false);
+    Object nullContextProvider = new FlacFileLoader(
+        new MemoryStream(FLAC, 0)).loadTrack(null);
+    check(nullContextProvider != null && FlacLoaderGateSupport.providerContext == null,
+        "null processing context is passed to provider without validation");
+
+    RuntimeException providerFailure = new RuntimeException("provider-failure");
+    FlacLoaderGateSupport.reset(false);
+    FlacLoaderGateSupport.providerFailure = providerFailure;
+    check(catchThrowable(() -> new FlacFileLoader(
+        new MemoryStream(FLAC, 0)).loadTrack(context)) == providerFailure
+        && FlacLoaderGateSupport.buildCalls == 1
+        && FlacLoaderGateSupport.providerConstructions == 1,
+        "provider construction failure follows successful parsing with exact identity");
+
+    IOException parseFailure = new IOException("load-parse-failure");
+    FlacLoaderGateSupport.reset(false);
+    FlacLoaderGateSupport.streamInfoFailure = parseFailure;
+    check(catchThrowable(() -> new FlacFileLoader(
+        new MemoryStream(FLAC, 0)).loadTrack(context)) == parseFailure
+        && FlacLoaderGateSupport.providerConstructions == 0,
+        "parse failure prevents provider constructor invocation");
+  }
+
+  private static void subclassUse() throws Exception {
+    FlacLoaderGateSupport.reset(false);
+    Derived derived = new Derived(new MemoryStream(FLAC, 0));
+    Object info = derived.parseHeaders();
+    check(info == FlacLoaderGateSupport.builtInfo()
+        && FlacLoaderGateSupport.buildCalls == 1,
+        "ordinary subclass inherits functional parsing behavior");
+  }
+
+  private static void reflection() throws Exception {
+    Class<FlacFileLoader> type = FlacFileLoader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete non-final loader metadata");
+    check(type.getDeclaredFields().length == 3 && type.getDeclaredMethods().length == 3
+        && type.getDeclaredConstructors().length == 1, "exact declared member counts");
+
+    Field fourcc = type.getDeclaredField("FLAC_CC");
+    fourcc.setAccessible(true);
+    check(fourcc.getType() == int[].class
+        && fourcc.getModifiers() == (Modifier.STATIC | Modifier.FINAL)
+        && !fourcc.isSynthetic()
+        && Arrays.equals((int[]) fourcc.get(null), new int[] {102, 76, 97, 67}),
+        "package-static final FourCC array metadata and contents");
+    checkField(type, "inputStream", SeekableInputStream.class);
+    checkField(type, "dataInput", DataInput.class);
+
+    Constructor<FlacFileLoader> constructor =
+        type.getDeclaredConstructor(SeekableInputStream.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    Method parse = type.getDeclaredMethod("parseHeaders");
+    checkMethod(parse, Modifier.PUBLIC,
+        "com.sedmelluq.discord.lavaplayer.container.flac.FlacTrackInfo",
+        new Class<?>[] {IOException.class});
+    Method load = type.getDeclaredMethod("loadTrack", AudioProcessingContext.class);
+    checkMethod(load, Modifier.PUBLIC,
+        "com.sedmelluq.discord.lavaplayer.container.flac.FlacTrackProvider",
+        new Class<?>[] {IOException.class});
+    Class<?> builder = Class.forName(
+        "com.sedmelluq.discord.lavaplayer.container.flac.FlacTrackInfoBuilder");
+    Method blocks = type.getDeclaredMethod("readMetadataBlocks", builder);
+    checkMethod(blocks, Modifier.PRIVATE, "void", new Class<?>[] {IOException.class});
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> fieldType)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == fieldType
+        && field.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && !field.isSynthetic(), name + " private final field metadata");
+  }
+
+  private static void checkMethod(Method method, int modifiers,
+      String returnType, Class<?>[] failures) {
+    check(method.getModifiers() == modifiers
+        && method.getReturnType().getName().equals(returnType)
+        && Arrays.equals(method.getExceptionTypes(), failures)
+        && !method.isSynthetic() && !method.isBridge() && !method.isVarArgs(),
+        method.getName() + " method metadata");
+  }
+
+  private static Object field(Object owner, String name) throws Exception {
+    Field field = FlacFileLoader.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(owner);
+  }
+
+  private static <T> T allocate(Class<T> type) throws Exception {
+    return type.cast(UNSAFE.getClass().getMethod("allocateInstance", Class.class)
+        .invoke(UNSAFE, type));
+  }
+
+  private static Object loadUnsafe() {
+    try {
+      Class<?> type = Class.forName("sun.misc.Unsafe");
+      Field field = type.getDeclaredField("theUnsafe");
+      field.setAccessible(true);
+      return field.get(null);
+    } catch (ReflectiveOperationException error) {
+      throw new ExceptionInInitializerError(error);
+    }
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable operation) {
+    try {
+      operation.run();
+      return null;
+    } catch (Throwable error) {
+      return error;
+    }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static class MemoryStream extends SeekableInputStream {
+    final byte[] data;
+    long position;
+    int readCalls;
+    int positionCalls;
+    int seekHardCalls;
+    IOException readFailure;
+    RuntimeException positionFailure;
+    int positionFailureCall;
+
+    MemoryStream(byte[] data, long position) {
+      super(data.length, 0L);
+      this.data = data;
+      this.position = position;
+    }
+
+    @Override
+    public int read() throws IOException {
+      readCalls++;
+      if (readFailure != null) throw readFailure;
+      if (position >= data.length) return -1;
+      return data[(int) position++] & 0xFF;
+    }
+
+    @Override
+    public long getPosition() {
+      positionCalls++;
+      if (positionFailure != null && positionCalls == positionFailureCall) {
+        throw positionFailure;
+      }
+      return position;
+    }
+
+    @Override
+    protected void seekHard(long position) {
+      seekHardCalls++;
+      this.position = position;
+    }
+
+    @Override
+    public boolean canSeekHard() {
+      return true;
+    }
+
+    @Override
+    public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      return Collections.emptyList();
+    }
+  }
+
+  private static final class Derived extends FlacFileLoader {
+    Derived(SeekableInputStream input) {
+      super(input);
     }
   }
 

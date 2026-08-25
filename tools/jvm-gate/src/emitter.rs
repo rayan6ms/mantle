@@ -172,6 +172,8 @@ const FLAC_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/FlacAudioTrack";
 const FLAC_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/FlacContainerProbe";
+const FLAC_FILE_LOADER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/flac/FlacFileLoader";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -513,6 +515,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     OPUS_PACKET_ROUTER_CLASS,
     FLAC_AUDIO_TRACK_CLASS,
     FLAC_CONTAINER_PROBE_CLASS,
+    FLAC_FILE_LOADER_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -992,6 +995,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | OPUS_PACKET_ROUTER_CLASS
             | FLAC_AUDIO_TRACK_CLASS
             | FLAC_CONTAINER_PROBE_CLASS
+            | FLAC_FILE_LOADER_CLASS
             | OPUS_AUDIO_DATA_FORMAT_CLASS
             | PCM16_AUDIO_DATA_FORMAT_CLASS
             | OPUS_CHUNK_DECODER_CLASS
@@ -1109,6 +1113,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | OPUS_PACKET_ROUTER_CLASS
             | FLAC_AUDIO_TRACK_CLASS
             | FLAC_CONTAINER_PROBE_CLASS
+            | FLAC_FILE_LOADER_CLASS
             | AUDIO_PIPELINE_FACTORY_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
@@ -1403,6 +1408,9 @@ fn replacement_body(
     }
     if class_name == FLAC_CONTAINER_PROBE_CLASS {
         return flac_container_probe_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == FLAC_FILE_LOADER_CLASS {
+        return flac_file_loader_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -5369,6 +5377,314 @@ fn flac_container_probe_clinit(pool: &mut ConstantPool<'static>) -> Result<Attri
             Instruction::Ldc_w(owner),
             Instruction::Invokestatic(get_logger),
             Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn flac_file_loader_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)V") => {
+            flac_file_loader_constructor(pool)
+        }
+        ("parseHeaders", "()Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfo;") => {
+            flac_file_loader_parse_headers(pool)
+        }
+        (
+            "loadTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;)Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackProvider;",
+        ) => flac_file_loader_load_track(pool),
+        (
+            "readMetadataBlocks",
+            "(Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfoBuilder;)V",
+        ) => flac_file_loader_read_metadata_blocks(pool),
+        ("<clinit>", "()V") => flac_file_loader_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {FLAC_FILE_LOADER_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn flac_file_loader_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_FILE_LOADER_CLASS)?;
+    let parent = pool.add_class("java/lang/Object")?;
+    let parent_init = pool.add_method_ref(parent, "<init>", "()V")?;
+    let input_stream = pool.add_field_ref(
+        owner,
+        "inputStream",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;",
+    )?;
+    let data_input_stream = pool.add_class("java/io/DataInputStream")?;
+    let data_input_init =
+        pool.add_method_ref(data_input_stream, "<init>", "(Ljava/io/InputStream;)V")?;
+    let data_input = pool.add_field_ref(owner, "dataInput", "Ljava/io/DataInput;")?;
+    code(
+        pool,
+        4,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(parent_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(input_stream),
+            Instruction::Aload_0,
+            Instruction::New(data_input_stream),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(data_input_init),
+            Instruction::Putfield(data_input),
+            Instruction::Return,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn flac_file_loader_parse_headers(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_FILE_LOADER_CLASS)?;
+    let input_stream_class =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream")?;
+    let input_stream = pool.add_field_ref(
+        owner,
+        "inputStream",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;",
+    )?;
+    let flac_cc = pool.add_field_ref(owner, "FLAC_CC", "[I")?;
+    let detection = pool.add_class(MEDIA_CONTAINER_DETECTION_CLASS)?;
+    let check_next_bytes = pool.add_method_ref(
+        detection,
+        "checkNextBytes",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;[IZ)Z",
+    )?;
+    let illegal_state = pool.add_class("java/lang/IllegalStateException")?;
+    let illegal_state_init =
+        pool.add_method_ref(illegal_state, "<init>", "(Ljava/lang/String;)V")?;
+    let invalid_message = pool.add_string("Not a FLAC file")?;
+    let builder =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfoBuilder")?;
+    let metadata_reader =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/flac/FlacMetadataReader")?;
+    let data_input = pool.add_field_ref(owner, "dataInput", "Ljava/io/DataInput;")?;
+    let read_stream_info = pool.add_method_ref(
+        metadata_reader,
+        "readStreamInfoBlock",
+        "(Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;",
+    )?;
+    let builder_init = pool.add_method_ref(
+        builder,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;)V",
+    )?;
+    let read_metadata_blocks = pool.add_method_ref(
+        owner,
+        "readMetadataBlocks",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfoBuilder;)V",
+    )?;
+    let get_position = pool.add_method_ref(input_stream_class, "getPosition", "()J")?;
+    let set_first_frame = pool.add_method_ref(builder, "setFirstFramePosition", "(J)V")?;
+    let build = pool.add_method_ref(
+        builder,
+        "build",
+        "()Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfo;",
+    )?;
+    let valid_target = 11;
+    let mut body = code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(input_stream),
+            Instruction::Getstatic(flac_cc),
+            Instruction::Iconst_0,
+            Instruction::Invokestatic(check_next_bytes),
+            Instruction::Ifne(valid_target),
+            Instruction::New(illegal_state),
+            Instruction::Dup,
+            Instruction::Ldc_w(invalid_message),
+            Instruction::Invokespecial(illegal_state_init),
+            Instruction::Athrow,
+            Instruction::New(builder),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(data_input),
+            Instruction::Invokestatic(read_stream_info),
+            Instruction::Invokespecial(builder_init),
+            Instruction::Astore_1,
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(read_metadata_blocks),
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(input_stream),
+            Instruction::Invokevirtual(get_position),
+            Instruction::Invokevirtual(set_first_frame),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(build),
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::FullFrame {
+            frame_type: 255,
+            offset_delta: valid_target,
+            locals: vec![VerificationType::Object { cpool_index: owner }],
+            stack: vec![],
+        }],
+    )?;
+    Ok(body)
+}
+
+fn flac_file_loader_load_track(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_FILE_LOADER_CLASS)?;
+    let provider =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/flac/FlacTrackProvider")?;
+    let parse_headers = pool.add_method_ref(
+        owner,
+        "parseHeaders",
+        "()Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfo;",
+    )?;
+    let input_stream = pool.add_field_ref(
+        owner,
+        "inputStream",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;",
+    )?;
+    let provider_init = pool.add_method_ref(
+        provider,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfo;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)V",
+    )?;
+    code(
+        pool,
+        5,
+        2,
+        vec![
+            Instruction::New(provider),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(parse_headers),
+            Instruction::Aload_0,
+            Instruction::Getfield(input_stream),
+            Instruction::Invokespecial(provider_init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn flac_file_loader_read_metadata_blocks(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_FILE_LOADER_CLASS)?;
+    let builder =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfoBuilder")?;
+    let stream_info =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo")?;
+    let get_stream_info = pool.add_method_ref(
+        builder,
+        "getStreamInfo",
+        "()Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;",
+    )?;
+    let has_metadata = pool.add_field_ref(stream_info, "hasMetadataBlocks", "Z")?;
+    let data_input = pool.add_field_ref(owner, "dataInput", "Ljava/io/DataInput;")?;
+    let input_stream = pool.add_field_ref(
+        owner,
+        "inputStream",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;",
+    )?;
+    let metadata_reader =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/flac/FlacMetadataReader")?;
+    let read_metadata = pool.add_method_ref(
+        metadata_reader,
+        "readMetadataBlock",
+        "(Ljava/io/DataInput;Ljava/io/InputStream;Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfoBuilder;)Z",
+    )?;
+    let loop_target = 4;
+    let return_target = 14;
+    let mut body = code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(get_stream_info),
+            Instruction::Getfield(has_metadata),
+            Instruction::Istore_2,
+            Instruction::Iload_2,
+            Instruction::Ifeq(return_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(data_input),
+            Instruction::Aload_0,
+            Instruction::Getfield(input_stream),
+            Instruction::Aload_1,
+            Instruction::Invokestatic(read_metadata),
+            Instruction::Istore_2,
+            Instruction::Goto(loop_target),
+            Instruction::Return,
+        ],
+    )?;
+    let locals = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Object {
+            cpool_index: builder,
+        },
+        VerificationType::Integer,
+    ];
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: loop_target,
+                locals: locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: return_target - loop_target - 1,
+                locals,
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn flac_file_loader_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_FILE_LOADER_CLASS)?;
+    let flac_cc = pool.add_field_ref(owner, "FLAC_CC", "[I")?;
+    code(
+        pool,
+        4,
+        0,
+        vec![
+            Instruction::Iconst_4,
+            Instruction::Newarray(ArrayType::Int),
+            Instruction::Dup,
+            Instruction::Iconst_0,
+            Instruction::Bipush(102),
+            Instruction::Iastore,
+            Instruction::Dup,
+            Instruction::Iconst_1,
+            Instruction::Bipush(76),
+            Instruction::Iastore,
+            Instruction::Dup,
+            Instruction::Iconst_2,
+            Instruction::Bipush(97),
+            Instruction::Iastore,
+            Instruction::Dup,
+            Instruction::Iconst_3,
+            Instruction::Bipush(67),
+            Instruction::Iastore,
+            Instruction::Putstatic(flac_cc),
             Instruction::Return,
         ],
     )
