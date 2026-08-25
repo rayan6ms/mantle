@@ -997,54 +997,84 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public concrete non-final MediaContainerProbe implementation with the exact eager logger, stateless instance shape, subclass behavior, member surface, and reflection metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.adts.AdtsContainerProbe",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Creates an ordinary stateless probe instance through the public no-argument constructor.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.adts.AdtsContainerProbe",
       "symbol_kind": "METHOD",
       "member_name": "getName",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Returns the stable interned lower-case string adts.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.adts.AdtsContainerProbe",
       "symbol_kind": "METHOD",
       "member_name": "matchesHints",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerHints;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Requires at least one present hint and case-insensitively accepts only audio/aac MIME and aac extension values, rejecting any conflicting non-null hint and preserving null failure behavior.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.adts.AdtsContainerProbe",
       "symbol_kind": "METHOD",
       "member_name": "probe",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Scans at most STREAM_SCAN_DISTANCE bytes without rewinding, accepts ordinary and CRC ADTS headers, builds ordered reference/stream metadata, returns a supported result retaining this probe and null settings, returns null on miss, and preserves checked/runtime failure identity.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.adts.AdtsContainerProbe",
       "symbol_kind": "METHOD",
       "member_name": "createTrack",
       "descriptor": "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Ignores parameters and creates a fresh AdtsAudioTrack retaining the exact nullable AudioTrackInfo and SeekableInputStream identities.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.adts.AdtsPacketHeader",

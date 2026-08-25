@@ -158,6 +158,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-media-container-probe-consumer" => Some(MEDIA_CONTAINER_PROBE_CONSUMER),
         "write-media-container-registry-consumer" => Some(MEDIA_CONTAINER_REGISTRY_CONSUMER),
         "write-adts-audio-track-consumer" => Some(ADTS_AUDIO_TRACK_CONSUMER),
+        "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
         _ => None,
     }
 }
@@ -13857,6 +13858,294 @@ public final class GateAdtsAudioTrack {
       if (identifierFailure != null) throw identifierFailure;
       return super.getIdentifier();
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const ADTS_CONTAINER_PROBE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDescriptor;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerHints;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerProbe;
+import com.sedmelluq.discord.lavaplayer.container.adts.AdtsAudioTrack;
+import com.sedmelluq.discord.lavaplayer.container.adts.AdtsContainerProbe;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateAdtsContainerProbe {
+  private static final byte[] HEADER = {
+      (byte) 0xFF, (byte) 0xF1, 0x4C, (byte) 0x80, 0x27, 0x3F, (byte) 0xFC};
+  private static final byte[] CRC_HEADER = {
+      (byte) 0xFF, (byte) 0xF0, 0x4C, (byte) 0x80, 0x27, 0x7F, (byte) 0xFC, 0, 0};
+
+  public static void main(String[] args) throws Exception {
+    namesAndHints();
+    successfulProbe();
+    scanBoundary();
+    probeFailures();
+    trackFactory();
+    subclassUse();
+    reflection();
+    System.out.println(
+        "contracts=name,hint-presence,mime,extension,case-insensitive,combined-hints,null-hints,header-detection,crc-header,scan-boundary,no-rewind,metadata-overlay,provider-order,supported-result,self-probe,null-settings,miss,null-reference,io-identity,runtime-identity,provider-failure,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,private-state,throws,reflection");
+  }
+
+  private static void namesAndHints() {
+    AdtsContainerProbe probe = new AdtsContainerProbe();
+    check(probe.getName().equals("adts") && probe.getName() == "adts",
+        "stable interned lower-case probe name");
+    check(!probe.matchesHints(MediaContainerHints.from(null, null)),
+        "empty hints do not match");
+    check(probe.matchesHints(MediaContainerHints.from("audio/aac", null))
+        && probe.matchesHints(MediaContainerHints.from("AuDiO/AaC", null)),
+        "AAC MIME matches case-insensitively");
+    check(probe.matchesHints(MediaContainerHints.from(null, "aac"))
+        && probe.matchesHints(MediaContainerHints.from(null, "AaC")),
+        "AAC extension matches case-insensitively");
+    check(probe.matchesHints(MediaContainerHints.from("audio/aac", "aac")),
+        "both valid hints match");
+    check(!probe.matchesHints(MediaContainerHints.from("audio/mpeg", "aac"))
+        && !probe.matchesHints(MediaContainerHints.from("audio/aac", "mp3"))
+        && !probe.matchesHints(MediaContainerHints.from("audio/aac; codecs=mp4a", "aac"))
+        && !probe.matchesHints(MediaContainerHints.from("", "")),
+        "either invalid non-null hint rejects the match");
+    check(catchThrowable(() -> probe.matchesHints(null)) instanceof NullPointerException,
+        "null hints fail at direct field access");
+  }
+
+  private static void successfulProbe() throws Exception {
+    AdtsContainerProbe probe = new AdtsContainerProbe();
+    AudioReference reference = new AudioReference("reference-id", "reference-title");
+    Metadata metadata = new Metadata();
+    MemoryStream stream = new MemoryStream(HEADER, Collections.singletonList(metadata));
+    MediaContainerDetectionResult result = probe.probe(reference, stream);
+    check(result != null && result.isContainerDetected() && result.isSupportedFile()
+        && !result.isReference() && result.getReference() == null
+        && result.getUnsupportedReason() == null, "detected stream produces supported result");
+    MediaContainerDescriptor descriptor = result.getContainerDescriptor();
+    check(descriptor.probe == probe && descriptor.parameters == null,
+        "supported result retains exact probe identity and null settings");
+    AudioTrackInfo info = result.getTrackInfo();
+    check(info.title.equals("stream-title") && info.author.equals("stream-author")
+        && info.length == 42L && info.identifier.equals("stream-id") && !info.isStream
+        && info.uri.equals("stream-uri") && info.artworkUrl.equals("stream-artwork")
+        && info.isrc.equals("stream-isrc"), "stream metadata overlays reference and defaults");
+    check(stream.readCalls == 7 && stream.getPosition() == 7L
+        && stream.providerCalls == 1 && stream.providerPosition == 7L,
+        "header scan is not rewound and providers run after detection");
+
+    MemoryStream crc = new MemoryStream(CRC_HEADER, Collections.emptyList());
+    MediaContainerDetectionResult crcResult =
+        probe.probe(new AudioReference("crc-id", null), crc);
+    check(crcResult != null && crc.readCalls == 9 && crc.getPosition() == 9L
+        && crc.providerPosition == 9L, "CRC-protected header consumes its two CRC bytes");
+  }
+
+  private static void scanBoundary() throws Exception {
+    AdtsContainerProbe probe = new AdtsContainerProbe();
+    MemoryStream exact = new MemoryStream(prefixed(993, HEADER), Collections.emptyList());
+    MediaContainerDetectionResult detected =
+        probe.probe(new AudioReference("boundary-id", null), exact);
+    check(detected != null && exact.readCalls == 1000 && exact.getPosition() == 1000L
+        && exact.providerPosition == 1000L, "header ending at byte one thousand is detected");
+
+    MemoryStream beyond = new MemoryStream(prefixed(994, HEADER), Collections.emptyList());
+    check(probe.probe(null, beyond) == null && beyond.readCalls == 1000
+        && beyond.getPosition() == 1000L && beyond.providerCalls == 0,
+        "header beyond scan distance is a miss and null reference remains untouched");
+
+    MemoryStream empty = new MemoryStream(new byte[0], Collections.emptyList());
+    check(probe.probe(null, empty) == null && empty.readCalls == 1
+        && empty.getPosition() == 0L && empty.providerCalls == 0,
+        "EOF miss returns null without metadata construction");
+  }
+
+  private static void probeFailures() throws Exception {
+    AdtsContainerProbe probe = new AdtsContainerProbe();
+    IOException ioFailure = new IOException("read-failure");
+    MemoryStream io = new MemoryStream(HEADER, Collections.emptyList());
+    io.ioFailure = ioFailure;
+    check(catchThrowable(() -> probe.probe(null, io)) == ioFailure && io.readCalls == 1,
+        "checked read failure propagates with exact identity");
+
+    RuntimeException runtimeFailure = new RuntimeException("runtime-read-failure");
+    MemoryStream runtime = new MemoryStream(HEADER, Collections.emptyList());
+    runtime.runtimeFailure = runtimeFailure;
+    check(catchThrowable(() -> probe.probe(null, runtime)) == runtimeFailure,
+        "runtime read failure propagates with exact identity");
+    check(catchThrowable(() -> probe.probe(null, null)) instanceof NullPointerException,
+        "null stream fails when the reader dereferences it");
+
+    MemoryStream matchedNullReference = new MemoryStream(HEADER, Collections.emptyList());
+    check(catchThrowable(() -> probe.probe(null, matchedNullReference))
+        instanceof NullPointerException, "matched stream dereferences reference for logging");
+
+    RuntimeException providersFailure = new RuntimeException("providers-failure");
+    MemoryStream providerStream = new MemoryStream(HEADER, Collections.emptyList());
+    providerStream.providersFailure = providersFailure;
+    check(catchThrowable(() -> probe.probe(
+        new AudioReference("provider-id", null), providerStream)) == providersFailure
+        && providerStream.providerCalls == 1 && providerStream.providerPosition == 7L,
+        "provider-list failure propagates after successful scan with exact identity");
+  }
+
+  private static void trackFactory() throws Exception {
+    AdtsContainerProbe probe = new AdtsContainerProbe();
+    AudioTrackInfo info = new AudioTrackInfo(
+        "title", "author", 1L, "track-id", false, "uri", "artwork", "isrc");
+    MemoryStream stream = new MemoryStream(new byte[0], Collections.emptyList());
+    AudioTrack first = probe.createTrack("ignored-one", info, stream);
+    AudioTrack second = probe.createTrack("ignored-two", info, stream);
+    check(first.getClass() == AdtsAudioTrack.class && second.getClass() == AdtsAudioTrack.class
+        && first != second && first.getInfo() == info && second.getInfo() == info
+        && input((AdtsAudioTrack) first) == stream && input((AdtsAudioTrack) second) == stream,
+        "factory creates fresh ADTS tracks retaining exact info and stream identities");
+    AdtsAudioTrack nulls = (AdtsAudioTrack) probe.createTrack(null, null, null);
+    check(nulls.getInfo() == null && input(nulls) == null,
+        "factory ignores parameters and accepts null track arguments");
+  }
+
+  private static void subclassUse() throws Exception {
+    Derived derived = new Derived();
+    MemoryStream stream = new MemoryStream(HEADER, Collections.emptyList());
+    MediaContainerDetectionResult result =
+        derived.probe(new AudioReference("derived-id", null), stream);
+    check(derived.getName().equals("derived-adts") && result != null
+        && result.getContainerDescriptor().probe == derived,
+        "ordinary subclass dispatch and supported-result self identity");
+  }
+
+  private static void reflection() throws Exception {
+    Class<AdtsContainerProbe> type = AdtsContainerProbe.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {MediaContainerProbe.class})
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0,
+        "public concrete non-final probe metadata");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredMethods().length == 4
+        && type.getDeclaredConstructors().length == 1, "exact declared member counts");
+
+    Field log = type.getDeclaredField("log");
+    log.setAccessible(true);
+    Object expectedLogger = Class.forName("org.slf4j.LoggerFactory")
+        .getMethod("getLogger", Class.class).invoke(null, type);
+    check(log.getType().getName().equals("org.slf4j.Logger")
+        && log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && !log.isSynthetic() && log.get(null) != null && log.get(null) == expectedLogger,
+        "eager logger identity and metadata");
+
+    Constructor<AdtsContainerProbe> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    checkMethod(type.getDeclaredMethod("getName"), String.class,
+        new Class<?>[0], new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("matchesHints", MediaContainerHints.class), boolean.class,
+        new Class<?>[] {MediaContainerHints.class}, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("probe", AudioReference.class, SeekableInputStream.class),
+        MediaContainerDetectionResult.class,
+        new Class<?>[] {AudioReference.class, SeekableInputStream.class},
+        new Class<?>[] {IOException.class});
+    checkMethod(type.getDeclaredMethod("createTrack", String.class, AudioTrackInfo.class,
+        SeekableInputStream.class), AudioTrack.class,
+        new Class<?>[] {String.class, AudioTrackInfo.class, SeekableInputStream.class},
+        new Class<?>[0]);
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType,
+      Class<?>[] parameters, Class<?>[] failures) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isDefault() && !method.isVarArgs(),
+        method.getName() + " method metadata");
+  }
+
+  private static InputStream input(AdtsAudioTrack track) throws Exception {
+    Field field = AdtsAudioTrack.class.getDeclaredField("inputStream");
+    field.setAccessible(true);
+    return (InputStream) field.get(track);
+  }
+
+  private static byte[] prefixed(int count, byte[] suffix) {
+    byte[] bytes = new byte[count + suffix.length];
+    Arrays.fill(bytes, 0, count, (byte) 0x55);
+    System.arraycopy(suffix, 0, bytes, count, suffix.length);
+    return bytes;
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try {
+      action.run();
+      return null;
+    } catch (Throwable throwable) {
+      return throwable;
+    }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class Metadata implements AudioTrackInfoProvider {
+    @Override public String getTitle() { return "stream-title"; }
+    @Override public String getAuthor() { return "stream-author"; }
+    @Override public Long getLength() { return 42L; }
+    @Override public String getIdentifier() { return "stream-id"; }
+    @Override public String getUri() { return "stream-uri"; }
+    @Override public String getArtworkUrl() { return "stream-artwork"; }
+    @Override public String getISRC() { return "stream-isrc"; }
+  }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    final byte[] data;
+    final List<AudioTrackInfoProvider> providers;
+    long position;
+    long providerPosition = -1L;
+    int readCalls;
+    int providerCalls;
+    IOException ioFailure;
+    RuntimeException runtimeFailure;
+    RuntimeException providersFailure;
+
+    MemoryStream(byte[] data, List<AudioTrackInfoProvider> providers) {
+      super(data.length, 0L);
+      this.data = data;
+      this.providers = providers;
+    }
+
+    @Override public int read() throws IOException {
+      readCalls++;
+      if (ioFailure != null) throw ioFailure;
+      if (runtimeFailure != null) throw runtimeFailure;
+      return position < data.length ? data[(int) position++] & 0xFF : -1;
+    }
+    @Override public long getPosition() { return position; }
+    @Override protected void seekHard(long target) { position = target; }
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      providerCalls++;
+      providerPosition = position;
+      if (providersFailure != null) throw providersFailure;
+      return providers;
+    }
+  }
+
+  private static final class Derived extends AdtsContainerProbe {
+    @Override public String getName() { return "derived-adts"; }
   }
 
   private static void check(boolean condition, String message) {

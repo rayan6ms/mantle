@@ -156,6 +156,8 @@ const MEDIA_CONTAINER_REGISTRY_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/MediaContainerRegistry";
 const ADTS_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/adts/AdtsAudioTrack";
+const ADTS_CONTAINER_PROBE_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/adts/AdtsContainerProbe";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -489,6 +491,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MEDIA_CONTAINER_PROBE_CLASS,
     MEDIA_CONTAINER_REGISTRY_CLASS,
     ADTS_AUDIO_TRACK_CLASS,
+    ADTS_CONTAINER_PROBE_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -961,6 +964,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | MEDIA_CONTAINER_HINTS_CLASS
             | MEDIA_CONTAINER_REGISTRY_CLASS
             | ADTS_AUDIO_TRACK_CLASS
+            | ADTS_CONTAINER_PROBE_CLASS
             | OPUS_AUDIO_DATA_FORMAT_CLASS
             | PCM16_AUDIO_DATA_FORMAT_CLASS
             | OPUS_CHUNK_DECODER_CLASS
@@ -1071,6 +1075,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | MEDIA_CONTAINER_HINTS_CLASS
             | MEDIA_CONTAINER_REGISTRY_CLASS
             | ADTS_AUDIO_TRACK_CLASS
+            | ADTS_CONTAINER_PROBE_CLASS
             | AUDIO_PIPELINE_FACTORY_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
@@ -1341,6 +1346,9 @@ fn replacement_body(
     }
     if class_name == ADTS_AUDIO_TRACK_CLASS {
         return adts_audio_track_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == ADTS_CONTAINER_PROBE_CLASS {
+        return adts_container_probe_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -4852,6 +4860,283 @@ fn adts_audio_track_process(pool: &mut ConstantPool<'static>) -> Result<Attribut
 
 fn adts_audio_track_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
     let owner = pool.add_class(ADTS_AUDIO_TRACK_CLASS)?;
+    let logger_factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        logger_factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn adts_container_probe_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        ("getName", "()Ljava/lang/String;") => string_return(pool, "adts", required_locals),
+        ("matchesHints", "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerHints;)Z") => {
+            adts_container_probe_matches_hints(pool)
+        }
+        (
+            "probe",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
+        ) => adts_container_probe_probe(pool),
+        (
+            "createTrack",
+            "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+        ) => adts_container_probe_create_track(pool),
+        ("<clinit>", "()V") => adts_container_probe_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {ADTS_CONTAINER_PROBE_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+fn adts_container_probe_matches_hints(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(ADTS_CONTAINER_PROBE_CLASS)?;
+    let hints = pool.add_class(MEDIA_CONTAINER_HINTS_CLASS)?;
+    let string = pool.add_class("java/lang/String")?;
+    let mime_type = pool.add_field_ref(hints, "mimeType", "Ljava/lang/String;")?;
+    let file_extension = pool.add_field_ref(hints, "fileExtension", "Ljava/lang/String;")?;
+    let equals_ignore_case =
+        pool.add_method_ref(string, "equalsIgnoreCase", "(Ljava/lang/String;)Z")?;
+    let present = pool.add_method_ref(hints, "present", "()Z")?;
+    let mime = pool.add_string("audio/aac")?;
+    let extension = pool.add_string("aac")?;
+    let mime_valid_target = 10;
+    let mime_store_target = 11;
+    let extension_valid_target = 22;
+    let extension_store_target = 23;
+    let false_target = 33;
+    let return_target = 34;
+    let mut body = code(
+        pool,
+        2,
+        4,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Getfield(mime_type),
+            Instruction::Ifnull(mime_valid_target),
+            Instruction::Ldc_w(mime),
+            Instruction::Aload_1,
+            Instruction::Getfield(mime_type),
+            Instruction::Invokevirtual(equals_ignore_case),
+            Instruction::Ifne(mime_valid_target),
+            Instruction::Iconst_1,
+            Instruction::Goto(mime_store_target),
+            Instruction::Iconst_0,
+            Instruction::Istore_2,
+            Instruction::Aload_1,
+            Instruction::Getfield(file_extension),
+            Instruction::Ifnull(extension_valid_target),
+            Instruction::Ldc_w(extension),
+            Instruction::Aload_1,
+            Instruction::Getfield(file_extension),
+            Instruction::Invokevirtual(equals_ignore_case),
+            Instruction::Ifne(extension_valid_target),
+            Instruction::Iconst_1,
+            Instruction::Goto(extension_store_target),
+            Instruction::Iconst_0,
+            Instruction::Istore_3,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(present),
+            Instruction::Ifeq(false_target),
+            Instruction::Iload_2,
+            Instruction::Ifne(false_target),
+            Instruction::Iload_3,
+            Instruction::Ifne(false_target),
+            Instruction::Iconst_1,
+            Instruction::Goto(return_target),
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+        ],
+    )?;
+    let base_locals = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Object { cpool_index: hints },
+    ];
+    let mut mime_locals = base_locals.clone();
+    mime_locals.push(VerificationType::Integer);
+    let mut all_locals = mime_locals.clone();
+    all_locals.push(VerificationType::Integer);
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: mime_valid_target,
+                locals: base_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: mime_store_target - mime_valid_target - 1,
+                locals: base_locals,
+                stack: vec![VerificationType::Integer],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: extension_valid_target - mime_store_target - 1,
+                locals: mime_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: extension_store_target - extension_valid_target - 1,
+                locals: mime_locals,
+                stack: vec![VerificationType::Integer],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: false_target - extension_store_target - 1,
+                locals: all_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: return_target - false_target - 1,
+                locals: all_locals,
+                stack: vec![VerificationType::Integer],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn adts_container_probe_probe(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(ADTS_CONTAINER_PROBE_CLASS)?;
+    let reference = pool.add_class(AUDIO_REFERENCE_CLASS)?;
+    let stream = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream")?;
+    let reader =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/adts/AdtsStreamReader")?;
+    let reader_init = pool.add_method_ref(reader, "<init>", "(Ljava/io/InputStream;)V")?;
+    let find_header = pool.add_method_ref(
+        reader,
+        "findPacketHeader",
+        "(I)Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let logger = pool.add_class("org/slf4j/Logger")?;
+    let debug =
+        pool.add_interface_method_ref(logger, "debug", "(Ljava/lang/String;Ljava/lang/Object;)V")?;
+    let message = pool.add_string("Track {} is an ADTS stream.")?;
+    let identifier = pool.add_field_ref(reference, "identifier", "Ljava/lang/String;")?;
+    let builder = pool.add_class(TRACK_INFO_BUILDER_CLASS)?;
+    let create = pool.add_method_ref(
+        builder,
+        "create",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)Lcom/sedmelluq/discord/lavaplayer/track/info/AudioTrackInfoBuilder;",
+    )?;
+    let build = pool.add_method_ref(
+        builder,
+        "build",
+        "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let result = pool.add_class(MEDIA_CONTAINER_DETECTION_RESULT_CLASS)?;
+    let supported = pool.add_method_ref(
+        result,
+        "supportedFormat",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
+    )?;
+    let detected_target = 11;
+    let mut body = code(
+        pool,
+        4,
+        4,
+        vec![
+            Instruction::New(reader),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Invokespecial(reader_init),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Sipush(1000),
+            Instruction::Invokevirtual(find_header),
+            Instruction::Ifnonnull(detected_target),
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+            Instruction::Getstatic(log),
+            Instruction::Ldc_w(message),
+            Instruction::Aload_1,
+            Instruction::Getfield(identifier),
+            Instruction::Invokeinterface(debug, 3),
+            Instruction::Aload_0,
+            Instruction::Aconst_null,
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Invokestatic(create),
+            Instruction::Invokevirtual(build),
+            Instruction::Invokestatic(supported),
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::FullFrame {
+            frame_type: 255,
+            offset_delta: detected_target,
+            locals: vec![
+                VerificationType::Object { cpool_index: owner },
+                VerificationType::Object {
+                    cpool_index: reference,
+                },
+                VerificationType::Object {
+                    cpool_index: stream,
+                },
+                VerificationType::Object {
+                    cpool_index: reader,
+                },
+            ],
+            stack: vec![],
+        }],
+    )?;
+    Ok(body)
+}
+
+fn adts_container_probe_create_track(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let track = pool.add_class(ADTS_AUDIO_TRACK_CLASS)?;
+    let init = pool.add_method_ref(
+        track,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Ljava/io/InputStream;)V",
+    )?;
+    code(
+        pool,
+        4,
+        4,
+        vec![
+            Instruction::New(track),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Aload_3,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn adts_container_probe_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(ADTS_CONTAINER_PROBE_CLASS)?;
     let logger_factory = pool.add_class("org/slf4j/LoggerFactory")?;
     let get_logger = pool.add_method_ref(
         logger_factory,

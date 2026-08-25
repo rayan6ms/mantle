@@ -227,6 +227,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-media-container-registry-consu
   --output "$WORK/GateMediaContainerRegistry.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-audio-track-consumer \
   --output "$WORK/GateAdtsAudioTrack.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-adts-container-probe-consumer \
+  --output "$WORK/GateAdtsContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -296,6 +298,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateMediaContainerProbe.java" \
   "$WORK/GateMediaContainerRegistry.java" \
   "$WORK/GateAdtsAudioTrack.java" \
+  "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GatePcmFilterFactory.java" \
   "$WORK/GatePcmFormat.java" \
   "$WORK/GateResamplingPcmAudioFilter.java" \
@@ -1199,6 +1202,16 @@ cmp "$WORK/adts-audio-track-reference.txt" "$WORK/adts-audio-track-candidate.txt
 grep --fixed-strings \
   'contracts=track-info,input-identity,null-construction,processing-context,read-callback,non-seekable,empty-stream,input-ownership,context-order,null-executor,null-input,io-wrapping,failure-identity,identifier-dispatch,subclassable,eager-logger,private-state,throws,reflection' \
   "$WORK/adts-audio-track-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateAdtsContainerProbe \
+  >"$WORK/adts-container-probe-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateAdtsContainerProbe >"$WORK/adts-container-probe-candidate.txt"
+cmp "$WORK/adts-container-probe-reference.txt" "$WORK/adts-container-probe-candidate.txt"
+grep --fixed-strings \
+  'contracts=name,hint-presence,mime,extension,case-insensitive,combined-hints,null-hints,header-detection,crc-header,scan-boundary,no-rewind,metadata-overlay,provider-order,supported-result,self-probe,null-settings,miss,null-reference,io-identity,runtime-identity,provider-failure,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,private-state,throws,reflection' \
+  "$WORK/adts-container-probe-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"
