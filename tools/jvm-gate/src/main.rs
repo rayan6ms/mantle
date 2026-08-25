@@ -154,6 +154,7 @@ fn filter_format_consumer_source(command: &str) -> Option<&'static str> {
         "write-pcm16-audio-data-format-consumer" => Some(PCM16_AUDIO_DATA_FORMAT_CONSUMER),
         "write-standard-audio-data-formats-consumer" => Some(STANDARD_AUDIO_DATA_FORMATS_CONSUMER),
         "write-audio-chunk-decoder-consumer" => Some(AUDIO_CHUNK_DECODER_CONSUMER),
+        "write-audio-chunk-encoder-consumer" => Some(AUDIO_CHUNK_ENCODER_CONSUMER),
         "write-pcm-filter-factory-consumer" => Some(PCM_FILTER_FACTORY_CONSUMER),
         "write-pcm-format-consumer" => Some(PCM_FORMAT_CONSUMER),
         "write-resampling-pcm-audio-filter-consumer" => Some(RESAMPLING_PCM_AUDIO_FILTER_CONSUMER),
@@ -10610,6 +10611,183 @@ public final class GateAudioChunkDecoder {
       decodeCalls++;
       if (decodeFailure != null) throw decodeFailure;
       if (encoded != null && buffer != null) buffer.put((short) encoded[0]);
+    }
+
+    @Override
+    public void close() {
+      closeCalls++;
+      if (closeFailure != null) throw closeFailure;
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_CHUNK_ENCODER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkEncoder;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.nio.ShortBuffer;
+
+public final class GateAudioChunkEncoder {
+  public static void main(String[] args) throws Exception {
+    returningDispatch();
+    callerOutputDispatch();
+    nullForwarding();
+    failureIdentity();
+    closeSemantics();
+    reflection();
+    System.out.println(
+        "contracts=public-abstract-interface,no-fields,no-constructors,overload-signatures,close-signature,identity-dispatch,input-consumption,returned-array,caller-output,null-forwarding,failure-identity,reflection");
+  }
+
+  private static void returningDispatch() {
+    RecordingEncoder implementation = new RecordingEncoder();
+    AudioChunkEncoder encoder = implementation;
+    ShortBuffer input = ShortBuffer.wrap(new short[] {10, 20, 30});
+    input.position(1);
+    byte[] expected = {4, 5, 6};
+    implementation.result = expected;
+    byte[] actual = encoder.encode(input);
+    check(implementation.returningCalls == 1 && implementation.input == input,
+        "returning overload preserves input identity");
+    check(actual == expected, "returning overload preserves implementation array identity");
+    check(input.position() == 2 && implementation.consumed == 20,
+        "implementation consumes the caller-owned input buffer");
+  }
+
+  private static void callerOutputDispatch() {
+    RecordingEncoder implementation = new RecordingEncoder();
+    AudioChunkEncoder encoder = implementation;
+    ShortBuffer input = ShortBuffer.wrap(new short[] {100, 200});
+    ByteBuffer output = ByteBuffer.allocate(4);
+    output.position(2);
+    encoder.encode(input, output);
+    check(implementation.bufferCalls == 1 && implementation.input == input
+        && implementation.output == output, "buffer overload preserves argument identities");
+    check(input.position() == 1 && implementation.consumed == 100,
+        "buffer overload exposes caller input consumption");
+    check(output.position() == 3 && output.get(2) == 100,
+        "implementation mutates the caller-owned output buffer");
+  }
+
+  private static void nullForwarding() {
+    RecordingEncoder returning = new RecordingEncoder();
+    AudioChunkEncoder returningEncoder = returning;
+    returningEncoder.encode(null);
+    check(returning.returningCalls == 1 && returning.input == null,
+        "null input reaches returning overload unchanged");
+
+    RecordingEncoder buffered = new RecordingEncoder();
+    AudioChunkEncoder bufferedEncoder = buffered;
+    bufferedEncoder.encode(null, null);
+    check(buffered.bufferCalls == 1 && buffered.input == null && buffered.output == null,
+        "null arguments reach buffer overload unchanged");
+  }
+
+  private static void failureIdentity() {
+    RecordingEncoder implementation = new RecordingEncoder();
+    AudioChunkEncoder encoder = implementation;
+    RuntimeException returningFailure = new RuntimeException("returning");
+    implementation.returningFailure = returningFailure;
+    check(expect(() -> encoder.encode(ShortBuffer.allocate(0))) == returningFailure,
+        "returning overload failure identity");
+
+    RuntimeException bufferFailure = new RuntimeException("buffer");
+    implementation.bufferFailure = bufferFailure;
+    check(expect(() -> encoder.encode(ShortBuffer.allocate(0), ByteBuffer.allocate(0)))
+        == bufferFailure, "buffer overload failure identity");
+
+    RuntimeException closeFailure = new RuntimeException("close");
+    implementation.closeFailure = closeFailure;
+    check(expect(encoder::close) == closeFailure, "close failure identity");
+  }
+
+  private static void closeSemantics() {
+    RecordingEncoder implementation = new RecordingEncoder();
+    AudioChunkEncoder encoder = implementation;
+    encoder.close();
+    encoder.close();
+    check(implementation.closeCalls == 2, "each close call dispatches to the implementation");
+  }
+
+  private static void reflection() throws Exception {
+    Class<AudioChunkEncoder> type = AudioChunkEncoder.class;
+    int interfaceModifiers = Modifier.PUBLIC | Modifier.ABSTRACT | Modifier.INTERFACE;
+    check(type.getModifiers() == interfaceModifiers && type.isInterface()
+        && type.getSuperclass() == null && type.getInterfaces().length == 0,
+        "interface metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 3, "declared member counts");
+
+    Method returning = type.getDeclaredMethod("encode", ShortBuffer.class);
+    checkAbstract(returning, byte[].class, "returning encode metadata");
+    check(returning.getParameterCount() == 1
+        && returning.getParameterTypes()[0] == ShortBuffer.class,
+        "returning encode parameters");
+
+    Method buffered = type.getDeclaredMethod("encode", ShortBuffer.class, ByteBuffer.class);
+    checkAbstract(buffered, void.class, "buffer encode metadata");
+    check(buffered.getParameterCount() == 2
+        && buffered.getParameterTypes()[0] == ShortBuffer.class
+        && buffered.getParameterTypes()[1] == ByteBuffer.class,
+        "buffer encode parameters");
+
+    Method close = type.getDeclaredMethod("close");
+    checkAbstract(close, void.class, "close metadata");
+    check(close.getParameterCount() == 0, "close parameters");
+  }
+
+  private static void checkAbstract(Method method, Class<?> returnType, String message) {
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == returnType && method.getExceptionTypes().length == 0
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic(), message);
+  }
+
+  private static RuntimeException expect(Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected failure");
+    } catch (RuntimeException error) {
+      return error;
+    }
+  }
+
+  private interface Operation { void run(); }
+
+  private static final class RecordingEncoder implements AudioChunkEncoder {
+    private ShortBuffer input;
+    private ByteBuffer output;
+    private byte[] result = new byte[0];
+    private short consumed;
+    private int returningCalls;
+    private int bufferCalls;
+    private int closeCalls;
+    private RuntimeException returningFailure;
+    private RuntimeException bufferFailure;
+    private RuntimeException closeFailure;
+
+    @Override
+    public byte[] encode(ShortBuffer input) {
+      this.input = input;
+      returningCalls++;
+      if (returningFailure != null) throw returningFailure;
+      if (input != null) consumed = input.get();
+      return result;
+    }
+
+    @Override
+    public void encode(ShortBuffer input, ByteBuffer output) {
+      this.input = input;
+      this.output = output;
+      bufferCalls++;
+      if (bufferFailure != null) throw bufferFailure;
+      if (input != null) consumed = input.get();
+      if (output != null) output.put((byte) consumed);
     }
 
     @Override
