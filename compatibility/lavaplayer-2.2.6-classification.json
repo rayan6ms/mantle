@@ -367,45 +367,70 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public concrete subclassable Object shape, two-field immutable state, construction, delegation, and reflected metadata are reference-proven.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDescriptor",
       "symbol_kind": "FIELD",
       "member_name": "probe",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public final probe field, reference identity, null acceptance, and reflected metadata are reference-proven.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDescriptor",
       "symbol_kind": "FIELD",
       "member_name": "parameters",
       "descriptor": "Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public final parameters field, String reference identity, null acceptance, and reflected metadata are reference-proven.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDescriptor",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;Ljava/lang/String;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public construction, argument identity, null acceptance, field initialization, subclass use, and absence of checked exceptions are reference-proven.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDescriptor",
       "symbol_kind": "METHOD",
       "member_name": "createTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact probe delegation order, null forwarding, repeated calls, return identity, exception identity, null-probe failure, and reflected metadata are reference-proven.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetection",

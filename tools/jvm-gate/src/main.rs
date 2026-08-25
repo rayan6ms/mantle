@@ -141,6 +141,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-formats-consumer" => Some(FORMATS_CONSUMER),
         "write-media-container-consumer" => Some(MEDIA_CONTAINER_CONSUMER),
+        "write-media-container-descriptor-consumer" => Some(MEDIA_CONTAINER_DESCRIPTOR_CONSUMER),
         _ => {
             filter_format_consumer_source(command).or_else(|| sound_cloud_consumer_source(command))
         }
@@ -12207,6 +12208,181 @@ public final class GateMediaContainer {
   }
 
   private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MEDIA_CONTAINER_DESCRIPTOR_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDescriptor;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerProbe;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+
+public final class GateMediaContainerDescriptor {
+  public static void main(String[] args) throws Exception {
+    constructionAndDelegation();
+    nullsAndFailures();
+    subclassUse();
+    reflection();
+    System.out.println(
+        "contracts=constructor-identity,null-construction,argument-order,return-identity,repeated-delegation,null-forwarding,exception-identity,null-probe-failure,subclassable,no-private-state,reflection");
+  }
+
+  private static void constructionAndDelegation() {
+    ProbeState state = new ProbeState();
+    MediaContainerProbe probe = state.proxy();
+    String parameters = new String("container-settings");
+    MediaContainerDescriptor descriptor = new MediaContainerDescriptor(probe, parameters);
+    AudioTrackInfo info = new AudioTrackInfo("title", "author", 123L, "id", false, "uri");
+    AudioTrack returned = trackProxy();
+    state.returned = returned;
+
+    check(descriptor.probe == probe && descriptor.parameters == parameters,
+        "constructor retains exact field identities");
+    check(descriptor.createTrack(info, null) == returned && state.calls == 1
+        && state.parameters == parameters && state.info == info && state.stream == null,
+        "createTrack forwards arguments and return identity");
+    AudioTrackInfo second = new AudioTrackInfo("second", "author", 0L, "second", true, null);
+    check(descriptor.createTrack(second, null) == returned && state.calls == 2
+        && state.parameters == parameters && state.info == second && state.stream == null,
+        "repeated delegation observes current call arguments");
+  }
+
+  private static void nullsAndFailures() {
+    ProbeState nullState = new ProbeState();
+    MediaContainerDescriptor nullable = new MediaContainerDescriptor(nullState.proxy(), null);
+    check(nullable.probe != null && nullable.parameters == null,
+        "constructor accepts null parameters");
+    check(nullable.createTrack(null, null) == null && nullState.calls == 1
+        && nullState.parameters == null && nullState.info == null && nullState.stream == null,
+        "all nullable values are forwarded unchanged");
+
+    RuntimeException failure = new RuntimeException("probe-failure");
+    ProbeState failingState = new ProbeState();
+    failingState.failure = failure;
+    MediaContainerDescriptor failing = new MediaContainerDescriptor(failingState.proxy(), "p");
+    expectSame(failure, () -> failing.createTrack(null, null));
+    check(failingState.calls == 1 && failingState.parameters.equals("p"),
+        "probe failure occurs after exact delegation");
+
+    MediaContainerDescriptor absent = new MediaContainerDescriptor(null, "retained");
+    check(absent.probe == null && absent.parameters.equals("retained"),
+        "constructor accepts null probe without validation");
+    expect(NullPointerException.class, () -> absent.createTrack(null, null));
+  }
+
+  private static void subclassUse() {
+    ProbeState state = new ProbeState();
+    AudioTrack returned = trackProxy();
+    state.returned = returned;
+    Derived derived = new Derived(state.proxy(), "derived");
+    check(derived instanceof MediaContainerDescriptor && derived.probe == state.probe
+        && derived.parameters.equals("derived") && derived.createTrack(null, null) == returned
+        && state.calls == 1, "public constructor and delegation support subclasses");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MediaContainerDescriptor> type = MediaContainerDescriptor.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete subclassable Object metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredMethods().length == 1
+        && type.getDeclaredConstructors().length == 1,
+        "exact declared member counts and no private state");
+
+    Field probe = type.getDeclaredField("probe");
+    Field parameters = type.getDeclaredField("parameters");
+    check(probe.getType() == MediaContainerProbe.class
+        && probe.getGenericType() == MediaContainerProbe.class
+        && probe.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL) && !probe.isSynthetic(),
+        "probe field metadata");
+    check(parameters.getType() == String.class && parameters.getGenericType() == String.class
+        && parameters.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && !parameters.isSynthetic(), "parameters field metadata");
+
+    Constructor<MediaContainerDescriptor> constructor =
+        type.getDeclaredConstructor(MediaContainerProbe.class, String.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && Arrays.equals(constructor.getParameterTypes(),
+            new Class<?>[] {MediaContainerProbe.class, String.class})
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "constructor metadata");
+    Method createTrack =
+        type.getDeclaredMethod("createTrack", AudioTrackInfo.class, SeekableInputStream.class);
+    check(createTrack.getModifiers() == Modifier.PUBLIC && createTrack.getReturnType() == AudioTrack.class
+        && Arrays.equals(createTrack.getParameterTypes(),
+            new Class<?>[] {AudioTrackInfo.class, SeekableInputStream.class})
+        && createTrack.getExceptionTypes().length == 0 && !createTrack.isSynthetic()
+        && !createTrack.isBridge(), "createTrack metadata");
+  }
+
+  private static AudioTrack trackProxy() {
+    return (AudioTrack) Proxy.newProxyInstance(AudioTrack.class.getClassLoader(),
+        new Class<?>[] {AudioTrack.class}, (instance, method, arguments) -> null);
+  }
+
+  private static void expect(Class<? extends Throwable> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable throwable) {
+      check(type.isInstance(throwable),
+          "expected " + type.getName() + " but got " + throwable.getClass().getName());
+    }
+  }
+
+  private static void expectSame(Throwable expected, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected failure");
+    } catch (Throwable throwable) {
+      check(throwable == expected, "exception identity");
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static final class ProbeState {
+    MediaContainerProbe probe;
+    String parameters;
+    AudioTrackInfo info;
+    SeekableInputStream stream;
+    AudioTrack returned;
+    RuntimeException failure;
+    int calls;
+
+    MediaContainerProbe proxy() {
+      probe = (MediaContainerProbe) Proxy.newProxyInstance(
+          MediaContainerProbe.class.getClassLoader(), new Class<?>[] {MediaContainerProbe.class},
+          (instance, method, arguments) -> {
+            if (!method.getName().equals("createTrack")) {
+              throw new AssertionError("unexpected probe call " + method.getName());
+            }
+            calls++;
+            parameters = (String) arguments[0];
+            info = (AudioTrackInfo) arguments[1];
+            stream = (SeekableInputStream) arguments[2];
+            if (failure != null) throw failure;
+            return returned;
+          });
+      return probe;
+    }
+  }
+
+  private static final class Derived extends MediaContainerDescriptor {
+    Derived(MediaContainerProbe probe, String parameters) { super(probe, parameters); }
+  }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

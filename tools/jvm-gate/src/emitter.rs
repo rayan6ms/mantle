@@ -142,6 +142,8 @@ const PCM_CHUNK_ENCODER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/format/transcoder/PcmChunkEncoder";
 const FORMATS_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/Formats";
 const MEDIA_CONTAINER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/MediaContainer";
+const MEDIA_CONTAINER_DESCRIPTOR_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -468,6 +470,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     PCM_CHUNK_ENCODER_CLASS,
     FORMATS_CLASS,
     MEDIA_CONTAINER_CLASS,
+    MEDIA_CONTAINER_DESCRIPTOR_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -1287,6 +1290,9 @@ fn replacement_body(
     }
     if class_name == MEDIA_CONTAINER_CLASS {
         return media_container_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == MEDIA_CONTAINER_DESCRIPTOR_CLASS {
+        return media_container_descriptor_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -3239,6 +3245,90 @@ fn media_container_replacement(
             required_locals,
         ),
     }
+}
+
+fn media_container_descriptor_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;Ljava/lang/String;)V",
+        ) => media_container_descriptor_constructor(pool),
+        (
+            "createTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+        ) => media_container_descriptor_create_track(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {MEDIA_CONTAINER_DESCRIPTOR_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn media_container_descriptor_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(MEDIA_CONTAINER_DESCRIPTOR_CLASS)?;
+    let probe = pool.add_field_ref(
+        owner,
+        "probe",
+        "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;",
+    )?;
+    let parameters = pool.add_field_ref(owner, "parameters", "Ljava/lang/String;")?;
+    code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(probe),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(parameters),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn media_container_descriptor_create_track(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MEDIA_CONTAINER_DESCRIPTOR_CLASS)?;
+    let probe_field = pool.add_field_ref(
+        owner,
+        "probe",
+        "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;",
+    )?;
+    let parameters = pool.add_field_ref(owner, "parameters", "Ljava/lang/String;")?;
+    let probe = pool.add_class("com/sedmelluq/discord/lavaplayer/container/MediaContainerProbe")?;
+    let create_track = pool.add_interface_method_ref(
+        probe,
+        "createTrack",
+        "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+    )?;
+    code(
+        pool,
+        4,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(probe_field),
+            Instruction::Aload_0,
+            Instruction::Getfield(parameters),
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(create_track, 4),
+            Instruction::Areturn,
+        ],
+    )
 }
 
 fn media_container_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {

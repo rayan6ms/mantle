@@ -213,6 +213,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-formats-consumer \
   --output "$WORK/GateFormats.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-media-container-consumer \
   --output "$WORK/GateMediaContainer.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-media-container-descriptor-consumer \
+  --output "$WORK/GateMediaContainerDescriptor.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -275,6 +277,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GatePcmChunkEncoder.java" \
   "$WORK/GateFormats.java" \
   "$WORK/GateMediaContainer.java" \
+  "$WORK/GateMediaContainerDescriptor.java" \
   "$WORK/GatePcmFilterFactory.java" \
   "$WORK/GatePcmFormat.java" \
   "$WORK/GateResamplingPcmAudioFilter.java" \
@@ -1104,6 +1107,17 @@ cmp "$WORK/media-container-reference.txt" "$WORK/media-container-candidate.txt"
 grep --fixed-strings \
   'contracts=enum-order,identity,name-ordinal,defensive-values,value-of,lookup-failures,probe-types,probe-identity,fresh-mutable-array-list,enum-collections,private-enum-state,generic-signatures,reflection' \
   "$WORK/media-container-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMediaContainerDescriptor \
+  >"$WORK/media-container-descriptor-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMediaContainerDescriptor >"$WORK/media-container-descriptor-candidate.txt"
+cmp "$WORK/media-container-descriptor-reference.txt" \
+  "$WORK/media-container-descriptor-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor-identity,null-construction,argument-order,return-identity,repeated-delegation,null-forwarding,exception-identity,null-probe-failure,subclassable,no-private-state,reflection' \
+  "$WORK/media-container-descriptor-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"
