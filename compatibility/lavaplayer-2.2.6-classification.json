@@ -8311,9 +8311,10 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted public abstract marker interface is byte-for-byte identical to the reference, with no declared members and the exact ordered ShortPcmAudioFilter, SplitShortPcmAudioFilter, and FloatPcmAudioFilter parents. Differential coverage proves intersection assignability, all inherited PCM and lifecycle dispatch, identity and state visibility, declaring-interface ownership, checked-failure identity, and null-receiver behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.UserProvidedAudioFilters",

@@ -103,6 +103,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-audio-filter-interface-consumer" => Some(AUDIO_FILTER_INTERFACE_CONSUMER),
         "write-float-pcm-audio-filter-consumer" => Some(FLOAT_PCM_AUDIO_FILTER_CONSUMER),
         "write-short-pcm-audio-filter-consumer" => Some(SHORT_PCM_AUDIO_FILTER_CONSUMER),
+        "write-universal-pcm-audio-filter-consumer" => Some(UNIVERSAL_PCM_AUDIO_FILTER_CONSUMER),
         "write-pcm-filter-factory-consumer" => Some(PCM_FILTER_FACTORY_CONSUMER),
         "write-pcm-format-consumer" => Some(PCM_FORMAT_CONSUMER),
         "write-resampling-pcm-audio-filter-consumer" => Some(RESAMPLING_PCM_AUDIO_FILTER_CONSUMER),
@@ -7641,6 +7642,221 @@ public final class GateShortPcmAudioFilter {
     public void seekPerformed(long requestedTimecode, long providedTimecode) { }
     public void flush() throws InterruptedException { }
     public void close() { }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const UNIVERSAL_PCM_AUDIO_FILTER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.AudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.FloatPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.ShortPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.SplitShortPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.UniversalPcmAudioFilter;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ShortBuffer;
+import java.util.Arrays;
+
+public final class GateUniversalPcmAudioFilter {
+  public static void main(String[] args) throws Exception {
+    intersectionDispatch();
+    checkedFailure();
+    nullReceiver();
+    reflection();
+    System.out.println(
+        "intersection=short-array,short-buffer,split-short,float,lifecycle,identity,state;"
+        + "failures=interrupted-identity,prefix,null-receiver;"
+        + "reflection=public-abstract-marker,0-fields,0-constructors,0-methods,"
+        + "3-ordered-parents,declaring-interfaces");
+  }
+
+  private static void intersectionDispatch() throws Exception {
+    RecordingUniversal implementation = new RecordingUniversal();
+    UniversalPcmAudioFilter universal = implementation;
+    check(universal instanceof ShortPcmAudioFilter
+        && universal instanceof SplitShortPcmAudioFilter
+        && universal instanceof FloatPcmAudioFilter
+        && universal instanceof AudioFilter, "intersection assignability");
+
+    short[] interleaved = new short[] { Short.MIN_VALUE, 0, Short.MAX_VALUE };
+    ((ShortPcmAudioFilter) universal).process(interleaved, Integer.MIN_VALUE,
+        Integer.MAX_VALUE);
+    check(implementation.shortArray == interleaved
+        && implementation.shortOffset == Integer.MIN_VALUE
+        && implementation.shortLength == Integer.MAX_VALUE,
+        "short array identity and full-width values");
+
+    ShortBuffer buffer = ShortBuffer.wrap(new short[] { 2, 3, 5, 7 });
+    buffer.position(1).limit(3);
+    universal.process(buffer);
+    check(implementation.shortBuffer == buffer && implementation.bufferPosition == 1
+        && implementation.bufferLimit == 3 && buffer.position() == 2,
+        "short buffer identity and state visibility");
+
+    short[][] split = new short[][] { new short[] { -1, 1 }, null };
+    ((SplitShortPcmAudioFilter) universal).process(split, -17, 23);
+    check(implementation.splitShort == split && implementation.splitFirst == split[0]
+        && implementation.splitSecond == null && implementation.splitOffset == -17
+        && implementation.splitLength == 23, "split identity and state");
+
+    float[][] floating = new float[][] {
+        new float[] { Float.NaN, -0.0f, Float.POSITIVE_INFINITY }, null
+    };
+    universal.process(floating, 31, -37);
+    check(implementation.floating == floating && implementation.floatFirst == floating[0]
+        && implementation.floatSecond == null && implementation.floatOffset == 31
+        && implementation.floatLength == -37, "float identity and state");
+
+    universal.seekPerformed(Long.MIN_VALUE, Long.MAX_VALUE);
+    universal.flush();
+    universal.close();
+    check(implementation.requestedTimecode == Long.MIN_VALUE
+        && implementation.providedTimecode == Long.MAX_VALUE
+        && implementation.seeks == 1 && implementation.flushes == 1
+        && implementation.closes == 1, "inherited lifecycle dispatch");
+  }
+
+  private static void checkedFailure() {
+    RecordingUniversal implementation = new RecordingUniversal();
+    InterruptedException sentinel = new InterruptedException("universal-sentinel");
+    implementation.failure = sentinel;
+    float[][] input = new float[][] { new float[] { 1.0f } };
+    expectIdentity(sentinel, () -> implementation.process(input, -41, 43));
+    check(implementation.floating == input && implementation.floatOffset == -41
+        && implementation.floatLength == 43 && implementation.floatCalls == 0,
+        "checked failure prefix");
+  }
+
+  private static void nullReceiver() {
+    UniversalPcmAudioFilter universal = null;
+    expect(NullPointerException.class,
+        () -> universal.process(new short[0], 0, 0));
+  }
+
+  private static void reflection() throws Exception {
+    Class<UniversalPcmAudioFilter> type = UniversalPcmAudioFilter.class;
+    check(type.isInterface() && Modifier.isPublic(type.getModifiers())
+        && Modifier.isAbstract(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == null, "marker interface metadata");
+    check(Arrays.equals(type.getInterfaces(), new Class<?>[] {
+        ShortPcmAudioFilter.class, SplitShortPcmAudioFilter.class,
+        FloatPcmAudioFilter.class }), "ordered parents");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 0, "zero declared members");
+
+    checkDeclaring(type.getMethod("process", short[].class, int.class, int.class),
+        ShortPcmAudioFilter.class);
+    checkDeclaring(type.getMethod("process", ShortBuffer.class), ShortPcmAudioFilter.class);
+    checkDeclaring(type.getMethod("process", short[][].class, int.class, int.class),
+        SplitShortPcmAudioFilter.class);
+    checkDeclaring(type.getMethod("process", float[][].class, int.class, int.class),
+        FloatPcmAudioFilter.class);
+    checkDeclaring(type.getMethod("seekPerformed", long.class, long.class), AudioFilter.class);
+    checkDeclaring(type.getMethod("flush"), AudioFilter.class);
+    checkDeclaring(type.getMethod("close"), AudioFilter.class);
+  }
+
+  private static void checkDeclaring(Method method, Class<?> owner) {
+    check(method.getDeclaringClass() == owner, method.getName() + " declaring interface");
+  }
+
+  private static void expectIdentity(
+      InterruptedException expected, InterruptibleOperation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("failure was swallowed");
+    } catch (InterruptedException error) {
+      check(error == expected, "InterruptedException identity");
+    }
+  }
+
+  private static void expect(Class<? extends Throwable> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
+  }
+
+  private interface InterruptibleOperation { void run() throws InterruptedException; }
+  private interface Operation { void run() throws Exception; }
+
+  private static final class RecordingUniversal implements UniversalPcmAudioFilter {
+    short[] shortArray;
+    ShortBuffer shortBuffer;
+    short[][] splitShort;
+    short[] splitFirst;
+    short[] splitSecond;
+    float[][] floating;
+    float[] floatFirst;
+    float[] floatSecond;
+    int shortOffset;
+    int shortLength;
+    int bufferPosition;
+    int bufferLimit;
+    int splitOffset;
+    int splitLength;
+    int floatOffset;
+    int floatLength;
+    int floatCalls;
+    long requestedTimecode;
+    long providedTimecode;
+    int seeks;
+    int flushes;
+    int closes;
+    InterruptedException failure;
+
+    public void process(short[] input, int offset, int length) throws InterruptedException {
+      shortArray = input;
+      shortOffset = offset;
+      shortLength = length;
+      if (failure != null) throw failure;
+    }
+
+    public void process(ShortBuffer buffer) throws InterruptedException {
+      shortBuffer = buffer;
+      if (failure != null) throw failure;
+      bufferPosition = buffer.position();
+      bufferLimit = buffer.limit();
+      buffer.position(buffer.position() + 1);
+    }
+
+    public void process(short[][] input, int offset, int length) throws InterruptedException {
+      splitShort = input;
+      splitFirst = input == null || input.length < 1 ? null : input[0];
+      splitSecond = input == null || input.length < 2 ? null : input[1];
+      splitOffset = offset;
+      splitLength = length;
+      if (failure != null) throw failure;
+    }
+
+    public void process(float[][] input, int offset, int length) throws InterruptedException {
+      floating = input;
+      floatFirst = input == null || input.length < 1 ? null : input[0];
+      floatSecond = input == null || input.length < 2 ? null : input[1];
+      floatOffset = offset;
+      floatLength = length;
+      if (failure != null) throw failure;
+      floatCalls++;
+    }
+
+    public void seekPerformed(long requestedTimecode, long providedTimecode) {
+      this.requestedTimecode = requestedTimecode;
+      this.providedTimecode = providedTimecode;
+      seeks++;
+    }
+
+    public void flush() throws InterruptedException {
+      if (failure != null) throw failure;
+      flushes++;
+    }
+
+    public void close() { closes++; }
   }
 
   private static void check(boolean condition, String message) {
