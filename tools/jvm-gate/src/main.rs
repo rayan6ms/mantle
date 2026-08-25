@@ -162,6 +162,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-adts-packet-header-consumer" => Some(ADTS_PACKET_HEADER_CONSUMER),
         "write-adts-stream-provider-consumer" => Some(ADTS_STREAM_PROVIDER_CONSUMER),
         "write-adts-stream-reader-consumer" => Some(ADTS_STREAM_READER_CONSUMER),
+        "write-aac-packet-router-consumer" => Some(AAC_PACKET_ROUTER_CONSUMER),
         _ => None,
     }
 }
@@ -38665,6 +38666,418 @@ public final class GateAdtsStreamReader {
   }
 
   private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AAC_PACKET_ROUTER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.common.AacPacketRouter;
+import com.sedmelluq.discord.lavaplayer.filter.AudioPipeline;
+import com.sedmelluq.discord.lavaplayer.filter.FinalPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.Pcm16AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.natives.aac.AacDecoder;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerOptions;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameRebuilder;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.ShortBuffer;
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import org.slf4j.LoggerFactory;
+
+public final class GateAacPacketRouter {
+  private static final Object UNSAFE = loadUnsafe();
+
+  public static void main(String[] args) throws Exception {
+    constructionAndLazyDecoder();
+    processingAndPipelineCreation();
+    seekingAndFlushing();
+    closing();
+    subclassingAndReflection();
+    System.out.println(
+        "contracts=construction,context-identity,configurer-identity,null-construction,eager-logger,private-state,lazy-decoder,configurer-order,configurer-failure,null-configurer,decoder-reuse,input-identity,stream-info-lazy,pipeline-creation,pcm-format,native-output-buffer,delayed-seek,retained-seek,decode-loop,non-flush-mode,buffer-clear,interruption-identity,seek-forwarding,seek-overwrite,decoder-reset,decoder-close-failure,flush-noop,flush-mode,flush-loop,close-order,close-finally,close-failure,repeated-close,public-decoder,subclassable,generic-signatures,throws,reflection");
+  }
+
+  private static void constructionAndLazyDecoder() throws Exception {
+    AudioProcessingContext context = context();
+    final AacDecoder[] configured = new AacDecoder[1];
+    RuntimeException sentinel = new RuntimeException("configurer-sentinel");
+    Consumer<AacDecoder> configurer = decoder -> {
+      configured[0] = decoder;
+      throw sentinel;
+    };
+    AacPacketRouter router = new AacPacketRouter(context, configurer);
+    check(field(router, "context") == context && field(router, "decoderConfigurer") == configurer
+        && field(router, "initialRequestedTimecode") == null
+        && field(router, "initialProvidedTimecode") == null
+        && field(router, "downstream") == null && field(router, "outputBuffer") == null
+        && router.decoder == null, "constructor retains only exact caller state");
+    Field log = AacPacketRouter.class.getDeclaredField("log");
+    log.setAccessible(true);
+    check(log.get(null) == LoggerFactory.getLogger(AacPacketRouter.class),
+        "logger is initialized eagerly for the exact router class");
+
+    ByteBuffer input = ByteBuffer.allocateDirect(3);
+    check(catchThrowable(() -> router.processInput(input)) == sentinel
+        && router.decoder == configured[0] && router.decoder.getClass() == AacDecoder.class,
+        "lazy decoder is assigned before exact configurer invocation");
+    router.decoder.close();
+    RecordingDecoder installed = allocate(RecordingDecoder.class);
+    router.decoder = installed;
+    router.processInput(input);
+    check(installed.fillCalls == 1 && installed.fillBuffer == input
+        && configured[0] != installed && installed.resolveCalls == 1,
+        "preinstalled public decoder skips configurer and receives exact input identity");
+
+    AacPacketRouter nulls = new AacPacketRouter(null, null);
+    Throwable nullFailure = catchThrowable(() -> nulls.processInput(ByteBuffer.allocate(0)));
+    check(nullFailure instanceof NullPointerException && nulls.decoder != null,
+        "null configurer fails only after lazy decoder assignment");
+    nulls.decoder.close();
+  }
+
+  private static void processingAndPipelineCreation() throws Exception {
+    AacPacketRouter router = new AacPacketRouter(null, decoder -> {});
+    RecordingDecoder decoder = allocate(RecordingDecoder.class);
+    RecordingPipeline pipeline = allocate(RecordingPipeline.class);
+    pipeline.buffersCleared = true;
+    ShortBuffer output = ByteBuffer.allocateDirect(16)
+        .order(ByteOrder.nativeOrder()).asShortBuffer();
+    router.decoder = decoder;
+    putObject(router, "downstream", pipeline);
+    putObject(router, "outputBuffer", output);
+    decoder.successfulDecodes = 2;
+    ByteBuffer input = ByteBuffer.allocateDirect(5);
+    router.processInput(input);
+    check(decoder.fillCalls == 1 && decoder.fillBuffer == input && decoder.resolveCalls == 0
+        && decoder.decodeCalls == 3 && decoder.nonFlushCalls == 3 && pipeline.processCalls == 2
+        && pipeline.firstBuffer == output && pipeline.lastBuffer == output
+        && pipeline.buffersCleared && output.position() == 0 && output.limit() == output.capacity(),
+        "existing pipeline drives exact non-flush decode/process/clear loop");
+
+    InterruptedException interrupted = new InterruptedException("process-sentinel");
+    pipeline.processFailure = interrupted;
+    decoder.successfulDecodes = decoder.decodeCalls + 1;
+    output.position(3);
+    Throwable processFailure = catchThrowable(() -> router.processInput(ByteBuffer.allocate(0)));
+    check(processFailure == interrupted && output.position() == 3,
+        "downstream interruption propagates before output clear");
+    pipeline.processFailure = null;
+
+    AacPacketRouter creating = new AacPacketRouter(context(), ignored -> {});
+    RecordingDecoder resolving = allocate(RecordingDecoder.class);
+    resolving.streamInfo = new AacDecoder.StreamInfo(48_000, 2, 1_024);
+    creating.decoder = resolving;
+    creating.seekPerformed(5_000L, 1_000L);
+    RecordingDecoder replacement = allocate(RecordingDecoder.class);
+    replacement.streamInfo = resolving.streamInfo;
+    creating.decoder = replacement;
+    creating.processInput(ByteBuffer.allocateDirect(0));
+    AudioPipeline actual = (AudioPipeline) field(creating, "downstream");
+    ShortBuffer actualOutput = (ShortBuffer) field(creating, "outputBuffer");
+    Object first = field(actual, AudioPipeline.class, "first");
+    check(actual.getClass() == AudioPipeline.class && first.getClass() == FinalPcmAudioFilter.class
+        && actualOutput.isDirect() && actualOutput.capacity() == 2_048
+        && actualOutput.order() == ByteOrder.nativeOrder()
+        && ((Long) field(first, FinalPcmAudioFilter.class, "timecodeBase")) == 5_000L
+        && ((Long) field(first, FinalPcmAudioFilter.class, "ignoredFrames")) == 384_000L
+        && ((Long) field(creating, "initialRequestedTimecode")) == 5_000L
+        && ((Long) field(creating, "initialProvidedTimecode")) == 1_000L,
+        "resolved stream creates exact PCM pipeline and native-order output then replays retained seek");
+    creating.close();
+    router.close();
+  }
+
+  private static void seekingAndFlushing() throws Exception {
+    AacPacketRouter pending = new AacPacketRouter(null, ignored -> {});
+    RecordingDecoder first = allocate(RecordingDecoder.class);
+    pending.decoder = first;
+    pending.seekPerformed(Long.MIN_VALUE + 7L, Long.MAX_VALUE - 9L);
+    check(first.closeCalls == 1 && pending.decoder == null
+        && ((Long) field(pending, "initialRequestedTimecode")) == Long.MIN_VALUE + 7L
+        && ((Long) field(pending, "initialProvidedTimecode")) == Long.MAX_VALUE - 9L,
+        "seek without pipeline overwrites pending values then resets decoder");
+    pending.flush();
+
+    RecordingPipeline pipeline = allocate(RecordingPipeline.class);
+    RecordingDecoder decoder = allocate(RecordingDecoder.class);
+    ShortBuffer output = ShortBuffer.allocate(4);
+    pending.decoder = decoder;
+    putObject(pending, "downstream", pipeline);
+    putObject(pending, "outputBuffer", output);
+    pending.seekPerformed(91L, -37L);
+    check(pipeline.seekCalls == 1 && pipeline.requested == 91L && pipeline.provided == -37L
+        && decoder.closeCalls == 1 && pending.decoder == null
+        && ((Long) field(pending, "initialRequestedTimecode")) == Long.MIN_VALUE + 7L,
+        "active seek forwards without changing pending values and resets decoder afterward");
+
+    RuntimeException closeFailure = new RuntimeException("seek-close-sentinel");
+    RecordingDecoder failing = allocate(RecordingDecoder.class);
+    failing.closeFailure = closeFailure;
+    pending.decoder = failing;
+    check(catchThrowable(() -> pending.seekPerformed(1L, 2L)) == closeFailure
+        && pending.decoder == failing,
+        "decoder close failure prevents seek reset with exact identity");
+    failing.closeFailure = null;
+
+    RecordingDecoder flushing = allocate(RecordingDecoder.class);
+    flushing.successfulDecodes = 2;
+    pending.decoder = flushing;
+    pending.flush();
+    check(flushing.decodeCalls == 3 && flushing.flushCalls == 3 && pipeline.processCalls == 2
+        && output.position() == 0 && output.limit() == output.capacity(),
+        "flush drains with true mode through the same process/clear loop");
+    pending.close();
+  }
+
+  private static void closing() throws Exception {
+    AacPacketRouter router = new AacPacketRouter(null, ignored -> {});
+    RecordingPipeline pipeline = allocate(RecordingPipeline.class);
+    RecordingDecoder decoder = allocate(RecordingDecoder.class);
+    router.decoder = decoder;
+    putObject(router, "downstream", pipeline);
+    router.close();
+    router.close();
+    check(pipeline.closeCalls == 2 && decoder.closeCalls == 2,
+        "repeated close forwards to both retained resources");
+
+    RuntimeException pipelineFailure = new RuntimeException("pipeline-close-sentinel");
+    pipeline.closeFailure = pipelineFailure;
+    check(catchThrowable(router::close) == pipelineFailure
+        && pipeline.closeCalls == 3 && decoder.closeCalls == 3,
+        "decoder closes in finally after downstream failure");
+
+    RuntimeException decoderFailure = new RuntimeException("decoder-close-sentinel");
+    decoder.closeFailure = decoderFailure;
+    check(catchThrowable(router::close) == decoderFailure
+        && pipeline.closeCalls == 4 && decoder.closeCalls == 4,
+        "decoder failure replaces downstream failure in plain finally");
+    pipeline.closeFailure = null;
+    decoder.closeFailure = null;
+  }
+
+  private static void subclassingAndReflection() throws Exception {
+    Derived derived = new Derived(null, ignored -> {});
+    AacPacketRouter dynamic = derived;
+    dynamic.flush();
+    check(derived.flushCalls == 1, "ordinary subclass participates in virtual dispatch");
+
+    Class<AacPacketRouter> type = AacPacketRouter.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0 && type.getDeclaredFields().length == 8
+        && type.getDeclaredMethods().length == 4 && type.getDeclaredConstructors().length == 1,
+        "exact class and declared-member metadata");
+    checkField(type, "log", org.slf4j.Logger.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "context", AudioProcessingContext.class, Modifier.PRIVATE | Modifier.FINAL);
+    Field configurer = checkField(type, "decoderConfigurer", Consumer.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    ParameterizedType generic = (ParameterizedType) configurer.getGenericType();
+    check(generic.getRawType() == Consumer.class
+        && Arrays.equals(generic.getActualTypeArguments(), new Object[] {AacDecoder.class}),
+        "decoder configurer retains exact generic field signature");
+    checkField(type, "initialRequestedTimecode", Long.class, Modifier.PRIVATE);
+    checkField(type, "initialProvidedTimecode", Long.class, Modifier.PRIVATE);
+    checkField(type, "downstream", AudioPipeline.class, Modifier.PRIVATE);
+    checkField(type, "outputBuffer", ShortBuffer.class, Modifier.PRIVATE);
+    checkField(type, "decoder", AacDecoder.class, Modifier.PUBLIC);
+
+    Constructor<AacPacketRouter> constructor =
+        type.getDeclaredConstructor(AudioProcessingContext.class, Consumer.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0
+        && constructor.getGenericParameterTypes()[1] instanceof ParameterizedType,
+        "constructor and generic parameter metadata");
+    checkMethod(type.getDeclaredMethod("processInput", ByteBuffer.class),
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("seekPerformed", long.class, long.class), new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("flush"), new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("close"), new Class<?>[0]);
+  }
+
+  private static AudioProcessingContext context() {
+    AudioConfiguration configuration = new AudioConfiguration();
+    AudioDataFormat format = new Pcm16AudioDataFormat(2, 48_000, 960, false);
+    configuration.setOutputFormat(format);
+    return new AudioProcessingContext(
+        configuration, new FrameBuffer(), new AudioPlayerOptions(), format);
+  }
+
+  private static Object field(Object target, String name) throws Exception {
+    return field(target, AacPacketRouter.class, name);
+  }
+
+  private static Object field(Object target, Class<?> owner, String name) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
+  }
+
+  private static void putObject(Object target, String name, Object value) throws Exception {
+    Field field = AacPacketRouter.class.getDeclaredField(name);
+    long offset = (Long) UNSAFE.getClass().getMethod("objectFieldOffset", Field.class)
+        .invoke(UNSAFE, field);
+    UNSAFE.getClass().getMethod("putObject", Object.class, long.class, Object.class)
+        .invoke(UNSAFE, target, offset, value);
+  }
+
+  private static <T> T allocate(Class<T> type) throws Exception {
+    return type.cast(UNSAFE.getClass().getMethod("allocateInstance", Class.class)
+        .invoke(UNSAFE, type));
+  }
+
+  private static Object loadUnsafe() {
+    try {
+      Class<?> type = Class.forName("sun.misc.Unsafe");
+      Field field = type.getDeclaredField("theUnsafe");
+      field.setAccessible(true);
+      return field.get(null);
+    } catch (ReflectiveOperationException error) {
+      throw new ExceptionInInitializerError(error);
+    }
+  }
+
+  private static Field checkField(
+      Class<?> owner, String name, Class<?> fieldType, int modifiers) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getModifiers() == modifiers
+        && !field.isSynthetic() && field.getDeclaredAnnotations().length == 0,
+        name + " field metadata");
+    return field;
+  }
+
+  private static void checkMethod(Method method, Class<?>[] failures) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == void.class
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isDefault() && !method.isVarArgs(),
+        method.getName() + " method metadata");
+  }
+
+  private static Throwable catchThrowable(Operation operation) {
+    try {
+      operation.run();
+      return null;
+    } catch (Throwable error) {
+      return error;
+    }
+  }
+
+  private interface Operation { void run() throws Throwable; }
+
+  private static final class RecordingDecoder extends AacDecoder {
+    int fillCalls;
+    ByteBuffer fillBuffer;
+    int resolveCalls;
+    StreamInfo streamInfo;
+    int decodeCalls;
+    int successfulDecodes;
+    int nonFlushCalls;
+    int flushCalls;
+    int closeCalls;
+    RuntimeException closeFailure;
+
+    @Override public synchronized int fill(ByteBuffer buffer) {
+      fillCalls++;
+      fillBuffer = buffer;
+      return buffer.remaining();
+    }
+
+    @Override public synchronized StreamInfo resolveStreamInfo() {
+      resolveCalls++;
+      return streamInfo;
+    }
+
+    @Override public synchronized boolean decode(ShortBuffer buffer, boolean flush) {
+      decodeCalls++;
+      if (flush) flushCalls++; else nonFlushCalls++;
+      return decodeCalls <= successfulDecodes;
+    }
+
+    @Override public void close() {
+      closeCalls++;
+      if (closeFailure != null) throw closeFailure;
+    }
+  }
+
+  private static final class RecordingPipeline extends AudioPipeline {
+    int processCalls;
+    ShortBuffer firstBuffer;
+    ShortBuffer lastBuffer;
+    boolean buffersCleared;
+    InterruptedException processFailure;
+    int seekCalls;
+    long requested;
+    long provided;
+    int closeCalls;
+    RuntimeException closeFailure;
+
+    RecordingPipeline() { super(null); }
+
+    @Override public void process(ShortBuffer buffer) throws InterruptedException {
+      processCalls++;
+      if (firstBuffer == null) firstBuffer = buffer;
+      lastBuffer = buffer;
+      buffersCleared &= buffer.position() == 0 && buffer.limit() == buffer.capacity();
+      if (processFailure != null) throw processFailure;
+    }
+
+    @Override public void seekPerformed(long requested, long provided) {
+      seekCalls++;
+      this.requested = requested;
+      this.provided = provided;
+    }
+
+    @Override public void close() {
+      closeCalls++;
+      if (closeFailure != null) throw closeFailure;
+    }
+  }
+
+  private static final class FrameBuffer implements AudioFrameBuffer {
+    public void consume(AudioFrame frame) {}
+    public int getRemainingCapacity() { return 0; }
+    public int getFullCapacity() { return 0; }
+    public void setClearOnInsert() {}
+    public void clear() {}
+    public void rebuild(AudioFrameRebuilder rebuilder) {}
+    public AudioFrame provide() { return null; }
+    public AudioFrame provide(long timeout, TimeUnit unit) { return null; }
+    public boolean provide(MutableAudioFrame targetFrame) { return false; }
+    public boolean provide(MutableAudioFrame targetFrame, long timeout, TimeUnit unit) {
+      return false;
+    }
+    public boolean hasClearOnInsert() { return false; }
+    public boolean hasReceivedFrames() { return false; }
+    public Long getLastInputTimecode() { return null; }
+    public void waitForTermination() {}
+    public void setTerminateOnEmpty() {}
+    public void shutdown() {}
+    public void lockBuffer() {}
+  }
+
+  private static final class Derived extends AacPacketRouter {
+    int flushCalls;
+    Derived(AudioProcessingContext context, Consumer<AacDecoder> configurer) {
+      super(context, configurer);
+    }
+    @Override public void flush() { flushCalls++; }
+  }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
