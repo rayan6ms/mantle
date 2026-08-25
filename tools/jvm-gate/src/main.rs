@@ -157,6 +157,7 @@ fn filter_format_consumer_source(command: &str) -> Option<&'static str> {
         "write-audio-chunk-encoder-consumer" => Some(AUDIO_CHUNK_ENCODER_CONSUMER),
         "write-opus-chunk-decoder-consumer" => Some(OPUS_CHUNK_DECODER_CONSUMER),
         "write-opus-chunk-encoder-consumer" => Some(OPUS_CHUNK_ENCODER_CONSUMER),
+        "write-pcm-chunk-decoder-consumer" => Some(PCM_CHUNK_DECODER_CONSUMER),
         "write-pcm-filter-factory-consumer" => Some(PCM_FILTER_FACTORY_CONSUMER),
         "write-pcm-format-consumer" => Some(PCM_FORMAT_CONSUMER),
         "write-resampling-pcm-audio-filter-consumer" => Some(RESAMPLING_PCM_AUDIO_FILTER_CONSUMER),
@@ -11337,6 +11338,266 @@ public final class GateOpusChunkEncoder {
       maximumCalls++;
       return maximum;
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const PCM_CHUNK_DECODER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkDecoder;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkEncoder;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.PcmChunkDecoder;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.BufferOverflowException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.ReadOnlyBufferException;
+import java.nio.ShortBuffer;
+
+public final class GatePcmChunkDecoder {
+  public static void main(String[] args) throws Exception {
+    constructionAndPrivateState();
+    endianConversionAndReuse();
+    failureOrdering();
+    closeSemantics();
+    reflection();
+    System.out.println(
+        "contracts=constructor-capacity,heap-byte-buffer,byte-order,shared-short-view,big-endian,little-endian,odd-tail,output-clear-rewind,buffer-reuse,oversize-order,null-order,small-output,readonly-output,close-noop,private-state,reflection");
+  }
+
+  private static void constructionAndPrivateState() throws Exception {
+    ProbeFormat bigFormat = new ProbeFormat(8);
+    PcmChunkDecoder big = new PcmChunkDecoder(bigFormat, true);
+    check(bigFormat.maximumCalls == 1, "constructor queries maximum capacity once");
+    ByteBuffer bigBytes = bytes(big);
+    ShortBuffer bigShorts = shorts(big);
+    check(!bigBytes.isDirect() && bigBytes.capacity() == 8
+        && bigBytes.position() == 0 && bigBytes.limit() == 8
+        && bigBytes.order() == ByteOrder.BIG_ENDIAN,
+        "constructor allocates exact big-endian heap buffer");
+    check(bigShorts.capacity() == 4 && bigShorts.position() == 0 && bigShorts.limit() == 4
+        && bigShorts.order() == ByteOrder.BIG_ENDIAN,
+        "constructor creates matching short view");
+
+    ProbeFormat littleFormat = new ProbeFormat(10);
+    PcmChunkDecoder little = new PcmChunkDecoder(littleFormat, false);
+    check(littleFormat.maximumCalls == 1 && bytes(little).capacity() == 10
+        && bytes(little).order() == ByteOrder.LITTLE_ENDIAN
+        && shorts(little).capacity() == 5
+        && shorts(little).order() == ByteOrder.LITTLE_ENDIAN,
+        "constructor selects little endian before creating view");
+    big.close();
+    little.close();
+  }
+
+  private static void endianConversionAndReuse() throws Exception {
+    PcmChunkDecoder big = decoder(true, 8);
+    ByteBuffer bigBytes = bytes(big);
+    ShortBuffer bigShorts = shorts(big);
+    ShortBuffer output = ShortBuffer.allocate(6);
+    for (int index = 0; index < output.capacity(); index++) output.put(index, (short) 0x3333);
+    output.position(3);
+    output.limit(4);
+    big.decode(new byte[] {0x01, 0x02, (byte) 0xfe, (byte) 0xdc, 0x7f}, output);
+    check(output.position() == 0 && output.limit() == output.capacity()
+        && output.get(0) == (short) 0x0102 && output.get(1) == (short) 0xfedc
+        && output.get(2) == (short) 0x3333,
+        "big-endian decode clears, ignores odd tail, and rewinds caller output");
+    check(bytes(big) == bigBytes && shorts(big) == bigShorts
+        && bigBytes.position() == 5 && bigBytes.limit() == 8
+        && bigShorts.position() == 2 && bigShorts.limit() == 2,
+        "decode consumes reusable shared staging view");
+
+    big.decode(new byte[] {0x12, 0x34}, output);
+    check(bytes(big) == bigBytes && shorts(big) == bigShorts
+        && output.position() == 0 && output.limit() == 6
+        && output.get(0) == (short) 0x1234 && output.get(1) == (short) 0xfedc
+        && bigBytes.position() == 2 && bigShorts.position() == 1 && bigShorts.limit() == 1,
+        "second decode reuses buffers and leaves caller tail untouched");
+
+    PcmChunkDecoder little = decoder(false, 8);
+    ShortBuffer littleOutput = ShortBuffer.allocate(3);
+    littleOutput.position(2);
+    littleOutput.limit(3);
+    little.decode(new byte[] {0x01, 0x02, (byte) 0xfe, (byte) 0xdc}, littleOutput);
+    check(littleOutput.position() == 0 && littleOutput.limit() == 3
+        && littleOutput.get(0) == (short) 0x0201
+        && littleOutput.get(1) == (short) 0xdcfe,
+        "little-endian decode uses frozen byte order");
+    big.close();
+    little.close();
+  }
+
+  private static void failureOrdering() throws Exception {
+    expect(NullPointerException.class, () -> new PcmChunkDecoder(null, true));
+    ProbeFormat negative = new ProbeFormat(-1);
+    expect(IllegalArgumentException.class, () -> new PcmChunkDecoder(negative, false));
+    check(negative.maximumCalls == 1, "negative allocation follows one maximum query");
+
+    PcmChunkDecoder nullOutput = decoder(true, 8);
+    nullOutput.decode(new byte[] {0x01, 0x02, 0x03, 0x04}, ShortBuffer.allocate(4));
+    ByteBuffer nullOutputBytes = bytes(nullOutput);
+    ShortBuffer nullOutputShorts = shorts(nullOutput);
+    int bytePosition = nullOutputBytes.position();
+    int byteLimit = nullOutputBytes.limit();
+    int shortPosition = nullOutputShorts.position();
+    int shortLimit = nullOutputShorts.limit();
+    expect(NullPointerException.class,
+        () -> nullOutput.decode(new byte[] {0x05, 0x06}, null));
+    check(nullOutputBytes.position() == bytePosition && nullOutputBytes.limit() == byteLimit
+        && nullOutputShorts.position() == shortPosition
+        && nullOutputShorts.limit() == shortLimit,
+        "null output fails before staging mutation");
+    nullOutput.close();
+
+    PcmChunkDecoder nullEncoded = decoder(true, 8);
+    nullEncoded.decode(new byte[] {0x01, 0x02, 0x03, 0x04}, ShortBuffer.allocate(4));
+    ShortBuffer nullEncodedShorts = shorts(nullEncoded);
+    ShortBuffer clearedOutput = ShortBuffer.allocate(4);
+    clearedOutput.position(2);
+    clearedOutput.limit(3);
+    expect(NullPointerException.class, () -> nullEncoded.decode(null, clearedOutput));
+    check(clearedOutput.position() == 0 && clearedOutput.limit() == 4
+        && bytes(nullEncoded).position() == 0 && bytes(nullEncoded).limit() == 8
+        && nullEncodedShorts.position() == 2 && nullEncodedShorts.limit() == 2,
+        "null encoded input fails after caller and byte staging clear");
+    nullEncoded.close();
+
+    PcmChunkDecoder oversize = decoder(true, 4);
+    oversize.decode(new byte[] {0x01, 0x02}, ShortBuffer.allocate(2));
+    ShortBuffer oversizeShorts = shorts(oversize);
+    ShortBuffer oversizeOutput = ShortBuffer.allocate(3);
+    oversizeOutput.position(1);
+    oversizeOutput.limit(2);
+    expect(BufferOverflowException.class,
+        () -> oversize.decode(new byte[] {0, 1, 2, 3, 4}, oversizeOutput));
+    check(oversizeOutput.position() == 0 && oversizeOutput.limit() == 3
+        && bytes(oversize).position() == 0 && bytes(oversize).limit() == 4
+        && oversizeShorts.position() == 1 && oversizeShorts.limit() == 1,
+        "oversize input fails before short staging clear");
+    oversize.close();
+
+    PcmChunkDecoder small = decoder(true, 8);
+    ShortBuffer smallOutput = ShortBuffer.allocate(1);
+    smallOutput.position(1);
+    expect(BufferOverflowException.class,
+        () -> small.decode(new byte[] {0x01, 0x02, 0x03, 0x04}, smallOutput));
+    check(smallOutput.position() == 0 && smallOutput.limit() == 1
+        && bytes(small).position() == 4
+        && shorts(small).position() == 0 && shorts(small).limit() == 2,
+        "small output fails after staging preparation without transfer");
+    small.close();
+
+    PcmChunkDecoder readOnly = decoder(true, 8);
+    ShortBuffer readOnlyOutput = ShortBuffer.allocate(3).asReadOnlyBuffer();
+    readOnlyOutput.position(2);
+    readOnlyOutput.limit(3);
+    expect(ReadOnlyBufferException.class,
+        () -> readOnly.decode(new byte[] {0x01, 0x02}, readOnlyOutput));
+    check(readOnlyOutput.position() == 0 && readOnlyOutput.limit() == 3
+        && bytes(readOnly).position() == 2
+        && shorts(readOnly).position() == 0 && shorts(readOnly).limit() == 1,
+        "read-only output fails after staging preparation without transfer");
+    readOnly.close();
+  }
+
+  private static void closeSemantics() {
+    PcmChunkDecoder decoder = decoder(true, 4);
+    decoder.close();
+    decoder.close();
+    ShortBuffer output = ShortBuffer.allocate(2);
+    decoder.decode(new byte[] {0x12, 0x34}, output);
+    check(output.position() == 0 && output.limit() == 2 && output.get(0) == (short) 0x1234,
+        "close is repeatable no-op and decoder remains usable");
+  }
+
+  private static void reflection() throws Exception {
+    Class<PcmChunkDecoder> type = PcmChunkDecoder.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 1
+        && type.getInterfaces()[0] == AudioChunkDecoder.class,
+        "class and interface metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 2, "declared member counts");
+    checkField("encodedAsByte", ByteBuffer.class);
+    checkField("encodedAsShort", ShortBuffer.class);
+
+    Constructor<?> constructor = type.getDeclaredConstructor(AudioDataFormat.class, boolean.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    Method decode = type.getDeclaredMethod("decode", byte[].class, ShortBuffer.class);
+    checkPublicMethod(decode, void.class, 2, "decode metadata");
+    Method close = type.getDeclaredMethod("close");
+    checkPublicMethod(close, void.class, 0, "close metadata");
+  }
+
+  private static void checkField(String name, Class<?> fieldType) throws Exception {
+    Field field = PcmChunkDecoder.class.getDeclaredField(name);
+    check(field.getType() == fieldType
+        && field.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL),
+        "field metadata " + name);
+  }
+
+  private static void checkPublicMethod(
+      Method method, Class<?> returnType, int parameterCount, String message) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == returnType
+        && method.getParameterCount() == parameterCount && method.getExceptionTypes().length == 0
+        && !method.isBridge() && !method.isSynthetic(), message);
+  }
+
+  private static PcmChunkDecoder decoder(boolean bigEndian, int maximum) {
+    return new PcmChunkDecoder(new ProbeFormat(maximum), bigEndian);
+  }
+
+  private static ByteBuffer bytes(PcmChunkDecoder decoder) throws Exception {
+    return (ByteBuffer) field("encodedAsByte").get(decoder);
+  }
+
+  private static ShortBuffer shorts(PcmChunkDecoder decoder) throws Exception {
+    return (ShortBuffer) field("encodedAsShort").get(decoder);
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = PcmChunkDecoder.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong failure", error);
+      return type.cast(error);
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static final class ProbeFormat extends AudioDataFormat {
+    private final int maximum;
+    private int maximumCalls;
+
+    private ProbeFormat(int maximum) {
+      super(2, 48_000, 2);
+      this.maximum = maximum;
+    }
+
+    public String codecName() { return "probe"; }
+    public byte[] silenceBytes() { return new byte[0]; }
+    public int expectedChunkSize() { return maximum; }
+    public int maximumChunkSize() { maximumCalls++; return maximum; }
+    public AudioChunkDecoder createDecoder() { return null; }
+    public AudioChunkEncoder createEncoder(AudioConfiguration configuration) { return null; }
   }
 
   private static void check(boolean condition, String message) {

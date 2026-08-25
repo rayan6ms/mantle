@@ -136,6 +136,8 @@ const OPUS_CHUNK_DECODER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/format/transcoder/OpusChunkDecoder";
 const OPUS_CHUNK_ENCODER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/format/transcoder/OpusChunkEncoder";
+const PCM_CHUNK_DECODER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/format/transcoder/PcmChunkDecoder";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -458,6 +460,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     AUDIO_CHUNK_ENCODER_CLASS,
     OPUS_CHUNK_DECODER_CLASS,
     OPUS_CHUNK_ENCODER_CLASS,
+    PCM_CHUNK_DECODER_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -927,6 +930,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | PCM16_AUDIO_DATA_FORMAT_CLASS
             | OPUS_CHUNK_DECODER_CLASS
             | OPUS_CHUNK_ENCODER_CLASS
+            | PCM_CHUNK_DECODER_CLASS
             | PLAYER_LIFECYCLE_MANAGER_CLASS
             | FUNCTIONAL_RESULT_HANDLER_CLASS
             | AUDIO_PIPELINE_CLASS
@@ -1260,6 +1264,9 @@ fn replacement_body(
     }
     if class_name == OPUS_CHUNK_ENCODER_CLASS {
         return opus_chunk_encoder_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == PCM_CHUNK_DECODER_CLASS {
+        return pcm_chunk_decoder_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -2778,6 +2785,165 @@ fn opus_chunk_encoder_close(pool: &mut ConstantPool<'static>) -> Result<Attribut
             Instruction::Aload_0,
             Instruction::Getfield(encoder),
             Instruction::Invokevirtual(close),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn pcm_chunk_decoder_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;Z)V") => {
+            pcm_chunk_decoder_constructor(pool)
+        }
+        ("decode", "([BLjava/nio/ShortBuffer;)V") => pcm_chunk_decoder_decode(pool),
+        ("close", "()V") => code(pool, 0, 1, vec![Instruction::Return]),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {PCM_CHUNK_DECODER_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn pcm_chunk_decoder_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(PCM_CHUNK_DECODER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let format_type = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let maximum_chunk_size = pool.add_method_ref(format_type, "maximumChunkSize", "()I")?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let allocate = pool.add_method_ref(byte_buffer, "allocate", "(I)Ljava/nio/ByteBuffer;")?;
+    let order = pool.add_method_ref(
+        byte_buffer,
+        "order",
+        "(Ljava/nio/ByteOrder;)Ljava/nio/ByteBuffer;",
+    )?;
+    let as_short_buffer =
+        pool.add_method_ref(byte_buffer, "asShortBuffer", "()Ljava/nio/ShortBuffer;")?;
+    let byte_order = pool.add_class("java/nio/ByteOrder")?;
+    let big_endian = pool.add_field_ref(byte_order, "BIG_ENDIAN", "Ljava/nio/ByteOrder;")?;
+    let little_endian = pool.add_field_ref(byte_order, "LITTLE_ENDIAN", "Ljava/nio/ByteOrder;")?;
+    let encoded_as_byte = pool.add_field_ref(owner, "encodedAsByte", "Ljava/nio/ByteBuffer;")?;
+    let encoded_as_short = pool.add_field_ref(owner, "encodedAsShort", "Ljava/nio/ShortBuffer;")?;
+    let little_endian_target = 15;
+    let view_target = 20;
+    let locals = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Object {
+            cpool_index: format_type,
+        },
+        VerificationType::Integer,
+    ];
+    let mut body = code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(maximum_chunk_size),
+            Instruction::Invokestatic(allocate),
+            Instruction::Putfield(encoded_as_byte),
+            Instruction::Iload_2,
+            Instruction::Ifeq(little_endian_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(encoded_as_byte),
+            Instruction::Getstatic(big_endian),
+            Instruction::Invokevirtual(order),
+            Instruction::Pop,
+            Instruction::Goto(view_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(encoded_as_byte),
+            Instruction::Getstatic(little_endian),
+            Instruction::Invokevirtual(order),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Aload_0,
+            Instruction::Getfield(encoded_as_byte),
+            Instruction::Invokevirtual(as_short_buffer),
+            Instruction::Putfield(encoded_as_short),
+            Instruction::Return,
+        ],
+    )?;
+    let mut previous = None;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            youtube_full_frame(
+                &mut previous,
+                little_endian_target.into(),
+                locals.clone(),
+                vec![],
+            )?,
+            youtube_full_frame(&mut previous, view_target.into(), locals, vec![])?,
+        ],
+    )?;
+    Ok(body)
+}
+
+fn pcm_chunk_decoder_decode(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(PCM_CHUNK_DECODER_CLASS)?;
+    let encoded_as_byte = pool.add_field_ref(owner, "encodedAsByte", "Ljava/nio/ByteBuffer;")?;
+    let encoded_as_short = pool.add_field_ref(owner, "encodedAsShort", "Ljava/nio/ShortBuffer;")?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let clear_byte = pool.add_method_ref(byte_buffer, "clear", "()Ljava/nio/ByteBuffer;")?;
+    let put_bytes = pool.add_method_ref(byte_buffer, "put", "([B)Ljava/nio/ByteBuffer;")?;
+    let position_byte = pool.add_method_ref(byte_buffer, "position", "()I")?;
+    let short_buffer = pool.add_class("java/nio/ShortBuffer")?;
+    let clear_short = pool.add_method_ref(short_buffer, "clear", "()Ljava/nio/ShortBuffer;")?;
+    let limit_short = pool.add_method_ref(short_buffer, "limit", "(I)Ljava/nio/ShortBuffer;")?;
+    let put_shorts = pool.add_method_ref(
+        short_buffer,
+        "put",
+        "(Ljava/nio/ShortBuffer;)Ljava/nio/ShortBuffer;",
+    )?;
+    let rewind = pool.add_method_ref(short_buffer, "rewind", "()Ljava/nio/ShortBuffer;")?;
+    code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(clear_short),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(encoded_as_byte),
+            Instruction::Invokevirtual(clear_byte),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(encoded_as_byte),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(put_bytes),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(encoded_as_short),
+            Instruction::Invokevirtual(clear_short),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(encoded_as_short),
+            Instruction::Aload_0,
+            Instruction::Getfield(encoded_as_byte),
+            Instruction::Invokevirtual(position_byte),
+            Instruction::Iconst_2,
+            Instruction::Idiv,
+            Instruction::Invokevirtual(limit_short),
+            Instruction::Pop,
+            Instruction::Aload_2,
+            Instruction::Aload_0,
+            Instruction::Getfield(encoded_as_short),
+            Instruction::Invokevirtual(put_shorts),
+            Instruction::Pop,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(rewind),
+            Instruction::Pop,
             Instruction::Return,
         ],
     )
