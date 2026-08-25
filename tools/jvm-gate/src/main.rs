@@ -166,6 +166,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-opus-packet-router-consumer" => Some(OPUS_PACKET_ROUTER_CONSUMER),
         "write-flac-audio-track-consumer" => Some(FLAC_AUDIO_TRACK_CONSUMER),
         "write-flac-audio-track-support-consumer" => Some(FLAC_AUDIO_TRACK_SUPPORT_CONSUMER),
+        "write-flac-container-probe-consumer" => Some(FLAC_CONTAINER_PROBE_CONSUMER),
         _ => None,
     }
 }
@@ -13879,18 +13880,26 @@ package com.sedmelluq.discord.lavaplayer.container.flac;
 import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
 import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Map;
 
 public final class FlacGateSupport {
   public static SeekableInputStream constructorInput;
   public static AudioProcessingContext loadContext;
   public static int loaderConstructions;
   public static int loadCalls;
+  public static int parseCalls;
   public static int providerCreations;
   public static int readCalls;
   public static int seekCalls;
   public static int closeCalls;
   public static long seekTimecode;
+  public static long constructorPosition;
+  public static long duration;
+  public static Map<String, String> tags;
   public static RuntimeException loadFailure;
+  public static IOException parseFailure;
+  public static RuntimeException parseRuntimeFailure;
   public static InterruptedException readFailure;
   public static RuntimeException seekFailure;
   public static RuntimeException closeFailure;
@@ -13904,12 +13913,18 @@ public final class FlacGateSupport {
     loadContext = null;
     loaderConstructions = 0;
     loadCalls = 0;
+    parseCalls = 0;
     providerCreations = 0;
     readCalls = 0;
     seekCalls = 0;
     closeCalls = 0;
     seekTimecode = 0L;
+    constructorPosition = Long.MIN_VALUE;
+    duration = 0L;
+    tags = Collections.emptyMap();
     loadFailure = null;
+    parseFailure = null;
+    parseRuntimeFailure = null;
     readFailure = null;
     seekFailure = null;
     closeFailure = null;
@@ -13924,9 +13939,13 @@ public final class FlacGateSupport {
 }
 
 class FlacFileLoader {
+  static final int[] FLAC_CC = {0x66, 0x4C, 0x61, 0x43};
+
   FlacFileLoader(SeekableInputStream inputStream) {
     FlacGateSupport.loaderConstructions++;
     FlacGateSupport.constructorInput = inputStream;
+    FlacGateSupport.constructorPosition =
+        inputStream == null ? Long.MIN_VALUE : inputStream.getPosition();
     FlacGateSupport.event("loader");
   }
 
@@ -13937,6 +13956,24 @@ class FlacFileLoader {
     if (FlacGateSupport.loadFailure != null) throw FlacGateSupport.loadFailure;
     if (FlacGateSupport.returnNull) return null;
     return new FlacTrackProvider();
+  }
+
+  FlacTrackInfo parseHeaders() throws IOException {
+    FlacGateSupport.parseCalls++;
+    FlacGateSupport.event("parse");
+    if (FlacGateSupport.parseFailure != null) throw FlacGateSupport.parseFailure;
+    if (FlacGateSupport.parseRuntimeFailure != null) throw FlacGateSupport.parseRuntimeFailure;
+    return new FlacTrackInfo(FlacGateSupport.tags, FlacGateSupport.duration);
+  }
+}
+
+class FlacTrackInfo {
+  public final Map<String, String> tags;
+  public final long duration;
+
+  FlacTrackInfo(Map<String, String> tags, long duration) {
+    this.tags = tags;
+    this.duration = duration;
   }
 }
 
@@ -14343,6 +14380,425 @@ public final class GateFlacAudioTrack {
       FlacGateSupport.event("identifier");
       if (identifierFailure != null) throw identifierFailure;
       return super.getIdentifier();
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const FLAC_CONTAINER_PROBE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDescriptor;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerHints;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerProbe;
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacAudioTrack;
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacContainerProbe;
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacGateSupport;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public final class GateFlacContainerProbe {
+  private static final byte[] FLAC = {0x66, 0x4C, 0x61, 0x43};
+
+  public static void main(String[] args) throws Exception {
+    namesAndHints();
+    missesAndRewind();
+    successfulProbe();
+    metadataFallbacks();
+    failures();
+    trackFactory();
+    subclassUse();
+    reflection();
+    System.out.println(
+        "contracts=name,ignored-hints,null-hints,fourcc,case-sensitive,rewind-match,rewind-miss,initial-position,logging-order,loader-input,parse-order,provider-order,tag-overlay,exact-tag-keys,duration,metadata-fallback,supported-result,self-probe,null-settings,miss,null-reference,read-failure,seek-failure,parse-failure,provider-failure,null-tags,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,constant-fields,private-state,throws,reflection");
+  }
+
+  private static void namesAndHints() {
+    FlacContainerProbe probe = new FlacContainerProbe();
+    check(probe.getName().equals("flac") && probe.getName() == "flac",
+        "stable interned lower-case probe name");
+    check(!probe.matchesHints(null)
+        && !probe.matchesHints(MediaContainerHints.from(null, null))
+        && !probe.matchesHints(MediaContainerHints.from("audio/flac", "flac"))
+        && !probe.matchesHints(MediaContainerHints.from("anything", "anything")),
+        "all hint values, including null, are ignored and return false");
+  }
+
+  private static void missesAndRewind() throws Exception {
+    FlacContainerProbe probe = new FlacContainerProbe();
+    FlacGateSupport.reset();
+    MemoryStream wrongFirst = new MemoryStream(new byte[] {0x00, 0x4C, 0x61, 0x43}, 0,
+        Collections.emptyList());
+    check(probe.probe(null, wrongFirst) == null && wrongFirst.readCalls == 1
+        && wrongFirst.seekHardCalls == 1 && wrongFirst.getPosition() == 0L
+        && FlacGateSupport.loaderConstructions == 0,
+        "first-byte miss rewinds and never touches the null reference or loader");
+
+    FlacGateSupport.reset();
+    MemoryStream wrongCase = new MemoryStream(new byte[] {0x66, 0x6C, 0x61, 0x43}, 0,
+        Collections.emptyList());
+    check(probe.probe(null, wrongCase) == null && wrongCase.readCalls == 2
+        && wrongCase.seekHardCalls == 1 && wrongCase.getPosition() == 0L,
+        "FourCC comparison is case-sensitive and stops at the first mismatch");
+
+    FlacGateSupport.reset();
+    MemoryStream shortInput = new MemoryStream(new byte[] {0x66, 0x4C}, 0,
+        Collections.emptyList());
+    check(probe.probe(null, shortInput) == null && shortInput.readCalls == 3
+        && shortInput.seekHardCalls == 1 && shortInput.getPosition() == 0L,
+        "truncated FourCC reads EOF once and rewinds before returning a miss");
+  }
+
+  private static void successfulProbe() throws Exception {
+    FlacContainerProbe probe = new FlacContainerProbe();
+    FlacGateSupport.reset();
+    Map<String, String> tags = new HashMap<>();
+    tags.put("TITLE", "tag-title");
+    tags.put("ARTIST", "tag-artist");
+    tags.put("title", "wrong-case-title");
+    FlacGateSupport.tags = tags;
+    FlacGateSupport.duration = Long.MAX_VALUE - 41L;
+    Metadata provider = new Metadata("provider-title", "provider-author", 777L,
+        "provider-id", "provider-uri", "provider-art", "provider-isrc");
+    byte[] prefixed = {9, 8, 0x66, 0x4C, 0x61, 0x43, 7};
+    MemoryStream stream = new MemoryStream(prefixed, 2,
+        Collections.singletonList(provider));
+    AudioReference reference = new AudioReference("reference-id", "reference-title");
+    MediaContainerDetectionResult result = probe.probe(reference, stream);
+
+    check(result != null && result.isContainerDetected() && result.isSupportedFile()
+        && !result.isReference() && result.getReference() == null
+        && result.getUnsupportedReason() == null,
+        "matched FourCC produces a supported non-reference result");
+    MediaContainerDescriptor descriptor = result.getContainerDescriptor();
+    check(descriptor.probe == probe && descriptor.parameters == null,
+        "supported result retains exact probe identity and null settings");
+    AudioTrackInfo info = result.getTrackInfo();
+    check(info.title.equals("tag-title") && info.author.equals("tag-artist")
+        && info.length == Long.MAX_VALUE - 41L && info.identifier.equals("provider-id")
+        && !info.isStream && info.uri.equals("provider-uri")
+        && info.artworkUrl.equals("provider-art") && info.isrc.equals("provider-isrc"),
+        "exact uppercase FLAC tags and duration overlay provider metadata");
+    check(stream.readCalls == 4 && stream.seekHardCalls == 1
+        && stream.getPosition() == 2L && stream.providerCalls == 1
+        && stream.providerPosition == 2L && FlacGateSupport.constructorInput == stream
+        && FlacGateSupport.constructorPosition == 2L
+        && FlacGateSupport.parseCalls == 1
+        && FlacGateSupport.events.toString().equals("loader,parse,providers"),
+        "match rewinds to the initial position before loading and providers run after parsing");
+  }
+
+  private static void metadataFallbacks() throws Exception {
+    FlacContainerProbe probe = new FlacContainerProbe();
+    FlacGateSupport.reset();
+    Map<String, String> lowerCase = new HashMap<>();
+    lowerCase.put("title", "lower-title");
+    lowerCase.put("artist", "lower-artist");
+    FlacGateSupport.tags = lowerCase;
+    FlacGateSupport.duration = -17L;
+    Metadata provider = new Metadata("provider-title", "provider-author", 81L,
+        "provider-id", "provider-uri", "provider-art", "provider-isrc");
+    MediaContainerDetectionResult result = probe.probe(
+        new AudioReference("reference-id", "reference-title"),
+        new MemoryStream(FLAC, 0, Collections.singletonList(provider)));
+    AudioTrackInfo info = result.getTrackInfo();
+    check(info.title.equals("provider-title") && info.author.equals("provider-author")
+        && info.length == -17L && info.identifier.equals("provider-id"),
+        "wrong-case tags do not override providers while duration always does");
+
+    FlacGateSupport.reset();
+    Map<String, String> nullValues = new HashMap<>();
+    nullValues.put("TITLE", null);
+    nullValues.put("ARTIST", null);
+    FlacGateSupport.tags = nullValues;
+    FlacGateSupport.duration = 0L;
+    MediaContainerDetectionResult defaults = probe.probe(
+        new AudioReference("default-id", "reference-title"),
+        new MemoryStream(FLAC, 0, Collections.emptyList()));
+    AudioTrackInfo defaultInfo = defaults.getTrackInfo();
+    check(defaultInfo.title.equals("reference-title")
+        && defaultInfo.author.equals("Unknown artist") && defaultInfo.length == 0L
+        && defaultInfo.identifier.equals("default-id") && !defaultInfo.isStream,
+        "null tag values retain builder reference and default metadata");
+  }
+
+  private static void failures() throws Exception {
+    FlacContainerProbe probe = new FlacContainerProbe();
+    IOException readFailure = new IOException("read-failure");
+    FlacGateSupport.reset();
+    MemoryStream read = new MemoryStream(FLAC, 0, Collections.emptyList());
+    read.readFailure = readFailure;
+    check(catchThrowable(() -> probe.probe(null, read)) == readFailure
+        && read.readCalls == 1 && read.seekHardCalls == 0
+        && FlacGateSupport.loaderConstructions == 0,
+        "read failure propagates before the ordinary rewind path");
+
+    IOException seekFailure = new IOException("seek-failure");
+    FlacGateSupport.reset();
+    MemoryStream seek = new MemoryStream(FLAC, 0, Collections.emptyList());
+    seek.seekFailure = seekFailure;
+    check(catchThrowable(() -> probe.probe(null, seek)) == seekFailure
+        && seek.readCalls == 4 && seek.seekHardCalls == 1
+        && FlacGateSupport.loaderConstructions == 0,
+        "rewind failure propagates after matching and before logging or loading");
+
+    FlacGateSupport.reset();
+    check(catchThrowable(() -> probe.probe(null, null)) instanceof NullPointerException
+        && FlacGateSupport.loaderConstructions == 0,
+        "null stream fails during initial position access");
+
+    FlacGateSupport.reset();
+    MemoryStream matchedNullReference =
+        new MemoryStream(FLAC, 0, Collections.emptyList());
+    check(catchThrowable(() -> probe.probe(null, matchedNullReference))
+        instanceof NullPointerException && matchedNullReference.readCalls == 4
+        && matchedNullReference.seekHardCalls == 1
+        && FlacGateSupport.loaderConstructions == 0,
+        "matched stream dereferences reference only after rewinding");
+
+    IOException parseFailure = new IOException("parse-failure");
+    FlacGateSupport.reset();
+    FlacGateSupport.parseFailure = parseFailure;
+    MemoryStream parse = new MemoryStream(FLAC, 0, Collections.emptyList());
+    check(catchThrowable(() -> probe.probe(
+        new AudioReference("parse-id", null), parse)) == parseFailure
+        && FlacGateSupport.loaderConstructions == 1 && FlacGateSupport.parseCalls == 1
+        && parse.providerCalls == 0,
+        "checked parse failure keeps identity and precedes metadata providers");
+
+    RuntimeException runtimeParseFailure = new RuntimeException("runtime-parse-failure");
+    FlacGateSupport.reset();
+    FlacGateSupport.parseRuntimeFailure = runtimeParseFailure;
+    check(catchThrowable(() -> probe.probe(new AudioReference("runtime-id", null),
+        new MemoryStream(FLAC, 0, Collections.emptyList()))) == runtimeParseFailure,
+        "runtime parse failure keeps exact identity");
+
+    RuntimeException providerFailure = new RuntimeException("provider-failure");
+    FlacGateSupport.reset();
+    FlacGateSupport.tags = Collections.emptyMap();
+    MemoryStream providers = new MemoryStream(FLAC, 0, Collections.emptyList());
+    providers.providersFailure = providerFailure;
+    check(catchThrowable(() -> probe.probe(
+        new AudioReference("provider-id", null), providers)) == providerFailure
+        && FlacGateSupport.parseCalls == 1 && providers.providerCalls == 1,
+        "provider-list failure follows successful parsing with exact identity");
+
+    FlacGateSupport.reset();
+    FlacGateSupport.tags = null;
+    MemoryStream nullTags = new MemoryStream(FLAC, 0, Collections.emptyList());
+    check(catchThrowable(() -> probe.probe(
+        new AudioReference("null-tags-id", null), nullTags))
+        instanceof NullPointerException && FlacGateSupport.parseCalls == 1
+        && nullTags.providerCalls == 1,
+        "null tag map fails only after builder providers are applied");
+  }
+
+  private static void trackFactory() throws Exception {
+    FlacContainerProbe probe = new FlacContainerProbe();
+    AudioTrackInfo info = new AudioTrackInfo(
+        "title", "author", 1L, "track-id", false, "uri", "artwork", "isrc");
+    MemoryStream stream = new MemoryStream(new byte[0], 0, Collections.emptyList());
+    AudioTrack first = probe.createTrack("ignored-one", info, stream);
+    AudioTrack second = probe.createTrack("ignored-two", info, stream);
+    check(first.getClass() == FlacAudioTrack.class && second.getClass() == FlacAudioTrack.class
+        && first != second && first.getInfo() == info && second.getInfo() == info
+        && input((FlacAudioTrack) first) == stream
+        && input((FlacAudioTrack) second) == stream,
+        "factory creates fresh FLAC tracks retaining exact info and stream identities");
+    FlacAudioTrack nulls = (FlacAudioTrack) probe.createTrack(null, null, null);
+    check(nulls.getInfo() == null && input(nulls) == null,
+        "factory ignores parameters and accepts null track arguments");
+  }
+
+  private static void subclassUse() throws Exception {
+    FlacGateSupport.reset();
+    FlacGateSupport.tags = Collections.emptyMap();
+    Derived derived = new Derived();
+    MediaContainerProbe dynamic = derived;
+    MediaContainerDetectionResult result = dynamic.probe(
+        new AudioReference("derived-id", null),
+        new MemoryStream(FLAC, 0, Collections.emptyList()));
+    check(dynamic.getName().equals("derived-flac") && result != null
+        && result.getContainerDescriptor().probe == derived,
+        "ordinary subclass dispatch and supported-result self identity");
+  }
+
+  private static void reflection() throws Exception {
+    Class<FlacContainerProbe> type = FlacContainerProbe.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {MediaContainerProbe.class})
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0,
+        "public concrete non-final probe metadata");
+    check(type.getDeclaredFields().length == 3 && type.getDeclaredMethods().length == 4
+        && type.getDeclaredConstructors().length == 1, "exact declared member counts");
+
+    Field log = type.getDeclaredField("log");
+    log.setAccessible(true);
+    Object expectedLogger = Class.forName("org.slf4j.LoggerFactory")
+        .getMethod("getLogger", Class.class).invoke(null, type);
+    check(log.getType().getName().equals("org.slf4j.Logger")
+        && log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && !log.isSynthetic() && log.get(null) != null && log.get(null) == expectedLogger,
+        "eager logger identity and metadata");
+    checkConstant(type, "TITLE_TAG", "TITLE");
+    checkConstant(type, "ARTIST_TAG", "ARTIST");
+
+    Constructor<FlacContainerProbe> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    checkMethod(type.getDeclaredMethod("getName"), String.class,
+        new Class<?>[0], new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("matchesHints", MediaContainerHints.class), boolean.class,
+        new Class<?>[] {MediaContainerHints.class}, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("probe", AudioReference.class, SeekableInputStream.class),
+        MediaContainerDetectionResult.class,
+        new Class<?>[] {AudioReference.class, SeekableInputStream.class},
+        new Class<?>[] {IOException.class});
+    checkMethod(type.getDeclaredMethod("createTrack", String.class, AudioTrackInfo.class,
+        SeekableInputStream.class), AudioTrack.class,
+        new Class<?>[] {String.class, AudioTrackInfo.class, SeekableInputStream.class},
+        new Class<?>[0]);
+  }
+
+  private static void checkConstant(Class<?> type, String name, String value) throws Exception {
+    Field field = type.getDeclaredField(name);
+    field.setAccessible(true);
+    check(field.getType() == String.class
+        && field.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && !field.isSynthetic() && field.get(null) == value,
+        name + " constant field metadata and interned value");
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType,
+      Class<?>[] parameters, Class<?>[] failures) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isDefault() && !method.isVarArgs(),
+        method.getName() + " method metadata");
+  }
+
+  private static Object input(FlacAudioTrack track) throws Exception {
+    Field field = FlacAudioTrack.class.getDeclaredField("inputStream");
+    field.setAccessible(true);
+    return field.get(track);
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable operation) {
+    try {
+      operation.run();
+      return null;
+    } catch (Throwable error) {
+      return error;
+    }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class Metadata implements AudioTrackInfoProvider {
+    final String title;
+    final String author;
+    final Long length;
+    final String identifier;
+    final String uri;
+    final String artwork;
+    final String isrc;
+
+    Metadata(String title, String author, Long length, String identifier,
+        String uri, String artwork, String isrc) {
+      this.title = title;
+      this.author = author;
+      this.length = length;
+      this.identifier = identifier;
+      this.uri = uri;
+      this.artwork = artwork;
+      this.isrc = isrc;
+    }
+
+    public String getTitle() { return title; }
+    public String getAuthor() { return author; }
+    public Long getLength() { return length; }
+    public String getIdentifier() { return identifier; }
+    public String getUri() { return uri; }
+    public String getArtworkUrl() { return artwork; }
+    public String getISRC() { return isrc; }
+  }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    final byte[] data;
+    final List<AudioTrackInfoProvider> providers;
+    long position;
+    int readCalls;
+    int seekHardCalls;
+    int providerCalls;
+    long providerPosition = Long.MIN_VALUE;
+    IOException readFailure;
+    IOException seekFailure;
+    RuntimeException providersFailure;
+
+    MemoryStream(byte[] data, long position, List<AudioTrackInfoProvider> providers) {
+      super(data.length, 0L);
+      this.data = data;
+      this.position = position;
+      this.providers = providers;
+    }
+
+    @Override
+    public int read() throws IOException {
+      readCalls++;
+      if (readFailure != null) throw readFailure;
+      if (position >= data.length) return -1;
+      return data[(int) position++] & 0xFF;
+    }
+
+    @Override
+    public long getPosition() {
+      return position;
+    }
+
+    @Override
+    protected void seekHard(long position) throws IOException {
+      seekHardCalls++;
+      if (seekFailure != null) throw seekFailure;
+      this.position = position;
+    }
+
+    @Override
+    public boolean canSeekHard() {
+      return true;
+    }
+
+    @Override
+    public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      providerCalls++;
+      providerPosition = position;
+      FlacGateSupport.event("providers");
+      if (providersFailure != null) throw providersFailure;
+      return providers;
+    }
+  }
+
+  private static final class Derived extends FlacContainerProbe {
+    @Override
+    public String getName() {
+      return "derived-flac";
     }
   }
 

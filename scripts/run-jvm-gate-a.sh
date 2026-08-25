@@ -243,6 +243,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-flac-audio-track-consumer \
   --output "$WORK/GateFlacAudioTrack.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-audio-track-support-consumer \
   --output "$WORK/FlacGateSupport.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-flac-container-probe-consumer \
+  --output "$WORK/GateFlacContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -313,6 +315,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateMediaContainerRegistry.java" \
   "$WORK/GateAdtsAudioTrack.java" \
   "$WORK/GateFlacAudioTrack.java" \
+  "$WORK/GateFlacContainerProbe.java" \
   "$WORK/FlacGateSupport.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
@@ -1293,6 +1296,17 @@ cmp "$WORK/flac-audio-track-reference.txt" "$WORK/flac-audio-track-candidate.txt
 grep --fixed-strings \
   'contracts=track-info,input-identity,null-construction,loader-order,processing-context,read-callback,seek-callback,full-timecode,executor-control,input-ownership,load-failure,context-failure,null-executor,null-provider,identifier-dispatch,loop-failure,callback-failure,close-finally,close-replacement,subclassable,eager-logger,private-state,throws,reflection' \
   "$WORK/flac-audio-track-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateFlacContainerProbe \
+  >"$WORK/flac-container-probe-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateFlacContainerProbe >"$WORK/flac-container-probe-candidate.txt"
+cmp "$WORK/flac-container-probe-reference.txt" \
+  "$WORK/flac-container-probe-candidate.txt"
+grep --fixed-strings \
+  'contracts=name,ignored-hints,null-hints,fourcc,case-sensitive,rewind-match,rewind-miss,initial-position,logging-order,loader-input,parse-order,provider-order,tag-overlay,exact-tag-keys,duration,metadata-fallback,supported-result,self-probe,null-settings,miss,null-reference,read-failure,seek-failure,parse-failure,provider-failure,null-tags,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,constant-fields,private-state,throws,reflection' \
+  "$WORK/flac-container-probe-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"
