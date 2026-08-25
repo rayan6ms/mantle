@@ -225,6 +225,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-media-container-probe-consumer
   --output "$WORK/GateMediaContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-media-container-registry-consumer \
   --output "$WORK/GateMediaContainerRegistry.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-adts-audio-track-consumer \
+  --output "$WORK/GateAdtsAudioTrack.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -293,6 +295,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateMediaContainerHints.java" \
   "$WORK/GateMediaContainerProbe.java" \
   "$WORK/GateMediaContainerRegistry.java" \
+  "$WORK/GateAdtsAudioTrack.java" \
   "$WORK/GatePcmFilterFactory.java" \
   "$WORK/GatePcmFormat.java" \
   "$WORK/GateResamplingPcmAudioFilter.java" \
@@ -1186,6 +1189,16 @@ cmp "$WORK/media-container-registry-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor-alias,list-identity,live-mutation,linear-find,first-match,short-circuit,null-list,null-name,null-probe,failure-identity,eager-default,default-order,default-mutability,fresh-extension,additional-order,array-copy,null-additional,null-varargs,subclassable,generic-signatures,varargs,reflection' \
   "$WORK/media-container-registry-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateAdtsAudioTrack \
+  >"$WORK/adts-audio-track-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateAdtsAudioTrack >"$WORK/adts-audio-track-candidate.txt"
+cmp "$WORK/adts-audio-track-reference.txt" "$WORK/adts-audio-track-candidate.txt"
+grep --fixed-strings \
+  'contracts=track-info,input-identity,null-construction,processing-context,read-callback,non-seekable,empty-stream,input-ownership,context-order,null-executor,null-input,io-wrapping,failure-identity,identifier-dispatch,subclassable,eager-logger,private-state,throws,reflection' \
+  "$WORK/adts-audio-track-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"

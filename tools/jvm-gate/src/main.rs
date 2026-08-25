@@ -157,6 +157,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-media-container-hints-consumer" => Some(MEDIA_CONTAINER_HINTS_CONSUMER),
         "write-media-container-probe-consumer" => Some(MEDIA_CONTAINER_PROBE_CONSUMER),
         "write-media-container-registry-consumer" => Some(MEDIA_CONTAINER_REGISTRY_CONSUMER),
+        "write-adts-audio-track-consumer" => Some(ADTS_AUDIO_TRACK_CONSUMER),
         _ => None,
     }
 }
@@ -13582,6 +13583,280 @@ public final class GateMediaContainerRegistry {
 
   private static final class Derived extends MediaContainerRegistry {
     Derived(List<MediaContainerProbe> probes) { super(probes); }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const ADTS_AUDIO_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.adts.AdtsAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateAdtsAudioTrack {
+  private static final Object UNSAFE = loadUnsafe();
+
+  public static void main(String[] args) throws Exception {
+    construction();
+    processing();
+    failures();
+    subclassUse();
+    reflection();
+    System.out.println(
+        "contracts=track-info,input-identity,null-construction,processing-context,read-callback,non-seekable,empty-stream,input-ownership,context-order,null-executor,null-input,io-wrapping,failure-identity,identifier-dispatch,subclassable,eager-logger,private-state,throws,reflection");
+  }
+
+  private static void construction() throws Exception {
+    AudioTrackInfo info = info("constructor-id");
+    CountingInputStream input = new CountingInputStream();
+    AdtsAudioTrack track = new AdtsAudioTrack(info, input);
+    check(track.getInfo() == info && track.getIdentifier() == info.identifier,
+        "base constructor retains exact track info identity");
+    check(field(track, "inputStream") == input,
+        "constructor retains exact input stream identity");
+
+    AdtsAudioTrack nullInput = new AdtsAudioTrack(info, null);
+    AdtsAudioTrack nullInfo = new AdtsAudioTrack(null, input);
+    check(field(nullInput, "inputStream") == null && nullInfo.getInfo() == null,
+        "constructor accepts null input and track info");
+  }
+
+  private static void processing() throws Exception {
+    CountingInputStream input = new CountingInputStream();
+    AdtsAudioTrack track = new AdtsAudioTrack(info("empty-id"), input);
+    RecordingExecutor executor = executor();
+    executor.invokeRead = true;
+    track.process(executor);
+    check(executor.contextCalls == 1 && executor.loopCalls == 1,
+        "processing context is acquired once before the loop");
+    check(executor.readExecutor != null && executor.seekExecutor == null,
+        "provider read callback is non-null and seeking is disabled");
+    check(input.readCalls == 1, "read callback delegates an empty stream scan to the provider");
+    check(input.closeCalls == 0, "provider cleanup does not close the caller input stream");
+
+    RecordingExecutor noRead = executor();
+    CountingInputStream untouched = new CountingInputStream();
+    new AdtsAudioTrack(info("no-read-id"), untouched).process(noRead);
+    check(noRead.loopCalls == 1 && noRead.readExecutor != null && noRead.seekExecutor == null
+        && untouched.readCalls == 0 && untouched.closeCalls == 0,
+        "executor exclusively controls callback invocation");
+  }
+
+  private static void failures() throws Exception {
+    AdtsAudioTrack track = new AdtsAudioTrack(info("failure-id"), new CountingInputStream());
+    check(catchThrowable(() -> track.process(null)) instanceof NullPointerException,
+        "null executor fails while acquiring the processing context");
+
+    RuntimeException contextFailure = new RuntimeException("context-failure");
+    RecordingExecutor contextExecutor = executor();
+    contextExecutor.contextFailure = contextFailure;
+    check(catchThrowable(() -> track.process(contextExecutor)) == contextFailure
+        && contextExecutor.contextCalls == 1 && contextExecutor.loopCalls == 0,
+        "context failure propagates before provider construction and loop execution");
+
+    RuntimeException loopFailure = new RuntimeException("loop-failure");
+    RecordingExecutor loopExecutor = executor();
+    loopExecutor.loopFailure = loopFailure;
+    check(catchThrowable(() -> track.process(loopExecutor)) == loopFailure
+        && loopExecutor.contextCalls == 1 && loopExecutor.loopCalls == 1,
+        "loop failure propagates with exact identity through provider cleanup");
+
+    RecordingExecutor nullInputExecutor = executor();
+    nullInputExecutor.invokeRead = true;
+    AdtsAudioTrack nullInput = new AdtsAudioTrack(info("null-input-id"), null);
+    check(catchThrowable(() -> nullInput.process(nullInputExecutor)) instanceof NullPointerException
+        && nullInputExecutor.contextCalls == 1 && nullInputExecutor.loopCalls == 1,
+        "null input fails only when the provider read callback dereferences it");
+
+    IOException ioFailure = new IOException("read-failure");
+    CountingInputStream failingInput = new CountingInputStream();
+    failingInput.failure = ioFailure;
+    RecordingExecutor readExecutor = executor();
+    readExecutor.invokeRead = true;
+    Throwable wrapped = catchThrowable(
+        () -> new AdtsAudioTrack(info("io-id"), failingInput).process(readExecutor));
+    check(wrapped instanceof RuntimeException && wrapped.getCause() == ioFailure
+        && failingInput.readCalls == 1 && failingInput.closeCalls == 0,
+        "provider wraps input IO failure and retains exact cause identity");
+
+    RuntimeException identifierFailure = new RuntimeException("identifier-failure");
+    Derived failingIdentifier =
+        new Derived(info("derived-failure-id"), new CountingInputStream(), identifierFailure);
+    RecordingExecutor identifierExecutor = executor();
+    check(catchThrowable(() -> failingIdentifier.process(identifierExecutor)) == identifierFailure
+        && identifierExecutor.contextCalls == 1 && identifierExecutor.loopCalls == 0,
+        "virtual identifier evaluation precedes loop execution and cleanup preserves failure");
+  }
+
+  private static void subclassUse() throws Exception {
+    Derived derived = new Derived(info("derived-id"), new CountingInputStream(), null);
+    RecordingExecutor executor = executor();
+    derived.process(executor);
+    check(derived.identifierCalls == 1 && executor.contextCalls == 1
+        && executor.loopCalls == 1 && executor.seekExecutor == null,
+        "ordinary subclass participates in virtual identifier and processing dispatch");
+  }
+
+  private static void reflection() throws Exception {
+    Class<AdtsAudioTrack> type = AdtsAudioTrack.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == BaseAudioTrack.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0, "public concrete non-final class metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredMethods().length == 1
+        && type.getDeclaredConstructors().length == 1, "exact declared member counts");
+
+    Field log = type.getDeclaredField("log");
+    log.setAccessible(true);
+    Object expectedLogger = Class.forName("org.slf4j.LoggerFactory")
+        .getMethod("getLogger", Class.class).invoke(null, AdtsAudioTrack.class);
+    check(log.getType().getName().equals("org.slf4j.Logger")
+        && log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && !log.isSynthetic() && log.get(null) != null
+        && log.get(null) == expectedLogger,
+        "eager class logger identity and metadata");
+    Field input = type.getDeclaredField("inputStream");
+    check(input.getType() == InputStream.class
+        && input.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && !input.isSynthetic(), "private input field metadata");
+
+    Constructor<AdtsAudioTrack> constructor =
+        type.getDeclaredConstructor(AudioTrackInfo.class, InputStream.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    Method process = type.getDeclaredMethod("process", LocalAudioTrackExecutor.class);
+    check(process.getModifiers() == Modifier.PUBLIC && process.getReturnType() == void.class
+        && Arrays.equals(process.getParameterTypes(), new Class<?>[] {LocalAudioTrackExecutor.class})
+        && Arrays.equals(process.getExceptionTypes(), new Class<?>[] {Exception.class})
+        && !process.isSynthetic() && !process.isBridge() && !process.isDefault()
+        && !process.isVarArgs(), "process descriptor and checked exception metadata");
+  }
+
+  private static AudioTrackInfo info(String identifier) {
+    return new AudioTrackInfo("title", "author", 123L, identifier, true,
+        "uri", "artwork", "isrc");
+  }
+
+  private static Object field(Object owner, String name) throws Exception {
+    Field field = AdtsAudioTrack.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(owner);
+  }
+
+  private static RecordingExecutor executor() throws Exception {
+    return allocate(RecordingExecutor.class);
+  }
+
+  private static <T> T allocate(Class<T> type) throws Exception {
+    return type.cast(UNSAFE.getClass().getMethod("allocateInstance", Class.class)
+        .invoke(UNSAFE, type));
+  }
+
+  private static Object loadUnsafe() {
+    try {
+      Class<?> type = Class.forName("sun.misc.Unsafe");
+      Field field = type.getDeclaredField("theUnsafe");
+      field.setAccessible(true);
+      return field.get(null);
+    } catch (ReflectiveOperationException error) {
+      throw new ExceptionInInitializerError(error);
+    }
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try {
+      action.run();
+      return null;
+    } catch (Throwable throwable) {
+      return throwable;
+    }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class CountingInputStream extends InputStream {
+    int readCalls;
+    int closeCalls;
+    IOException failure;
+
+    @Override
+    public int read() throws IOException {
+      readCalls++;
+      if (failure != null) throw failure;
+      return -1;
+    }
+
+    @Override
+    public void close() {
+      closeCalls++;
+    }
+  }
+
+  private static final class RecordingExecutor extends LocalAudioTrackExecutor {
+    int contextCalls;
+    int loopCalls;
+    boolean invokeRead;
+    RuntimeException contextFailure;
+    RuntimeException loopFailure;
+    ReadExecutor readExecutor;
+    SeekExecutor seekExecutor;
+
+    private RecordingExecutor() {
+      super(null, null, null, false, 0);
+    }
+
+    @Override
+    public AudioProcessingContext getProcessingContext() {
+      contextCalls++;
+      if (contextFailure != null) throw contextFailure;
+      return null;
+    }
+
+    @Override
+    public void executeProcessingLoop(ReadExecutor read, SeekExecutor seek) {
+      loopCalls++;
+      readExecutor = read;
+      seekExecutor = seek;
+      if (loopFailure != null) throw loopFailure;
+      if (invokeRead) {
+        try {
+          read.performRead();
+        } catch (RuntimeException error) {
+          throw error;
+        } catch (Exception error) {
+          throw new AssertionError("unexpected checked callback failure", error);
+        }
+      }
+    }
+  }
+
+  private static final class Derived extends AdtsAudioTrack {
+    final RuntimeException identifierFailure;
+    int identifierCalls;
+
+    Derived(AudioTrackInfo info, InputStream input, RuntimeException identifierFailure) {
+      super(info, input);
+      this.identifierFailure = identifierFailure;
+    }
+
+    @Override
+    public String getIdentifier() {
+      identifierCalls++;
+      if (identifierFailure != null) throw identifierFailure;
+      return super.getIdentifier();
+    }
   }
 
   private static void check(boolean condition, String message) {
