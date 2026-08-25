@@ -233,6 +233,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-adts-packet-header-consumer \
   --output "$WORK/GateAdtsPacketHeader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-stream-provider-consumer \
   --output "$WORK/GateAdtsStreamProvider.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-adts-stream-reader-consumer \
+  --output "$WORK/GateAdtsStreamReader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -304,6 +306,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateAdtsAudioTrack.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
+  "$WORK/GateAdtsStreamReader.java" \
   "$WORK/GatePcmFilterFactory.java" \
   "$WORK/GatePcmFormat.java" \
   "$WORK/GateResamplingPcmAudioFilter.java" \
@@ -1238,6 +1241,16 @@ cmp "$WORK/adts-stream-provider-reference.txt" "$WORK/adts-stream-provider-candi
 grep --fixed-strings \
   'contracts=construction,input-identity,context-identity,private-state,initial-seek,seek-overwrite,empty-stream,io-wrapping,runtime-identity,packet-bounds,truncated-packet,complete-packet,decoder-configuration,decoder-reuse,reconfiguration,downstream-reset,decode-fill,decode-loop,interruption-identity,pipeline-creation,delayed-seek,native-output-buffer,close-order,close-finally,repeated-close,subclassable,throws,reflection' \
   "$WORK/adts-stream-provider-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateAdtsStreamReader \
+  >"$WORK/adts-stream-reader-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateAdtsStreamReader >"$WORK/adts-stream-reader-candidate.txt"
+cmp "$WORK/adts-stream-reader-reference.txt" "$WORK/adts-stream-reader-candidate.txt"
+grep --fixed-strings \
+  'contracts=construction,input-identity,scan-buffer,static-state,distance-bounds,unbounded-delegation,header-cache,next-packet,sticky-eof,rollover,sequential-packets,syncword,mpeg-id,layer,protection,crc-consumption,crc-eof,profiles,sample-rates,channels,payload-length,private-bit,ignored-flags,single-frame,io-identity,null-input,private-helpers,subclassable,throws,reflection' \
+  "$WORK/adts-stream-reader-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"

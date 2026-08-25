@@ -1263,45 +1263,70 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public concrete non-final Object subclass retains the exact nine-field private state, four private helpers, cached-packet and sticky-EOF state machine, subclass behavior, checked-exception metadata, and reflection shape.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.adts.AdtsStreamReader",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Ljava/io/InputStream;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Retains the exact nullable input identity and eagerly creates the zeroed 32-byte scan array, its wrapping ByteBuffer, and the associated BitBufferReader while leaving the current packet null.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.adts.AdtsStreamReader",
       "symbol_kind": "METHOD",
       "member_name": "findPacketHeader",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Virtually delegates to the bounded overload with Integer.MAX_VALUE, preserving subclass dispatch, cached identity, sticky EOF, and direct IOException propagation.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.adts.AdtsStreamReader",
       "symbol_kind": "METHOD",
       "member_name": "findPacketHeader",
       "descriptor": "(I)Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Scans at most the exact signed byte distance using 32-byte rollover, validates all ADTS header fields, consumes CRC bytes outside that limit, returns and caches exact parsed headers, caches EOF through a private singleton, and leaves bounded misses uncached.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.adts.AdtsStreamReader",
       "symbol_kind": "METHOD",
       "member_name": "nextPacket",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Clears only the cached current packet, including the EOF sentinel, so the next lookup resumes scanning at the input stream's exact current cursor.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.common.AacPacketRouter",

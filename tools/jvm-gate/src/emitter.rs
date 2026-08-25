@@ -162,6 +162,8 @@ const ADTS_PACKET_HEADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader";
 const ADTS_STREAM_PROVIDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/adts/AdtsStreamProvider";
+const ADTS_STREAM_READER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/adts/AdtsStreamReader";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -498,6 +500,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     ADTS_CONTAINER_PROBE_CLASS,
     ADTS_PACKET_HEADER_CLASS,
     ADTS_STREAM_PROVIDER_CLASS,
+    ADTS_STREAM_READER_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -972,6 +975,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | ADTS_AUDIO_TRACK_CLASS
             | ADTS_CONTAINER_PROBE_CLASS
             | ADTS_STREAM_PROVIDER_CLASS
+            | ADTS_STREAM_READER_CLASS
             | OPUS_AUDIO_DATA_FORMAT_CLASS
             | PCM16_AUDIO_DATA_FORMAT_CLASS
             | OPUS_CHUNK_DECODER_CLASS
@@ -1084,6 +1088,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | ADTS_AUDIO_TRACK_CLASS
             | ADTS_CONTAINER_PROBE_CLASS
             | ADTS_STREAM_PROVIDER_CLASS
+            | ADTS_STREAM_READER_CLASS
             | AUDIO_PIPELINE_FACTORY_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
@@ -1363,6 +1368,9 @@ fn replacement_body(
     }
     if class_name == ADTS_STREAM_PROVIDER_CLASS {
         return adts_stream_provider_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == ADTS_STREAM_READER_CLASS {
+        return adts_stream_reader_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -5929,6 +5937,782 @@ fn adts_stream_provider_close(pool: &mut ConstantPool<'static>) -> Result<Attrib
         ],
     )?;
     Ok(body)
+}
+
+fn adts_stream_reader_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(Ljava/io/InputStream;)V") => adts_stream_reader_constructor(pool),
+        (
+            "findPacketHeader",
+            "()Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;",
+        ) => adts_stream_reader_find_packet_header(pool),
+        (
+            "findPacketHeader",
+            "(I)Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;",
+        ) => adts_stream_reader_find_packet_header_bounded(pool),
+        ("nextPacket", "()V") => adts_stream_reader_next_packet(pool),
+        (
+            "scanForPacketHeader",
+            "(I)Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;",
+        ) => adts_stream_reader_scan_for_packet_header(pool),
+        (
+            "readHeaderFromBufferTail",
+            "(I)Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;",
+        ) => adts_stream_reader_read_header_from_buffer_tail(pool),
+        ("copyEndToBeginning", "([BI)V") => adts_stream_reader_copy_end_to_beginning(pool),
+        (
+            "readHeader",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/BitBufferReader;)Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;",
+        ) => adts_stream_reader_read_header(pool),
+        ("<clinit>", "()V") => adts_stream_reader_class_init(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {ADTS_STREAM_READER_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn adts_stream_reader_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(ADTS_STREAM_READER_CLASS)?;
+    let input = pool.add_field_ref(owner, "inputStream", "Ljava/io/InputStream;")?;
+    let scan_buffer = pool.add_field_ref(owner, "scanBuffer", "[B")?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let wrap = pool.add_method_ref(byte_buffer, "wrap", "([B)Ljava/nio/ByteBuffer;")?;
+    let scan_byte_buffer = pool.add_field_ref(owner, "scanByteBuffer", "Ljava/nio/ByteBuffer;")?;
+    let bit_reader = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/BitBufferReader")?;
+    let bit_reader_init = pool.add_method_ref(bit_reader, "<init>", "(Ljava/nio/ByteBuffer;)V")?;
+    let scan_reader = pool.add_field_ref(
+        owner,
+        "scanBufferReader",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/BitBufferReader;",
+    )?;
+    code(
+        pool,
+        4,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(input),
+            Instruction::Aload_0,
+            Instruction::Bipush(32),
+            Instruction::Newarray(ArrayType::Byte),
+            Instruction::Putfield(scan_buffer),
+            Instruction::Aload_0,
+            Instruction::Aload_0,
+            Instruction::Getfield(scan_buffer),
+            Instruction::Invokestatic(wrap),
+            Instruction::Putfield(scan_byte_buffer),
+            Instruction::Aload_0,
+            Instruction::New(bit_reader),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(scan_byte_buffer),
+            Instruction::Invokespecial(bit_reader_init),
+            Instruction::Putfield(scan_reader),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn adts_stream_reader_find_packet_header(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(ADTS_STREAM_READER_CLASS)?;
+    let find = pool.add_method_ref(
+        owner,
+        "findPacketHeader",
+        "(I)Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;",
+    )?;
+    let maximum = pool.add_integer(i32::MAX)?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Ldc_w(maximum),
+            Instruction::Invokevirtual(find),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn adts_stream_reader_find_packet_header_bounded(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(ADTS_STREAM_READER_CLASS)?;
+    let header = pool.add_class(ADTS_PACKET_HEADER_CLASS)?;
+    let current = pool.add_field_ref(
+        owner,
+        "currentPacket",
+        "Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;",
+    )?;
+    let scan = pool.add_method_ref(
+        owner,
+        "scanForPacketHeader",
+        "(I)Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;",
+    )?;
+    let eof = pool.add_field_ref(
+        owner,
+        "EOF_PACKET",
+        "Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;",
+    )?;
+    let cached_target = 8;
+    let packet_target = 14;
+    let return_target = 16;
+    let mut body = code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(current),
+            Instruction::Ifnonnull(cached_target),
+            Instruction::Aload_0,
+            Instruction::Aload_0,
+            Instruction::Iload_1,
+            Instruction::Invokevirtual(scan),
+            Instruction::Putfield(current),
+            Instruction::Aload_0,
+            Instruction::Getfield(current),
+            Instruction::Getstatic(eof),
+            Instruction::If_acmpne(packet_target),
+            Instruction::Aconst_null,
+            Instruction::Goto(return_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(current),
+            Instruction::Areturn,
+        ],
+    )?;
+    let locals = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Integer,
+    ];
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: cached_target,
+                locals: locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: packet_target - cached_target - 1,
+                locals: locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: return_target - packet_target - 1,
+                locals,
+                stack: vec![VerificationType::Object {
+                    cpool_index: header,
+                }],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn adts_stream_reader_next_packet(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(ADTS_STREAM_READER_CLASS)?;
+    let current = pool.add_field_ref(
+        owner,
+        "currentPacket",
+        "Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;",
+    )?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aconst_null,
+            Instruction::Putfield(current),
+            Instruction::Return,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn adts_stream_reader_scan_for_packet_header(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(ADTS_STREAM_READER_CLASS)?;
+    let input_stream = pool.add_class("java/io/InputStream")?;
+    let input = pool.add_field_ref(owner, "inputStream", "Ljava/io/InputStream;")?;
+    let read = pool.add_method_ref(input_stream, "read", "()I")?;
+    let scan_buffer = pool.add_field_ref(owner, "scanBuffer", "[B")?;
+    let eof = pool.add_field_ref(
+        owner,
+        "EOF_PACKET",
+        "Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;",
+    )?;
+    let read_tail = pool.add_method_ref(
+        owner,
+        "readHeaderFromBufferTail",
+        "(I)Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;",
+    )?;
+    let copy = pool.add_method_ref(owner, "copyEndToBeginning", "([BI)V")?;
+    let loop_target = 4;
+    let byte_target = 16;
+    let after_header_target = 34;
+    let increment_target = 45;
+    let return_target = 47;
+    let mut body = code(
+        pool,
+        3,
+        6,
+        vec![
+            Instruction::Iconst_0,
+            Instruction::Istore_2,
+            Instruction::Iconst_0,
+            Instruction::Istore_3,
+            Instruction::Iload_3,
+            Instruction::Iload_1,
+            Instruction::If_icmpge(return_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(input),
+            Instruction::Invokevirtual(read),
+            Instruction::Istore(4),
+            Instruction::Iload(4),
+            Instruction::Iconst_m1,
+            Instruction::If_icmpne(byte_target),
+            Instruction::Getstatic(eof),
+            Instruction::Areturn,
+            Instruction::Aload_0,
+            Instruction::Getfield(scan_buffer),
+            Instruction::Iload_2,
+            Instruction::Iinc(2, 1),
+            Instruction::Iload(4),
+            Instruction::I2b,
+            Instruction::Bastore,
+            Instruction::Iload_2,
+            Instruction::Bipush(7),
+            Instruction::If_icmplt(after_header_target),
+            Instruction::Aload_0,
+            Instruction::Iload_2,
+            Instruction::Invokevirtual(read_tail),
+            Instruction::Astore(5),
+            Instruction::Aload(5),
+            Instruction::Ifnull(after_header_target),
+            Instruction::Aload(5),
+            Instruction::Areturn,
+            Instruction::Iload_2,
+            Instruction::Aload_0,
+            Instruction::Getfield(scan_buffer),
+            Instruction::Arraylength,
+            Instruction::If_icmpne(increment_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(scan_buffer),
+            Instruction::Bipush(7),
+            Instruction::Invokestatic(copy),
+            Instruction::Bipush(7),
+            Instruction::Istore_2,
+            Instruction::Iinc(3, 1),
+            Instruction::Goto(loop_target),
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+        ],
+    )?;
+    let owner_type = VerificationType::Object { cpool_index: owner };
+    let loop_locals = vec![
+        owner_type.clone(),
+        VerificationType::Integer,
+        VerificationType::Integer,
+        VerificationType::Integer,
+    ];
+    let byte_locals = vec![
+        owner_type,
+        VerificationType::Integer,
+        VerificationType::Integer,
+        VerificationType::Integer,
+        VerificationType::Integer,
+    ];
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: loop_target,
+                locals: loop_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: byte_target - loop_target - 1,
+                locals: byte_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: after_header_target - byte_target - 1,
+                locals: byte_locals,
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: increment_target - after_header_target - 1,
+                locals: loop_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: return_target - increment_target - 1,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn adts_stream_reader_read_header_from_buffer_tail(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(ADTS_STREAM_READER_CLASS)?;
+    let header = pool.add_class(ADTS_PACKET_HEADER_CLASS)?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let position = pool.add_method_ref(byte_buffer, "position", "(I)Ljava/nio/ByteBuffer;")?;
+    let scan_byte_buffer = pool.add_field_ref(owner, "scanByteBuffer", "Ljava/nio/ByteBuffer;")?;
+    let bit_reader = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/BitBufferReader")?;
+    let scan_reader = pool.add_field_ref(
+        owner,
+        "scanBufferReader",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/BitBufferReader;",
+    )?;
+    let read_header = pool.add_method_ref(
+        owner,
+        "readHeader",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/BitBufferReader;)Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;",
+    )?;
+    let remaining = pool.add_method_ref(bit_reader, "readRemainingBits", "()I")?;
+    let protection = pool.add_field_ref(header, "isProtectionAbsent", "Z")?;
+    let input_stream = pool.add_class("java/io/InputStream")?;
+    let input = pool.add_field_ref(owner, "inputStream", "Ljava/io/InputStream;")?;
+    let read = pool.add_method_ref(input_stream, "read", "()I")?;
+    let eof = pool.add_field_ref(
+        owner,
+        "EOF_PACKET",
+        "Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;",
+    )?;
+    let header_target = 19;
+    let eof_target = 36;
+    let return_target = 38;
+    let mut body = code(
+        pool,
+        3,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(scan_byte_buffer),
+            Instruction::Iload_1,
+            Instruction::Bipush(7),
+            Instruction::Isub,
+            Instruction::Invokevirtual(position),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(scan_reader),
+            Instruction::Invokestatic(read_header),
+            Instruction::Astore_2,
+            Instruction::Aload_0,
+            Instruction::Getfield(scan_reader),
+            Instruction::Invokevirtual(remaining),
+            Instruction::Pop,
+            Instruction::Aload_2,
+            Instruction::Ifnonnull(header_target),
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+            Instruction::Aload_2,
+            Instruction::Getfield(protection),
+            Instruction::Ifne(return_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(input),
+            Instruction::Invokevirtual(read),
+            Instruction::Istore_3,
+            Instruction::Aload_0,
+            Instruction::Getfield(input),
+            Instruction::Invokevirtual(read),
+            Instruction::Istore(4),
+            Instruction::Iload_3,
+            Instruction::Iconst_m1,
+            Instruction::If_icmpeq(eof_target),
+            Instruction::Iload(4),
+            Instruction::Iconst_m1,
+            Instruction::If_icmpne(return_target),
+            Instruction::Getstatic(eof),
+            Instruction::Areturn,
+            Instruction::Aload_2,
+            Instruction::Areturn,
+        ],
+    )?;
+    let base_locals = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Integer,
+        VerificationType::Object {
+            cpool_index: header,
+        },
+    ];
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: header_target,
+                locals: base_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: eof_target - header_target - 1,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Integer,
+                    VerificationType::Object {
+                        cpool_index: header,
+                    },
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: return_target - eof_target - 1,
+                locals: base_locals,
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn adts_stream_reader_copy_end_to_beginning(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let byte_array = pool.add_class("[B")?;
+    let loop_target = 2;
+    let return_target = 18;
+    let mut body = code(
+        pool,
+        5,
+        3,
+        vec![
+            Instruction::Iconst_0,
+            Instruction::Istore_2,
+            Instruction::Iload_2,
+            Instruction::Iload_1,
+            Instruction::If_icmpge(return_target),
+            Instruction::Aload_0,
+            Instruction::Iload_2,
+            Instruction::Aload_0,
+            Instruction::Aload_0,
+            Instruction::Arraylength,
+            Instruction::Iload_1,
+            Instruction::Isub,
+            Instruction::Iload_2,
+            Instruction::Iadd,
+            Instruction::Baload,
+            Instruction::Bastore,
+            Instruction::Iinc(2, 1),
+            Instruction::Goto(loop_target),
+            Instruction::Return,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: loop_target,
+                locals: vec![
+                    VerificationType::Object {
+                        cpool_index: byte_array,
+                    },
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: return_target - loop_target - 1,
+                locals: vec![
+                    VerificationType::Object {
+                        cpool_index: byte_array,
+                    },
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn adts_stream_reader_read_header(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(ADTS_STREAM_READER_CLASS)?;
+    let reader = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/BitBufferReader")?;
+    let as_long = pool.add_method_ref(reader, "asLong", "(I)J")?;
+    let as_integer = pool.add_method_ref(reader, "asInteger", "(I)I")?;
+    let mask = pool.add_long(0x7ffb)?;
+    let expected = pool.add_long(0x7ff8)?;
+    let mapping = pool.add_field_ref(owner, "sampleRateMapping", "[I")?;
+    let header = pool.add_class(ADTS_PACKET_HEADER_CLASS)?;
+    let header_init = pool.add_method_ref(header, "<init>", "(ZIIII)V")?;
+    let sync_target = 10;
+    let protection_false_target = 18;
+    let protection_target = 19;
+    let invalid_target = 43;
+    let valid_target = 45;
+    let crc_target = 60;
+    let payload_target = 61;
+    let construct_target = 75;
+    let mut body = code(
+        pool,
+        7,
+        7,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Bipush(15),
+            Instruction::Invokevirtual(as_long),
+            Instruction::Ldc2_w(mask),
+            Instruction::Land,
+            Instruction::Ldc2_w(expected),
+            Instruction::Lcmp,
+            Instruction::Ifeq(sync_target),
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+            Instruction::Aload_0,
+            Instruction::Iconst_1,
+            Instruction::Invokevirtual(as_long),
+            Instruction::Lconst_1,
+            Instruction::Lcmp,
+            Instruction::Ifne(protection_false_target),
+            Instruction::Iconst_1,
+            Instruction::Goto(protection_target),
+            Instruction::Iconst_0,
+            Instruction::Istore_1,
+            Instruction::Aload_0,
+            Instruction::Iconst_2,
+            Instruction::Invokevirtual(as_integer),
+            Instruction::Istore_2,
+            Instruction::Getstatic(mapping),
+            Instruction::Aload_0,
+            Instruction::Iconst_4,
+            Instruction::Invokevirtual(as_integer),
+            Instruction::Iaload,
+            Instruction::Istore_3,
+            Instruction::Aload_0,
+            Instruction::Iconst_1,
+            Instruction::Invokevirtual(as_long),
+            Instruction::Pop2,
+            Instruction::Aload_0,
+            Instruction::Iconst_3,
+            Instruction::Invokevirtual(as_integer),
+            Instruction::Istore(4),
+            Instruction::Iload_3,
+            Instruction::Iconst_m1,
+            Instruction::If_icmpeq(invalid_target),
+            Instruction::Iload(4),
+            Instruction::Ifne(valid_target),
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+            Instruction::Aload_0,
+            Instruction::Iconst_4,
+            Instruction::Invokevirtual(as_long),
+            Instruction::Pop2,
+            Instruction::Aload_0,
+            Instruction::Bipush(13),
+            Instruction::Invokevirtual(as_integer),
+            Instruction::Istore(5),
+            Instruction::Iload(5),
+            Instruction::Bipush(7),
+            Instruction::Isub,
+            Instruction::Iload_1,
+            Instruction::Ifeq(crc_target),
+            Instruction::Iconst_0,
+            Instruction::Goto(payload_target),
+            Instruction::Iconst_2,
+            Instruction::Isub,
+            Instruction::Istore(6),
+            Instruction::Aload_0,
+            Instruction::Bipush(11),
+            Instruction::Invokevirtual(as_long),
+            Instruction::Pop2,
+            Instruction::Aload_0,
+            Instruction::Iconst_2,
+            Instruction::Invokevirtual(as_long),
+            Instruction::Lconst_0,
+            Instruction::Lcmp,
+            Instruction::Ifeq(construct_target),
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+            Instruction::New(header),
+            Instruction::Dup,
+            Instruction::Iload_1,
+            Instruction::Iload_2,
+            Instruction::Iconst_1,
+            Instruction::Iadd,
+            Instruction::Iload_3,
+            Instruction::Iload(4),
+            Instruction::Iload(6),
+            Instruction::Invokespecial(header_init),
+            Instruction::Areturn,
+        ],
+    )?;
+    let reader_local = VerificationType::Object {
+        cpool_index: reader,
+    };
+    let five_locals = vec![
+        reader_local.clone(),
+        VerificationType::Integer,
+        VerificationType::Integer,
+        VerificationType::Integer,
+        VerificationType::Integer,
+    ];
+    let six_locals = vec![
+        reader_local.clone(),
+        VerificationType::Integer,
+        VerificationType::Integer,
+        VerificationType::Integer,
+        VerificationType::Integer,
+        VerificationType::Integer,
+    ];
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: sync_target,
+                locals: vec![reader_local.clone()],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: protection_false_target - sync_target - 1,
+                locals: vec![reader_local.clone()],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: protection_target - protection_false_target - 1,
+                locals: vec![reader_local.clone()],
+                stack: vec![VerificationType::Integer],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: invalid_target - protection_target - 1,
+                locals: five_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: valid_target - invalid_target - 1,
+                locals: five_locals,
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: crc_target - valid_target - 1,
+                locals: six_locals.clone(),
+                stack: vec![VerificationType::Integer],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: payload_target - crc_target - 1,
+                locals: six_locals.clone(),
+                stack: vec![VerificationType::Integer, VerificationType::Integer],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: construct_target - payload_target - 1,
+                locals: vec![
+                    reader_local,
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn adts_stream_reader_class_init(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(ADTS_STREAM_READER_CLASS)?;
+    let header = pool.add_class(ADTS_PACKET_HEADER_CLASS)?;
+    let header_init = pool.add_method_ref(header, "<init>", "(ZIIII)V")?;
+    let eof = pool.add_field_ref(
+        owner,
+        "EOF_PACKET",
+        "Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;",
+    )?;
+    let mapping = pool.add_field_ref(owner, "sampleRateMapping", "[I")?;
+    let rates = [
+        96_000, 88_200, 64_000, 48_000, 44_100, 32_000, 24_000, 22_050, 16_000, 12_000, 11_025,
+        8_000, 7_350, -1, -1, -1,
+    ];
+    let mut instructions = vec![
+        Instruction::New(header),
+        Instruction::Dup,
+        Instruction::Iconst_0,
+        Instruction::Iconst_0,
+        Instruction::Iconst_0,
+        Instruction::Iconst_0,
+        Instruction::Iconst_0,
+        Instruction::Invokespecial(header_init),
+        Instruction::Putstatic(eof),
+        Instruction::Bipush(16),
+        Instruction::Newarray(ArrayType::Int),
+    ];
+    for (index, rate) in rates.into_iter().enumerate() {
+        instructions.push(Instruction::Dup);
+        instructions.push(match index {
+            0 => Instruction::Iconst_0,
+            1 => Instruction::Iconst_1,
+            2 => Instruction::Iconst_2,
+            3 => Instruction::Iconst_3,
+            4 => Instruction::Iconst_4,
+            5 => Instruction::Iconst_5,
+            _ => Instruction::Bipush(i8::try_from(index)?),
+        });
+        instructions.push(if rate == -1 {
+            Instruction::Iconst_m1
+        } else if i16::try_from(rate).is_ok() {
+            Instruction::Sipush(i16::try_from(rate)?)
+        } else {
+            Instruction::Ldc_w(pool.add_integer(rate)?)
+        });
+        instructions.push(Instruction::Iastore);
+    }
+    instructions.extend([Instruction::Putstatic(mapping), Instruction::Return]);
+    code(pool, 7, 0, instructions)
 }
 
 fn media_container_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {

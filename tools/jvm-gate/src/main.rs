@@ -161,6 +161,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
         "write-adts-packet-header-consumer" => Some(ADTS_PACKET_HEADER_CONSUMER),
         "write-adts-stream-provider-consumer" => Some(ADTS_STREAM_PROVIDER_CONSUMER),
+        "write-adts-stream-reader-consumer" => Some(ADTS_STREAM_READER_CONSUMER),
         _ => None,
     }
 }
@@ -38292,6 +38293,375 @@ public final class GateYoutubeAccessTokenTracker {
       if (!type.isInstance(error.getCause())) throw new AssertionError("wrong cause", error);
       return type.cast(error.getCause());
     }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const ADTS_STREAM_READER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.adts.AdtsPacketHeader;
+import com.sedmelluq.discord.lavaplayer.container.adts.AdtsStreamReader;
+import com.sedmelluq.discord.lavaplayer.tools.io.BitBufferReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+
+public final class GateAdtsStreamReader {
+  private static final int[] SAMPLE_RATES = {
+      96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050,
+      16000, 12000, 11025, 8000, 7350, -1, -1, -1};
+
+  public static void main(String[] args) throws Exception {
+    constructionAndStatics();
+    distanceCachingAndEof();
+    rolloverAndSequentialPackets();
+    headerValuesAndValidation();
+    crcAndFailures();
+    privateHelpers();
+    subclassingAndReflection();
+    System.out.println(
+        "contracts=construction,input-identity,scan-buffer,static-state,distance-bounds,unbounded-delegation,header-cache,next-packet,sticky-eof,rollover,sequential-packets,syncword,mpeg-id,layer,protection,crc-consumption,crc-eof,profiles,sample-rates,channels,payload-length,private-bit,ignored-flags,single-frame,io-identity,null-input,private-helpers,subclassable,throws,reflection");
+  }
+
+  private static void constructionAndStatics() throws Exception {
+    CountingInput input = new CountingInput(new byte[0]);
+    AdtsStreamReader reader = new AdtsStreamReader(input);
+    byte[] scan = (byte[]) field(reader, "scanBuffer");
+    ByteBuffer bytes = (ByteBuffer) field(reader, "scanByteBuffer");
+
+    check(field(reader, "inputStream") == input, "exact input identity");
+    check(scan.length == 32 && Arrays.equals(scan, new byte[32]), "32-byte zeroed scan buffer");
+    check(bytes.hasArray() && bytes.array() == scan && bytes.position() == 0
+        && bytes.limit() == 32, "byte buffer wraps scan array");
+    check(field(reader, "scanBufferReader").getClass() == BitBufferReader.class,
+        "eager exact bit reader");
+    check(field(reader, "currentPacket") == null, "initial packet is null");
+
+    AdtsPacketHeader eof = (AdtsPacketHeader) staticField("EOF_PACKET");
+    check(!eof.isProtectionAbsent && eof.profile == 0 && eof.sampleRate == 0
+        && eof.channels == 0 && eof.payloadLength == 0, "EOF singleton values");
+    check(staticInt("HEADER_BASE_SIZE") == 7 && staticInt("INVALID_VALUE") == -1,
+        "private constants");
+    check(Arrays.equals((int[]) staticField("sampleRateMapping"), SAMPLE_RATES),
+        "sample-rate mapping");
+
+    AdtsStreamReader nullReader = new AdtsStreamReader(null);
+    check(field(nullReader, "inputStream") == null, "null input retained");
+    expect(NullPointerException.class, nullReader::findPacketHeader);
+  }
+
+  private static void distanceCachingAndEof() throws Exception {
+    byte[] header = header(true, 2, 4, 2, 27, 0);
+
+    CountingInput zero = new CountingInput(header);
+    AdtsStreamReader zeroReader = new AdtsStreamReader(zero);
+    check(zeroReader.findPacketHeader(0) == null && zero.calls == 0, "zero distance");
+    check(zeroReader.findPacketHeader(-9) == null && zero.calls == 0, "negative distance");
+
+    CountingInput shortInput = new CountingInput(header);
+    AdtsStreamReader shortReader = new AdtsStreamReader(shortInput);
+    check(shortReader.findPacketHeader(6) == null && shortInput.calls == 6,
+        "distance stops before complete header");
+
+    CountingInput exactInput = new CountingInput(header);
+    AdtsStreamReader exactReader = new AdtsStreamReader(exactInput);
+    AdtsPacketHeader first = exactReader.findPacketHeader(7);
+    checkHeader(first, true, 2, 44100, 2, 20, "exact boundary");
+    check(exactInput.calls == 7 && exactReader.findPacketHeader(0) == first
+        && exactReader.findPacketHeader() == first && exactInput.calls == 7,
+        "cached identity ignores later distances");
+
+    exactReader.nextPacket();
+    check(exactReader.findPacketHeader() == null && exactInput.calls == 8, "first EOF read");
+    Object eof = staticField("EOF_PACKET");
+    check(field(exactReader, "currentPacket") == eof, "EOF singleton cached");
+    check(exactReader.findPacketHeader(100) == null && exactInput.calls == 8, "sticky EOF");
+    exactReader.nextPacket();
+    check(field(exactReader, "currentPacket") == null, "next packet clears EOF");
+    check(exactReader.findPacketHeader(1) == null && exactInput.calls == 9,
+        "scan resumes after clearing EOF");
+  }
+
+  private static void rolloverAndSequentialPackets() throws Exception {
+    byte[] noise = new byte[40];
+    Arrays.fill(noise, (byte) 0x55);
+    byte[] packet = header(true, 1, 3, 1, 7, 0);
+    CountingInput rolloverInput = new CountingInput(join(noise, packet));
+    AdtsPacketHeader rollover = new AdtsStreamReader(rolloverInput).findPacketHeader(47);
+    checkHeader(rollover, true, 1, 48000, 1, 0, "rollover header");
+    check(rolloverInput.calls == 47, "rollover exact consumption");
+
+    byte[] firstBytes = header(true, 4, 12, 7, 7, 0);
+    byte[] secondBytes = header(true, 1, 0, 1, 12, 0);
+    CountingInput sequentialInput = new CountingInput(join(firstBytes, secondBytes));
+    AdtsStreamReader sequential = new AdtsStreamReader(sequentialInput);
+    AdtsPacketHeader first = sequential.findPacketHeader();
+    checkHeader(first, true, 4, 7350, 7, 0, "first sequential packet");
+    check(sequential.findPacketHeader() == first && sequentialInput.calls == 7,
+        "first packet remains cached");
+    sequential.nextPacket();
+    checkHeader(sequential.findPacketHeader(), true, 1, 96000, 1, 5,
+        "second sequential packet");
+    check(sequentialInput.calls == 14, "second header begins at current cursor");
+  }
+
+  private static void headerValuesAndValidation() throws Exception {
+    for (int profile = 1; profile <= 4; profile++) {
+      checkHeader(parse(header(true, profile, 3, 2, 7, 0), 7), true, profile,
+          48000, 2, 0, "profile " + profile);
+    }
+    for (int rate = 0; rate <= 12; rate++) {
+      checkHeader(parse(header(true, 2, rate, 2, 7, 0), 7), true, 2,
+          SAMPLE_RATES[rate], 2, 0, "rate " + rate);
+    }
+    for (int channels = 1; channels <= 7; channels++) {
+      checkHeader(parse(header(true, 2, 4, channels, 8191, 0), 7), true, 2,
+          44100, channels, 8184, "channels " + channels);
+    }
+
+    checkHeader(parse(header(true, 2, 4, 2, 0, 0), 7), true, 2, 44100, 2, -7,
+        "negative payload retained");
+    byte[] ignored = header(true, 2, 4, 2, 77, 0);
+    ignored[1] |= 0x08;
+    ignored[2] |= 0x02;
+    ignored[3] |= 0x3C;
+    checkHeader(parse(ignored, 7), true, 2, 44100, 2, 70,
+        "MPEG ID private and boring flags ignored");
+
+    for (int invalidRate = 13; invalidRate <= 15; invalidRate++) {
+      check(parse(header(true, 2, invalidRate, 2, 7, 0), 7) == null,
+          "invalid sample-rate index " + invalidRate);
+    }
+    check(parse(header(true, 2, 4, 0, 7, 0), 7) == null, "zero channels rejected");
+    check(parse(header(true, 2, 4, 2, 7, 1), 7) == null,
+        "multiple raw blocks rejected");
+    byte[] layer = header(true, 2, 4, 2, 7, 0);
+    layer[1] |= 0x02;
+    check(parse(layer, 7) == null, "nonzero layer rejected");
+    byte[] sync = header(true, 2, 4, 2, 7, 0);
+    sync[0] = (byte) 0xFE;
+    check(parse(sync, 7) == null, "bad syncword rejected");
+  }
+
+  private static void crcAndFailures() throws Exception {
+    byte[] protectedHeader = header(false, 3, 5, 6, 109, 0);
+    CountingInput completeInput = new CountingInput(join(protectedHeader, new byte[] {12, 34}));
+    AdtsPacketHeader complete = new AdtsStreamReader(completeInput).findPacketHeader(7);
+    checkHeader(complete, false, 3, 32000, 6, 100, "protected packet");
+    check(completeInput.calls == 9, "CRC bytes consumed beyond scan distance");
+
+    CountingInput truncatedInput = new CountingInput(join(protectedHeader, new byte[] {12}));
+    AdtsStreamReader truncated = new AdtsStreamReader(truncatedInput);
+    check(truncated.findPacketHeader(7) == null && truncatedInput.calls == 9,
+        "truncated CRC becomes EOF");
+    check(field(truncated, "currentPacket") == staticField("EOF_PACKET"),
+        "truncated CRC caches EOF singleton");
+    check(truncated.findPacketHeader() == null && truncatedInput.calls == 9,
+        "truncated CRC EOF is sticky");
+
+    IOException failure = new IOException("exact");
+    ThrowingInput throwing = new ThrowingInput(failure);
+    AdtsStreamReader failing = new AdtsStreamReader(throwing);
+    check(expect(IOException.class, failing::findPacketHeader) == failure,
+        "IOException identity");
+    check(field(failing, "currentPacket") == null, "failure does not cache state");
+  }
+
+  private static void privateHelpers() throws Exception {
+    Method copy = AdtsStreamReader.class.getDeclaredMethod(
+        "copyEndToBeginning", byte[].class, int.class);
+    copy.setAccessible(true);
+    byte[] values = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    copy.invoke(null, values, 3);
+    check(Arrays.equals(values, new byte[] {7, 8, 9, 3, 4, 5, 6, 7, 8, 9}),
+        "copy tail to beginning");
+    copy.invoke(null, null, 0);
+    copy.invoke(null, values, -1);
+    expectInvocation(ArrayIndexOutOfBoundsException.class, () -> copy.invoke(null, values, 11));
+
+    Method readHeader = AdtsStreamReader.class.getDeclaredMethod(
+        "readHeader", BitBufferReader.class);
+    readHeader.setAccessible(true);
+    byte[] bytes = header(true, 4, 2, 5, 55, 0);
+    AdtsPacketHeader parsed = (AdtsPacketHeader) readHeader.invoke(
+        null, new BitBufferReader(ByteBuffer.wrap(bytes)));
+    checkHeader(parsed, true, 4, 64000, 5, 48, "private header helper");
+  }
+
+  private static void subclassingAndReflection() throws Exception {
+    AdtsPacketHeader sentinel = new AdtsPacketHeader(true, 9, 8, 7, 6);
+    RecordingReader reader = new RecordingReader(sentinel);
+    check(reader.findPacketHeader() == sentinel && reader.maximumDistance == Integer.MAX_VALUE,
+        "unbounded overload uses virtual bounded overload");
+    reader.nextPacket();
+    check(reader.nextCalls == 1, "nextPacket virtual dispatch");
+
+    Class<?> type = AdtsStreamReader.class;
+    check(type.getSuperclass() == Object.class && type.getInterfaces().length == 0
+        && Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && !Modifier.isAbstract(type.getModifiers()), "class shape");
+    check(type.getDeclaredFields().length == 9 && type.getDeclaredMethods().length == 7
+        && type.getDeclaredConstructors().length == 1, "declared member counts");
+
+    checkField("EOF_PACKET", AdtsPacketHeader.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField("HEADER_BASE_SIZE", int.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField("INVALID_VALUE", int.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField("sampleRateMapping", int[].class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField("inputStream", InputStream.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField("scanBuffer", byte[].class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField("scanByteBuffer", ByteBuffer.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField("scanBufferReader", BitBufferReader.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField("currentPacket", AdtsPacketHeader.class, Modifier.PRIVATE);
+
+    Constructor<?> constructor = type.getDeclaredConstructor(InputStream.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic(),
+        "constructor metadata");
+    checkMethod(type.getDeclaredMethod("findPacketHeader"), AdtsPacketHeader.class,
+        Modifier.PUBLIC, IOException.class);
+    checkMethod(type.getDeclaredMethod("findPacketHeader", int.class), AdtsPacketHeader.class,
+        Modifier.PUBLIC, IOException.class);
+    checkMethod(type.getDeclaredMethod("nextPacket"), void.class, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("scanForPacketHeader", int.class), AdtsPacketHeader.class,
+        Modifier.PRIVATE, IOException.class);
+    checkMethod(type.getDeclaredMethod("readHeaderFromBufferTail", int.class),
+        AdtsPacketHeader.class, Modifier.PRIVATE, IOException.class);
+    checkMethod(type.getDeclaredMethod("copyEndToBeginning", byte[].class, int.class),
+        void.class, Modifier.PRIVATE | Modifier.STATIC);
+    checkMethod(type.getDeclaredMethod("readHeader", BitBufferReader.class),
+        AdtsPacketHeader.class, Modifier.PRIVATE | Modifier.STATIC);
+  }
+
+  private static AdtsPacketHeader parse(byte[] bytes, int maximumDistance) throws Exception {
+    return new AdtsStreamReader(new CountingInput(bytes)).findPacketHeader(maximumDistance);
+  }
+
+  private static byte[] header(boolean protectionAbsent, int profile, int rateIndex,
+                               int channels, int frameLength, int blocks) {
+    return new byte[] {
+        (byte) 0xFF,
+        (byte) (0xF0 | (protectionAbsent ? 1 : 0)),
+        (byte) (((profile - 1) << 6) | (rateIndex << 2) | ((channels >> 2) & 1)),
+        (byte) (((channels & 3) << 6) | ((frameLength >> 11) & 3)),
+        (byte) ((frameLength >> 3) & 0xFF),
+        (byte) (((frameLength & 7) << 5) | 0x1F),
+        (byte) (0xFC | (blocks & 3))};
+  }
+
+  private static byte[] join(byte[] first, byte[] second) {
+    byte[] result = Arrays.copyOf(first, first.length + second.length);
+    System.arraycopy(second, 0, result, first.length, second.length);
+    return result;
+  }
+
+  private static void checkHeader(AdtsPacketHeader header, boolean protectionAbsent,
+                                  int profile, int sampleRate, int channels, int payload,
+                                  String message) {
+    check(header != null && header.isProtectionAbsent == protectionAbsent
+        && header.profile == profile && header.sampleRate == sampleRate
+        && header.channels == channels && header.payloadLength == payload, message);
+  }
+
+  private static Object field(Object target, String name) throws Exception {
+    Field field = AdtsStreamReader.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
+  }
+
+  private static Object staticField(String name) throws Exception {
+    return field(null, name);
+  }
+
+  private static int staticInt(String name) throws Exception {
+    Field field = AdtsStreamReader.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.getInt(null);
+  }
+
+  private static void checkField(String name, Class<?> fieldType, int modifiers) throws Exception {
+    Field field = AdtsStreamReader.class.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getModifiers() == modifiers
+        && !field.isSynthetic(), name + " field metadata");
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, int modifiers,
+                                  Class<?>... exceptions) {
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isBridge() && !method.isSynthetic(), method + " metadata");
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+      return type.cast(error);
+    }
+  }
+
+  private static <T extends Throwable> T expectInvocation(Class<T> type, Operation operation)
+      throws Exception {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (InvocationTargetException error) {
+      if (!type.isInstance(error.getCause())) throw new AssertionError("wrong cause", error);
+      return type.cast(error.getCause());
+    }
+  }
+
+  private static final class CountingInput extends InputStream {
+    private final byte[] bytes;
+    private int position;
+    int calls;
+
+    CountingInput(byte[] bytes) { this.bytes = bytes; }
+
+    @Override public int read() {
+      calls++;
+      return position < bytes.length ? bytes[position++] & 0xFF : -1;
+    }
+  }
+
+  private static final class ThrowingInput extends InputStream {
+    private final IOException failure;
+    ThrowingInput(IOException failure) { this.failure = failure; }
+    @Override public int read() throws IOException { throw failure; }
+  }
+
+  private static final class RecordingReader extends AdtsStreamReader {
+    private final AdtsPacketHeader result;
+    int maximumDistance;
+    int nextCalls;
+
+    RecordingReader(AdtsPacketHeader result) {
+      super(new CountingInput(new byte[0]));
+      this.result = result;
+    }
+
+    @Override public AdtsPacketHeader findPacketHeader(int maximumDistance) {
+      this.maximumDistance = maximumDistance;
+      return result;
+    }
+
+    @Override public void nextPacket() { nextCalls++; }
   }
 
   private interface Operation { void run() throws Exception; }
