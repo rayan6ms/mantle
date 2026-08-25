@@ -139,6 +139,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
         }
+        "write-formats-consumer" => Some(FORMATS_CONSUMER),
         _ => {
             filter_format_consumer_source(command).or_else(|| sound_cloud_consumer_source(command))
         }
@@ -11935,6 +11936,97 @@ public final class GatePcmChunkEncoder {
     public AudioChunkDecoder createDecoder() { return null; }
     public AudioChunkEncoder createEncoder(AudioConfiguration configuration) { return null; }
   }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const FORMATS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.Formats;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateFormats {
+  private static final String[][] CONSTANTS = {
+      {"MIME_AUDIO_WEBM", "audio/webm"},
+      {"MIME_VIDEO_WEBM", "video/webm"},
+      {"MIME_AUDIO_MP4", "audio/mp4"},
+      {"MIME_VIDEO_MP4", "video/mp4"},
+      {"CODEC_OPUS", "opus"},
+      {"CODEC_VORBIS", "vorbis"},
+      {"CODEC_AAC_LC", "mp4a.40.2"}
+  };
+
+  public static void main(String[] args) throws Exception {
+    constants();
+    construction();
+    reflection();
+    System.out.println(
+        "contracts=constant-values,constant-identity,public-static-final,constant-value-attributes,public-constructor,subclassable,no-instance-state,no-class-initializer,reflection");
+  }
+
+  private static void constants() throws Exception {
+    Formats receiver = new Formats();
+    for (String[] specification : CONSTANTS) {
+      Field field = Formats.class.getDeclaredField(specification[0]);
+      Object withoutReceiver = field.get(null);
+      Object ignoredReceiver = field.get(receiver);
+      check(withoutReceiver instanceof String && withoutReceiver.equals(specification[1])
+          && withoutReceiver == specification[1] && ignoredReceiver == withoutReceiver,
+          "reflective constant value and interned identity " + specification[0]);
+    }
+    check(Formats.MIME_AUDIO_WEBM.equals("audio/webm")
+        && Formats.MIME_VIDEO_WEBM.equals("video/webm")
+        && Formats.MIME_AUDIO_MP4.equals("audio/mp4")
+        && Formats.MIME_VIDEO_MP4.equals("video/mp4")
+        && Formats.CODEC_OPUS.equals("opus")
+        && Formats.CODEC_VORBIS.equals("vorbis")
+        && Formats.CODEC_AAC_LC.equals("mp4a.40.2"),
+        "compile-time constant values");
+  }
+
+  private static void construction() {
+    Formats first = new Formats();
+    Formats second = new Formats();
+    Derived derived = new Derived();
+    check(first != second && first.getClass() == Formats.class
+        && derived instanceof Formats && derived.getClass() == Derived.class,
+        "public constructor creates independent subclassable instances");
+  }
+
+  private static void reflection() throws Exception {
+    Class<Formats> type = Formats.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete object class metadata");
+    check(type.getDeclaredFields().length == 7 && type.getDeclaredMethods().length == 0
+        && type.getDeclaredConstructors().length == 1,
+        "declared member counts and no class-initializer reflection surface");
+
+    String[] declaredNames = Arrays.stream(type.getDeclaredFields())
+        .map(Field::getName).sorted().toArray(String[]::new);
+    String[] expectedNames = Arrays.stream(CONSTANTS)
+        .map(specification -> specification[0]).sorted().toArray(String[]::new);
+    check(Arrays.equals(declaredNames, expectedNames), "exact declared field names");
+    for (String[] specification : CONSTANTS) {
+      Field field = type.getDeclaredField(specification[0]);
+      check(field.getType() == String.class && field.getGenericType() == String.class
+          && field.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL)
+          && !field.isSynthetic(), "field metadata " + specification[0]);
+    }
+
+    Constructor<Formats> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getParameterCount() == 0
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "constructor metadata");
+  }
+
+  private static final class Derived extends Formats {}
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

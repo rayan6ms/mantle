@@ -209,6 +209,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-pcm-chunk-decoder-consumer \
   --output "$WORK/GatePcmChunkDecoder.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-pcm-chunk-encoder-consumer \
   --output "$WORK/GatePcmChunkEncoder.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-formats-consumer \
+  --output "$WORK/GateFormats.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -269,6 +271,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateOpusChunkEncoder.java" \
   "$WORK/GatePcmChunkDecoder.java" \
   "$WORK/GatePcmChunkEncoder.java" \
+  "$WORK/GateFormats.java" \
   "$WORK/GatePcmFilterFactory.java" \
   "$WORK/GatePcmFormat.java" \
   "$WORK/GateResamplingPcmAudioFilter.java" \
@@ -1078,6 +1081,16 @@ cmp "$WORK/pcm-chunk-encoder-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor-capacity,heap-byte-buffer,byte-order,shared-short-view,big-endian,little-endian,returning-array,exact-allocation,input-mark-reset,buffered-append-flip,byte-cursor-bypass,buffer-reuse,null-order,oversize-order,small-output,readonly-output,close-noop,private-state,reflection' \
   "$WORK/pcm-chunk-encoder-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateFormats \
+  >"$WORK/formats-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateFormats >"$WORK/formats-candidate.txt"
+cmp "$WORK/formats-reference.txt" "$WORK/formats-candidate.txt"
+grep --fixed-strings \
+  'contracts=constant-values,constant-identity,public-static-final,constant-value-attributes,public-constructor,subclassable,no-instance-state,no-class-initializer,reflection' \
+  "$WORK/formats-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"

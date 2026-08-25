@@ -140,6 +140,7 @@ const PCM_CHUNK_DECODER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/format/transcoder/PcmChunkDecoder";
 const PCM_CHUNK_ENCODER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/format/transcoder/PcmChunkEncoder";
+const FORMATS_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/Formats";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -464,6 +465,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     OPUS_CHUNK_ENCODER_CLASS,
     PCM_CHUNK_DECODER_CLASS,
     PCM_CHUNK_ENCODER_CLASS,
+    FORMATS_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -1275,6 +1277,9 @@ fn replacement_body(
     }
     if class_name == PCM_CHUNK_ENCODER_CLASS {
         return pcm_chunk_encoder_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == FORMATS_CLASS {
+        return formats_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -3183,6 +3188,22 @@ fn pcm_chunk_encoder_encode_buffer(pool: &mut ConstantPool<'static>) -> Result<A
             Instruction::Return,
         ],
     )
+}
+
+fn formats_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {FORMATS_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
 }
 
 fn opus_audio_data_format_replacement(
