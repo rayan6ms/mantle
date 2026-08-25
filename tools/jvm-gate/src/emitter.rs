@@ -93,6 +93,8 @@ const SPLIT_SHORT_PCM_AUDIO_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/SplitShortPcmAudioFilter";
 const UNIVERSAL_PCM_AUDIO_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter";
+const USER_PROVIDED_AUDIO_FILTERS_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/filter/UserProvidedAudioFilters";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -394,6 +396,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     SHORT_PCM_AUDIO_FILTER_CLASS,
     SPLIT_SHORT_PCM_AUDIO_FILTER_CLASS,
     UNIVERSAL_PCM_AUDIO_FILTER_CLASS,
+    USER_PROVIDED_AUDIO_FILTERS_CLASS,
     "com/sedmelluq/discord/lavaplayer/format/AudioDataFormat",
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
@@ -862,6 +865,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | COMPOSITE_AUDIO_FILTER_CLASS
             | FILTER_CHAIN_BUILDER_CLASS
             | FINAL_PCM_AUDIO_FILTER_CLASS
+            | USER_PROVIDED_AUDIO_FILTERS_CLASS
             | TRACK_MARKER_TRACKER_CLASS
             | BASE_AUDIO_TRACK_CLASS
             | DELEGATED_AUDIO_TRACK_CLASS
@@ -945,6 +949,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | COMPOSITE_AUDIO_FILTER_CLASS
             | FILTER_CHAIN_BUILDER_CLASS
             | FINAL_PCM_AUDIO_FILTER_CLASS
+            | USER_PROVIDED_AUDIO_FILTERS_CLASS
             | TRACK_INFO_BUILDER_CLASS
             | ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
             | NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
@@ -1106,6 +1111,9 @@ fn replacement_body(
     }
     if class_name == FINAL_PCM_AUDIO_FILTER_CLASS {
         return final_pcm_audio_filter_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == USER_PROVIDED_AUDIO_FILTERS_CLASS {
+        return user_provided_audio_filters_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -2740,6 +2748,458 @@ fn composite_audio_filter_lifecycle(
                 stack: vec![],
             },
         ],
+    )?;
+    Ok(body)
+}
+
+fn user_provided_audio_filters_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;)V",
+        ) => user_provided_audio_filters_constructor(pool),
+        (
+            "buildFragment",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;)Lcom/sedmelluq/discord/lavaplayer/filter/AudioFilterChain;",
+        ) => user_provided_audio_filters_build_fragment(pool),
+        ("getFilters", "()Ljava/util/List;") => user_provided_audio_filters_get_filters(pool),
+        ("process", "([[FII)V" | "([SII)V" | "([[SII)V") => {
+            user_provided_audio_filters_process(pool, descriptor, false)
+        }
+        ("process", "(Ljava/nio/ShortBuffer;)V") => {
+            user_provided_audio_filters_process(pool, descriptor, true)
+        }
+        ("checkRebuild", "()V") => user_provided_audio_filters_check_rebuild(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {USER_PROVIDED_AUDIO_FILTERS_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn user_provided_audio_filters_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(USER_PROVIDED_AUDIO_FILTERS_CLASS)?;
+    let composite = pool.add_class(COMPOSITE_AUDIO_FILTER_CLASS)?;
+    let context_type = pool.add_class(AUDIO_PROCESSING_CONTEXT_CLASS)?;
+    let composite_init = pool.add_method_ref(composite, "<init>", "()V")?;
+    let context = pool.add_field_ref(
+        owner,
+        "context",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;",
+    )?;
+    let next_filter = pool.add_field_ref(
+        owner,
+        "nextFilter",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;",
+    )?;
+    let hot_swap_enabled = pool.add_field_ref(owner, "hotSwapEnabled", "Z")?;
+    let context_hot_swap = pool.add_field_ref(context_type, "filterHotSwapEnabled", "Z")?;
+    let chain = pool.add_field_ref(
+        owner,
+        "chain",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/AudioFilterChain;",
+    )?;
+    let build_fragment = pool.add_method_ref(
+        owner,
+        "buildFragment",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;)Lcom/sedmelluq/discord/lavaplayer/filter/AudioFilterChain;",
+    )?;
+    code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(composite_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(context),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(next_filter),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Getfield(context_hot_swap),
+            Instruction::Putfield(hot_swap_enabled),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Invokestatic(build_fragment),
+            Instruction::Putfield(chain),
+            Instruction::Return,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn user_provided_audio_filters_build_fragment(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let context_type = pool.add_class(AUDIO_PROCESSING_CONTEXT_CLASS)?;
+    let options_type = pool.add_class(AUDIO_PLAYER_OPTIONS_CLASS)?;
+    let atomic_reference = pool.add_class("java/util/concurrent/atomic/AtomicReference")?;
+    let factory_type =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/filter/PcmFilterFactory")?;
+    let chain_type = pool.add_class(AUDIO_FILTER_CHAIN_CLASS)?;
+    let builder_type = pool.add_class(FILTER_CHAIN_BUILDER_CLASS)?;
+    let array_list = pool.add_class("java/util/ArrayList")?;
+    let list_type = pool.add_class("java/util/List")?;
+    let iterator_type = pool.add_class("java/util/Iterator")?;
+    let collections = pool.add_class("java/util/Collections")?;
+    let audio_filter = pool.add_class(AUDIO_FILTER_CLASS)?;
+    let format_type = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let player_options = pool.add_field_ref(
+        context_type,
+        "playerOptions",
+        "Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerOptions;",
+    )?;
+    let filter_factory = pool.add_field_ref(
+        options_type,
+        "filterFactory",
+        "Ljava/util/concurrent/atomic/AtomicReference;",
+    )?;
+    let output_format = pool.add_field_ref(
+        context_type,
+        "outputFormat",
+        "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let channel_count = pool.add_field_ref(format_type, "channelCount", "I")?;
+    let atomic_get = pool.add_method_ref(atomic_reference, "get", "()Ljava/lang/Object;")?;
+    let empty_list = pool.add_method_ref(collections, "emptyList", "()Ljava/util/List;")?;
+    let chain_init = pool.add_method_ref(
+        chain_type,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;Ljava/util/List;Ljava/lang/Object;)V",
+    )?;
+    let builder_init = pool.add_method_ref(builder_type, "<init>", "()V")?;
+    let factory_build = pool.add_interface_method_ref(
+        factory_type,
+        "buildChain",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;)Ljava/util/List;",
+    )?;
+    let array_list_init = pool.add_method_ref(array_list, "<init>", "(Ljava/util/Collection;)V")?;
+    let is_empty = pool.add_interface_method_ref(list_type, "isEmpty", "()Z")?;
+    let reverse = pool.add_method_ref(collections, "reverse", "(Ljava/util/List;)V")?;
+    let list_iterator =
+        pool.add_interface_method_ref(list_type, "iterator", "()Ljava/util/Iterator;")?;
+    let has_next = pool.add_interface_method_ref(iterator_type, "hasNext", "()Z")?;
+    let next = pool.add_interface_method_ref(iterator_type, "next", "()Ljava/lang/Object;")?;
+    let add_first = pool.add_method_ref(
+        builder_type,
+        "addFirst",
+        "(Lcom/sedmelluq/discord/lavaplayer/filter/AudioFilter;)V",
+    )?;
+    let build = pool.add_method_ref(
+        builder_type,
+        "build",
+        "(Ljava/lang/Object;I)Lcom/sedmelluq/discord/lavaplayer/filter/AudioFilterChain;",
+    )?;
+
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Getfield(player_options),
+        Instruction::Getfield(filter_factory),
+        Instruction::Invokevirtual(atomic_get),
+        Instruction::Checkcast(factory_type),
+        Instruction::Astore_2,
+        Instruction::Aload_2,
+        Instruction::Ifnonnull(0),
+        Instruction::New(chain_type),
+        Instruction::Dup,
+        Instruction::Aload_1,
+        Instruction::Invokestatic(empty_list),
+        Instruction::Aconst_null,
+        Instruction::Invokespecial(chain_init),
+        Instruction::Areturn,
+    ];
+    let factory_target = instructions.len();
+    instructions.extend([
+        Instruction::New(builder_type),
+        Instruction::Dup,
+        Instruction::Invokespecial(builder_init),
+        Instruction::Astore_3,
+        Instruction::New(array_list),
+        Instruction::Dup,
+        Instruction::Aload_2,
+        Instruction::Aconst_null,
+        Instruction::Aload_0,
+        Instruction::Getfield(output_format),
+        Instruction::Aload_1,
+        Instruction::Invokeinterface(factory_build, 4),
+        Instruction::Invokespecial(array_list_init),
+        Instruction::Astore(4),
+        Instruction::Aload(4),
+        Instruction::Invokeinterface(is_empty, 1),
+        Instruction::Ifeq(0),
+        Instruction::New(chain_type),
+        Instruction::Dup,
+        Instruction::Aload_1,
+        Instruction::Invokestatic(empty_list),
+        Instruction::Aconst_null,
+        Instruction::Invokespecial(chain_init),
+        Instruction::Areturn,
+    ]);
+    let non_empty_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload(4),
+        Instruction::Invokestatic(reverse),
+        Instruction::Aload(4),
+        Instruction::Invokeinterface(list_iterator, 1),
+        Instruction::Astore(5),
+    ]);
+    let loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload(5),
+        Instruction::Invokeinterface(has_next, 1),
+        Instruction::Ifeq(0),
+        Instruction::Aload(5),
+        Instruction::Invokeinterface(next, 1),
+        Instruction::Checkcast(audio_filter),
+        Instruction::Astore(6),
+        Instruction::Aload_3,
+        Instruction::Aload(6),
+        Instruction::Invokevirtual(add_first),
+        Instruction::Goto(u16::try_from(loop_target)?),
+    ]);
+    let build_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_3,
+        Instruction::Aload_2,
+        Instruction::Aload_0,
+        Instruction::Getfield(output_format),
+        Instruction::Getfield(channel_count),
+        Instruction::Invokevirtual(build),
+        Instruction::Areturn,
+    ]);
+    instructions[7] = Instruction::Ifnonnull(u16::try_from(factory_target)?);
+    instructions[factory_target + 16] = Instruction::Ifeq(u16::try_from(non_empty_target)?);
+    instructions[loop_target + 2] = Instruction::Ifeq(u16::try_from(build_target)?);
+
+    let context_verification = VerificationType::Object {
+        cpool_index: context_type,
+    };
+    let next_verification = VerificationType::Object {
+        cpool_index: pool.add_class(UNIVERSAL_PCM_AUDIO_FILTER_CLASS)?,
+    };
+    let factory_verification = VerificationType::Object {
+        cpool_index: factory_type,
+    };
+    let builder_verification = VerificationType::Object {
+        cpool_index: builder_type,
+    };
+    let list_verification = VerificationType::Object {
+        cpool_index: list_type,
+    };
+    let iterator_verification = VerificationType::Object {
+        cpool_index: iterator_type,
+    };
+    let mut body = code(pool, 6, 7, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: u16::try_from(factory_target)?,
+                locals: vec![
+                    context_verification.clone(),
+                    next_verification.clone(),
+                    factory_verification.clone(),
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: u16::try_from(non_empty_target - factory_target - 1)?,
+                locals: vec![
+                    context_verification.clone(),
+                    next_verification.clone(),
+                    factory_verification.clone(),
+                    builder_verification.clone(),
+                    list_verification.clone(),
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: u16::try_from(loop_target - non_empty_target - 1)?,
+                locals: vec![
+                    context_verification.clone(),
+                    next_verification.clone(),
+                    factory_verification.clone(),
+                    builder_verification.clone(),
+                    list_verification.clone(),
+                    iterator_verification,
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: u16::try_from(build_target - loop_target - 1)?,
+                locals: vec![
+                    context_verification,
+                    next_verification,
+                    factory_verification,
+                    builder_verification,
+                    list_verification,
+                ],
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn user_provided_audio_filters_get_filters(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(USER_PROVIDED_AUDIO_FILTERS_CLASS)?;
+    let chain_type = pool.add_class(AUDIO_FILTER_CHAIN_CLASS)?;
+    let chain = pool.add_field_ref(
+        owner,
+        "chain",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/AudioFilterChain;",
+    )?;
+    let filters = pool.add_field_ref(chain_type, "filters", "Ljava/util/List;")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(chain),
+            Instruction::Getfield(filters),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn user_provided_audio_filters_process(
+    pool: &mut ConstantPool<'static>,
+    descriptor: &str,
+    buffer: bool,
+) -> Result<Attribute> {
+    let owner = pool.add_class(USER_PROVIDED_AUDIO_FILTERS_CLASS)?;
+    let chain_type = pool.add_class(AUDIO_FILTER_CHAIN_CLASS)?;
+    let universal = pool.add_class(UNIVERSAL_PCM_AUDIO_FILTER_CLASS)?;
+    let rebuild = pool.add_method_ref(owner, "checkRebuild", "()V")?;
+    let chain = pool.add_field_ref(
+        owner,
+        "chain",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/AudioFilterChain;",
+    )?;
+    let input = pool.add_field_ref(
+        chain_type,
+        "input",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;",
+    )?;
+    let process = pool.add_interface_method_ref(universal, "process", descriptor)?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Invokevirtual(rebuild),
+        Instruction::Aload_0,
+        Instruction::Getfield(chain),
+        Instruction::Getfield(input),
+        Instruction::Aload_1,
+    ];
+    if !buffer {
+        instructions.extend([Instruction::Iload_2, Instruction::Iload_3]);
+    }
+    instructions.extend([
+        Instruction::Invokeinterface(process, if buffer { 2 } else { 4 }),
+        Instruction::Return,
+    ]);
+    code(
+        pool,
+        if buffer { 2 } else { 4 },
+        if buffer { 2 } else { 4 },
+        instructions,
+    )
+}
+
+fn user_provided_audio_filters_check_rebuild(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(USER_PROVIDED_AUDIO_FILTERS_CLASS)?;
+    let context_type = pool.add_class(AUDIO_PROCESSING_CONTEXT_CLASS)?;
+    let options_type = pool.add_class(AUDIO_PLAYER_OPTIONS_CLASS)?;
+    let atomic_reference = pool.add_class("java/util/concurrent/atomic/AtomicReference")?;
+    let chain_type = pool.add_class(AUDIO_FILTER_CHAIN_CLASS)?;
+    let hot_swap_enabled = pool.add_field_ref(owner, "hotSwapEnabled", "Z")?;
+    let context = pool.add_field_ref(
+        owner,
+        "context",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;",
+    )?;
+    let next_filter = pool.add_field_ref(
+        owner,
+        "nextFilter",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;",
+    )?;
+    let chain = pool.add_field_ref(
+        owner,
+        "chain",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/AudioFilterChain;",
+    )?;
+    let player_options = pool.add_field_ref(
+        context_type,
+        "playerOptions",
+        "Lcom/sedmelluq/discord/lavaplayer/player/AudioPlayerOptions;",
+    )?;
+    let filter_factory = pool.add_field_ref(
+        options_type,
+        "filterFactory",
+        "Ljava/util/concurrent/atomic/AtomicReference;",
+    )?;
+    let chain_context = pool.add_field_ref(chain_type, "context", "Ljava/lang/Object;")?;
+    let atomic_get = pool.add_method_ref(atomic_reference, "get", "()Ljava/lang/Object;")?;
+    let flush = pool.add_method_ref(owner, "flush", "()V")?;
+    let close = pool.add_method_ref(owner, "close", "()V")?;
+    let build_fragment = pool.add_method_ref(
+        owner,
+        "buildFragment",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;)Lcom/sedmelluq/discord/lavaplayer/filter/AudioFilterChain;",
+    )?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Getfield(hot_swap_enabled),
+        Instruction::Ifeq(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(context),
+        Instruction::Getfield(player_options),
+        Instruction::Getfield(filter_factory),
+        Instruction::Invokevirtual(atomic_get),
+        Instruction::Aload_0,
+        Instruction::Getfield(chain),
+        Instruction::Getfield(chain_context),
+        Instruction::If_acmpeq(0),
+        Instruction::Aload_0,
+        Instruction::Invokevirtual(flush),
+        Instruction::Aload_0,
+        Instruction::Invokevirtual(close),
+        Instruction::Aload_0,
+        Instruction::Aload_0,
+        Instruction::Getfield(context),
+        Instruction::Aload_0,
+        Instruction::Getfield(next_filter),
+        Instruction::Invokestatic(build_fragment),
+        Instruction::Putfield(chain),
+    ];
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[2] = Instruction::Ifeq(u16::try_from(return_target)?);
+    instructions[11] = Instruction::If_acmpeq(u16::try_from(return_target)?);
+    let mut body = code(pool, 3, 1, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![same_stack_frame(u16::try_from(return_target)?)],
     )?;
     Ok(body)
 }

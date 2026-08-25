@@ -8321,63 +8321,70 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted public non-final CompositeAudioFilter subclass preserves all exported and private structure, constructor state, copied and reversed factory-chain assembly, all four PCM paths, lifecycle forwarding, hot-swap identity checks and teardown order, repeated empty-chain rebuilding, and failed-rebuild rollback. Differential coverage proves exact metadata, identities, full-width values, buffer state, null edges, and checked and unchecked failure identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.UserProvidedAudioFilters",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted public non-final CompositeAudioFilter subclass preserves all exported and private structure, constructor state, copied and reversed factory-chain assembly, all four PCM paths, lifecycle forwarding, hot-swap identity checks and teardown order, repeated empty-chain rebuilding, and failed-rebuild rollback. Differential coverage proves exact metadata, identities, full-width values, buffer state, null edges, and checked and unchecked failure identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.UserProvidedAudioFilters",
       "symbol_kind": "METHOD",
       "member_name": "getFilters",
       "descriptor": "()Ljava/util/List;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted public non-final CompositeAudioFilter subclass preserves all exported and private structure, constructor state, copied and reversed factory-chain assembly, all four PCM paths, lifecycle forwarding, hot-swap identity checks and teardown order, repeated empty-chain rebuilding, and failed-rebuild rollback. Differential coverage proves exact metadata, identities, full-width values, buffer state, null edges, and checked and unchecked failure identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.UserProvidedAudioFilters",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "([[FII)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted public non-final CompositeAudioFilter subclass preserves all exported and private structure, constructor state, copied and reversed factory-chain assembly, all four PCM paths, lifecycle forwarding, hot-swap identity checks and teardown order, repeated empty-chain rebuilding, and failed-rebuild rollback. Differential coverage proves exact metadata, identities, full-width values, buffer state, null edges, and checked and unchecked failure identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.UserProvidedAudioFilters",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "([SII)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted public non-final CompositeAudioFilter subclass preserves all exported and private structure, constructor state, copied and reversed factory-chain assembly, all four PCM paths, lifecycle forwarding, hot-swap identity checks and teardown order, repeated empty-chain rebuilding, and failed-rebuild rollback. Differential coverage proves exact metadata, identities, full-width values, buffer state, null edges, and checked and unchecked failure identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.UserProvidedAudioFilters",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "(Ljava/nio/ShortBuffer;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted public non-final CompositeAudioFilter subclass preserves all exported and private structure, constructor state, copied and reversed factory-chain assembly, all four PCM paths, lifecycle forwarding, hot-swap identity checks and teardown order, repeated empty-chain rebuilding, and failed-rebuild rollback. Differential coverage proves exact metadata, identities, full-width values, buffer state, null edges, and checked and unchecked failure identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.UserProvidedAudioFilters",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "([[SII)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted public non-final CompositeAudioFilter subclass preserves all exported and private structure, constructor state, copied and reversed factory-chain assembly, all four PCM paths, lifecycle forwarding, hot-swap identity checks and teardown order, repeated empty-chain rebuilding, and failed-rebuild rollback. Differential coverage proves exact metadata, identities, full-width values, buffer state, null edges, and checked and unchecked failure identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.converter.ConverterAudioFilter",

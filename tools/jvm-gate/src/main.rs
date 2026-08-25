@@ -104,6 +104,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-float-pcm-audio-filter-consumer" => Some(FLOAT_PCM_AUDIO_FILTER_CONSUMER),
         "write-short-pcm-audio-filter-consumer" => Some(SHORT_PCM_AUDIO_FILTER_CONSUMER),
         "write-universal-pcm-audio-filter-consumer" => Some(UNIVERSAL_PCM_AUDIO_FILTER_CONSUMER),
+        "write-user-provided-audio-filters-consumer" => Some(USER_PROVIDED_AUDIO_FILTERS_CONSUMER),
         "write-pcm-filter-factory-consumer" => Some(PCM_FILTER_FACTORY_CONSUMER),
         "write-pcm-format-consumer" => Some(PCM_FORMAT_CONSUMER),
         "write-resampling-pcm-audio-filter-consumer" => Some(RESAMPLING_PCM_AUDIO_FILTER_CONSUMER),
@@ -7857,6 +7858,430 @@ public final class GateUniversalPcmAudioFilter {
     }
 
     public void close() { closes++; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const USER_PROVIDED_AUDIO_FILTERS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.AudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.AudioFilterChain;
+import com.sedmelluq.discord.lavaplayer.filter.CompositeAudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.PcmFilterFactory;
+import com.sedmelluq.discord.lavaplayer.filter.UniversalPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.UserProvidedAudioFilters;
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkDecoder;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkEncoder;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerOptions;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.nio.ShortBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateUserProvidedAudioFilters {
+  public static void main(String[] args) throws Exception {
+    emptyConstruction();
+    nonEmptyConstruction();
+    inputDispatch();
+    lifecycleAndHotSwap();
+    failures();
+    reflection();
+    System.out.println(
+        "construction=context,next,snapshot,null-factory,empty-factory,copy,reverse,subclass;"
+        + "dispatch=float,short-array,buffer,split,identity,values,interrupted;"
+        + "lifecycle=reverse-order,continue-after-failure,same-factory,no-swap,swap,empty-repeat,null-target;"
+        + "failures=null-context,null-list,runtime-identity,rebuild-rollback;"
+        + "reflection=public-concrete-composite,4-private-fields,1-constructor,7-methods,generic-list,throws");
+  }
+
+  private static void emptyConstruction() throws Exception {
+    Fixture fixture = new Fixture(false);
+    RecordingUniversal output = new RecordingUniversal("output", new ArrayList<>());
+    Exposed filters = new Exposed(fixture.context, output);
+    AudioFilterChain chain = chain(filters);
+    check(context(filters) == fixture.context && next(filters) == output
+        && !snapshot(filters), "stored constructor state");
+    check(chain.input == output && chain.context == null && chain.filters.isEmpty()
+        && filters.exposedFilters() == chain.filters, "null factory chain");
+    expect(UnsupportedOperationException.class, () -> chain.filters.add(output));
+
+    fixture.options.filterFactory.set(new RecordingFactory(new ArrayList<>()));
+    RecordingFactory empty = (RecordingFactory) fixture.options.filterFactory.get();
+    Exposed emptyFilters = new Exposed(fixture.context, output);
+    check(empty.calls == 1 && empty.track == null && empty.format == fixture.format
+        && empty.output == output && chain(emptyFilters).input == output
+        && chain(emptyFilters).context == null && chain(emptyFilters).filters.isEmpty(),
+        "empty factory chain");
+
+    Exposed nullOutput = new Exposed(new Fixture(false).context, null);
+    check(chain(nullOutput).input == null, "null output accepted without factory");
+    expect(NullPointerException.class, () -> new UserProvidedAudioFilters(null, output));
+  }
+
+  private static void nonEmptyConstruction() throws Exception {
+    Fixture fixture = new Fixture(false);
+    List<String> events = new ArrayList<>();
+    RecordingUniversal first = new RecordingUniversal("first", events);
+    RecordingUniversal second = new RecordingUniversal("second", events);
+    ArrayList<AudioFilter> supplied = new ArrayList<>(Arrays.asList(first, second));
+    RecordingFactory factory = new RecordingFactory(supplied);
+    fixture.options.filterFactory.set(factory);
+
+    Exposed filters = new Exposed(fixture.context, first);
+    AudioFilterChain chain = chain(filters);
+    check(factory.calls == 1 && factory.track == null && factory.format == fixture.format
+        && factory.output == first, "factory arguments");
+    check(supplied.equals(Arrays.asList(first, second)), "factory list not mutated");
+    check(chain.input == first && chain.context == factory
+        && chain.filters.equals(Arrays.asList(second, first))
+        && chain.filters != supplied && filters.exposedFilters() == chain.filters,
+        "copied reversed chain and head");
+    supplied.clear();
+    check(chain.filters.equals(Arrays.asList(second, first)), "chain independent of source list");
+  }
+
+  private static void inputDispatch() throws Exception {
+    Fixture fixture = new Fixture(false);
+    List<String> events = new ArrayList<>();
+    RecordingUniversal output = new RecordingUniversal("output", events);
+    UserProvidedAudioFilters filters = new UserProvidedAudioFilters(fixture.context, output);
+
+    float[][] floating = new float[][] { new float[] { Float.NaN, -0.0f }, null };
+    filters.process(floating, Integer.MIN_VALUE, Integer.MAX_VALUE);
+    check(output.floating == floating && output.offset == Integer.MIN_VALUE
+        && output.length == Integer.MAX_VALUE, "float dispatch");
+
+    short[] interleaved = new short[] { Short.MIN_VALUE, 0, Short.MAX_VALUE };
+    filters.process(interleaved, -17, 23);
+    check(output.interleaved == interleaved && output.offset == -17
+        && output.length == 23, "short dispatch");
+
+    ShortBuffer buffer = ShortBuffer.wrap(new short[] { 2, 3, 5, 7 });
+    buffer.position(1).limit(3);
+    filters.process(buffer);
+    check(output.buffer == buffer && output.bufferPosition == 1
+        && output.bufferLimit == 3 && buffer.position() == 2, "buffer dispatch and state");
+
+    short[][] split = new short[][] { new short[] { 11 }, null };
+    filters.process(split, 29, -31);
+    check(output.split == split && output.offset == 29 && output.length == -31,
+        "split dispatch");
+
+    InterruptedException sentinel = new InterruptedException("process-sentinel");
+    output.processFailure = sentinel;
+    expectIdentity(sentinel, () -> filters.process(floating, 37, 41));
+    check(output.floating == floating && output.offset == 37 && output.length == 41,
+        "failure prefix");
+  }
+
+  private static void lifecycleAndHotSwap() throws Exception {
+    Fixture fixture = new Fixture(true);
+    List<String> events = new ArrayList<>();
+    RecordingUniversal output = new RecordingUniversal("output", events);
+    RecordingUniversal first = new RecordingUniversal("first", events);
+    RecordingUniversal second = new RecordingUniversal("second", events);
+    second.flushFailure = new InterruptedException("ignored-flush");
+    second.closeFailure = new RuntimeException("ignored-close");
+    RecordingFactory original = new RecordingFactory(Arrays.asList(first, second));
+    fixture.options.filterFactory.set(original);
+    UserProvidedAudioFilters filters = new UserProvidedAudioFilters(fixture.context, output);
+
+    filters.seekPerformed(Long.MIN_VALUE, Long.MAX_VALUE);
+    filters.flush();
+    filters.close();
+    check(events.equals(Arrays.asList("second:seek", "first:seek", "second:flush",
+        "first:flush", "second:close", "first:close")),
+        "reverse lifecycle and continue after failures");
+    events.clear();
+
+    filters.process(new short[0], 1, 2);
+    check(original.calls == 1 && first.shortCalls == 1 && events.isEmpty(),
+        "same factory identity does not rebuild");
+
+    RecordingUniversal replacement = new RecordingUniversal("replacement", events);
+    RecordingFactory changed = new RecordingFactory(Collections.singletonList(replacement));
+    fixture.options.filterFactory.set(changed);
+    filters.process(new short[0], 3, 4);
+    check(events.equals(Arrays.asList("second:flush", "first:flush", "second:close",
+        "first:close")) && changed.calls == 1 && replacement.shortCalls == 1
+        && chain(filters).context == changed && chain(filters).input == replacement,
+        "hot swap order and replacement dispatch");
+
+    Fixture disabled = new Fixture(false);
+    RecordingFactory disabledOriginal = new RecordingFactory(Collections.singletonList(first));
+    disabled.options.filterFactory.set(disabledOriginal);
+    UserProvidedAudioFilters fixed = new UserProvidedAudioFilters(disabled.context, output);
+    disabled.options.filterFactory.set(changed);
+    fixed.process(new short[0], 5, 6);
+    check(disabledOriginal.calls == 1 && changed.calls == 1 && first.shortCalls == 2,
+        "disabled snapshot ignores changes");
+
+    Fixture repeated = new Fixture(true);
+    RecordingFactory empty = new RecordingFactory(Collections.emptyList());
+    repeated.options.filterFactory.set(empty);
+    UserProvidedAudioFilters emptyFilters = new UserProvidedAudioFilters(repeated.context, output);
+    emptyFilters.process(new short[0], 0, 0);
+    emptyFilters.process(new short[0], 0, 0);
+    check(empty.calls == 3 && chain(emptyFilters).context == null,
+        "non-null empty factory rebuilds every call");
+
+    fixture.options.filterFactory.set(null);
+    filters.process(new short[0], 7, 8);
+    check(chain(filters).context == null && chain(filters).input == output
+        && output.shortCalls == 3, "swap to null factory and output");
+  }
+
+  private static void failures() throws Exception {
+    Fixture nullListFixture = new Fixture(false);
+    RecordingFactory nullList = new RecordingFactory(null);
+    nullListFixture.options.filterFactory.set(nullList);
+    expect(NullPointerException.class,
+        () -> new UserProvidedAudioFilters(nullListFixture.context, null));
+
+    Fixture constructorFailureFixture = new Fixture(false);
+    RuntimeException constructorSentinel = new RuntimeException("constructor-sentinel");
+    RecordingFactory constructorFailure = new RecordingFactory(Collections.emptyList());
+    constructorFailure.failure = constructorSentinel;
+    constructorFailureFixture.options.filterFactory.set(constructorFailure);
+    expectIdentity(constructorSentinel,
+        () -> new UserProvidedAudioFilters(constructorFailureFixture.context, null));
+
+    Fixture swapFixture = new Fixture(true);
+    List<String> events = new ArrayList<>();
+    RecordingUniversal output = new RecordingUniversal("output", events);
+    RecordingUniversal old = new RecordingUniversal("old", events);
+    RecordingFactory original = new RecordingFactory(Collections.singletonList(old));
+    swapFixture.options.filterFactory.set(original);
+    UserProvidedAudioFilters filters = new UserProvidedAudioFilters(swapFixture.context, output);
+    AudioFilterChain oldChain = chain(filters);
+    RuntimeException swapSentinel = new RuntimeException("swap-sentinel");
+    RecordingFactory broken = new RecordingFactory(Collections.emptyList());
+    broken.failure = swapSentinel;
+    swapFixture.options.filterFactory.set(broken);
+    expectIdentity(swapSentinel, () -> filters.process(new short[0], 0, 0));
+    check(events.equals(Arrays.asList("old:flush", "old:close"))
+        && chain(filters) == oldChain && old.shortCalls == 0 && broken.calls == 0,
+        "failed replacement retains old chain after teardown");
+    events.clear();
+    expectIdentity(swapSentinel, () -> filters.process(new short[0], 0, 0));
+    check(events.equals(Arrays.asList("old:flush", "old:close")),
+        "failed replacement retries");
+  }
+
+  private static void reflection() throws Exception {
+    Class<UserProvidedAudioFilters> type = UserProvidedAudioFilters.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers()) && type.getSuperclass() == CompositeAudioFilter.class
+        && type.getInterfaces().length == 0, "class metadata");
+    check(type.getDeclaredFields().length == 4 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 7, "member counts");
+    checkField(type, "context", AudioProcessingContext.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "nextFilter", UniversalPcmAudioFilter.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "hotSwapEnabled", boolean.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "chain", AudioFilterChain.class, Modifier.PRIVATE);
+
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        AudioProcessingContext.class, UniversalPcmAudioFilter.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    Method build = type.getDeclaredMethod("buildFragment",
+        AudioProcessingContext.class, UniversalPcmAudioFilter.class);
+    check(build.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC)
+        && build.getReturnType() == AudioFilterChain.class
+        && build.getExceptionTypes().length == 0, "builder metadata");
+    Method exposed = type.getDeclaredMethod("getFilters");
+    check(exposed.getModifiers() == Modifier.PROTECTED && exposed.getReturnType() == List.class
+        && exposed.getExceptionTypes().length == 0
+        && exposed.getGenericReturnType() instanceof ParameterizedType,
+        "getFilters metadata");
+    ParameterizedType generic = (ParameterizedType) exposed.getGenericReturnType();
+    check(generic.getRawType() == List.class && generic.getOwnerType() == null
+        && Arrays.equals(generic.getActualTypeArguments(), new Type[] { AudioFilter.class }),
+        "generic filter list");
+    checkProcess(type, float[][].class, int.class, int.class);
+    checkProcess(type, short[].class, int.class, int.class);
+    checkProcess(type, ShortBuffer.class);
+    checkProcess(type, short[][].class, int.class, int.class);
+    Method rebuild = type.getDeclaredMethod("checkRebuild");
+    check(rebuild.getModifiers() == Modifier.PRIVATE && rebuild.getReturnType() == void.class
+        && Arrays.equals(rebuild.getExceptionTypes(), new Class<?>[] { InterruptedException.class }),
+        "rebuild metadata");
+  }
+
+  private static void checkProcess(Class<?> type, Class<?>... parameters) throws Exception {
+    Method method = type.getDeclaredMethod("process", parameters);
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == void.class
+        && Arrays.equals(method.getExceptionTypes(), new Class<?>[] { InterruptedException.class })
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs(),
+        "process metadata " + Arrays.toString(parameters));
+  }
+
+  private static void checkField(Class<?> type, String name, Class<?> fieldType, int modifiers)
+      throws Exception {
+    Field field = type.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getModifiers() == modifiers
+        && !field.isSynthetic(), "field metadata " + name);
+  }
+
+  private static AudioFilterChain chain(UserProvidedAudioFilters filters) throws Exception {
+    Field field = UserProvidedAudioFilters.class.getDeclaredField("chain");
+    field.setAccessible(true);
+    return (AudioFilterChain) field.get(filters);
+  }
+
+  private static AudioProcessingContext context(UserProvidedAudioFilters filters) throws Exception {
+    Field field = UserProvidedAudioFilters.class.getDeclaredField("context");
+    field.setAccessible(true);
+    return (AudioProcessingContext) field.get(filters);
+  }
+
+  private static UniversalPcmAudioFilter next(UserProvidedAudioFilters filters) throws Exception {
+    Field field = UserProvidedAudioFilters.class.getDeclaredField("nextFilter");
+    field.setAccessible(true);
+    return (UniversalPcmAudioFilter) field.get(filters);
+  }
+
+  private static boolean snapshot(UserProvidedAudioFilters filters) throws Exception {
+    Field field = UserProvidedAudioFilters.class.getDeclaredField("hotSwapEnabled");
+    field.setAccessible(true);
+    return field.getBoolean(filters);
+  }
+
+  private static void expectIdentity(Throwable expected, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("failure was swallowed");
+    } catch (Throwable error) {
+      check(error == expected, "exception identity");
+    }
+  }
+
+  private static void expect(Class<? extends Throwable> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static final class Fixture {
+    final AudioConfiguration configuration = new AudioConfiguration();
+    final AudioPlayerOptions options = new AudioPlayerOptions();
+    final TestFormat format = new TestFormat();
+    final AudioProcessingContext context;
+
+    Fixture(boolean hotSwap) {
+      configuration.setFilterHotSwapEnabled(hotSwap);
+      configuration.setOutputFormat(format);
+      context = new AudioProcessingContext(configuration, null, options, format);
+    }
+  }
+
+  private static final class Exposed extends UserProvidedAudioFilters {
+    Exposed(AudioProcessingContext context, UniversalPcmAudioFilter next) {
+      super(context, next);
+    }
+    List<AudioFilter> exposedFilters() { return getFilters(); }
+  }
+
+  private static final class RecordingFactory implements PcmFilterFactory {
+    AudioTrack track;
+    AudioDataFormat format;
+    UniversalPcmAudioFilter output;
+    final List<AudioFilter> result;
+    RuntimeException failure;
+    int calls;
+
+    RecordingFactory(List<AudioFilter> result) { this.result = result; }
+
+    public List<AudioFilter> buildChain(
+        AudioTrack track, AudioDataFormat format, UniversalPcmAudioFilter output) {
+      this.track = track;
+      this.format = format;
+      this.output = output;
+      if (failure != null) throw failure;
+      calls++;
+      return result;
+    }
+  }
+
+  private static final class RecordingUniversal implements UniversalPcmAudioFilter {
+    final String name;
+    final List<String> events;
+    float[][] floating;
+    short[] interleaved;
+    ShortBuffer buffer;
+    short[][] split;
+    int offset;
+    int length;
+    int bufferPosition;
+    int bufferLimit;
+    int shortCalls;
+    InterruptedException processFailure;
+    InterruptedException flushFailure;
+    RuntimeException closeFailure;
+
+    RecordingUniversal(String name, List<String> events) {
+      this.name = name;
+      this.events = events;
+    }
+
+    public void process(float[][] input, int offset, int length) throws InterruptedException {
+      floating = input; this.offset = offset; this.length = length;
+      if (processFailure != null) throw processFailure;
+    }
+    public void process(short[] input, int offset, int length) throws InterruptedException {
+      interleaved = input; this.offset = offset; this.length = length;
+      if (processFailure != null) throw processFailure;
+      shortCalls++;
+    }
+    public void process(ShortBuffer input) throws InterruptedException {
+      buffer = input;
+      if (processFailure != null) throw processFailure;
+      bufferPosition = input.position(); bufferLimit = input.limit();
+      input.position(input.position() + 1);
+    }
+    public void process(short[][] input, int offset, int length) throws InterruptedException {
+      split = input; this.offset = offset; this.length = length;
+      if (processFailure != null) throw processFailure;
+    }
+    public void seekPerformed(long requested, long provided) { events.add(name + ":seek"); }
+    public void flush() throws InterruptedException {
+      events.add(name + ":flush");
+      if (flushFailure != null) throw flushFailure;
+    }
+    public void close() {
+      events.add(name + ":close");
+      if (closeFailure != null) throw closeFailure;
+    }
+  }
+
+  private static final class TestFormat extends AudioDataFormat {
+    TestFormat() { super(2, 48_000, 960); }
+    public String codecName() { return "test"; }
+    public byte[] silenceBytes() { return new byte[0]; }
+    public int expectedChunkSize() { return 0; }
+    public int maximumChunkSize() { return 0; }
+    public AudioChunkDecoder createDecoder() { return null; }
+    public AudioChunkEncoder createEncoder(AudioConfiguration configuration) { return null; }
   }
 
   private static void check(boolean condition, String message) {
