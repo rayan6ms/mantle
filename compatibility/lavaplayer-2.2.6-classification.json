@@ -559,112 +559,172 @@
     ]
     },
     {
-      "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult",
-      "symbol_kind": "CLASS",
+    "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult",
+    "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+    "assessment": "CLASSIFIED",
+    "classification": "A_EXACT",
+    "notes": "Generated class shape, eager unknown singleton, private constructor and state, factories, derived predicates, descriptors, getters, null handling, and reflection match the frozen reference.",
+    "tests": [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult",
       "symbol_kind": "METHOD",
-      "member_name": "unknownFormat",
+    "member_name": "unknownFormat",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+    "assessment": "CLASSIFIED",
+    "classification": "A_EXACT",
+    "notes": "Returns the same eagerly initialized all-null singleton on every call, matching the frozen reference.",
+    "tests": [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult",
       "symbol_kind": "METHOD",
-      "member_name": "unsupportedFormat",
+    "member_name": "unsupportedFormat",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+    "assessment": "CLASSIFIED",
+    "classification": "A_EXACT",
+    "notes": "Fresh allocation, exact probe and reason identities, null acceptance, and remaining null state match the frozen reference.",
+    "tests": [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult",
       "symbol_kind": "METHOD",
-      "member_name": "refer",
+    "member_name": "refer",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+    "assessment": "CLASSIFIED",
+    "classification": "A_EXACT",
+    "notes": "Fresh allocation, exact probe and reference identities, null acceptance, and remaining null state match the frozen reference.",
+    "tests": [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult",
       "symbol_kind": "METHOD",
-      "member_name": "supportedFormat",
+    "member_name": "supportedFormat",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+    "assessment": "CLASSIFIED",
+    "classification": "A_EXACT",
+    "notes": "Fresh allocation, exact track-info, probe and settings identities, null acceptance, and remaining null state match the frozen reference.",
+    "tests": [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult",
       "symbol_kind": "METHOD",
-      "member_name": "isContainerDetected",
+    "member_name": "isContainerDetected",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+    "assessment": "CLASSIFIED",
+    "classification": "A_EXACT",
+    "notes": "Returns exactly whether the retained container probe is non-null, matching every factory and arbitrary private state.",
+    "tests": [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult",
       "symbol_kind": "METHOD",
-      "member_name": "getContainerDescriptor",
+    "member_name": "getContainerDescriptor",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+    "assessment": "CLASSIFIED",
+    "classification": "A_EXACT",
+    "notes": "Creates a fresh descriptor retaining the exact probe and settings references on every call, including nulls.",
+    "tests": [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult",
       "symbol_kind": "METHOD",
-      "member_name": "isSupportedFile",
+    "member_name": "isSupportedFile",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+    "assessment": "CLASSIFIED",
+    "classification": "A_EXACT",
+    "notes": "Derives support solely from a non-null probe and null unsupported reason, independent of track info and reference state.",
+    "tests": [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult",
       "symbol_kind": "METHOD",
-      "member_name": "getUnsupportedReason",
+    "member_name": "getUnsupportedReason",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+    "assessment": "CLASSIFIED",
+    "classification": "A_EXACT",
+    "notes": "Returns the exact retained unsupported-reason reference, including null, matching the frozen reference.",
+    "tests": [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult",
       "symbol_kind": "METHOD",
-      "member_name": "getTrackInfo",
+    "member_name": "getTrackInfo",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+    "assessment": "CLASSIFIED",
+    "classification": "A_EXACT",
+    "notes": "Returns the exact retained track-info reference, including null, matching the frozen reference.",
+    "tests": [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult",
       "symbol_kind": "METHOD",
-      "member_name": "isReference",
+    "member_name": "isReference",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+    "assessment": "CLASSIFIED",
+    "classification": "A_EXACT",
+    "notes": "Returns exactly whether the retained audio reference is non-null, independent of all other result state.",
+    "tests": [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult",
       "symbol_kind": "METHOD",
-      "member_name": "getReference",
+    "member_name": "getReference",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+    "assessment": "CLASSIFIED",
+    "classification": "A_EXACT",
+    "notes": "Returns the exact retained audio-reference identity, including null, matching the frozen reference.",
+    "tests": [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerHints",

@@ -139,13 +139,22 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
         }
+        _ => container_consumer_source(command)
+            .or_else(|| filter_format_consumer_source(command))
+            .or_else(|| sound_cloud_consumer_source(command)),
+    }
+}
+
+fn container_consumer_source(command: &str) -> Option<&'static str> {
+    match command {
         "write-formats-consumer" => Some(FORMATS_CONSUMER),
         "write-media-container-consumer" => Some(MEDIA_CONTAINER_CONSUMER),
         "write-media-container-descriptor-consumer" => Some(MEDIA_CONTAINER_DESCRIPTOR_CONSUMER),
         "write-media-container-detection-consumer" => Some(MEDIA_CONTAINER_DETECTION_CONSUMER),
-        _ => {
-            filter_format_consumer_source(command).or_else(|| sound_cloud_consumer_source(command))
+        "write-media-container-detection-result-consumer" => {
+            Some(MEDIA_CONTAINER_DETECTION_RESULT_CONSUMER)
         }
+        _ => None,
     }
 }
 
@@ -12740,6 +12749,242 @@ public final class GateMediaContainerDetection {
       if (readFailure != null) throw readFailure;
       return position < data.length ? data[(int) position++] & 0xFF : -1;
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MEDIA_CONTAINER_DETECTION_RESULT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDescriptor;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerProbe;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
+public final class GateMediaContainerDetectionResult {
+  public static void main(String[] args) throws Exception {
+    unknownSingleton();
+    unsupportedFactory();
+    referenceFactory();
+    supportedFactory();
+    arbitraryPrivateState();
+    reflection();
+    System.out.println(
+        "contracts=unknown-singleton,unknown-null-state,fresh-factories,argument-identity,null-acceptance,container-detected,descriptor-freshness,descriptor-state,supported-derivation,unsupported-reason,track-info,reference-derivation,private-constructor-state,reflection");
+  }
+
+  private static void unknownSingleton() throws Exception {
+    MediaContainerDetectionResult first = MediaContainerDetectionResult.unknownFormat();
+    MediaContainerDetectionResult second = MediaContainerDetectionResult.unknownFormat();
+    check(first == second, "unknown format is one eager singleton");
+    check(!first.isContainerDetected() && !first.isSupportedFile() && !first.isReference()
+        && first.getUnsupportedReason() == null && first.getTrackInfo() == null
+        && first.getReference() == null, "unknown singleton has all-null state");
+    checkPrivateState(first, null, null, null, null, null);
+    MediaContainerDescriptor descriptor1 = first.getContainerDescriptor();
+    MediaContainerDescriptor descriptor2 = first.getContainerDescriptor();
+    check(descriptor1 != descriptor2 && descriptor1.probe == null
+        && descriptor1.parameters == null && descriptor2.probe == null
+        && descriptor2.parameters == null, "unknown creates fresh all-null descriptors");
+  }
+
+  private static void unsupportedFactory() throws Exception {
+    MediaContainerProbe probe = probe();
+    String reason = new String("unsupported-reason");
+    MediaContainerDetectionResult first =
+        MediaContainerDetectionResult.unsupportedFormat(probe, reason);
+    MediaContainerDetectionResult second =
+        MediaContainerDetectionResult.unsupportedFormat(probe, reason);
+    check(first != second && first != MediaContainerDetectionResult.unknownFormat(),
+        "unsupported factory allocates every call");
+    check(first.isContainerDetected() && !first.isSupportedFile() && !first.isReference()
+        && first.getUnsupportedReason() == reason && first.getTrackInfo() == null
+        && first.getReference() == null, "unsupported state and derived predicates");
+    checkPrivateState(first, null, probe, null, null, reason);
+    checkDescriptor(first, probe, null);
+
+    MediaContainerDetectionResult nullReason =
+        MediaContainerDetectionResult.unsupportedFormat(probe, null);
+    check(nullReason.isContainerDetected() && nullReason.isSupportedFile()
+        && nullReason.getUnsupportedReason() == null,
+        "supported predicate depends on detected probe and null reason only");
+    MediaContainerDetectionResult nullProbe =
+        MediaContainerDetectionResult.unsupportedFormat(null, reason);
+    check(!nullProbe.isContainerDetected() && !nullProbe.isSupportedFile()
+        && nullProbe.getUnsupportedReason() == reason, "null probe is retained without validation");
+    checkDescriptor(nullProbe, null, null);
+  }
+
+  private static void referenceFactory() throws Exception {
+    MediaContainerProbe probe = probe();
+    AudioReference reference = new AudioReference("identifier", "title");
+    MediaContainerDetectionResult result = MediaContainerDetectionResult.refer(probe, reference);
+    check(result.isContainerDetected() && result.isSupportedFile() && result.isReference()
+        && result.getReference() == reference && result.getTrackInfo() == null
+        && result.getUnsupportedReason() == null, "reference state and derived predicates");
+    checkPrivateState(result, null, probe, null, reference, null);
+    checkDescriptor(result, probe, null);
+    check(MediaContainerDetectionResult.refer(probe, reference) != result,
+        "reference factory allocates every call");
+
+    MediaContainerDetectionResult nullReference = MediaContainerDetectionResult.refer(probe, null);
+    check(nullReference.isContainerDetected() && nullReference.isSupportedFile()
+        && !nullReference.isReference() && nullReference.getReference() == null,
+        "reference predicate depends only on non-null reference");
+    MediaContainerDetectionResult nulls = MediaContainerDetectionResult.refer(null, null);
+    check(!nulls.isContainerDetected() && !nulls.isSupportedFile() && !nulls.isReference(),
+        "all-null reference factory remains a fresh unknown-shaped result");
+    check(nulls != MediaContainerDetectionResult.unknownFormat(),
+        "all-null factory result is not the unknown singleton");
+  }
+
+  private static void supportedFactory() throws Exception {
+    MediaContainerProbe probe = probe();
+    String settings = new String("settings");
+    AudioTrackInfo info = new AudioTrackInfo("title", "author", 123L, "id", false, "uri");
+    MediaContainerDetectionResult result =
+        MediaContainerDetectionResult.supportedFormat(probe, settings, info);
+    check(result.isContainerDetected() && result.isSupportedFile() && !result.isReference()
+        && result.getTrackInfo() == info && result.getUnsupportedReason() == null
+        && result.getReference() == null, "supported state and derived predicates");
+    checkPrivateState(result, info, probe, settings, null, null);
+    checkDescriptor(result, probe, settings);
+    check(MediaContainerDetectionResult.supportedFormat(probe, settings, info) != result,
+        "supported factory allocates every call");
+
+    MediaContainerDetectionResult nullInfo =
+        MediaContainerDetectionResult.supportedFormat(probe, null, null);
+    check(nullInfo.isContainerDetected() && nullInfo.isSupportedFile()
+        && nullInfo.getTrackInfo() == null, "track info and settings are not validated");
+    checkDescriptor(nullInfo, probe, null);
+    MediaContainerDetectionResult nullProbe =
+        MediaContainerDetectionResult.supportedFormat(null, settings, info);
+    check(!nullProbe.isContainerDetected() && !nullProbe.isSupportedFile()
+        && nullProbe.getTrackInfo() == info, "null probe controls detected and supported predicates");
+  }
+
+  private static void arbitraryPrivateState() throws Exception {
+    Constructor<MediaContainerDetectionResult> constructor = privateConstructor();
+    MediaContainerProbe probe = probe();
+    AudioTrackInfo info = new AudioTrackInfo("t", "a", 0, "i", true, null);
+    String settings = new String("private-settings");
+    AudioReference reference = new AudioReference("private-id", null);
+    String reason = new String("private-reason");
+    MediaContainerDetectionResult result =
+        constructor.newInstance(info, probe, settings, reference, reason);
+    checkPrivateState(result, info, probe, settings, reference, reason);
+    check(result.isContainerDetected() && !result.isSupportedFile() && result.isReference()
+        && result.getTrackInfo() == info && result.getReference() == reference
+        && result.getUnsupportedReason() == reason,
+        "private constructor retains arbitrary independent state");
+    checkDescriptor(result, probe, settings);
+  }
+
+  private static void reflection() throws Exception {
+    Class<MediaContainerDetectionResult> type = MediaContainerDetectionResult.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0, "public concrete non-final class metadata");
+    check(type.getDeclaredFields().length == 6 && type.getDeclaredMethods().length == 11
+        && type.getDeclaredConstructors().length == 1, "exact declared member counts");
+    checkField(type, "UNKNOWN_FORMAT", MediaContainerDetectionResult.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "trackInfo", AudioTrackInfo.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "containerProbe", MediaContainerProbe.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "probeSettings", String.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "reference", AudioReference.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "unsupportedReason", String.class, Modifier.PRIVATE | Modifier.FINAL);
+
+    Constructor<MediaContainerDetectionResult> constructor = privateConstructor();
+    check(constructor.getModifiers() == Modifier.PRIVATE
+        && Arrays.equals(constructor.getParameterTypes(), new Class<?>[] {AudioTrackInfo.class,
+            MediaContainerProbe.class, String.class, AudioReference.class, String.class})
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "private constructor metadata");
+
+    checkMethod(type, "unknownFormat", MediaContainerDetectionResult.class,
+        Modifier.PUBLIC | Modifier.STATIC);
+    checkMethod(type, "unsupportedFormat", MediaContainerDetectionResult.class,
+        Modifier.PUBLIC | Modifier.STATIC, MediaContainerProbe.class, String.class);
+    checkMethod(type, "refer", MediaContainerDetectionResult.class,
+        Modifier.PUBLIC | Modifier.STATIC, MediaContainerProbe.class, AudioReference.class);
+    checkMethod(type, "supportedFormat", MediaContainerDetectionResult.class,
+        Modifier.PUBLIC | Modifier.STATIC, MediaContainerProbe.class, String.class,
+        AudioTrackInfo.class);
+    checkMethod(type, "isContainerDetected", boolean.class, Modifier.PUBLIC);
+    checkMethod(type, "getContainerDescriptor", MediaContainerDescriptor.class, Modifier.PUBLIC);
+    checkMethod(type, "isSupportedFile", boolean.class, Modifier.PUBLIC);
+    checkMethod(type, "getUnsupportedReason", String.class, Modifier.PUBLIC);
+    checkMethod(type, "getTrackInfo", AudioTrackInfo.class, Modifier.PUBLIC);
+    checkMethod(type, "isReference", boolean.class, Modifier.PUBLIC);
+    checkMethod(type, "getReference", AudioReference.class, Modifier.PUBLIC);
+
+    Set<String> names = new HashSet<>();
+    for (Method method : type.getDeclaredMethods()) names.add(method.getName());
+    check(names.size() == 11, "no overloads or synthetic methods");
+  }
+
+  private static Constructor<MediaContainerDetectionResult> privateConstructor() throws Exception {
+    Constructor<MediaContainerDetectionResult> constructor =
+        MediaContainerDetectionResult.class.getDeclaredConstructor(AudioTrackInfo.class,
+            MediaContainerProbe.class, String.class, AudioReference.class, String.class);
+    constructor.setAccessible(true);
+    return constructor;
+  }
+
+  private static void checkDescriptor(MediaContainerDetectionResult result,
+      MediaContainerProbe probe, String settings) {
+    MediaContainerDescriptor first = result.getContainerDescriptor();
+    MediaContainerDescriptor second = result.getContainerDescriptor();
+    check(first != second && first.probe == probe && first.parameters == settings
+        && second.probe == probe && second.parameters == settings,
+        "descriptor is fresh and retains exact probe/settings identities");
+  }
+
+  private static void checkPrivateState(MediaContainerDetectionResult result,
+      AudioTrackInfo info, MediaContainerProbe probe, String settings,
+      AudioReference reference, String reason) throws Exception {
+    check(field(result, "trackInfo") == info && field(result, "containerProbe") == probe
+        && field(result, "probeSettings") == settings && field(result, "reference") == reference
+        && field(result, "unsupportedReason") == reason, "exact private state identities");
+  }
+
+  private static Object field(Object owner, String name) throws Exception {
+    Field field = owner.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(owner);
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> type, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == type && field.getGenericType() == type
+        && field.getModifiers() == modifiers && !field.isSynthetic(), name + " field metadata");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+      int modifiers, Class<?>... parameters) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == modifiers && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && !method.isSynthetic() && !method.isBridge(),
+        name + " method metadata");
+  }
+
+  private static MediaContainerProbe probe() {
+    return (MediaContainerProbe) Proxy.newProxyInstance(MediaContainerProbe.class.getClassLoader(),
+        new Class<?>[] {MediaContainerProbe.class}, (instance, method, arguments) -> null);
   }
 
   private static void check(boolean condition, String message) {

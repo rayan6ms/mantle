@@ -146,6 +146,8 @@ const MEDIA_CONTAINER_DESCRIPTOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor";
 const MEDIA_CONTAINER_DETECTION_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/MediaContainerDetection";
+const MEDIA_CONTAINER_DETECTION_RESULT_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -474,6 +476,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MEDIA_CONTAINER_CLASS,
     MEDIA_CONTAINER_DESCRIPTOR_CLASS,
     MEDIA_CONTAINER_DETECTION_CLASS,
+    MEDIA_CONTAINER_DETECTION_RESULT_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -942,6 +945,7 @@ fn retain_private_fields(class_name: &str) -> bool {
         AUDIO_PLAYER_INPUT_STREAM_CLASS
             | MEDIA_CONTAINER_CLASS
             | MEDIA_CONTAINER_DETECTION_CLASS
+            | MEDIA_CONTAINER_DETECTION_RESULT_CLASS
             | OPUS_AUDIO_DATA_FORMAT_CLASS
             | PCM16_AUDIO_DATA_FORMAT_CLASS
             | OPUS_CHUNK_DECODER_CLASS
@@ -1048,6 +1052,7 @@ fn retain_private_methods(class_name: &str) -> bool {
         AUDIO_PLAYER_INPUT_STREAM_CLASS
             | MEDIA_CONTAINER_CLASS
             | MEDIA_CONTAINER_DETECTION_CLASS
+            | MEDIA_CONTAINER_DETECTION_RESULT_CLASS
             | AUDIO_PIPELINE_FACTORY_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
@@ -1301,6 +1306,14 @@ fn replacement_body(
     }
     if class_name == MEDIA_CONTAINER_DETECTION_CLASS {
         return media_container_detection_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == MEDIA_CONTAINER_DETECTION_RESULT_CLASS {
+        return media_container_detection_result_replacement(
+            pool,
+            name,
+            descriptor,
+            required_locals,
+        );
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -3982,6 +3995,342 @@ fn media_container_detection_clinit(pool: &mut ConstantPool<'static>) -> Result<
             Instruction::Ldc_w(owner),
             Instruction::Invokestatic(get_logger),
             Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn media_container_detection_result_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Ljava/lang/String;)V",
+        ) => media_container_detection_result_constructor(pool),
+        (
+            "unknownFormat",
+            "()Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
+        ) => media_container_detection_result_unknown(pool),
+        (
+            "unsupportedFormat",
+            "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
+        ) => media_container_detection_result_unsupported(pool),
+        (
+            "refer",
+            "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
+        ) => media_container_detection_result_refer(pool),
+        (
+            "supportedFormat",
+            "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
+        ) => media_container_detection_result_supported(pool),
+        ("isContainerDetected", "()Z") => media_container_detection_result_non_null_field(
+            pool,
+            "containerProbe",
+            "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;",
+        ),
+        (
+            "getContainerDescriptor",
+            "()Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDescriptor;",
+        ) => media_container_detection_result_descriptor(pool),
+        ("isSupportedFile", "()Z") => media_container_detection_result_is_supported(pool),
+        ("getUnsupportedReason", "()Ljava/lang/String;") => {
+            media_container_detection_result_getter(pool, "unsupportedReason", "Ljava/lang/String;")
+        }
+        ("getTrackInfo", "()Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;") => {
+            media_container_detection_result_getter(
+                pool,
+                "trackInfo",
+                "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+            )
+        }
+        ("isReference", "()Z") => media_container_detection_result_non_null_field(
+            pool,
+            "reference",
+            "Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;",
+        ),
+        ("getReference", "()Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;") => {
+            media_container_detection_result_getter(
+                pool,
+                "reference",
+                "Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;",
+            )
+        }
+        ("<clinit>", "()V") => media_container_detection_result_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {MEDIA_CONTAINER_DETECTION_RESULT_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn media_container_detection_result_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(MEDIA_CONTAINER_DETECTION_RESULT_CLASS)?;
+    let track_info = pool.add_field_ref(
+        owner,
+        "trackInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;",
+    )?;
+    let probe = pool.add_field_ref(
+        owner,
+        "containerProbe",
+        "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;",
+    )?;
+    let settings = pool.add_field_ref(owner, "probeSettings", "Ljava/lang/String;")?;
+    let reference = pool.add_field_ref(
+        owner,
+        "reference",
+        "Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;",
+    )?;
+    let reason = pool.add_field_ref(owner, "unsupportedReason", "Ljava/lang/String;")?;
+    code(
+        pool,
+        2,
+        6,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(track_info),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(probe),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Putfield(settings),
+            Instruction::Aload_0,
+            Instruction::Aload(4),
+            Instruction::Putfield(reference),
+            Instruction::Aload_0,
+            Instruction::Aload(5),
+            Instruction::Putfield(reason),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn media_container_detection_result_init(pool: &mut ConstantPool<'static>) -> Result<(u16, u16)> {
+    let owner = pool.add_class(MEDIA_CONTAINER_DETECTION_RESULT_CLASS)?;
+    let init = pool.add_method_ref(owner, "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Ljava/lang/String;)V")?;
+    Ok((owner, init))
+}
+
+fn media_container_detection_result_unknown(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MEDIA_CONTAINER_DETECTION_RESULT_CLASS)?;
+    let unknown = pool.add_field_ref(
+        owner,
+        "UNKNOWN_FORMAT",
+        "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
+    )?;
+    code(
+        pool,
+        1,
+        0,
+        vec![Instruction::Getstatic(unknown), Instruction::Areturn],
+    )
+}
+
+fn media_container_detection_result_unsupported(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let (owner, init) = media_container_detection_result_init(pool)?;
+    code(
+        pool,
+        7,
+        2,
+        vec![
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Aconst_null,
+            Instruction::Aload_0,
+            Instruction::Aconst_null,
+            Instruction::Aconst_null,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn media_container_detection_result_refer(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let (owner, init) = media_container_detection_result_init(pool)?;
+    code(
+        pool,
+        7,
+        2,
+        vec![
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Aconst_null,
+            Instruction::Aload_0,
+            Instruction::Aconst_null,
+            Instruction::Aload_1,
+            Instruction::Aconst_null,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn media_container_detection_result_supported(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let (owner, init) = media_container_detection_result_init(pool)?;
+    code(
+        pool,
+        7,
+        3,
+        vec![
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Aconst_null,
+            Instruction::Aconst_null,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn media_container_detection_result_non_null_field(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+) -> Result<Attribute> {
+    let owner = pool.add_class(MEDIA_CONTAINER_DETECTION_RESULT_CLASS)?;
+    let field = pool.add_field_ref(owner, name, descriptor)?;
+    let mut body = code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Ifnull(5),
+            Instruction::Iconst_1,
+            Instruction::Ireturn,
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+        ],
+    )?;
+    add_stack_map_table(pool, &mut body, vec![same_stack_frame(5)])?;
+    Ok(body)
+}
+
+fn media_container_detection_result_descriptor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(MEDIA_CONTAINER_DETECTION_RESULT_CLASS)?;
+    let probe = pool.add_field_ref(
+        owner,
+        "containerProbe",
+        "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;",
+    )?;
+    let settings = pool.add_field_ref(owner, "probeSettings", "Ljava/lang/String;")?;
+    let result = pool.add_class(MEDIA_CONTAINER_DESCRIPTOR_CLASS)?;
+    let init = pool.add_method_ref(
+        result,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;Ljava/lang/String;)V",
+    )?;
+    code(
+        pool,
+        4,
+        1,
+        vec![
+            Instruction::New(result),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(probe),
+            Instruction::Aload_0,
+            Instruction::Getfield(settings),
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn media_container_detection_result_is_supported(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(MEDIA_CONTAINER_DETECTION_RESULT_CLASS)?;
+    let detected = pool.add_method_ref(owner, "isContainerDetected", "()Z")?;
+    let reason = pool.add_field_ref(owner, "unsupportedReason", "Ljava/lang/String;")?;
+    let mut body = code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(detected),
+            Instruction::Ifeq(8),
+            Instruction::Aload_0,
+            Instruction::Getfield(reason),
+            Instruction::Ifnonnull(8),
+            Instruction::Iconst_1,
+            Instruction::Ireturn,
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+        ],
+    )?;
+    add_stack_map_table(pool, &mut body, vec![same_stack_frame(8)])?;
+    Ok(body)
+}
+
+fn media_container_detection_result_getter(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+) -> Result<Attribute> {
+    let owner = pool.add_class(MEDIA_CONTAINER_DETECTION_RESULT_CLASS)?;
+    let field = pool.add_field_ref(owner, name, descriptor)?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn media_container_detection_result_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let (owner, init) = media_container_detection_result_init(pool)?;
+    let unknown = pool.add_field_ref(
+        owner,
+        "UNKNOWN_FORMAT",
+        "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
+    )?;
+    code(
+        pool,
+        7,
+        0,
+        vec![
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Aconst_null,
+            Instruction::Aconst_null,
+            Instruction::Aconst_null,
+            Instruction::Aconst_null,
+            Instruction::Aconst_null,
+            Instruction::Invokespecial(init),
+            Instruction::Putstatic(unknown),
             Instruction::Return,
         ],
     )
