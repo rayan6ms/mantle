@@ -134,6 +134,8 @@ const AUDIO_CHUNK_ENCODER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/format/transcoder/AudioChunkEncoder";
 const OPUS_CHUNK_DECODER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/format/transcoder/OpusChunkDecoder";
+const OPUS_CHUNK_ENCODER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/format/transcoder/OpusChunkEncoder";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -455,6 +457,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     AUDIO_CHUNK_DECODER_CLASS,
     AUDIO_CHUNK_ENCODER_CLASS,
     OPUS_CHUNK_DECODER_CLASS,
+    OPUS_CHUNK_ENCODER_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -923,6 +926,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | OPUS_AUDIO_DATA_FORMAT_CLASS
             | PCM16_AUDIO_DATA_FORMAT_CLASS
             | OPUS_CHUNK_DECODER_CLASS
+            | OPUS_CHUNK_ENCODER_CLASS
             | PLAYER_LIFECYCLE_MANAGER_CLASS
             | FUNCTIONAL_RESULT_HANDLER_CLASS
             | AUDIO_PIPELINE_CLASS
@@ -1253,6 +1257,9 @@ fn replacement_body(
     }
     if class_name == OPUS_CHUNK_DECODER_CLASS {
         return opus_chunk_decoder_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == OPUS_CHUNK_ENCODER_CLASS {
+        return opus_chunk_encoder_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -2515,6 +2522,261 @@ fn opus_chunk_decoder_close(pool: &mut ConstantPool<'static>) -> Result<Attribut
         vec![
             Instruction::Aload_0,
             Instruction::Getfield(decoder),
+            Instruction::Invokevirtual(close),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn opus_chunk_encoder_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V",
+        ) => opus_chunk_encoder_constructor(pool),
+        ("encode", "(Ljava/nio/ShortBuffer;)[B") => opus_chunk_encoder_encode_array(pool),
+        ("encode", "(Ljava/nio/ShortBuffer;Ljava/nio/ByteBuffer;)V") => {
+            opus_chunk_encoder_encode_buffer(pool)
+        }
+        ("close", "()V") => opus_chunk_encoder_close(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {OPUS_CHUNK_ENCODER_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn opus_chunk_encoder_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(OPUS_CHUNK_ENCODER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let format_type = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let maximum_chunk_size = pool.add_method_ref(format_type, "maximumChunkSize", "()I")?;
+    let sample_rate = pool.add_field_ref(format_type, "sampleRate", "I")?;
+    let channel_count = pool.add_field_ref(format_type, "channelCount", "I")?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let allocate_direct =
+        pool.add_method_ref(byte_buffer, "allocateDirect", "(I)Ljava/nio/ByteBuffer;")?;
+    let encoded_buffer = pool.add_field_ref(owner, "encodedBuffer", "Ljava/nio/ByteBuffer;")?;
+    let configuration =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/player/AudioConfiguration")?;
+    let get_quality = pool.add_method_ref(configuration, "getOpusEncodingQuality", "()I")?;
+    let opus_encoder =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/natives/opus/OpusEncoder")?;
+    let encoder_init = pool.add_method_ref(opus_encoder, "<init>", "(III)V")?;
+    let encoder = pool.add_field_ref(
+        owner,
+        "encoder",
+        "Lcom/sedmelluq/discord/lavaplayer/natives/opus/OpusEncoder;",
+    )?;
+    let format = pool.add_field_ref(
+        owner,
+        "format",
+        "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    code(
+        pool,
+        6,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(maximum_chunk_size),
+            Instruction::Invokestatic(allocate_direct),
+            Instruction::Putfield(encoded_buffer),
+            Instruction::Aload_0,
+            Instruction::New(opus_encoder),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Getfield(sample_rate),
+            Instruction::Aload_2,
+            Instruction::Getfield(channel_count),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(get_quality),
+            Instruction::Invokespecial(encoder_init),
+            Instruction::Putfield(encoder),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(format),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn opus_chunk_encoder_encode_array(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(OPUS_CHUNK_ENCODER_CLASS)?;
+    let encoder = pool.add_field_ref(
+        owner,
+        "encoder",
+        "Lcom/sedmelluq/discord/lavaplayer/natives/opus/OpusEncoder;",
+    )?;
+    let format = pool.add_field_ref(
+        owner,
+        "format",
+        "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let encoded_buffer = pool.add_field_ref(owner, "encodedBuffer", "Ljava/nio/ByteBuffer;")?;
+    let format_type = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let chunk_sample_count = pool.add_field_ref(format_type, "chunkSampleCount", "I")?;
+    let opus_encoder =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/natives/opus/OpusEncoder")?;
+    let encode = pool.add_method_ref(
+        opus_encoder,
+        "encode",
+        "(Ljava/nio/ShortBuffer;ILjava/nio/ByteBuffer;)I",
+    )?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let remaining = pool.add_method_ref(byte_buffer, "remaining", "()I")?;
+    let get = pool.add_method_ref(byte_buffer, "get", "([B)Ljava/nio/ByteBuffer;")?;
+    code(
+        pool,
+        4,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(encoder),
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(format),
+            Instruction::Getfield(chunk_sample_count),
+            Instruction::Aload_0,
+            Instruction::Getfield(encoded_buffer),
+            Instruction::Invokevirtual(encode),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(encoded_buffer),
+            Instruction::Invokevirtual(remaining),
+            Instruction::Newarray(ArrayType::Byte),
+            Instruction::Astore_2,
+            Instruction::Aload_0,
+            Instruction::Getfield(encoded_buffer),
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(get),
+            Instruction::Pop,
+            Instruction::Aload_2,
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn opus_chunk_encoder_encode_buffer(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(OPUS_CHUNK_ENCODER_CLASS)?;
+    let encoder = pool.add_field_ref(
+        owner,
+        "encoder",
+        "Lcom/sedmelluq/discord/lavaplayer/natives/opus/OpusEncoder;",
+    )?;
+    let format = pool.add_field_ref(
+        owner,
+        "format",
+        "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let encoded_buffer = pool.add_field_ref(owner, "encodedBuffer", "Ljava/nio/ByteBuffer;")?;
+    let format_type = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let chunk_sample_count = pool.add_field_ref(format_type, "chunkSampleCount", "I")?;
+    let opus_encoder =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/natives/opus/OpusEncoder")?;
+    let encode = pool.add_method_ref(
+        opus_encoder,
+        "encode",
+        "(Ljava/nio/ShortBuffer;ILjava/nio/ByteBuffer;)I",
+    )?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let is_direct = pool.add_method_ref(byte_buffer, "isDirect", "()Z")?;
+    let remaining = pool.add_method_ref(byte_buffer, "remaining", "()I")?;
+    let array = pool.add_method_ref(byte_buffer, "array", "()[B")?;
+    let get = pool.add_method_ref(byte_buffer, "get", "([BII)Ljava/nio/ByteBuffer;")?;
+    let position = pool.add_method_ref(byte_buffer, "position", "(I)Ljava/nio/ByteBuffer;")?;
+    let limit = pool.add_method_ref(byte_buffer, "limit", "(I)Ljava/nio/ByteBuffer;")?;
+    let heap_target = 13;
+    let return_target = 43;
+    let mut body = code(
+        pool,
+        4,
+        4,
+        vec![
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(is_direct),
+            Instruction::Ifeq(heap_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(encoder),
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(format),
+            Instruction::Getfield(chunk_sample_count),
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(encode),
+            Instruction::Pop,
+            Instruction::Goto(return_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(encoder),
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(format),
+            Instruction::Getfield(chunk_sample_count),
+            Instruction::Aload_0,
+            Instruction::Getfield(encoded_buffer),
+            Instruction::Invokevirtual(encode),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(encoded_buffer),
+            Instruction::Invokevirtual(remaining),
+            Instruction::Istore_3,
+            Instruction::Aload_0,
+            Instruction::Getfield(encoded_buffer),
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(array),
+            Instruction::Iconst_0,
+            Instruction::Iload_3,
+            Instruction::Invokevirtual(get),
+            Instruction::Pop,
+            Instruction::Aload_2,
+            Instruction::Iconst_0,
+            Instruction::Invokevirtual(position),
+            Instruction::Pop,
+            Instruction::Aload_2,
+            Instruction::Iload_3,
+            Instruction::Invokevirtual(limit),
+            Instruction::Pop,
+            Instruction::Return,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            same_stack_frame(heap_target),
+            same_stack_frame(return_target - heap_target - 1),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn opus_chunk_encoder_close(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(OPUS_CHUNK_ENCODER_CLASS)?;
+    let encoder = pool.add_field_ref(
+        owner,
+        "encoder",
+        "Lcom/sedmelluq/discord/lavaplayer/natives/opus/OpusEncoder;",
+    )?;
+    let opus_encoder =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/natives/opus/OpusEncoder")?;
+    let close = pool.add_method_ref(opus_encoder, "close", "()V")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(encoder),
             Instruction::Invokevirtual(close),
             Instruction::Return,
         ],

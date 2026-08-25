@@ -156,6 +156,7 @@ fn filter_format_consumer_source(command: &str) -> Option<&'static str> {
         "write-audio-chunk-decoder-consumer" => Some(AUDIO_CHUNK_DECODER_CONSUMER),
         "write-audio-chunk-encoder-consumer" => Some(AUDIO_CHUNK_ENCODER_CONSUMER),
         "write-opus-chunk-decoder-consumer" => Some(OPUS_CHUNK_DECODER_CONSUMER),
+        "write-opus-chunk-encoder-consumer" => Some(OPUS_CHUNK_ENCODER_CONSUMER),
         "write-pcm-filter-factory-consumer" => Some(PCM_FILTER_FACTORY_CONSUMER),
         "write-pcm-format-consumer" => Some(PCM_FORMAT_CONSUMER),
         "write-resampling-pcm-audio-filter-consumer" => Some(RESAMPLING_PCM_AUDIO_FILTER_CONSUMER),
@@ -10993,6 +10994,350 @@ public final class GateOpusChunkDecoder {
   }
 
   private interface Operation { void run() throws Exception; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const OPUS_CHUNK_ENCODER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.OpusAudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkEncoder;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.OpusChunkDecoder;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.OpusChunkEncoder;
+import com.sedmelluq.discord.lavaplayer.natives.opus.OpusEncoder;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.ReadOnlyBufferException;
+import java.nio.ShortBuffer;
+import java.util.Arrays;
+
+public final class GateOpusChunkEncoder {
+  private static final int CHANNELS = 2;
+  private static final int SAMPLE_RATE = 48_000;
+  private static final int FRAME_SAMPLES = 960;
+
+  public static void main(String[] args) throws Exception {
+    constructionAndPrivateState();
+    returningEncode();
+    directAndHeapOutputs();
+    heapArrayOffset();
+    failureOrdering();
+    closeSemantics();
+    reflection();
+    System.out.println(
+        "contracts=constructor-order,configuration-quality,format-identity,direct-staging-capacity,returning-array,exact-allocation,staging-consumption,direct-output,heap-output,array-offset-zero,input-preservation,null-order,heap-input,small-output,readonly-output,close-idempotence,closed-failure,private-state,reflection");
+  }
+
+  private static void constructionAndPrivateState() throws Exception {
+    StringBuilder events = new StringBuilder();
+    ProbeConfiguration configuration = new ProbeConfiguration(events, 7);
+    ProbeFormat format = new ProbeFormat(events, 1_568);
+    OpusChunkEncoder encoder = new OpusChunkEncoder(configuration, format);
+    check(events.toString().equals("maximum,quality,")
+        && configuration.qualityCalls == 1 && format.maximumCalls == 1,
+        "constructor allocation and quality lookup order");
+
+    Field formatField = field("format");
+    Field encoderField = field("encoder");
+    Field encodedField = field("encodedBuffer");
+    check(formatField.get(encoder) == format
+        && encoderField.get(encoder).getClass() == OpusEncoder.class,
+        "constructor retains exact format and native encoder");
+    ByteBuffer encoded = (ByteBuffer) encodedField.get(encoder);
+    check(encoded.isDirect() && encoded.capacity() == 1_568
+        && encoded.position() == 0 && encoded.limit() == encoded.capacity(),
+        "constructor allocates exact direct staging capacity");
+    encoder.close();
+  }
+
+  private static void returningEncode() throws Exception {
+    OpusChunkEncoder encoder = encoder(7);
+    ByteBuffer staging = staging(encoder);
+    ShortBuffer input = pcm();
+    byte[] first = encoder.encode(input);
+    check(first.length > 0 && first.length <= 1_568
+        && staging.position() == staging.limit() && staging.limit() == first.length,
+        "returning encode allocates exact bytes and consumes staging output");
+    check(input.position() == 0 && input.limit() == FRAME_SAMPLES * CHANNELS,
+        "native encode preserves caller input window");
+    byte[] second = encoder.encode(pcm());
+    check(second != first && second.length > 0, "each returning encode allocates a new array");
+
+    OpusChunkDecoder decoder = new OpusChunkDecoder(format());
+    ShortBuffer decoded = directShortBuffer(FRAME_SAMPLES * CHANNELS);
+    decoder.decode(first, decoded);
+    check(decoded.position() == 0 && decoded.limit() == FRAME_SAMPLES * CHANNELS,
+        "returned packet decodes to one configured frame");
+    decoder.close();
+    encoder.close();
+  }
+
+  private static void directAndHeapOutputs() throws Exception {
+    OpusChunkEncoder baseline = encoder(7);
+    byte[] expected = baseline.encode(pcm());
+    baseline.close();
+
+    OpusChunkEncoder directEncoder = encoder(7);
+    ByteBuffer staging = staging(directEncoder);
+    ByteBuffer direct = ByteBuffer.allocateDirect(1_568);
+    direct.position(5);
+    direct.limit(6);
+    ShortBuffer directInput = pcm();
+    directEncoder.encode(directInput, direct);
+    check(direct.position() == 0 && direct.limit() == expected.length
+        && bytes(direct).equals(hex(expected)), "direct caller output is cleared and flipped");
+    check(staging.position() == 0 && staging.limit() == staging.capacity(),
+        "direct output bypasses internal staging buffer");
+    check(directInput.position() == 0, "direct output path preserves input position");
+    directEncoder.close();
+
+    OpusChunkEncoder heapEncoder = encoder(7);
+    ByteBuffer heap = ByteBuffer.allocate(1_568);
+    heap.position(7);
+    heap.limit(8);
+    heapEncoder.encode(pcm(), heap);
+    check(heap.position() == 0 && heap.limit() == expected.length
+        && bytes(heap).equals(hex(expected)), "heap output copies and resets caller window");
+    ByteBuffer heapStaging = staging(heapEncoder);
+    check(heapStaging.position() == heapStaging.limit()
+        && heapStaging.limit() == expected.length, "heap path consumes staging bytes");
+    heapEncoder.close();
+  }
+
+  private static void heapArrayOffset() {
+    OpusChunkEncoder baseline = encoder(7);
+    byte[] expected = baseline.encode(pcm());
+    baseline.close();
+
+    byte[] backing = new byte[1_573];
+    Arrays.fill(backing, (byte) 0x55);
+    ByteBuffer parent = ByteBuffer.wrap(backing);
+    parent.position(5);
+    ByteBuffer slice = parent.slice();
+    OpusChunkEncoder encoder = encoder(7);
+    encoder.encode(pcm(), slice);
+    check(slice.arrayOffset() == 5 && slice.position() == 0 && slice.limit() == expected.length,
+        "heap slice window reset");
+    for (int index = 0; index < expected.length; index++) {
+      check(backing[index] == expected[index], "frozen zero array-offset copy " + index);
+    }
+    encoder.close();
+  }
+
+  private static void failureOrdering() throws Exception {
+    expect(NullPointerException.class, () -> new OpusChunkEncoder(configuration(7), null));
+
+    StringBuilder events = new StringBuilder();
+    ProbeConfiguration unused = new ProbeConfiguration(events, 7);
+    expect(IllegalArgumentException.class,
+        () -> new OpusChunkEncoder(unused, new ProbeFormat(events, -1)));
+    check(events.toString().equals("maximum,") && unused.qualityCalls == 0,
+        "negative staging capacity fails before configuration lookup");
+    expect(NullPointerException.class, () -> new OpusChunkEncoder(null, format()));
+
+    OpusChunkEncoder nullOutput = encoder(7);
+    expect(NullPointerException.class, () -> nullOutput.encode(pcm(), null));
+    check(staging(nullOutput).position() == 0
+        && staging(nullOutput).limit() == staging(nullOutput).capacity(),
+        "null output fails before native encode");
+    nullOutput.close();
+
+    OpusChunkEncoder nullInput = encoder(7);
+    expect(NullPointerException.class, () -> nullInput.encode(null));
+    check(staging(nullInput).position() == 0
+        && staging(nullInput).limit() == staging(nullInput).capacity(),
+        "null input fails before staging clear");
+    nullInput.close();
+
+    OpusChunkEncoder heapInput = encoder(7);
+    ByteBuffer directOutput = ByteBuffer.allocateDirect(1_568);
+    directOutput.position(3);
+    directOutput.limit(4);
+    IllegalArgumentException heapFailure = expect(IllegalArgumentException.class,
+        () -> heapInput.encode(ShortBuffer.allocate(FRAME_SAMPLES * CHANNELS), directOutput));
+    check(heapFailure.getMessage().equals("Arguments must be direct buffers.")
+        && directOutput.position() == 3 && directOutput.limit() == 4,
+        "heap input fails before caller output clear");
+    heapInput.close();
+
+    OpusChunkEncoder smallOutput = encoder(7);
+    ByteBuffer small = ByteBuffer.allocate(1);
+    expect(IndexOutOfBoundsException.class, () -> smallOutput.encode(pcm(), small));
+    ByteBuffer prepared = staging(smallOutput);
+    check(prepared.position() == 0 && prepared.limit() > small.capacity(),
+        "small heap output fails after staging encode and before transfer");
+    smallOutput.close();
+
+    OpusChunkEncoder readOnlyOutput = encoder(7);
+    ByteBuffer readOnly = ByteBuffer.allocate(1_568).asReadOnlyBuffer();
+    expect(ReadOnlyBufferException.class, () -> readOnlyOutput.encode(pcm(), readOnly));
+    check(staging(readOnlyOutput).position() == 0
+        && staging(readOnlyOutput).limit() < staging(readOnlyOutput).capacity(),
+        "read-only heap output fails after staging encode");
+    readOnlyOutput.close();
+  }
+
+  private static void closeSemantics() throws Exception {
+    OpusChunkEncoder encoder = encoder(7);
+    encoder.close();
+    encoder.close();
+    ByteBuffer direct = ByteBuffer.allocateDirect(1_568);
+    direct.position(2);
+    direct.limit(3);
+    expect(IllegalStateException.class, () -> encoder.encode(pcm(), direct));
+    check(direct.position() == 2 && direct.limit() == 3,
+        "closed failure occurs before caller output clear");
+    ByteBuffer staging = staging(encoder);
+    expect(IllegalStateException.class, () -> encoder.encode(pcm()));
+    check(staging.position() == 0 && staging.limit() == staging.capacity(),
+        "closed returning encode fails before staging mutation");
+  }
+
+  private static void reflection() throws Exception {
+    Class<OpusChunkEncoder> type = OpusChunkEncoder.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 1
+        && type.getInterfaces()[0] == AudioChunkEncoder.class,
+        "class and interface metadata");
+    check(type.getDeclaredFields().length == 3 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 3, "declared member counts");
+    checkField("format", AudioDataFormat.class);
+    checkField("encoder", OpusEncoder.class);
+    checkField("encodedBuffer", ByteBuffer.class);
+
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        AudioConfiguration.class, AudioDataFormat.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    Method returning = type.getDeclaredMethod("encode", ShortBuffer.class);
+    checkPublicMethod(returning, byte[].class, 1, "returning encode metadata");
+    Method buffered = type.getDeclaredMethod("encode", ShortBuffer.class, ByteBuffer.class);
+    checkPublicMethod(buffered, void.class, 2, "buffer encode metadata");
+    Method close = type.getDeclaredMethod("close");
+    checkPublicMethod(close, void.class, 0, "close metadata");
+  }
+
+  private static void checkField(String name, Class<?> fieldType) throws Exception {
+    Field field = OpusChunkEncoder.class.getDeclaredField(name);
+    check(field.getType() == fieldType
+        && field.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL),
+        "field metadata " + name);
+  }
+
+  private static void checkPublicMethod(
+      Method method, Class<?> returnType, int parameterCount, String message) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == returnType
+        && method.getParameterCount() == parameterCount && method.getExceptionTypes().length == 0
+        && !method.isBridge() && !method.isSynthetic(), message);
+  }
+
+  private static OpusChunkEncoder encoder(int quality) {
+    return new OpusChunkEncoder(configuration(quality), format());
+  }
+
+  private static AudioConfiguration configuration(int quality) {
+    AudioConfiguration configuration = new AudioConfiguration();
+    configuration.setOpusEncodingQuality(quality);
+    return configuration;
+  }
+
+  private static OpusAudioDataFormat format() {
+    return new OpusAudioDataFormat(CHANNELS, SAMPLE_RATE, FRAME_SAMPLES);
+  }
+
+  private static ShortBuffer pcm() {
+    ShortBuffer buffer = directShortBuffer(FRAME_SAMPLES * CHANNELS);
+    for (int frame = 0; frame < FRAME_SAMPLES; frame++) {
+      buffer.put(frame * CHANNELS, (short) (frame * 97 - 30_000));
+      buffer.put(frame * CHANNELS + 1, (short) (20_000 - frame * 53));
+    }
+    return buffer;
+  }
+
+  private static ShortBuffer directShortBuffer(int samples) {
+    return ByteBuffer.allocateDirect(samples * 2).order(ByteOrder.nativeOrder()).asShortBuffer();
+  }
+
+  private static ByteBuffer staging(OpusChunkEncoder encoder) throws Exception {
+    return (ByteBuffer) field("encodedBuffer").get(encoder);
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = OpusChunkEncoder.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static String bytes(ByteBuffer buffer) {
+    StringBuilder value = new StringBuilder();
+    for (int index = 0; index < buffer.limit(); index++) {
+      value.append(String.format("%02x", buffer.get(index) & 0xff));
+    }
+    return value.toString();
+  }
+
+  private static String hex(byte[] bytes) {
+    StringBuilder value = new StringBuilder();
+    for (byte item : bytes) value.append(String.format("%02x", item & 0xff));
+    return value.toString();
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong failure", error);
+      return type.cast(error);
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static final class ProbeConfiguration extends AudioConfiguration {
+    private final StringBuilder events;
+    private final int quality;
+    private int qualityCalls;
+
+    private ProbeConfiguration(StringBuilder events, int quality) {
+      this.events = events;
+      this.quality = quality;
+    }
+
+    @Override
+    public int getOpusEncodingQuality() {
+      events.append("quality,");
+      qualityCalls++;
+      return quality;
+    }
+  }
+
+  private static final class ProbeFormat extends OpusAudioDataFormat {
+    private final StringBuilder events;
+    private final int maximum;
+    private int maximumCalls;
+
+    private ProbeFormat(StringBuilder events, int maximum) {
+      super(CHANNELS, SAMPLE_RATE, FRAME_SAMPLES);
+      this.events = events;
+      this.maximum = maximum;
+    }
+
+    @Override
+    public int maximumChunkSize() {
+      events.append("maximum,");
+      maximumCalls++;
+      return maximum;
+    }
+  }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

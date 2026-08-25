@@ -203,6 +203,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-audio-chunk-encoder-consumer \
   --output "$WORK/GateAudioChunkEncoder.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-opus-chunk-decoder-consumer \
   --output "$WORK/GateOpusChunkDecoder.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-opus-chunk-encoder-consumer \
+  --output "$WORK/GateOpusChunkEncoder.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -260,6 +262,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateAudioChunkDecoder.java" \
   "$WORK/GateAudioChunkEncoder.java" \
   "$WORK/GateOpusChunkDecoder.java" \
+  "$WORK/GateOpusChunkEncoder.java" \
   "$WORK/GatePcmFilterFactory.java" \
   "$WORK/GatePcmFormat.java" \
   "$WORK/GateResamplingPcmAudioFilter.java" \
@@ -1036,6 +1039,17 @@ cmp "$WORK/opus-chunk-decoder-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor-geometry,direct-encoded-buffer,capacity-4096,buffer-reuse,silence-decode,output-clear-flip,oversize-order,null-order,heap-output,close-idempotence,closed-failure,private-state,reflection' \
   "$WORK/opus-chunk-decoder-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateOpusChunkEncoder \
+  >"$WORK/opus-chunk-encoder-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOpusChunkEncoder >"$WORK/opus-chunk-encoder-candidate.txt"
+cmp "$WORK/opus-chunk-encoder-reference.txt" \
+  "$WORK/opus-chunk-encoder-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor-order,configuration-quality,format-identity,direct-staging-capacity,returning-array,exact-allocation,staging-consumption,direct-output,heap-output,array-offset-zero,input-preservation,null-order,heap-input,small-output,readonly-output,close-idempotence,closed-failure,private-state,reflection' \
+  "$WORK/opus-chunk-encoder-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"
