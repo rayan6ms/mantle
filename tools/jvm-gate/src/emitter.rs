@@ -179,6 +179,8 @@ const FLAC_METADATA_HEADER_CLASS: &str =
 const FLAC_METADATA_READER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/FlacMetadataReader";
 const FLAC_SEEK_POINT_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/flac/FlacSeekPoint";
+const FLAC_STREAM_INFO_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -524,6 +526,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     FLAC_METADATA_HEADER_CLASS,
     FLAC_METADATA_READER_CLASS,
     FLAC_SEEK_POINT_CLASS,
+    FLAC_STREAM_INFO_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -1430,6 +1433,9 @@ fn replacement_body(
     }
     if class_name == FLAC_SEEK_POINT_CLASS {
         return flac_seek_point_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == FLAC_STREAM_INFO_CLASS {
+        return flac_stream_info_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -5899,6 +5905,124 @@ fn flac_seek_point_constructor(pool: &mut ConstantPool<'static>) -> Result<Attri
             Instruction::Aload_0,
             Instruction::Iload(5),
             Instruction::Putfield(sample_count),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn flac_stream_info_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "([BZ)V") => flac_stream_info_constructor(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {FLAC_STREAM_INFO_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn flac_stream_info_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_STREAM_INFO_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let wrap = pool.add_method_ref(byte_buffer, "wrap", "([B)Ljava/nio/ByteBuffer;")?;
+    let bit_reader = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/BitBufferReader")?;
+    let bit_reader_init = pool.add_method_ref(bit_reader, "<init>", "(Ljava/nio/ByteBuffer;)V")?;
+    let as_integer = pool.add_method_ref(bit_reader, "asInteger", "(I)I")?;
+    let as_long = pool.add_method_ref(bit_reader, "asLong", "(I)J")?;
+    let minimum_block_size = pool.add_field_ref(owner, "minimumBlockSize", "I")?;
+    let maximum_block_size = pool.add_field_ref(owner, "maximumBlockSize", "I")?;
+    let minimum_frame_size = pool.add_field_ref(owner, "minimumFrameSize", "I")?;
+    let maximum_frame_size = pool.add_field_ref(owner, "maximumFrameSize", "I")?;
+    let sample_rate = pool.add_field_ref(owner, "sampleRate", "I")?;
+    let channel_count = pool.add_field_ref(owner, "channelCount", "I")?;
+    let bits_per_sample = pool.add_field_ref(owner, "bitsPerSample", "I")?;
+    let sample_count = pool.add_field_ref(owner, "sampleCount", "J")?;
+    let md5_signature = pool.add_field_ref(owner, "md5Signature", "[B")?;
+    let has_metadata_blocks = pool.add_field_ref(owner, "hasMetadataBlocks", "Z")?;
+    let system = pool.add_class("java/lang/System")?;
+    let arraycopy = pool.add_method_ref(
+        system,
+        "arraycopy",
+        "(Ljava/lang/Object;ILjava/lang/Object;II)V",
+    )?;
+    code(
+        pool,
+        5,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::New(bit_reader),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Invokestatic(wrap),
+            Instruction::Invokespecial(bit_reader_init),
+            Instruction::Astore_3,
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Bipush(16),
+            Instruction::Invokevirtual(as_integer),
+            Instruction::Putfield(minimum_block_size),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Bipush(16),
+            Instruction::Invokevirtual(as_integer),
+            Instruction::Putfield(maximum_block_size),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Bipush(24),
+            Instruction::Invokevirtual(as_integer),
+            Instruction::Putfield(minimum_frame_size),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Bipush(24),
+            Instruction::Invokevirtual(as_integer),
+            Instruction::Putfield(maximum_frame_size),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Bipush(20),
+            Instruction::Invokevirtual(as_integer),
+            Instruction::Putfield(sample_rate),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Iconst_3,
+            Instruction::Invokevirtual(as_integer),
+            Instruction::Iconst_1,
+            Instruction::Iadd,
+            Instruction::Putfield(channel_count),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Iconst_5,
+            Instruction::Invokevirtual(as_integer),
+            Instruction::Iconst_1,
+            Instruction::Iadd,
+            Instruction::Putfield(bits_per_sample),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Bipush(36),
+            Instruction::Invokevirtual(as_long),
+            Instruction::Putfield(sample_count),
+            Instruction::Aload_0,
+            Instruction::Bipush(16),
+            Instruction::Newarray(ArrayType::Byte),
+            Instruction::Putfield(md5_signature),
+            Instruction::Aload_1,
+            Instruction::Bipush(18),
+            Instruction::Aload_0,
+            Instruction::Getfield(md5_signature),
+            Instruction::Iconst_0,
+            Instruction::Bipush(16),
+            Instruction::Invokestatic(arraycopy),
+            Instruction::Aload_0,
+            Instruction::Iload_2,
+            Instruction::Putfield(has_metadata_blocks),
             Instruction::Return,
         ],
     )

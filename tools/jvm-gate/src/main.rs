@@ -175,6 +175,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
             Some(FLAC_METADATA_READER_SUPPORT_CONSUMER)
         }
         "write-flac-seek-point-consumer" => Some(FLAC_SEEK_POINT_CONSUMER),
+        "write-flac-stream-info-consumer" => Some(FLAC_STREAM_INFO_CONSUMER),
         _ => None,
     }
 }
@@ -15738,6 +15739,208 @@ public final class GateFlacSeekPoint {
   private static final class Derived extends FlacSeekPoint {
     Derived(long sampleIndex, long byteOffset, int sampleCount) {
       super(sampleIndex, byteOffset, sampleCount);
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const FLAC_STREAM_INFO_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacStreamInfo;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.nio.BufferUnderflowException;
+import java.util.Arrays;
+
+public final class GateFlacStreamInfo {
+  public static void main(String[] args) throws Exception {
+    zeroAndMaximumVectors();
+    asymmetricVector();
+    copyAndMutation();
+    failures();
+    identityAndSubclassing();
+    reflection();
+    System.out.println(
+        "contracts=constant,zero-vector,maximum-vector,bit-widths,big-endian,field-order,channel-offset,bits-offset,sample-count,md5-copy,input-snapshot,public-mutation,metadata-flag,trailing-input,short-input,null-input,identity-semantics,subclassable,public-final-fields,constructor-descriptor,no-throws,member-counts,reflection");
+  }
+
+  private static void zeroAndMaximumVectors() {
+    byte[] zeros = new byte[FlacStreamInfo.LENGTH];
+    FlacStreamInfo zero = new FlacStreamInfo(zeros, false);
+    checkInfo(zero, 0, 0, 0, 0, 0, 1, 1, 0L, false, "zero vector");
+    check(Arrays.equals(zero.md5Signature, new byte[16]), "zero MD5");
+
+    byte[] ones = new byte[FlacStreamInfo.LENGTH];
+    Arrays.fill(ones, (byte) 0xFF);
+    FlacStreamInfo maximum = new FlacStreamInfo(ones, true);
+    checkInfo(maximum, 0xFFFF, 0xFFFF, 0xFF_FFFF, 0xFF_FFFF, 0xF_FFFF,
+        8, 32, (1L << 36) - 1L, true, "maximum vector");
+    byte[] expectedMd5 = new byte[16];
+    Arrays.fill(expectedMd5, (byte) 0xFF);
+    check(Arrays.equals(maximum.md5Signature, expectedMd5), "maximum MD5");
+  }
+
+  private static void asymmetricVector() {
+    byte[] data = new byte[40];
+    data[0] = 0x01;
+    data[1] = 0x02;
+    data[2] = 0x03;
+    data[3] = 0x04;
+    data[4] = 0x05;
+    data[5] = 0x06;
+    data[6] = 0x07;
+    data[7] = 0x08;
+    data[8] = 0x09;
+    data[9] = 0x0A;
+    long packed = (0xABCDEL << 44) | (5L << 41) | (23L << 36) | 0x9_8765_4321L;
+    for (int index = 17; index >= 10; index--) {
+      data[index] = (byte) packed;
+      packed >>>= 8;
+    }
+    for (int index = 0; index < 16; index++) {
+      data[18 + index] = (byte) (0x80 + index);
+    }
+    Arrays.fill(data, 34, data.length, (byte) 0x55);
+
+    FlacStreamInfo info = new FlacStreamInfo(data, true);
+    checkInfo(info, 0x0102, 0x0304, 0x050607, 0x08090A, 0xABCDE,
+        6, 24, 0x9_8765_4321L, true, "asymmetric vector");
+    for (int index = 0; index < 16; index++) {
+      check(info.md5Signature[index] == (byte) (0x80 + index),
+          "MD5 byte " + index);
+    }
+  }
+
+  private static void copyAndMutation() {
+    byte[] data = new byte[FlacStreamInfo.LENGTH];
+    data[0] = 0x12;
+    data[1] = 0x34;
+    data[18] = 0x45;
+    data[33] = 0x67;
+    FlacStreamInfo first = new FlacStreamInfo(data, false);
+    FlacStreamInfo second = new FlacStreamInfo(data, true);
+    check(first.md5Signature != second.md5Signature,
+        "each construction owns a distinct MD5 array");
+    data[0] = 0;
+    data[18] = 0;
+    data[33] = 0;
+    check(first.minimumBlockSize == 0x1234 && first.md5Signature[0] == 0x45
+        && first.md5Signature[15] == 0x67,
+        "parsed fields and MD5 snapshot caller input");
+    first.md5Signature[0] = 0x22;
+    check(first.md5Signature[0] == 0x22 && second.md5Signature[0] == 0x45,
+        "public MD5 mutation is local to the instance");
+    check(!first.hasMetadataBlocks && second.hasMetadataBlocks,
+        "metadata flag is stored without coupling");
+  }
+
+  private static void failures() {
+    expect(NullPointerException.class, () -> new FlacStreamInfo(null, false),
+        "null input");
+    expect(BufferUnderflowException.class, () -> new FlacStreamInfo(new byte[0], false),
+        "empty input");
+    expect(BufferUnderflowException.class, () -> new FlacStreamInfo(new byte[17], false),
+        "input shorter than parsed prefix");
+    expect(ArrayIndexOutOfBoundsException.class,
+        () -> new FlacStreamInfo(new byte[18], false),
+        "parsed prefix without MD5 payload");
+    expect(ArrayIndexOutOfBoundsException.class,
+        () -> new FlacStreamInfo(new byte[33], true),
+        "one-byte-short MD5 payload");
+  }
+
+  private static void identityAndSubclassing() {
+    byte[] data = new byte[FlacStreamInfo.LENGTH];
+    FlacStreamInfo first = new FlacStreamInfo(data, false);
+    FlacStreamInfo second = new FlacStreamInfo(data, false);
+    check(first != second && !first.equals(second) && first.equals(first),
+        "stream info retains Object identity equality");
+    Derived derived = new Derived(data, true);
+    check(derived.hasMetadataBlocks && derived.channelCount == 1,
+        "ordinary subclass inherits parsing");
+  }
+
+  private static void reflection() throws Exception {
+    Class<FlacStreamInfo> type = FlacStreamInfo.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete non-final class metadata");
+    check(type.getDeclaredFields().length == 11 && type.getDeclaredMethods().length == 0
+        && type.getDeclaredConstructors().length == 1,
+        "exact declared member counts");
+
+    checkConstant(type.getDeclaredField("LENGTH"), 34);
+    checkField(type.getDeclaredField("minimumBlockSize"), int.class);
+    checkField(type.getDeclaredField("maximumBlockSize"), int.class);
+    checkField(type.getDeclaredField("minimumFrameSize"), int.class);
+    checkField(type.getDeclaredField("maximumFrameSize"), int.class);
+    checkField(type.getDeclaredField("sampleRate"), int.class);
+    checkField(type.getDeclaredField("channelCount"), int.class);
+    checkField(type.getDeclaredField("bitsPerSample"), int.class);
+    checkField(type.getDeclaredField("sampleCount"), long.class);
+    checkField(type.getDeclaredField("md5Signature"), byte[].class);
+    checkField(type.getDeclaredField("hasMetadataBlocks"), boolean.class);
+
+    Constructor<FlacStreamInfo> constructor =
+        type.getDeclaredConstructor(byte[].class, boolean.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0
+        && Arrays.equals(constructor.getParameterTypes(),
+            new Class<?>[] {byte[].class, boolean.class}),
+        "constructor descriptor and metadata");
+  }
+
+  private static void checkConstant(Field field, int expected) throws Exception {
+    check(field.getType() == int.class
+        && field.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL)
+        && field.getInt(null) == expected && !field.isSynthetic()
+        && field.getDeclaredAnnotations().length == 0,
+        field.getName() + " constant metadata and value");
+  }
+
+  private static void checkField(Field field, Class<?> fieldType) {
+    check(field.getType() == fieldType
+        && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && !field.isSynthetic() && field.getDeclaredAnnotations().length == 0,
+        field.getName() + " instance field metadata");
+  }
+
+  private static void checkInfo(FlacStreamInfo info, int minimumBlockSize,
+      int maximumBlockSize, int minimumFrameSize, int maximumFrameSize, int sampleRate,
+      int channelCount, int bitsPerSample, long sampleCount, boolean hasMetadataBlocks,
+      String message) {
+    check(info.minimumBlockSize == minimumBlockSize
+        && info.maximumBlockSize == maximumBlockSize
+        && info.minimumFrameSize == minimumFrameSize
+        && info.maximumFrameSize == maximumFrameSize
+        && info.sampleRate == sampleRate && info.channelCount == channelCount
+        && info.bitsPerSample == bitsPerSample && info.sampleCount == sampleCount
+        && info.hasMetadataBlocks == hasMetadataBlocks, message);
+  }
+
+  private static void expect(Class<? extends Throwable> expected, ThrowingRunnable action,
+      String message) {
+    try {
+      action.run();
+      throw new AssertionError(message + " did not fail");
+    } catch (Throwable failure) {
+      check(failure.getClass() == expected,
+          message + " failure type: " + failure.getClass().getName());
+    }
+  }
+
+  private interface ThrowingRunnable {
+    void run() throws Throwable;
+  }
+
+  private static final class Derived extends FlacStreamInfo {
+    Derived(byte[] data, boolean hasMetadataBlocks) {
+      super(data, hasMetadataBlocks);
     }
   }
 
