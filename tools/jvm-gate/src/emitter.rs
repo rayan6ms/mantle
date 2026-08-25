@@ -83,6 +83,7 @@ const FINAL_PCM_AUDIO_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/FinalPcmAudioFilter";
 const FLOAT_PCM_AUDIO_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter";
+const PCM_FORMAT_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/PcmFormat";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -379,6 +380,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     AUDIO_PIPELINE_CLASS,
     AUDIO_PIPELINE_FACTORY_CLASS,
     "com/sedmelluq/discord/lavaplayer/filter/PcmFilterFactory",
+    PCM_FORMAT_CLASS,
     "com/sedmelluq/discord/lavaplayer/format/AudioDataFormat",
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
@@ -1091,6 +1093,9 @@ fn replacement_body(
     if class_name == FINAL_PCM_AUDIO_FILTER_CLASS {
         return final_pcm_audio_filter_replacement(pool, name, descriptor, required_locals);
     }
+    if class_name == PCM_FORMAT_CLASS {
+        return pcm_format_replacement(pool, name, descriptor, required_locals);
+    }
     if class_name == PROBING_AUDIO_SOURCE_MANAGER_CLASS {
         return probing_audio_source_manager_replacement(pool, name, descriptor, required_locals);
     }
@@ -1578,6 +1583,46 @@ fn replacement_body(
             required_locals,
         )?,
     })
+}
+
+fn pcm_format_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(II)V") => pcm_format_constructor(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {PCM_FORMAT_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn pcm_format_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(PCM_FORMAT_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let channel_count = pool.add_field_ref(owner, "channelCount", "I")?;
+    let sample_rate = pool.add_field_ref(owner, "sampleRate", "I")?;
+    code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Iload_1,
+            Instruction::Putfield(channel_count),
+            Instruction::Aload_0,
+            Instruction::Iload_2,
+            Instruction::Putfield(sample_rate),
+            Instruction::Return,
+        ],
+    )
 }
 
 fn audio_filter_chain_replacement(

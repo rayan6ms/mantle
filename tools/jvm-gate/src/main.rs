@@ -103,6 +103,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-audio-filter-interface-consumer" => Some(AUDIO_FILTER_INTERFACE_CONSUMER),
         "write-float-pcm-audio-filter-consumer" => Some(FLOAT_PCM_AUDIO_FILTER_CONSUMER),
         "write-pcm-filter-factory-consumer" => Some(PCM_FILTER_FACTORY_CONSUMER),
+        "write-pcm-format-consumer" => Some(PCM_FORMAT_CONSUMER),
         "write-audio-post-processor-consumer" => Some(AUDIO_POST_PROCESSOR_CONSUMER),
         "write-buffering-post-processor-consumer" => Some(BUFFERING_POST_PROCESSOR_CONSUMER),
         "write-channel-count-pcm-audio-filter-consumer" => {
@@ -7558,6 +7559,87 @@ public final class GatePcmFilterFactory {
     public int maximumChunkSize() { return 0; }
     public AudioChunkDecoder createDecoder() { return null; }
     public AudioChunkEncoder createEncoder(AudioConfiguration configuration) { return null; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const PCM_FORMAT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.PcmFormat;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GatePcmFormat {
+  public static void main(String[] args) throws Exception {
+    construction();
+    reflection();
+    System.out.println(
+        "construction=order,positive,zero,negative,min,max,independent,subclass;"
+        + "reflection=public-concrete-object,2-public-final-fields,1-constructor,0-methods,no-throws");
+  }
+
+  private static void construction() {
+    PcmFormat positive = new PcmFormat(2, 48_000);
+    check(positive.channelCount == 2 && positive.sampleRate == 48_000,
+        "positive field order");
+
+    PcmFormat zero = new PcmFormat(0, 0);
+    PcmFormat negative = new PcmFormat(-7, -44_100);
+    PcmFormat extremes = new PcmFormat(Integer.MIN_VALUE, Integer.MAX_VALUE);
+    check(zero.channelCount == 0 && zero.sampleRate == 0,
+        "zero values");
+    check(negative.channelCount == -7 && negative.sampleRate == -44_100,
+        "negative values");
+    check(extremes.channelCount == Integer.MIN_VALUE
+        && extremes.sampleRate == Integer.MAX_VALUE, "integer extremes");
+
+    PcmFormat duplicate = new PcmFormat(2, 48_000);
+    check(positive != duplicate && !positive.equals(duplicate)
+        && positive.hashCode() == System.identityHashCode(positive)
+        && positive.toString().equals(positive.getClass().getName() + "@"
+            + Integer.toHexString(positive.hashCode())),
+        "independent Object identity semantics");
+    DerivedFormat derived = new DerivedFormat(6, 192_000);
+    check(derived.channelCount == 6 && derived.sampleRate == 192_000
+        && derived instanceof PcmFormat, "subclass construction");
+  }
+
+  private static void reflection() throws Exception {
+    Class<PcmFormat> type = PcmFormat.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers()) && !type.isInterface()
+        && type.getSuperclass() == Object.class && type.getInterfaces().length == 0,
+        "class metadata");
+    check(type.getDeclaredFields().length == 2
+        && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 0, "member counts");
+    checkField(type.getDeclaredField("channelCount"));
+    checkField(type.getDeclaredField("sampleRate"));
+
+    Constructor<PcmFormat> constructor =
+        type.getDeclaredConstructor(int.class, int.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && Arrays.equals(constructor.getParameterTypes(),
+            new Class<?>[] { int.class, int.class })
+        && constructor.getExceptionTypes().length == 0
+        && constructor.getTypeParameters().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(),
+        "constructor metadata");
+  }
+
+  private static void checkField(Field field) {
+    check(field.getType() == int.class
+        && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && !field.isEnumConstant() && !field.isSynthetic(), field.getName() + " metadata");
+  }
+
+  private static final class DerivedFormat extends PcmFormat {
+    DerivedFormat(int channelCount, int sampleRate) { super(channelCount, sampleRate); }
   }
 
   private static void check(boolean condition, String message) {
