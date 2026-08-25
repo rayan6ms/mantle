@@ -148,6 +148,8 @@ const MEDIA_CONTAINER_DETECTION_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/MediaContainerDetection";
 const MEDIA_CONTAINER_DETECTION_RESULT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult";
+const MEDIA_CONTAINER_HINTS_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/MediaContainerHints";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -477,6 +479,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MEDIA_CONTAINER_DESCRIPTOR_CLASS,
     MEDIA_CONTAINER_DETECTION_CLASS,
     MEDIA_CONTAINER_DETECTION_RESULT_CLASS,
+    MEDIA_CONTAINER_HINTS_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -946,6 +949,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | MEDIA_CONTAINER_CLASS
             | MEDIA_CONTAINER_DETECTION_CLASS
             | MEDIA_CONTAINER_DETECTION_RESULT_CLASS
+            | MEDIA_CONTAINER_HINTS_CLASS
             | OPUS_AUDIO_DATA_FORMAT_CLASS
             | PCM16_AUDIO_DATA_FORMAT_CLASS
             | OPUS_CHUNK_DECODER_CLASS
@@ -1053,6 +1057,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | MEDIA_CONTAINER_CLASS
             | MEDIA_CONTAINER_DETECTION_CLASS
             | MEDIA_CONTAINER_DETECTION_RESULT_CLASS
+            | MEDIA_CONTAINER_HINTS_CLASS
             | AUDIO_PIPELINE_FACTORY_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
@@ -1314,6 +1319,9 @@ fn replacement_body(
             descriptor,
             required_locals,
         );
+    }
+    if class_name == MEDIA_CONTAINER_HINTS_CLASS {
+        return media_container_hints_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -4331,6 +4339,140 @@ fn media_container_detection_result_clinit(pool: &mut ConstantPool<'static>) -> 
             Instruction::Aconst_null,
             Instruction::Invokespecial(init),
             Instruction::Putstatic(unknown),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn media_container_hints_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(Ljava/lang/String;Ljava/lang/String;)V") => {
+            media_container_hints_constructor(pool)
+        }
+        ("present", "()Z") => media_container_hints_present(pool),
+        (
+            "from",
+            "(Ljava/lang/String;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerHints;",
+        ) => media_container_hints_from(pool),
+        ("<clinit>", "()V") => media_container_hints_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {MEDIA_CONTAINER_HINTS_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn media_container_hints_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(MEDIA_CONTAINER_HINTS_CLASS)?;
+    let mime_type = pool.add_field_ref(owner, "mimeType", "Ljava/lang/String;")?;
+    let file_extension = pool.add_field_ref(owner, "fileExtension", "Ljava/lang/String;")?;
+    code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(mime_type),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(file_extension),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn media_container_hints_present(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MEDIA_CONTAINER_HINTS_CLASS)?;
+    let mime_type = pool.add_field_ref(owner, "mimeType", "Ljava/lang/String;")?;
+    let file_extension = pool.add_field_ref(owner, "fileExtension", "Ljava/lang/String;")?;
+    let mut body = code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(mime_type),
+            Instruction::Ifnonnull(6),
+            Instruction::Aload_0,
+            Instruction::Getfield(file_extension),
+            Instruction::Ifnull(8),
+            Instruction::Iconst_1,
+            Instruction::Ireturn,
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![same_stack_frame(6), same_stack_frame(1)],
+    )?;
+    Ok(body)
+}
+
+fn media_container_hints_from(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MEDIA_CONTAINER_HINTS_CLASS)?;
+    let no_information = pool.add_field_ref(
+        owner,
+        "NO_INFORMATION",
+        "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerHints;",
+    )?;
+    let init = pool.add_method_ref(owner, "<init>", "(Ljava/lang/String;Ljava/lang/String;)V")?;
+    let mut body = code(
+        pool,
+        4,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Ifnonnull(6),
+            Instruction::Aload_1,
+            Instruction::Ifnonnull(6),
+            Instruction::Getstatic(no_information),
+            Instruction::Areturn,
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(pool, &mut body, vec![same_stack_frame(6)])?;
+    Ok(body)
+}
+
+fn media_container_hints_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MEDIA_CONTAINER_HINTS_CLASS)?;
+    let init = pool.add_method_ref(owner, "<init>", "(Ljava/lang/String;Ljava/lang/String;)V")?;
+    let no_information = pool.add_field_ref(
+        owner,
+        "NO_INFORMATION",
+        "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerHints;",
+    )?;
+    code(
+        pool,
+        4,
+        0,
+        vec![
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Aconst_null,
+            Instruction::Aconst_null,
+            Instruction::Invokespecial(init),
+            Instruction::Putstatic(no_information),
             Instruction::Return,
         ],
     )

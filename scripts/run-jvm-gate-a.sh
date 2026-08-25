@@ -219,6 +219,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-media-container-detection-cons
   --output "$WORK/GateMediaContainerDetection.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-media-container-detection-result-consumer \
   --output "$WORK/GateMediaContainerDetectionResult.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-media-container-hints-consumer \
+  --output "$WORK/GateMediaContainerHints.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -284,6 +286,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateMediaContainerDescriptor.java" \
   "$WORK/GateMediaContainerDetection.java" \
   "$WORK/GateMediaContainerDetectionResult.java" \
+  "$WORK/GateMediaContainerHints.java" \
   "$WORK/GatePcmFilterFactory.java" \
   "$WORK/GatePcmFormat.java" \
   "$WORK/GateResamplingPcmAudioFilter.java" \
@@ -1146,6 +1149,16 @@ cmp "$WORK/media-container-detection-result-reference.txt" \
 grep --fixed-strings \
   'contracts=unknown-singleton,unknown-null-state,fresh-factories,argument-identity,null-acceptance,container-detected,descriptor-freshness,descriptor-state,supported-derivation,unsupported-reason,track-info,reference-derivation,private-constructor-state,reflection' \
   "$WORK/media-container-detection-result-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMediaContainerHints \
+  >"$WORK/media-container-hints-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMediaContainerHints >"$WORK/media-container-hints-candidate.txt"
+cmp "$WORK/media-container-hints-reference.txt" "$WORK/media-container-hints-candidate.txt"
+grep --fixed-strings \
+  'contracts=eager-empty-singleton,singleton-identity,fresh-non-null,factory-identity,null-acceptance,empty-string-presence,derived-presence,private-constructor-state,non-final-class,reflection' \
+  "$WORK/media-container-hints-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"

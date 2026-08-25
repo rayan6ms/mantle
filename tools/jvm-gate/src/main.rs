@@ -154,6 +154,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-media-container-detection-result-consumer" => {
             Some(MEDIA_CONTAINER_DETECTION_RESULT_CONSUMER)
         }
+        "write-media-container-hints-consumer" => Some(MEDIA_CONTAINER_HINTS_CONSUMER),
         _ => None,
     }
 }
@@ -12985,6 +12986,134 @@ public final class GateMediaContainerDetectionResult {
   private static MediaContainerProbe probe() {
     return (MediaContainerProbe) Proxy.newProxyInstance(MediaContainerProbe.class.getClassLoader(),
         new Class<?>[] {MediaContainerProbe.class}, (instance, method, arguments) -> null);
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MEDIA_CONTAINER_HINTS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerHints;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
+public final class GateMediaContainerHints {
+  public static void main(String[] args) throws Exception {
+    emptySingleton();
+    factoryMatrix();
+    privateConstructor();
+    reflection();
+    System.out.println(
+        "contracts=eager-empty-singleton,singleton-identity,fresh-non-null,factory-identity,null-acceptance,empty-string-presence,derived-presence,private-constructor-state,non-final-class,reflection");
+  }
+
+  private static void emptySingleton() throws Exception {
+    Field singletonField = MediaContainerHints.class.getDeclaredField("NO_INFORMATION");
+    singletonField.setAccessible(true);
+    MediaContainerHints eager = (MediaContainerHints) singletonField.get(null);
+    MediaContainerHints first = MediaContainerHints.from(null, null);
+    MediaContainerHints second = MediaContainerHints.from(null, null);
+    check(eager != null && first == eager && second == eager,
+        "all-null factory returns the eager singleton");
+    check(first.mimeType == null && first.fileExtension == null && !first.present(),
+        "singleton retains two null fields and is not present");
+  }
+
+  private static void factoryMatrix() {
+    String mime = new String("audio/test");
+    String extension = new String("test");
+    checkFactory(mime, null, true);
+    checkFactory(null, extension, true);
+    checkFactory(mime, extension, true);
+    checkFactory("", null, true);
+    checkFactory(null, "", true);
+    checkFactory("", "", true);
+
+    MediaContainerHints first = MediaContainerHints.from(mime, extension);
+    MediaContainerHints second = MediaContainerHints.from(mime, extension);
+    check(first != second && first != MediaContainerHints.from(null, null),
+        "every factory call with a non-null hint allocates");
+    check(first.mimeType == mime && first.fileExtension == extension,
+        "factory retains exact argument identities");
+  }
+
+  private static void checkFactory(String mime, String extension, boolean expectedPresent) {
+    MediaContainerHints hints = MediaContainerHints.from(mime, extension);
+    check(hints.mimeType == mime && hints.fileExtension == extension,
+        "factory preserves nulls and exact string identities");
+    check(hints.present() == expectedPresent,
+        "presence is derived only from either field being non-null");
+  }
+
+  private static void privateConstructor() throws Exception {
+    Constructor<MediaContainerHints> constructor = constructor();
+    String mime = new String("private-mime");
+    String extension = new String("private-extension");
+    MediaContainerHints both = constructor.newInstance(mime, extension);
+    MediaContainerHints empty = constructor.newInstance(null, null);
+    check(both.mimeType == mime && both.fileExtension == extension && both.present(),
+        "private constructor retains arbitrary identities");
+    check(empty.mimeType == null && empty.fileExtension == null && !empty.present()
+        && empty != MediaContainerHints.from(null, null),
+        "private all-null instance is independent from the singleton");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MediaContainerHints> type = MediaContainerHints.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete non-final class metadata");
+    check(type.getDeclaredFields().length == 3 && type.getDeclaredMethods().length == 2
+        && type.getDeclaredConstructors().length == 1, "exact declared member counts");
+    checkField(type, "NO_INFORMATION", MediaContainerHints.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "mimeType", String.class, Modifier.PUBLIC | Modifier.FINAL);
+    checkField(type, "fileExtension", String.class, Modifier.PUBLIC | Modifier.FINAL);
+
+    Constructor<MediaContainerHints> constructor = constructor();
+    check(constructor.getModifiers() == Modifier.PRIVATE
+        && Arrays.equals(constructor.getParameterTypes(),
+            new Class<?>[] {String.class, String.class})
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "private constructor metadata");
+    checkMethod(type, "present", boolean.class, Modifier.PUBLIC);
+    checkMethod(type, "from", MediaContainerHints.class,
+        Modifier.PUBLIC | Modifier.STATIC, String.class, String.class);
+
+    Set<String> names = new HashSet<>();
+    for (Method method : type.getDeclaredMethods()) names.add(method.getName());
+    check(names.size() == 2, "no overloads or synthetic methods");
+  }
+
+  private static Constructor<MediaContainerHints> constructor() throws Exception {
+    Constructor<MediaContainerHints> constructor =
+        MediaContainerHints.class.getDeclaredConstructor(String.class, String.class);
+    constructor.setAccessible(true);
+    return constructor;
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> type, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == type && field.getGenericType() == type
+        && field.getModifiers() == modifiers && !field.isSynthetic(), name + " field metadata");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+      int modifiers, Class<?>... parameters) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == modifiers && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && !method.isSynthetic() && !method.isBridge(),
+        name + " method metadata");
   }
 
   private static void check(boolean condition, String message) {
