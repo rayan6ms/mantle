@@ -2062,9 +2062,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[1].completed_slices[].symbols] | add) == .cohorts[1].classified_symbols and
   (.cohorts[1].classified_symbols + .cohorts[1].remaining_symbols) == .cohorts[1].symbols and
   .cohorts[2].status == "IN_PROGRESS" and
-  .cohorts[2].classified_symbols == 110 and
-  .cohorts[2].remaining_symbols == 109 and
-  (.cohorts[2].completed_slices | length) == 21 and
+  .cohorts[2].classified_symbols == 127 and
+  .cohorts[2].remaining_symbols == 92 and
+  (.cohorts[2].completed_slices | length) == 22 and
   .cohorts[2].completed_slices[0] == {
     id: "audio-filter-interface-contracts",
     classes: 1,
@@ -2341,11 +2341,24 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "docs/architecture/ADR-0022-bounded-split-short-converter.md"
     ]
   } and
+  .cohorts[2].completed_slices[21] == {
+    id: "equalizer-contracts",
+    classes: 3,
+    fields: 2,
+    methods: 12,
+    symbols: 17,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
   ([.cohorts[2].completed_slices[].symbols] | add) == .cohorts[2].classified_symbols and
   (.cohorts[2].classified_symbols + .cohorts[2].remaining_symbols) == .cohorts[2].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1343 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1360 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1198 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1215 and
   ([$classifications.symbols[] |
     select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 129 and
   ([$classifications.symbols[] |
@@ -2378,6 +2391,13 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
       (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
       (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 6 and
+  ([$classifications.symbols[] |
+    select((.binary_name | startswith(
+        "com.sedmelluq.discord.lavaplayer.filter.equalizer.")) and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 17 and
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.filter.converter.ToShortAudioFilter" and
@@ -2782,6 +2802,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.filter.converter.ToFloatAudioFilter",
         "com.sedmelluq.discord.lavaplayer.filter.converter.ToShortAudioFilter",
         "com.sedmelluq.discord.lavaplayer.filter.converter.ToSplitShortAudioFilter",
+        "com.sedmelluq.discord.lavaplayer.filter.equalizer.Equalizer",
+        "com.sedmelluq.discord.lavaplayer.filter.equalizer.EqualizerConfiguration",
+        "com.sedmelluq.discord.lavaplayer.filter.equalizer.EqualizerFactory",
         "com.sedmelluq.discord.lavaplayer.source.AudioSourceManager",
         "com.sedmelluq.discord.lavaplayer.source.AudioSourceManagers",
         "com.sedmelluq.discord.lavaplayer.source.ProbingAudioSourceManager",
@@ -3220,7 +3243,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "equalizer-contracts" and
+  .phase_entry.next_slice == "volume-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 ' "$PLAN" >/dev/null
@@ -3228,7 +3251,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '196 reference classes / 1,370 symbols' \
+  '199 reference classes / 1,387 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -3238,4 +3261,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 1,343 classified symbols and 1,419 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 1,360 classified symbols and 1,402 unassessed symbols.\n'

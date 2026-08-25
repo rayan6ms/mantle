@@ -103,6 +103,15 @@ const TO_SHORT_AUDIO_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/converter/ToShortAudioFilter";
 const TO_SPLIT_SHORT_AUDIO_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/converter/ToSplitShortAudioFilter";
+const EQUALIZER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/equalizer/Equalizer";
+const EQUALIZER_CONFIGURATION_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/filter/equalizer/EqualizerConfiguration";
+const EQUALIZER_FACTORY_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/filter/equalizer/EqualizerFactory";
+const EQUALIZER_CHANNEL_PROCESSOR_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/filter/equalizer/Equalizer$ChannelProcessor";
+const EQUALIZER_COEFFICIENTS_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/filter/equalizer/Equalizer$Coefficients";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -409,6 +418,9 @@ const REFERENCE_CLASSES: &[&str] = &[
     TO_FLOAT_AUDIO_FILTER_CLASS,
     TO_SHORT_AUDIO_FILTER_CLASS,
     TO_SPLIT_SHORT_AUDIO_FILTER_CLASS,
+    EQUALIZER_CLASS,
+    EQUALIZER_CONFIGURATION_CLASS,
+    EQUALIZER_FACTORY_CLASS,
     "com/sedmelluq/discord/lavaplayer/format/AudioDataFormat",
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
@@ -564,6 +576,11 @@ const REFERENCE_CLASSES: &[&str] = &[
     REFERENCE_MUTABLE_FRAME_CLASS,
 ];
 
+const PRIVATE_SUPPORT_CLASSES: &[&str] = &[
+    EQUALIZER_CHANNEL_PROCESSOR_CLASS,
+    EQUALIZER_COEFFICIENTS_CLASS,
+];
+
 #[derive(Serialize)]
 struct EmissionManifest {
     schema_version: u8,
@@ -588,7 +605,7 @@ pub fn emit(
 ) -> Result<()> {
     let mut source = ZipArchive::new(File::open(reference_jar)?)?;
     let mut classes = Vec::new();
-    for binary_name in REFERENCE_CLASSES {
+    for binary_name in REFERENCE_CLASSES.iter().chain(PRIVATE_SUPPORT_CLASSES) {
         let mut entry = source.by_name(&format!("{binary_name}.class"))?;
         let mut bytes = Vec::new();
         entry.read_to_end(&mut bytes)?;
@@ -717,7 +734,7 @@ pub fn emit_reference_slice(reference_jar: &Path, output: &Path) -> Result<()> {
     let options = SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
     jar.start_file("META-INF/MANIFEST.MF", options)?;
     jar.write_all(b"Manifest-Version: 1.0\r\nCreated-By: Mantle Gate A reference slicer\r\n\r\n")?;
-    for binary_name in REFERENCE_CLASSES {
+    for binary_name in REFERENCE_CLASSES.iter().chain(PRIVATE_SUPPORT_CLASSES) {
         let entry_name = format!("{binary_name}.class");
         let mut entry = source.by_name(&entry_name)?;
         let mut bytes = Vec::new();
@@ -732,7 +749,7 @@ pub fn emit_reference_slice(reference_jar: &Path, output: &Path) -> Result<()> {
 pub fn verify_structure(reference_jar: &Path, candidate_jar: &Path) -> Result<()> {
     let mut reference = ZipArchive::new(File::open(reference_jar)?)?;
     let mut candidate = ZipArchive::new(File::open(candidate_jar)?)?;
-    for binary_name in REFERENCE_CLASSES {
+    for binary_name in REFERENCE_CLASSES.iter().chain(PRIVATE_SUPPORT_CLASSES) {
         let entry_name = format!("{binary_name}.class");
         let reference_class = read_class(&mut reference, &entry_name)?;
         let candidate_class = read_class(&mut candidate, &entry_name)?;
@@ -881,6 +898,10 @@ fn retain_private_fields(class_name: &str) -> bool {
             | TO_FLOAT_AUDIO_FILTER_CLASS
             | TO_SHORT_AUDIO_FILTER_CLASS
             | TO_SPLIT_SHORT_AUDIO_FILTER_CLASS
+            | EQUALIZER_CLASS
+            | EQUALIZER_CONFIGURATION_CLASS
+            | EQUALIZER_CHANNEL_PROCESSOR_CLASS
+            | EQUALIZER_COEFFICIENTS_CLASS
             | TRACK_MARKER_TRACKER_CLASS
             | BASE_AUDIO_TRACK_CLASS
             | DELEGATED_AUDIO_TRACK_CLASS
@@ -966,6 +987,10 @@ fn retain_private_methods(class_name: &str) -> bool {
             | FINAL_PCM_AUDIO_FILTER_CLASS
             | USER_PROVIDED_AUDIO_FILTERS_CLASS
             | TO_FLOAT_AUDIO_FILTER_CLASS
+            | EQUALIZER_CLASS
+            | EQUALIZER_CONFIGURATION_CLASS
+            | EQUALIZER_CHANNEL_PROCESSOR_CLASS
+            | EQUALIZER_COEFFICIENTS_CLASS
             | TRACK_INFO_BUILDER_CLASS
             | ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
             | NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS
@@ -1142,6 +1167,16 @@ fn replacement_body(
     }
     if class_name == TO_SPLIT_SHORT_AUDIO_FILTER_CLASS {
         return to_split_short_audio_filter_replacement(pool, name, descriptor, required_locals);
+    }
+    if matches!(
+        class_name,
+        EQUALIZER_CLASS
+            | EQUALIZER_CONFIGURATION_CLASS
+            | EQUALIZER_FACTORY_CLASS
+            | EQUALIZER_CHANNEL_PROCESSOR_CLASS
+            | EQUALIZER_COEFFICIENTS_CLASS
+    ) {
+        return equalizer_replacement(pool, class_name, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -4102,6 +4137,861 @@ fn to_split_short_audio_filter_process_buffer(
                 offset_delta: u16::try_from(return_target - dispatch_target - 1)?,
             },
         ],
+    )?;
+    Ok(body)
+}
+
+fn equalizer_replacement(
+    pool: &mut ConstantPool<'static>,
+    class_name: &str,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    let body = match (class_name, name, descriptor) {
+        (EQUALIZER_CONFIGURATION_CLASS, "<init>", "([F)V") => {
+            equalizer_configuration_constructor(pool)?
+        }
+        (EQUALIZER_CONFIGURATION_CLASS, "setGain", "(IF)V") => {
+            equalizer_configuration_set_gain(pool)?
+        }
+        (EQUALIZER_CONFIGURATION_CLASS, "getGain", "(I)F") => {
+            equalizer_configuration_get_gain(pool)?
+        }
+        (EQUALIZER_CONFIGURATION_CLASS, "isValidBand", "(I)Z") => {
+            equalizer_configuration_is_valid_band(pool)?
+        }
+        (
+            EQUALIZER_CLASS,
+            "<init>",
+            "(ILcom/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter;[F)V",
+        ) => equalizer_constructor(pool)?,
+        (
+            EQUALIZER_CLASS,
+            "<init>",
+            "(ILcom/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter;)V",
+        ) => equalizer_default_constructor(pool)?,
+        (
+            EQUALIZER_CLASS,
+            "isCompatible",
+            "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)Z",
+        ) => equalizer_is_compatible(pool)?,
+        (EQUALIZER_CLASS, "process", "([[FII)V") => equalizer_process(pool)?,
+        (EQUALIZER_CLASS, "seekPerformed", "(JJ)V") => equalizer_seek_performed(pool)?,
+        (EQUALIZER_CLASS, "flush" | "close", "()V") => {
+            code(pool, 0, required_locals, vec![Instruction::Return])?
+        }
+        (
+            EQUALIZER_CLASS,
+            "createProcessors",
+            "(I[F)[Lcom/sedmelluq/discord/lavaplayer/filter/equalizer/Equalizer$ChannelProcessor;",
+        ) => equalizer_create_processors(pool)?,
+        (EQUALIZER_CLASS, "<clinit>", "()V") => equalizer_class_initializer(pool)?,
+        (EQUALIZER_CHANNEL_PROCESSOR_CLASS, "<init>", "([F)V") => {
+            equalizer_channel_processor_constructor(pool)?
+        }
+        (EQUALIZER_CHANNEL_PROCESSOR_CLASS, "process", "([FII)V") => {
+            equalizer_channel_processor_process(pool)?
+        }
+        (EQUALIZER_CHANNEL_PROCESSOR_CLASS, "reset", "()V") => {
+            equalizer_channel_processor_reset(pool)?
+        }
+        (EQUALIZER_COEFFICIENTS_CLASS, "<init>", "(FFF)V") => {
+            equalizer_coefficients_constructor(pool)?
+        }
+        (EQUALIZER_FACTORY_CLASS, "<init>", "()V") => equalizer_factory_constructor(pool)?,
+        (
+            EQUALIZER_FACTORY_CLASS,
+            "buildChain",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;)Ljava/util/List;",
+        ) => equalizer_factory_build_chain(pool)?,
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {class_name}.{name}{descriptor}"),
+            required_locals,
+        )?,
+    };
+    Ok(body)
+}
+
+fn equalizer_configuration_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(EQUALIZER_CONFIGURATION_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let multipliers = pool.add_field_ref(owner, "bandMultipliers", "[F")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(multipliers),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn equalizer_configuration_is_valid_band(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(EQUALIZER_CONFIGURATION_CLASS)?;
+    let multipliers = pool.add_field_ref(owner, "bandMultipliers", "[F")?;
+    let mut instructions = vec![
+        Instruction::Iload_1,
+        Instruction::Iflt(0),
+        Instruction::Iload_1,
+        Instruction::Aload_0,
+        Instruction::Getfield(multipliers),
+        Instruction::Arraylength,
+        Instruction::If_icmpge(0),
+        Instruction::Iconst_1,
+        Instruction::Ireturn,
+    ];
+    let invalid_target = instructions.len();
+    instructions.extend([Instruction::Iconst_0, Instruction::Ireturn]);
+    instructions[1] = Instruction::Iflt(u16::try_from(invalid_target)?);
+    instructions[6] = Instruction::If_icmpge(u16::try_from(invalid_target)?);
+    let mut body = code(pool, 2, 2, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![same_stack_frame(u16::try_from(invalid_target)?)],
+    )?;
+    Ok(body)
+}
+
+fn equalizer_configuration_set_gain(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(EQUALIZER_CONFIGURATION_CLASS)?;
+    let math = pool.add_class("java/lang/Math")?;
+    let multipliers = pool.add_field_ref(owner, "bandMultipliers", "[F")?;
+    let valid = pool.add_method_ref(owner, "isValidBand", "(I)Z")?;
+    let min = pool.add_method_ref(math, "min", "(FF)F")?;
+    let max = pool.add_method_ref(math, "max", "(FF)F")?;
+    let one = pool.add_float(1.0)?;
+    let minimum = pool.add_float(-0.25)?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Iload_1,
+        Instruction::Invokevirtual(valid),
+        Instruction::Ifeq(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(multipliers),
+        Instruction::Iload_1,
+        Instruction::Fload_2,
+        Instruction::Ldc_w(one),
+        Instruction::Invokestatic(min),
+        Instruction::Ldc_w(minimum),
+        Instruction::Invokestatic(max),
+        Instruction::Fastore,
+    ];
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[3] = Instruction::Ifeq(u16::try_from(return_target)?);
+    let mut body = code(pool, 4, 3, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![same_stack_frame(u16::try_from(return_target)?)],
+    )?;
+    Ok(body)
+}
+
+fn equalizer_configuration_get_gain(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(EQUALIZER_CONFIGURATION_CLASS)?;
+    let multipliers = pool.add_field_ref(owner, "bandMultipliers", "[F")?;
+    let valid = pool.add_method_ref(owner, "isValidBand", "(I)Z")?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Iload_1,
+        Instruction::Invokevirtual(valid),
+        Instruction::Ifeq(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(multipliers),
+        Instruction::Iload_1,
+        Instruction::Faload,
+        Instruction::Freturn,
+    ];
+    let invalid_target = instructions.len();
+    instructions.extend([Instruction::Fconst_0, Instruction::Freturn]);
+    instructions[3] = Instruction::Ifeq(u16::try_from(invalid_target)?);
+    let mut body = code(pool, 2, 2, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![same_stack_frame(u16::try_from(invalid_target)?)],
+    )?;
+    Ok(body)
+}
+
+fn equalizer_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(EQUALIZER_CLASS)?;
+    let parent = pool.add_class(EQUALIZER_CONFIGURATION_CLASS)?;
+    let parent_init = pool.add_method_ref(parent, "<init>", "([F)V")?;
+    let create = pool.add_method_ref(
+        owner,
+        "createProcessors",
+        "(I[F)[Lcom/sedmelluq/discord/lavaplayer/filter/equalizer/Equalizer$ChannelProcessor;",
+    )?;
+    let channels = pool.add_field_ref(
+        owner,
+        "channels",
+        "[Lcom/sedmelluq/discord/lavaplayer/filter/equalizer/Equalizer$ChannelProcessor;",
+    )?;
+    let next = pool.add_field_ref(
+        owner,
+        "next",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter;",
+    )?;
+    code(
+        pool,
+        3,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Invokespecial(parent_init),
+            Instruction::Aload_0,
+            Instruction::Iload_1,
+            Instruction::Aload_3,
+            Instruction::Invokestatic(create),
+            Instruction::Putfield(channels),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(next),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn equalizer_default_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(EQUALIZER_CLASS)?;
+    let init = pool.add_method_ref(
+        owner,
+        "<init>",
+        "(ILcom/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter;[F)V",
+    )?;
+    code(
+        pool,
+        4,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Iload_1,
+            Instruction::Aload_2,
+            Instruction::Bipush(15),
+            Instruction::Newarray(ArrayType::Float),
+            Instruction::Invokespecial(init),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn equalizer_is_compatible(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let format = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let sample_rate = pool.add_field_ref(format, "sampleRate", "I")?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Getfield(sample_rate),
+        Instruction::Ldc_w(pool.add_integer(48_000)?),
+        Instruction::If_icmpne(0),
+        Instruction::Iconst_1,
+        Instruction::Ireturn,
+    ];
+    let false_target = instructions.len();
+    instructions.extend([Instruction::Iconst_0, Instruction::Ireturn]);
+    instructions[3] = Instruction::If_icmpne(u16::try_from(false_target)?);
+    let mut body = code(pool, 2, 1, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![same_stack_frame(u16::try_from(false_target)?)],
+    )?;
+    Ok(body)
+}
+
+fn equalizer_process(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(EQUALIZER_CLASS)?;
+    let processor = pool.add_class(EQUALIZER_CHANNEL_PROCESSOR_CLASS)?;
+    let float_filter = pool.add_class(FLOAT_PCM_AUDIO_FILTER_CLASS)?;
+    let channels = pool.add_field_ref(
+        owner,
+        "channels",
+        "[Lcom/sedmelluq/discord/lavaplayer/filter/equalizer/Equalizer$ChannelProcessor;",
+    )?;
+    let next = pool.add_field_ref(
+        owner,
+        "next",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter;",
+    )?;
+    let process_channel = pool.add_method_ref(processor, "process", "([FII)V")?;
+    let process_next = pool.add_interface_method_ref(float_filter, "process", "([[FII)V")?;
+    let mut instructions = vec![Instruction::Iconst_0, Instruction::Istore(4)];
+    let loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(4),
+        Instruction::Aload_0,
+        Instruction::Getfield(channels),
+        Instruction::Arraylength,
+        Instruction::If_icmpge(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(channels),
+        Instruction::Iload(4),
+        Instruction::Aaload,
+        Instruction::Aload_1,
+        Instruction::Iload(4),
+        Instruction::Aaload,
+        Instruction::Iload_2,
+        Instruction::Iload_2,
+        Instruction::Iload_3,
+        Instruction::Iadd,
+        Instruction::Invokevirtual(process_channel),
+        Instruction::Iinc(4, 1),
+        Instruction::Goto(u16::try_from(loop_target)?),
+    ]);
+    let dispatch_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Getfield(next),
+        Instruction::Aload_1,
+        Instruction::Iload_2,
+        Instruction::Iload_3,
+        Instruction::Invokeinterface(process_next, 4),
+        Instruction::Return,
+    ]);
+    instructions[loop_target + 4] = Instruction::If_icmpge(u16::try_from(dispatch_target)?);
+    let mut body = code(pool, 5, 5, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(loop_target)?,
+                locals: vec![VerificationType::Integer],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: u16::try_from(dispatch_target - loop_target - 1)?,
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn equalizer_seek_performed(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(EQUALIZER_CLASS)?;
+    let processor = pool.add_class(EQUALIZER_CHANNEL_PROCESSOR_CLASS)?;
+    let channels = pool.add_field_ref(
+        owner,
+        "channels",
+        "[Lcom/sedmelluq/discord/lavaplayer/filter/equalizer/Equalizer$ChannelProcessor;",
+    )?;
+    let reset = pool.add_method_ref(processor, "reset", "()V")?;
+    let mut instructions = vec![Instruction::Iconst_0, Instruction::Istore(5)];
+    let loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(5),
+        Instruction::Aload_0,
+        Instruction::Getfield(channels),
+        Instruction::Arraylength,
+        Instruction::If_icmpge(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(channels),
+        Instruction::Iload(5),
+        Instruction::Aaload,
+        Instruction::Invokevirtual(reset),
+        Instruction::Iinc(5, 1),
+        Instruction::Goto(u16::try_from(loop_target)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[loop_target + 4] = Instruction::If_icmpge(u16::try_from(return_target)?);
+    let mut body = code(pool, 2, 6, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(loop_target)?,
+                locals: vec![VerificationType::Integer],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: u16::try_from(return_target - loop_target - 1)?,
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn equalizer_create_processors(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let processor = pool.add_class(EQUALIZER_CHANNEL_PROCESSOR_CLASS)?;
+    let processor_array = pool.add_class(
+        "[Lcom/sedmelluq/discord/lavaplayer/filter/equalizer/Equalizer$ChannelProcessor;",
+    )?;
+    let init = pool.add_method_ref(processor, "<init>", "([F)V")?;
+    let mut instructions = vec![
+        Instruction::Iload_0,
+        Instruction::Anewarray(processor),
+        Instruction::Astore_2,
+        Instruction::Iconst_0,
+        Instruction::Istore_3,
+    ];
+    let loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload_3,
+        Instruction::Iload_0,
+        Instruction::If_icmpge(0),
+        Instruction::Aload_2,
+        Instruction::Iload_3,
+        Instruction::New(processor),
+        Instruction::Dup,
+        Instruction::Aload_1,
+        Instruction::Invokespecial(init),
+        Instruction::Aastore,
+        Instruction::Iinc(3, 1),
+        Instruction::Goto(u16::try_from(loop_target)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.extend([Instruction::Aload_2, Instruction::Areturn]);
+    instructions[loop_target + 2] = Instruction::If_icmpge(u16::try_from(return_target)?);
+    let mut body = code(pool, 5, 4, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 253,
+                offset_delta: u16::try_from(loop_target)?,
+                locals: vec![
+                    VerificationType::Object {
+                        cpool_index: processor_array,
+                    },
+                    VerificationType::Integer,
+                ],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: u16::try_from(return_target - loop_target - 1)?,
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn equalizer_coefficients_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(EQUALIZER_COEFFICIENTS_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let beta = pool.add_field_ref(owner, "beta", "F")?;
+    let alpha = pool.add_field_ref(owner, "alpha", "F")?;
+    let gamma = pool.add_field_ref(owner, "gamma", "F")?;
+    code(
+        pool,
+        2,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Fload_1,
+            Instruction::Putfield(beta),
+            Instruction::Aload_0,
+            Instruction::Fload_2,
+            Instruction::Putfield(alpha),
+            Instruction::Aload_0,
+            Instruction::Fload_3,
+            Instruction::Putfield(gamma),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn equalizer_channel_processor_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(EQUALIZER_CHANNEL_PROCESSOR_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let history = pool.add_field_ref(owner, "history", "[F")?;
+    let multipliers = pool.add_field_ref(owner, "bandMultipliers", "[F")?;
+    let current = pool.add_field_ref(owner, "current", "I")?;
+    let minus_one = pool.add_field_ref(owner, "minusOne", "I")?;
+    let minus_two = pool.add_field_ref(owner, "minusTwo", "I")?;
+    code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Bipush(90),
+            Instruction::Newarray(ArrayType::Float),
+            Instruction::Putfield(history),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(multipliers),
+            Instruction::Aload_0,
+            Instruction::Iconst_0,
+            Instruction::Putfield(current),
+            Instruction::Aload_0,
+            Instruction::Iconst_2,
+            Instruction::Putfield(minus_one),
+            Instruction::Aload_0,
+            Instruction::Iconst_1,
+            Instruction::Putfield(minus_two),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn equalizer_channel_processor_reset(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(EQUALIZER_CHANNEL_PROCESSOR_CLASS)?;
+    let arrays = pool.add_class("java/util/Arrays")?;
+    let history = pool.add_field_ref(owner, "history", "[F")?;
+    let fill = pool.add_method_ref(arrays, "fill", "([FF)V")?;
+    code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(history),
+            Instruction::Fconst_0,
+            Instruction::Invokestatic(fill),
+            Instruction::Return,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn equalizer_channel_processor_process(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(EQUALIZER_CHANNEL_PROCESSOR_CLASS)?;
+    let equalizer = pool.add_class(EQUALIZER_CLASS)?;
+    let coefficients_type = pool.add_class(EQUALIZER_COEFFICIENTS_CLASS)?;
+    let math = pool.add_class("java/lang/Math")?;
+    let history = pool.add_field_ref(owner, "history", "[F")?;
+    let multipliers = pool.add_field_ref(owner, "bandMultipliers", "[F")?;
+    let current = pool.add_field_ref(owner, "current", "I")?;
+    let minus_one = pool.add_field_ref(owner, "minusOne", "I")?;
+    let minus_two = pool.add_field_ref(owner, "minusTwo", "I")?;
+    let coefficients = pool.add_field_ref(
+        equalizer,
+        "coefficients48000",
+        "[Lcom/sedmelluq/discord/lavaplayer/filter/equalizer/Equalizer$Coefficients;",
+    )?;
+    let beta = pool.add_field_ref(coefficients_type, "beta", "F")?;
+    let alpha = pool.add_field_ref(coefficients_type, "alpha", "F")?;
+    let gamma = pool.add_field_ref(coefficients_type, "gamma", "F")?;
+    let max = pool.add_method_ref(math, "max", "(FF)F")?;
+    let min = pool.add_method_ref(math, "min", "(FF)F")?;
+    let quarter = pool.add_float(0.25)?;
+    let four = pool.add_float(4.0)?;
+    let negative_one = pool.add_float(-1.0)?;
+    let one = pool.add_float(1.0)?;
+    let mut instructions = vec![Instruction::Nop];
+    let sample_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload_2,
+        Instruction::Iload_3,
+        Instruction::If_icmpge(0),
+        Instruction::Aload_1,
+        Instruction::Iload_2,
+        Instruction::Faload,
+        Instruction::Fstore(4),
+        Instruction::Fload(4),
+        Instruction::Ldc_w(quarter),
+        Instruction::Fmul,
+        Instruction::Fstore(5),
+        Instruction::Iconst_0,
+        Instruction::Istore(6),
+    ]);
+    let band_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(6),
+        Instruction::Bipush(15),
+        Instruction::If_icmpge(0),
+        Instruction::Iload(6),
+        Instruction::Bipush(6),
+        Instruction::Imul,
+        Instruction::Istore(7),
+        Instruction::Iload(7),
+        Instruction::Iconst_3,
+        Instruction::Iadd,
+        Instruction::Istore(8),
+        Instruction::Getstatic(coefficients),
+        Instruction::Iload(6),
+        Instruction::Aaload,
+        Instruction::Astore(9),
+        Instruction::Aload(9),
+        Instruction::Getfield(alpha),
+        Instruction::Fload(4),
+        Instruction::Aload_0,
+        Instruction::Getfield(history),
+        Instruction::Iload(7),
+        Instruction::Aload_0,
+        Instruction::Getfield(minus_two),
+        Instruction::Iadd,
+        Instruction::Faload,
+        Instruction::Fsub,
+        Instruction::Fmul,
+        Instruction::Aload(9),
+        Instruction::Getfield(gamma),
+        Instruction::Aload_0,
+        Instruction::Getfield(history),
+        Instruction::Iload(8),
+        Instruction::Aload_0,
+        Instruction::Getfield(minus_one),
+        Instruction::Iadd,
+        Instruction::Faload,
+        Instruction::Fmul,
+        Instruction::Fadd,
+        Instruction::Aload(9),
+        Instruction::Getfield(beta),
+        Instruction::Aload_0,
+        Instruction::Getfield(history),
+        Instruction::Iload(8),
+        Instruction::Aload_0,
+        Instruction::Getfield(minus_two),
+        Instruction::Iadd,
+        Instruction::Faload,
+        Instruction::Fmul,
+        Instruction::Fsub,
+        Instruction::Fstore(10),
+        Instruction::Aload_0,
+        Instruction::Getfield(history),
+        Instruction::Iload(7),
+        Instruction::Aload_0,
+        Instruction::Getfield(current),
+        Instruction::Iadd,
+        Instruction::Fload(4),
+        Instruction::Fastore,
+        Instruction::Aload_0,
+        Instruction::Getfield(history),
+        Instruction::Iload(8),
+        Instruction::Aload_0,
+        Instruction::Getfield(current),
+        Instruction::Iadd,
+        Instruction::Fload(10),
+        Instruction::Fastore,
+        Instruction::Fload(5),
+        Instruction::Fload(10),
+        Instruction::Aload_0,
+        Instruction::Getfield(multipliers),
+        Instruction::Iload(6),
+        Instruction::Faload,
+        Instruction::Fmul,
+        Instruction::Fadd,
+        Instruction::Fstore(5),
+        Instruction::Iinc(6, 1),
+        Instruction::Goto(u16::try_from(band_target)?),
+    ]);
+    let band_exit = instructions.len();
+    instructions.extend([
+        Instruction::Aload_1,
+        Instruction::Iload_2,
+        Instruction::Fload(5),
+        Instruction::Ldc_w(four),
+        Instruction::Fmul,
+        Instruction::Ldc_w(negative_one),
+        Instruction::Invokestatic(max),
+        Instruction::Ldc_w(one),
+        Instruction::Invokestatic(min),
+        Instruction::Fastore,
+        Instruction::Aload_0,
+        Instruction::Aload_0,
+        Instruction::Getfield(current),
+        Instruction::Iconst_1,
+        Instruction::Iadd,
+        Instruction::Iconst_3,
+        Instruction::Irem,
+        Instruction::Putfield(current),
+        Instruction::Aload_0,
+        Instruction::Aload_0,
+        Instruction::Getfield(minus_one),
+        Instruction::Iconst_1,
+        Instruction::Iadd,
+        Instruction::Iconst_3,
+        Instruction::Irem,
+        Instruction::Putfield(minus_one),
+        Instruction::Aload_0,
+        Instruction::Aload_0,
+        Instruction::Getfield(minus_two),
+        Instruction::Iconst_1,
+        Instruction::Iadd,
+        Instruction::Iconst_3,
+        Instruction::Irem,
+        Instruction::Putfield(minus_two),
+        Instruction::Iinc(2, 1),
+        Instruction::Goto(u16::try_from(sample_target)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[sample_target + 2] = Instruction::If_icmpge(u16::try_from(return_target)?);
+    instructions[band_target + 2] = Instruction::If_icmpge(u16::try_from(band_exit)?);
+    let base_locals = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Object {
+            cpool_index: pool.add_class("[F")?,
+        },
+        VerificationType::Integer,
+        VerificationType::Integer,
+    ];
+    let mut band_locals = base_locals.clone();
+    band_locals.extend([
+        VerificationType::Float,
+        VerificationType::Float,
+        VerificationType::Integer,
+    ]);
+    let mut body = code(pool, 6, 11, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: u16::try_from(sample_target)?,
+                locals: base_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: u16::try_from(band_target - sample_target - 1)?,
+                locals: band_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: u16::try_from(band_exit - band_target - 1)?,
+                locals: band_locals,
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: u16::try_from(return_target - band_exit - 1)?,
+                locals: base_locals,
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::excessive_precision, clippy::unreadable_literal)]
+fn equalizer_class_initializer(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    const VALUES: [(f32, f32, f32); 15] = [
+        (9.9847546664e-1, 7.6226668143e-4, 1.9984647656),
+        (9.9756184654e-1, 1.2190767289e-3, 1.9975344645),
+        (9.9616261379e-1, 1.9186931041e-3, 1.9960947369),
+        (9.9391578543e-1, 3.0421072865e-3, 1.9937449618),
+        (9.9028307215e-1, 4.8584639242e-3, 1.9898465702),
+        (9.8485897264e-1, 7.5705136795e-3, 1.9837962543),
+        (9.7588512657e-1, 1.2057436715e-2, 1.9731772447),
+        (9.6228521814e-1, 1.8857390928e-2, 1.9556164694),
+        (9.4080933132e-1, 2.9595334338e-2, 1.9242054384),
+        (9.0702059196e-1, 4.6489704022e-2, 1.8653476166),
+        (8.5868004289e-1, 7.0659978553e-2, 1.7600401337),
+        (7.8409610788e-1, 1.0795194606e-1, 1.5450725522),
+        (6.8332861002e-1, 1.5833569499e-1, 1.1426447155),
+        (5.5267518228e-1, 2.2366240886e-1, 4.0186190803e-1),
+        (4.1811888447e-1, 2.9094055777e-1, -7.0905944223e-1),
+    ];
+    let owner = pool.add_class(EQUALIZER_CLASS)?;
+    let coefficients_type = pool.add_class(EQUALIZER_COEFFICIENTS_CLASS)?;
+    let field = pool.add_field_ref(
+        owner,
+        "coefficients48000",
+        "[Lcom/sedmelluq/discord/lavaplayer/filter/equalizer/Equalizer$Coefficients;",
+    )?;
+    let init = pool.add_method_ref(coefficients_type, "<init>", "(FFF)V")?;
+    let mut instructions = vec![
+        Instruction::Bipush(15),
+        Instruction::Anewarray(coefficients_type),
+    ];
+    for (index, (beta, alpha, gamma)) in VALUES.into_iter().enumerate() {
+        let beta = pool.add_float(beta)?;
+        let alpha = pool.add_float(alpha)?;
+        let gamma = pool.add_float(gamma)?;
+        instructions.extend([
+            Instruction::Dup,
+            Instruction::Bipush(i8::try_from(index)?),
+            Instruction::New(coefficients_type),
+            Instruction::Dup,
+            Instruction::Ldc_w(beta),
+            Instruction::Ldc_w(alpha),
+            Instruction::Ldc_w(gamma),
+            Instruction::Invokespecial(init),
+            Instruction::Aastore,
+        ]);
+    }
+    instructions.extend([Instruction::Putstatic(field), Instruction::Return]);
+    code(pool, 8, 0, instructions)
+}
+
+fn equalizer_factory_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let parent = pool.add_class(EQUALIZER_CONFIGURATION_CLASS)?;
+    let init = pool.add_method_ref(parent, "<init>", "([F)V")?;
+    code(
+        pool,
+        3,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Bipush(15),
+            Instruction::Newarray(ArrayType::Float),
+            Instruction::Invokespecial(init),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn equalizer_factory_build_chain(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let configuration = pool.add_class(EQUALIZER_CONFIGURATION_CLASS)?;
+    let equalizer = pool.add_class(EQUALIZER_CLASS)?;
+    let format = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let collections = pool.add_class("java/util/Collections")?;
+    let compatible = pool.add_method_ref(
+        equalizer,
+        "isCompatible",
+        "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)Z",
+    )?;
+    let init = pool.add_method_ref(
+        equalizer,
+        "<init>",
+        "(ILcom/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter;[F)V",
+    )?;
+    let channel_count = pool.add_field_ref(format, "channelCount", "I")?;
+    let multipliers = pool.add_field_ref(configuration, "bandMultipliers", "[F")?;
+    let singleton = pool.add_method_ref(
+        collections,
+        "singletonList",
+        "(Ljava/lang/Object;)Ljava/util/List;",
+    )?;
+    let empty = pool.add_method_ref(collections, "emptyList", "()Ljava/util/List;")?;
+    let mut instructions = vec![
+        Instruction::Aload_2,
+        Instruction::Invokestatic(compatible),
+        Instruction::Ifeq(0),
+        Instruction::New(equalizer),
+        Instruction::Dup,
+        Instruction::Aload_2,
+        Instruction::Getfield(channel_count),
+        Instruction::Aload_3,
+        Instruction::Aload_0,
+        Instruction::Getfield(multipliers),
+        Instruction::Invokespecial(init),
+        Instruction::Invokestatic(singleton),
+        Instruction::Areturn,
+    ];
+    let empty_target = instructions.len();
+    instructions.extend([Instruction::Invokestatic(empty), Instruction::Areturn]);
+    instructions[2] = Instruction::Ifeq(u16::try_from(empty_target)?);
+    let mut body = code(pool, 5, 4, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![same_stack_frame(u16::try_from(empty_target)?)],
     )?;
     Ok(body)
 }

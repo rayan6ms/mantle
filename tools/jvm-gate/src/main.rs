@@ -109,6 +109,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-to-float-audio-filter-consumer" => Some(TO_FLOAT_AUDIO_FILTER_CONSUMER),
         "write-to-short-audio-filter-consumer" => Some(TO_SHORT_AUDIO_FILTER_CONSUMER),
         "write-to-split-short-audio-filter-consumer" => Some(TO_SPLIT_SHORT_AUDIO_FILTER_CONSUMER),
+        "write-equalizer-consumer" => Some(EQUALIZER_CONSUMER),
         "write-pcm-filter-factory-consumer" => Some(PCM_FILTER_FACTORY_CONSUMER),
         "write-pcm-format-consumer" => Some(PCM_FORMAT_CONSUMER),
         "write-resampling-pcm-audio-filter-consumer" => Some(RESAMPLING_PCM_AUDIO_FILTER_CONSUMER),
@@ -9291,6 +9292,278 @@ public final class GateToSplitShortAudioFilter {
       identities.clear();
       snapshots.clear();
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const EQUALIZER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.AudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.FloatPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.UniversalPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.equalizer.Equalizer;
+import com.sedmelluq.discord.lavaplayer.filter.equalizer.EqualizerConfiguration;
+import com.sedmelluq.discord.lavaplayer.filter.equalizer.EqualizerFactory;
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkDecoder;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkEncoder;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.List;
+
+public final class GateEqualizer {
+  public static void main(String[] args) throws Exception {
+    configuration();
+    String digest = processing();
+    factory();
+    failures();
+    reflection();
+    System.out.println("dsp=" + digest
+        + ";contracts=configuration,clamping,live-array,15-band-dsp,channel-history,seek-reset,"
+        + "identity,offset,length,interrupted,lifecycle,compatibility,factory,failures,reflection");
+  }
+
+  private static void configuration() {
+    float[] values = new float[] {0.0f, 0.0f, 0.0f};
+    ExposedConfiguration configuration = new ExposedConfiguration(values);
+    check(configuration.values() == values && configuration.getGain(-1) == 0.0f
+        && configuration.getGain(3) == 0.0f, "configuration identity and invalid gain");
+    configuration.setGain(0, 2.0f);
+    configuration.setGain(1, -2.0f);
+    configuration.setGain(2, Float.NaN);
+    configuration.setGain(-1, 0.5f);
+    configuration.setGain(3, 0.5f);
+    check(values[0] == 1.0f && values[1] == -0.25f && Float.isNaN(values[2]),
+        "gain clamping and NaN");
+
+    ExposedConfiguration nullValues = new ExposedConfiguration(null);
+    check(nullValues.getGain(-1) == 0.0f, "negative band short-circuits null storage");
+    expect(NullPointerException.class, () -> nullValues.getGain(0), "null gain storage");
+  }
+
+  private static String processing() throws Exception {
+    float[] gains = new float[Equalizer.BAND_COUNT];
+    gains[0] = 1.0f;
+    gains[4] = -0.25f;
+    gains[9] = 0.5f;
+    Probe probe = new Probe();
+    Equalizer equalizer = new Equalizer(2, probe, gains);
+    float[][] first = samples();
+    equalizer.process(first, 1, 5);
+    check(probe.calls == 1 && probe.identity == first && probe.offset == 1 && probe.length == 5,
+        "downstream identity and range");
+    check(raw(first[0][0]) == raw(9.0f) && raw(first[0][6]) == raw(8.0f)
+        && raw(first[1][0]) == raw(7.0f) && raw(first[1][6]) == raw(6.0f),
+        "offset boundaries");
+    String firstDigest = digest(first);
+
+    gains[0] = -0.25f;
+    gains[4] = 1.0f;
+    float[][] second = samples();
+    equalizer.process(second, 1, 5);
+    String continuedDigest = digest(second);
+    check(!continuedDigest.equals(firstDigest), "live gains and continued history");
+
+    equalizer.seekPerformed(100L, 90L);
+    float[][] reset = samples();
+    equalizer.process(reset, 1, 5);
+    String resetDigest = digest(reset);
+    Equalizer fresh = new Equalizer(2, new Probe(), gains);
+    float[][] expectedReset = samples();
+    fresh.process(expectedReset, 1, 5);
+    check(resetDigest.equals(digest(expectedReset)), "seek clears channel history");
+
+    int calls = probe.calls;
+    equalizer.flush();
+    equalizer.close();
+    check(probe.calls == calls, "flush and close are local no-ops");
+
+    float[][] negative = samples();
+    equalizer.process(negative, 5, -1);
+    check(probe.calls == calls + 1 && probe.identity == negative
+        && probe.offset == 5 && probe.length == -1, "negative length forwarding");
+
+    InterruptedException sentinel = new InterruptedException("equalizer-sentinel");
+    probe.failure = sentinel;
+    float[][] interrupted = samples();
+    try {
+      equalizer.process(interrupted, 1, 1);
+      throw new AssertionError("interruption expected");
+    } catch (InterruptedException error) {
+      check(error == sentinel && probe.identity == interrupted, "interruption identity");
+    }
+    return firstDigest + "/" + continuedDigest + "/" + resetDigest;
+  }
+
+  private static void factory() {
+    EqualizerFactory factory = new EqualizerFactory();
+    TestFormat compatible = new TestFormat(2, 48_000);
+    UniversalSink output = new UniversalSink();
+    List<AudioFilter> chain = factory.buildChain(null, compatible, output);
+    check(chain.size() == 1 && chain.get(0) instanceof Equalizer, "compatible factory chain");
+    Equalizer built = (Equalizer) chain.get(0);
+    check(built.getGain(3) == 0.0f, "factory initial gain");
+    factory.setGain(3, 0.75f);
+    check(built.getGain(3) == 0.75f, "factory gains remain live in existing filter");
+    expect(UnsupportedOperationException.class, () -> chain.add(output),
+        "singleton chain is immutable");
+
+    List<AudioFilter> incompatible = factory.buildChain(null, new TestFormat(2, 44_100), output);
+    check(incompatible.isEmpty(), "incompatible factory chain");
+    expect(UnsupportedOperationException.class, () -> incompatible.add(output),
+        "empty chain is immutable");
+  }
+
+  private static void failures() throws Exception {
+    Probe probe = new Probe();
+    expect(NegativeArraySizeException.class, () -> new Equalizer(-1, probe),
+        "negative channels");
+    expect(NullPointerException.class, () -> Equalizer.isCompatible(null),
+        "null compatibility format");
+    Equalizer one = new Equalizer(1, null);
+    expect(NullPointerException.class,
+        () -> one.process(new float[][] {{0.0f}}, 0, 1), "null downstream");
+    Equalizer two = new Equalizer(2, probe);
+    expect(ArrayIndexOutOfBoundsException.class,
+        () -> two.process(new float[][] {{0.0f}}, 0, 1), "missing channel");
+    expect(ArrayIndexOutOfBoundsException.class,
+        () -> two.process(new float[][] {{0.0f}, {}}, 0, 1), "short channel");
+
+    Equalizer zero = new Equalizer(0, probe);
+    zero.process(null, 4, 0);
+    check(probe.identity == null && probe.offset == 4 && probe.length == 0,
+        "zero-channel forwarding");
+    expect(NullPointerException.class,
+        () -> new EqualizerFactory().buildChain(null, null, new UniversalSink()),
+        "null factory format");
+    expect(NegativeArraySizeException.class,
+        () -> new EqualizerFactory().buildChain(
+            null, new TestFormat(-1, 48_000), new UniversalSink()),
+        "negative factory channels");
+  }
+
+  private static void reflection() throws Exception {
+    Class<EqualizerConfiguration> configuration = EqualizerConfiguration.class;
+    check(Modifier.isPublic(configuration.getModifiers()) && !Modifier.isFinal(configuration.getModifiers())
+        && configuration.getSuperclass() == Object.class && configuration.getInterfaces().length == 0,
+        "configuration class metadata");
+    check(configuration.getDeclaredFields().length == 1
+        && configuration.getDeclaredConstructors().length == 1
+        && configuration.getDeclaredMethods().length == 3, "configuration member counts");
+    Field multipliers = configuration.getDeclaredField("bandMultipliers");
+    check(multipliers.getType() == float[].class
+        && multipliers.getModifiers() == (Modifier.PROTECTED | Modifier.FINAL),
+        "configuration field metadata");
+
+    Class<Equalizer> equalizer = Equalizer.class;
+    check(Modifier.isPublic(equalizer.getModifiers()) && !Modifier.isFinal(equalizer.getModifiers())
+        && equalizer.getSuperclass() == EqualizerConfiguration.class
+        && Arrays.equals(equalizer.getInterfaces(), new Class<?>[] {FloatPcmAudioFilter.class}),
+        "equalizer class metadata");
+    check(Equalizer.BAND_COUNT == 15 && equalizer.getDeclaredFields().length == 5
+        && equalizer.getDeclaredConstructors().length == 2
+        && equalizer.getDeclaredMethods().length == 6, "equalizer member counts");
+    Field bandCount = equalizer.getDeclaredField("BAND_COUNT");
+    check(bandCount.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL)
+        && bandCount.getInt(null) == 15, "band count metadata");
+    for (Constructor<?> constructor : equalizer.getDeclaredConstructors()) {
+      check(constructor.getModifiers() == Modifier.PUBLIC
+          && constructor.getExceptionTypes().length == 0, "equalizer constructor metadata");
+    }
+    Method process = equalizer.getDeclaredMethod("process", float[][].class, int.class, int.class);
+    check(process.getModifiers() == Modifier.PUBLIC
+        && Arrays.equals(process.getExceptionTypes(), new Class<?>[] {InterruptedException.class}),
+        "process metadata");
+    Method compatible = equalizer.getDeclaredMethod("isCompatible", AudioDataFormat.class);
+    check(compatible.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && compatible.getReturnType() == boolean.class, "compatibility metadata");
+
+    Class<EqualizerFactory> factory = EqualizerFactory.class;
+    check(Modifier.isPublic(factory.getModifiers()) && !Modifier.isFinal(factory.getModifiers())
+        && factory.getSuperclass() == EqualizerConfiguration.class
+        && factory.getInterfaces().length == 1
+        && factory.getDeclaredFields().length == 0
+        && factory.getDeclaredConstructors().length == 1
+        && factory.getDeclaredMethods().length == 1, "factory metadata");
+    Method build = factory.getDeclaredMethods()[0];
+    check(build.getName().equals("buildChain") && build.getReturnType() == List.class
+        && build.getExceptionTypes().length == 0, "factory method metadata");
+  }
+
+  private static float[][] samples() {
+    return new float[][] {
+        {9.0f, 0.75f, -0.5f, 0.25f, -1.0f, 0.125f, 8.0f},
+        {7.0f, -0.25f, 0.5f, -0.75f, 1.0f, -0.125f, 6.0f}
+    };
+  }
+
+  private static String digest(float[][] samples) {
+    StringBuilder builder = new StringBuilder();
+    for (float[] channel : samples) {
+      if (builder.length() > 0) builder.append(':');
+      for (float sample : channel) builder.append(Integer.toHexString(raw(sample))).append(',');
+    }
+    return builder.toString();
+  }
+
+  private static int raw(float value) { return Float.floatToRawIntBits(value); }
+
+  private static void expect(Class<? extends Throwable> type, Operation operation, String message) {
+    try {
+      operation.run();
+    } catch (Throwable error) {
+      check(error.getClass() == type, message + " type: " + error);
+      return;
+    }
+    throw new AssertionError(message + " did not fail");
+  }
+
+  private interface Operation { void run() throws Exception; }
+
+  private static final class ExposedConfiguration extends EqualizerConfiguration {
+    ExposedConfiguration(float[] values) { super(values); }
+    float[] values() { return bandMultipliers; }
+  }
+
+  private static class Probe implements FloatPcmAudioFilter {
+    int calls;
+    float[][] identity;
+    int offset;
+    int length;
+    InterruptedException failure;
+    public void process(float[][] input, int offset, int length) throws InterruptedException {
+      calls++;
+      identity = input;
+      this.offset = offset;
+      this.length = length;
+      if (failure != null) throw failure;
+    }
+    public void seekPerformed(long requestedTime, long providedTime) { }
+    public void flush() { }
+    public void close() { }
+  }
+
+  private static final class UniversalSink extends Probe implements UniversalPcmAudioFilter {
+    public void process(short[] input, int offset, int length) { }
+    public void process(java.nio.ShortBuffer input) { }
+    public void process(short[][] input, int offset, int length) { }
+  }
+
+  private static final class TestFormat extends AudioDataFormat {
+    TestFormat(int channels, int sampleRate) { super(channels, sampleRate, 960); }
+    public String codecName() { return "test"; }
+    public byte[] silenceBytes() { return new byte[0]; }
+    public int expectedChunkSize() { return 0; }
+    public int maximumChunkSize() { return 0; }
+    public AudioChunkDecoder createDecoder() { return null; }
+    public AudioChunkEncoder createEncoder(AudioConfiguration configuration) { return null; }
   }
 
   private static void check(boolean condition, String message) {

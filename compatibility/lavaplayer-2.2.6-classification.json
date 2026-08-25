@@ -8641,153 +8641,170 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen equalizer contract exactly, with structural, differential DSP, shared-gain, lifecycle, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.equalizer.Equalizer",
       "symbol_kind": "FIELD",
       "member_name": "BAND_COUNT",
       "descriptor": "I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen equalizer contract exactly, with structural, differential DSP, shared-gain, lifecycle, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.equalizer.Equalizer",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(ILcom/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter;[F)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen equalizer contract exactly, with structural, differential DSP, shared-gain, lifecycle, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.equalizer.Equalizer",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(ILcom/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen equalizer contract exactly, with structural, differential DSP, shared-gain, lifecycle, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.equalizer.Equalizer",
       "symbol_kind": "METHOD",
       "member_name": "isCompatible",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen equalizer contract exactly, with structural, differential DSP, shared-gain, lifecycle, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.equalizer.Equalizer",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "([[FII)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen equalizer contract exactly, with structural, differential DSP, shared-gain, lifecycle, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.equalizer.Equalizer",
       "symbol_kind": "METHOD",
       "member_name": "seekPerformed",
       "descriptor": "(JJ)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen equalizer contract exactly, with structural, differential DSP, shared-gain, lifecycle, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.equalizer.Equalizer",
       "symbol_kind": "METHOD",
       "member_name": "flush",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen equalizer contract exactly, with structural, differential DSP, shared-gain, lifecycle, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.equalizer.Equalizer",
       "symbol_kind": "METHOD",
       "member_name": "close",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen equalizer contract exactly, with structural, differential DSP, shared-gain, lifecycle, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.equalizer.EqualizerConfiguration",
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen equalizer contract exactly, with structural, differential DSP, shared-gain, lifecycle, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.equalizer.EqualizerConfiguration",
       "symbol_kind": "FIELD",
       "member_name": "bandMultipliers",
       "descriptor": "[F",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen equalizer contract exactly, with structural, differential DSP, shared-gain, lifecycle, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.equalizer.EqualizerConfiguration",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "([F)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen equalizer contract exactly, with structural, differential DSP, shared-gain, lifecycle, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.equalizer.EqualizerConfiguration",
       "symbol_kind": "METHOD",
       "member_name": "setGain",
       "descriptor": "(IF)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen equalizer contract exactly, with structural, differential DSP, shared-gain, lifecycle, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.equalizer.EqualizerConfiguration",
       "symbol_kind": "METHOD",
       "member_name": "getGain",
       "descriptor": "(I)F",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen equalizer contract exactly, with structural, differential DSP, shared-gain, lifecycle, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.equalizer.EqualizerFactory",
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen equalizer contract exactly, with structural, differential DSP, shared-gain, lifecycle, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.equalizer.EqualizerFactory",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen equalizer contract exactly, with structural, differential DSP, shared-gain, lifecycle, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.equalizer.EqualizerFactory",
       "symbol_kind": "METHOD",
       "member_name": "buildChain",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;Lcom/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter;)Ljava/util/List;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen equalizer contract exactly, with structural, differential DSP, shared-gain, lifecycle, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.volume.AudioFrameVolumeChanger",
