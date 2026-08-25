@@ -111,12 +111,6 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-to-split-short-audio-filter-consumer" => Some(TO_SPLIT_SHORT_AUDIO_FILTER_CONSUMER),
         "write-equalizer-consumer" => Some(EQUALIZER_CONSUMER),
         "write-volume-consumer" => Some(VOLUME_CONSUMER),
-        "write-audio-data-format-consumer" => Some(AUDIO_DATA_FORMAT_CONSUMER),
-        "write-audio-data-format-tools-consumer" => Some(AUDIO_DATA_FORMAT_TOOLS_CONSUMER),
-        "write-audio-player-input-stream-consumer" => Some(AUDIO_PLAYER_INPUT_STREAM_CONSUMER),
-        "write-pcm-filter-factory-consumer" => Some(PCM_FILTER_FACTORY_CONSUMER),
-        "write-pcm-format-consumer" => Some(PCM_FORMAT_CONSUMER),
-        "write-resampling-pcm-audio-filter-consumer" => Some(RESAMPLING_PCM_AUDIO_FILTER_CONSUMER),
         "write-audio-post-processor-consumer" => Some(AUDIO_POST_PROCESSOR_CONSUMER),
         "write-buffering-post-processor-consumer" => Some(BUFFERING_POST_PROCESSOR_CONSUMER),
         "write-channel-count-pcm-audio-filter-consumer" => {
@@ -145,7 +139,22 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
         }
-        _ => sound_cloud_consumer_source(command),
+        _ => {
+            filter_format_consumer_source(command).or_else(|| sound_cloud_consumer_source(command))
+        }
+    }
+}
+
+fn filter_format_consumer_source(command: &str) -> Option<&'static str> {
+    match command {
+        "write-audio-data-format-consumer" => Some(AUDIO_DATA_FORMAT_CONSUMER),
+        "write-audio-data-format-tools-consumer" => Some(AUDIO_DATA_FORMAT_TOOLS_CONSUMER),
+        "write-audio-player-input-stream-consumer" => Some(AUDIO_PLAYER_INPUT_STREAM_CONSUMER),
+        "write-opus-audio-data-format-consumer" => Some(OPUS_AUDIO_DATA_FORMAT_CONSUMER),
+        "write-pcm-filter-factory-consumer" => Some(PCM_FILTER_FACTORY_CONSUMER),
+        "write-pcm-format-consumer" => Some(PCM_FORMAT_CONSUMER),
+        "write-resampling-pcm-audio-filter-consumer" => Some(RESAMPLING_PCM_AUDIO_FILTER_CONSUMER),
+        _ => None,
     }
 }
 
@@ -10163,6 +10172,172 @@ public final class GateAudioDataFormatTools {
     public int maximumChunkSize() { return 0; }
     public AudioChunkDecoder createDecoder() { return null; }
     public AudioChunkEncoder createEncoder(AudioConfiguration configuration) { return null; }
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong failure", error);
+      return type.cast(error);
+    }
+  }
+  private interface Operation { void run() throws Exception; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const OPUS_AUDIO_DATA_FORMAT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.OpusAudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkDecoder;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkEncoder;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.OpusChunkDecoder;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.OpusChunkEncoder;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateOpusAudioDataFormat {
+  public static void main(String[] args) throws Exception {
+    geometry();
+    sharedSilence();
+    equalityAndHashing();
+    factories();
+    failures();
+    reflection();
+    System.out.println(
+        "contracts=codec,geometry,overflow,silence-alias,equality,hash,factories,failure-order,private-state,reflection");
+  }
+
+  private static void geometry() {
+    OpusAudioDataFormat ordinary = new OpusAudioDataFormat(2, 48_000, 960);
+    check(ordinary.channelCount == 2 && ordinary.sampleRate == 48_000
+        && ordinary.chunkSampleCount == 960 && ordinary.totalSampleCount() == 1_920
+        && ordinary.frameDuration() == 20L, "inherited geometry");
+    check(ordinary.codecName().equals("OPUS")
+        && ordinary.expectedChunkSize() == 544
+        && ordinary.maximumChunkSize() == 1_568, "ordinary Opus geometry");
+
+    for (int samples : new int[] {0, 1, -1, -960, 1_500_000,
+        Integer.MAX_VALUE, Integer.MIN_VALUE}) {
+      OpusAudioDataFormat format = new OpusAudioDataFormat(-7, 0, samples);
+      check(format.expectedChunkSize() == 32 + 512 * samples / 960
+          && format.maximumChunkSize() == 32 + 1536 * samples / 960,
+          "overflowing chunk arithmetic " + samples);
+    }
+  }
+
+  private static void sharedSilence() {
+    OpusAudioDataFormat first = new OpusAudioDataFormat(1, 8_000, 80);
+    OpusAudioDataFormat second = new OpusAudioDataFormat(2, 48_000, 960);
+    byte[] silence = first.silenceBytes();
+    check(silence == first.silenceBytes() && silence == second.silenceBytes()
+        && Arrays.equals(silence, new byte[] {(byte) 0xfc, (byte) 0xff, (byte) 0xfe}),
+        "shared silent frame");
+    silence[0] = 7;
+    check(second.silenceBytes()[0] == 7, "silent frame remains mutable and aliased");
+    silence[0] = (byte) 0xfc;
+  }
+
+  private static void equalityAndHashing() {
+    OpusAudioDataFormat first = new OpusAudioDataFormat(2, 48_000, 960);
+    OpusAudioDataFormat equal = new OpusAudioDataFormat(2, 48_000, 960);
+    check(first.equals(first) && first.equals(equal) && equal.equals(first)
+        && !first.equals(null) && !first.equals("OPUS"), "equality basics");
+    check(!first.equals(new OpusAudioDataFormat(1, 48_000, 960))
+        && !first.equals(new OpusAudioDataFormat(2, 44_100, 960))
+        && !first.equals(new OpusAudioDataFormat(2, 48_000, 480)),
+        "geometry equality");
+    Derived derived = new Derived(2, 48_000, 960);
+    check(!first.equals(derived) && !derived.equals(first), "exact runtime class equality");
+
+    OpusAudioDataFormat overflow =
+        new OpusAudioDataFormat(Integer.MAX_VALUE, Integer.MIN_VALUE, -17);
+    int expected = overflow.channelCount;
+    expected = 31 * expected + overflow.sampleRate;
+    expected = 31 * expected + overflow.chunkSampleCount;
+    expected = 31 * expected + "OPUS".hashCode();
+    check(overflow.hashCode() == expected && first.hashCode() == equal.hashCode(),
+        "inherited hash arithmetic");
+  }
+
+  private static void factories() throws Exception {
+    OpusAudioDataFormat format = new OpusAudioDataFormat(2, 48_000, 960);
+    AudioChunkDecoder decoder = format.createDecoder();
+    check(decoder.getClass() == OpusChunkDecoder.class, "decoder implementation");
+    decoder.close();
+
+    AudioConfiguration configuration = new AudioConfiguration();
+    configuration.setOpusEncodingQuality(7);
+    AudioChunkEncoder encoder = format.createEncoder(configuration);
+    check(encoder.getClass() == OpusChunkEncoder.class, "encoder implementation");
+    encoder.close();
+  }
+
+  private static void failures() {
+    OpusAudioDataFormat format = new OpusAudioDataFormat(2, 48_000, 960);
+    NullPointerException nullConfiguration =
+        expect(NullPointerException.class, () -> format.createEncoder(null));
+    check(nullConfiguration.getCause() == null, "null configuration failure");
+
+    OpusAudioDataFormat negativeCapacity = new OpusAudioDataFormat(2, 48_000, 1_500_000);
+    check(negativeCapacity.maximumChunkSize() < 0, "negative overflow capacity fixture");
+    expect(IllegalArgumentException.class, () -> negativeCapacity.createEncoder(null));
+  }
+
+  private static void reflection() throws Exception {
+    Class<OpusAudioDataFormat> type = OpusAudioDataFormat.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == AudioDataFormat.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 4
+        && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 8, "class metadata");
+
+    Field codec = type.getDeclaredField("CODEC_NAME");
+    check(codec.getType() == String.class
+        && codec.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL)
+        && codec.get(null).equals("OPUS"), "codec field metadata");
+    Field silence = type.getDeclaredField("SILENT_OPUS_FRAME");
+    check(silence.getType() == byte[].class
+        && silence.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL),
+        "silence field metadata");
+    for (String name : new String[] {"maximumChunkSize", "expectedChunkSize"}) {
+      Field field = type.getDeclaredField(name);
+      check(field.getType() == int.class
+          && field.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL),
+          "chunk field metadata " + name);
+    }
+
+    Constructor<?> constructor = type.getDeclaredConstructor(int.class, int.class, int.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    for (Method method : type.getDeclaredMethods()) {
+      check(method.getModifiers() == Modifier.PUBLIC && !method.isBridge()
+          && !method.isSynthetic() && method.getExceptionTypes().length == 0,
+          "method metadata " + method);
+    }
+
+    OpusAudioDataFormat format = new OpusAudioDataFormat(3, 12_345, 480);
+    check(((Integer) readField(type, format, "maximumChunkSize")) == 800
+        && ((Integer) readField(type, format, "expectedChunkSize")) == 288
+        && readField(type, null, "SILENT_OPUS_FRAME") == format.silenceBytes(),
+        "private constructor state");
+  }
+
+  private static Object readField(Class<?> type, Object instance, String name) throws Exception {
+    Field field = type.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(instance);
+  }
+
+  private static final class Derived extends OpusAudioDataFormat {
+    Derived(int channels, int rate, int samples) { super(channels, rate, samples); }
   }
 
   private static <T extends Throwable> T expect(Class<T> type, Operation operation) {

@@ -191,6 +191,8 @@ for consumer in smoke probe integration classloader event track-value track-enum
 done
 cargo run --locked -q -p mantle-jvm-gate -- write-audio-player-input-stream-consumer \
   --output "$WORK/GateAudioPlayerInputStream.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-opus-audio-data-format-consumer \
+  --output "$WORK/GateOpusAudioDataFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -242,6 +244,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateAudioDataFormat.java" \
   "$WORK/GateAudioDataFormatTools.java" \
   "$WORK/GateAudioPlayerInputStream.java" \
+  "$WORK/GateOpusAudioDataFormat.java" \
   "$WORK/GatePcmFilterFactory.java" \
   "$WORK/GatePcmFormat.java" \
   "$WORK/GateResamplingPcmAudioFilter.java" \
@@ -952,6 +955,17 @@ cmp "$WORK/audio-player-input-stream-reference.txt" \
 grep --fixed-strings \
   'contracts=signed-read,availability,bulk-offset,frame-crossing,null-retry,silence,timeout-listener,interrupt,format-check,close,factory,private-state,reflection' \
   "$WORK/audio-player-input-stream-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateOpusAudioDataFormat \
+  >"$WORK/opus-audio-data-format-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOpusAudioDataFormat >"$WORK/opus-audio-data-format-candidate.txt"
+cmp "$WORK/opus-audio-data-format-reference.txt" \
+  "$WORK/opus-audio-data-format-candidate.txt"
+grep --fixed-strings \
+  'contracts=codec,geometry,overflow,silence-alias,equality,hash,factories,failure-order,private-state,reflection' \
+  "$WORK/opus-audio-data-format-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"

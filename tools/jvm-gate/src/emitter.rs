@@ -122,6 +122,8 @@ const AUDIO_DATA_FORMAT_TOOLS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/format/AudioDataFormatTools";
 const AUDIO_PLAYER_INPUT_STREAM_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/format/AudioPlayerInputStream";
+const OPUS_AUDIO_DATA_FORMAT_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/format/OpusAudioDataFormat";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -437,6 +439,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/format/AudioDataFormat",
     AUDIO_DATA_FORMAT_TOOLS_CLASS,
     AUDIO_PLAYER_INPUT_STREAM_CLASS,
+    OPUS_AUDIO_DATA_FORMAT_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -902,6 +905,7 @@ fn retain_private_fields(class_name: &str) -> bool {
     matches!(
         class_name,
         AUDIO_PLAYER_INPUT_STREAM_CLASS
+            | OPUS_AUDIO_DATA_FORMAT_CLASS
             | PLAYER_LIFECYCLE_MANAGER_CLASS
             | FUNCTIONAL_RESULT_HANDLER_CLASS
             | AUDIO_PIPELINE_CLASS
@@ -1093,6 +1097,10 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             || method
                 .access_flags
                 .intersects(MethodAccessFlags::PUBLIC | MethodAccessFlags::PROTECTED)
+            || (class_name == OPUS_AUDIO_DATA_FORMAT_CLASS
+                && class_pool
+                    .try_get_utf8(method.name_index)
+                    .is_ok_and(|name| name == "<clinit>"))
             || (class_name == BANDCAMP_AUDIO_SOURCE_MANAGER_CLASS
                 && class_pool
                     .try_get_utf8(method.name_index)
@@ -1212,6 +1220,9 @@ fn replacement_body(
     }
     if class_name == AUDIO_PLAYER_INPUT_STREAM_CLASS {
         return audio_player_input_stream_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == OPUS_AUDIO_DATA_FORMAT_CLASS {
+        return opus_audio_data_format_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -2337,6 +2348,223 @@ fn audio_player_input_stream_notify_stuck(pool: &mut ConstantPool<'static>) -> R
     )?;
     add_stack_map_table(pool, &mut body, vec![same_stack_frame(return_target)])?;
     Ok(body)
+}
+
+fn opus_audio_data_format_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(III)V") => opus_audio_data_format_constructor(pool),
+        ("codecName", "()Ljava/lang/String;") => opus_audio_data_format_codec_name(pool),
+        ("silenceBytes", "()[B") => opus_audio_data_format_silence_bytes(pool),
+        ("expectedChunkSize", "()I") => {
+            opus_audio_data_format_chunk_size(pool, "expectedChunkSize")
+        }
+        ("maximumChunkSize", "()I") => opus_audio_data_format_chunk_size(pool, "maximumChunkSize"),
+        (
+            "createDecoder",
+            "()Lcom/sedmelluq/discord/lavaplayer/format/transcoder/AudioChunkDecoder;",
+        ) => opus_audio_data_format_create_decoder(pool),
+        (
+            "createEncoder",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;)Lcom/sedmelluq/discord/lavaplayer/format/transcoder/AudioChunkEncoder;",
+        ) => opus_audio_data_format_create_encoder(pool),
+        ("equals", "(Ljava/lang/Object;)Z") => opus_audio_data_format_equals(pool),
+        ("hashCode", "()I") => opus_audio_data_format_hash_code(pool),
+        ("<clinit>", "()V") => opus_audio_data_format_class_init(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {OPUS_AUDIO_DATA_FORMAT_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn opus_audio_data_format_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(OPUS_AUDIO_DATA_FORMAT_CLASS)?;
+    let parent = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let parent_init = pool.add_method_ref(parent, "<init>", "(III)V")?;
+    let maximum_chunk_size = pool.add_field_ref(owner, "maximumChunkSize", "I")?;
+    let expected_chunk_size = pool.add_field_ref(owner, "expectedChunkSize", "I")?;
+    code(
+        pool,
+        4,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Iload_1,
+            Instruction::Iload_2,
+            Instruction::Iload_3,
+            Instruction::Invokespecial(parent_init),
+            Instruction::Aload_0,
+            Instruction::Bipush(32),
+            Instruction::Sipush(1536),
+            Instruction::Iload_3,
+            Instruction::Imul,
+            Instruction::Sipush(960),
+            Instruction::Idiv,
+            Instruction::Iadd,
+            Instruction::Putfield(maximum_chunk_size),
+            Instruction::Aload_0,
+            Instruction::Bipush(32),
+            Instruction::Sipush(512),
+            Instruction::Iload_3,
+            Instruction::Imul,
+            Instruction::Sipush(960),
+            Instruction::Idiv,
+            Instruction::Iadd,
+            Instruction::Putfield(expected_chunk_size),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn opus_audio_data_format_codec_name(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let codec = pool.add_string("OPUS")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![Instruction::Ldc_w(codec), Instruction::Areturn],
+    )
+}
+
+fn opus_audio_data_format_silence_bytes(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(OPUS_AUDIO_DATA_FORMAT_CLASS)?;
+    let silence = pool.add_field_ref(owner, "SILENT_OPUS_FRAME", "[B")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![Instruction::Getstatic(silence), Instruction::Areturn],
+    )
+}
+
+fn opus_audio_data_format_chunk_size(
+    pool: &mut ConstantPool<'static>,
+    field_name: &str,
+) -> Result<Attribute> {
+    let owner = pool.add_class(OPUS_AUDIO_DATA_FORMAT_CLASS)?;
+    let field = pool.add_field_ref(owner, field_name, "I")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+fn opus_audio_data_format_create_decoder(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let decoder =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/format/transcoder/OpusChunkDecoder")?;
+    let init = pool.add_method_ref(
+        decoder,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V",
+    )?;
+    code(
+        pool,
+        3,
+        1,
+        vec![
+            Instruction::New(decoder),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn opus_audio_data_format_create_encoder(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let encoder =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/format/transcoder/OpusChunkEncoder")?;
+    let init = pool.add_method_ref(
+        encoder,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V",
+    )?;
+    code(
+        pool,
+        4,
+        2,
+        vec![
+            Instruction::New(encoder),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn opus_audio_data_format_equals(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let parent = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let equals = pool.add_method_ref(parent, "equals", "(Ljava/lang/Object;)Z")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(equals),
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+fn opus_audio_data_format_hash_code(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let parent = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let hash_code = pool.add_method_ref(parent, "hashCode", "()I")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(hash_code),
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+fn opus_audio_data_format_class_init(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(OPUS_AUDIO_DATA_FORMAT_CLASS)?;
+    let silence = pool.add_field_ref(owner, "SILENT_OPUS_FRAME", "[B")?;
+    code(
+        pool,
+        4,
+        0,
+        vec![
+            Instruction::Iconst_3,
+            Instruction::Newarray(ArrayType::Byte),
+            Instruction::Dup,
+            Instruction::Iconst_0,
+            Instruction::Bipush(-4),
+            Instruction::Bastore,
+            Instruction::Dup,
+            Instruction::Iconst_1,
+            Instruction::Iconst_m1,
+            Instruction::Bastore,
+            Instruction::Dup,
+            Instruction::Iconst_2,
+            Instruction::Bipush(-2),
+            Instruction::Bastore,
+            Instruction::Putstatic(silence),
+            Instruction::Return,
+        ],
+    )
 }
 
 fn pcm_format_replacement(
