@@ -102,6 +102,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-audio-filter-interface-consumer" => Some(AUDIO_FILTER_INTERFACE_CONSUMER),
         "write-float-pcm-audio-filter-consumer" => Some(FLOAT_PCM_AUDIO_FILTER_CONSUMER),
+        "write-pcm-filter-factory-consumer" => Some(PCM_FILTER_FACTORY_CONSUMER),
         "write-audio-post-processor-consumer" => Some(AUDIO_POST_PROCESSOR_CONSUMER),
         "write-buffering-post-processor-consumer" => Some(BUFFERING_POST_PROCESSOR_CONSUMER),
         "write-channel-count-pcm-audio-filter-consumer" => {
@@ -7398,6 +7399,165 @@ public final class GateFloatPcmAudioFilter {
     public void seekPerformed(long requestedTimecode, long providedTimecode) { }
     public void flush() throws InterruptedException { }
     public void close() { }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const PCM_FILTER_FACTORY_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.AudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.PcmFilterFactory;
+import com.sedmelluq.discord.lavaplayer.filter.UniversalPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkDecoder;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkEncoder;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+public final class GatePcmFilterFactory {
+  public static void main(String[] args) throws Exception {
+    callerImplementation();
+    runtimeFailure();
+    nullReceiver();
+    reflection();
+    System.out.println(
+        "implementation=track,format,output,list-identity,mutable,repeated,nulls;"
+        + "failures=runtime-identity,null-receiver;"
+        + "reflection=public-abstract-interface,0-fields,0-constructors,1-method,generic-list,no-throws");
+  }
+
+  private static void callerImplementation() {
+    RecordingFactory implementation = new RecordingFactory();
+    PcmFilterFactory factory = implementation;
+    AudioTrack track = proxy(AudioTrack.class);
+    AudioDataFormat format = new TestFormat();
+    UniversalPcmAudioFilter output = proxy(UniversalPcmAudioFilter.class);
+    List<AudioFilter> result = new ArrayList<>();
+    result.add(output);
+    implementation.result = result;
+
+    List<AudioFilter> returned = factory.buildChain(track, format, output);
+    check(returned == result && implementation.track == track
+        && implementation.format == format && implementation.output == output,
+        "argument and result identity");
+    returned.add(null);
+    check(result.size() == 2 && result.get(1) == null, "mutable result visibility");
+
+    implementation.result = null;
+    check(factory.buildChain(null, null, null) == null && implementation.calls == 2
+        && implementation.track == null && implementation.format == null
+        && implementation.output == null, "repeated null dispatch");
+  }
+
+  private static void runtimeFailure() {
+    RecordingFactory factory = new RecordingFactory();
+    RuntimeException sentinel = new RuntimeException("factory-sentinel");
+    factory.failure = sentinel;
+    AudioTrack track = proxy(AudioTrack.class);
+    expectIdentity(sentinel, () -> factory.buildChain(track, null, null));
+    check(factory.calls == 0 && factory.track == track
+        && factory.format == null && factory.output == null,
+        "failure prefix and identity");
+  }
+
+  private static void nullReceiver() {
+    PcmFilterFactory factory = null;
+    expect(NullPointerException.class, () -> factory.buildChain(null, null, null));
+  }
+
+  private static void reflection() throws Exception {
+    Class<PcmFilterFactory> type = PcmFilterFactory.class;
+    check(type.isInterface() && Modifier.isPublic(type.getModifiers())
+        && Modifier.isAbstract(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == null && type.getInterfaces().length == 0,
+        "interface metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 1, "member counts");
+
+    Method method = type.getDeclaredMethod("buildChain", AudioTrack.class,
+        AudioDataFormat.class, UniversalPcmAudioFilter.class);
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == List.class
+        && Arrays.equals(method.getParameterTypes(), new Class<?>[] {
+            AudioTrack.class, AudioDataFormat.class, UniversalPcmAudioFilter.class })
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), "method metadata");
+    check(Arrays.equals(method.getGenericParameterTypes(), new Type[] {
+        AudioTrack.class, AudioDataFormat.class, UniversalPcmAudioFilter.class }),
+        "generic parameter metadata");
+    check(method.getGenericReturnType() instanceof ParameterizedType,
+        "parameterized return type");
+    ParameterizedType result = (ParameterizedType) method.getGenericReturnType();
+    check(result.getRawType() == List.class && result.getOwnerType() == null
+        && Arrays.equals(result.getActualTypeArguments(), new Type[] { AudioFilter.class }),
+        "List<AudioFilter> metadata");
+  }
+
+  private static void expectIdentity(RuntimeException expected, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("failure was swallowed");
+    } catch (RuntimeException error) {
+      check(error == expected, "RuntimeException identity");
+    }
+  }
+
+  private static void expect(Class<? extends Throwable> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] { type },
+        (instance, method, arguments) -> null);
+  }
+
+  private interface Operation { void run(); }
+
+  private static final class RecordingFactory implements PcmFilterFactory {
+    AudioTrack track;
+    AudioDataFormat format;
+    UniversalPcmAudioFilter output;
+    List<AudioFilter> result;
+    RuntimeException failure;
+    int calls;
+
+    public List<AudioFilter> buildChain(
+        AudioTrack track, AudioDataFormat format, UniversalPcmAudioFilter output) {
+      this.track = track;
+      this.format = format;
+      this.output = output;
+      if (failure != null) throw failure;
+      calls++;
+      return result;
+    }
+  }
+
+  private static final class TestFormat extends AudioDataFormat {
+    TestFormat() { super(2, 48_000, 960); }
+    public String codecName() { return "test"; }
+    public byte[] silenceBytes() { return new byte[0]; }
+    public int expectedChunkSize() { return 0; }
+    public int maximumChunkSize() { return 0; }
+    public AudioChunkDecoder createDecoder() { return null; }
+    public AudioChunkEncoder createEncoder(AudioConfiguration configuration) { return null; }
   }
 
   private static void check(boolean condition, String message) {
