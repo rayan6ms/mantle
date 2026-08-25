@@ -81,6 +81,8 @@ const FILTER_CHAIN_BUILDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/FilterChainBuilder";
 const FINAL_PCM_AUDIO_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/FinalPcmAudioFilter";
+const FLOAT_PCM_AUDIO_FILTER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/filter/FloatPcmAudioFilter";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -372,6 +374,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     COMPOSITE_AUDIO_FILTER_CLASS,
     FILTER_CHAIN_BUILDER_CLASS,
     FINAL_PCM_AUDIO_FILTER_CLASS,
+    FLOAT_PCM_AUDIO_FILTER_CLASS,
     AUDIO_FILTER_CHAIN_CLASS,
     AUDIO_PIPELINE_CLASS,
     AUDIO_PIPELINE_FACTORY_CLASS,

@@ -101,6 +101,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
             Some(NON_ALLOCATING_AUDIO_FRAME_BUFFER_CONSUMER)
         }
         "write-audio-filter-interface-consumer" => Some(AUDIO_FILTER_INTERFACE_CONSUMER),
+        "write-float-pcm-audio-filter-consumer" => Some(FLOAT_PCM_AUDIO_FILTER_CONSUMER),
         "write-audio-post-processor-consumer" => Some(AUDIO_POST_PROCESSOR_CONSUMER),
         "write-buffering-post-processor-consumer" => Some(BUFFERING_POST_PROCESSOR_CONSUMER),
         "write-channel-count-pcm-audio-filter-consumer" => {
@@ -7268,6 +7269,135 @@ public final class GateAudioFilterInterface {
     }
 
     public void close() { closes++; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const FLOAT_PCM_AUDIO_FILTER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.AudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.FloatPcmAudioFilter;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateFloatPcmAudioFilter {
+  public static void main(String[] args) throws Exception {
+    callerImplementation();
+    checkedFailure();
+    nullReceiver();
+    reflection();
+    System.out.println(
+        "implementation=process,input-identity,offset,length,state;"
+        + "exceptions=process-interrupted,null-receiver;"
+        + "reflection=public-abstract-interface,0-fields,0-constructors,1-method,1-parent,throws");
+  }
+
+  private static void callerImplementation() throws Exception {
+    RecordingFilter implementation = new RecordingFilter();
+    FloatPcmAudioFilter filter = implementation;
+    float[][] input = new float[][] {
+        new float[] { Float.NaN, Float.NEGATIVE_INFINITY, -0.0f },
+        null,
+        new float[] { Float.MIN_VALUE, Float.MAX_VALUE }
+    };
+    filter.process(input, Integer.MIN_VALUE, Integer.MAX_VALUE);
+    check(implementation.processes == 1 && implementation.input == input,
+        "process dispatch and input identity");
+    check(implementation.offset == Integer.MIN_VALUE
+        && implementation.length == Integer.MAX_VALUE,
+        "full-width offset and length");
+    check(Float.isNaN(input[0][0]) && input[1] == null
+        && Float.floatToRawIntBits(input[0][2]) == Float.floatToRawIntBits(-0.0f),
+        "caller array state");
+  }
+
+  private static void checkedFailure() {
+    RecordingFilter filter = new RecordingFilter();
+    InterruptedException sentinel = new InterruptedException("process-sentinel");
+    filter.failure = sentinel;
+    float[][] input = new float[][] { new float[] { 1.0f } };
+    expectIdentity(sentinel, () -> filter.process(input, -7, 13));
+    check(filter.processes == 0 && filter.input == input
+        && filter.offset == -7 && filter.length == 13,
+        "failure prefix and argument identity");
+  }
+
+  private static void nullReceiver() {
+    FloatPcmAudioFilter filter = null;
+    expect(NullPointerException.class,
+        () -> filter.process(new float[0][], 0, 0));
+  }
+
+  private static void reflection() throws Exception {
+    Class<FloatPcmAudioFilter> type = FloatPcmAudioFilter.class;
+    check(type.isInterface() && Modifier.isPublic(type.getModifiers())
+        && Modifier.isAbstract(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == null
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] { AudioFilter.class }),
+        "interface metadata and parent");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 1, "member counts");
+
+    Method process = type.getDeclaredMethod("process", float[][].class, int.class, int.class);
+    check(process.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && process.getReturnType() == void.class
+        && Arrays.equals(process.getParameterTypes(),
+            new Class<?>[] { float[][].class, int.class, int.class })
+        && Arrays.equals(process.getExceptionTypes(),
+            new Class<?>[] { InterruptedException.class })
+        && !process.isDefault() && !process.isBridge() && !process.isSynthetic()
+        && !process.isVarArgs(), "process metadata");
+    check(type.getMethod("seekPerformed", long.class, long.class).getDeclaringClass()
+            == AudioFilter.class
+        && type.getMethod("flush").getDeclaringClass() == AudioFilter.class
+        && type.getMethod("close").getDeclaringClass() == AudioFilter.class,
+        "inherited AudioFilter contract");
+  }
+
+  private static void expectIdentity(
+      InterruptedException expected, InterruptibleOperation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("failure was swallowed");
+    } catch (InterruptedException error) {
+      check(error == expected, "InterruptedException identity");
+    }
+  }
+
+  private static void expect(Class<? extends Throwable> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong exception", error);
+    }
+  }
+
+  private interface InterruptibleOperation { void run() throws InterruptedException; }
+  private interface Operation { void run() throws Exception; }
+
+  private static final class RecordingFilter implements FloatPcmAudioFilter {
+    float[][] input;
+    int offset;
+    int length;
+    int processes;
+    InterruptedException failure;
+
+    public void process(float[][] input, int offset, int length) throws InterruptedException {
+      this.input = input;
+      this.offset = offset;
+      this.length = length;
+      if (failure != null) throw failure;
+      processes++;
+    }
+
+    public void seekPerformed(long requestedTimecode, long providedTimecode) { }
+    public void flush() throws InterruptedException { }
+    public void close() { }
   }
 
   private static void check(boolean condition, String message) {
