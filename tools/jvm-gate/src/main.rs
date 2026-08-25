@@ -110,6 +110,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-to-short-audio-filter-consumer" => Some(TO_SHORT_AUDIO_FILTER_CONSUMER),
         "write-to-split-short-audio-filter-consumer" => Some(TO_SPLIT_SHORT_AUDIO_FILTER_CONSUMER),
         "write-equalizer-consumer" => Some(EQUALIZER_CONSUMER),
+        "write-volume-consumer" => Some(VOLUME_CONSUMER),
         "write-pcm-filter-factory-consumer" => Some(PCM_FILTER_FACTORY_CONSUMER),
         "write-pcm-format-consumer" => Some(PCM_FORMAT_CONSUMER),
         "write-resampling-pcm-audio-filter-consumer" => Some(RESAMPLING_PCM_AUDIO_FILTER_CONSUMER),
@@ -9566,6 +9567,269 @@ public final class GateEqualizer {
     public AudioChunkEncoder createEncoder(AudioConfiguration configuration) { return null; }
   }
 
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const VOLUME_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.volume.AudioFrameVolumeChanger;
+import com.sedmelluq.discord.lavaplayer.filter.volume.PcmVolumeProcessor;
+import com.sedmelluq.discord.lavaplayer.filter.volume.VolumePostProcessor;
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkDecoder;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkEncoder;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerOptions;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameRebuilder;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.nio.ReadOnlyBufferException;
+import java.nio.ShortBuffer;
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
+
+public final class GateVolume {
+  public static void main(String[] args) throws Exception {
+    String pcm = pcm();
+    String changer = changer();
+    String post = postProcessor();
+    failures();
+    reflection();
+    System.out.println("pcm=" + pcm + ";changer=" + changer + ";post=" + post
+        + ";contracts=arithmetic,saturation,slices,state,frame-interpolation,identity,codec-lifecycle,finally,interrupt,post-processing,failures,reflection");
+  }
+
+  private static String pcm() {
+    StringBuilder result = new StringBuilder();
+    int[][] cases = {
+        {100, 100}, {100, 0}, {100, 25}, {100, 50}, {100, 150}, {100, 151},
+        {50, 125}, {-7, 73}, {Integer.MAX_VALUE, 200}
+    };
+    for (int[] pair : cases) {
+      short[] values = {Short.MIN_VALUE, -20000, -1, 0, 1, 20000, Short.MAX_VALUE};
+      PcmVolumeProcessor processor = new PcmVolumeProcessor(pair[0]);
+      processor.applyVolume(pair[0], pair[1], ShortBuffer.wrap(values));
+      result.append(pair[0]).append('>').append(pair[1]).append(':')
+          .append(Arrays.toString(values)).append('|');
+      check(processor.getLastVolume() == pair[1], "last volume");
+    }
+
+    short[] sliced = {111, -30000, 20000, 222};
+    ShortBuffer window = ShortBuffer.wrap(sliced);
+    window.position(1).limit(3);
+    new PcmVolumeProcessor(100).applyVolume(100, 80, window);
+    check(window.position() == 1 && window.limit() == 3
+        && sliced[0] == 111 && sliced[3] == 222, "absolute sliced processing");
+
+    PcmVolumeProcessor state = new PcmVolumeProcessor(50);
+    state.setLastVolume(75);
+    short[] stateValues = {1000};
+    state.applyVolume(100, 75, ShortBuffer.wrap(stateValues));
+    result.append("state:").append(state.getLastVolume()).append(':').append(stateValues[0]);
+    return result.toString();
+  }
+
+  private static String changer() {
+    Fixture identity = new Fixture(100, 100);
+    AudioFrameVolumeChanger.apply(identity.context);
+    check(identity.frames.outputs[0] == identity.frames.input, "same-volume identity");
+    check(identity.format.decoder.calls == 0 && identity.format.encoder.calls == 0,
+        "same-volume codec bypass");
+    check(identity.format.encoder.closes == 1 && identity.format.decoder.closes == 1,
+        "identity lifecycle");
+
+    Fixture changed = new Fixture(50, 100);
+    changed.frames.rebuildCount = 2;
+    AudioFrameVolumeChanger.apply(changed.context);
+    check(changed.frames.outputs[0].getVolume() == 99
+        && changed.frames.outputs[1].getVolume() == 98, "frame interpolation");
+    check(changed.frames.outputs[0].getTimecode() == 1234L
+        && changed.frames.outputs[0].getFormat() == changed.format, "frame metadata");
+    check(changed.format.decoder.calls == 2 && changed.format.encoder.calls == 2
+        && changed.format.encoder.closes == 1 && changed.format.decoder.closes == 1,
+        "changed codec lifecycle");
+
+    Fixture interrupted = new Fixture(50, 100);
+    Thread.currentThread().interrupt();
+    AudioFrameVolumeChanger.apply(interrupted.context);
+    check(Thread.currentThread().isInterrupted(), "interrupt restored");
+    Thread.interrupted();
+    return changed.frames.outputs[0].getVolume() + "," + changed.frames.outputs[1].getVolume()
+        + "," + changed.format.encoder.digest + ",identity="
+        + (identity.frames.outputs[0] == identity.frames.input);
+  }
+
+  private static String postProcessor() throws Exception {
+    Fixture fixture = new Fixture(50, 50);
+    VolumePostProcessor post = new VolumePostProcessor(fixture.context);
+    short[] values = {-32000, -1000, 1000, 32000};
+    post.process(55L, ShortBuffer.wrap(values));
+    check(fixture.frames.calls == 0, "unchanged volume avoids rebuild");
+    fixture.options.volumeLevel.set(0);
+    fixture.frames.input = new ImmutableAudioFrame(77L, new byte[] {7}, 0, fixture.format);
+    short[] muted = {123, -456};
+    post.process(56L, ShortBuffer.wrap(muted));
+    check(Arrays.equals(muted, new short[] {123, -456}), "zero volume buffer bypass");
+    post.close();
+    return Arrays.toString(values) + ",zero=" + Arrays.toString(muted)
+        + ",rebuilds=" + fixture.frames.calls;
+  }
+
+  private static void failures() {
+    expect(NullPointerException.class, () -> new PcmVolumeProcessor(100)
+        .applyVolume(100, 50, null));
+    new PcmVolumeProcessor(100).applyVolume(100, 100, null);
+    expect(ReadOnlyBufferException.class, () -> new PcmVolumeProcessor(100)
+        .applyVolume(100, 50, ShortBuffer.wrap(new short[] {1}).asReadOnlyBuffer()));
+    new PcmVolumeProcessor(100).applyVolume(100, 100,
+        ShortBuffer.wrap(new short[] {1}).asReadOnlyBuffer());
+    expect(NullPointerException.class, () -> AudioFrameVolumeChanger.apply(null));
+
+    Fixture failure = new Fixture(50, 100);
+    RuntimeException sentinel = new RuntimeException("rebuild-sentinel");
+    failure.frames.failure = sentinel;
+    try {
+      AudioFrameVolumeChanger.apply(failure.context);
+      throw new AssertionError("missing rebuild failure");
+    } catch (RuntimeException error) {
+      check(error == sentinel, "rebuild failure identity");
+    }
+    check(failure.format.encoder.closes == 1 && failure.format.decoder.closes == 1,
+        "failure finally cleanup");
+  }
+
+  private static void reflection() throws Exception {
+    Class<PcmVolumeProcessor> pcm = PcmVolumeProcessor.class;
+    check(Modifier.isPublic(pcm.getModifiers()) && !Modifier.isFinal(pcm.getModifiers())
+        && pcm.getDeclaredFields().length == 2 && pcm.getDeclaredConstructors().length == 1
+        && pcm.getDeclaredMethods().length == 6, "pcm metadata");
+    for (Field field : pcm.getDeclaredFields()) check(field.getModifiers() == Modifier.PRIVATE,
+        "pcm private field");
+    Constructor<?> pcmConstructor = pcm.getDeclaredConstructors()[0];
+    check(pcmConstructor.getModifiers() == Modifier.PUBLIC, "pcm constructor visibility");
+
+    Class<AudioFrameVolumeChanger> changer = AudioFrameVolumeChanger.class;
+    check(Modifier.isPublic(changer.getModifiers()) && !Modifier.isFinal(changer.getModifiers())
+        && changer.getDeclaredFields().length == 8
+        && changer.getDeclaredConstructors().length == 1
+        && changer.getDeclaredMethods().length == 4, "changer metadata");
+    check(changer.getDeclaredConstructors()[0].getModifiers() == Modifier.PRIVATE,
+        "changer constructor visibility");
+    Method apply = changer.getDeclaredMethod("apply", AudioProcessingContext.class);
+    check(apply.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC), "changer apply metadata");
+
+    Class<VolumePostProcessor> post = VolumePostProcessor.class;
+    check(Modifier.isPublic(post.getModifiers()) && !Modifier.isFinal(post.getModifiers())
+        && post.getDeclaredFields().length == 2 && post.getDeclaredConstructors().length == 1
+        && post.getDeclaredMethods().length == 2, "post metadata");
+    Method process = post.getDeclaredMethod("process", long.class, ShortBuffer.class);
+    check(Arrays.equals(process.getExceptionTypes(), new Class<?>[] {InterruptedException.class}),
+        "post checked exception");
+  }
+
+  private static final class Fixture {
+    final AudioConfiguration configuration = new AudioConfiguration();
+    final AudioPlayerOptions options = new AudioPlayerOptions();
+    final TestFormat format = new TestFormat();
+    final FrameBuffer frames;
+    final AudioProcessingContext context;
+
+    Fixture(int targetVolume, int frameVolume) {
+      options.volumeLevel.set(targetVolume);
+      frames = new FrameBuffer(new ImmutableAudioFrame(
+          1234L, new byte[] {1, 2, 3}, frameVolume, format));
+      context = new AudioProcessingContext(configuration, frames, options, format);
+    }
+  }
+
+  private static final class TestFormat extends AudioDataFormat {
+    final Decoder decoder = new Decoder();
+    final Encoder encoder = new Encoder();
+    TestFormat() { super(1, 48000, 4); }
+    public String codecName() { return "test"; }
+    public byte[] silenceBytes() { return new byte[0]; }
+    public int expectedChunkSize() { return 8; }
+    public int maximumChunkSize() { return 8; }
+    public AudioChunkDecoder createDecoder() { return decoder; }
+    public AudioChunkEncoder createEncoder(AudioConfiguration value) { return encoder; }
+  }
+
+  private static final class Decoder implements AudioChunkDecoder {
+    int calls;
+    int closes;
+    public void decode(byte[] data, ShortBuffer buffer) {
+      calls++;
+      buffer.clear();
+      buffer.put(new short[] {-30000, -1000, 1000, 30000});
+      buffer.flip();
+    }
+    public void close() { closes++; }
+  }
+
+  private static final class Encoder implements AudioChunkEncoder {
+    int calls;
+    int closes;
+    String digest = "";
+    public byte[] encode(ShortBuffer buffer) {
+      calls++;
+      short[] values = new short[buffer.remaining()];
+      for (int i = 0; i < values.length; i++) values[i] = buffer.get(buffer.position() + i);
+      if (!digest.isEmpty()) digest += ":";
+      digest += Arrays.toString(values);
+      return new byte[] {(byte) calls};
+    }
+    public void encode(ShortBuffer buffer, ByteBuffer output) {}
+    public void close() { closes++; }
+  }
+
+  private static final class FrameBuffer implements AudioFrameBuffer {
+    AudioFrame input;
+    final AudioFrame[] outputs = new AudioFrame[4];
+    int rebuildCount = 1;
+    int calls;
+    RuntimeException failure;
+    FrameBuffer(AudioFrame frame) { input = frame; }
+    public void rebuild(AudioFrameRebuilder rebuilder) {
+      calls++;
+      if (failure != null) throw failure;
+      for (int i = 0; i < rebuildCount; i++) outputs[i] = rebuilder.rebuild(input);
+    }
+    public void consume(AudioFrame frame) {}
+    public int getRemainingCapacity() { return 0; }
+    public int getFullCapacity() { return 0; }
+    public void waitForTermination() {}
+    public void setTerminateOnEmpty() {}
+    public void setClearOnInsert() {}
+    public boolean hasClearOnInsert() { return false; }
+    public void clear() {}
+    public void lockBuffer() {}
+    public boolean hasReceivedFrames() { return false; }
+    public Long getLastInputTimecode() { return null; }
+    public AudioFrame provide() { return null; }
+    public AudioFrame provide(long timeout, TimeUnit unit) { return null; }
+    public boolean provide(MutableAudioFrame target) { return false; }
+    public boolean provide(MutableAudioFrame target, long timeout, TimeUnit unit) { return false; }
+  }
+
+  private static void expect(Class<? extends Throwable> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong failure", error);
+    }
+  }
+  private interface Operation { void run() throws Exception; }
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }

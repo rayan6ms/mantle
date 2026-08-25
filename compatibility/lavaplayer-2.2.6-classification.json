@@ -8811,108 +8811,120 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen volume-processing contract exactly, with structural, differential arithmetic, frame-rebuild, lifecycle, failure, interrupt, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.volume.AudioFrameVolumeChanger",
       "symbol_kind": "METHOD",
       "member_name": "rebuild",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;)Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen volume-processing contract exactly, with structural, differential arithmetic, frame-rebuild, lifecycle, failure, interrupt, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.volume.AudioFrameVolumeChanger",
       "symbol_kind": "METHOD",
       "member_name": "apply",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen volume-processing contract exactly, with structural, differential arithmetic, frame-rebuild, lifecycle, failure, interrupt, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.volume.PcmVolumeProcessor",
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen volume-processing contract exactly, with structural, differential arithmetic, frame-rebuild, lifecycle, failure, interrupt, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.volume.PcmVolumeProcessor",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(I)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen volume-processing contract exactly, with structural, differential arithmetic, frame-rebuild, lifecycle, failure, interrupt, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.volume.PcmVolumeProcessor",
       "symbol_kind": "METHOD",
       "member_name": "getLastVolume",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen volume-processing contract exactly, with structural, differential arithmetic, frame-rebuild, lifecycle, failure, interrupt, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.volume.PcmVolumeProcessor",
       "symbol_kind": "METHOD",
       "member_name": "setLastVolume",
       "descriptor": "(I)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen volume-processing contract exactly, with structural, differential arithmetic, frame-rebuild, lifecycle, failure, interrupt, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.volume.PcmVolumeProcessor",
       "symbol_kind": "METHOD",
       "member_name": "applyVolume",
       "descriptor": "(IILjava/nio/ShortBuffer;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen volume-processing contract exactly, with structural, differential arithmetic, frame-rebuild, lifecycle, failure, interrupt, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.volume.VolumePostProcessor",
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen volume-processing contract exactly, with structural, differential arithmetic, frame-rebuild, lifecycle, failure, interrupt, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.volume.VolumePostProcessor",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen volume-processing contract exactly, with structural, differential arithmetic, frame-rebuild, lifecycle, failure, interrupt, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.volume.VolumePostProcessor",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "(JLjava/nio/ShortBuffer;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen volume-processing contract exactly, with structural, differential arithmetic, frame-rebuild, lifecycle, failure, interrupt, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.volume.VolumePostProcessor",
       "symbol_kind": "METHOD",
       "member_name": "close",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen volume-processing contract exactly, with structural, differential arithmetic, frame-rebuild, lifecycle, failure, interrupt, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioDataFormat",
