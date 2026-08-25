@@ -158,6 +158,8 @@ const ADTS_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/adts/AdtsAudioTrack";
 const ADTS_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/adts/AdtsContainerProbe";
+const ADTS_PACKET_HEADER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -492,6 +494,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MEDIA_CONTAINER_REGISTRY_CLASS,
     ADTS_AUDIO_TRACK_CLASS,
     ADTS_CONTAINER_PROBE_CLASS,
+    ADTS_PACKET_HEADER_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -1349,6 +1352,9 @@ fn replacement_body(
     }
     if class_name == ADTS_CONTAINER_PROBE_CLASS {
         return adts_container_probe_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == ADTS_PACKET_HEADER_CLASS {
+        return adts_packet_header_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -5155,6 +5161,122 @@ fn adts_container_probe_clinit(pool: &mut ConstantPool<'static>) -> Result<Attri
             Instruction::Return,
         ],
     )
+}
+
+fn adts_packet_header_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(ZIIII)V") => adts_packet_header_constructor(pool),
+        (
+            "canUseSameDecoder",
+            "(Lcom/sedmelluq/discord/lavaplayer/container/adts/AdtsPacketHeader;)Z",
+        ) => adts_packet_header_can_use_same_decoder(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {ADTS_PACKET_HEADER_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn adts_packet_header_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(ADTS_PACKET_HEADER_CLASS)?;
+    let protection = pool.add_field_ref(owner, "isProtectionAbsent", "Z")?;
+    let profile = pool.add_field_ref(owner, "profile", "I")?;
+    let sample_rate = pool.add_field_ref(owner, "sampleRate", "I")?;
+    let channels = pool.add_field_ref(owner, "channels", "I")?;
+    let payload_length = pool.add_field_ref(owner, "payloadLength", "I")?;
+    code(
+        pool,
+        2,
+        6,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Iload_1,
+            Instruction::Putfield(protection),
+            Instruction::Aload_0,
+            Instruction::Iload_2,
+            Instruction::Putfield(profile),
+            Instruction::Aload_0,
+            Instruction::Iload_3,
+            Instruction::Putfield(sample_rate),
+            Instruction::Aload_0,
+            Instruction::Iload(4),
+            Instruction::Putfield(channels),
+            Instruction::Aload_0,
+            Instruction::Iload(5),
+            Instruction::Putfield(payload_length),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn adts_packet_header_can_use_same_decoder(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(ADTS_PACKET_HEADER_CLASS)?;
+    let profile = pool.add_field_ref(owner, "profile", "I")?;
+    let sample_rate = pool.add_field_ref(owner, "sampleRate", "I")?;
+    let channels = pool.add_field_ref(owner, "channels", "I")?;
+    let false_target = 19;
+    let return_target = 20;
+    let mut body = code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Ifnull(false_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(profile),
+            Instruction::Aload_1,
+            Instruction::Getfield(profile),
+            Instruction::If_icmpne(false_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(sample_rate),
+            Instruction::Aload_1,
+            Instruction::Getfield(sample_rate),
+            Instruction::If_icmpne(false_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(channels),
+            Instruction::Aload_1,
+            Instruction::Getfield(channels),
+            Instruction::If_icmpne(false_target),
+            Instruction::Iconst_1,
+            Instruction::Goto(return_target),
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+        ],
+    )?;
+    let locals = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Object { cpool_index: owner },
+    ];
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: false_target,
+                locals: locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: return_target - false_target - 1,
+                locals,
+                stack: vec![VerificationType::Integer],
+            },
+        ],
+    )?;
+    Ok(body)
 }
 
 fn media_container_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {

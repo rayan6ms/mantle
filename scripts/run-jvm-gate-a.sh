@@ -229,6 +229,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-adts-audio-track-consumer \
   --output "$WORK/GateAdtsAudioTrack.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-container-probe-consumer \
   --output "$WORK/GateAdtsContainerProbe.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-adts-packet-header-consumer \
+  --output "$WORK/GateAdtsPacketHeader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -299,6 +301,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateMediaContainerRegistry.java" \
   "$WORK/GateAdtsAudioTrack.java" \
   "$WORK/GateAdtsContainerProbe.java" \
+  "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GatePcmFilterFactory.java" \
   "$WORK/GatePcmFormat.java" \
   "$WORK/GateResamplingPcmAudioFilter.java" \
@@ -1212,6 +1215,16 @@ cmp "$WORK/adts-container-probe-reference.txt" "$WORK/adts-container-probe-candi
 grep --fixed-strings \
   'contracts=name,hint-presence,mime,extension,case-insensitive,combined-hints,null-hints,header-detection,crc-header,scan-boundary,no-rewind,metadata-overlay,provider-order,supported-result,self-probe,null-settings,miss,null-reference,io-identity,runtime-identity,provider-failure,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,private-state,throws,reflection' \
   "$WORK/adts-container-probe-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateAdtsPacketHeader \
+  >"$WORK/adts-packet-header-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateAdtsPacketHeader >"$WORK/adts-packet-header-candidate.txt"
+cmp "$WORK/adts-packet-header-reference.txt" "$WORK/adts-packet-header-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,protection,profile,sample-rate,channels,payload-length,raw-values,null-comparison,decoder-key,ignored-protection,ignored-payload,self-comparison,identity-semantics,subclassable,public-final-fields,reflection' \
+  "$WORK/adts-packet-header-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"

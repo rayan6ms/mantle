@@ -159,6 +159,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-media-container-registry-consumer" => Some(MEDIA_CONTAINER_REGISTRY_CONSUMER),
         "write-adts-audio-track-consumer" => Some(ADTS_AUDIO_TRACK_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
+        "write-adts-packet-header-consumer" => Some(ADTS_PACKET_HEADER_CONSUMER),
         _ => None,
     }
 }
@@ -14146,6 +14147,129 @@ public final class GateAdtsContainerProbe {
 
   private static final class Derived extends AdtsContainerProbe {
     @Override public String getName() { return "derived-adts"; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const ADTS_PACKET_HEADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.adts.AdtsPacketHeader;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateAdtsPacketHeader {
+  public static void main(String[] args) throws Exception {
+    constructorValues();
+    decoderCompatibility();
+    identityAndSubclassing();
+    reflection();
+    System.out.println(
+        "contracts=constructor,protection,profile,sample-rate,channels,payload-length,raw-values,null-comparison,decoder-key,ignored-protection,ignored-payload,self-comparison,identity-semantics,subclassable,public-final-fields,reflection");
+  }
+
+  private static void constructorValues() {
+    AdtsPacketHeader ordinary = new AdtsPacketHeader(true, 2, 48_000, 2, 1_024);
+    check(ordinary.isProtectionAbsent && ordinary.profile == 2
+        && ordinary.sampleRate == 48_000 && ordinary.channels == 2
+        && ordinary.payloadLength == 1_024,
+        "constructor retains ordinary values without derivation");
+
+    AdtsPacketHeader raw = new AdtsPacketHeader(
+        false, Integer.MIN_VALUE, Integer.MAX_VALUE, 0, -1);
+    check(!raw.isProtectionAbsent && raw.profile == Integer.MIN_VALUE
+        && raw.sampleRate == Integer.MAX_VALUE && raw.channels == 0
+        && raw.payloadLength == -1, "constructor retains arbitrary raw values without validation");
+  }
+
+  private static void decoderCompatibility() {
+    AdtsPacketHeader base = new AdtsPacketHeader(true, 2, 48_000, 2, 1_024);
+    check(base.canUseSameDecoder(base), "header is decoder-compatible with itself");
+    check(!base.canUseSameDecoder(null), "null header is never decoder-compatible");
+    check(base.canUseSameDecoder(new AdtsPacketHeader(false, 2, 48_000, 2, -99)),
+        "protection and payload length are not decoder configuration");
+    check(!base.canUseSameDecoder(new AdtsPacketHeader(true, 3, 48_000, 2, 1_024)),
+        "profile participates in decoder configuration");
+    check(!base.canUseSameDecoder(new AdtsPacketHeader(true, 2, 44_100, 2, 1_024)),
+        "sample rate participates in decoder configuration");
+    check(!base.canUseSameDecoder(new AdtsPacketHeader(true, 2, 48_000, 1, 1_024)),
+        "channel count participates in decoder configuration");
+    check(new AdtsPacketHeader(false, Integer.MIN_VALUE, Integer.MAX_VALUE, -7, 0)
+        .canUseSameDecoder(new AdtsPacketHeader(
+            true, Integer.MIN_VALUE, Integer.MAX_VALUE, -7, Integer.MAX_VALUE)),
+        "decoder comparison preserves exact signed integer equality");
+  }
+
+  private static void identityAndSubclassing() {
+    AdtsPacketHeader first = new AdtsPacketHeader(true, 2, 48_000, 2, 1_024);
+    AdtsPacketHeader second = new AdtsPacketHeader(true, 2, 48_000, 2, 1_024);
+    check(!first.equals(second) && first.equals(first),
+        "headers retain Object identity equality");
+
+    Derived derived = new Derived(false, 2, 48_000, 2, 7);
+    AdtsPacketHeader dynamic = derived;
+    check(!dynamic.isProtectionAbsent && dynamic.payloadLength == 7
+        && dynamic.canUseSameDecoder(first) && derived.calls == 1,
+        "ordinary subclass construction, inherited fields, and virtual dispatch are retained");
+  }
+
+  private static void reflection() throws Exception {
+    Class<AdtsPacketHeader> type = AdtsPacketHeader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete non-final class metadata");
+    check(type.getDeclaredFields().length == 5 && type.getDeclaredMethods().length == 1
+        && type.getDeclaredConstructors().length == 1,
+        "exact declared member counts");
+
+    checkField(type.getDeclaredField("isProtectionAbsent"), boolean.class);
+    checkField(type.getDeclaredField("profile"), int.class);
+    checkField(type.getDeclaredField("sampleRate"), int.class);
+    checkField(type.getDeclaredField("channels"), int.class);
+    checkField(type.getDeclaredField("payloadLength"), int.class);
+
+    Constructor<AdtsPacketHeader> constructor = type.getDeclaredConstructor(
+        boolean.class, int.class, int.class, int.class, int.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0
+        && Arrays.equals(constructor.getParameterTypes(),
+            new Class<?>[] {boolean.class, int.class, int.class, int.class, int.class}),
+        "constructor descriptor and metadata");
+
+    Method compatibility = type.getDeclaredMethod("canUseSameDecoder", type);
+    check(compatibility.getModifiers() == Modifier.PUBLIC
+        && compatibility.getReturnType() == boolean.class
+        && Arrays.equals(compatibility.getParameterTypes(), new Class<?>[] {type})
+        && compatibility.getExceptionTypes().length == 0 && !compatibility.isSynthetic()
+        && !compatibility.isBridge() && !compatibility.isDefault() && !compatibility.isVarArgs(),
+        "decoder predicate descriptor and metadata");
+  }
+
+  private static void checkField(Field field, Class<?> fieldType) {
+    check(field.getType() == fieldType
+        && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && !field.isSynthetic() && field.getDeclaredAnnotations().length == 0,
+        field.getName() + " field metadata");
+  }
+
+  private static final class Derived extends AdtsPacketHeader {
+    int calls;
+
+    Derived(boolean protectionAbsent, int profile, int sampleRate, int channels,
+        int payloadLength) {
+      super(protectionAbsent, profile, sampleRate, channels, payloadLength);
+    }
+
+    @Override public boolean canUseSameDecoder(AdtsPacketHeader packetHeader) {
+      calls++;
+      return super.canUseSameDecoder(packetHeader);
+    }
   }
 
   private static void check(boolean condition, String message) {
