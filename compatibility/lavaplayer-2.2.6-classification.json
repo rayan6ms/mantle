@@ -8581,54 +8581,60 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "The emitted concrete ConverterAudioFilter subclass preserves its exact structure, constructor, private reusable planar storage, direct split-short forwarding, one-channel conversion behavior, and checked exceptions. Mantle deliberately corrects the reference's nonterminating planar-float and zero-channel array/buffer loops plus multichannel sample/frame over-consumption, using bounded 4,096-frame chunks, complete-frame consumption, and preserved tails.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "docs/architecture/ADR-0022-bounded-split-short-converter.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.converter.ToSplitShortAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/filter/SplitShortPcmAudioFilter;I)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted public constructor exactly preserves downstream and channel-count state, negative-channel failure, and distinct reusable 4,096-sample storage for every channel. Gate A proves matching state and reflected metadata against the frozen reference.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.converter.ToSplitShortAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "([[FII)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Mantle preserves exact float-to-short conversion, offsets, reusable planar storage, downstream arguments, exceptions, and negative-length no-ops, but advances offset after each bounded chunk instead of reproducing the reference's positive-length infinite loop. The liveness oracle proves the deliberate divergence and 4,096-plus-one progress.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "docs/architecture/ADR-0022-bounded-split-short-converter.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.converter.ToSplitShortAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "([SII)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Mantle preserves the reference's inherited floatToShort conversion quirk, complete one-channel behavior, reusable storage, and interruption identity, but corrects multichannel sample/frame accounting to consume only complete frames in bounded 4,096-frame chunks instead of over-consuming and overrunning buffers, and makes zero-channel input a bounded no-op.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "docs/architecture/ADR-0022-bounded-split-short-converter.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.converter.ToSplitShortAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "(Ljava/nio/ShortBuffer;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Mantle preserves one-channel conversion, input-position visibility, reusable storage, and downstream interruption identity, but corrects multichannel sample/frame accounting, preserves incomplete tails, and makes zero-channel nonempty input a bounded no-op instead of reproducing the reference's infinite loop.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs", "docs/architecture/ADR-0022-bounded-split-short-converter.md"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.converter.ToSplitShortAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "([[SII)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted planar-short method exactly forwards the outer and row identities, offset, length, checked interruption, null behavior, and downstream failure identity. The differential oracle compares the safe path directly with the frozen reference.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.equalizer.Equalizer",

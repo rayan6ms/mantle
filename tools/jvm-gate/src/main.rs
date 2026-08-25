@@ -108,6 +108,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-converter-audio-filter-consumer" => Some(CONVERTER_AUDIO_FILTER_CONSUMER),
         "write-to-float-audio-filter-consumer" => Some(TO_FLOAT_AUDIO_FILTER_CONSUMER),
         "write-to-short-audio-filter-consumer" => Some(TO_SHORT_AUDIO_FILTER_CONSUMER),
+        "write-to-split-short-audio-filter-consumer" => Some(TO_SPLIT_SHORT_AUDIO_FILTER_CONSUMER),
         "write-pcm-filter-factory-consumer" => Some(PCM_FILTER_FACTORY_CONSUMER),
         "write-pcm-format-consumer" => Some(PCM_FORMAT_CONSUMER),
         "write-resampling-pcm-audio-filter-consumer" => Some(RESAMPLING_PCM_AUDIO_FILTER_CONSUMER),
@@ -8958,6 +8959,334 @@ public final class GateToShortAudioFilter {
       lastLength = 0;
       lastArray = null;
       lastBuffer = null;
+      lengths.clear();
+      identities.clear();
+      snapshots.clear();
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const TO_SPLIT_SHORT_AUDIO_FILTER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.SplitShortPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.converter.ConverterAudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.converter.ToSplitShortAudioFilter;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.BufferUnderflowException;
+import java.nio.ShortBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
+
+public final class GateToSplitShortAudioFilter {
+  public static void main(String[] args) throws Exception {
+    String mode = args.length == 0 ? "exact" : args[0];
+    if (mode.equals("exact")) {
+      exactContracts();
+      System.out.println(
+          "exact=constructor,one-channel-array,one-channel-buffer,split-identity,negative-noop,"
+          + "interrupted,null,reflection");
+    } else if (mode.equals("safety")) {
+      safetyCorrections();
+      System.out.println(
+          "safety=float-progress,4096-plus-1,reuse,stereo-array,stereo-buffer,tail-preserved,"
+          + "zero-channel,bounds,interrupted");
+    } else if (mode.equals("liveness")) {
+      liveness();
+    } else if (mode.equals("reference-defects")) {
+      referenceDefects();
+      System.out.println("reference-defects=array-overrun,buffer-overread");
+    } else {
+      throw new IllegalArgumentException("unknown mode: " + mode);
+    }
+  }
+
+  private static void exactContracts() throws Exception {
+    Probe probe = new Probe();
+    ToSplitShortAudioFilter filter = new ToSplitShortAudioFilter(probe, 1);
+
+    short[] input = new short[] {77, 0, 1, 2, -1, Short.MAX_VALUE, 88};
+    filter.process(input, 1, 4);
+    check(probe.calls == 1 && probe.lastOffset == 0 && probe.lastLength == 4,
+        "one-channel array dispatch");
+    checkSamples(probe.snapshots.get(0), new short[][] {{
+        convert((float) 0), convert((float) 1), convert((float) 2), convert((float) -1)
+    }}, "one-channel array conversion");
+
+    probe.reset();
+    ShortBuffer buffer = ShortBuffer.wrap(new short[] {99, 3, 4, -2, -3, 98});
+    buffer.position(1);
+    buffer.limit(5);
+    filter.process(buffer);
+    check(probe.calls == 1 && buffer.position() == 5 && !buffer.hasRemaining(),
+        "one-channel buffer consumption");
+    checkSamples(probe.snapshots.get(0), new short[][] {{
+        convert((float) 3), convert((float) 4), convert((float) -2), convert((float) -3)
+    }}, "one-channel buffer conversion");
+
+    probe.reset();
+    short[][] split = new short[][] {{7, 8, 9}, {17, 18, 19}};
+    filter.process(split, 1, 2);
+    check(probe.calls == 1 && probe.lastIdentity == split
+        && probe.lastOffset == 1 && probe.lastLength == 2, "split identity and arguments");
+
+    probe.reset();
+    filter.process((float[][]) null, 5, -1);
+    check(probe.calls == 0, "negative planar length is a no-op");
+
+    InterruptedException sentinel = new InterruptedException("sentinel");
+    probe.failure = sentinel;
+    try {
+      filter.process(split, 0, 1);
+      throw new AssertionError("interruption expected");
+    } catch (InterruptedException error) {
+      check(error == sentinel && probe.lastIdentity == split, "interruption and identity");
+    }
+
+    ToSplitShortAudioFilter nullDownstream = new ToSplitShortAudioFilter(null, 1);
+    expect(NullPointerException.class,
+        () -> nullDownstream.process(new short[][] {{1}}, 0, 1), "null downstream");
+    expect(NegativeArraySizeException.class,
+        () -> new ToSplitShortAudioFilter(new Probe(), -1), "negative channel count");
+
+    Class<ToSplitShortAudioFilter> type = ToSplitShortAudioFilter.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers()) && type.getSuperclass() == ConverterAudioFilter.class
+        && type.getInterfaces().length == 0, "class metadata");
+    check(type.getDeclaredFields().length == 3 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 4, "member counts");
+
+    ToSplitShortAudioFilter instance = new ToSplitShortAudioFilter(probe, 2);
+    Field downstream = field(type, "downstream", SplitShortPcmAudioFilter.class);
+    Field channelCount = field(type, "channelCount", int.class);
+    Field buffers = field(type, "buffers", short[][].class);
+    downstream.setAccessible(true);
+    channelCount.setAccessible(true);
+    buffers.setAccessible(true);
+    short[][] storage = (short[][]) buffers.get(instance);
+    check(downstream.get(instance) == probe && channelCount.getInt(instance) == 2
+        && storage.length == 2 && storage[0].length == 4096 && storage[1].length == 4096
+        && storage[0] != storage[1], "constructor state");
+
+    Constructor<?> constructor = type.getDeclaredConstructor(SplitShortPcmAudioFilter.class, int.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic()
+        && !constructor.isVarArgs(), "constructor metadata");
+    method(type, "process", float[][].class, int.class, int.class);
+    method(type, "process", short[].class, int.class, int.class);
+    method(type, "process", ShortBuffer.class);
+    method(type, "process", short[][].class, int.class, int.class);
+  }
+
+  private static void safetyCorrections() throws Exception {
+    Probe probe = new Probe();
+    ToSplitShortAudioFilter stereo = new ToSplitShortAudioFilter(probe, 2);
+    float[][] floats = new float[][] {
+        {9.0f, -1.0f, 0.5f, Float.NaN, 8.0f},
+        {7.0f, 1.0f, -0.5f, Float.POSITIVE_INFINITY, 6.0f}
+    };
+    stereo.process(floats, 1, 3);
+    check(probe.calls == 1 && probe.lastOffset == 0 && probe.lastLength == 3,
+        "bounded planar float dispatch");
+    checkSamples(probe.snapshots.get(0), new short[][] {
+        {convert(-1.0f), convert(0.5f), convert(Float.NaN)},
+        {convert(1.0f), convert(-0.5f), convert(Float.POSITIVE_INFINITY)}
+    }, "planar float conversion and offset");
+
+    probe.reset();
+    float[][] chunked = new float[][] {new float[4097], new float[4097]};
+    for (int index = 0; index < 4097; index++) {
+      chunked[0][index] = index / 8192.0f;
+      chunked[1][index] = -index / 8192.0f;
+    }
+    stereo.process(chunked, 0, 4097);
+    check(probe.calls == 2 && probe.lengths.equals(Arrays.asList(4096, 1))
+        && probe.identities.get(0) == probe.identities.get(1), "float chunking and reuse");
+    check(probe.snapshots.get(1)[0][0] == convert(chunked[0][4096])
+        && probe.snapshots.get(1)[1][0] == convert(chunked[1][4096]),
+        "later float chunk advances input");
+
+    probe.reset();
+    short[] interleaved = new short[] {1, -1, 2, -2, 3, -3, 99};
+    stereo.process(interleaved, 0, interleaved.length);
+    check(probe.calls == 1 && probe.lastLength == 3, "complete stereo array frames");
+    checkSamples(probe.snapshots.get(0), new short[][] {
+        {convert((float) 1), convert((float) 2), convert((float) 3)},
+        {convert((float) -1), convert((float) -2), convert((float) -3)}
+    }, "stereo array deinterleaving");
+
+    probe.reset();
+    ShortBuffer buffer = ShortBuffer.wrap(new short[] {77, 4, -4, 5, -5, 6, -6, 88});
+    buffer.position(1);
+    stereo.process(buffer);
+    check(probe.calls == 1 && probe.lastLength == 3
+        && buffer.position() == 7 && buffer.remaining() == 1, "buffer complete frames and tail");
+    checkSamples(probe.snapshots.get(0), new short[][] {
+        {convert((float) 4), convert((float) 5), convert((float) 6)},
+        {convert((float) -4), convert((float) -5), convert((float) -6)}
+    }, "stereo buffer deinterleaving");
+
+    Probe zeroProbe = new Probe();
+    ToSplitShortAudioFilter zero = new ToSplitShortAudioFilter(zeroProbe, 0);
+    ShortBuffer zeroBuffer = ShortBuffer.wrap(new short[] {1});
+    zero.process(zeroBuffer);
+    check(zeroProbe.calls == 0 && zeroBuffer.position() == 0,
+        "zero-channel buffer terminates without consumption");
+    zero.process(new short[] {1}, 0, 1);
+    check(zeroProbe.calls == 0, "zero-channel array terminates without consumption");
+    zero.process((float[][]) null, 0, 1);
+    check(zeroProbe.calls == 1 && zeroProbe.lastIdentity.length == 0
+        && zeroProbe.lastLength == 1, "zero-channel float dispatch is bounded");
+
+    expect(ArrayIndexOutOfBoundsException.class,
+        () -> stereo.process(new float[][] {{1.0f}, {}}, 0, 1), "float row bounds");
+
+    InterruptedException sentinel = new InterruptedException("sentinel");
+    Probe interrupted = new Probe();
+    interrupted.failure = sentinel;
+    ToSplitShortAudioFilter failing = new ToSplitShortAudioFilter(interrupted, 2);
+    ShortBuffer consumed = ShortBuffer.wrap(new short[] {1, 2, 3, 4, 5});
+    try {
+      failing.process(consumed);
+      throw new AssertionError("interruption expected");
+    } catch (InterruptedException error) {
+      check(error == sentinel && consumed.position() == 4 && consumed.remaining() == 1,
+          "interruption after bounded complete-frame consumption");
+    }
+  }
+
+  private static void liveness() throws Exception {
+    boolean floatStalls = stalls(() -> new ToSplitShortAudioFilter(new Sink(), 1)
+        .process(new float[][] {{0.25f}}, 0, 1));
+    boolean zeroArrayStalls = stalls(() -> new ToSplitShortAudioFilter(new Sink(), 0)
+        .process(new short[] {1}, 0, 1));
+    boolean zeroBufferStalls = stalls(() -> new ToSplitShortAudioFilter(new Sink(), 0)
+        .process(ShortBuffer.wrap(new short[] {1})));
+    System.out.println("liveness=float-stalls-" + floatStalls
+        + ",zero-array-stalls-" + zeroArrayStalls
+        + ",zero-buffer-stalls-" + zeroBufferStalls);
+  }
+
+  private static void referenceDefects() throws Exception {
+    ToSplitShortAudioFilter stereo = new ToSplitShortAudioFilter(new Sink(), 2);
+    expect(ArrayIndexOutOfBoundsException.class,
+        () -> stereo.process(new short[] {1, 2}, 0, 2), "reference array overrun");
+    expect(BufferUnderflowException.class,
+        () -> stereo.process(ShortBuffer.wrap(new short[] {1, 2})), "reference buffer overread");
+  }
+
+  private static boolean stalls(Throwing action) throws Exception {
+    CountDownLatch started = new CountDownLatch(1);
+    AtomicReference<Throwable> failure = new AtomicReference<>();
+    Thread thread = new Thread(() -> {
+      started.countDown();
+      try {
+        action.run();
+      } catch (Throwable error) {
+        failure.set(error);
+      }
+    });
+    thread.setDaemon(true);
+    thread.start();
+    started.await();
+    thread.join(150);
+    if (thread.isAlive()) return true;
+    if (failure.get() != null) throw new AssertionError("liveness action failed", failure.get());
+    return false;
+  }
+
+  private static Field field(Class<?> type, String name, Class<?> fieldType) throws Exception {
+    Field field = type.getDeclaredField(name);
+    check(field.getType() == fieldType
+        && field.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL) && !field.isSynthetic(),
+        "field metadata " + name);
+    return field;
+  }
+
+  private static void method(Class<?> type, String name, Class<?>... parameters) throws Exception {
+    Method method = type.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == void.class
+        && Arrays.equals(method.getExceptionTypes(), new Class<?>[] {InterruptedException.class})
+        && !method.isBridge() && !method.isSynthetic() && !method.isDefault()
+        && !method.isVarArgs() && method.getTypeParameters().length == 0,
+        "process metadata " + Arrays.toString(parameters));
+  }
+
+  private static short convert(float value) {
+    return (short) (value * 32768.0f);
+  }
+
+  private static void checkSamples(short[][] actual, short[][] expected, String message) {
+    check(actual.length == expected.length, message + " channels");
+    for (int channel = 0; channel < expected.length; channel++) {
+      check(Arrays.equals(actual[channel], expected[channel]), message + " channel " + channel);
+    }
+  }
+
+  private static void expect(Class<? extends Throwable> type, Throwing action, String message)
+      throws Exception {
+    try {
+      action.run();
+    } catch (Throwable error) {
+      check(error.getClass() == type, message + " type: " + error);
+      return;
+    }
+    throw new AssertionError(message + " did not fail");
+  }
+
+  private interface Throwing { void run() throws Exception; }
+
+  private static final class Sink implements SplitShortPcmAudioFilter {
+    public void process(short[][] input, int offset, int length) { }
+    public void seekPerformed(long requestedTime, long providedTime) { }
+    public void flush() { }
+    public void close() { }
+  }
+
+  private static final class Probe implements SplitShortPcmAudioFilter {
+    int calls;
+    int lastOffset;
+    int lastLength;
+    short[][] lastIdentity;
+    InterruptedException failure;
+    final List<Integer> lengths = new ArrayList<>();
+    final List<short[][]> identities = new ArrayList<>();
+    final List<short[][]> snapshots = new ArrayList<>();
+
+    public void process(short[][] input, int offset, int length) throws InterruptedException {
+      calls++;
+      lastIdentity = input;
+      lastOffset = offset;
+      lastLength = length;
+      lengths.add(length);
+      identities.add(input);
+      short[][] snapshot = new short[input.length][];
+      for (int channel = 0; channel < input.length; channel++) {
+        snapshot[channel] = Arrays.copyOfRange(input[channel], offset, offset + length);
+      }
+      snapshots.add(snapshot);
+      if (failure != null) throw failure;
+    }
+
+    public void seekPerformed(long requestedTime, long providedTime) { }
+    public void flush() throws InterruptedException { }
+    public void close() { }
+
+    void reset() {
+      calls = 0;
+      lastOffset = 0;
+      lastLength = 0;
+      lastIdentity = null;
+      failure = null;
       lengths.clear();
       identities.clear();
       snapshots.clear();

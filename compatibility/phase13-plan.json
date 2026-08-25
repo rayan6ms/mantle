@@ -2072,8 +2072,8 @@
       "objective": "Cover filter factories, extension classes, PCM filters, and audio format contracts.",
       "exit_evidence": "Filter extension/identity tests, format behavior tests, per-symbol ledger entries, and Revapi diff.",
       "status": "IN_PROGRESS",
-      "classified_symbols": 104,
-      "remaining_symbols": 115,
+      "classified_symbols": 110,
+      "remaining_symbols": 109,
       "completed_slices": [
         {
           "id": "audio-filter-interface-contracts",
@@ -2336,6 +2336,20 @@
             "tools/jvm-gate/src/emitter.rs",
             "tools/jvm-gate/src/main.rs"
           ]
+        },
+        {
+          "id": "to-split-short-audio-filter-contracts",
+          "classes": 1,
+          "fields": 0,
+          "methods": 5,
+          "symbols": 6,
+          "classification": "MIXED_A_EXACT_C_SEMANTIC",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs",
+            "docs/architecture/ADR-0022-bounded-split-short-converter.md"
+          ]
         }
       ]
     },
@@ -2443,7 +2457,7 @@
   "phase_entry": {
     "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
     "first_execution_cohort": "core-player-track",
-    "next_slice": "to-split-short-audio-filter-contracts",
+    "next_slice": "equalizer-contracts",
     "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
   }
 }
