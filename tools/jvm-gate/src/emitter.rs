@@ -150,6 +150,8 @@ const MEDIA_CONTAINER_DETECTION_RESULT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult";
 const MEDIA_CONTAINER_HINTS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/MediaContainerHints";
+const MEDIA_CONTAINER_PROBE_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/MediaContainerProbe";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -480,6 +482,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MEDIA_CONTAINER_DETECTION_CLASS,
     MEDIA_CONTAINER_DETECTION_RESULT_CLASS,
     MEDIA_CONTAINER_HINTS_CLASS,
+    MEDIA_CONTAINER_PROBE_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,

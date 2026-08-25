@@ -155,6 +155,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
             Some(MEDIA_CONTAINER_DETECTION_RESULT_CONSUMER)
         }
         "write-media-container-hints-consumer" => Some(MEDIA_CONTAINER_HINTS_CONSUMER),
+        "write-media-container-probe-consumer" => Some(MEDIA_CONTAINER_PROBE_CONSUMER),
         _ => None,
     }
 }
@@ -13114,6 +13115,194 @@ public final class GateMediaContainerHints {
         && Arrays.equals(method.getParameterTypes(), parameters)
         && method.getExceptionTypes().length == 0 && !method.isSynthetic() && !method.isBridge(),
         name + " method metadata");
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MEDIA_CONTAINER_PROBE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerHints;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerProbe;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+public final class GateMediaContainerProbe {
+  public static void main(String[] args) throws Exception {
+    dispatchAndIdentity();
+    nullsAndFailures();
+    reflection();
+    System.out.println(
+        "contracts=implementation-dispatch,name-identity,hints-identity,boolean-result,probe-identity,result-identity,checked-exception-identity,create-track-identity,nulls,abstract-interface,reflection");
+  }
+
+  private static void dispatchAndIdentity() throws Exception {
+    ProbeImpl implementation = new ProbeImpl();
+    MediaContainerProbe probe = implementation;
+    String name = new String("probe-name");
+    implementation.name = name;
+    check(probe.getName() == name, "getName dispatches and preserves return identity");
+
+    MediaContainerHints hints = MediaContainerHints.from("audio/test", "test");
+    implementation.hintsResult = true;
+    check(probe.matchesHints(hints) && implementation.seenHints == hints,
+        "matchesHints dispatches exact argument and true result");
+    implementation.hintsResult = false;
+    check(!probe.matchesHints(hints) && implementation.seenHints == hints,
+        "matchesHints preserves false result");
+
+    AudioReference reference = new AudioReference("identifier", "title");
+    MemoryStream stream = new MemoryStream();
+    MediaContainerDetectionResult result = MediaContainerDetectionResult.unknownFormat();
+    implementation.probeResult = result;
+    check(probe.probe(reference, stream) == result
+        && implementation.seenReference == reference
+        && implementation.seenProbeStream == stream,
+        "probe dispatches arguments and preserves result identity");
+
+    String parameters = new String("parameters");
+    AudioTrackInfo info = new AudioTrackInfo("title", "author", 1L, "id", false, "uri");
+    AudioTrack track = track();
+    implementation.trackResult = track;
+    check(probe.createTrack(parameters, info, stream) == track
+        && implementation.seenParameters == parameters && implementation.seenInfo == info
+        && implementation.seenCreateStream == stream,
+        "createTrack dispatches all arguments and preserves result identity");
+  }
+
+  private static void nullsAndFailures() throws Exception {
+    ProbeImpl implementation = new ProbeImpl();
+    MediaContainerProbe probe = implementation;
+    check(probe.getName() == null, "null name is returned unchanged");
+    check(!probe.matchesHints(null) && implementation.seenHints == null,
+        "null hints dispatch unchanged");
+    check(probe.probe(null, null) == null && implementation.seenReference == null
+        && implementation.seenProbeStream == null, "null probe arguments and result are unchanged");
+    check(probe.createTrack(null, null, null) == null
+        && implementation.seenParameters == null && implementation.seenInfo == null
+        && implementation.seenCreateStream == null,
+        "null createTrack arguments and result are unchanged");
+
+    IOException failure = new IOException("probe-failure");
+    implementation.probeFailure = failure;
+    Throwable caught = catchThrowable(() -> probe.probe(null, null));
+    check(caught == failure, "declared IOException propagates with exact identity");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MediaContainerProbe> type = MediaContainerProbe.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT | Modifier.INTERFACE)
+        && type.isInterface() && type.getSuperclass() == null && type.getInterfaces().length == 0
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0,
+        "exact public abstract interface metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 4, "exact declared member counts");
+
+    checkMethod(type, "getName", String.class, new Class<?>[0], new Class<?>[0]);
+    checkMethod(type, "matchesHints", boolean.class,
+        new Class<?>[] {MediaContainerHints.class}, new Class<?>[0]);
+    checkMethod(type, "probe", MediaContainerDetectionResult.class,
+        new Class<?>[] {AudioReference.class, SeekableInputStream.class},
+        new Class<?>[] {IOException.class});
+    checkMethod(type, "createTrack", AudioTrack.class,
+        new Class<?>[] {String.class, AudioTrackInfo.class, SeekableInputStream.class},
+        new Class<?>[0]);
+
+    Set<String> names = new HashSet<>();
+    for (Method method : type.getDeclaredMethods()) names.add(method.getName());
+    check(names.size() == 4, "no overloads, defaults, bridges, or synthetic methods");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+      Class<?>[] parameters, Class<?>[] exceptions) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == returnType && method.getGenericReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getGenericParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isDefault() && !method.isSynthetic() && !method.isBridge()
+        && method.getDeclaredAnnotations().length == 0,
+        name + " method metadata");
+  }
+
+  private static AudioTrack track() {
+    return (AudioTrack) Proxy.newProxyInstance(AudioTrack.class.getClassLoader(),
+        new Class<?>[] {AudioTrack.class}, (instance, method, arguments) -> null);
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try {
+      action.run();
+      return null;
+    } catch (Throwable throwable) {
+      return throwable;
+    }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class ProbeImpl implements MediaContainerProbe {
+    String name;
+    MediaContainerHints seenHints;
+    boolean hintsResult;
+    AudioReference seenReference;
+    SeekableInputStream seenProbeStream;
+    MediaContainerDetectionResult probeResult;
+    IOException probeFailure;
+    String seenParameters;
+    AudioTrackInfo seenInfo;
+    SeekableInputStream seenCreateStream;
+    AudioTrack trackResult;
+
+    @Override public String getName() { return name; }
+
+    @Override public boolean matchesHints(MediaContainerHints hints) {
+      seenHints = hints;
+      return hintsResult;
+    }
+
+    @Override public MediaContainerDetectionResult probe(
+        AudioReference reference, SeekableInputStream inputStream) throws IOException {
+      seenReference = reference;
+      seenProbeStream = inputStream;
+      if (probeFailure != null) throw probeFailure;
+      return probeResult;
+    }
+
+    @Override public AudioTrack createTrack(
+        String parameters, AudioTrackInfo trackInfo, SeekableInputStream inputStream) {
+      seenParameters = parameters;
+      seenInfo = trackInfo;
+      seenCreateStream = inputStream;
+      return trackResult;
+    }
+  }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    MemoryStream() { super(0, 0); }
+    @Override public long getPosition() { return 0; }
+    @Override protected void seekHard(long position) {}
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      return Collections.emptyList();
+    }
+    @Override public int read() { return -1; }
   }
 
   private static void check(boolean condition, String message) {

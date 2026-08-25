@@ -221,6 +221,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-media-container-detection-resu
   --output "$WORK/GateMediaContainerDetectionResult.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-media-container-hints-consumer \
   --output "$WORK/GateMediaContainerHints.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-media-container-probe-consumer \
+  --output "$WORK/GateMediaContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -287,6 +289,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateMediaContainerDetection.java" \
   "$WORK/GateMediaContainerDetectionResult.java" \
   "$WORK/GateMediaContainerHints.java" \
+  "$WORK/GateMediaContainerProbe.java" \
   "$WORK/GatePcmFilterFactory.java" \
   "$WORK/GatePcmFormat.java" \
   "$WORK/GateResamplingPcmAudioFilter.java" \
@@ -1159,6 +1162,16 @@ cmp "$WORK/media-container-hints-reference.txt" "$WORK/media-container-hints-can
 grep --fixed-strings \
   'contracts=eager-empty-singleton,singleton-identity,fresh-non-null,factory-identity,null-acceptance,empty-string-presence,derived-presence,private-constructor-state,non-final-class,reflection' \
   "$WORK/media-container-hints-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMediaContainerProbe \
+  >"$WORK/media-container-probe-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMediaContainerProbe >"$WORK/media-container-probe-candidate.txt"
+cmp "$WORK/media-container-probe-reference.txt" "$WORK/media-container-probe-candidate.txt"
+grep --fixed-strings \
+  'contracts=implementation-dispatch,name-identity,hints-identity,boolean-result,probe-identity,result-identity,checked-exception-identity,create-track-identity,nulls,abstract-interface,reflection' \
+  "$WORK/media-container-probe-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"
