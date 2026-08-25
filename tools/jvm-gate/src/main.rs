@@ -152,6 +152,7 @@ fn filter_format_consumer_source(command: &str) -> Option<&'static str> {
         "write-audio-player-input-stream-consumer" => Some(AUDIO_PLAYER_INPUT_STREAM_CONSUMER),
         "write-opus-audio-data-format-consumer" => Some(OPUS_AUDIO_DATA_FORMAT_CONSUMER),
         "write-pcm16-audio-data-format-consumer" => Some(PCM16_AUDIO_DATA_FORMAT_CONSUMER),
+        "write-standard-audio-data-formats-consumer" => Some(STANDARD_AUDIO_DATA_FORMATS_CONSUMER),
         "write-pcm-filter-factory-consumer" => Some(PCM_FILTER_FACTORY_CONSUMER),
         "write-pcm-format-consumer" => Some(PCM_FORMAT_CONSUMER),
         "write-resampling-pcm-audio-filter-consumer" => Some(RESAMPLING_PCM_AUDIO_FILTER_CONSUMER),
@@ -10351,6 +10352,148 @@ public final class GateOpusAudioDataFormat {
     }
   }
   private interface Operation { void run() throws Exception; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const STANDARD_AUDIO_DATA_FORMATS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.OpusAudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.Pcm16AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.StandardAudioDataFormats;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkEncoder;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.nio.ShortBuffer;
+import java.util.Arrays;
+
+public final class GateStandardAudioDataFormats {
+  public static void main(String[] args) throws Exception {
+    identitiesAndGeometry();
+    endianAssignments();
+    construction();
+    reflection();
+    System.out.println(
+        "contracts=singletons,initialization-order,runtime-types,discord-geometry,common-geometry,endian-assignments,value-pairs,constructor,reflection");
+  }
+
+  private static void identitiesAndGeometry() {
+    AudioDataFormat opus = StandardAudioDataFormats.DISCORD_OPUS;
+    AudioDataFormat discordBig = StandardAudioDataFormats.DISCORD_PCM_S16_BE;
+    AudioDataFormat discordLittle = StandardAudioDataFormats.DISCORD_PCM_S16_LE;
+    AudioDataFormat commonBig = StandardAudioDataFormats.COMMON_PCM_S16_BE;
+    AudioDataFormat commonLittle = StandardAudioDataFormats.COMMON_PCM_S16_LE;
+    AudioDataFormat[] values = {opus, discordBig, discordLittle, commonBig, commonLittle};
+    for (int index = 0; index < values.length; index++) {
+      check(values[index] != null, "non-null singleton " + index);
+      for (int other = index + 1; other < values.length; other++) {
+        check(values[index] != values[other], "independent singleton allocation");
+      }
+    }
+    check(opus == StandardAudioDataFormats.DISCORD_OPUS
+        && discordBig == StandardAudioDataFormats.DISCORD_PCM_S16_BE
+        && discordLittle == StandardAudioDataFormats.DISCORD_PCM_S16_LE
+        && commonBig == StandardAudioDataFormats.COMMON_PCM_S16_BE
+        && commonLittle == StandardAudioDataFormats.COMMON_PCM_S16_LE,
+        "stable singleton identities");
+    check(opus.getClass() == OpusAudioDataFormat.class
+        && discordBig.getClass() == Pcm16AudioDataFormat.class
+        && discordLittle.getClass() == Pcm16AudioDataFormat.class
+        && commonBig.getClass() == Pcm16AudioDataFormat.class
+        && commonLittle.getClass() == Pcm16AudioDataFormat.class, "runtime format types");
+
+    check(opus.channelCount == 2 && opus.sampleRate == 48_000 && opus.chunkSampleCount == 960
+        && opus.codecName().equals("OPUS") && opus.expectedChunkSize() == 544
+        && opus.maximumChunkSize() == 1_568, "Discord Opus geometry");
+    for (AudioDataFormat format : new AudioDataFormat[] {discordBig, discordLittle}) {
+      check(format.channelCount == 2 && format.sampleRate == 48_000
+          && format.chunkSampleCount == 960 && format.expectedChunkSize() == 3_840
+          && format.maximumChunkSize() == 3_840 && format.codecName().equals("PCM_S16_BE"),
+          "Discord PCM geometry");
+    }
+    for (AudioDataFormat format : new AudioDataFormat[] {commonBig, commonLittle}) {
+      check(format.channelCount == 2 && format.sampleRate == 44_100
+          && format.chunkSampleCount == 960 && format.expectedChunkSize() == 3_840
+          && format.maximumChunkSize() == 3_840 && format.codecName().equals("PCM_S16_BE"),
+          "common PCM geometry");
+    }
+    check(discordBig.equals(discordLittle) && commonBig.equals(commonLittle)
+        && !discordBig.equals(commonBig), "frozen PCM value pairs");
+    check(discordBig.silenceBytes() != discordLittle.silenceBytes()
+        && discordBig.silenceBytes() != commonBig.silenceBytes()
+        && commonBig.silenceBytes() != commonLittle.silenceBytes(),
+        "independent PCM silence buffers");
+  }
+
+  private static void endianAssignments() throws Exception {
+    check(readEndian(StandardAudioDataFormats.DISCORD_PCM_S16_BE)
+        && !readEndian(StandardAudioDataFormats.DISCORD_PCM_S16_LE)
+        && readEndian(StandardAudioDataFormats.COMMON_PCM_S16_BE)
+        && !readEndian(StandardAudioDataFormats.COMMON_PCM_S16_LE),
+        "private endian assignment order");
+
+    AudioChunkEncoder big = StandardAudioDataFormats.DISCORD_PCM_S16_BE.createEncoder(null);
+    AudioChunkEncoder little = StandardAudioDataFormats.DISCORD_PCM_S16_LE.createEncoder(null);
+    check(Arrays.equals(big.encode(ShortBuffer.wrap(new short[] {0x0102})),
+            new byte[] {1, 2})
+        && Arrays.equals(little.encode(ShortBuffer.wrap(new short[] {0x0102})),
+            new byte[] {2, 1}), "catalog transcoder endianness");
+    big.close();
+    little.close();
+  }
+
+  private static boolean readEndian(AudioDataFormat format) throws Exception {
+    Field field = Pcm16AudioDataFormat.class.getDeclaredField("bigEndian");
+    field.setAccessible(true);
+    return field.getBoolean(format);
+  }
+
+  private static void construction() {
+    AudioDataFormat[] before = fields();
+    StandardAudioDataFormats first = new StandardAudioDataFormats();
+    StandardAudioDataFormats second = new StandardAudioDataFormats();
+    AudioDataFormat[] after = fields();
+    check(first != second && first.getClass() == StandardAudioDataFormats.class
+        && second.getClass() == StandardAudioDataFormats.class,
+        "public instances remain ordinary and independent");
+    for (int index = 0; index < before.length; index++) {
+      check(before[index] == after[index], "construction does not replace singleton fields");
+    }
+  }
+
+  private static AudioDataFormat[] fields() {
+    return new AudioDataFormat[] {
+        StandardAudioDataFormats.DISCORD_OPUS,
+        StandardAudioDataFormats.DISCORD_PCM_S16_BE,
+        StandardAudioDataFormats.DISCORD_PCM_S16_LE,
+        StandardAudioDataFormats.COMMON_PCM_S16_BE,
+        StandardAudioDataFormats.COMMON_PCM_S16_LE
+    };
+  }
+
+  private static void reflection() throws Exception {
+    Class<StandardAudioDataFormats> type = StandardAudioDataFormats.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 5
+        && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 0, "class metadata");
+    String[] names = {"DISCORD_OPUS", "DISCORD_PCM_S16_BE", "DISCORD_PCM_S16_LE",
+        "COMMON_PCM_S16_BE", "COMMON_PCM_S16_LE"};
+    Field[] fields = type.getDeclaredFields();
+    for (int index = 0; index < names.length; index++) {
+      Field field = fields[index];
+      check(field.getName().equals(names[index]) && field.getType() == AudioDataFormat.class
+          && field.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL)
+          && field.get(null) == fields()[index], "field metadata and declaration order " + index);
+    }
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+  }
+
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }

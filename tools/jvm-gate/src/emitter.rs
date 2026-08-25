@@ -126,6 +126,8 @@ const OPUS_AUDIO_DATA_FORMAT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/format/OpusAudioDataFormat";
 const PCM16_AUDIO_DATA_FORMAT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/format/Pcm16AudioDataFormat";
+const STANDARD_AUDIO_DATA_FORMATS_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/format/StandardAudioDataFormats";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -443,6 +445,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     AUDIO_PLAYER_INPUT_STREAM_CLASS,
     OPUS_AUDIO_DATA_FORMAT_CLASS,
     PCM16_AUDIO_DATA_FORMAT_CLASS,
+    STANDARD_AUDIO_DATA_FORMATS_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -1105,6 +1108,10 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
                 && class_pool
                     .try_get_utf8(method.name_index)
                     .is_ok_and(|name| name == "<clinit>"))
+            || (class_name == STANDARD_AUDIO_DATA_FORMATS_CLASS
+                && class_pool
+                    .try_get_utf8(method.name_index)
+                    .is_ok_and(|name| name == "<clinit>"))
             || (class_name == BANDCAMP_AUDIO_SOURCE_MANAGER_CLASS
                 && class_pool
                     .try_get_utf8(method.name_index)
@@ -1230,6 +1237,9 @@ fn replacement_body(
     }
     if class_name == PCM16_AUDIO_DATA_FORMAT_CLASS {
         return pcm16_audio_data_format_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == STANDARD_AUDIO_DATA_FORMATS_CLASS {
+        return standard_audio_data_formats_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -2759,6 +2769,93 @@ fn pcm16_audio_data_format_hash_code(pool: &mut ConstantPool<'static>) -> Result
             Instruction::Aload_0,
             Instruction::Invokespecial(hash_code),
             Instruction::Ireturn,
+        ],
+    )
+}
+
+fn standard_audio_data_formats_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        ("<clinit>", "()V") => standard_audio_data_formats_class_init(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {STANDARD_AUDIO_DATA_FORMATS_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn standard_audio_data_formats_class_init(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(STANDARD_AUDIO_DATA_FORMATS_CLASS)?;
+    let format_descriptor = "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;";
+    let catalog_fields = [
+        "DISCORD_OPUS",
+        "DISCORD_PCM_S16_BE",
+        "DISCORD_PCM_S16_LE",
+        "COMMON_PCM_S16_BE",
+        "COMMON_PCM_S16_LE",
+    ]
+    .into_iter()
+    .map(|name| pool.add_field_ref(owner, name, format_descriptor))
+    .collect::<std::result::Result<Vec<_>, _>>()?;
+    let opus = pool.add_class(OPUS_AUDIO_DATA_FORMAT_CLASS)?;
+    let opus_init = pool.add_method_ref(opus, "<init>", "(III)V")?;
+    let pcm = pool.add_class(PCM16_AUDIO_DATA_FORMAT_CLASS)?;
+    let pcm_init = pool.add_method_ref(pcm, "<init>", "(IIIZ)V")?;
+    let discord_rate = pool.add_integer(48_000)?;
+    let common_rate = pool.add_integer(44_100)?;
+    code(
+        pool,
+        6,
+        0,
+        vec![
+            Instruction::New(opus),
+            Instruction::Dup,
+            Instruction::Iconst_2,
+            Instruction::Ldc_w(discord_rate),
+            Instruction::Sipush(960),
+            Instruction::Invokespecial(opus_init),
+            Instruction::Putstatic(catalog_fields[0]),
+            Instruction::New(pcm),
+            Instruction::Dup,
+            Instruction::Iconst_2,
+            Instruction::Ldc_w(discord_rate),
+            Instruction::Sipush(960),
+            Instruction::Iconst_1,
+            Instruction::Invokespecial(pcm_init),
+            Instruction::Putstatic(catalog_fields[1]),
+            Instruction::New(pcm),
+            Instruction::Dup,
+            Instruction::Iconst_2,
+            Instruction::Ldc_w(discord_rate),
+            Instruction::Sipush(960),
+            Instruction::Iconst_0,
+            Instruction::Invokespecial(pcm_init),
+            Instruction::Putstatic(catalog_fields[2]),
+            Instruction::New(pcm),
+            Instruction::Dup,
+            Instruction::Iconst_2,
+            Instruction::Ldc_w(common_rate),
+            Instruction::Sipush(960),
+            Instruction::Iconst_1,
+            Instruction::Invokespecial(pcm_init),
+            Instruction::Putstatic(catalog_fields[3]),
+            Instruction::New(pcm),
+            Instruction::Dup,
+            Instruction::Iconst_2,
+            Instruction::Ldc_w(common_rate),
+            Instruction::Sipush(960),
+            Instruction::Iconst_0,
+            Instruction::Invokespecial(pcm_init),
+            Instruction::Putstatic(catalog_fields[4]),
+            Instruction::Return,
         ],
     )
 }
