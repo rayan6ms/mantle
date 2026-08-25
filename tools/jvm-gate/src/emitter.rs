@@ -95,6 +95,8 @@ const UNIVERSAL_PCM_AUDIO_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/UniversalPcmAudioFilter";
 const USER_PROVIDED_AUDIO_FILTERS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/UserProvidedAudioFilters";
+const CONVERTER_AUDIO_FILTER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/filter/converter/ConverterAudioFilter";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -397,6 +399,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     SPLIT_SHORT_PCM_AUDIO_FILTER_CLASS,
     UNIVERSAL_PCM_AUDIO_FILTER_CLASS,
     USER_PROVIDED_AUDIO_FILTERS_CLASS,
+    CONVERTER_AUDIO_FILTER_CLASS,
     "com/sedmelluq/discord/lavaplayer/format/AudioDataFormat",
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
@@ -1114,6 +1117,9 @@ fn replacement_body(
     }
     if class_name == USER_PROVIDED_AUDIO_FILTERS_CLASS {
         return user_provided_audio_filters_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == CONVERTER_AUDIO_FILTER_CLASS {
+        return converter_audio_filter_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -2750,6 +2756,55 @@ fn composite_audio_filter_lifecycle(
         ],
     )?;
     Ok(body)
+}
+
+fn converter_audio_filter_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => {
+            let object = pool.add_class("java/lang/Object")?;
+            let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+            code(
+                pool,
+                1,
+                1,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Invokespecial(object_init),
+                    Instruction::Return,
+                ],
+            )
+        }
+        ("seekPerformed", "(JJ)V") => code(pool, 0, 5, vec![Instruction::Return]),
+        ("flush" | "close", "()V") => code(pool, 0, 1, vec![Instruction::Return]),
+        ("floatToShort", "(F)S") => {
+            let scale = pool.add_float(32_768.0)?;
+            code(
+                pool,
+                2,
+                1,
+                vec![
+                    Instruction::Fload_0,
+                    Instruction::Ldc_w(scale),
+                    Instruction::Fmul,
+                    Instruction::F2i,
+                    Instruction::I2s,
+                    Instruction::Ireturn,
+                ],
+            )
+        }
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {CONVERTER_AUDIO_FILTER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
 }
 
 fn user_provided_audio_filters_replacement(

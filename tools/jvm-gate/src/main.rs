@@ -105,6 +105,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-short-pcm-audio-filter-consumer" => Some(SHORT_PCM_AUDIO_FILTER_CONSUMER),
         "write-universal-pcm-audio-filter-consumer" => Some(UNIVERSAL_PCM_AUDIO_FILTER_CONSUMER),
         "write-user-provided-audio-filters-consumer" => Some(USER_PROVIDED_AUDIO_FILTERS_CONSUMER),
+        "write-converter-audio-filter-consumer" => Some(CONVERTER_AUDIO_FILTER_CONSUMER),
         "write-pcm-filter-factory-consumer" => Some(PCM_FILTER_FACTORY_CONSUMER),
         "write-pcm-format-consumer" => Some(PCM_FORMAT_CONSUMER),
         "write-resampling-pcm-audio-filter-consumer" => Some(RESAMPLING_PCM_AUDIO_FILTER_CONSUMER),
@@ -8282,6 +8283,127 @@ public final class GateUserProvidedAudioFilters {
     public int maximumChunkSize() { return 0; }
     public AudioChunkDecoder createDecoder() { return null; }
     public AudioChunkEncoder createEncoder(AudioConfiguration configuration) { return null; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const CONVERTER_AUDIO_FILTER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.filter.UniversalPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.converter.ConverterAudioFilter;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ShortBuffer;
+import java.util.Arrays;
+
+public final class GateConverterAudioFilter {
+  public static void main(String[] args) throws Exception {
+    conversion();
+    lifecycle();
+    reflection();
+    System.out.println(
+        "conversion=zero,signed-zero,subnormal,halves,unit-wrap,multiple-wrap,nan,infinities,extremes;"
+        + "lifecycle=seek,flush,close,repeated,stateless,subclass;"
+        + "reflection=public-abstract-object,universal-parent,1-protected-constant,1-public-constructor,4-methods,throws");
+  }
+
+  private static void conversion() {
+    float[] input = new float[] {
+        0.0f, -0.0f, Float.MIN_VALUE, -Float.MIN_VALUE,
+        0.5f, -0.5f, Math.nextDown(1.0f), 1.0f, -1.0f,
+        1.5f, -1.5f, 2.0f, -2.0f,
+        Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY,
+        Float.MAX_VALUE, -Float.MAX_VALUE
+    };
+    short[] expected = new short[] {
+        0, 0, 0, 0,
+        16384, -16384, 32767, -32768, -32768,
+        -16384, 16384, 0, 0,
+        0, -1, 0, -1, 0
+    };
+    short[] actual = new short[input.length];
+    for (int index = 0; index < input.length; index++) {
+      actual[index] = Exposed.convert(input[index]);
+    }
+    check(Arrays.equals(actual, expected),
+        "exact float multiplication, f2i saturation, and i2s narrowing");
+    check(Exposed.convert(32767.0f / 32768.0f) == Short.MAX_VALUE
+        && Exposed.convert(-32768.0f / 32768.0f) == Short.MIN_VALUE,
+        "exact short boundaries");
+  }
+
+  private static void lifecycle() throws Exception {
+    Exposed first = new Exposed(17);
+    Exposed second = new Exposed(23);
+    check(first instanceof UniversalPcmAudioFilter && first.marker == 17
+        && second.marker == 23 && Exposed.size() == 4096, "subclass construction and constant");
+    first.seekPerformed(Long.MIN_VALUE, Long.MAX_VALUE);
+    first.flush();
+    first.close();
+    first.seekPerformed(0, -1);
+    first.flush();
+    first.close();
+    check(first.marker == 17 && second.marker == 23, "stateless repeated lifecycle");
+  }
+
+  private static void reflection() throws Exception {
+    Class<ConverterAudioFilter> type = ConverterAudioFilter.class;
+    check(Modifier.isPublic(type.getModifiers()) && Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers()) && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] { UniversalPcmAudioFilter.class }),
+        "class metadata");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 4, "member counts");
+
+    Field size = type.getDeclaredField("BUFFER_SIZE");
+    check(size.getType() == int.class
+        && size.getModifiers() == (Modifier.PROTECTED | Modifier.STATIC | Modifier.FINAL)
+        && !size.isSynthetic(), "constant metadata");
+    size.setAccessible(true);
+    check(size.getInt(null) == 4096, "constant value");
+
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic()
+        && !constructor.isVarArgs(), "constructor metadata");
+
+    Method seek = type.getDeclaredMethod("seekPerformed", long.class, long.class);
+    check(seek.getModifiers() == Modifier.PUBLIC && seek.getReturnType() == void.class
+        && seek.getExceptionTypes().length == 0, "seek metadata");
+    Method flush = type.getDeclaredMethod("flush");
+    check(flush.getModifiers() == Modifier.PUBLIC && flush.getReturnType() == void.class
+        && Arrays.equals(flush.getExceptionTypes(),
+            new Class<?>[] { InterruptedException.class }), "flush metadata");
+    Method close = type.getDeclaredMethod("close");
+    check(close.getModifiers() == Modifier.PUBLIC && close.getReturnType() == void.class
+        && close.getExceptionTypes().length == 0, "close metadata");
+    Method convert = type.getDeclaredMethod("floatToShort", float.class);
+    check(convert.getModifiers() == (Modifier.PROTECTED | Modifier.STATIC)
+        && convert.getReturnType() == short.class && convert.getExceptionTypes().length == 0,
+        "conversion metadata");
+    for (Method method : type.getDeclaredMethods()) {
+      check(!method.isBridge() && !method.isSynthetic() && !method.isDefault()
+          && !method.isVarArgs() && method.getTypeParameters().length == 0,
+          "plain declared method " + method.getName());
+    }
+    check(type.getMethod("process", float[][].class, int.class, int.class)
+        .getDeclaringClass() != type, "PCM methods remain inherited");
+  }
+
+  private static final class Exposed extends ConverterAudioFilter {
+    int marker;
+    Exposed(int marker) { this.marker = marker; }
+    static short convert(float value) { return floatToShort(value); }
+    static int size() { return BUFFER_SIZE; }
+    public void process(float[][] input, int offset, int length) { }
+    public void process(short[] input, int offset, int length) { }
+    public void process(ShortBuffer buffer) { }
+    public void process(short[][] input, int offset, int length) { }
   }
 
   private static void check(boolean condition, String message) {
