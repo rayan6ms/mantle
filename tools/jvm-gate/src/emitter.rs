@@ -141,6 +141,7 @@ const PCM_CHUNK_DECODER_CLASS: &str =
 const PCM_CHUNK_ENCODER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/format/transcoder/PcmChunkEncoder";
 const FORMATS_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/Formats";
+const MEDIA_CONTAINER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/MediaContainer";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -466,6 +467,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     PCM_CHUNK_DECODER_CLASS,
     PCM_CHUNK_ENCODER_CLASS,
     FORMATS_CLASS,
+    MEDIA_CONTAINER_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -932,6 +934,7 @@ fn retain_private_fields(class_name: &str) -> bool {
     matches!(
         class_name,
         AUDIO_PLAYER_INPUT_STREAM_CLASS
+            | MEDIA_CONTAINER_CLASS
             | OPUS_AUDIO_DATA_FORMAT_CLASS
             | PCM16_AUDIO_DATA_FORMAT_CLASS
             | OPUS_CHUNK_DECODER_CLASS
@@ -1036,6 +1039,7 @@ fn retain_private_methods(class_name: &str) -> bool {
     matches!(
         class_name,
         AUDIO_PLAYER_INPUT_STREAM_CLASS
+            | MEDIA_CONTAINER_CLASS
             | AUDIO_PIPELINE_FACTORY_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
@@ -1280,6 +1284,9 @@ fn replacement_body(
     }
     if class_name == FORMATS_CLASS {
         return formats_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == MEDIA_CONTAINER_CLASS {
+        return media_container_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -3204,6 +3211,211 @@ fn formats_replacement(
             required_locals,
         ),
     }
+}
+
+fn media_container_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Ljava/lang/String;ILcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;)V",
+        ) => media_container_constructor(pool),
+        ("values", "()[Lcom/sedmelluq/discord/lavaplayer/container/MediaContainer;") => {
+            media_container_values(pool)
+        }
+        (
+            "valueOf",
+            "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainer;",
+        ) => track_enum_value_of(pool, MEDIA_CONTAINER_CLASS),
+        ("asList", "()Ljava/util/List;") => media_container_as_list(pool),
+        ("<clinit>", "()V") => media_container_initializer(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {MEDIA_CONTAINER_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn media_container_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let enumeration = pool.add_class("java/lang/Enum")?;
+    let enum_init = pool.add_method_ref(enumeration, "<init>", "(Ljava/lang/String;I)V")?;
+    let owner = pool.add_class(MEDIA_CONTAINER_CLASS)?;
+    let probe = pool.add_field_ref(
+        owner,
+        "probe",
+        "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;",
+    )?;
+    code(
+        pool,
+        3,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Iload_2,
+            Instruction::Invokespecial(enum_init),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Putfield(probe),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn media_container_values(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MEDIA_CONTAINER_CLASS)?;
+    let array = pool.add_class("[Lcom/sedmelluq/discord/lavaplayer/container/MediaContainer;")?;
+    let values = pool.add_field_ref(
+        owner,
+        "$VALUES",
+        "[Lcom/sedmelluq/discord/lavaplayer/container/MediaContainer;",
+    )?;
+    let clone = pool.add_method_ref(array, "clone", "()Ljava/lang/Object;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Getstatic(values),
+            Instruction::Invokevirtual(clone),
+            Instruction::Checkcast(array),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn media_container_as_list(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    const CONSTANTS: [&str; 11] = [
+        "WAV", "MKV", "MP4", "FLAC", "OGG", "M3U", "PLS", "PLAIN", "MP3", "ADTS", "MPEGADTS",
+    ];
+    let owner = pool.add_class(MEDIA_CONTAINER_CLASS)?;
+    let owner_descriptor = format!("L{MEDIA_CONTAINER_CLASS};");
+    let probe = pool.add_field_ref(
+        owner,
+        "probe",
+        "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;",
+    )?;
+    let array_list = pool.add_class("java/util/ArrayList")?;
+    let init = pool.add_method_ref(array_list, "<init>", "()V")?;
+    let list = pool.add_class("java/util/List")?;
+    let add = pool.add_interface_method_ref(list, "add", "(Ljava/lang/Object;)Z")?;
+    let mut instructions = vec![
+        Instruction::New(array_list),
+        Instruction::Dup,
+        Instruction::Invokespecial(init),
+        Instruction::Astore_0,
+    ];
+    for name in CONSTANTS {
+        let constant = pool.add_field_ref(owner, name, &owner_descriptor)?;
+        instructions.extend([
+            Instruction::Aload_0,
+            Instruction::Getstatic(constant),
+            Instruction::Getfield(probe),
+            Instruction::Invokeinterface(add, 2),
+            Instruction::Pop,
+        ]);
+    }
+    instructions.extend([Instruction::Aload_0, Instruction::Areturn]);
+    code(pool, 2, 1, instructions)
+}
+
+fn media_container_initializer(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    const CONSTANTS: [(&str, &str); 11] = [
+        (
+            "WAV",
+            "com/sedmelluq/discord/lavaplayer/container/wav/WavContainerProbe",
+        ),
+        (
+            "MKV",
+            "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaContainerProbe",
+        ),
+        (
+            "MP4",
+            "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegContainerProbe",
+        ),
+        (
+            "FLAC",
+            "com/sedmelluq/discord/lavaplayer/container/flac/FlacContainerProbe",
+        ),
+        (
+            "OGG",
+            "com/sedmelluq/discord/lavaplayer/container/ogg/OggContainerProbe",
+        ),
+        (
+            "M3U",
+            "com/sedmelluq/discord/lavaplayer/container/playlists/M3uPlaylistContainerProbe",
+        ),
+        (
+            "PLS",
+            "com/sedmelluq/discord/lavaplayer/container/playlists/PlsPlaylistContainerProbe",
+        ),
+        (
+            "PLAIN",
+            "com/sedmelluq/discord/lavaplayer/container/playlists/PlainPlaylistContainerProbe",
+        ),
+        (
+            "MP3",
+            "com/sedmelluq/discord/lavaplayer/container/mp3/Mp3ContainerProbe",
+        ),
+        (
+            "ADTS",
+            "com/sedmelluq/discord/lavaplayer/container/adts/AdtsContainerProbe",
+        ),
+        (
+            "MPEGADTS",
+            "com/sedmelluq/discord/lavaplayer/container/mpegts/MpegAdtsContainerProbe",
+        ),
+    ];
+    let owner = pool.add_class(MEDIA_CONTAINER_CLASS)?;
+    let owner_descriptor = format!("L{MEDIA_CONTAINER_CLASS};");
+    let constructor = pool.add_method_ref(
+        owner,
+        "<init>",
+        "(Ljava/lang/String;ILcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;)V",
+    )?;
+    let mut fields = Vec::with_capacity(CONSTANTS.len());
+    let mut instructions = Vec::with_capacity(CONSTANTS.len() * 9 + 50);
+    for (ordinal, (name, probe_name)) in CONSTANTS.iter().enumerate() {
+        let field = pool.add_field_ref(owner, *name, &owner_descriptor)?;
+        fields.push(field);
+        let probe_class = pool.add_class(*probe_name)?;
+        let probe_constructor = pool.add_method_ref(probe_class, "<init>", "()V")?;
+        instructions.extend([
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Ldc_w(pool.add_string(*name)?),
+            small_integer_instruction(ordinal)?,
+            Instruction::New(probe_class),
+            Instruction::Dup,
+            Instruction::Invokespecial(probe_constructor),
+            Instruction::Invokespecial(constructor),
+            Instruction::Putstatic(field),
+        ]);
+    }
+    instructions.extend([
+        small_integer_instruction(CONSTANTS.len())?,
+        Instruction::Anewarray(owner),
+    ]);
+    for (ordinal, field) in fields.into_iter().enumerate() {
+        instructions.extend([
+            Instruction::Dup,
+            small_integer_instruction(ordinal)?,
+            Instruction::Getstatic(field),
+            Instruction::Aastore,
+        ]);
+    }
+    let values = pool.add_field_ref(
+        owner,
+        "$VALUES",
+        "[Lcom/sedmelluq/discord/lavaplayer/container/MediaContainer;",
+    )?;
+    instructions.extend([Instruction::Putstatic(values), Instruction::Return]);
+    code(pool, 6, 0, instructions)
 }
 
 fn opus_audio_data_format_replacement(

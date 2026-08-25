@@ -140,6 +140,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
         }
         "write-formats-consumer" => Some(FORMATS_CONSUMER),
+        "write-media-container-consumer" => Some(MEDIA_CONTAINER_CONSUMER),
         _ => {
             filter_format_consumer_source(command).or_else(|| sound_cloud_consumer_source(command))
         }
@@ -12027,6 +12028,185 @@ public final class GateFormats {
   }
 
   private static final class Derived extends Formats {}
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MEDIA_CONTAINER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainer;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerProbe;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.List;
+
+public final class GateMediaContainer {
+  private static final String[] NAMES = {
+      "WAV", "MKV", "MP4", "FLAC", "OGG", "M3U", "PLS", "PLAIN", "MP3", "ADTS",
+      "MPEGADTS"
+  };
+  private static final String[] PROBES = {
+      "com.sedmelluq.discord.lavaplayer.container.wav.WavContainerProbe",
+      "com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaContainerProbe",
+      "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegContainerProbe",
+      "com.sedmelluq.discord.lavaplayer.container.flac.FlacContainerProbe",
+      "com.sedmelluq.discord.lavaplayer.container.ogg.OggContainerProbe",
+      "com.sedmelluq.discord.lavaplayer.container.playlists.M3uPlaylistContainerProbe",
+      "com.sedmelluq.discord.lavaplayer.container.playlists.PlsPlaylistContainerProbe",
+      "com.sedmelluq.discord.lavaplayer.container.playlists.PlainPlaylistContainerProbe",
+      "com.sedmelluq.discord.lavaplayer.container.mp3.Mp3ContainerProbe",
+      "com.sedmelluq.discord.lavaplayer.container.adts.AdtsContainerProbe",
+      "com.sedmelluq.discord.lavaplayer.container.mpegts.MpegAdtsContainerProbe"
+  };
+
+  public static void main(String[] args) throws Exception {
+    valuesAndLookup();
+    probesAndLists();
+    failures();
+    reflection();
+    System.out.println(
+        "contracts=enum-order,identity,name-ordinal,defensive-values,value-of,lookup-failures,probe-types,probe-identity,fresh-mutable-array-list,enum-collections,private-enum-state,generic-signatures,reflection");
+  }
+
+  private static void valuesAndLookup() throws Exception {
+    MediaContainer[] first = MediaContainer.values();
+    MediaContainer[] second = MediaContainer.values();
+    check(first != second && first.length == NAMES.length && second.length == NAMES.length,
+        "values returns full defensive arrays");
+    for (int index = 0; index < first.length; index++) {
+      MediaContainer value = first[index];
+      Field field = MediaContainer.class.getDeclaredField(NAMES[index]);
+      check(value == second[index] && value == field.get(null)
+          && value == MediaContainer.valueOf(NAMES[index])
+          && value.name().equals(NAMES[index]) && value.toString().equals(NAMES[index])
+          && value.ordinal() == index && value.getDeclaringClass() == MediaContainer.class,
+          "enum identity " + NAMES[index]);
+    }
+    first[0] = null;
+    first[1] = first[2];
+    check(MediaContainer.values()[0] == MediaContainer.WAV
+        && MediaContainer.values()[1] == MediaContainer.MKV,
+        "mutating returned values array does not alter enum state");
+    check(Arrays.equals(MediaContainer.class.getEnumConstants(), MediaContainer.values()),
+        "Class enum constants follow values order");
+
+    EnumSet<MediaContainer> set = EnumSet.allOf(MediaContainer.class);
+    EnumMap<MediaContainer, Integer> map = new EnumMap<>(MediaContainer.class);
+    for (MediaContainer value : MediaContainer.values()) map.put(value, value.ordinal());
+    check(set.size() == NAMES.length && map.size() == NAMES.length
+        && map.get(MediaContainer.MPEGADTS) == 10,
+        "standard enum collections use the complete universe");
+  }
+
+  private static void probesAndLists() {
+    MediaContainer[] values = MediaContainer.values();
+    for (int index = 0; index < values.length; index++) {
+      MediaContainer container = values[index];
+      check(container.probe != null && container.probe instanceof MediaContainerProbe
+          && container.probe.getClass().getName().equals(PROBES[index]),
+          "concrete probe type " + NAMES[index]);
+    }
+
+    List<MediaContainerProbe> first = MediaContainer.asList();
+    List<MediaContainerProbe> second = MediaContainer.asList();
+    check(first != second && first.getClass() == ArrayList.class
+        && second.getClass() == ArrayList.class && first.size() == NAMES.length,
+        "fresh exact ArrayList instances");
+    for (int index = 0; index < values.length; index++) {
+      check(first.get(index) == values[index].probe && second.get(index) == values[index].probe,
+          "list retains probe identity and declaration order " + NAMES[index]);
+    }
+    first.remove(0);
+    first.add(null);
+    first.clear();
+    check(first.isEmpty() && MediaContainer.asList().size() == NAMES.length
+        && MediaContainer.asList().get(0) == MediaContainer.WAV.probe,
+        "list is independently mutable");
+  }
+
+  private static void failures() {
+    expect(IllegalArgumentException.class, () -> MediaContainer.valueOf("wav"));
+    expect(IllegalArgumentException.class, () -> MediaContainer.valueOf(""));
+    expect(NullPointerException.class, () -> MediaContainer.valueOf(null));
+  }
+
+  private static void reflection() throws Exception {
+    Class<MediaContainer> type = MediaContainer.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL | 0x4000)
+        && type.isEnum() && type.getSuperclass() == Enum.class
+        && type.getInterfaces().length == 0 && type.getDeclaredAnnotations().length == 0,
+        "final public enum metadata");
+    ParameterizedType genericSuperclass = (ParameterizedType) type.getGenericSuperclass();
+    check(genericSuperclass.getRawType() == Enum.class
+        && genericSuperclass.getActualTypeArguments().length == 1
+        && genericSuperclass.getActualTypeArguments()[0] == MediaContainer.class,
+        "self-referential Enum generic superclass");
+    check(type.getDeclaredFields().length == 13 && type.getDeclaredMethods().length == 3
+        && type.getDeclaredConstructors().length == 1,
+        "exact declared member counts");
+
+    for (String name : NAMES) {
+      Field field = type.getDeclaredField(name);
+      check(field.getType() == MediaContainer.class
+          && field.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL | 0x4000)
+          && field.isEnumConstant() && !field.isSynthetic(), "enum field metadata " + name);
+    }
+    Field probe = type.getDeclaredField("probe");
+    check(probe.getType() == MediaContainerProbe.class
+        && probe.getGenericType() == MediaContainerProbe.class
+        && probe.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && !probe.isEnumConstant() && !probe.isSynthetic(), "probe field metadata");
+    Field values = type.getDeclaredField("$VALUES");
+    check(values.getType() == MediaContainer[].class
+        && values.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL | 0x1000)
+        && values.isSynthetic() && !values.isEnumConstant(), "private values field metadata");
+
+    Method valuesMethod = type.getDeclaredMethod("values");
+    Method valueOfMethod = type.getDeclaredMethod("valueOf", String.class);
+    Method asList = type.getDeclaredMethod("asList");
+    check(valuesMethod.getReturnType() == MediaContainer[].class
+        && valueOfMethod.getReturnType() == MediaContainer.class
+        && asList.getReturnType() == List.class
+        && valuesMethod.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && valueOfMethod.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && asList.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && !valuesMethod.isSynthetic() && !valueOfMethod.isSynthetic() && !asList.isSynthetic(),
+        "public method metadata");
+    ParameterizedType listType = (ParameterizedType) asList.getGenericReturnType();
+    check(listType.getRawType() == List.class && listType.getActualTypeArguments().length == 1
+        && listType.getActualTypeArguments()[0] == MediaContainerProbe.class,
+        "asList generic return metadata");
+
+    Constructor<?> constructor = type.getDeclaredConstructors()[0];
+    check(constructor.getModifiers() == Modifier.PRIVATE && !constructor.isSynthetic()
+        && Arrays.equals(constructor.getParameterTypes(),
+            new Class<?>[] {String.class, int.class, MediaContainerProbe.class})
+        && Arrays.equals(constructor.getGenericParameterTypes(),
+            new java.lang.reflect.Type[] {MediaContainerProbe.class})
+        && constructor.getExceptionTypes().length == 0,
+        "private enum constructor metadata");
+  }
+
+  private static void expect(Class<? extends Throwable> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable throwable) {
+      check(type.isInstance(throwable),
+          "expected " + type.getName() + " but got " + throwable.getClass().getName());
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

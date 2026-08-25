@@ -143,144 +143,224 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public final enum shape, declaration order, probe construction, private enum state, generic superclass, and reflected metadata are reference-proven.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainer",
       "symbol_kind": "FIELD",
       "member_name": "WAV",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public static final WAV enum constant, ordinal, identity, and WavContainerProbe binding are reference-proven.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainer",
       "symbol_kind": "FIELD",
       "member_name": "MKV",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public static final MKV enum constant, ordinal, identity, and MatroskaContainerProbe binding are reference-proven.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainer",
       "symbol_kind": "FIELD",
       "member_name": "MP4",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public static final MP4 enum constant, ordinal, identity, and MpegContainerProbe binding are reference-proven.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainer",
       "symbol_kind": "FIELD",
       "member_name": "FLAC",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public static final FLAC enum constant, ordinal, identity, and FlacContainerProbe binding are reference-proven.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainer",
       "symbol_kind": "FIELD",
       "member_name": "OGG",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public static final OGG enum constant, ordinal, identity, and OggContainerProbe binding are reference-proven.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainer",
       "symbol_kind": "FIELD",
       "member_name": "M3U",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public static final M3U enum constant, ordinal, identity, and M3uPlaylistContainerProbe binding are reference-proven.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainer",
       "symbol_kind": "FIELD",
       "member_name": "PLS",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public static final PLS enum constant, ordinal, identity, and PlsPlaylistContainerProbe binding are reference-proven.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainer",
       "symbol_kind": "FIELD",
       "member_name": "PLAIN",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public static final PLAIN enum constant, ordinal, identity, and PlainPlaylistContainerProbe binding are reference-proven.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainer",
       "symbol_kind": "FIELD",
       "member_name": "MP3",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public static final MP3 enum constant, ordinal, identity, and Mp3ContainerProbe binding are reference-proven.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainer",
       "symbol_kind": "FIELD",
       "member_name": "ADTS",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public static final ADTS enum constant, ordinal, identity, and AdtsContainerProbe binding are reference-proven.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainer",
       "symbol_kind": "FIELD",
       "member_name": "MPEGADTS",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public static final MPEGADTS enum constant, ordinal, identity, and MpegAdtsContainerProbe binding are reference-proven.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainer",
       "symbol_kind": "FIELD",
       "member_name": "probe",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public final probe field, concrete per-constant values, stable identity, and reflected metadata are reference-proven.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainer",
       "symbol_kind": "METHOD",
       "member_name": "values",
       "descriptor": "()[Lcom/sedmelluq/discord/lavaplayer/container/MediaContainer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact declaration-order values array, defensive cloning, enum identity, and reflected method metadata are reference-proven.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainer",
       "symbol_kind": "METHOD",
       "member_name": "valueOf",
       "descriptor": "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact enum lookup identity, case sensitivity, null and unknown-name failures, and reflected method metadata are reference-proven.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainer",
       "symbol_kind": "METHOD",
       "member_name": "asList",
       "descriptor": "()Ljava/util/List;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact fresh mutable ArrayList type, declaration-order probe identities, isolation, generic return signature, and reflected metadata are reference-proven.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.MediaContainerDescriptor",
