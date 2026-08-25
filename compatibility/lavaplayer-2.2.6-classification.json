@@ -9081,27 +9081,30 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-data-format-tools contract exactly, with structural, differential conversion, overflow, codec-dispatch, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioDataFormatTools",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-data-format-tools contract exactly, with structural, differential conversion, overflow, codec-dispatch, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioDataFormatTools",
       "symbol_kind": "METHOD",
       "member_name": "toAudioFormat",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)Ljavax/sound/sampled/AudioFormat;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-data-format-tools contract exactly, with structural, differential conversion, overflow, codec-dispatch, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioPlayerInputStream",

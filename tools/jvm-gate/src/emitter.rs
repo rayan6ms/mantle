@@ -118,6 +118,8 @@ const PCM_VOLUME_PROCESSOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/volume/PcmVolumeProcessor";
 const VOLUME_POST_PROCESSOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/volume/VolumePostProcessor";
+const AUDIO_DATA_FORMAT_TOOLS_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/format/AudioDataFormatTools";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -431,6 +433,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     PCM_VOLUME_PROCESSOR_CLASS,
     VOLUME_POST_PROCESSOR_CLASS,
     "com/sedmelluq/discord/lavaplayer/format/AudioDataFormat",
+    AUDIO_DATA_FORMAT_TOOLS_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -1199,6 +1202,9 @@ fn replacement_body(
     ) {
         return volume_replacement(pool, class_name, name, descriptor, required_locals);
     }
+    if class_name == AUDIO_DATA_FORMAT_TOOLS_CLASS {
+        return audio_data_format_tools_replacement(pool, name, descriptor, required_locals);
+    }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
     }
@@ -1700,6 +1706,95 @@ fn replacement_body(
             required_locals,
         )?,
     })
+}
+
+fn audio_data_format_tools_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        (
+            "toAudioFormat",
+            "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)Ljavax/sound/sampled/AudioFormat;",
+        ) => audio_data_format_tools_to_audio_format(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {AUDIO_DATA_FORMAT_TOOLS_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn audio_data_format_tools_to_audio_format(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let pcm = pool.add_class("com/sedmelluq/discord/lavaplayer/format/Pcm16AudioDataFormat")?;
+    let audio_format = pool.add_class("javax/sound/sampled/AudioFormat")?;
+    let encoding = pool.add_class("javax/sound/sampled/AudioFormat$Encoding")?;
+    let pcm_signed = pool.add_field_ref(
+        encoding,
+        "PCM_SIGNED",
+        "Ljavax/sound/sampled/AudioFormat$Encoding;",
+    )?;
+    let format = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let sample_rate = pool.add_field_ref(format, "sampleRate", "I")?;
+    let channel_count = pool.add_field_ref(format, "channelCount", "I")?;
+    let codec_name = pool.add_method_ref(format, "codecName", "()Ljava/lang/String;")?;
+    let string = pool.add_class("java/lang/String")?;
+    let equals = pool.add_method_ref(string, "equals", "(Ljava/lang/Object;)Z")?;
+    let audio_format_init = pool.add_method_ref(
+        audio_format,
+        "<init>",
+        "(Ljavax/sound/sampled/AudioFormat$Encoding;FIIIFZ)V",
+    )?;
+    let illegal_state = pool.add_class("java/lang/IllegalStateException")?;
+    let illegal_state_init =
+        pool.add_method_ref(illegal_state, "<init>", "(Ljava/lang/String;)V")?;
+    let big_endian_codec = pool.add_string("PCM_S16_BE")?;
+    let unsupported_message = pool.add_string("Only PCM is currently supported.")?;
+    let unsupported_target = 25;
+    let mut body = code(
+        pool,
+        10,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Instanceof(pcm),
+            Instruction::Ifeq(unsupported_target),
+            Instruction::New(audio_format),
+            Instruction::Dup,
+            Instruction::Getstatic(pcm_signed),
+            Instruction::Aload_0,
+            Instruction::Getfield(sample_rate),
+            Instruction::I2f,
+            Instruction::Bipush(16),
+            Instruction::Aload_0,
+            Instruction::Getfield(channel_count),
+            Instruction::Aload_0,
+            Instruction::Getfield(channel_count),
+            Instruction::Iconst_2,
+            Instruction::Imul,
+            Instruction::Aload_0,
+            Instruction::Getfield(sample_rate),
+            Instruction::I2f,
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(codec_name),
+            Instruction::Ldc_w(big_endian_codec),
+            Instruction::Invokevirtual(equals),
+            Instruction::Invokespecial(audio_format_init),
+            Instruction::Areturn,
+            Instruction::New(illegal_state),
+            Instruction::Dup,
+            Instruction::Ldc_w(unsupported_message),
+            Instruction::Invokespecial(illegal_state_init),
+            Instruction::Athrow,
+        ],
+    )?;
+    add_stack_map_table(pool, &mut body, vec![same_stack_frame(unsupported_target)])?;
+    Ok(body)
 }
 
 fn pcm_format_replacement(

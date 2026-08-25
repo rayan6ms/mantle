@@ -112,6 +112,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-equalizer-consumer" => Some(EQUALIZER_CONSUMER),
         "write-volume-consumer" => Some(VOLUME_CONSUMER),
         "write-audio-data-format-consumer" => Some(AUDIO_DATA_FORMAT_CONSUMER),
+        "write-audio-data-format-tools-consumer" => Some(AUDIO_DATA_FORMAT_TOOLS_CONSUMER),
         "write-pcm-filter-factory-consumer" => Some(PCM_FILTER_FACTORY_CONSUMER),
         "write-pcm-format-consumer" => Some(PCM_FORMAT_CONSUMER),
         "write-resampling-pcm-audio-filter-consumer" => Some(RESAMPLING_PCM_AUDIO_FILTER_CONSUMER),
@@ -10034,6 +10035,142 @@ public final class GateAudioDataFormat {
       throw new AssertionError("expected " + type.getName());
     } catch (Throwable error) {
       if (!type.isInstance(error)) throw new AssertionError("wrong failure", error);
+    }
+  }
+  private interface Operation { void run() throws Exception; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_DATA_FORMAT_TOOLS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormatTools;
+import com.sedmelluq.discord.lavaplayer.format.Pcm16AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkDecoder;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkEncoder;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import javax.sound.sampled.AudioFormat;
+
+public final class GateAudioDataFormatTools {
+  public static void main(String[] args) throws Exception {
+    conversion();
+    codecDispatch();
+    failures();
+    reflection();
+    System.out.println(
+        "contracts=pcm-signed,geometry,float-conversion,overflow,codec-dispatch,unsupported,null-codec,failure-identity,reflection");
+  }
+
+  private static void conversion() {
+    Pcm16AudioDataFormat source = new Pcm16AudioDataFormat(2, 48_000, 960, false);
+    AudioFormat result = AudioDataFormatTools.toAudioFormat(source);
+    check(result.getEncoding() == AudioFormat.Encoding.PCM_SIGNED
+        && result.getSampleRate() == 48_000.0f
+        && result.getSampleSizeInBits() == 16
+        && result.getChannels() == 2
+        && result.getFrameSize() == 4
+        && result.getFrameRate() == 48_000.0f
+        && result.isBigEndian(), "ordinary PCM conversion");
+
+    Pcm16AudioDataFormat overflow =
+        new Pcm16AudioDataFormat(Integer.MAX_VALUE, 16_777_217, 0, true);
+    AudioFormat unusual = AudioDataFormatTools.toAudioFormat(overflow);
+    check(unusual.getSampleRate() == (float) 16_777_217
+        && unusual.getFrameRate() == (float) 16_777_217
+        && unusual.getChannels() == Integer.MAX_VALUE
+        && unusual.getFrameSize() == -2, "float conversion and frame-size overflow");
+  }
+
+  private static void codecDispatch() {
+    NamedPcm big = new NamedPcm("PCM_S16_BE");
+    NamedPcm little = new NamedPcm("PCM_S16_LE");
+    NamedPcm other = new NamedPcm("pcm_s16_be");
+    check(AudioDataFormatTools.toAudioFormat(big).isBigEndian()
+        && !AudioDataFormatTools.toAudioFormat(little).isBigEndian()
+        && !AudioDataFormatTools.toAudioFormat(other).isBigEndian()
+        && big.codecCalls == 1 && little.codecCalls == 1 && other.codecCalls == 1,
+        "virtual codec dispatch and exact comparison");
+  }
+
+  private static void failures() {
+    IllegalStateException nullError = expect(IllegalStateException.class,
+        () -> AudioDataFormatTools.toAudioFormat(null));
+    IllegalStateException nonPcmError = expect(IllegalStateException.class,
+        () -> AudioDataFormatTools.toAudioFormat(new NonPcm()));
+    check("Only PCM is currently supported.".equals(nullError.getMessage())
+        && nullError.getCause() == null
+        && "Only PCM is currently supported.".equals(nonPcmError.getMessage())
+        && nonPcmError.getCause() == null, "unsupported format failure");
+
+    NamedPcm nullCodec = new NamedPcm(null);
+    expect(NullPointerException.class, () -> AudioDataFormatTools.toAudioFormat(nullCodec));
+    check(nullCodec.codecCalls == 1, "null codec call count");
+
+    RuntimeException sentinel = new RuntimeException("codec-sentinel");
+    NamedPcm failing = new NamedPcm("PCM_S16_BE");
+    failing.failure = sentinel;
+    try {
+      AudioDataFormatTools.toAudioFormat(failing);
+      throw new AssertionError("missing codec failure");
+    } catch (RuntimeException error) {
+      check(error == sentinel && failing.codecCalls == 1, "codec failure identity");
+    }
+  }
+
+  private static void reflection() throws Exception {
+    Class<AudioDataFormatTools> type = AudioDataFormatTools.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 0
+        && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 1, "class metadata");
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    Method method = type.getDeclaredMethod("toAudioFormat", AudioDataFormat.class);
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && method.getReturnType() == AudioFormat.class
+        && method.getExceptionTypes().length == 0
+        && !method.isBridge() && !method.isSynthetic(), "method metadata");
+    check(new AudioDataFormatTools().getClass() == type, "constructor behavior");
+  }
+
+  private static final class NamedPcm extends Pcm16AudioDataFormat {
+    final String codec;
+    int codecCalls;
+    RuntimeException failure;
+    NamedPcm(String codec) {
+      super(1, 8_000, 0, false);
+      this.codec = codec;
+    }
+    public String codecName() {
+      codecCalls++;
+      if (failure != null) throw failure;
+      return codec;
+    }
+  }
+
+  private static final class NonPcm extends AudioDataFormat {
+    NonPcm() { super(1, 8_000, 80); }
+    public String codecName() { return "PCM_S16_BE"; }
+    public byte[] silenceBytes() { return null; }
+    public int expectedChunkSize() { return 0; }
+    public int maximumChunkSize() { return 0; }
+    public AudioChunkDecoder createDecoder() { return null; }
+    public AudioChunkEncoder createEncoder(AudioConfiguration configuration) { return null; }
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong failure", error);
+      return type.cast(error);
     }
   }
   private interface Operation { void run() throws Exception; }
