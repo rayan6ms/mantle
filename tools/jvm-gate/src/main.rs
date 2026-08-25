@@ -153,6 +153,7 @@ fn filter_format_consumer_source(command: &str) -> Option<&'static str> {
         "write-opus-audio-data-format-consumer" => Some(OPUS_AUDIO_DATA_FORMAT_CONSUMER),
         "write-pcm16-audio-data-format-consumer" => Some(PCM16_AUDIO_DATA_FORMAT_CONSUMER),
         "write-standard-audio-data-formats-consumer" => Some(STANDARD_AUDIO_DATA_FORMATS_CONSUMER),
+        "write-audio-chunk-decoder-consumer" => Some(AUDIO_CHUNK_DECODER_CONSUMER),
         "write-pcm-filter-factory-consumer" => Some(PCM_FILTER_FACTORY_CONSUMER),
         "write-pcm-format-consumer" => Some(PCM_FORMAT_CONSUMER),
         "write-resampling-pcm-audio-filter-consumer" => Some(RESAMPLING_PCM_AUDIO_FILTER_CONSUMER),
@@ -10492,6 +10493,130 @@ public final class GateStandardAudioDataFormats {
     Constructor<?> constructor = type.getDeclaredConstructor();
     check(constructor.getModifiers() == Modifier.PUBLIC
         && constructor.getExceptionTypes().length == 0, "constructor metadata");
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_CHUNK_DECODER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkDecoder;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ShortBuffer;
+
+public final class GateAudioChunkDecoder {
+  public static void main(String[] args) throws Exception {
+    dispatchAndCallerBuffer();
+    nullForwarding();
+    failureIdentity();
+    closeSemantics();
+    reflection();
+    System.out.println(
+        "contracts=public-abstract-interface,no-fields,no-constructors,decode-signature,close-signature,identity-dispatch,caller-buffer,null-forwarding,failure-identity,reflection");
+  }
+
+  private static void dispatchAndCallerBuffer() {
+    RecordingDecoder implementation = new RecordingDecoder();
+    AudioChunkDecoder decoder = implementation;
+    byte[] encoded = {7, 8};
+    ShortBuffer output = ShortBuffer.allocate(3);
+    output.position(1);
+    decoder.decode(encoded, output);
+    check(implementation.decodeCalls == 1 && implementation.encoded == encoded
+        && implementation.buffer == output, "interface dispatch preserves argument identities");
+    check(output.position() == 2 && output.get(1) == 7,
+        "implementation mutates the caller-owned output buffer");
+  }
+
+  private static void nullForwarding() {
+    RecordingDecoder implementation = new RecordingDecoder();
+    AudioChunkDecoder decoder = implementation;
+    decoder.decode(null, null);
+    check(implementation.decodeCalls == 1 && implementation.encoded == null
+        && implementation.buffer == null, "null arguments reach the implementation unchanged");
+  }
+
+  private static void failureIdentity() {
+    RecordingDecoder implementation = new RecordingDecoder();
+    AudioChunkDecoder decoder = implementation;
+    RuntimeException decodeFailure = new RuntimeException("decode");
+    implementation.decodeFailure = decodeFailure;
+    check(expect(() -> decoder.decode(new byte[0], ShortBuffer.allocate(0))) == decodeFailure,
+        "decode failure identity");
+
+    RuntimeException closeFailure = new RuntimeException("close");
+    implementation.closeFailure = closeFailure;
+    check(expect(decoder::close) == closeFailure, "close failure identity");
+  }
+
+  private static void closeSemantics() {
+    RecordingDecoder implementation = new RecordingDecoder();
+    AudioChunkDecoder decoder = implementation;
+    decoder.close();
+    decoder.close();
+    check(implementation.closeCalls == 2, "each close call dispatches to the implementation");
+  }
+
+  private static void reflection() throws Exception {
+    Class<AudioChunkDecoder> type = AudioChunkDecoder.class;
+    int interfaceModifiers = Modifier.PUBLIC | Modifier.ABSTRACT | Modifier.INTERFACE;
+    check(type.getModifiers() == interfaceModifiers && type.isInterface()
+        && type.getSuperclass() == null && type.getInterfaces().length == 0,
+        "interface metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 2, "declared member counts");
+
+    Method decode = type.getDeclaredMethod("decode", byte[].class, ShortBuffer.class);
+    check(decode.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && decode.getReturnType() == void.class && decode.getParameterCount() == 2
+        && decode.getParameterTypes()[0] == byte[].class
+        && decode.getParameterTypes()[1] == ShortBuffer.class
+        && decode.getExceptionTypes().length == 0 && !decode.isDefault()
+        && !decode.isBridge() && !decode.isSynthetic(), "decode metadata");
+
+    Method close = type.getDeclaredMethod("close");
+    check(close.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && close.getReturnType() == void.class && close.getParameterCount() == 0
+        && close.getExceptionTypes().length == 0 && !close.isDefault()
+        && !close.isBridge() && !close.isSynthetic(), "close metadata");
+  }
+
+  private static RuntimeException expect(Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected failure");
+    } catch (RuntimeException error) {
+      return error;
+    }
+  }
+
+  private interface Operation { void run(); }
+
+  private static final class RecordingDecoder implements AudioChunkDecoder {
+    private byte[] encoded;
+    private ShortBuffer buffer;
+    private int decodeCalls;
+    private int closeCalls;
+    private RuntimeException decodeFailure;
+    private RuntimeException closeFailure;
+
+    @Override
+    public void decode(byte[] encoded, ShortBuffer buffer) {
+      this.encoded = encoded;
+      this.buffer = buffer;
+      decodeCalls++;
+      if (decodeFailure != null) throw decodeFailure;
+      if (encoded != null && buffer != null) buffer.put((short) encoded[0]);
+    }
+
+    @Override
+    public void close() {
+      closeCalls++;
+      if (closeFailure != null) throw closeFailure;
+    }
   }
 
   private static void check(boolean condition, String message) {

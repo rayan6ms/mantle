@@ -197,6 +197,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-pcm16-audio-data-format-consum
   --output "$WORK/GatePcm16AudioDataFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-standard-audio-data-formats-consumer \
   --output "$WORK/GateStandardAudioDataFormats.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-audio-chunk-decoder-consumer \
+  --output "$WORK/GateAudioChunkDecoder.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -251,6 +253,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateOpusAudioDataFormat.java" \
   "$WORK/GatePcm16AudioDataFormat.java" \
   "$WORK/GateStandardAudioDataFormats.java" \
+  "$WORK/GateAudioChunkDecoder.java" \
   "$WORK/GatePcmFilterFactory.java" \
   "$WORK/GatePcmFormat.java" \
   "$WORK/GateResamplingPcmAudioFilter.java" \
@@ -994,6 +997,17 @@ cmp "$WORK/standard-audio-data-formats-reference.txt" \
 grep --fixed-strings \
   'contracts=singletons,initialization-order,runtime-types,discord-geometry,common-geometry,endian-assignments,value-pairs,constructor,reflection' \
   "$WORK/standard-audio-data-formats-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateAudioChunkDecoder \
+  >"$WORK/audio-chunk-decoder-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateAudioChunkDecoder >"$WORK/audio-chunk-decoder-candidate.txt"
+cmp "$WORK/audio-chunk-decoder-reference.txt" \
+  "$WORK/audio-chunk-decoder-candidate.txt"
+grep --fixed-strings \
+  'contracts=public-abstract-interface,no-fields,no-constructors,decode-signature,close-signature,identity-dispatch,caller-buffer,null-forwarding,failure-identity,reflection' \
+  "$WORK/audio-chunk-decoder-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"

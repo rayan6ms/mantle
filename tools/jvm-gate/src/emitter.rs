@@ -128,6 +128,8 @@ const PCM16_AUDIO_DATA_FORMAT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/format/Pcm16AudioDataFormat";
 const STANDARD_AUDIO_DATA_FORMATS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/format/StandardAudioDataFormats";
+const AUDIO_CHUNK_DECODER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/format/transcoder/AudioChunkDecoder";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -446,6 +448,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     OPUS_AUDIO_DATA_FORMAT_CLASS,
     PCM16_AUDIO_DATA_FORMAT_CLASS,
     STANDARD_AUDIO_DATA_FORMATS_CLASS,
+    AUDIO_CHUNK_DECODER_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
