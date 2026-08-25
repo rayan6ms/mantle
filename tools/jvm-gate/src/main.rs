@@ -155,6 +155,7 @@ fn filter_format_consumer_source(command: &str) -> Option<&'static str> {
         "write-standard-audio-data-formats-consumer" => Some(STANDARD_AUDIO_DATA_FORMATS_CONSUMER),
         "write-audio-chunk-decoder-consumer" => Some(AUDIO_CHUNK_DECODER_CONSUMER),
         "write-audio-chunk-encoder-consumer" => Some(AUDIO_CHUNK_ENCODER_CONSUMER),
+        "write-opus-chunk-decoder-consumer" => Some(OPUS_CHUNK_DECODER_CONSUMER),
         "write-pcm-filter-factory-consumer" => Some(PCM_FILTER_FACTORY_CONSUMER),
         "write-pcm-format-consumer" => Some(PCM_FORMAT_CONSUMER),
         "write-resampling-pcm-audio-filter-consumer" => Some(RESAMPLING_PCM_AUDIO_FILTER_CONSUMER),
@@ -10796,6 +10797,202 @@ public final class GateAudioChunkEncoder {
       if (closeFailure != null) throw closeFailure;
     }
   }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const OPUS_CHUNK_DECODER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.format.OpusAudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkDecoder;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.OpusChunkDecoder;
+import com.sedmelluq.discord.lavaplayer.natives.opus.OpusDecoder;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.BufferOverflowException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.ShortBuffer;
+
+public final class GateOpusChunkDecoder {
+  private static final byte[] SILENCE = {(byte) 0xfc, (byte) 0xff, (byte) 0xfe};
+
+  public static void main(String[] args) throws Exception {
+    decodeAndReuse();
+    formatGeometry();
+    failureOrdering();
+    closeSemantics();
+    reflection();
+    System.out.println(
+        "contracts=constructor-geometry,direct-encoded-buffer,capacity-4096,buffer-reuse,silence-decode,output-clear-flip,oversize-order,null-order,heap-output,close-idempotence,closed-failure,private-state,reflection");
+  }
+
+  private static void decodeAndReuse() throws Exception {
+    OpusChunkDecoder decoder = new OpusChunkDecoder(new OpusAudioDataFormat(2, 48_000, 960));
+    ByteBuffer encodedBuffer = encodedBuffer(decoder);
+    check(encodedBuffer.isDirect() && encodedBuffer.capacity() == 4_096
+        && encodedBuffer.position() == 0 && encodedBuffer.limit() == 4_096,
+        "constructor allocates direct encoded storage");
+
+    ShortBuffer output = directShortBuffer(2_048);
+    output.position(9);
+    output.limit(10);
+    decoder.decode(SILENCE, output);
+    check(output.position() == 0 && output.limit() == 1_920,
+        "decode clears and flips stereo output to decoded samples");
+    for (int index = 0; index < output.limit(); index++) {
+      check(output.get(index) == 0, "silent packet PCM " + index);
+    }
+    check(encodedBuffer(decoder) == encodedBuffer && encodedBuffer.position() == 0
+        && encodedBuffer.limit() == SILENCE.length && encodedBuffer.get(0) == SILENCE[0]
+        && encodedBuffer.get(1) == SILENCE[1] && encodedBuffer.get(2) == SILENCE[2],
+        "encoded buffer is reused and flipped over the copied packet");
+
+    ShortBuffer second = directShortBuffer(2_048);
+    decoder.decode(SILENCE, second);
+    check(encodedBuffer(decoder) == encodedBuffer && second.position() == 0
+        && second.limit() == 1_920, "subsequent decode reuses native and encoded state");
+    decoder.close();
+  }
+
+  private static void formatGeometry() {
+    OpusChunkDecoder decoder = new OpusChunkDecoder(new OpusAudioDataFormat(1, 8_000, 80));
+    ShortBuffer output = directShortBuffer(512);
+    decoder.decode(SILENCE, output);
+    check(output.position() == 0 && output.limit() == 160,
+        "constructor passes sample rate and channel count to native decoder");
+    decoder.close();
+  }
+
+  private static void failureOrdering() throws Exception {
+    expect(NullPointerException.class, () -> new OpusChunkDecoder(null));
+
+    OpusChunkDecoder oversize = decoder();
+    ShortBuffer untouched = directShortBuffer(4);
+    untouched.position(1);
+    untouched.limit(2);
+    expect(BufferOverflowException.class, () -> oversize.decode(new byte[4_097], untouched));
+    check(untouched.position() == 1 && untouched.limit() == 2,
+        "oversize encoded packet fails before output clear");
+    ByteBuffer oversizeInternal = encodedBuffer(oversize);
+    check(oversizeInternal.position() == 0 && oversizeInternal.limit() == 4_096,
+        "oversize packet leaves cleared encoded storage");
+    oversize.close();
+
+    OpusChunkDecoder nullEncoded = decoder();
+    ShortBuffer nullEncodedOutput = directShortBuffer(4);
+    nullEncodedOutput.position(1);
+    nullEncodedOutput.limit(2);
+    expect(NullPointerException.class, () -> nullEncoded.decode(null, nullEncodedOutput));
+    check(nullEncodedOutput.position() == 1 && nullEncodedOutput.limit() == 2,
+        "null encoded packet fails before output clear");
+    ByteBuffer nullInternal = encodedBuffer(nullEncoded);
+    check(nullInternal.position() == 0 && nullInternal.limit() == 4_096,
+        "null packet leaves cleared encoded storage");
+    nullEncoded.close();
+
+    OpusChunkDecoder nullOutput = decoder();
+    expect(NullPointerException.class, () -> nullOutput.decode(SILENCE, null));
+    ByteBuffer prepared = encodedBuffer(nullOutput);
+    check(prepared.position() == 0 && prepared.limit() == SILENCE.length,
+        "packet is copied and flipped before null output failure");
+    nullOutput.close();
+
+    OpusChunkDecoder heapOutput = decoder();
+    ShortBuffer heap = ShortBuffer.allocate(8);
+    heap.position(2);
+    heap.limit(3);
+    IllegalArgumentException heapFailure =
+        expect(IllegalArgumentException.class, () -> heapOutput.decode(SILENCE, heap));
+    check(heapFailure.getMessage().equals("Arguments must be direct buffers.")
+        && heap.position() == 0 && heap.limit() == heap.capacity(),
+        "heap output is cleared before native direct-buffer validation");
+    heapOutput.close();
+  }
+
+  private static void closeSemantics() {
+    OpusChunkDecoder decoder = decoder();
+    decoder.close();
+    decoder.close();
+    ShortBuffer output = directShortBuffer(8);
+    output.position(2);
+    output.limit(3);
+    expect(IllegalStateException.class, () -> decoder.decode(SILENCE, output));
+    check(output.position() == 0 && output.limit() == output.capacity(),
+        "closed decoder failure occurs after output clear");
+  }
+
+  private static void reflection() throws Exception {
+    Class<OpusChunkDecoder> type = OpusChunkDecoder.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 1
+        && type.getInterfaces()[0] == AudioChunkDecoder.class,
+        "class and interface metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 2, "declared member counts");
+
+    Field decoder = type.getDeclaredField("decoder");
+    check(decoder.getType() == OpusDecoder.class
+        && decoder.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL),
+        "native decoder field metadata");
+    Field encoded = type.getDeclaredField("encodedBuffer");
+    check(encoded.getType() == ByteBuffer.class
+        && encoded.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL),
+        "encoded buffer field metadata");
+
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        com.sedmelluq.discord.lavaplayer.format.AudioDataFormat.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    Method decode = type.getDeclaredMethod("decode", byte[].class, ShortBuffer.class);
+    checkPublicMethod(decode, void.class, 2, "decode metadata");
+    Method close = type.getDeclaredMethod("close");
+    checkPublicMethod(close, void.class, 0, "close metadata");
+
+    OpusChunkDecoder instance = decoder();
+    decoder.setAccessible(true);
+    encoded.setAccessible(true);
+    check(decoder.get(instance).getClass() == OpusDecoder.class
+        && ((ByteBuffer) encoded.get(instance)).isDirect(), "private runtime state");
+    instance.close();
+  }
+
+  private static void checkPublicMethod(
+      Method method, Class<?> returnType, int parameterCount, String message) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == returnType
+        && method.getParameterCount() == parameterCount && method.getExceptionTypes().length == 0
+        && !method.isBridge() && !method.isSynthetic(), message);
+  }
+
+  private static OpusChunkDecoder decoder() {
+    return new OpusChunkDecoder(new OpusAudioDataFormat(2, 48_000, 960));
+  }
+
+  private static ShortBuffer directShortBuffer(int samples) {
+    return ByteBuffer.allocateDirect(samples * 2).order(ByteOrder.nativeOrder()).asShortBuffer();
+  }
+
+  private static ByteBuffer encodedBuffer(OpusChunkDecoder decoder) throws Exception {
+    Field field = OpusChunkDecoder.class.getDeclaredField("encodedBuffer");
+    field.setAccessible(true);
+    return (ByteBuffer) field.get(decoder);
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong failure", error);
+      return type.cast(error);
+    }
+  }
+
+  private interface Operation { void run() throws Exception; }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

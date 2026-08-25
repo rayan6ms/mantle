@@ -201,6 +201,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-audio-chunk-decoder-consumer \
   --output "$WORK/GateAudioChunkDecoder.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-audio-chunk-encoder-consumer \
   --output "$WORK/GateAudioChunkEncoder.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-opus-chunk-decoder-consumer \
+  --output "$WORK/GateOpusChunkDecoder.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -257,6 +259,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateStandardAudioDataFormats.java" \
   "$WORK/GateAudioChunkDecoder.java" \
   "$WORK/GateAudioChunkEncoder.java" \
+  "$WORK/GateOpusChunkDecoder.java" \
   "$WORK/GatePcmFilterFactory.java" \
   "$WORK/GatePcmFormat.java" \
   "$WORK/GateResamplingPcmAudioFilter.java" \
@@ -1022,6 +1025,17 @@ cmp "$WORK/audio-chunk-encoder-reference.txt" \
 grep --fixed-strings \
   'contracts=public-abstract-interface,no-fields,no-constructors,overload-signatures,close-signature,identity-dispatch,input-consumption,returned-array,caller-output,null-forwarding,failure-identity,reflection' \
   "$WORK/audio-chunk-encoder-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateOpusChunkDecoder \
+  >"$WORK/opus-chunk-decoder-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOpusChunkDecoder >"$WORK/opus-chunk-decoder-candidate.txt"
+cmp "$WORK/opus-chunk-decoder-reference.txt" \
+  "$WORK/opus-chunk-decoder-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor-geometry,direct-encoded-buffer,capacity-4096,buffer-reuse,silence-decode,output-clear-flip,oversize-order,null-order,heap-output,close-idempotence,closed-failure,private-state,reflection' \
+  "$WORK/opus-chunk-decoder-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"
