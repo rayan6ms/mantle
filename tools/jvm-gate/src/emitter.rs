@@ -1682,6 +1682,14 @@ fn replacement_body(
             audio_data_format_total_sample_count(pool)?
         }
         (
+            "com/sedmelluq/discord/lavaplayer/format/AudioDataFormat",
+            "equals",
+            "(Ljava/lang/Object;)Z",
+        ) => audio_data_format_equals(pool)?,
+        ("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat", "hashCode", "()I") => {
+            audio_data_format_hash_code(pool)?
+        }
+        (
             "com/sedmelluq/discord/lavaplayer/track/TrackMarker",
             "<init>",
             "(JLcom/sedmelluq/discord/lavaplayer/track/TrackMarkerHandler;)V",
@@ -47015,6 +47023,135 @@ fn audio_data_format_total_sample_count(pool: &mut ConstantPool<'static>) -> Res
             Instruction::Aload_0,
             Instruction::Getfield(channels),
             Instruction::Imul,
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+fn audio_data_format_equals(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let object = pool.add_class("java/lang/Object")?;
+    let objects = pool.add_class("java/util/Objects")?;
+    let channels = pool.add_field_ref(owner, "channelCount", "I")?;
+    let sample_rate = pool.add_field_ref(owner, "sampleRate", "I")?;
+    let chunk_samples = pool.add_field_ref(owner, "chunkSampleCount", "I")?;
+    let get_class = pool.add_method_ref(object, "getClass", "()Ljava/lang/Class;")?;
+    let codec_name = pool.add_method_ref(owner, "codecName", "()Ljava/lang/String;")?;
+    let objects_equals =
+        pool.add_method_ref(objects, "equals", "(Ljava/lang/Object;Ljava/lang/Object;)Z")?;
+    let instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Aload_1,
+        Instruction::If_acmpne(5),
+        Instruction::Iconst_1,
+        Instruction::Ireturn,
+        Instruction::Aload_1,
+        Instruction::Ifnull(12),
+        Instruction::Aload_0,
+        Instruction::Invokevirtual(get_class),
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(get_class),
+        Instruction::If_acmpeq(14),
+        Instruction::Iconst_0,
+        Instruction::Ireturn,
+        Instruction::Aload_1,
+        Instruction::Checkcast(owner),
+        Instruction::Astore_2,
+        Instruction::Aload_0,
+        Instruction::Getfield(channels),
+        Instruction::Aload_2,
+        Instruction::Getfield(channels),
+        Instruction::If_icmpeq(24),
+        Instruction::Iconst_0,
+        Instruction::Ireturn,
+        Instruction::Aload_0,
+        Instruction::Getfield(sample_rate),
+        Instruction::Aload_2,
+        Instruction::Getfield(sample_rate),
+        Instruction::If_icmpeq(31),
+        Instruction::Iconst_0,
+        Instruction::Ireturn,
+        Instruction::Aload_0,
+        Instruction::Getfield(chunk_samples),
+        Instruction::Aload_2,
+        Instruction::Getfield(chunk_samples),
+        Instruction::If_icmpeq(38),
+        Instruction::Iconst_0,
+        Instruction::Ireturn,
+        Instruction::Aload_0,
+        Instruction::Invokevirtual(codec_name),
+        Instruction::Aload_2,
+        Instruction::Invokevirtual(codec_name),
+        Instruction::Invokestatic(objects_equals),
+        Instruction::Ireturn,
+    ];
+    let base = vec![
+        VerificationType::Object { cpool_index: owner },
+        VerificationType::Object {
+            cpool_index: object,
+        },
+    ];
+    let compared = [
+        base.clone(),
+        vec![VerificationType::Object { cpool_index: owner }],
+    ]
+    .concat();
+    let mut previous = None;
+    let mut body = code(pool, 2, 3, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            youtube_full_frame(&mut previous, 5, base.clone(), vec![])?,
+            youtube_full_frame(&mut previous, 12, base.clone(), vec![])?,
+            youtube_full_frame(&mut previous, 14, base, vec![])?,
+            youtube_full_frame(&mut previous, 24, compared.clone(), vec![])?,
+            youtube_full_frame(&mut previous, 31, compared.clone(), vec![])?,
+            youtube_full_frame(&mut previous, 38, compared, vec![])?,
+        ],
+    )?;
+    Ok(body)
+}
+
+fn audio_data_format_hash_code(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let string = pool.add_class("java/lang/String")?;
+    let channels = pool.add_field_ref(owner, "channelCount", "I")?;
+    let sample_rate = pool.add_field_ref(owner, "sampleRate", "I")?;
+    let chunk_samples = pool.add_field_ref(owner, "chunkSampleCount", "I")?;
+    let codec_name = pool.add_method_ref(owner, "codecName", "()Ljava/lang/String;")?;
+    let string_hash = pool.add_method_ref(string, "hashCode", "()I")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(channels),
+            Instruction::Istore_1,
+            Instruction::Bipush(31),
+            Instruction::Iload_1,
+            Instruction::Imul,
+            Instruction::Aload_0,
+            Instruction::Getfield(sample_rate),
+            Instruction::Iadd,
+            Instruction::Istore_1,
+            Instruction::Bipush(31),
+            Instruction::Iload_1,
+            Instruction::Imul,
+            Instruction::Aload_0,
+            Instruction::Getfield(chunk_samples),
+            Instruction::Iadd,
+            Instruction::Istore_1,
+            Instruction::Bipush(31),
+            Instruction::Iload_1,
+            Instruction::Imul,
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(codec_name),
+            Instruction::Invokevirtual(string_hash),
+            Instruction::Iadd,
+            Instruction::Istore_1,
+            Instruction::Iload_1,
             Instruction::Ireturn,
         ],
     )

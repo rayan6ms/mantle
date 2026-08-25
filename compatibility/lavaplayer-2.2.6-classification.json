@@ -8931,135 +8931,150 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-data-format contract exactly, with structural, differential geometry, equality, hashing, dispatch, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioDataFormat",
       "symbol_kind": "FIELD",
       "member_name": "channelCount",
       "descriptor": "I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-data-format contract exactly, with structural, differential geometry, equality, hashing, dispatch, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioDataFormat",
       "symbol_kind": "FIELD",
       "member_name": "sampleRate",
       "descriptor": "I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-data-format contract exactly, with structural, differential geometry, equality, hashing, dispatch, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioDataFormat",
       "symbol_kind": "FIELD",
       "member_name": "chunkSampleCount",
       "descriptor": "I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-data-format contract exactly, with structural, differential geometry, equality, hashing, dispatch, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioDataFormat",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(III)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-data-format contract exactly, with structural, differential geometry, equality, hashing, dispatch, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioDataFormat",
       "symbol_kind": "METHOD",
       "member_name": "totalSampleCount",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-data-format contract exactly, with structural, differential geometry, equality, hashing, dispatch, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioDataFormat",
       "symbol_kind": "METHOD",
       "member_name": "frameDuration",
       "descriptor": "()J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-data-format contract exactly, with structural, differential geometry, equality, hashing, dispatch, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioDataFormat",
       "symbol_kind": "METHOD",
       "member_name": "codecName",
       "descriptor": "()Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-data-format contract exactly, with structural, differential geometry, equality, hashing, dispatch, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioDataFormat",
       "symbol_kind": "METHOD",
       "member_name": "silenceBytes",
       "descriptor": "()[B",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-data-format contract exactly, with structural, differential geometry, equality, hashing, dispatch, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioDataFormat",
       "symbol_kind": "METHOD",
       "member_name": "expectedChunkSize",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-data-format contract exactly, with structural, differential geometry, equality, hashing, dispatch, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioDataFormat",
       "symbol_kind": "METHOD",
       "member_name": "maximumChunkSize",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-data-format contract exactly, with structural, differential geometry, equality, hashing, dispatch, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioDataFormat",
       "symbol_kind": "METHOD",
       "member_name": "createDecoder",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/format/transcoder/AudioChunkDecoder;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-data-format contract exactly, with structural, differential geometry, equality, hashing, dispatch, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioDataFormat",
       "symbol_kind": "METHOD",
       "member_name": "createEncoder",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;)Lcom/sedmelluq/discord/lavaplayer/format/transcoder/AudioChunkEncoder;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-data-format contract exactly, with structural, differential geometry, equality, hashing, dispatch, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioDataFormat",
       "symbol_kind": "METHOD",
       "member_name": "equals",
       "descriptor": "(Ljava/lang/Object;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-data-format contract exactly, with structural, differential geometry, equality, hashing, dispatch, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioDataFormat",
       "symbol_kind": "METHOD",
       "member_name": "hashCode",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The generated Rust-owned JVM implementation preserves the frozen audio-data-format contract exactly, with structural, differential geometry, equality, hashing, dispatch, failure, and reflection evidence.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.format.AudioDataFormatTools",

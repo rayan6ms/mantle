@@ -111,6 +111,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-to-split-short-audio-filter-consumer" => Some(TO_SPLIT_SHORT_AUDIO_FILTER_CONSUMER),
         "write-equalizer-consumer" => Some(EQUALIZER_CONSUMER),
         "write-volume-consumer" => Some(VOLUME_CONSUMER),
+        "write-audio-data-format-consumer" => Some(AUDIO_DATA_FORMAT_CONSUMER),
         "write-pcm-filter-factory-consumer" => Some(PCM_FILTER_FACTORY_CONSUMER),
         "write-pcm-format-consumer" => Some(PCM_FORMAT_CONSUMER),
         "write-resampling-pcm-audio-filter-consumer" => Some(RESAMPLING_PCM_AUDIO_FILTER_CONSUMER),
@@ -9821,6 +9822,212 @@ public final class GateVolume {
     public boolean provide(MutableAudioFrame target, long timeout, TimeUnit unit) { return false; }
   }
 
+  private static void expect(Class<? extends Throwable> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong failure", error);
+    }
+  }
+  private interface Operation { void run() throws Exception; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const AUDIO_DATA_FORMAT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkDecoder;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkEncoder;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.nio.ShortBuffer;
+import java.util.Arrays;
+
+public final class GateAudioDataFormat {
+  public static void main(String[] args) throws Exception {
+    geometry();
+    abstractDispatch();
+    equality();
+    hashing();
+    failures();
+    reflection();
+    System.out.println(
+        "contracts=geometry,overflow,duration,abstract-dispatch,exact-class,short-circuit,nullable-codec,hash-overflow,failures,reflection");
+  }
+
+  private static void geometry() {
+    Format ordinary = new Format(2, 48_000, 960, "opus");
+    check(ordinary.channelCount == 2 && ordinary.sampleRate == 48_000
+        && ordinary.chunkSampleCount == 960, "constructor geometry");
+    check(ordinary.totalSampleCount() == 1_920 && ordinary.frameDuration() == 20L,
+        "ordinary calculations");
+
+    Format fractional = new Format(3, 44_100, 1_024, "aac");
+    check(fractional.totalSampleCount() == 3_072
+        && fractional.frameDuration() == 23L, "integer duration truncation");
+    check(new Format(Integer.MAX_VALUE, 1, 2, "x").totalSampleCount() == -2,
+        "sample-count overflow");
+    check(new Format(1, -3, Integer.MAX_VALUE, "x").frameDuration()
+        == -715_827_882_333L, "signed duration");
+  }
+
+  private static void abstractDispatch() {
+    Format format = new Format(1, 8_000, 80, "pcm");
+    AudioDataFormat base = format;
+    AudioConfiguration configuration = new AudioConfiguration();
+    check(base.codecName().equals("pcm") && base.silenceBytes() == format.silence
+        && base.expectedChunkSize() == 17 && base.maximumChunkSize() == 23,
+        "value dispatch");
+    check(base.createDecoder() == format.decoder
+        && base.createEncoder(configuration) == format.encoder
+        && format.encoderConfiguration == configuration, "codec factory dispatch");
+  }
+
+  private static void equality() {
+    Format first = new Format(2, 48_000, 960, "opus");
+    check(first.equals(first) && first.codecCalls == 0, "identity fast path");
+    check(!first.equals(null) && first.codecCalls == 0, "null fast path");
+
+    Alternate alternate = new Alternate(2, 48_000, 960, "opus");
+    check(!first.equals(alternate) && first.codecCalls == 0 && alternate.codecCalls == 0,
+        "exact-class requirement");
+
+    Format channels = new Format(1, 48_000, 960, "opus");
+    Format rate = new Format(2, 44_100, 960, "opus");
+    Format samples = new Format(2, 48_000, 480, "opus");
+    check(!first.equals(channels) && !first.equals(rate) && !first.equals(samples)
+        && first.codecCalls == 0 && channels.codecCalls == 0
+        && rate.codecCalls == 0 && samples.codecCalls == 0, "field short circuits");
+
+    Format equal = new Format(2, 48_000, 960, "opus");
+    check(first.equals(equal) && first.codecCalls == 1 && equal.codecCalls == 1,
+        "codec equality");
+    Format leftNull = new Format(2, 48_000, 960, null);
+    Format rightNull = new Format(2, 48_000, 960, null);
+    Format nonNull = new Format(2, 48_000, 960, "opus");
+    check(leftNull.equals(rightNull) && !leftNull.equals(nonNull)
+        && leftNull.codecCalls == 2 && rightNull.codecCalls == 1 && nonNull.codecCalls == 1,
+        "nullable codec equality");
+  }
+
+  private static void hashing() {
+    Format format = new Format(Integer.MAX_VALUE, Integer.MIN_VALUE, -17, "overflow");
+    int expected = format.channelCount;
+    expected = 31 * expected + format.sampleRate;
+    expected = 31 * expected + format.chunkSampleCount;
+    expected = 31 * expected + "overflow".hashCode();
+    check(format.hashCode() == expected && format.codecCalls == 1, "hash arithmetic");
+    Format equal = new Format(Integer.MAX_VALUE, Integer.MIN_VALUE, -17, "overflow");
+    check(format.equals(equal) && format.hashCode() == equal.hashCode(), "hash equality");
+  }
+
+  private static void failures() {
+    expect(ArithmeticException.class, () -> new Format(1, 0, 960, "x").frameDuration());
+    expect(NullPointerException.class, () -> new Format(1, 1, 1, null).hashCode());
+
+    RuntimeException sentinel = new RuntimeException("codec-sentinel");
+    Format first = new Format(1, 1, 1, "x");
+    Format second = new Format(1, 1, 1, "x");
+    first.codecFailure = sentinel;
+    try {
+      first.equals(second);
+      throw new AssertionError("missing codec failure");
+    } catch (RuntimeException error) {
+      check(error == sentinel && first.codecCalls == 1 && second.codecCalls == 0,
+          "codec failure identity and order");
+    }
+  }
+
+  private static void reflection() throws Exception {
+    Class<AudioDataFormat> type = AudioDataFormat.class;
+    check(Modifier.isPublic(type.getModifiers()) && Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers()) && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 3
+        && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 10, "class metadata");
+    for (String name : new String[] {"channelCount", "sampleRate", "chunkSampleCount"}) {
+      Field field = type.getDeclaredField(name);
+      check(field.getType() == int.class
+          && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL), "field metadata");
+    }
+    Constructor<?> constructor = type.getDeclaredConstructor(int.class, int.class, int.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    for (String name : new String[] {"codecName", "silenceBytes", "expectedChunkSize",
+        "maximumChunkSize", "createDecoder", "createEncoder"}) {
+      Method method = Arrays.stream(type.getDeclaredMethods())
+          .filter(candidate -> candidate.getName().equals(name)).findFirst().orElseThrow();
+      check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+          && method.getExceptionTypes().length == 0, "abstract method metadata");
+    }
+    for (String name : new String[] {"totalSampleCount", "frameDuration", "equals", "hashCode"}) {
+      Method method = Arrays.stream(type.getDeclaredMethods())
+          .filter(candidate -> candidate.getName().equals(name)).findFirst().orElseThrow();
+      check(method.getModifiers() == Modifier.PUBLIC && !method.isSynthetic()
+          && !method.isBridge() && method.getExceptionTypes().length == 0,
+          "concrete method metadata");
+    }
+  }
+
+  private static class Format extends AudioDataFormat {
+    final String codec;
+    final byte[] silence = {1, 2};
+    final AudioChunkDecoder decoder = new Decoder();
+    final AudioChunkEncoder encoder = new Encoder();
+    int codecCalls;
+    RuntimeException codecFailure;
+    AudioConfiguration encoderConfiguration;
+
+    Format(int channels, int rate, int samples, String name) {
+      super(channels, rate, samples);
+      codec = name;
+    }
+    public String codecName() {
+      codecCalls++;
+      if (codecFailure != null) throw codecFailure;
+      return codec;
+    }
+    public byte[] silenceBytes() { return silence; }
+    public int expectedChunkSize() { return 17; }
+    public int maximumChunkSize() { return 23; }
+    public AudioChunkDecoder createDecoder() { return decoder; }
+    public AudioChunkEncoder createEncoder(AudioConfiguration configuration) {
+      encoderConfiguration = configuration;
+      return encoder;
+    }
+  }
+
+  private static final class Alternate extends AudioDataFormat {
+    final String codec;
+    int codecCalls;
+    Alternate(int channels, int rate, int samples, String name) {
+      super(channels, rate, samples);
+      codec = name;
+    }
+    public String codecName() { codecCalls++; return codec; }
+    public byte[] silenceBytes() { return null; }
+    public int expectedChunkSize() { return 0; }
+    public int maximumChunkSize() { return 0; }
+    public AudioChunkDecoder createDecoder() { return null; }
+    public AudioChunkEncoder createEncoder(AudioConfiguration configuration) { return null; }
+  }
+
+  private static final class Decoder implements AudioChunkDecoder {
+    public void decode(byte[] data, ShortBuffer buffer) {}
+    public void close() {}
+  }
+  private static final class Encoder implements AudioChunkEncoder {
+    public byte[] encode(ShortBuffer buffer) { return null; }
+    public void encode(ShortBuffer buffer, ByteBuffer output) {}
+    public void close() {}
+  }
   private static void expect(Class<? extends Throwable> type, Operation operation) {
     try {
       operation.run();
