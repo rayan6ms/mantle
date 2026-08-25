@@ -151,6 +151,7 @@ fn filter_format_consumer_source(command: &str) -> Option<&'static str> {
         "write-audio-data-format-tools-consumer" => Some(AUDIO_DATA_FORMAT_TOOLS_CONSUMER),
         "write-audio-player-input-stream-consumer" => Some(AUDIO_PLAYER_INPUT_STREAM_CONSUMER),
         "write-opus-audio-data-format-consumer" => Some(OPUS_AUDIO_DATA_FORMAT_CONSUMER),
+        "write-pcm16-audio-data-format-consumer" => Some(PCM16_AUDIO_DATA_FORMAT_CONSUMER),
         "write-pcm-filter-factory-consumer" => Some(PCM_FILTER_FACTORY_CONSUMER),
         "write-pcm-format-consumer" => Some(PCM_FORMAT_CONSUMER),
         "write-resampling-pcm-audio-filter-consumer" => Some(RESAMPLING_PCM_AUDIO_FILTER_CONSUMER),
@@ -10338,6 +10339,190 @@ public final class GateOpusAudioDataFormat {
 
   private static final class Derived extends OpusAudioDataFormat {
     Derived(int channels, int rate, int samples) { super(channels, rate, samples); }
+  }
+
+  private static <T extends Throwable> T expect(Class<T> type, Operation operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong failure", error);
+      return type.cast(error);
+    }
+  }
+  private interface Operation { void run() throws Exception; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const PCM16_AUDIO_DATA_FORMAT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.Pcm16AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkDecoder;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.AudioChunkEncoder;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.PcmChunkDecoder;
+import com.sedmelluq.discord.lavaplayer.format.transcoder.PcmChunkEncoder;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ShortBuffer;
+import java.util.Arrays;
+
+public final class GatePcm16AudioDataFormat {
+  public static void main(String[] args) throws Exception {
+    geometryAndSilence();
+    equalityAndHashing();
+    factories();
+    failures();
+    reflection();
+    System.out.println(
+        "contracts=codec,geometry,overflow,silence-instance,equality,endian-ignored,hash,factories,endian-transcoding,null-configuration,private-state,reflection");
+  }
+
+  private static void geometryAndSilence() {
+    Pcm16AudioDataFormat big = new Pcm16AudioDataFormat(2, 48_000, 960, true);
+    Pcm16AudioDataFormat little = new Pcm16AudioDataFormat(2, 48_000, 960, false);
+    check(big.channelCount == 2 && big.sampleRate == 48_000 && big.chunkSampleCount == 960
+        && big.totalSampleCount() == 1_920 && big.frameDuration() == 20L,
+        "inherited geometry");
+    check(big.codecName().equals("PCM_S16_BE")
+        && little.codecName().equals("PCM_S16_BE"), "frozen codec identity");
+    check(big.expectedChunkSize() == 3_840 && big.maximumChunkSize() == 3_840
+        && little.expectedChunkSize() == 3_840 && little.maximumChunkSize() == 3_840,
+        "PCM chunk geometry");
+
+    byte[] silence = big.silenceBytes();
+    check(silence == big.silenceBytes() && silence != little.silenceBytes()
+        && silence.length == 3_840 && silence[0] == 0 && silence[silence.length - 1] == 0,
+        "per-instance zero silence");
+    silence[0] = 9;
+    check(big.silenceBytes()[0] == 9 && little.silenceBytes()[0] == 0
+        && big.expectedChunkSize() == 3_840 && big.maximumChunkSize() == 3_840,
+        "mutable silence alias");
+
+    Pcm16AudioDataFormat overflowZero =
+        new Pcm16AudioDataFormat(Integer.MIN_VALUE, 1, 1, false);
+    check(overflowZero.silenceBytes().length == 0
+        && overflowZero.expectedChunkSize() == 0 && overflowZero.maximumChunkSize() == 0,
+        "overflowing zero-length allocation");
+  }
+
+  private static void equalityAndHashing() {
+    Pcm16AudioDataFormat big = new Pcm16AudioDataFormat(2, 48_000, 2, true);
+    Pcm16AudioDataFormat little = new Pcm16AudioDataFormat(2, 48_000, 2, false);
+    big.silenceBytes()[0] = 99;
+    check(big.equals(big) && big.equals(little) && little.equals(big)
+        && big.hashCode() == little.hashCode(), "endianness and silence excluded from value identity");
+    check(!big.equals(null) && !big.equals("PCM_S16_BE")
+        && !big.equals(new Pcm16AudioDataFormat(1, 48_000, 2, true))
+        && !big.equals(new Pcm16AudioDataFormat(2, 44_100, 2, true))
+        && !big.equals(new Pcm16AudioDataFormat(2, 48_000, 1, true)),
+        "geometry equality");
+    Derived derived = new Derived(2, 48_000, 2, true);
+    check(!big.equals(derived) && !derived.equals(big), "exact runtime class equality");
+
+    Pcm16AudioDataFormat overflow =
+        new Pcm16AudioDataFormat(Integer.MAX_VALUE, Integer.MIN_VALUE, 0, false);
+    int expected = overflow.channelCount;
+    expected = 31 * expected + overflow.sampleRate;
+    expected = 31 * expected + overflow.chunkSampleCount;
+    expected = 31 * expected + "PCM_S16_BE".hashCode();
+    check(overflow.hashCode() == expected, "inherited hash arithmetic");
+  }
+
+  private static void factories() {
+    Pcm16AudioDataFormat big = new Pcm16AudioDataFormat(1, 8_000, 2, true);
+    Pcm16AudioDataFormat little = new Pcm16AudioDataFormat(1, 8_000, 2, false);
+    AudioChunkDecoder bigDecoder = big.createDecoder();
+    AudioChunkDecoder littleDecoder = little.createDecoder();
+    check(bigDecoder.getClass() == PcmChunkDecoder.class
+        && littleDecoder.getClass() == PcmChunkDecoder.class, "decoder implementation");
+    ShortBuffer bigDecoded = ShortBuffer.allocate(2);
+    ShortBuffer littleDecoded = ShortBuffer.allocate(2);
+    byte[] encoded = {1, 2, 3, 4};
+    bigDecoder.decode(encoded, bigDecoded);
+    littleDecoder.decode(encoded, littleDecoded);
+    check(bigDecoded.position() == 0 && bigDecoded.get(0) == 0x0102
+        && bigDecoded.get(1) == 0x0304 && littleDecoded.position() == 0
+        && littleDecoded.get(0) == 0x0201 && littleDecoded.get(1) == 0x0403,
+        "decoder endian forwarding");
+    bigDecoder.close();
+    littleDecoder.close();
+
+    AudioChunkEncoder bigEncoder = big.createEncoder(null);
+    AudioChunkEncoder littleEncoder = little.createEncoder(null);
+    check(bigEncoder.getClass() == PcmChunkEncoder.class
+        && littleEncoder.getClass() == PcmChunkEncoder.class,
+        "encoder implementation and ignored configuration");
+    ShortBuffer bigInput = ShortBuffer.wrap(new short[] {0x0102, 0x0304});
+    ShortBuffer littleInput = ShortBuffer.wrap(new short[] {0x0102, 0x0304});
+    check(Arrays.equals(bigEncoder.encode(bigInput), new byte[] {1, 2, 3, 4})
+        && Arrays.equals(littleEncoder.encode(littleInput), new byte[] {2, 1, 4, 3})
+        && bigInput.position() == 0 && littleInput.position() == 0,
+        "encoder endian forwarding and input reset");
+    bigEncoder.close();
+    littleEncoder.close();
+  }
+
+  private static void failures() {
+    expect(NegativeArraySizeException.class,
+        () -> new Pcm16AudioDataFormat(-1, 1, 1, false));
+    expect(NegativeArraySizeException.class,
+        () -> new Pcm16AudioDataFormat(Integer.MAX_VALUE, 1, 1, true));
+  }
+
+  private static void reflection() throws Exception {
+    Class<Pcm16AudioDataFormat> type = Pcm16AudioDataFormat.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == AudioDataFormat.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 4
+        && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 8, "class metadata");
+    for (String name : new String[] {"CODEC_NAME_BE", "CODEC_NAME_LE"}) {
+      Field field = type.getDeclaredField(name);
+      check(field.getType() == String.class
+          && field.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL),
+          "codec field metadata " + name);
+    }
+    check(type.getDeclaredField("CODEC_NAME_BE").get(null).equals("PCM_S16_BE")
+        && type.getDeclaredField("CODEC_NAME_LE").get(null).equals("PCM_S16_LE"),
+        "codec field values");
+    Field endian = type.getDeclaredField("bigEndian");
+    Field silence = type.getDeclaredField("silenceBytes");
+    check(endian.getType() == boolean.class
+        && endian.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && silence.getType() == byte[].class
+        && silence.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL),
+        "private field metadata");
+
+    Constructor<?> constructor =
+        type.getDeclaredConstructor(int.class, int.class, int.class, boolean.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    for (Method method : type.getDeclaredMethods()) {
+      check(method.getModifiers() == Modifier.PUBLIC && !method.isBridge()
+          && !method.isSynthetic() && method.getExceptionTypes().length == 0,
+          "method metadata " + method);
+    }
+
+    Pcm16AudioDataFormat format = new Pcm16AudioDataFormat(3, 12_345, 4, true);
+    check((Boolean) readField(type, format, "bigEndian")
+        && readField(type, format, "silenceBytes") == format.silenceBytes()
+        && format.silenceBytes().length == 24, "private constructor state");
+  }
+
+  private static Object readField(Class<?> type, Object instance, String name) throws Exception {
+    Field field = type.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(instance);
+  }
+
+  private static final class Derived extends Pcm16AudioDataFormat {
+    Derived(int channels, int rate, int samples, boolean endian) {
+      super(channels, rate, samples, endian);
+    }
   }
 
   private static <T extends Throwable> T expect(Class<T> type, Operation operation) {

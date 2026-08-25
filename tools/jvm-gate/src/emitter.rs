@@ -124,6 +124,8 @@ const AUDIO_PLAYER_INPUT_STREAM_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/format/AudioPlayerInputStream";
 const OPUS_AUDIO_DATA_FORMAT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/format/OpusAudioDataFormat";
+const PCM16_AUDIO_DATA_FORMAT_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/format/Pcm16AudioDataFormat";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -440,6 +442,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     AUDIO_DATA_FORMAT_TOOLS_CLASS,
     AUDIO_PLAYER_INPUT_STREAM_CLASS,
     OPUS_AUDIO_DATA_FORMAT_CLASS,
+    PCM16_AUDIO_DATA_FORMAT_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -906,6 +909,7 @@ fn retain_private_fields(class_name: &str) -> bool {
         class_name,
         AUDIO_PLAYER_INPUT_STREAM_CLASS
             | OPUS_AUDIO_DATA_FORMAT_CLASS
+            | PCM16_AUDIO_DATA_FORMAT_CLASS
             | PLAYER_LIFECYCLE_MANAGER_CLASS
             | FUNCTIONAL_RESULT_HANDLER_CLASS
             | AUDIO_PIPELINE_CLASS
@@ -1223,6 +1227,9 @@ fn replacement_body(
     }
     if class_name == OPUS_AUDIO_DATA_FORMAT_CLASS {
         return opus_audio_data_format_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == PCM16_AUDIO_DATA_FORMAT_CLASS {
+        return pcm16_audio_data_format_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -2563,6 +2570,195 @@ fn opus_audio_data_format_class_init(pool: &mut ConstantPool<'static>) -> Result
             Instruction::Bastore,
             Instruction::Putstatic(silence),
             Instruction::Return,
+        ],
+    )
+}
+
+fn pcm16_audio_data_format_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(IIIZ)V") => pcm16_audio_data_format_constructor(pool),
+        ("codecName", "()Ljava/lang/String;") => pcm16_audio_data_format_codec_name(pool),
+        ("silenceBytes", "()[B") => pcm16_audio_data_format_silence_bytes(pool),
+        ("expectedChunkSize" | "maximumChunkSize", "()I") => {
+            pcm16_audio_data_format_chunk_size(pool)
+        }
+        (
+            "createDecoder",
+            "()Lcom/sedmelluq/discord/lavaplayer/format/transcoder/AudioChunkDecoder;",
+        ) => pcm16_audio_data_format_create_decoder(pool),
+        (
+            "createEncoder",
+            "(Lcom/sedmelluq/discord/lavaplayer/player/AudioConfiguration;)Lcom/sedmelluq/discord/lavaplayer/format/transcoder/AudioChunkEncoder;",
+        ) => pcm16_audio_data_format_create_encoder(pool),
+        ("equals", "(Ljava/lang/Object;)Z") => pcm16_audio_data_format_equals(pool),
+        ("hashCode", "()I") => pcm16_audio_data_format_hash_code(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {PCM16_AUDIO_DATA_FORMAT_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn pcm16_audio_data_format_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(PCM16_AUDIO_DATA_FORMAT_CLASS)?;
+    let parent = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let parent_init = pool.add_method_ref(parent, "<init>", "(III)V")?;
+    let big_endian = pool.add_field_ref(owner, "bigEndian", "Z")?;
+    let silence_bytes = pool.add_field_ref(owner, "silenceBytes", "[B")?;
+    code(
+        pool,
+        4,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Iload_1,
+            Instruction::Iload_2,
+            Instruction::Iload_3,
+            Instruction::Invokespecial(parent_init),
+            Instruction::Aload_0,
+            Instruction::Iload(4),
+            Instruction::Putfield(big_endian),
+            Instruction::Aload_0,
+            Instruction::Iload_1,
+            Instruction::Iload_3,
+            Instruction::Imul,
+            Instruction::Iconst_2,
+            Instruction::Imul,
+            Instruction::Newarray(ArrayType::Byte),
+            Instruction::Putfield(silence_bytes),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn pcm16_audio_data_format_codec_name(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let codec = pool.add_string("PCM_S16_BE")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![Instruction::Ldc_w(codec), Instruction::Areturn],
+    )
+}
+
+fn pcm16_audio_data_format_silence_bytes(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(PCM16_AUDIO_DATA_FORMAT_CLASS)?;
+    let silence_bytes = pool.add_field_ref(owner, "silenceBytes", "[B")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(silence_bytes),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn pcm16_audio_data_format_chunk_size(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(PCM16_AUDIO_DATA_FORMAT_CLASS)?;
+    let silence_bytes = pool.add_field_ref(owner, "silenceBytes", "[B")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(silence_bytes),
+            Instruction::Arraylength,
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+fn pcm16_audio_data_format_create_decoder(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(PCM16_AUDIO_DATA_FORMAT_CLASS)?;
+    let big_endian = pool.add_field_ref(owner, "bigEndian", "Z")?;
+    let decoder =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/format/transcoder/PcmChunkDecoder")?;
+    let init = pool.add_method_ref(
+        decoder,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;Z)V",
+    )?;
+    code(
+        pool,
+        4,
+        1,
+        vec![
+            Instruction::New(decoder),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Aload_0,
+            Instruction::Getfield(big_endian),
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn pcm16_audio_data_format_create_encoder(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(PCM16_AUDIO_DATA_FORMAT_CLASS)?;
+    let big_endian = pool.add_field_ref(owner, "bigEndian", "Z")?;
+    let encoder =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/format/transcoder/PcmChunkEncoder")?;
+    let init = pool.add_method_ref(
+        encoder,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;Z)V",
+    )?;
+    code(
+        pool,
+        4,
+        2,
+        vec![
+            Instruction::New(encoder),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Aload_0,
+            Instruction::Getfield(big_endian),
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn pcm16_audio_data_format_equals(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let parent = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let equals = pool.add_method_ref(parent, "equals", "(Ljava/lang/Object;)Z")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(equals),
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+fn pcm16_audio_data_format_hash_code(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let parent = pool.add_class("com/sedmelluq/discord/lavaplayer/format/AudioDataFormat")?;
+    let hash_code = pool.add_method_ref(parent, "hashCode", "()I")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(hash_code),
+            Instruction::Ireturn,
         ],
     )
 }

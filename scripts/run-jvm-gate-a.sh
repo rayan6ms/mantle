@@ -193,6 +193,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-audio-player-input-stream-cons
   --output "$WORK/GateAudioPlayerInputStream.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-opus-audio-data-format-consumer \
   --output "$WORK/GateOpusAudioDataFormat.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-pcm16-audio-data-format-consumer \
+  --output "$WORK/GatePcm16AudioDataFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -245,6 +247,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateAudioDataFormatTools.java" \
   "$WORK/GateAudioPlayerInputStream.java" \
   "$WORK/GateOpusAudioDataFormat.java" \
+  "$WORK/GatePcm16AudioDataFormat.java" \
   "$WORK/GatePcmFilterFactory.java" \
   "$WORK/GatePcmFormat.java" \
   "$WORK/GateResamplingPcmAudioFilter.java" \
@@ -966,6 +969,17 @@ cmp "$WORK/opus-audio-data-format-reference.txt" \
 grep --fixed-strings \
   'contracts=codec,geometry,overflow,silence-alias,equality,hash,factories,failure-order,private-state,reflection' \
   "$WORK/opus-audio-data-format-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcm16AudioDataFormat \
+  >"$WORK/pcm16-audio-data-format-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GatePcm16AudioDataFormat >"$WORK/pcm16-audio-data-format-candidate.txt"
+cmp "$WORK/pcm16-audio-data-format-reference.txt" \
+  "$WORK/pcm16-audio-data-format-candidate.txt"
+grep --fixed-strings \
+  'contracts=codec,geometry,overflow,silence-instance,equality,endian-ignored,hash,factories,endian-transcoding,null-configuration,private-state,reflection' \
+  "$WORK/pcm16-audio-data-format-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"
