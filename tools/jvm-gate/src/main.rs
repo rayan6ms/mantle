@@ -163,6 +163,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-adts-stream-provider-consumer" => Some(ADTS_STREAM_PROVIDER_CONSUMER),
         "write-adts-stream-reader-consumer" => Some(ADTS_STREAM_READER_CONSUMER),
         "write-aac-packet-router-consumer" => Some(AAC_PACKET_ROUTER_CONSUMER),
+        "write-opus-packet-router-consumer" => Some(OPUS_PACKET_ROUTER_CONSUMER),
         _ => None,
     }
 }
@@ -39076,6 +39077,555 @@ public final class GateAacPacketRouter {
     Derived(AudioProcessingContext context, Consumer<AacDecoder> configurer) {
       super(context, configurer);
     }
+    @Override public void flush() { flushCalls++; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const OPUS_PACKET_ROUTER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.common.OpusPacketRouter;
+import com.sedmelluq.discord.lavaplayer.filter.AudioPipeline;
+import com.sedmelluq.discord.lavaplayer.filter.FinalPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.OpusAudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.Pcm16AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.natives.opus.OpusDecoder;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerOptions;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameRebuilder;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.ShortBuffer;
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
+import org.slf4j.LoggerFactory;
+
+public final class GateOpusPacketRouter {
+  private static final Object UNSAFE = loadUnsafe();
+
+  public static void main(String[] args) throws Exception {
+    constructionAndPacketTiming();
+    passthroughAndSeek();
+    downstreamRouting();
+    modeTransitionsAndInitialisation();
+    flushingAndClosing();
+    subclassingAndReflection();
+    System.out.println(
+        "contracts=construction,context-identity,input-geometry,header-state,offered-frame,output-format,volume,private-state,eager-logger,heap-header,direct-header,position-preservation,direct-underflow,zero-frame,frame-size,format-rebuild,format-reuse,duration,timecode,seek-state,seek-forwarding,seek-failure-prefix,strict-seek-threshold,passthrough,input-window,frame-reuse,heap-staging,staging-growth,direct-identity,native-output,decode-limit,decode-order,interruption-identity,reencode-mode,passthrough-mode,mode-cleanup,volume-application,pipeline-creation,initial-seek,initialisation-cleanup,flush-noop,flush-forwarding,close-order,close-failure-prefix,buffer-cleanup,repeated-close,subclassable,private-helpers,throws,reflection");
+  }
+
+  private static void constructionAndPacketTiming() throws Exception {
+    RecordingFrameBuffer frames = new RecordingFrameBuffer();
+    OpusAudioDataFormat output = new OpusAudioDataFormat(2, 48_000, 960);
+    AudioProcessingContext context = context(output, frames);
+    OpusPacketRouter router = new OpusPacketRouter(context, 48_000, 2);
+    MutableAudioFrame offered = (MutableAudioFrame) field(router, "offeredFrame");
+    check(field(router, "context") == context && intField(router, "inputFrequency") == 48_000
+        && intField(router, "inputChannels") == 2
+        && ((byte[]) field(router, "headerBytes")).length == 2
+        && offered.getVolume() == 100 && offered.getFormat() == output
+        && longField(router, "currentFrameDuration") == 0L
+        && longField(router, "currentTimecode") == 0L
+        && longField(router, "requestedTimecode") == 0L
+        && field(router, "opusDecoder") == null && field(router, "downstream") == null
+        && field(router, "directInput") == null && field(router, "frameBuffer") == null
+        && field(router, "inputFormat") == null && intField(router, "lastFrameSize") == 0,
+        "constructor initializes exact eager and lazy state");
+    Field log = OpusPacketRouter.class.getDeclaredField("log");
+    log.setAccessible(true);
+    check(log.get(null) == LoggerFactory.getLogger(OpusPacketRouter.class),
+        "logger is initialized eagerly for the exact router class");
+
+    ByteBuffer empty = ByteBuffer.allocate(0);
+    router.process(empty);
+    check(frames.consumeCalls == 0 && longField(router, "currentTimecode") == 0L
+        && field(router, "inputFormat") == null,
+        "zero-frame heap packet returns without mode checks or timing changes");
+
+    ByteBuffer packet = ByteBuffer.wrap(new byte[] {8, 0, 99});
+    packet.position(1);
+    packet.position(0);
+    router.process(packet);
+    Object firstFormat = field(router, "inputFormat");
+    check(frames.consumeCalls == 1 && frames.lastFrame == offered
+        && frames.lastTimecode == 20L && frames.lastDataLength == 3
+        && field(offered, MutableAudioFrame.class, "frameBuffer") == packet
+        && intField(offered, MutableAudioFrame.class, "framePosition") == 0
+        && intField(offered, MutableAudioFrame.class, "frameLength") == 3
+        && packet.position() == 0 && intField(router, "lastFrameSize") == 960
+        && longField(router, "currentFrameDuration") == 20L
+        && longField(router, "currentTimecode") == 20L
+        && firstFormat.getClass() == OpusAudioDataFormat.class,
+        "heap packet derives format and duration before exact passthrough delivery");
+    router.process(packet);
+    check(field(router, "inputFormat") == firstFormat
+        && longField(router, "currentTimecode") == 40L && frames.consumeCalls == 2,
+        "same frame size reuses format identity and advances time again");
+
+    ByteBuffer direct = ByteBuffer.allocateDirect(2);
+    direct.put((byte) 0).put((byte) 0).flip();
+    direct.position(0);
+    router.process(direct);
+    check(direct.position() == 0 && intField(router, "lastFrameSize") == 480
+        && field(router, "inputFormat") != firstFormat
+        && longField(router, "currentFrameDuration") == 10L
+        && longField(router, "currentTimecode") == 50L,
+        "direct header path restores position and rebuilds changed frame format");
+
+    ByteBuffer shortDirect = ByteBuffer.allocateDirect(1);
+    shortDirect.put((byte) 8).flip();
+    check(catchThrowable(() -> router.process(shortDirect)) instanceof BufferUnderflowException
+        && shortDirect.position() == 0 && longField(router, "currentTimecode") == 50L,
+        "direct header underflow preserves the exact checked-read prefix");
+    router.close();
+  }
+
+  private static void passthroughAndSeek() throws Exception {
+    RecordingFrameBuffer frames = new RecordingFrameBuffer();
+    OpusPacketRouter router = new OpusPacketRouter(
+        context(new OpusAudioDataFormat(2, 48_000, 960), frames), 48_000, 2);
+    router.seekPerformed(100L, 5L);
+    check(longField(router, "requestedTimecode") == 100L
+        && longField(router, "currentTimecode") == 5L,
+        "seek stores both full-width values without downstream");
+    ByteBuffer packet = ByteBuffer.wrap(new byte[] {8, 0});
+    for (int index = 0; index < 4; index++) router.process(packet);
+    check(frames.consumeCalls == 0 && longField(router, "currentTimecode") == 85L,
+        "requested timecode suppresses passthrough while current time is not greater");
+    router.process(packet);
+    check(frames.consumeCalls == 1 && frames.lastTimecode == 105L,
+        "strict requested-current comparison delivers only after crossing seek target");
+
+    RecordingPipeline pipeline = allocate(RecordingPipeline.class);
+    putObject(router, "downstream", pipeline);
+    RuntimeException seekFailure = new RuntimeException("seek-sentinel");
+    pipeline.seekFailure = seekFailure;
+    check(catchThrowable(() -> router.seekPerformed(Long.MIN_VALUE + 3L, Long.MAX_VALUE - 5L))
+        == seekFailure && longField(router, "requestedTimecode") == Long.MIN_VALUE + 3L
+        && longField(router, "currentTimecode") == Long.MAX_VALUE - 5L
+        && pipeline.seekCalls == 1,
+        "seek stores exact values before downstream failure propagation");
+    pipeline.seekFailure = null;
+    router.close();
+  }
+
+  private static void downstreamRouting() throws Exception {
+    RecordingFrameBuffer frames = new RecordingFrameBuffer();
+    AudioProcessingContext context = context(new Pcm16AudioDataFormat(2, 48_000, 960, false), frames);
+    OpusPacketRouter router = new OpusPacketRouter(context, 48_000, 2);
+    RecordingOpusDecoder decoder = allocate(RecordingOpusDecoder.class);
+    RecordingPipeline pipeline = allocate(RecordingPipeline.class);
+    putObject(router, "opusDecoder", decoder);
+    putObject(router, "downstream", pipeline);
+
+    ByteBuffer heap = ByteBuffer.wrap(new byte[] {8, 0, 7});
+    router.process(heap);
+    ByteBuffer staging = (ByteBuffer) field(router, "directInput");
+    ShortBuffer pcm = (ShortBuffer) field(router, "frameBuffer");
+    check(heap.position() == heap.limit() && staging.isDirect() && staging.capacity() == 203
+        && decoder.decodeCalls == 1 && decoder.input == staging
+        && decoder.inputPosition == 0 && decoder.inputLimit == 3
+        && decoder.output == pcm && pcm.isDirect() && pcm.capacity() == 1_920
+        && pcm.limit() == 960 && pcm.order() == ByteOrder.nativeOrder()
+        && pipeline.processCalls == 1 && pipeline.lastBuffer == pcm
+        && decoder.sequence < pipeline.processSequence,
+        "heap reencode stages direct input, allocates native PCM, decodes, then processes");
+
+    ByteBuffer larger = ByteBuffer.allocate(204);
+    larger.put((byte) 8).put((byte) 0).position(0).limit(204);
+    router.process(larger);
+    ByteBuffer grownStaging = (ByteBuffer) field(router, "directInput");
+    check(grownStaging != staging && grownStaging.capacity() == 404
+        && decoder.input == grownStaging && larger.position() == larger.limit(),
+        "insufficient heap staging grows by the frozen 200-byte margin");
+
+    ByteBuffer smaller = ByteBuffer.wrap(new byte[] {0, 0});
+    router.process(smaller);
+    check(field(router, "directInput") == grownStaging && field(router, "frameBuffer") == pcm
+        && pcm.limit() == 480 && decoder.decodeCalls == 3 && pipeline.processCalls == 3,
+        "sufficient staging and PCM buffers are cleared, limited, and reused");
+
+    ByteBuffer direct = ByteBuffer.allocateDirect(2);
+    direct.put((byte) 8).put((byte) 0).flip();
+    router.process(direct);
+    check(decoder.input == direct && direct.position() == 0 && decoder.decodeCalls == 4,
+        "direct packet identity bypasses staging without router-side consumption");
+
+    InterruptedException interrupted = new InterruptedException("process-sentinel");
+    pipeline.processFailure = interrupted;
+    check(catchThrowable(() -> router.process(ByteBuffer.wrap(new byte[] {8, 0}))) == interrupted
+        && decoder.decodeCalls == 5 && pipeline.processCalls == 5,
+        "downstream interruption propagates after exactly one decode");
+    pipeline.processFailure = null;
+    router.close();
+  }
+
+  private static void modeTransitionsAndInitialisation() throws Exception {
+    RecordingFrameBuffer frames = new RecordingFrameBuffer();
+    AudioProcessingContext passthroughContext =
+        context(new OpusAudioDataFormat(2, 48_000, 960), frames);
+    OpusPacketRouter switching = new OpusPacketRouter(passthroughContext, 48_000, 2);
+    RecordingOpusDecoder decoder = allocate(RecordingOpusDecoder.class);
+    RecordingPipeline pipeline = allocate(RecordingPipeline.class);
+    ByteBuffer staging = ByteBuffer.allocateDirect(8);
+    ShortBuffer pcm = ShortBuffer.allocate(8);
+    putObject(switching, "opusDecoder", decoder);
+    putObject(switching, "downstream", pipeline);
+    putObject(switching, "directInput", staging);
+    putObject(switching, "frameBuffer", pcm);
+    switching.process(ByteBuffer.wrap(new byte[] {8, 0}));
+    check(decoder.closeCalls == 1 && pipeline.closeCalls == 1
+        && field(switching, "opusDecoder") == null && field(switching, "downstream") == null
+        && field(switching, "directInput") == null && field(switching, "frameBuffer") == null
+        && frames.consumeCalls == 1,
+        "processing becoming unnecessary destroys decoder state before passthrough");
+
+    RecordingFrameBuffer encodedFrames = new RecordingFrameBuffer();
+    AudioProcessingContext reencodeContext = context(
+        new Pcm16AudioDataFormat(2, 48_000, 960, false), encodedFrames);
+    OpusPacketRouter initialising = new OpusPacketRouter(reencodeContext, 48_000, 2);
+    initialising.seekPerformed(50L, 5L);
+    invoke(initialising, "processFrameSize", new Class<?>[] {ByteBuffer.class},
+        ByteBuffer.wrap(new byte[] {8, 0}));
+    invoke(initialising, "checkDecoderNecessity", new Class<?>[0]);
+    Object actualDecoder = field(initialising, "opusDecoder");
+    AudioPipeline actualPipeline = (AudioPipeline) field(initialising, "downstream");
+    Object first = field(actualPipeline, AudioPipeline.class, "first");
+    check(actualDecoder.getClass() == OpusDecoder.class
+        && actualPipeline.getClass() == AudioPipeline.class
+        && first.getClass() == FinalPcmAudioFilter.class
+        && ((Long) field(first, FinalPcmAudioFilter.class, "timecodeBase")) == 50L
+        && ((Long) field(first, FinalPcmAudioFilter.class, "ignoredFrames")) == 2_400L,
+        "reencode transition creates native decoder and PCM pipeline with max/current seek");
+    initialising.close();
+
+    OpusPacketRouter failing = new OpusPacketRouter(reencodeContext, 48_000, 2);
+    putObject(failing, "context", null);
+    Throwable failure = invocationFailure(() -> invoke(failing, "initialiseDecoder", new Class<?>[0]));
+    check(failure instanceof NullPointerException && field(failing, "opusDecoder") == null
+        && field(failing, "downstream") == null,
+        "initialisation failure destroys a decoder when no downstream was published");
+  }
+
+  private static void flushingAndClosing() throws Exception {
+    OpusPacketRouter router = new OpusPacketRouter(
+        context(new OpusAudioDataFormat(2, 48_000, 960), new RecordingFrameBuffer()), 48_000, 2);
+    router.flush();
+    RecordingPipeline pipeline = allocate(RecordingPipeline.class);
+    RecordingOpusDecoder decoder = allocate(RecordingOpusDecoder.class);
+    putObject(router, "opusDecoder", decoder);
+    putObject(router, "downstream", pipeline);
+    putObject(router, "directInput", ByteBuffer.allocateDirect(2));
+    putObject(router, "frameBuffer", ShortBuffer.allocate(2));
+    InterruptedException flushFailure = new InterruptedException("flush-sentinel");
+    pipeline.flushFailure = flushFailure;
+    check(catchThrowable(router::flush) == flushFailure && pipeline.flushCalls == 1,
+        "flush forwards exact interruption identity only when downstream exists");
+    pipeline.flushFailure = null;
+
+    RuntimeException decoderFailure = new RuntimeException("decoder-close-sentinel");
+    decoder.closeFailure = decoderFailure;
+    check(catchThrowable(router::close) == decoderFailure && decoder.closeCalls == 1
+        && pipeline.closeCalls == 0 && field(router, "opusDecoder") == decoder
+        && field(router, "downstream") == pipeline && field(router, "directInput") != null,
+        "decoder close failure preserves every later teardown field");
+    decoder.closeFailure = null;
+    RuntimeException pipelineFailure = new RuntimeException("pipeline-close-sentinel");
+    pipeline.closeFailure = pipelineFailure;
+    check(catchThrowable(router::close) == pipelineFailure && decoder.closeCalls == 2
+        && field(router, "opusDecoder") == null && field(router, "downstream") == pipeline
+        && field(router, "directInput") != null && field(router, "frameBuffer") != null,
+        "pipeline close failure occurs after decoder reset and before buffer cleanup");
+    pipeline.closeFailure = null;
+    router.close();
+    router.close();
+    check(pipeline.closeCalls == 2 && field(router, "downstream") == null
+        && field(router, "directInput") == null && field(router, "frameBuffer") == null,
+        "successful and repeated close clear retained routing buffers idempotently");
+  }
+
+  private static void subclassingAndReflection() throws Exception {
+    Derived derived = new Derived(
+        context(new OpusAudioDataFormat(2, 48_000, 960), new RecordingFrameBuffer()));
+    OpusPacketRouter dynamic = derived;
+    dynamic.flush();
+    check(derived.flushCalls == 1, "ordinary subclass participates in virtual dispatch");
+
+    Class<OpusPacketRouter> type = OpusPacketRouter.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0 && type.getDeclaredFields().length == 15
+        && type.getDeclaredMethods().length == 10 && type.getDeclaredConstructors().length == 1,
+        "exact class and declared-member metadata");
+    checkField(type, "log", org.slf4j.Logger.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "context", AudioProcessingContext.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "inputFrequency", int.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "inputChannels", int.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "headerBytes", byte[].class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "offeredFrame", MutableAudioFrame.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "currentFrameDuration", long.class, Modifier.PRIVATE);
+    checkField(type, "currentTimecode", long.class, Modifier.PRIVATE);
+    checkField(type, "requestedTimecode", long.class, Modifier.PRIVATE);
+    checkField(type, "opusDecoder", OpusDecoder.class, Modifier.PRIVATE);
+    checkField(type, "downstream", AudioPipeline.class, Modifier.PRIVATE);
+    checkField(type, "directInput", ByteBuffer.class, Modifier.PRIVATE);
+    checkField(type, "frameBuffer", ShortBuffer.class, Modifier.PRIVATE);
+    checkField(type, "inputFormat", AudioDataFormat.class, Modifier.PRIVATE);
+    checkField(type, "lastFrameSize", int.class, Modifier.PRIVATE);
+
+    Constructor<OpusPacketRouter> constructor =
+        type.getDeclaredConstructor(AudioProcessingContext.class, int.class, int.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    checkMethod(type.getDeclaredMethod("seekPerformed", long.class, long.class),
+        Modifier.PUBLIC, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("flush"), Modifier.PUBLIC,
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("process", ByteBuffer.class), Modifier.PUBLIC,
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("close"), Modifier.PUBLIC, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("processFrameSize", ByteBuffer.class), Modifier.PRIVATE,
+        new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("passDownstream", ByteBuffer.class, int.class),
+        Modifier.PRIVATE, new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("passThrough", ByteBuffer.class), Modifier.PRIVATE,
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("checkDecoderNecessity"), Modifier.PRIVATE, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("initialiseDecoder"), Modifier.PRIVATE, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("destroyDecoder"), Modifier.PRIVATE, new Class<?>[0]);
+  }
+
+  private static AudioProcessingContext context(
+      AudioDataFormat format, RecordingFrameBuffer frames) {
+    AudioConfiguration configuration = new AudioConfiguration();
+    configuration.setOutputFormat(format);
+    return new AudioProcessingContext(
+        configuration, frames, new AudioPlayerOptions(), format);
+  }
+
+  private static Object invoke(
+      OpusPacketRouter router, String name, Class<?>[] parameters, Object... arguments)
+      throws Exception {
+    Method method = OpusPacketRouter.class.getDeclaredMethod(name, parameters);
+    method.setAccessible(true);
+    try {
+      return method.invoke(router, arguments);
+    } catch (InvocationTargetException error) {
+      throw error;
+    }
+  }
+
+  private static Throwable invocationFailure(Operation operation) {
+    try {
+      operation.run();
+      return null;
+    } catch (InvocationTargetException error) {
+      return error.getCause();
+    } catch (Throwable error) {
+      return error;
+    }
+  }
+
+  private static Object field(Object target, String name) throws Exception {
+    return field(target, OpusPacketRouter.class, name);
+  }
+
+  private static Object field(Object target, Class<?> owner, String name) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
+  }
+
+  private static int intField(Object target, String name) throws Exception {
+    return intField(target, OpusPacketRouter.class, name);
+  }
+
+  private static int intField(Object target, Class<?> owner, String name) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.getInt(target);
+  }
+
+  private static long longField(Object target, String name) throws Exception {
+    Field field = OpusPacketRouter.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.getLong(target);
+  }
+
+  private static void putObject(Object target, String name, Object value) throws Exception {
+    Field field = OpusPacketRouter.class.getDeclaredField(name);
+    long offset = (Long) UNSAFE.getClass().getMethod("objectFieldOffset", Field.class)
+        .invoke(UNSAFE, field);
+    UNSAFE.getClass().getMethod("putObject", Object.class, long.class, Object.class)
+        .invoke(UNSAFE, target, offset, value);
+  }
+
+  private static <T> T allocate(Class<T> type) throws Exception {
+    return type.cast(UNSAFE.getClass().getMethod("allocateInstance", Class.class)
+        .invoke(UNSAFE, type));
+  }
+
+  private static Object loadUnsafe() {
+    try {
+      Class<?> type = Class.forName("sun.misc.Unsafe");
+      Field field = type.getDeclaredField("theUnsafe");
+      field.setAccessible(true);
+      return field.get(null);
+    } catch (ReflectiveOperationException error) {
+      throw new ExceptionInInitializerError(error);
+    }
+  }
+
+  private static Field checkField(
+      Class<?> owner, String name, Class<?> fieldType, int modifiers) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getModifiers() == modifiers
+        && !field.isSynthetic() && field.getDeclaredAnnotations().length == 0,
+        name + " field metadata");
+    return field;
+  }
+
+  private static void checkMethod(Method method, int modifiers, Class<?>[] failures) {
+    check(method.getModifiers() == modifiers && Arrays.equals(method.getExceptionTypes(), failures)
+        && !method.isSynthetic() && !method.isBridge() && !method.isDefault()
+        && !method.isVarArgs(), method.getName() + " method metadata");
+  }
+
+  private static Throwable catchThrowable(Operation operation) {
+    try {
+      operation.run();
+      return null;
+    } catch (Throwable error) {
+      return error;
+    }
+  }
+
+  private interface Operation { void run() throws Throwable; }
+
+  private static final class RecordingOpusDecoder extends OpusDecoder {
+    int decodeCalls;
+    ByteBuffer input;
+    int inputPosition;
+    int inputLimit;
+    ShortBuffer output;
+    int sequence;
+    int closeCalls;
+    RuntimeException closeFailure;
+
+    RecordingOpusDecoder() { super(48_000, 2); }
+
+    @Override public int decode(ByteBuffer input, ShortBuffer output) {
+      decodeCalls++;
+      this.input = input;
+      inputPosition = input.position();
+      inputLimit = input.limit();
+      this.output = output;
+      sequence = Sequence.next();
+      return output.remaining();
+    }
+
+    @Override public void close() {
+      closeCalls++;
+      if (closeFailure != null) throw closeFailure;
+    }
+  }
+
+  private static final class RecordingPipeline extends AudioPipeline {
+    int processCalls;
+    ShortBuffer lastBuffer;
+    int processSequence;
+    InterruptedException processFailure;
+    int seekCalls;
+    long requested;
+    long provided;
+    RuntimeException seekFailure;
+    int flushCalls;
+    InterruptedException flushFailure;
+    int closeCalls;
+    RuntimeException closeFailure;
+
+    RecordingPipeline() { super(null); }
+
+    @Override public void process(ShortBuffer buffer) throws InterruptedException {
+      processCalls++;
+      lastBuffer = buffer;
+      processSequence = Sequence.next();
+      if (processFailure != null) throw processFailure;
+    }
+
+    @Override public void seekPerformed(long requested, long provided) {
+      seekCalls++;
+      this.requested = requested;
+      this.provided = provided;
+      if (seekFailure != null) throw seekFailure;
+    }
+
+    @Override public void flush() throws InterruptedException {
+      flushCalls++;
+      if (flushFailure != null) throw flushFailure;
+    }
+
+    @Override public void close() {
+      closeCalls++;
+      if (closeFailure != null) throw closeFailure;
+    }
+  }
+
+  private static final class Sequence {
+    static int value;
+    static int next() { return ++value; }
+  }
+
+  private static final class RecordingFrameBuffer implements AudioFrameBuffer {
+    int consumeCalls;
+    AudioFrame lastFrame;
+    long lastTimecode;
+    int lastDataLength;
+    public void consume(AudioFrame frame) {
+      consumeCalls++;
+      lastFrame = frame;
+      lastTimecode = frame.getTimecode();
+      lastDataLength = frame.getDataLength();
+    }
+    public int getRemainingCapacity() { return 0; }
+    public int getFullCapacity() { return 0; }
+    public void setClearOnInsert() {}
+    public void clear() {}
+    public void rebuild(AudioFrameRebuilder rebuilder) {}
+    public AudioFrame provide() { return null; }
+    public AudioFrame provide(long timeout, TimeUnit unit) { return null; }
+    public boolean provide(MutableAudioFrame targetFrame) { return false; }
+    public boolean provide(MutableAudioFrame targetFrame, long timeout, TimeUnit unit) {
+      return false;
+    }
+    public boolean hasClearOnInsert() { return false; }
+    public boolean hasReceivedFrames() { return false; }
+    public Long getLastInputTimecode() { return null; }
+    public void waitForTermination() {}
+    public void setTerminateOnEmpty() {}
+    public void shutdown() {}
+    public void lockBuffer() {}
+  }
+
+  private static final class Derived extends OpusPacketRouter {
+    int flushCalls;
+    Derived(AudioProcessingContext context) { super(context, 48_000, 2); }
     @Override public void flush() { flushCalls++; }
   }
 

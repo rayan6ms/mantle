@@ -237,6 +237,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-adts-stream-reader-consumer \
   --output "$WORK/GateAdtsStreamReader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-aac-packet-router-consumer \
   --output "$WORK/GateAacPacketRouter.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-opus-packet-router-consumer \
+  --output "$WORK/GateOpusPacketRouter.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -362,6 +364,7 @@ readonly REFERENCE_PROVIDER_TOOLS_CLASSPATH="$reference_provider_tools_classpath
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateAdtsStreamProvider.java" \
   "$WORK/GateAacPacketRouter.java" \
+  "$WORK/GateOpusPacketRouter.java" \
   "$WORK/GateDefaultSoundCloudDataLoader.java" \
   "$WORK/GateDefaultSoundCloudPlaylistLoader.java" \
   "$WORK/GateSoundCloudAudioSourceManager.java" \
@@ -1264,6 +1267,16 @@ cmp "$WORK/aac-packet-router-reference.txt" "$WORK/aac-packet-router-candidate.t
 grep --fixed-strings \
   'contracts=construction,context-identity,configurer-identity,null-construction,eager-logger,private-state,lazy-decoder,configurer-order,configurer-failure,null-configurer,decoder-reuse,input-identity,stream-info-lazy,pipeline-creation,pcm-format,native-output-buffer,delayed-seek,retained-seek,decode-loop,non-flush-mode,buffer-clear,interruption-identity,seek-forwarding,seek-overwrite,decoder-reset,decoder-close-failure,flush-noop,flush-mode,flush-loop,close-order,close-finally,close-failure,repeated-close,public-decoder,subclassable,generic-signatures,throws,reflection' \
   "$WORK/aac-packet-router-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateOpusPacketRouter \
+  >"$WORK/opus-packet-router-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOpusPacketRouter >"$WORK/opus-packet-router-candidate.txt"
+cmp "$WORK/opus-packet-router-reference.txt" "$WORK/opus-packet-router-candidate.txt"
+grep --fixed-strings \
+  'contracts=construction,context-identity,input-geometry,header-state,offered-frame,output-format,volume,private-state,eager-logger,heap-header,direct-header,position-preservation,direct-underflow,zero-frame,frame-size,format-rebuild,format-reuse,duration,timecode,seek-state,seek-forwarding,seek-failure-prefix,strict-seek-threshold,passthrough,input-window,frame-reuse,heap-staging,staging-growth,direct-identity,native-output,decode-limit,decode-order,interruption-identity,reencode-mode,passthrough-mode,mode-cleanup,volume-application,pipeline-creation,initial-seek,initialisation-cleanup,flush-noop,flush-forwarding,close-order,close-failure-prefix,buffer-cleanup,repeated-close,subclassable,private-helpers,throws,reflection' \
+  "$WORK/opus-packet-router-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"

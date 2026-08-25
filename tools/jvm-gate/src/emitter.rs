@@ -166,6 +166,8 @@ const ADTS_STREAM_READER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/adts/AdtsStreamReader";
 const AAC_PACKET_ROUTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/common/AacPacketRouter";
+const OPUS_PACKET_ROUTER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/common/OpusPacketRouter";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -504,6 +506,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     ADTS_STREAM_PROVIDER_CLASS,
     ADTS_STREAM_READER_CLASS,
     AAC_PACKET_ROUTER_CLASS,
+    OPUS_PACKET_ROUTER_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -980,6 +983,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | ADTS_STREAM_PROVIDER_CLASS
             | ADTS_STREAM_READER_CLASS
             | AAC_PACKET_ROUTER_CLASS
+            | OPUS_PACKET_ROUTER_CLASS
             | OPUS_AUDIO_DATA_FORMAT_CLASS
             | PCM16_AUDIO_DATA_FORMAT_CLASS
             | OPUS_CHUNK_DECODER_CLASS
@@ -1094,6 +1098,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | ADTS_STREAM_PROVIDER_CLASS
             | ADTS_STREAM_READER_CLASS
             | AAC_PACKET_ROUTER_CLASS
+            | OPUS_PACKET_ROUTER_CLASS
             | AUDIO_PIPELINE_FACTORY_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
@@ -1379,6 +1384,9 @@ fn replacement_body(
     }
     if class_name == AAC_PACKET_ROUTER_CLASS {
         return aac_packet_router_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == OPUS_PACKET_ROUTER_CLASS {
+        return opus_packet_router_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -6426,6 +6434,1005 @@ fn aac_packet_router_close(pool: &mut ConstantPool<'static>) -> Result<Attribute
 
 fn aac_packet_router_class_init(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
     let owner = pool.add_class(AAC_PACKET_ROUTER_CLASS)?;
+    let logger_factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        logger_factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn opus_packet_router_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;II)V",
+        ) => opus_packet_router_constructor(pool),
+        ("seekPerformed", "(JJ)V") => opus_packet_router_seek_performed(pool),
+        ("flush", "()V") => opus_packet_router_flush(pool),
+        ("process", "(Ljava/nio/ByteBuffer;)V") => opus_packet_router_process(pool),
+        ("close", "()V") => opus_packet_router_close(pool),
+        ("processFrameSize", "(Ljava/nio/ByteBuffer;)I") => {
+            opus_packet_router_process_frame_size(pool)
+        }
+        ("passDownstream", "(Ljava/nio/ByteBuffer;I)V") => opus_packet_router_pass_downstream(pool),
+        ("passThrough", "(Ljava/nio/ByteBuffer;)V") => opus_packet_router_pass_through(pool),
+        ("checkDecoderNecessity", "()V") => opus_packet_router_check_decoder_necessity(pool),
+        ("initialiseDecoder", "()V") => opus_packet_router_initialise_decoder(pool),
+        ("destroyDecoder", "()V") => opus_packet_router_destroy_decoder(pool),
+        ("<clinit>", "()V") => opus_packet_router_class_init(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {OPUS_PACKET_ROUTER_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn opus_packet_router_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(OPUS_PACKET_ROUTER_CLASS)?;
+    let context = pool.add_field_ref(
+        owner,
+        "context",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;",
+    )?;
+    let frequency = pool.add_field_ref(owner, "inputFrequency", "I")?;
+    let channels = pool.add_field_ref(owner, "inputChannels", "I")?;
+    let header = pool.add_field_ref(owner, "headerBytes", "[B")?;
+    let mutable =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame")?;
+    let mutable_init = pool.add_method_ref(mutable, "<init>", "()V")?;
+    let offered = pool.add_field_ref(
+        owner,
+        "offeredFrame",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;",
+    )?;
+    let last_size = pool.add_field_ref(owner, "lastFrameSize", "I")?;
+    let set_volume = pool.add_method_ref(mutable, "setVolume", "(I)V")?;
+    let processing_context = pool.add_class(AUDIO_PROCESSING_CONTEXT_CLASS)?;
+    let output_format = pool.add_field_ref(
+        processing_context,
+        "outputFormat",
+        "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let set_format = pool.add_method_ref(
+        mutable,
+        "setFormat",
+        "(Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)V",
+    )?;
+    code(
+        pool,
+        3,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(context),
+            Instruction::Aload_0,
+            Instruction::Iload_2,
+            Instruction::Putfield(frequency),
+            Instruction::Aload_0,
+            Instruction::Iload_3,
+            Instruction::Putfield(channels),
+            Instruction::Aload_0,
+            Instruction::Iconst_2,
+            Instruction::Newarray(ArrayType::Byte),
+            Instruction::Putfield(header),
+            Instruction::Aload_0,
+            Instruction::New(mutable),
+            Instruction::Dup,
+            Instruction::Invokespecial(mutable_init),
+            Instruction::Putfield(offered),
+            Instruction::Aload_0,
+            Instruction::Iconst_0,
+            Instruction::Putfield(last_size),
+            Instruction::Aload_0,
+            Instruction::Getfield(offered),
+            Instruction::Bipush(100),
+            Instruction::Invokevirtual(set_volume),
+            Instruction::Aload_0,
+            Instruction::Getfield(offered),
+            Instruction::Aload_1,
+            Instruction::Getfield(output_format),
+            Instruction::Invokevirtual(set_format),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn opus_packet_router_seek_performed(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(OPUS_PACKET_ROUTER_CLASS)?;
+    let requested = pool.add_field_ref(owner, "requestedTimecode", "J")?;
+    let current = pool.add_field_ref(owner, "currentTimecode", "J")?;
+    let pipeline = pool.add_class("com/sedmelluq/discord/lavaplayer/filter/AudioPipeline")?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/AudioPipeline;",
+    )?;
+    let seek = pool.add_method_ref(pipeline, "seekPerformed", "(JJ)V")?;
+    let return_target = 14;
+    let mut body = code(
+        pool,
+        5,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Lload_1,
+            Instruction::Putfield(requested),
+            Instruction::Aload_0,
+            Instruction::Lload_3,
+            Instruction::Putfield(current),
+            Instruction::Aload_0,
+            Instruction::Getfield(downstream),
+            Instruction::Ifnull(return_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(downstream),
+            Instruction::Lload_1,
+            Instruction::Lload_3,
+            Instruction::Invokevirtual(seek),
+            Instruction::Return,
+        ],
+    )?;
+    add_stack_map_table(pool, &mut body, vec![same_stack_frame(return_target)])?;
+    Ok(body)
+}
+
+fn opus_packet_router_flush(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(OPUS_PACKET_ROUTER_CLASS)?;
+    let pipeline = pool.add_class("com/sedmelluq/discord/lavaplayer/filter/AudioPipeline")?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/AudioPipeline;",
+    )?;
+    let flush = pool.add_method_ref(pipeline, "flush", "()V")?;
+    let return_target = 6;
+    let mut body = code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(downstream),
+            Instruction::Ifnull(return_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(downstream),
+            Instruction::Invokevirtual(flush),
+            Instruction::Return,
+        ],
+    )?;
+    add_stack_map_table(pool, &mut body, vec![same_stack_frame(return_target)])?;
+    Ok(body)
+}
+
+fn opus_packet_router_process(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(OPUS_PACKET_ROUTER_CLASS)?;
+    let process_size =
+        pool.add_method_ref(owner, "processFrameSize", "(Ljava/nio/ByteBuffer;)I")?;
+    let check_decoder = pool.add_method_ref(owner, "checkDecoderNecessity", "()V")?;
+    let decoder_field = pool.add_field_ref(
+        owner,
+        "opusDecoder",
+        "Lcom/sedmelluq/discord/lavaplayer/natives/opus/OpusDecoder;",
+    )?;
+    let pass_downstream =
+        pool.add_method_ref(owner, "passDownstream", "(Ljava/nio/ByteBuffer;I)V")?;
+    let pass_through = pool.add_method_ref(owner, "passThrough", "(Ljava/nio/ByteBuffer;)V")?;
+    let passthrough_target = 16;
+    let return_target = 19;
+    let mut body = code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(process_size),
+            Instruction::Istore_2,
+            Instruction::Iload_2,
+            Instruction::Ifeq(return_target),
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(check_decoder),
+            Instruction::Aload_0,
+            Instruction::Getfield(decoder_field),
+            Instruction::Ifnull(passthrough_target),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Iload_2,
+            Instruction::Invokevirtual(pass_downstream),
+            Instruction::Goto(return_target),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(pass_through),
+            Instruction::Return,
+        ],
+    )?;
+    let owner_type = VerificationType::Object { cpool_index: owner };
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let input_type = VerificationType::Object {
+        cpool_index: byte_buffer,
+    };
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: passthrough_target,
+                locals: vec![
+                    owner_type.clone(),
+                    input_type.clone(),
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: return_target - passthrough_target - 1,
+                locals: vec![owner_type, input_type, VerificationType::Integer],
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn opus_packet_router_close(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(OPUS_PACKET_ROUTER_CLASS)?;
+    let destroy = pool.add_method_ref(owner, "destroyDecoder", "()V")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(destroy),
+            Instruction::Return,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn opus_packet_router_process_frame_size(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(OPUS_PACKET_ROUTER_CLASS)?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let is_direct = pool.add_method_ref(byte_buffer, "isDirect", "()Z")?;
+    let mark = pool.add_method_ref(byte_buffer, "mark", "()Ljava/nio/ByteBuffer;")?;
+    let get = pool.add_method_ref(byte_buffer, "get", "([B)Ljava/nio/ByteBuffer;")?;
+    let reset = pool.add_method_ref(byte_buffer, "reset", "()Ljava/nio/ByteBuffer;")?;
+    let array = pool.add_method_ref(byte_buffer, "array", "()[B")?;
+    let position = pool.add_method_ref(byte_buffer, "position", "()I")?;
+    let remaining = pool.add_method_ref(byte_buffer, "remaining", "()I")?;
+    let header = pool.add_field_ref(owner, "headerBytes", "[B")?;
+    let frequency = pool.add_field_ref(owner, "inputFrequency", "I")?;
+    let decoder = pool.add_class("com/sedmelluq/discord/lavaplayer/natives/opus/OpusDecoder")?;
+    let frame_size = pool.add_method_ref(decoder, "getPacketFrameSize", "(I[BII)I")?;
+    let last_size = pool.add_field_ref(owner, "lastFrameSize", "I")?;
+    let opus_format =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/format/OpusAudioDataFormat")?;
+    let opus_format_init = pool.add_method_ref(opus_format, "<init>", "(III)V")?;
+    let channels = pool.add_field_ref(owner, "inputChannels", "I")?;
+    let input_format = pool.add_field_ref(
+        owner,
+        "inputFormat",
+        "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let duration = pool.add_field_ref(owner, "currentFrameDuration", "J")?;
+    let current = pool.add_field_ref(owner, "currentTimecode", "J")?;
+    let heap_target = 25;
+    let frame_target = 35;
+    let nonzero_target = 39;
+    let format_target = 56;
+    let mut body = code(
+        pool,
+        6,
+        3,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(is_direct),
+            Instruction::Ifeq(heap_target),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(mark),
+            Instruction::Pop,
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(header),
+            Instruction::Invokevirtual(get),
+            Instruction::Pop,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(reset),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(frequency),
+            Instruction::Aload_0,
+            Instruction::Getfield(header),
+            Instruction::Iconst_0,
+            Instruction::Aload_0,
+            Instruction::Getfield(header),
+            Instruction::Arraylength,
+            Instruction::Invokestatic(frame_size),
+            Instruction::Istore_2,
+            Instruction::Goto(frame_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(frequency),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(array),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(position),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(remaining),
+            Instruction::Invokestatic(frame_size),
+            Instruction::Istore_2,
+            Instruction::Iload_2,
+            Instruction::Ifne(nonzero_target),
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+            Instruction::Iload_2,
+            Instruction::Aload_0,
+            Instruction::Getfield(last_size),
+            Instruction::If_icmpeq(format_target),
+            Instruction::Aload_0,
+            Instruction::Iload_2,
+            Instruction::Putfield(last_size),
+            Instruction::Aload_0,
+            Instruction::New(opus_format),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(channels),
+            Instruction::Aload_0,
+            Instruction::Getfield(frequency),
+            Instruction::Iload_2,
+            Instruction::Invokespecial(opus_format_init),
+            Instruction::Putfield(input_format),
+            Instruction::Aload_0,
+            Instruction::Iload_2,
+            Instruction::Sipush(1000),
+            Instruction::Imul,
+            Instruction::Aload_0,
+            Instruction::Getfield(frequency),
+            Instruction::Idiv,
+            Instruction::I2l,
+            Instruction::Putfield(duration),
+            Instruction::Aload_0,
+            Instruction::Dup,
+            Instruction::Getfield(current),
+            Instruction::Aload_0,
+            Instruction::Getfield(duration),
+            Instruction::Ladd,
+            Instruction::Putfield(current),
+            Instruction::Iload_2,
+            Instruction::Ireturn,
+        ],
+    )?;
+    let owner_type = VerificationType::Object { cpool_index: owner };
+    let input_type = VerificationType::Object {
+        cpool_index: byte_buffer,
+    };
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: heap_target,
+                locals: vec![owner_type.clone(), input_type.clone()],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: frame_target - heap_target - 1,
+                locals: vec![
+                    owner_type.clone(),
+                    input_type.clone(),
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: nonzero_target - frame_target - 1,
+                locals: vec![
+                    owner_type.clone(),
+                    input_type.clone(),
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: format_target - nonzero_target - 1,
+                locals: vec![owner_type, input_type, VerificationType::Integer],
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn opus_packet_router_pass_downstream(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(OPUS_PACKET_ROUTER_CLASS)?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let is_direct = pool.add_method_ref(byte_buffer, "isDirect", "()Z")?;
+    let capacity = pool.add_method_ref(byte_buffer, "capacity", "()I")?;
+    let remaining = pool.add_method_ref(byte_buffer, "remaining", "()I")?;
+    let allocate_direct =
+        pool.add_method_ref(byte_buffer, "allocateDirect", "(I)Ljava/nio/ByteBuffer;")?;
+    let clear_byte = pool.add_method_ref(byte_buffer, "clear", "()Ljava/nio/ByteBuffer;")?;
+    let put = pool.add_method_ref(
+        byte_buffer,
+        "put",
+        "(Ljava/nio/ByteBuffer;)Ljava/nio/ByteBuffer;",
+    )?;
+    let flip = pool.add_method_ref(byte_buffer, "flip", "()Ljava/nio/ByteBuffer;")?;
+    let direct_input = pool.add_field_ref(owner, "directInput", "Ljava/nio/ByteBuffer;")?;
+    let short_buffer = pool.add_class("java/nio/ShortBuffer")?;
+    let short_capacity = pool.add_method_ref(short_buffer, "capacity", "()I")?;
+    let clear_short = pool.add_method_ref(short_buffer, "clear", "()Ljava/nio/ShortBuffer;")?;
+    let limit = pool.add_method_ref(short_buffer, "limit", "(I)Ljava/nio/ShortBuffer;")?;
+    let frame_buffer = pool.add_field_ref(owner, "frameBuffer", "Ljava/nio/ShortBuffer;")?;
+    let channels = pool.add_field_ref(owner, "inputChannels", "I")?;
+    let byte_order = pool.add_class("java/nio/ByteOrder")?;
+    let native_order = pool.add_method_ref(byte_order, "nativeOrder", "()Ljava/nio/ByteOrder;")?;
+    let order = pool.add_method_ref(
+        byte_buffer,
+        "order",
+        "(Ljava/nio/ByteOrder;)Ljava/nio/ByteBuffer;",
+    )?;
+    let as_short = pool.add_method_ref(byte_buffer, "asShortBuffer", "()Ljava/nio/ShortBuffer;")?;
+    let decoder = pool.add_class("com/sedmelluq/discord/lavaplayer/natives/opus/OpusDecoder")?;
+    let decoder_field = pool.add_field_ref(
+        owner,
+        "opusDecoder",
+        "Lcom/sedmelluq/discord/lavaplayer/natives/opus/OpusDecoder;",
+    )?;
+    let decode = pool.add_method_ref(
+        decoder,
+        "decode",
+        "(Ljava/nio/ByteBuffer;Ljava/nio/ShortBuffer;)I",
+    )?;
+    let pipeline = pool.add_class("com/sedmelluq/discord/lavaplayer/filter/AudioPipeline")?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/AudioPipeline;",
+    )?;
+    let process = pool.add_method_ref(pipeline, "process", "(Ljava/nio/ShortBuffer;)V")?;
+    let allocate_input = 12;
+    let copy_input = 19;
+    let direct_target = 36;
+    let native_done = 38;
+    let allocate_frame = 49;
+    let frame_ready = 61;
+    let mut body = code(
+        pool,
+        3,
+        4,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(is_direct),
+            Instruction::Ifne(direct_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(direct_input),
+            Instruction::Ifnull(allocate_input),
+            Instruction::Aload_0,
+            Instruction::Getfield(direct_input),
+            Instruction::Invokevirtual(capacity),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(remaining),
+            Instruction::If_icmpge(copy_input),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(remaining),
+            Instruction::Sipush(200),
+            Instruction::Iadd,
+            Instruction::Invokestatic(allocate_direct),
+            Instruction::Putfield(direct_input),
+            Instruction::Aload_0,
+            Instruction::Getfield(direct_input),
+            Instruction::Invokevirtual(clear_byte),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(direct_input),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(put),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(direct_input),
+            Instruction::Invokevirtual(flip),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(direct_input),
+            Instruction::Astore_3,
+            Instruction::Goto(native_done),
+            Instruction::Aload_1,
+            Instruction::Astore_3,
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_buffer),
+            Instruction::Ifnull(allocate_frame),
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_buffer),
+            Instruction::Invokevirtual(short_capacity),
+            Instruction::Iload_2,
+            Instruction::Aload_0,
+            Instruction::Getfield(channels),
+            Instruction::Imul,
+            Instruction::If_icmpge(frame_ready),
+            Instruction::Aload_0,
+            Instruction::Iload_2,
+            Instruction::Aload_0,
+            Instruction::Getfield(channels),
+            Instruction::Imul,
+            Instruction::Iconst_2,
+            Instruction::Imul,
+            Instruction::Invokestatic(allocate_direct),
+            Instruction::Invokestatic(native_order),
+            Instruction::Invokevirtual(order),
+            Instruction::Invokevirtual(as_short),
+            Instruction::Putfield(frame_buffer),
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_buffer),
+            Instruction::Invokevirtual(clear_short),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_buffer),
+            Instruction::Iload_2,
+            Instruction::Invokevirtual(limit),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(decoder_field),
+            Instruction::Aload_3,
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_buffer),
+            Instruction::Invokevirtual(decode),
+            Instruction::Pop,
+            Instruction::Aload_0,
+            Instruction::Getfield(downstream),
+            Instruction::Aload_0,
+            Instruction::Getfield(frame_buffer),
+            Instruction::Invokevirtual(process),
+            Instruction::Return,
+        ],
+    )?;
+    let owner_type = VerificationType::Object { cpool_index: owner };
+    let input_type = VerificationType::Object {
+        cpool_index: byte_buffer,
+    };
+    let base_locals = vec![
+        owner_type.clone(),
+        input_type.clone(),
+        VerificationType::Integer,
+    ];
+    let native_locals = vec![
+        owner_type,
+        input_type,
+        VerificationType::Integer,
+        VerificationType::Object {
+            cpool_index: byte_buffer,
+        },
+    ];
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: allocate_input,
+                locals: base_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: copy_input - allocate_input - 1,
+                locals: base_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: direct_target - copy_input - 1,
+                locals: base_locals,
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: native_done - direct_target - 1,
+                locals: native_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: allocate_frame - native_done - 1,
+                locals: native_locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: frame_ready - allocate_frame - 1,
+                locals: native_locals,
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn opus_packet_router_pass_through(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(OPUS_PACKET_ROUTER_CLASS)?;
+    let requested = pool.add_field_ref(owner, "requestedTimecode", "J")?;
+    let current = pool.add_field_ref(owner, "currentTimecode", "J")?;
+    let mutable =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame")?;
+    let offered = pool.add_field_ref(
+        owner,
+        "offeredFrame",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/MutableAudioFrame;",
+    )?;
+    let set_timecode = pool.add_method_ref(mutable, "setTimecode", "(J)V")?;
+    let set_buffer = pool.add_method_ref(mutable, "setBuffer", "(Ljava/nio/ByteBuffer;)V")?;
+    let context = pool.add_field_ref(
+        owner,
+        "context",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;",
+    )?;
+    let processing_context = pool.add_class(AUDIO_PROCESSING_CONTEXT_CLASS)?;
+    let frame_buffer = pool.add_field_ref(
+        processing_context,
+        "frameBuffer",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBuffer;",
+    )?;
+    let buffer_type =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/playback/AudioFrameBuffer")?;
+    let consume = pool.add_interface_method_ref(
+        buffer_type,
+        "consume",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioFrame;)V",
+    )?;
+    let return_target = 21;
+    let mut body = code(
+        pool,
+        4,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(requested),
+            Instruction::Aload_0,
+            Instruction::Getfield(current),
+            Instruction::Lcmp,
+            Instruction::Ifge(return_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(offered),
+            Instruction::Aload_0,
+            Instruction::Getfield(current),
+            Instruction::Invokevirtual(set_timecode),
+            Instruction::Aload_0,
+            Instruction::Getfield(offered),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(set_buffer),
+            Instruction::Aload_0,
+            Instruction::Getfield(context),
+            Instruction::Getfield(frame_buffer),
+            Instruction::Aload_0,
+            Instruction::Getfield(offered),
+            Instruction::Invokeinterface(consume, 2),
+            Instruction::Return,
+        ],
+    )?;
+    add_stack_map_table(pool, &mut body, vec![same_stack_frame(return_target)])?;
+    Ok(body)
+}
+
+fn opus_packet_router_check_decoder_necessity(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(OPUS_PACKET_ROUTER_CLASS)?;
+    let context = pool.add_field_ref(
+        owner,
+        "context",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;",
+    )?;
+    let input_format = pool.add_field_ref(
+        owner,
+        "inputFormat",
+        "Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;",
+    )?;
+    let factory = pool.add_class("com/sedmelluq/discord/lavaplayer/filter/AudioPipelineFactory")?;
+    let required = pool.add_method_ref(
+        factory,
+        "isProcessingRequired",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;Lcom/sedmelluq/discord/lavaplayer/format/AudioDataFormat;)Z",
+    )?;
+    let decoder_field = pool.add_field_ref(
+        owner,
+        "opusDecoder",
+        "Lcom/sedmelluq/discord/lavaplayer/natives/opus/OpusDecoder;",
+    )?;
+    let logger = pool.add_class("org/slf4j/Logger")?;
+    let debug = pool.add_interface_method_ref(logger, "debug", "(Ljava/lang/String;)V")?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let reencode_message = pool.add_string("Enabling reencode mode on opus track.")?;
+    let passthrough_message = pool.add_string("Enabling passthrough mode on opus track.")?;
+    let initialise = pool.add_method_ref(owner, "initialiseDecoder", "()V")?;
+    let destroy = pool.add_method_ref(owner, "destroyDecoder", "()V")?;
+    let volume =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/filter/volume/AudioFrameVolumeChanger")?;
+    let apply = pool.add_method_ref(
+        volume,
+        "apply",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;)V",
+    )?;
+    let passthrough_target = 18;
+    let return_target = 29;
+    let mut body = code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(context),
+            Instruction::Aload_0,
+            Instruction::Getfield(input_format),
+            Instruction::Invokestatic(required),
+            Instruction::Ifeq(passthrough_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(decoder_field),
+            Instruction::Ifnonnull(return_target),
+            Instruction::Getstatic(log),
+            Instruction::Ldc_w(reencode_message),
+            Instruction::Invokeinterface(debug, 2),
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(initialise),
+            Instruction::Aload_0,
+            Instruction::Getfield(context),
+            Instruction::Invokestatic(apply),
+            Instruction::Goto(return_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(decoder_field),
+            Instruction::Ifnull(return_target),
+            Instruction::Getstatic(log),
+            Instruction::Ldc_w(passthrough_message),
+            Instruction::Invokeinterface(debug, 2),
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(destroy),
+            Instruction::Aload_0,
+            Instruction::Getfield(context),
+            Instruction::Invokestatic(apply),
+            Instruction::Return,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            same_stack_frame(passthrough_target),
+            same_stack_frame(return_target - passthrough_target - 1),
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn opus_packet_router_initialise_decoder(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(OPUS_PACKET_ROUTER_CLASS)?;
+    let decoder = pool.add_class("com/sedmelluq/discord/lavaplayer/natives/opus/OpusDecoder")?;
+    let decoder_init = pool.add_method_ref(decoder, "<init>", "(II)V")?;
+    let decoder_field = pool.add_field_ref(
+        owner,
+        "opusDecoder",
+        "Lcom/sedmelluq/discord/lavaplayer/natives/opus/OpusDecoder;",
+    )?;
+    let frequency = pool.add_field_ref(owner, "inputFrequency", "I")?;
+    let channels = pool.add_field_ref(owner, "inputChannels", "I")?;
+    let context = pool.add_field_ref(
+        owner,
+        "context",
+        "Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;",
+    )?;
+    let pcm = pool.add_class("com/sedmelluq/discord/lavaplayer/filter/PcmFormat")?;
+    let pcm_init = pool.add_method_ref(pcm, "<init>", "(II)V")?;
+    let factory = pool.add_class("com/sedmelluq/discord/lavaplayer/filter/AudioPipelineFactory")?;
+    let create = pool.add_method_ref(
+        factory,
+        "create",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;Lcom/sedmelluq/discord/lavaplayer/filter/PcmFormat;)Lcom/sedmelluq/discord/lavaplayer/filter/AudioPipeline;",
+    )?;
+    let pipeline = pool.add_class("com/sedmelluq/discord/lavaplayer/filter/AudioPipeline")?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/AudioPipeline;",
+    )?;
+    let current = pool.add_field_ref(owner, "currentTimecode", "J")?;
+    let requested = pool.add_field_ref(owner, "requestedTimecode", "J")?;
+    let math = pool.add_class("java/lang/Math")?;
+    let max = pool.add_method_ref(math, "max", "(JJ)J")?;
+    let seek = pool.add_method_ref(pipeline, "seekPerformed", "(JJ)V")?;
+    let destroy = pool.add_method_ref(owner, "destroyDecoder", "()V")?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let try_start = 9;
+    let try_end = 31;
+    let handler_target = 37;
+    let throw_target = 43;
+    let return_target = 45;
+    let mut body = code_with_exceptions(
+        pool,
+        6,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::New(decoder),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(frequency),
+            Instruction::Aload_0,
+            Instruction::Getfield(channels),
+            Instruction::Invokespecial(decoder_init),
+            Instruction::Putfield(decoder_field),
+            Instruction::Aload_0,
+            Instruction::Aload_0,
+            Instruction::Getfield(context),
+            Instruction::New(pcm),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(channels),
+            Instruction::Aload_0,
+            Instruction::Getfield(frequency),
+            Instruction::Invokespecial(pcm_init),
+            Instruction::Invokestatic(create),
+            Instruction::Putfield(downstream),
+            Instruction::Aload_0,
+            Instruction::Getfield(downstream),
+            Instruction::Aload_0,
+            Instruction::Getfield(current),
+            Instruction::Aload_0,
+            Instruction::Getfield(requested),
+            Instruction::Invokestatic(max),
+            Instruction::Aload_0,
+            Instruction::Getfield(current),
+            Instruction::Invokevirtual(seek),
+            Instruction::Aload_0,
+            Instruction::Getfield(downstream),
+            Instruction::Ifnonnull(return_target),
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(destroy),
+            Instruction::Goto(return_target),
+            Instruction::Astore_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(downstream),
+            Instruction::Ifnonnull(throw_target),
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(destroy),
+            Instruction::Aload_1,
+            Instruction::Athrow,
+            Instruction::Return,
+        ],
+        vec![ExceptionTableEntry {
+            range_pc: try_start..try_end,
+            handler_pc: handler_target,
+            catch_type: 0,
+        }],
+    )?;
+    let owner_type = VerificationType::Object { cpool_index: owner };
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: handler_target,
+                locals: vec![owner_type.clone()],
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: throw_target - handler_target - 1,
+                locals: vec![
+                    owner_type.clone(),
+                    VerificationType::Object {
+                        cpool_index: throwable,
+                    },
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: return_target - throw_target - 1,
+                locals: vec![owner_type],
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn opus_packet_router_destroy_decoder(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(OPUS_PACKET_ROUTER_CLASS)?;
+    let decoder = pool.add_class("com/sedmelluq/discord/lavaplayer/natives/opus/OpusDecoder")?;
+    let decoder_field = pool.add_field_ref(
+        owner,
+        "opusDecoder",
+        "Lcom/sedmelluq/discord/lavaplayer/natives/opus/OpusDecoder;",
+    )?;
+    let decoder_close = pool.add_method_ref(decoder, "close", "()V")?;
+    let pipeline = pool.add_class("com/sedmelluq/discord/lavaplayer/filter/AudioPipeline")?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/AudioPipeline;",
+    )?;
+    let pipeline_close = pool.add_method_ref(pipeline, "close", "()V")?;
+    let direct_input = pool.add_field_ref(owner, "directInput", "Ljava/nio/ByteBuffer;")?;
+    let frame_buffer = pool.add_field_ref(owner, "frameBuffer", "Ljava/nio/ShortBuffer;")?;
+    let pipeline_target = 9;
+    let clear_target = 18;
+    let mut body = code(
+        pool,
+        2,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(decoder_field),
+            Instruction::Ifnull(pipeline_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(decoder_field),
+            Instruction::Invokevirtual(decoder_close),
+            Instruction::Aload_0,
+            Instruction::Aconst_null,
+            Instruction::Putfield(decoder_field),
+            Instruction::Aload_0,
+            Instruction::Getfield(downstream),
+            Instruction::Ifnull(clear_target),
+            Instruction::Aload_0,
+            Instruction::Getfield(downstream),
+            Instruction::Invokevirtual(pipeline_close),
+            Instruction::Aload_0,
+            Instruction::Aconst_null,
+            Instruction::Putfield(downstream),
+            Instruction::Aload_0,
+            Instruction::Aconst_null,
+            Instruction::Putfield(direct_input),
+            Instruction::Aload_0,
+            Instruction::Aconst_null,
+            Instruction::Putfield(frame_buffer),
+            Instruction::Return,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            same_stack_frame(pipeline_target),
+            same_stack_frame(clear_target - pipeline_target - 1),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn opus_packet_router_class_init(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(OPUS_PACKET_ROUTER_CLASS)?;
     let logger_factory = pool.add_class("org/slf4j/LoggerFactory")?;
     let get_logger = pool.add_method_ref(
         logger_factory,
