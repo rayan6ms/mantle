@@ -99,6 +99,8 @@ const CONVERTER_AUDIO_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/converter/ConverterAudioFilter";
 const TO_FLOAT_AUDIO_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/filter/converter/ToFloatAudioFilter";
+const TO_SHORT_AUDIO_FILTER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/filter/converter/ToShortAudioFilter";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -403,6 +405,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     USER_PROVIDED_AUDIO_FILTERS_CLASS,
     CONVERTER_AUDIO_FILTER_CLASS,
     TO_FLOAT_AUDIO_FILTER_CLASS,
+    TO_SHORT_AUDIO_FILTER_CLASS,
     "com/sedmelluq/discord/lavaplayer/format/AudioDataFormat",
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
@@ -873,6 +876,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | FINAL_PCM_AUDIO_FILTER_CLASS
             | USER_PROVIDED_AUDIO_FILTERS_CLASS
             | TO_FLOAT_AUDIO_FILTER_CLASS
+            | TO_SHORT_AUDIO_FILTER_CLASS
             | TRACK_MARKER_TRACKER_CLASS
             | BASE_AUDIO_TRACK_CLASS
             | DELEGATED_AUDIO_TRACK_CLASS
@@ -1128,6 +1132,9 @@ fn replacement_body(
     }
     if class_name == TO_FLOAT_AUDIO_FILTER_CLASS {
         return to_float_audio_filter_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == TO_SHORT_AUDIO_FILTER_CLASS {
+        return to_short_audio_filter_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -3322,6 +3329,248 @@ fn to_float_audio_filter_process_split(pool: &mut ConstantPool<'static>) -> Resu
             },
             StackFrame::ChopFrame {
                 frame_type: 250,
+                offset_delta: u16::try_from(return_target - dispatch_target - 1)?,
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn to_short_audio_filter_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(Lcom/sedmelluq/discord/lavaplayer/filter/ShortPcmAudioFilter;I)V") => {
+            to_short_audio_filter_constructor(pool)
+        }
+        ("process", "([[FII)V") => to_short_audio_filter_process_planar(pool, true),
+        ("process", "([SII)V") => {
+            to_short_audio_filter_process_passthrough(pool, descriptor, false)
+        }
+        ("process", "(Ljava/nio/ShortBuffer;)V") => {
+            to_short_audio_filter_process_passthrough(pool, descriptor, true)
+        }
+        ("process", "([[SII)V") => to_short_audio_filter_process_planar(pool, false),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {TO_SHORT_AUDIO_FILTER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn to_short_audio_filter_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(TO_SHORT_AUDIO_FILTER_CLASS)?;
+    let parent = pool.add_class(CONVERTER_AUDIO_FILTER_CLASS)?;
+    let parent_init = pool.add_method_ref(parent, "<init>", "()V")?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/ShortPcmAudioFilter;",
+    )?;
+    let channel_count = pool.add_field_ref(owner, "channelCount", "I")?;
+    let output_buffer = pool.add_field_ref(owner, "outputBuffer", "[S")?;
+    code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(parent_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(downstream),
+            Instruction::Aload_0,
+            Instruction::Iload_2,
+            Instruction::Putfield(channel_count),
+            Instruction::Aload_0,
+            Instruction::Sipush(4096),
+            Instruction::Iload_2,
+            Instruction::Imul,
+            Instruction::Newarray(ArrayType::Short),
+            Instruction::Putfield(output_buffer),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn to_short_audio_filter_process_passthrough(
+    pool: &mut ConstantPool<'static>,
+    descriptor: &str,
+    buffer: bool,
+) -> Result<Attribute> {
+    let owner = pool.add_class(TO_SHORT_AUDIO_FILTER_CLASS)?;
+    let short_filter = pool.add_class(SHORT_PCM_AUDIO_FILTER_CLASS)?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/ShortPcmAudioFilter;",
+    )?;
+    let process = pool.add_interface_method_ref(short_filter, "process", descriptor)?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Getfield(downstream),
+        Instruction::Aload_1,
+    ];
+    if !buffer {
+        instructions.extend([Instruction::Iload_2, Instruction::Iload_3]);
+    }
+    instructions.extend([
+        Instruction::Invokeinterface(process, if buffer { 2 } else { 4 }),
+        Instruction::Return,
+    ]);
+    code(
+        pool,
+        if buffer { 2 } else { 4 },
+        if buffer { 2 } else { 4 },
+        instructions,
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn to_short_audio_filter_process_planar(
+    pool: &mut ConstantPool<'static>,
+    float_input: bool,
+) -> Result<Attribute> {
+    let owner = pool.add_class(TO_SHORT_AUDIO_FILTER_CLASS)?;
+    let short_filter = pool.add_class(SHORT_PCM_AUDIO_FILTER_CLASS)?;
+    let math = pool.add_class("java/lang/Math")?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/ShortPcmAudioFilter;",
+    )?;
+    let channel_count = pool.add_field_ref(owner, "channelCount", "I")?;
+    let output_buffer = pool.add_field_ref(owner, "outputBuffer", "[S")?;
+    let min = pool.add_method_ref(math, "min", "(II)I")?;
+    let convert = if float_input {
+        Some(pool.add_method_ref(owner, "floatToShort", "(F)S")?)
+    } else {
+        None
+    };
+    let process = pool.add_interface_method_ref(short_filter, "process", "([SII)V")?;
+    let mut instructions = vec![
+        Instruction::Iload_2,
+        Instruction::Iload_3,
+        Instruction::Iadd,
+        Instruction::Istore(4),
+    ];
+    let outer_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload_2,
+        Instruction::Iload(4),
+        Instruction::If_icmpge(0),
+        Instruction::Sipush(4096),
+        Instruction::Iload(4),
+        Instruction::Iload_2,
+        Instruction::Isub,
+        Instruction::Invokestatic(min),
+        Instruction::Istore(5),
+        Instruction::Iconst_0,
+        Instruction::Istore(6),
+        Instruction::Iconst_0,
+        Instruction::Istore(7),
+    ]);
+    let frame_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(7),
+        Instruction::Iload(5),
+        Instruction::If_icmpge(0),
+        Instruction::Iconst_0,
+        Instruction::Istore(8),
+    ]);
+    let channel_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(8),
+        Instruction::Aload_0,
+        Instruction::Getfield(channel_count),
+        Instruction::If_icmpge(0),
+        Instruction::Aload_0,
+        Instruction::Getfield(output_buffer),
+        Instruction::Iload(6),
+        Instruction::Iinc(6, 1),
+        Instruction::Aload_1,
+        Instruction::Iload(8),
+        Instruction::Aaload,
+        Instruction::Iload(7),
+    ]);
+    if float_input {
+        instructions.extend([
+            Instruction::Faload,
+            Instruction::Invokestatic(convert.expect("float conversion method")),
+        ]);
+    } else {
+        instructions.push(Instruction::Saload);
+    }
+    instructions.extend([
+        Instruction::Sastore,
+        Instruction::Iinc(8, 1),
+        Instruction::Goto(u16::try_from(channel_target)?),
+    ]);
+    let frame_continue = instructions.len();
+    instructions.extend([
+        Instruction::Iinc(7, 1),
+        Instruction::Goto(u16::try_from(frame_target)?),
+    ]);
+    let dispatch_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload_2,
+        Instruction::Iload(5),
+        Instruction::Iadd,
+        Instruction::Istore_2,
+        Instruction::Aload_0,
+        Instruction::Getfield(downstream),
+        Instruction::Aload_0,
+        Instruction::Getfield(output_buffer),
+        Instruction::Iconst_0,
+        Instruction::Iload(5),
+        Instruction::Invokeinterface(process, 4),
+        Instruction::Goto(u16::try_from(outer_target)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[outer_target + 2] = Instruction::If_icmpge(u16::try_from(return_target)?);
+    instructions[frame_target + 2] = Instruction::If_icmpge(u16::try_from(dispatch_target)?);
+    instructions[channel_target + 3] = Instruction::If_icmpge(u16::try_from(frame_continue)?);
+    let mut body = code(pool, 4, 9, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(outer_target)?,
+                locals: vec![VerificationType::Integer],
+            },
+            StackFrame::AppendFrame {
+                frame_type: 254,
+                offset_delta: u16::try_from(frame_target - outer_target - 1)?,
+                locals: vec![
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                ],
+            },
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(channel_target - frame_target - 1)?,
+                locals: vec![VerificationType::Integer],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: u16::try_from(frame_continue - channel_target - 1)?,
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: u16::try_from(dispatch_target - frame_continue - 1)?,
+            },
+            StackFrame::ChopFrame {
+                frame_type: 249,
                 offset_delta: u16::try_from(return_target - dispatch_target - 1)?,
             },
         ],

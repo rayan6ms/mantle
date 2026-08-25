@@ -8521,54 +8521,60 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted concrete ConverterAudioFilter subclass preserves its three private final fields, public constructor, four checked PCM entry points, reusable interleaved short buffer, direct short and ShortBuffer forwarding, and the reference's planar source-prefix offset quirk. Differential coverage proves raw float conversion, planar interleaving, 4,096-frame chunking and reuse, repeated source prefixes, identity forwarding, interruption identity, null, zero-channel, channel-size overflow, bounds, signed end overflow, state, and metadata behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.converter.ToShortAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/filter/ShortPcmAudioFilter;I)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted concrete ConverterAudioFilter subclass preserves its three private final fields, public constructor, four checked PCM entry points, reusable interleaved short buffer, direct short and ShortBuffer forwarding, and the reference's planar source-prefix offset quirk. Differential coverage proves raw float conversion, planar interleaving, 4,096-frame chunking and reuse, repeated source prefixes, identity forwarding, interruption identity, null, zero-channel, channel-size overflow, bounds, signed end overflow, state, and metadata behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.converter.ToShortAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "([[FII)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted concrete ConverterAudioFilter subclass preserves its three private final fields, public constructor, four checked PCM entry points, reusable interleaved short buffer, direct short and ShortBuffer forwarding, and the reference's planar source-prefix offset quirk. Differential coverage proves raw float conversion, planar interleaving, 4,096-frame chunking and reuse, repeated source prefixes, identity forwarding, interruption identity, null, zero-channel, channel-size overflow, bounds, signed end overflow, state, and metadata behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.converter.ToShortAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "([SII)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted concrete ConverterAudioFilter subclass preserves its three private final fields, public constructor, four checked PCM entry points, reusable interleaved short buffer, direct short and ShortBuffer forwarding, and the reference's planar source-prefix offset quirk. Differential coverage proves raw float conversion, planar interleaving, 4,096-frame chunking and reuse, repeated source prefixes, identity forwarding, interruption identity, null, zero-channel, channel-size overflow, bounds, signed end overflow, state, and metadata behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.converter.ToShortAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "(Ljava/nio/ShortBuffer;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted concrete ConverterAudioFilter subclass preserves its three private final fields, public constructor, four checked PCM entry points, reusable interleaved short buffer, direct short and ShortBuffer forwarding, and the reference's planar source-prefix offset quirk. Differential coverage proves raw float conversion, planar interleaving, 4,096-frame chunking and reuse, repeated source prefixes, identity forwarding, interruption identity, null, zero-channel, channel-size overflow, bounds, signed end overflow, state, and metadata behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.converter.ToShortAudioFilter",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "([[SII)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The emitted concrete ConverterAudioFilter subclass preserves its three private final fields, public constructor, four checked PCM entry points, reusable interleaved short buffer, direct short and ShortBuffer forwarding, and the reference's planar source-prefix offset quirk. Differential coverage proves raw float conversion, planar interleaving, 4,096-frame chunking and reuse, repeated source prefixes, identity forwarding, interruption identity, null, zero-channel, channel-size overflow, bounds, signed end overflow, state, and metadata behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.filter.converter.ToSplitShortAudioFilter",
