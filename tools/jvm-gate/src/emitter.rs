@@ -188,6 +188,10 @@ const FLAC_TRACK_PROVIDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/FlacTrackProvider";
 const FLAC_FRAME_HEADER_READER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameHeaderReader";
+const FLAC_FRAME_INFO_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo";
+const FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -538,6 +542,8 @@ const REFERENCE_CLASSES: &[&str] = &[
     FLAC_TRACK_INFO_BUILDER_CLASS,
     FLAC_TRACK_PROVIDER_CLASS,
     FLAC_FRAME_HEADER_READER_CLASS,
+    FLAC_FRAME_INFO_CLASS,
+    FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -1023,6 +1029,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | FLAC_TRACK_INFO_BUILDER_CLASS
             | FLAC_TRACK_PROVIDER_CLASS
             | FLAC_FRAME_HEADER_READER_CLASS
+            | FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS
             | OPUS_AUDIO_DATA_FORMAT_CLASS
             | PCM16_AUDIO_DATA_FORMAT_CLASS
             | OPUS_CHUNK_DECODER_CLASS
@@ -1144,6 +1151,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | FLAC_METADATA_READER_CLASS
             | FLAC_TRACK_PROVIDER_CLASS
             | FLAC_FRAME_HEADER_READER_CLASS
+            | FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS
             | AUDIO_PIPELINE_FACTORY_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
@@ -1465,6 +1473,12 @@ fn replacement_body(
     }
     if class_name == FLAC_FRAME_HEADER_READER_CLASS {
         return flac_frame_header_reader_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == FLAC_FRAME_INFO_CLASS {
+        return flac_frame_info_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS {
+        return flac_frame_info_channel_delta_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -6980,6 +6994,181 @@ fn flac_track_provider_close(pool: &mut ConstantPool<'static>) -> Result<Attribu
             Instruction::Return,
         ],
     )
+}
+
+fn flac_frame_info_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(ILcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta;)V",
+        ) => flac_frame_info_constructor(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {FLAC_FRAME_INFO_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn flac_frame_info_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(FLAC_FRAME_INFO_CLASS)?;
+    let sample_count = pool.add_field_ref(owner, "sampleCount", "I")?;
+    let channel_delta = pool.add_field_ref(
+        owner,
+        "channelDelta",
+        "Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta;",
+    )?;
+    code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Iload_1,
+            Instruction::Putfield(sample_count),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(channel_delta),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn flac_frame_info_channel_delta_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "values",
+            "()[Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta;",
+        ) => flac_frame_info_channel_delta_values(pool),
+        (
+            "valueOf",
+            "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta;",
+        ) => track_enum_value_of(pool, FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS),
+        ("<init>", "(Ljava/lang/String;II)V") => flac_frame_info_channel_delta_constructor(pool),
+        ("<clinit>", "()V") => flac_frame_info_channel_delta_initializer(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn flac_frame_info_channel_delta_values(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS)?;
+    let array = pool.add_class(
+        "[Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta;",
+    )?;
+    let values = pool.add_field_ref(
+        owner,
+        "$VALUES",
+        "[Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta;",
+    )?;
+    let clone = pool.add_method_ref(array, "clone", "()Ljava/lang/Object;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Getstatic(values),
+            Instruction::Invokevirtual(clone),
+            Instruction::Checkcast(array),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn flac_frame_info_channel_delta_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let enumeration = pool.add_class("java/lang/Enum")?;
+    let enum_init = pool.add_method_ref(enumeration, "<init>", "(Ljava/lang/String;I)V")?;
+    let owner = pool.add_class(FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS)?;
+    let delta_channel = pool.add_field_ref(owner, "deltaChannel", "I")?;
+    code(
+        pool,
+        3,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Iload_2,
+            Instruction::Invokespecial(enum_init),
+            Instruction::Aload_0,
+            Instruction::Iload_3,
+            Instruction::Putfield(delta_channel),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn flac_frame_info_channel_delta_initializer(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    const CONSTANTS: [(&str, i32); 4] = [
+        ("NONE", -1),
+        ("LEFT_SIDE", 1),
+        ("RIGHT_SIDE", 0),
+        ("MID_SIDE", 1),
+    ];
+    let owner = pool.add_class(FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS)?;
+    let descriptor =
+        "Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta;";
+    let constructor = pool.add_method_ref(owner, "<init>", "(Ljava/lang/String;II)V")?;
+    let mut fields = Vec::with_capacity(CONSTANTS.len());
+    let mut instructions = Vec::with_capacity(CONSTANTS.len() * 12 + 4);
+    for (ordinal, (name, delta_channel)) in CONSTANTS.iter().enumerate() {
+        let field = pool.add_field_ref(owner, *name, descriptor)?;
+        fields.push(field);
+        instructions.extend([
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Ldc_w(pool.add_string(*name)?),
+            small_integer_instruction(ordinal)?,
+            if *delta_channel == -1 {
+                Instruction::Iconst_m1
+            } else {
+                small_integer_instruction(usize::try_from(*delta_channel)?)?
+            },
+            Instruction::Invokespecial(constructor),
+            Instruction::Putstatic(field),
+        ]);
+    }
+    instructions.extend([
+        small_integer_instruction(CONSTANTS.len())?,
+        Instruction::Anewarray(owner),
+    ]);
+    for (ordinal, field) in fields.into_iter().enumerate() {
+        instructions.extend([
+            Instruction::Dup,
+            small_integer_instruction(ordinal)?,
+            Instruction::Getstatic(field),
+            Instruction::Aastore,
+        ]);
+    }
+    let values = pool.add_field_ref(
+        owner,
+        "$VALUES",
+        "[Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta;",
+    )?;
+    instructions.extend([Instruction::Putstatic(values), Instruction::Return]);
+    code(pool, 5, 0, instructions)
 }
 
 #[allow(clippy::too_many_lines)]

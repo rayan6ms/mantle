@@ -273,6 +273,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-flac-track-provider-consumer \
   --output "$WORK/GateFlacTrackProvider.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-frame-header-reader-consumer \
   --output "$WORK/GateFlacFrameHeaderReader.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-flac-frame-info-consumer \
+  --output "$WORK/GateFlacFrameInfo.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -349,6 +351,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateFlacTrackInfoBuilder.java" \
   "$WORK/GateFlacTrackProvider.java" \
   "$WORK/GateFlacFrameHeaderReader.java" \
+  "$WORK/GateFlacFrameInfo.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GateAdtsStreamReader.java" \
@@ -1463,6 +1466,17 @@ cmp "$WORK/flac-frame-header-reader-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,block-mapping,rate-mapping,channel-mapping,size-mapping,standard,explicit,inherited,left-side,mid-side,utf8-variable,invalid-block,rate-mismatch,channel-mismatch,size-mismatch,io-propagation,private-fields,private-methods,throws,identity-semantics,subclassable,reflection' \
   "$WORK/flac-frame-header-reader-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateFlacFrameInfo \
+  >"$WORK/flac-frame-info-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateFlacFrameInfo >"$WORK/flac-frame-info-candidate.txt"
+cmp "$WORK/flac-frame-info-reference.txt" \
+  "$WORK/flac-frame-info-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor-values,constructor-edges,null-channel,public-final-fields,identity-semantics,subclassable,enum-order,delta-channels,name-ordinal,defensive-values,value-of,lookup-failures,enum-collections,nested-enum,private-enum-state,generic-signature,reflection' \
+  "$WORK/flac-frame-info-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"

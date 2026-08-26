@@ -180,6 +180,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-flac-track-info-builder-consumer" => Some(FLAC_TRACK_INFO_BUILDER_CONSUMER),
         "write-flac-track-provider-consumer" => Some(FLAC_TRACK_PROVIDER_CONSUMER),
         "write-flac-frame-header-reader-consumer" => Some(FLAC_FRAME_HEADER_READER_CONSUMER),
+        "write-flac-frame-info-consumer" => Some(FLAC_FRAME_INFO_CONSUMER),
         _ => None,
     }
 }
@@ -16431,6 +16432,167 @@ public final class GateFlacFrameHeaderReader {
     byte[] bytes() { if (count != 0) out.write(current << (8 - count)); return out.toByteArray(); }
   }
   private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
+}
+"#;
+
+const FLAC_FRAME_INFO_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameInfo;
+import com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameInfo.ChannelDelta;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.util.Arrays;
+import java.util.EnumMap;
+import java.util.EnumSet;
+
+public final class GateFlacFrameInfo {
+  private static final String[] NAMES = {"NONE", "LEFT_SIDE", "RIGHT_SIDE", "MID_SIDE"};
+  private static final int[] CHANNELS = {-1, 1, 0, 1};
+
+  public static void main(String[] args) throws Exception {
+    construction();
+    enumBehavior();
+    reflection();
+    System.out.println("contracts=constructor-values,constructor-edges,null-channel,public-final-fields,identity-semantics,subclassable,enum-order,delta-channels,name-ordinal,defensive-values,value-of,lookup-failures,enum-collections,nested-enum,private-enum-state,generic-signature,reflection");
+  }
+
+  private static void construction() {
+    FlacFrameInfo ordinary = new FlacFrameInfo(4096, ChannelDelta.MID_SIDE);
+    check(ordinary.sampleCount == 4096 && ordinary.channelDelta == ChannelDelta.MID_SIDE,
+        "constructor retains ordinary values");
+    check(new FlacFrameInfo(Integer.MIN_VALUE, ChannelDelta.NONE).sampleCount == Integer.MIN_VALUE
+        && new FlacFrameInfo(0, ChannelDelta.RIGHT_SIDE).sampleCount == 0
+        && new FlacFrameInfo(Integer.MAX_VALUE, ChannelDelta.LEFT_SIDE).sampleCount == Integer.MAX_VALUE,
+        "constructor accepts the complete int domain without validation");
+    FlacFrameInfo nullable = new FlacFrameInfo(-7, null);
+    check(nullable.sampleCount == -7 && nullable.channelDelta == null,
+        "constructor accepts null channel delta without validation");
+    FlacFrameInfo first = new FlacFrameInfo(1, ChannelDelta.NONE);
+    FlacFrameInfo second = new FlacFrameInfo(1, ChannelDelta.NONE);
+    check(first != second && !first.equals(second) && first.equals(first),
+        "frame info retains Object identity equality");
+    Derived derived = new Derived(17, ChannelDelta.LEFT_SIDE);
+    check(derived.sampleCount == 17 && derived.channelDelta == ChannelDelta.LEFT_SIDE,
+        "ordinary subclass inherits constructor state");
+  }
+
+  private static void enumBehavior() {
+    ChannelDelta[] first = ChannelDelta.values();
+    ChannelDelta[] second = ChannelDelta.values();
+    check(first != second && first.length == NAMES.length && second.length == NAMES.length,
+        "values returns complete defensive arrays");
+    for (int index = 0; index < NAMES.length; index++) {
+      ChannelDelta value = first[index];
+      check(value == second[index] && value == ChannelDelta.valueOf(NAMES[index])
+          && value.name().equals(NAMES[index]) && value.toString().equals(NAMES[index])
+          && value.ordinal() == index && value.deltaChannel == CHANNELS[index]
+          && value.getDeclaringClass() == ChannelDelta.class,
+          "enum identity and channel metadata " + NAMES[index]);
+    }
+    first[0] = null;
+    first[1] = first[2];
+    check(ChannelDelta.values()[0] == ChannelDelta.NONE
+        && ChannelDelta.values()[1] == ChannelDelta.LEFT_SIDE,
+        "mutating returned values array does not alter enum state");
+    check(Arrays.equals(ChannelDelta.class.getEnumConstants(), ChannelDelta.values()),
+        "Class enum constants follow declaration order");
+    EnumSet<ChannelDelta> set = EnumSet.allOf(ChannelDelta.class);
+    EnumMap<ChannelDelta, Integer> map = new EnumMap<>(ChannelDelta.class);
+    for (ChannelDelta value : ChannelDelta.values()) map.put(value, value.deltaChannel);
+    check(set.size() == 4 && map.size() == 4 && map.get(ChannelDelta.NONE) == -1
+        && map.get(ChannelDelta.MID_SIDE) == 1,
+        "standard enum collections see the complete universe");
+    expect(IllegalArgumentException.class, () -> ChannelDelta.valueOf("none"));
+    expect(IllegalArgumentException.class, () -> ChannelDelta.valueOf(""));
+    expect(NullPointerException.class, () -> ChannelDelta.valueOf(null));
+  }
+
+  private static void reflection() throws Exception {
+    Class<FlacFrameInfo> outer = FlacFrameInfo.class;
+    check(outer.getModifiers() == Modifier.PUBLIC && outer.getSuperclass() == Object.class
+        && outer.getInterfaces().length == 0 && outer.getTypeParameters().length == 0
+        && outer.getDeclaredAnnotations().length == 0,
+        "public concrete non-final outer class metadata");
+    check(outer.getDeclaredFields().length == 2 && outer.getDeclaredMethods().length == 0
+        && outer.getDeclaredConstructors().length == 1 && outer.getDeclaredClasses().length == 1,
+        "exact outer member counts");
+    checkField(outer.getDeclaredField("sampleCount"), int.class);
+    checkField(outer.getDeclaredField("channelDelta"), ChannelDelta.class);
+    Constructor<FlacFrameInfo> outerConstructor =
+        outer.getDeclaredConstructor(int.class, ChannelDelta.class);
+    check(outerConstructor.getModifiers() == Modifier.PUBLIC
+        && Arrays.equals(outerConstructor.getParameterTypes(),
+            new Class<?>[] {int.class, ChannelDelta.class})
+        && outerConstructor.getExceptionTypes().length == 0 && !outerConstructor.isSynthetic(),
+        "outer constructor descriptor and metadata");
+
+    Class<ChannelDelta> nested = ChannelDelta.class;
+    check(nested.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL | 0x4000)
+        && nested.isEnum() && nested.getSuperclass() == Enum.class
+        && nested.getInterfaces().length == 0 && nested.getDeclaringClass() == outer
+        && nested.getEnclosingClass() == outer && nested.getDeclaredAnnotations().length == 0,
+        "public static final nested enum metadata");
+    ParameterizedType superclass = (ParameterizedType) nested.getGenericSuperclass();
+    check(superclass.getRawType() == Enum.class
+        && superclass.getActualTypeArguments().length == 1
+        && superclass.getActualTypeArguments()[0] == ChannelDelta.class,
+        "self-referential Enum generic superclass");
+    check(nested.getDeclaredFields().length == 6 && nested.getDeclaredMethods().length == 2
+        && nested.getDeclaredConstructors().length == 1,
+        "exact nested enum member counts");
+    for (String name : NAMES) {
+      Field field = nested.getDeclaredField(name);
+      check(field.getType() == nested
+          && field.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL | 0x4000)
+          && field.isEnumConstant() && !field.isSynthetic(), "enum constant metadata " + name);
+    }
+    checkField(nested.getDeclaredField("deltaChannel"), int.class);
+    Field values = nested.getDeclaredField("$VALUES");
+    check(values.getType() == ChannelDelta[].class
+        && values.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL | 0x1000)
+        && values.isSynthetic() && !values.isEnumConstant(), "private values field metadata");
+    Method valuesMethod = nested.getDeclaredMethod("values");
+    Method valueOfMethod = nested.getDeclaredMethod("valueOf", String.class);
+    check(valuesMethod.getReturnType() == ChannelDelta[].class
+        && valueOfMethod.getReturnType() == ChannelDelta.class
+        && valuesMethod.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && valueOfMethod.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && !valuesMethod.isSynthetic() && !valueOfMethod.isSynthetic(),
+        "enum method metadata");
+    Constructor<?> enumConstructor = nested.getDeclaredConstructors()[0];
+    check(enumConstructor.getModifiers() == Modifier.PRIVATE && !enumConstructor.isSynthetic()
+        && Arrays.equals(enumConstructor.getParameterTypes(),
+            new Class<?>[] {String.class, int.class, int.class})
+        && Arrays.equals(enumConstructor.getGenericParameterTypes(),
+            new java.lang.reflect.Type[] {int.class})
+        && enumConstructor.getExceptionTypes().length == 0,
+        "private enum constructor metadata");
+  }
+
+  private static void checkField(Field field, Class<?> type) {
+    check(field.getType() == type && field.getGenericType() == type
+        && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && !field.isSynthetic() && !field.isEnumConstant(), field.getName() + " field metadata");
+  }
+
+  private static void expect(Class<? extends Throwable> type, Runnable operation) {
+    try {
+      operation.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable error) {
+      if (!type.isInstance(error)) throw new AssertionError("wrong failure", error);
+    }
+  }
+
+  private static final class Derived extends FlacFrameInfo {
+    Derived(int sampleCount, ChannelDelta channelDelta) { super(sampleCount, channelDelta); }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
 }
 "#;
 

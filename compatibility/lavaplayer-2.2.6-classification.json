@@ -2453,108 +2453,168 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public subclassable immutable frame DTO preserves exact Object superclass, nested ChannelDelta declaration, constructor behavior, identity semantics, and reflection surface.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameInfo",
       "symbol_kind": "FIELD",
       "member_name": "sampleCount",
       "descriptor": "I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public final sample count retains the complete signed int domain without validation.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameInfo",
       "symbol_kind": "FIELD",
       "member_name": "channelDelta",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public final channel-delta field retains the exact enum identity and permits null.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameInfo",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(ILcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Constructor assigns both arguments directly with no validation while preserving subclassability and Object identity semantics.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameInfo$ChannelDelta",
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public static final nested enum preserves its self-referential generic superclass, four-value universe, private synthetic backing array, and reflection surface.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameInfo$ChannelDelta",
       "symbol_kind": "FIELD",
       "member_name": "NONE",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Enum constant preserves declaration ordinal zero and delta channel -1.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameInfo$ChannelDelta",
       "symbol_kind": "FIELD",
       "member_name": "LEFT_SIDE",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Enum constant preserves declaration ordinal one and delta channel 1.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameInfo$ChannelDelta",
       "symbol_kind": "FIELD",
       "member_name": "RIGHT_SIDE",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Enum constant preserves declaration ordinal two and delta channel 0.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameInfo$ChannelDelta",
       "symbol_kind": "FIELD",
       "member_name": "MID_SIDE",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Enum constant preserves declaration ordinal three and delta channel 1.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameInfo$ChannelDelta",
       "symbol_kind": "FIELD",
       "member_name": "deltaChannel",
       "descriptor": "I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public final delta-channel index preserves values -1, 1, 0, and 1 in declaration order.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameInfo$ChannelDelta",
       "symbol_kind": "METHOD",
       "member_name": "values",
       "descriptor": "()[Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Returns a defensive clone containing the complete enum universe in declaration order.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameInfo$ChannelDelta",
       "symbol_kind": "METHOD",
       "member_name": "valueOf",
       "descriptor": "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Delegates to standard Enum lookup with exact identity and IllegalArgumentException/null failure behavior.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameReader",
