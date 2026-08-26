@@ -2243,63 +2243,98 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Generated public concrete non-final builder preserves constructor state, mutable assembly semantics, build ordering, shared identities, subclassability, and reflected structure.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.FlacTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves stream-info identity and eagerly creates an independent HashMap tag store with all default fields unset.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.FlacTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "getStreamInfo",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Returns the exact constructor stream-info reference without validation or copying.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.FlacTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "setSeekPoints",
       "descriptor": "([Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacSeekPoint;I)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Stores the seek-point array and count directly, including null, negative, and caller-mutated values.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.FlacTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "addTag",
       "descriptor": "(Ljava/lang/String;Ljava/lang/String;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Uses the eagerly created Map directly, replacing duplicate keys and accepting null keys and values.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.FlacTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "setFirstFramePosition",
       "descriptor": "(J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Stores the full-width long frame position directly without validation.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.FlacTrackInfoBuilder",
       "symbol_kind": "METHOD",
       "member_name": "build",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfo;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Constructs a fresh FlacTrackInfo in exact argument order while retaining the builder's seek array and tag map identities and propagating downstream failures.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.FlacTrackProvider",

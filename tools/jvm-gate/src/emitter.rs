@@ -182,6 +182,8 @@ const FLAC_SEEK_POINT_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/
 const FLAC_STREAM_INFO_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo";
 const FLAC_TRACK_INFO_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfo";
+const FLAC_TRACK_INFO_BUILDER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfoBuilder";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -529,6 +531,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     FLAC_SEEK_POINT_CLASS,
     FLAC_STREAM_INFO_CLASS,
     FLAC_TRACK_INFO_CLASS,
+    FLAC_TRACK_INFO_BUILDER_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -1010,6 +1013,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | FLAC_CONTAINER_PROBE_CLASS
             | FLAC_FILE_LOADER_CLASS
             | FLAC_METADATA_READER_CLASS
+            | FLAC_TRACK_INFO_BUILDER_CLASS
             | OPUS_AUDIO_DATA_FORMAT_CLASS
             | PCM16_AUDIO_DATA_FORMAT_CLASS
             | OPUS_CHUNK_DECODER_CLASS
@@ -1441,6 +1445,9 @@ fn replacement_body(
     }
     if class_name == FLAC_TRACK_INFO_CLASS {
         return flac_track_info_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == FLAC_TRACK_INFO_BUILDER_CLASS {
+        return flac_track_info_builder_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -6107,6 +6114,200 @@ fn flac_track_info_constructor(pool: &mut ConstantPool<'static>) -> Result<Attri
             Instruction::Ldiv,
             Instruction::Putfield(duration),
             Instruction::Return,
+        ],
+    )
+}
+
+fn flac_track_info_builder_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;)V") => {
+            flac_track_info_builder_constructor(pool)
+        }
+        ("getStreamInfo", "()Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;") => {
+            flac_track_info_builder_get_stream_info(pool)
+        }
+        (
+            "setSeekPoints",
+            "([Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacSeekPoint;I)V",
+        ) => flac_track_info_builder_set_seek_points(pool),
+        ("addTag", "(Ljava/lang/String;Ljava/lang/String;)V") => {
+            flac_track_info_builder_add_tag(pool)
+        }
+        ("setFirstFramePosition", "(J)V") => flac_track_info_builder_set_first_frame(pool),
+        ("build", "()Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfo;") => {
+            flac_track_info_builder_build(pool)
+        }
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {FLAC_TRACK_INFO_BUILDER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn flac_track_info_builder_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_TRACK_INFO_BUILDER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let stream_info = pool.add_field_ref(
+        owner,
+        "streamInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;",
+    )?;
+    let hash_map = pool.add_class("java/util/HashMap")?;
+    let hash_map_init = pool.add_method_ref(hash_map, "<init>", "()V")?;
+    let tags = pool.add_field_ref(owner, "tags", "Ljava/util/Map;")?;
+    code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(stream_info),
+            Instruction::Aload_0,
+            Instruction::New(hash_map),
+            Instruction::Dup,
+            Instruction::Invokespecial(hash_map_init),
+            Instruction::Putfield(tags),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn flac_track_info_builder_get_stream_info(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_TRACK_INFO_BUILDER_CLASS)?;
+    let stream_info = pool.add_field_ref(
+        owner,
+        "streamInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(stream_info),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn flac_track_info_builder_set_seek_points(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_TRACK_INFO_BUILDER_CLASS)?;
+    let seek_points = pool.add_field_ref(
+        owner,
+        "seekPoints",
+        "[Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacSeekPoint;",
+    )?;
+    let seek_point_count = pool.add_field_ref(owner, "seekPointCount", "I")?;
+    code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(seek_points),
+            Instruction::Aload_0,
+            Instruction::Iload_2,
+            Instruction::Putfield(seek_point_count),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn flac_track_info_builder_add_tag(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_TRACK_INFO_BUILDER_CLASS)?;
+    let tags = pool.add_field_ref(owner, "tags", "Ljava/util/Map;")?;
+    let map = pool.add_class("java/util/Map")?;
+    let put = pool.add_interface_method_ref(
+        map,
+        "put",
+        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+    )?;
+    code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(tags),
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Invokeinterface(put, 3),
+            Instruction::Pop,
+            Instruction::Return,
+        ],
+    )
+}
+
+fn flac_track_info_builder_set_first_frame(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_TRACK_INFO_BUILDER_CLASS)?;
+    let first_frame_position = pool.add_field_ref(owner, "firstFramePosition", "J")?;
+    code(
+        pool,
+        3,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Lload_1,
+            Instruction::Putfield(first_frame_position),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn flac_track_info_builder_build(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_TRACK_INFO_BUILDER_CLASS)?;
+    let track_info = pool.add_class(FLAC_TRACK_INFO_CLASS)?;
+    let track_info_init = pool.add_method_ref(
+        track_info,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;[Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacSeekPoint;ILjava/util/Map;J)V",
+    )?;
+    let stream_info = pool.add_field_ref(
+        owner,
+        "streamInfo",
+        "Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;",
+    )?;
+    let seek_points = pool.add_field_ref(
+        owner,
+        "seekPoints",
+        "[Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacSeekPoint;",
+    )?;
+    let seek_point_count = pool.add_field_ref(owner, "seekPointCount", "I")?;
+    let tags = pool.add_field_ref(owner, "tags", "Ljava/util/Map;")?;
+    let first_frame_position = pool.add_field_ref(owner, "firstFramePosition", "J")?;
+    code(
+        pool,
+        8,
+        1,
+        vec![
+            Instruction::New(track_info),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(stream_info),
+            Instruction::Aload_0,
+            Instruction::Getfield(seek_points),
+            Instruction::Aload_0,
+            Instruction::Getfield(seek_point_count),
+            Instruction::Aload_0,
+            Instruction::Getfield(tags),
+            Instruction::Aload_0,
+            Instruction::Getfield(first_frame_position),
+            Instruction::Invokespecial(track_info_init),
+            Instruction::Areturn,
         ],
     )
 }

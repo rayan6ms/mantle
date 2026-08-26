@@ -177,6 +177,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-flac-seek-point-consumer" => Some(FLAC_SEEK_POINT_CONSUMER),
         "write-flac-stream-info-consumer" => Some(FLAC_STREAM_INFO_CONSUMER),
         "write-flac-track-info-consumer" => Some(FLAC_TRACK_INFO_CONSUMER),
+        "write-flac-track-info-builder-consumer" => Some(FLAC_TRACK_INFO_BUILDER_CONSUMER),
         _ => None,
     }
 }
@@ -16101,6 +16102,180 @@ public final class GateFlacTrackInfo {
     Derived(FlacStreamInfo stream, FlacSeekPoint[] seekPoints, int seekPointCount,
         Map<String, String> tags, long firstFramePosition) {
       super(stream, seekPoints, seekPointCount, tags, firstFramePosition);
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const FLAC_TRACK_INFO_BUILDER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacSeekPoint;
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacStreamInfo;
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacTrackInfo;
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacTrackInfoBuilder;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Map;
+
+public final class GateFlacTrackInfoBuilder {
+  public static void main(String[] args) throws Exception {
+    constructionAndDefaults();
+    settersAndBuild();
+    nullsAndFailures();
+    identityAndSubclassing();
+    reflection();
+    System.out.println(
+        "contracts=constructor-identity,hash-map-default,get-stream-info,default-seek-points,default-count,default-position,set-seek-points,set-count,seek-array-identity,add-tag,tag-replacement,null-tags,set-first-frame-position,build-order,build-freshness,build-shared-state,build-duration,post-build-mutation,null-stream,zero-rate,identity-semantics,subclassable,private-fields,private-generic-field,public-methods,method-descriptors,no-throws,member-counts,reflection");
+  }
+
+  private static void constructionAndDefaults() {
+    FlacStreamInfo stream = stream(1_000, 12_345L);
+    FlacTrackInfoBuilder builder = new FlacTrackInfoBuilder(stream);
+    check(builder.getStreamInfo() == stream, "constructor and getter retain stream identity");
+    FlacTrackInfo info = builder.build();
+    check(info.stream == stream && info.seekPoints == null && info.seekPointCount == 0
+        && info.firstFramePosition == 0L && info.tags != null && info.tags.isEmpty(),
+        "constructor defaults build into a valid empty track");
+    check(info.duration == 12_345L, "default build derives duration from stream");
+  }
+
+  private static void settersAndBuild() {
+    FlacStreamInfo stream = stream(44_100, 5_446_350L);
+    FlacTrackInfoBuilder builder = new FlacTrackInfoBuilder(stream);
+    FlacSeekPoint[] seekPoints = {new FlacSeekPoint(1L, 2L, 3)};
+    builder.setSeekPoints(seekPoints, -9);
+    builder.addTag("TITLE", "first");
+    builder.addTag("TITLE", "second");
+    builder.addTag(null, null);
+    builder.setFirstFramePosition(Long.MIN_VALUE);
+
+    FlacTrackInfo first = builder.build();
+    check(first.stream == stream && first.seekPoints == seekPoints
+        && first.seekPointCount == -9 && first.firstFramePosition == Long.MIN_VALUE
+        && "second".equals(first.tags.get("TITLE")) && first.tags.containsKey(null),
+        "setters preserve argument identity, order, replacement, and nulls");
+    FlacTrackInfo second = builder.build();
+    check(second != first && second.tags == first.tags && second.seekPoints == seekPoints,
+        "each build creates a fresh track with shared mutable inputs");
+
+    FlacSeekPoint replacement = new FlacSeekPoint(4L, 5L, 6);
+    seekPoints[0] = replacement;
+    builder.addTag("AFTER", "value");
+    check(first.seekPoints[0] == replacement && second.seekPoints[0] == replacement
+        && "value".equals(first.tags.get("AFTER")),
+        "post-build array and tag mutations remain visible");
+  }
+
+  private static void nullsAndFailures() {
+    FlacStreamInfo stream = stream(1, 1L);
+    FlacTrackInfoBuilder builder = new FlacTrackInfoBuilder(stream);
+    builder.setSeekPoints(null, Integer.MAX_VALUE);
+    builder.setFirstFramePosition(Long.MAX_VALUE);
+    FlacTrackInfo info = builder.build();
+    check(info.seekPoints == null && info.seekPointCount == Integer.MAX_VALUE
+        && info.firstFramePosition == Long.MAX_VALUE, "null and edge setter values are accepted");
+
+    FlacTrackInfoBuilder nullStream = new FlacTrackInfoBuilder(null);
+    check(nullStream.getStreamInfo() == null, "null stream is stored by the builder");
+    expect(NullPointerException.class, nullStream::build, "null stream build");
+    expect(ArithmeticException.class,
+        () -> new FlacTrackInfoBuilder(stream(0, 1L)).build(), "zero-rate build");
+  }
+
+  private static void identityAndSubclassing() {
+    FlacStreamInfo stream = stream(8_000, 8_000L);
+    FlacTrackInfoBuilder first = new FlacTrackInfoBuilder(stream);
+    FlacTrackInfoBuilder second = new FlacTrackInfoBuilder(stream);
+    check(first != second && !first.equals(second) && first.equals(first),
+        "builder retains Object identity equality");
+    Derived derived = new Derived(stream);
+    check(derived.getStreamInfo() == stream && derived.build().duration == 1_000L,
+        "ordinary subclass inherits construction and build");
+  }
+
+  private static void reflection() throws Exception {
+    Class<FlacTrackInfoBuilder> type = FlacTrackInfoBuilder.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete non-final class metadata");
+    check(type.getDeclaredFields().length == 5 && type.getDeclaredMethods().length == 5
+        && type.getDeclaredConstructors().length == 1,
+        "exact declared member counts");
+    checkPrivateField(type.getDeclaredField("streamInfo"), FlacStreamInfo.class);
+    Field tags = type.getDeclaredField("tags");
+    checkPrivateField(tags, Map.class);
+    check(tags.getGenericType().getTypeName().equals(
+        "java.util.Map<java.lang.String, java.lang.String>"),
+        "private tag field generic signature");
+    checkPrivateField(type.getDeclaredField("seekPoints"), FlacSeekPoint[].class);
+    checkPrivateField(type.getDeclaredField("seekPointCount"), int.class);
+    checkPrivateField(type.getDeclaredField("firstFramePosition"), long.class);
+
+    Constructor<FlacTrackInfoBuilder> constructor =
+        type.getDeclaredConstructor(FlacStreamInfo.class);
+    checkPublicMethod(constructor, new Class<?>[] {FlacStreamInfo.class});
+    checkPublicMethod(type.getDeclaredMethod("getStreamInfo"), new Class<?>[0]);
+    checkPublicMethod(type.getDeclaredMethod("setSeekPoints", FlacSeekPoint[].class, int.class),
+        new Class<?>[] {FlacSeekPoint[].class, int.class});
+    checkPublicMethod(type.getDeclaredMethod("addTag", String.class, String.class),
+        new Class<?>[] {String.class, String.class});
+    checkPublicMethod(type.getDeclaredMethod("setFirstFramePosition", long.class),
+        new Class<?>[] {long.class});
+    checkPublicMethod(type.getDeclaredMethod("build"), new Class<?>[0]);
+  }
+
+  private static void checkPrivateField(Field field, Class<?> fieldType) {
+    check(field.getType() == fieldType && field.getModifiers() == (Modifier.PRIVATE
+        | (field.getName().equals("streamInfo") || field.getName().equals("tags")
+            ? Modifier.FINAL : 0)) && !field.isSynthetic()
+        && field.getDeclaredAnnotations().length == 0,
+        field.getName() + " private field metadata");
+  }
+
+  private static void checkPublicMethod(java.lang.reflect.Executable executable,
+      Class<?>[] parameterTypes) {
+    check(executable.getModifiers() == Modifier.PUBLIC && !executable.isSynthetic()
+        && !executable.isVarArgs() && executable.getExceptionTypes().length == 0
+        && Arrays.equals(executable.getParameterTypes(), parameterTypes)
+        && executable.getDeclaredAnnotations().length == 0,
+        executable.toGenericString() + " metadata");
+  }
+
+  private static FlacStreamInfo stream(int sampleRate, long sampleCount) {
+    byte[] data = new byte[FlacStreamInfo.LENGTH];
+    long packed = ((long) sampleRate << 44) | sampleCount;
+    for (int index = 17; index >= 10; index--) {
+      data[index] = (byte) packed;
+      packed >>>= 8;
+    }
+    return new FlacStreamInfo(data, false);
+  }
+
+  private static void expect(Class<? extends Throwable> expected, ThrowingRunnable action,
+      String message) {
+    try {
+      action.run();
+      throw new AssertionError(message + " did not fail");
+    } catch (Throwable failure) {
+      check(failure.getClass() == expected,
+          message + " failure type: " + failure.getClass().getName());
+    }
+  }
+
+  private interface ThrowingRunnable {
+    void run() throws Throwable;
+  }
+
+  private static final class Derived extends FlacTrackInfoBuilder {
+    Derived(FlacStreamInfo stream) {
+      super(stream);
     }
   }
 
