@@ -265,6 +265,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-flac-seek-point-consumer \
   --output "$WORK/GateFlacSeekPoint.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-stream-info-consumer \
   --output "$WORK/GateFlacStreamInfo.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-flac-track-info-consumer \
+  --output "$WORK/GateFlacTrackInfo.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -337,6 +339,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateFlacMetadataHeader.java" \
   "$WORK/GateFlacSeekPoint.java" \
   "$WORK/GateFlacStreamInfo.java" \
+  "$WORK/GateFlacTrackInfo.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GateAdtsStreamReader.java" \
@@ -1407,6 +1410,17 @@ cmp "$WORK/flac-stream-info-reference.txt" \
 grep --fixed-strings \
   'contracts=constant,zero-vector,maximum-vector,bit-widths,big-endian,field-order,channel-offset,bits-offset,sample-count,md5-copy,input-snapshot,public-mutation,metadata-flag,trailing-input,short-input,null-input,identity-semantics,subclassable,public-final-fields,constructor-descriptor,no-throws,member-counts,reflection' \
   "$WORK/flac-stream-info-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateFlacTrackInfo \
+  >"$WORK/flac-track-info-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateFlacTrackInfo >"$WORK/flac-track-info-candidate.txt"
+cmp "$WORK/flac-track-info-reference.txt" \
+  "$WORK/flac-track-info-candidate.txt"
+grep --fixed-strings \
+  'contracts=stream-identity,seek-array-identity,seek-count,tags-identity,first-frame-position,duration-formula,duration-truncation,duration-maximum,null-members,null-stream,zero-rate,mutation-visibility,identity-semantics,subclassable,public-final-fields,generic-tags,constructor-descriptor,no-throws,member-counts,reflection' \
+  "$WORK/flac-track-info-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"

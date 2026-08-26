@@ -181,6 +181,7 @@ const FLAC_METADATA_READER_CLASS: &str =
 const FLAC_SEEK_POINT_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/flac/FlacSeekPoint";
 const FLAC_STREAM_INFO_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo";
+const FLAC_TRACK_INFO_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfo";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -527,6 +528,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     FLAC_METADATA_READER_CLASS,
     FLAC_SEEK_POINT_CLASS,
     FLAC_STREAM_INFO_CLASS,
+    FLAC_TRACK_INFO_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -1436,6 +1438,9 @@ fn replacement_body(
     }
     if class_name == FLAC_STREAM_INFO_CLASS {
         return flac_stream_info_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == FLAC_TRACK_INFO_CLASS {
+        return flac_track_info_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -6023,6 +6028,84 @@ fn flac_stream_info_constructor(pool: &mut ConstantPool<'static>) -> Result<Attr
             Instruction::Aload_0,
             Instruction::Iload_2,
             Instruction::Putfield(has_metadata_blocks),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn flac_track_info_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;[Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacSeekPoint;ILjava/util/Map;J)V",
+        ) => flac_track_info_constructor(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {FLAC_TRACK_INFO_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn flac_track_info_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_TRACK_INFO_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let stream_info = pool.add_class(FLAC_STREAM_INFO_CLASS)?;
+    let stream = pool.add_field_ref(
+        owner,
+        "stream",
+        "Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;",
+    )?;
+    let seek_points = pool.add_field_ref(
+        owner,
+        "seekPoints",
+        "[Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacSeekPoint;",
+    )?;
+    let seek_point_count = pool.add_field_ref(owner, "seekPointCount", "I")?;
+    let tags = pool.add_field_ref(owner, "tags", "Ljava/util/Map;")?;
+    let first_frame_position = pool.add_field_ref(owner, "firstFramePosition", "J")?;
+    let duration = pool.add_field_ref(owner, "duration", "J")?;
+    let sample_count = pool.add_field_ref(stream_info, "sampleCount", "J")?;
+    let sample_rate = pool.add_field_ref(stream_info, "sampleRate", "I")?;
+    let thousand = pool.add_long(1_000)?;
+    code(
+        pool,
+        5,
+        7,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Putfield(stream),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(seek_points),
+            Instruction::Aload_0,
+            Instruction::Iload_3,
+            Instruction::Putfield(seek_point_count),
+            Instruction::Aload_0,
+            Instruction::Aload(4),
+            Instruction::Putfield(tags),
+            Instruction::Aload_0,
+            Instruction::Lload(5),
+            Instruction::Putfield(first_frame_position),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Getfield(sample_count),
+            Instruction::Ldc2_w(thousand),
+            Instruction::Lmul,
+            Instruction::Aload_1,
+            Instruction::Getfield(sample_rate),
+            Instruction::I2l,
+            Instruction::Ldiv,
+            Instruction::Putfield(duration),
             Instruction::Return,
         ],
     )

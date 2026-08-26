@@ -176,6 +176,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-flac-seek-point-consumer" => Some(FLAC_SEEK_POINT_CONSUMER),
         "write-flac-stream-info-consumer" => Some(FLAC_STREAM_INFO_CONSUMER),
+        "write-flac-track-info-consumer" => Some(FLAC_TRACK_INFO_CONSUMER),
         _ => None,
     }
 }
@@ -15941,6 +15942,165 @@ public final class GateFlacStreamInfo {
   private static final class Derived extends FlacStreamInfo {
     Derived(byte[] data, boolean hasMetadataBlocks) {
       super(data, hasMetadataBlocks);
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const FLAC_TRACK_INFO_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacSeekPoint;
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacStreamInfo;
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacTrackInfo;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+public final class GateFlacTrackInfo {
+  public static void main(String[] args) throws Exception {
+    identitiesAndDuration();
+    durationEdges();
+    nullsAndFailures();
+    identityAndSubclassing();
+    reflection();
+    System.out.println(
+        "contracts=stream-identity,seek-array-identity,seek-count,tags-identity,first-frame-position,duration-formula,duration-truncation,duration-maximum,null-members,null-stream,zero-rate,mutation-visibility,identity-semantics,subclassable,public-final-fields,generic-tags,constructor-descriptor,no-throws,member-counts,reflection");
+  }
+
+  private static void identitiesAndDuration() {
+    FlacStreamInfo stream = stream(44_100, 5_446_350L);
+    FlacSeekPoint[] seekPoints = {
+        new FlacSeekPoint(1L, 2L, 3),
+        new FlacSeekPoint(4L, 5L, 6)
+    };
+    Map<String, String> tags = new LinkedHashMap<>();
+    tags.put("TITLE", "before");
+    FlacTrackInfo info = new FlacTrackInfo(
+        stream, seekPoints, -7, tags, Long.MIN_VALUE);
+
+    check(info.stream == stream && info.seekPoints == seekPoints && info.tags == tags,
+        "reference arguments retain exact identity");
+    check(info.seekPointCount == -7 && info.firstFramePosition == Long.MIN_VALUE,
+        "scalar arguments are stored without validation");
+    check(info.duration == 123_500L, "duration uses integer milliseconds");
+
+    FlacSeekPoint replacement = new FlacSeekPoint(7L, 8L, 9);
+    seekPoints[0] = replacement;
+    tags.put("TITLE", "after");
+    check(info.seekPoints[0] == replacement && "after".equals(info.tags.get("TITLE")),
+        "caller collection and array mutations remain visible");
+  }
+
+  private static void durationEdges() {
+    check(new FlacTrackInfo(stream(48_000, 0L), null, 0, null, 0L).duration == 0L,
+        "zero samples produce zero duration");
+    check(new FlacTrackInfo(stream(3, 2L), null, 0, null, 0L).duration == 666L,
+        "duration truncates after multiplication");
+    check(new FlacTrackInfo(stream(1, (1L << 36) - 1L), null, 0, null, 0L).duration
+        == 68_719_476_735_000L,
+        "maximum encoded sample count retains full long duration");
+  }
+
+  private static void nullsAndFailures() {
+    FlacStreamInfo stream = stream(1, 1L);
+    FlacTrackInfo nullable = new FlacTrackInfo(
+        stream, null, Integer.MAX_VALUE, null, Long.MAX_VALUE);
+    check(nullable.seekPoints == null && nullable.tags == null
+        && nullable.seekPointCount == Integer.MAX_VALUE
+        && nullable.firstFramePosition == Long.MAX_VALUE,
+        "nullable members and edge scalars are accepted");
+    expect(NullPointerException.class,
+        () -> new FlacTrackInfo(null, null, 0, null, 0L), "null stream");
+    expect(ArithmeticException.class,
+        () -> new FlacTrackInfo(stream(0, 1L), null, 0, null, 0L), "zero sample rate");
+  }
+
+  private static void identityAndSubclassing() {
+    FlacStreamInfo stream = stream(1_000, 12_345L);
+    FlacTrackInfo first = new FlacTrackInfo(stream, null, 0, null, 0L);
+    FlacTrackInfo second = new FlacTrackInfo(stream, null, 0, null, 0L);
+    check(first != second && !first.equals(second) && first.equals(first),
+        "track info retains Object identity equality");
+    Derived derived = new Derived(stream, null, 0, null, -1L);
+    check(derived.stream == stream && derived.duration == 12_345L
+        && derived.firstFramePosition == -1L,
+        "ordinary subclass inherits construction");
+  }
+
+  private static void reflection() throws Exception {
+    Class<FlacTrackInfo> type = FlacTrackInfo.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete non-final class metadata");
+    check(type.getDeclaredFields().length == 6 && type.getDeclaredMethods().length == 0
+        && type.getDeclaredConstructors().length == 1,
+        "exact declared member counts");
+
+    checkField(type.getDeclaredField("stream"), FlacStreamInfo.class);
+    checkField(type.getDeclaredField("seekPoints"), FlacSeekPoint[].class);
+    checkField(type.getDeclaredField("seekPointCount"), int.class);
+    Field tags = type.getDeclaredField("tags");
+    checkField(tags, Map.class);
+    check(tags.getGenericType().getTypeName().equals(
+        "java.util.Map<java.lang.String, java.lang.String>"),
+        "tag field generic signature");
+    checkField(type.getDeclaredField("firstFramePosition"), long.class);
+    checkField(type.getDeclaredField("duration"), long.class);
+
+    Constructor<FlacTrackInfo> constructor = type.getDeclaredConstructor(
+        FlacStreamInfo.class, FlacSeekPoint[].class, int.class, Map.class, long.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0
+        && Arrays.equals(constructor.getParameterTypes(), new Class<?>[] {
+            FlacStreamInfo.class, FlacSeekPoint[].class, int.class, Map.class, long.class})
+        && constructor.getGenericParameterTypes()[3].getTypeName().equals(
+            "java.util.Map<java.lang.String, java.lang.String>"),
+        "constructor descriptor and generic metadata");
+  }
+
+  private static FlacStreamInfo stream(int sampleRate, long sampleCount) {
+    byte[] data = new byte[FlacStreamInfo.LENGTH];
+    long packed = ((long) sampleRate << 44) | sampleCount;
+    for (int index = 17; index >= 10; index--) {
+      data[index] = (byte) packed;
+      packed >>>= 8;
+    }
+    return new FlacStreamInfo(data, false);
+  }
+
+  private static void checkField(Field field, Class<?> fieldType) {
+    check(field.getType() == fieldType
+        && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && !field.isSynthetic() && field.getDeclaredAnnotations().length == 0,
+        field.getName() + " field metadata");
+  }
+
+  private static void expect(Class<? extends Throwable> expected, ThrowingRunnable action,
+      String message) {
+    try {
+      action.run();
+      throw new AssertionError(message + " did not fail");
+    } catch (Throwable failure) {
+      check(failure.getClass() == expected,
+          message + " failure type: " + failure.getClass().getName());
+    }
+  }
+
+  private interface ThrowingRunnable {
+    void run() throws Throwable;
+  }
+
+  private static final class Derived extends FlacTrackInfo {
+    Derived(FlacStreamInfo stream, FlacSeekPoint[] seekPoints, int seekPointCount,
+        Map<String, String> tags, long firstFramePosition) {
+      super(stream, seekPoints, seekPointCount, tags, firstFramePosition);
     }
   }
 
