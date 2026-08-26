@@ -183,6 +183,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-flac-frame-info-consumer" => Some(FLAC_FRAME_INFO_CONSUMER),
         "write-flac-frame-reader-consumer" => Some(FLAC_FRAME_READER_CONSUMER),
         "write-flac-sub-frame-reader-consumer" => Some(FLAC_SUB_FRAME_READER_CONSUMER),
+        "write-matroska-aac-track-consumer-consumer" => Some(MATROSKA_AAC_TRACK_CONSUMER_CONSUMER),
         _ => None,
     }
 }
@@ -17183,6 +17184,335 @@ public final class GateFlacSubFrameReader {
   }
 
   private static final class Derived extends FlacSubFrameReader {}
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MATROSKA_AAC_TRACK_CONSUMER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.common.AacPacketRouter;
+import com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaAacTrackConsumer;
+import com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaTrackConsumer;
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack;
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack.AudioDetails;
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack.Type;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegAacTrackConsumer;
+import com.sedmelluq.discord.lavaplayer.natives.aac.AacDecoder;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Consumer;
+import org.slf4j.LoggerFactory;
+
+public final class GateMatroskaAacTrackConsumer {
+  private static final Object UNSAFE = loadUnsafe();
+
+  public static void main(String[] args) throws Exception {
+    constructionAndConfiguration();
+    chunkingAndFailures();
+    forwarding();
+    reflection();
+    System.out.println("contracts=constructor,track-identity,direct-buffer,buffer-capacity,router-construction,bound-configurer,codec-private-identity,configure-result-ignored,initialise,get-track,chunking,remainder-chunk,input-position,reused-buffer,direct-chunks,empty-input,null-input,interruption-position,seek-forwarding,flush-forwarding,close-forwarding,failure-identity,private-fields,private-method,logger-owner,interface,throws,identity-semantics,subclassable,reflection");
+  }
+
+  private static void constructionAndConfiguration() throws Exception {
+    byte[] codecPrivate = {9, 8, 7, 6};
+    MatroskaFileTrack track = track(codecPrivate, new AudioDetails(44_100.5f, 48_000.25f, 2, 24));
+    MatroskaAacTrackConsumer consumer = new MatroskaAacTrackConsumer(null, track);
+    check(consumer.getTrack() == track && field(consumer, "track") == track,
+        "constructor and getter retain exact track identity");
+    ByteBuffer input = (ByteBuffer) field(consumer, "inputBuffer");
+    Object router = field(consumer, "packetRouter");
+    check(input.isDirect() && input.capacity() == 4_096 && input.position() == 0
+        && input.limit() == input.capacity() && router.getClass() == AacPacketRouter.class
+        && field(router, AacPacketRouter.class, "context") == null,
+        "constructor creates exact direct staging buffer and router");
+
+    @SuppressWarnings("unchecked")
+    Consumer<AacDecoder> configurer = (Consumer<AacDecoder>) field(
+        router, AacPacketRouter.class, "decoderConfigurer");
+    RecordingDecoder decoder = allocate(RecordingDecoder.class);
+    decoder.configureResult = -71;
+    configurer.accept(decoder);
+    check(decoder.configureCalls == 1 && decoder.codecPrivate == codecPrivate,
+        "bound configurer forwards exact codec-private identity and ignores result");
+    codecPrivate[0] = 33;
+    configurer.accept(decoder);
+    check(decoder.configureCalls == 2 && decoder.codecPrivate[0] == 33,
+        "configuration observes caller-owned codec-private mutations");
+
+    consumer.initialise();
+    MatroskaAacTrackConsumer nullTrack = new MatroskaAacTrackConsumer(null, null);
+    check(catchThrowable(nullTrack::initialise) instanceof NullPointerException,
+        "initialise evaluates track details even when debug output is disabled");
+    MatroskaAacTrackConsumer nullAudio = new MatroskaAacTrackConsumer(
+        null, track(codecPrivate, null));
+    check(catchThrowable(nullAudio::initialise) instanceof NullPointerException,
+        "initialise evaluates both audio fields");
+  }
+
+  private static void chunkingAndFailures() throws Exception {
+    MatroskaAacTrackConsumer consumer = new MatroskaAacTrackConsumer(
+        null, track(new byte[] {1}, new AudioDetails(48_000, 48_000, 2, 16)));
+    RecordingRouter router = new RecordingRouter();
+    putObject(consumer, "packetRouter", router);
+
+    byte[] values = new byte[9_000];
+    for (int index = 0; index < values.length; index++) values[index] = (byte) (index * 31 + 7);
+    ByteBuffer data = ByteBuffer.wrap(values).asReadOnlyBuffer();
+    data.position(3);
+    data.limit(8_506);
+    consumer.consume(data);
+    check(data.position() == 8_506 && router.chunks.size() == 3
+        && router.chunks.get(0).length == 4_096 && router.chunks.get(1).length == 4_096
+        && router.chunks.get(2).length == 311,
+        "consume advances source through two full chunks and one remainder");
+    check(Arrays.equals(router.chunks.get(0), Arrays.copyOfRange(values, 3, 4_099))
+        && Arrays.equals(router.chunks.get(1), Arrays.copyOfRange(values, 4_099, 8_195))
+        && Arrays.equals(router.chunks.get(2), Arrays.copyOfRange(values, 8_195, 8_506)),
+        "chunk content and ordering match the selected input window");
+    check(router.sameBuffer && router.directBuffers && router.zeroPositions
+        && router.capacities4096 && router.limits.equals(Arrays.asList(4_096, 4_096, 311)),
+        "router receives one reused direct staging buffer with exact limits");
+    int calls = router.calls;
+    consumer.consume(ByteBuffer.allocate(0));
+    check(router.calls == calls, "empty input performs no router call");
+    check(catchThrowable(() -> consumer.consume(null)) instanceof NullPointerException,
+        "null input fails before router use");
+
+    router.reset();
+    InterruptedException failure = new InterruptedException("chunk-sentinel");
+    router.failure = failure;
+    router.failAt = 2;
+    ByteBuffer interrupted = ByteBuffer.wrap(values);
+    interrupted.position(3);
+    interrupted.limit(8_506);
+    check(catchThrowable(() -> consumer.consume(interrupted)) == failure
+        && interrupted.position() == 4_099 && router.calls == 2
+        && router.chunks.get(1).length == 4_096,
+        "interruption propagates before committing the failing chunk source position");
+  }
+
+  private static void forwarding() throws Exception {
+    MatroskaAacTrackConsumer consumer = new MatroskaAacTrackConsumer(
+        null, track(new byte[0], new AudioDetails(1, 2, 1, 0)));
+    RecordingRouter router = new RecordingRouter();
+    putObject(consumer, "packetRouter", router);
+    consumer.seekPerformed(Long.MIN_VALUE + 3, Long.MAX_VALUE - 5);
+    consumer.flush();
+    consumer.close();
+    check(router.seekCalls == 1 && router.requested == Long.MIN_VALUE + 3
+        && router.provided == Long.MAX_VALUE - 5 && router.flushCalls == 1
+        && router.closeCalls == 1, "lifecycle methods forward exact values once");
+
+    RuntimeException seek = new RuntimeException("seek-sentinel");
+    router.seekFailure = seek;
+    check(catchThrowable(() -> consumer.seekPerformed(1, 2)) == seek,
+        "seek failure preserves exact identity");
+    InterruptedException flush = new InterruptedException("flush-sentinel");
+    router.flushFailure = flush;
+    check(catchThrowable(consumer::flush) == flush,
+        "flush interruption preserves exact identity");
+    RuntimeException close = new RuntimeException("close-sentinel");
+    router.closeFailure = close;
+    check(catchThrowable(consumer::close) == close,
+        "close failure preserves exact identity");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MatroskaAacTrackConsumer> type = MatroskaAacTrackConsumer.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {MatroskaTrackConsumer.class})
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0
+        && type.getDeclaredFields().length == 4 && type.getDeclaredMethods().length == 7
+        && type.getDeclaredConstructors().length == 1,
+        "exact class, interface, and declared-member metadata");
+    Field log = checkField(type, "log", org.slf4j.Logger.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    log.setAccessible(true);
+    check(log.get(null) == LoggerFactory.getLogger(MpegAacTrackConsumer.class),
+        "logger uses the reference MPEG AAC consumer category");
+    checkField(type, "track", MatroskaFileTrack.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "inputBuffer", ByteBuffer.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "packetRouter", AacPacketRouter.class, Modifier.PRIVATE | Modifier.FINAL);
+
+    Constructor<MatroskaAacTrackConsumer> constructor = type.getDeclaredConstructor(
+        AudioProcessingContext.class, MatroskaFileTrack.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    checkMethod(type.getDeclaredMethod("initialise"), Modifier.PUBLIC, void.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("getTrack"), Modifier.PUBLIC,
+        MatroskaFileTrack.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("seekPerformed", long.class, long.class),
+        Modifier.PUBLIC, void.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("flush"), Modifier.PUBLIC, void.class,
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("consume", ByteBuffer.class), Modifier.PUBLIC, void.class,
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("close"), Modifier.PUBLIC, void.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("configureDecoder", AacDecoder.class),
+        Modifier.PRIVATE, void.class, new Class<?>[0]);
+
+    MatroskaAacTrackConsumer first = new MatroskaAacTrackConsumer(null, null);
+    MatroskaAacTrackConsumer second = new MatroskaAacTrackConsumer(null, null);
+    Derived derived = new Derived();
+    MatroskaAacTrackConsumer dynamic = derived;
+    dynamic.initialise();
+    check(first != second && !first.equals(second) && derived.initialiseCalls == 1,
+        "Object identity, subclassability, and virtual dispatch are preserved");
+  }
+
+  private static MatroskaFileTrack track(byte[] codecPrivate, AudioDetails audio) {
+    return new MatroskaFileTrack(7, Type.AUDIO, 91L, "track", "A_AAC",
+        codecPrivate, audio);
+  }
+
+  private static Object field(Object target, String name) throws Exception {
+    return field(target, MatroskaAacTrackConsumer.class, name);
+  }
+
+  private static Object field(Object target, Class<?> owner, String name) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
+  }
+
+  private static void putObject(Object target, String name, Object value) throws Exception {
+    Field field = MatroskaAacTrackConsumer.class.getDeclaredField(name);
+    long offset = (Long) UNSAFE.getClass().getMethod("objectFieldOffset", Field.class)
+        .invoke(UNSAFE, field);
+    UNSAFE.getClass().getMethod("putObject", Object.class, long.class, Object.class)
+        .invoke(UNSAFE, target, offset, value);
+  }
+
+  private static <T> T allocate(Class<T> type) throws Exception {
+    return type.cast(UNSAFE.getClass().getMethod("allocateInstance", Class.class)
+        .invoke(UNSAFE, type));
+  }
+
+  private static Object loadUnsafe() {
+    try {
+      Class<?> type = Class.forName("sun.misc.Unsafe");
+      Field field = type.getDeclaredField("theUnsafe");
+      field.setAccessible(true);
+      return field.get(null);
+    } catch (ReflectiveOperationException error) {
+      throw new ExceptionInInitializerError(error);
+    }
+  }
+
+  private static Field checkField(
+      Class<?> owner, String name, Class<?> fieldType, int modifiers) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getModifiers() == modifiers
+        && !field.isSynthetic() && field.getDeclaredAnnotations().length == 0,
+        name + " field metadata");
+    return field;
+  }
+
+  private static void checkMethod(Method method, int modifiers, Class<?> result,
+      Class<?>[] failures) {
+    check(method.getModifiers() == modifiers && method.getReturnType() == result
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isDefault() && !method.isVarArgs(),
+        method.getName() + " method metadata");
+  }
+
+  private static Throwable catchThrowable(Operation operation) {
+    try { operation.run(); return null; } catch (Throwable error) { return error; }
+  }
+
+  private interface Operation { void run() throws Throwable; }
+
+  private static final class RecordingDecoder extends AacDecoder {
+    int configureCalls;
+    byte[] codecPrivate;
+    int configureResult;
+    @Override public int configure(byte[] data) {
+      configureCalls++;
+      codecPrivate = data;
+      return configureResult;
+    }
+  }
+
+  private static final class RecordingRouter extends AacPacketRouter {
+    int calls;
+    int failAt;
+    InterruptedException failure;
+    final List<byte[]> chunks = new ArrayList<>();
+    final List<Integer> limits = new ArrayList<>();
+    ByteBuffer firstBuffer;
+    boolean sameBuffer = true;
+    boolean directBuffers = true;
+    boolean zeroPositions = true;
+    boolean capacities4096 = true;
+    int seekCalls;
+    long requested;
+    long provided;
+    RuntimeException seekFailure;
+    int flushCalls;
+    InterruptedException flushFailure;
+    int closeCalls;
+    RuntimeException closeFailure;
+
+    RecordingRouter() { super(null, ignored -> {}); }
+
+    @Override public void processInput(ByteBuffer buffer) throws InterruptedException {
+      calls++;
+      if (firstBuffer == null) firstBuffer = buffer; else sameBuffer &= firstBuffer == buffer;
+      directBuffers &= buffer.isDirect();
+      zeroPositions &= buffer.position() == 0;
+      capacities4096 &= buffer.capacity() == 4_096;
+      limits.add(buffer.limit());
+      ByteBuffer copy = buffer.duplicate();
+      byte[] bytes = new byte[copy.remaining()];
+      copy.get(bytes);
+      chunks.add(bytes);
+      if (calls == failAt) throw failure;
+    }
+
+    @Override public void seekPerformed(long requested, long provided) {
+      seekCalls++;
+      this.requested = requested;
+      this.provided = provided;
+      if (seekFailure != null) throw seekFailure;
+    }
+
+    @Override public void flush() throws InterruptedException {
+      flushCalls++;
+      if (flushFailure != null) throw flushFailure;
+    }
+
+    @Override public void close() {
+      closeCalls++;
+      if (closeFailure != null) throw closeFailure;
+    }
+
+    void reset() {
+      calls = 0;
+      failAt = 0;
+      failure = null;
+      chunks.clear();
+      limits.clear();
+      firstBuffer = null;
+      sameBuffer = directBuffers = zeroPositions = capacities4096 = true;
+    }
+  }
+
+  private static final class Derived extends MatroskaAacTrackConsumer {
+    int initialiseCalls;
+    Derived() { super(null, null); }
+    @Override public void initialise() { initialiseCalls++; }
+  }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

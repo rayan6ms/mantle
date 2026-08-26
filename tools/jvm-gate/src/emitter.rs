@@ -196,6 +196,8 @@ const FLAC_FRAME_READER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameReader";
 const FLAC_SUB_FRAME_READER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/frame/FlacSubFrameReader";
+const MATROSKA_AAC_TRACK_CONSUMER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaAacTrackConsumer";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -550,6 +552,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS,
     FLAC_FRAME_READER_CLASS,
     FLAC_SUB_FRAME_READER_CLASS,
+    MATROSKA_AAC_TRACK_CONSUMER_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -1036,6 +1039,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | FLAC_TRACK_PROVIDER_CLASS
             | FLAC_FRAME_HEADER_READER_CLASS
             | FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS
+            | MATROSKA_AAC_TRACK_CONSUMER_CLASS
             | OPUS_AUDIO_DATA_FORMAT_CLASS
             | PCM16_AUDIO_DATA_FORMAT_CLASS
             | OPUS_CHUNK_DECODER_CLASS
@@ -1136,6 +1140,7 @@ fn retain_private_fields(class_name: &str) -> bool {
     )
 }
 
+#[allow(clippy::too_many_lines)]
 fn retain_private_methods(class_name: &str) -> bool {
     matches!(
         class_name,
@@ -1160,6 +1165,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS
             | FLAC_FRAME_READER_CLASS
             | FLAC_SUB_FRAME_READER_CLASS
+            | MATROSKA_AAC_TRACK_CONSUMER_CLASS
             | AUDIO_PIPELINE_FACTORY_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
@@ -1493,6 +1499,9 @@ fn replacement_body(
     }
     if class_name == FLAC_SUB_FRAME_READER_CLASS {
         return flac_sub_frame_reader_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == MATROSKA_AAC_TRACK_CONSUMER_CLASS {
+        return matroska_aac_track_consumer_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -8913,6 +8922,407 @@ fn flac_sub_frame_reader_residual_block(pool: &mut ConstantPool<'static>) -> Res
         ],
     )?;
     Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn matroska_aac_track_consumer_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;)V",
+        ) => matroska_aac_track_consumer_constructor(pool),
+        ("initialise", "()V") => matroska_aac_track_consumer_initialise(pool),
+        (
+            "getTrack",
+            "()Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;",
+        ) => matroska_aac_track_consumer_get_track(pool),
+        ("seekPerformed", "(JJ)V") => matroska_aac_track_consumer_seek(pool),
+        ("flush", "()V") => matroska_aac_track_consumer_flush(pool),
+        ("consume", "(Ljava/nio/ByteBuffer;)V") => matroska_aac_track_consumer_consume(pool),
+        ("close", "()V") => matroska_aac_track_consumer_close(pool),
+        ("configureDecoder", "(Lcom/sedmelluq/discord/lavaplayer/natives/aac/AacDecoder;)V") => {
+            matroska_aac_track_consumer_configure_decoder(pool)
+        }
+        ("<clinit>", "()V") => matroska_aac_track_consumer_class_init(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {MATROSKA_AAC_TRACK_CONSUMER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn matroska_aac_track_consumer_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_AAC_TRACK_CONSUMER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let track = pool.add_field_ref(
+        owner,
+        "track",
+        "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;",
+    )?;
+    let input_buffer = pool.add_field_ref(owner, "inputBuffer", "Ljava/nio/ByteBuffer;")?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let allocate_direct =
+        pool.add_method_ref(byte_buffer, "allocateDirect", "(I)Ljava/nio/ByteBuffer;")?;
+    let router = pool.add_class(AAC_PACKET_ROUTER_CLASS)?;
+    let router_init = pool.add_method_ref(
+        router,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;Ljava/util/function/Consumer;)V",
+    )?;
+    let packet_router = pool.add_field_ref(
+        owner,
+        "packetRouter",
+        "Lcom/sedmelluq/discord/lavaplayer/container/common/AacPacketRouter;",
+    )?;
+    let configurer = pool.add_invoke_dynamic(
+        0,
+        "accept",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/MatroskaAacTrackConsumer;)Ljava/util/function/Consumer;",
+    )?;
+    code(
+        pool,
+        5,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(track),
+            Instruction::Aload_0,
+            Instruction::Sipush(4096),
+            Instruction::Invokestatic(allocate_direct),
+            Instruction::Putfield(input_buffer),
+            Instruction::Aload_0,
+            Instruction::New(router),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Invokedynamic(configurer),
+            Instruction::Invokespecial(router_init),
+            Instruction::Putfield(packet_router),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn matroska_aac_track_consumer_initialise(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_AAC_TRACK_CONSUMER_CLASS)?;
+    let logger = pool.add_class("org/slf4j/Logger")?;
+    let debug = pool.add_interface_method_ref(
+        logger,
+        "debug",
+        "(Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;)V",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let track = pool.add_field_ref(
+        owner,
+        "track",
+        "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;",
+    )?;
+    let file_track = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack",
+    )?;
+    let audio = pool.add_field_ref(
+        file_track,
+        "audio",
+        "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$AudioDetails;",
+    )?;
+    let details = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$AudioDetails",
+    )?;
+    let sampling_frequency = pool.add_field_ref(details, "samplingFrequency", "F")?;
+    let channels = pool.add_field_ref(details, "channels", "I")?;
+    let float = pool.add_class("java/lang/Float")?;
+    let float_value = pool.add_method_ref(float, "valueOf", "(F)Ljava/lang/Float;")?;
+    let integer = pool.add_class("java/lang/Integer")?;
+    let integer_value = pool.add_method_ref(integer, "valueOf", "(I)Ljava/lang/Integer;")?;
+    let message =
+        pool.add_string("Initialising AAC track with expected frequency {} and channel count {}.")?;
+    code(
+        pool,
+        4,
+        1,
+        vec![
+            Instruction::Getstatic(log),
+            Instruction::Ldc_w(message),
+            Instruction::Aload_0,
+            Instruction::Getfield(track),
+            Instruction::Getfield(audio),
+            Instruction::Getfield(sampling_frequency),
+            Instruction::Invokestatic(float_value),
+            Instruction::Aload_0,
+            Instruction::Getfield(track),
+            Instruction::Getfield(audio),
+            Instruction::Getfield(channels),
+            Instruction::Invokestatic(integer_value),
+            Instruction::Invokeinterface(debug, 4),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn matroska_aac_track_consumer_get_track(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_AAC_TRACK_CONSUMER_CLASS)?;
+    let track = pool.add_field_ref(
+        owner,
+        "track",
+        "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(track),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn matroska_aac_track_consumer_seek(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_AAC_TRACK_CONSUMER_CLASS)?;
+    let router = pool.add_class(AAC_PACKET_ROUTER_CLASS)?;
+    let seek = pool.add_method_ref(router, "seekPerformed", "(JJ)V")?;
+    let packet_router = pool.add_field_ref(
+        owner,
+        "packetRouter",
+        "Lcom/sedmelluq/discord/lavaplayer/container/common/AacPacketRouter;",
+    )?;
+    code(
+        pool,
+        5,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(packet_router),
+            Instruction::Lload_1,
+            Instruction::Lload_3,
+            Instruction::Invokevirtual(seek),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn matroska_aac_track_consumer_flush(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_AAC_TRACK_CONSUMER_CLASS)?;
+    let router = pool.add_class(AAC_PACKET_ROUTER_CLASS)?;
+    let flush = pool.add_method_ref(router, "flush", "()V")?;
+    let packet_router = pool.add_field_ref(
+        owner,
+        "packetRouter",
+        "Lcom/sedmelluq/discord/lavaplayer/container/common/AacPacketRouter;",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(packet_router),
+            Instruction::Invokevirtual(flush),
+            Instruction::Return,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn matroska_aac_track_consumer_consume(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_AAC_TRACK_CONSUMER_CLASS)?;
+    let input_buffer = pool.add_field_ref(owner, "inputBuffer", "Ljava/nio/ByteBuffer;")?;
+    let packet_router = pool.add_field_ref(
+        owner,
+        "packetRouter",
+        "Lcom/sedmelluq/discord/lavaplayer/container/common/AacPacketRouter;",
+    )?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let has_remaining = pool.add_method_ref(byte_buffer, "hasRemaining", "()Z")?;
+    let remaining = pool.add_method_ref(byte_buffer, "remaining", "()I")?;
+    let capacity = pool.add_method_ref(byte_buffer, "capacity", "()I")?;
+    let duplicate = pool.add_method_ref(byte_buffer, "duplicate", "()Ljava/nio/ByteBuffer;")?;
+    let position_get = pool.add_method_ref(byte_buffer, "position", "()I")?;
+    let position_set = pool.add_method_ref(byte_buffer, "position", "(I)Ljava/nio/ByteBuffer;")?;
+    let limit = pool.add_method_ref(byte_buffer, "limit", "(I)Ljava/nio/ByteBuffer;")?;
+    let clear = pool.add_method_ref(byte_buffer, "clear", "()Ljava/nio/ByteBuffer;")?;
+    let put = pool.add_method_ref(
+        byte_buffer,
+        "put",
+        "(Ljava/nio/ByteBuffer;)Ljava/nio/ByteBuffer;",
+    )?;
+    let flip = pool.add_method_ref(byte_buffer, "flip", "()Ljava/nio/ByteBuffer;")?;
+    let math = pool.add_class("java/lang/Math")?;
+    let min = pool.add_method_ref(math, "min", "(II)I")?;
+    let router = pool.add_class(AAC_PACKET_ROUTER_CLASS)?;
+    let process = pool.add_method_ref(router, "processInput", "(Ljava/nio/ByteBuffer;)V")?;
+
+    let mut instructions = vec![Instruction::Nop];
+    let loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(has_remaining),
+        Instruction::Ifeq(0),
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(remaining),
+        Instruction::Aload_0,
+        Instruction::Getfield(input_buffer),
+        Instruction::Invokevirtual(capacity),
+        Instruction::Invokestatic(min),
+        Instruction::Istore_2,
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(duplicate),
+        Instruction::Astore_3,
+        Instruction::Aload_3,
+        Instruction::Aload_3,
+        Instruction::Invokevirtual(position_get),
+        Instruction::Iload_2,
+        Instruction::Iadd,
+        Instruction::Invokevirtual(limit),
+        Instruction::Pop,
+        Instruction::Aload_0,
+        Instruction::Getfield(input_buffer),
+        Instruction::Invokevirtual(clear),
+        Instruction::Pop,
+        Instruction::Aload_0,
+        Instruction::Getfield(input_buffer),
+        Instruction::Aload_3,
+        Instruction::Invokevirtual(put),
+        Instruction::Pop,
+        Instruction::Aload_0,
+        Instruction::Getfield(input_buffer),
+        Instruction::Invokevirtual(flip),
+        Instruction::Pop,
+        Instruction::Aload_0,
+        Instruction::Getfield(packet_router),
+        Instruction::Aload_0,
+        Instruction::Getfield(input_buffer),
+        Instruction::Invokevirtual(process),
+        Instruction::Aload_1,
+        Instruction::Aload_3,
+        Instruction::Invokevirtual(position_get),
+        Instruction::Invokevirtual(position_set),
+        Instruction::Pop,
+        Instruction::Goto(u16::try_from(loop_target)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[loop_target + 2] = Instruction::Ifeq(u16::try_from(return_target)?);
+    let mut body = code(pool, 3, 4, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: u16::try_from(loop_target)?,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: byte_buffer,
+                    },
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: u16::try_from(return_target - loop_target - 1)?,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: byte_buffer,
+                    },
+                ],
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn matroska_aac_track_consumer_close(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_AAC_TRACK_CONSUMER_CLASS)?;
+    let router = pool.add_class(AAC_PACKET_ROUTER_CLASS)?;
+    let close = pool.add_method_ref(router, "close", "()V")?;
+    let packet_router = pool.add_field_ref(
+        owner,
+        "packetRouter",
+        "Lcom/sedmelluq/discord/lavaplayer/container/common/AacPacketRouter;",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(packet_router),
+            Instruction::Invokevirtual(close),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn matroska_aac_track_consumer_configure_decoder(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_AAC_TRACK_CONSUMER_CLASS)?;
+    let track = pool.add_field_ref(
+        owner,
+        "track",
+        "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;",
+    )?;
+    let file_track = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack",
+    )?;
+    let codec_private = pool.add_field_ref(file_track, "codecPrivate", "[B")?;
+    let decoder = pool.add_class("com/sedmelluq/discord/lavaplayer/natives/aac/AacDecoder")?;
+    let configure = pool.add_method_ref(decoder, "configure", "([B)I")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(track),
+            Instruction::Getfield(codec_private),
+            Instruction::Invokevirtual(configure),
+            Instruction::Pop,
+            Instruction::Return,
+        ],
+    )
+}
+
+fn matroska_aac_track_consumer_class_init(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_AAC_TRACK_CONSUMER_CLASS)?;
+    let logger_factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        logger_factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let logger_owner =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/mpeg/MpegAacTrackConsumer")?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(logger_owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
 }
 
 #[allow(clippy::too_many_lines)]

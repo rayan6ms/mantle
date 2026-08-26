@@ -279,6 +279,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-flac-frame-reader-consumer \
   --output "$WORK/GateFlacFrameReader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-sub-frame-reader-consumer \
   --output "$WORK/GateFlacSubFrameReader.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-matroska-aac-track-consumer-consumer \
+  --output "$WORK/GateMatroskaAacTrackConsumer.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -433,6 +435,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateAdtsStreamProvider.java" \
   "$WORK/GateAacPacketRouter.java" \
+  "$WORK/GateMatroskaAacTrackConsumer.java" \
   "$WORK/GateOpusPacketRouter.java" \
   "$WORK/GateDefaultSoundCloudDataLoader.java" \
   "$WORK/GateDefaultSoundCloudPlaylistLoader.java" \
@@ -1505,6 +1508,17 @@ cmp "$WORK/flac-sub-frame-reader-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,constant,verbatim,signed-samples,wasted-bits,delta-width,fixed-orders,rice-signed,rice-partitions,rice2-escape,lpc-orders,lpc-coefficients,lpc-shift,temporary-buffer,invalid-header,invalid-descriptor,invalid-residual,io-propagation,private-methods,throws,identity-semantics,subclassable,reflection' \
   "$WORK/flac-sub-frame-reader-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMatroskaAacTrackConsumer \
+  >"$WORK/matroska-aac-track-consumer-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMatroskaAacTrackConsumer >"$WORK/matroska-aac-track-consumer-candidate.txt"
+cmp "$WORK/matroska-aac-track-consumer-reference.txt" \
+  "$WORK/matroska-aac-track-consumer-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,track-identity,direct-buffer,buffer-capacity,router-construction,bound-configurer,codec-private-identity,configure-result-ignored,initialise,get-track,chunking,remainder-chunk,input-position,reused-buffer,direct-chunks,empty-input,null-input,interruption-position,seek-forwarding,flush-forwarding,close-forwarding,failure-identity,private-fields,private-method,logger-owner,interface,throws,identity-semantics,subclassable,reflection' \
+  "$WORK/matroska-aac-track-consumer-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"
