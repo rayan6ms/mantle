@@ -2621,36 +2621,56 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public subclassable frame reader preserves sync scanning, FLAC decode sequencing, channel reconstruction, PCM conversion, checked failures, private helpers, and reflection surface.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameReader",
       "symbol_kind": "FIELD",
       "member_name": "TEMPORARY_BUFFER_SIZE",
       "descriptor": "I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public static final compile-time buffer-size constant retains value 32 and exact field metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameReader",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public zero-argument constructor preserves ordinary Object identity and subclassability.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameReader",
       "symbol_kind": "METHOD",
       "member_name": "readFlacFrame",
       "descriptor": "(Ljava/io/InputStream;Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;[[I[[S[I)I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Scans fixed and variable frame sync, decodes each subframe, consumes alignment and CRC, reconstructs stereo deltas, converts 8/16/24-bit PCM, returns zero at EOF, and preserves IO/failure ordering.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacSubFrameReader",

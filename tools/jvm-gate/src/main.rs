@@ -181,6 +181,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-flac-track-provider-consumer" => Some(FLAC_TRACK_PROVIDER_CONSUMER),
         "write-flac-frame-header-reader-consumer" => Some(FLAC_FRAME_HEADER_READER_CONSUMER),
         "write-flac-frame-info-consumer" => Some(FLAC_FRAME_INFO_CONSUMER),
+        "write-flac-frame-reader-consumer" => Some(FLAC_FRAME_READER_CONSUMER),
         _ => None,
     }
 }
@@ -16589,6 +16590,301 @@ public final class GateFlacFrameInfo {
   private static final class Derived extends FlacFrameInfo {
     Derived(int sampleCount, ChannelDelta channelDelta) { super(sampleCount, channelDelta); }
   }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const FLAC_FRAME_READER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacStreamInfo;
+import com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameInfo.ChannelDelta;
+import com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameReader;
+import com.sedmelluq.discord.lavaplayer.tools.io.BitStreamReader;
+import java.io.ByteArrayInputStream;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateFlacFrameReader {
+  public static void main(String[] args) throws Exception {
+    syncAndEof();
+    monoPcm();
+    channelDeltas();
+    helperEdges();
+    failures();
+    reflection();
+    System.out.println("contracts=temporary-buffer-constant,constructor,sync-scan,fixed-blocking,variable-blocking,eof,subframe-loop,crc-consumption,8-bit-increase,16-bit-copy,24-bit-decrease,left-side,right-side,mid-side,none-delta,sample-prefix,io-propagation,header-failure,subframe-failure,private-methods,throws,identity-semantics,subclassable,reflection");
+  }
+
+  private static void syncAndEof() throws Exception {
+    check(FlacFrameReader.readFlacFrame(new ByteArrayInputStream(new byte[0]), null, null,
+        null, null, null) == 0, "EOF returns zero before other arguments are observed");
+    check((int) invoke("skipToFrameSync", new Class<?>[] {InputStream.class},
+        new ByteArrayInputStream(new byte[] {1, (byte) 0xFF, (byte) 0xF7,
+            (byte) 0xFF, (byte) 0xF8})) == 0,
+        "sync scan skips false prefixes and returns fixed blocking strategy");
+    check((int) invoke("skipToFrameSync", new Class<?>[] {InputStream.class},
+        new ByteArrayInputStream(new byte[] {(byte) 0xFF, (byte) 0xF9})) == 1,
+        "sync scan returns variable blocking strategy");
+    check((int) invoke("skipToFrameSync", new Class<?>[] {InputStream.class},
+        new ByteArrayInputStream(new byte[] {(byte) 0xFF, 1})) == -1,
+        "sync scan returns minus one at EOF");
+
+    FrameResult fixed = read(frame(false, 4, 0, 16, new int[] {1234}, true), 1, 16);
+    FrameResult variable = read(frame(true, 4, 0, 16, new int[] {-2345}, false), 1, 16);
+    check(fixed.count == 192 && fixed.raw[0][0] == 1234 && fixed.pcm[0][191] == 1234
+        && fixed.remaining == 1, "fixed frame skips junk and consumes through CRC only");
+    check(variable.count == 192 && variable.raw[0][191] == -2345
+        && variable.pcm[0][0] == -2345,
+        "variable blocking frame parses through the same decode pipeline");
+  }
+
+  private static void monoPcm() throws Exception {
+    FrameResult eight = read(frame(false, 1, 0, 8, new int[] {100}, false), 1, 8);
+    check(eight.count == 192 && eight.raw[0][0] == 100
+        && eight.pcm[0][0] == 25_600 && eight.pcm[0][191] == 25_600,
+        "8-bit samples are increased to signed 16-bit PCM");
+    FrameResult sixteen = read(frame(false, 4, 0, 16, new int[] {-1234}, false), 1, 16);
+    check(sixteen.raw[0][0] == -1234 && sixteen.pcm[0][0] == -1234,
+        "16-bit samples are copied with short conversion");
+    FrameResult twentyFour = read(
+        frame(false, 6, 0, 24, new int[] {0x12_3400}, false), 1, 24);
+    check(twentyFour.raw[0][0] == 0x12_3400 && twentyFour.pcm[0][0] == 0x1234,
+        "24-bit samples are arithmetically decreased to signed 16-bit PCM");
+  }
+
+  private static void channelDeltas() throws Exception {
+    FrameResult left = read(frame(false, 4, 8, 16, new int[] {1000, 200}, false), 2, 16);
+    check(left.raw[0][0] == 1000 && left.raw[1][0] == 800
+        && left.pcm[0][191] == 1000 && left.pcm[1][191] == 800,
+        "left-side delta reconstructs the right channel");
+    FrameResult right = read(frame(false, 4, 9, 16, new int[] {200, 800}, false), 2, 16);
+    check(right.raw[0][0] == 1000 && right.raw[1][0] == 800
+        && right.pcm[0][0] == 1000 && right.pcm[1][0] == 800,
+        "right-side delta reconstructs the left channel");
+    FrameResult mid = read(frame(false, 4, 10, 16, new int[] {900, 200}, false), 2, 16);
+    check(mid.raw[0][0] == 1000 && mid.raw[1][0] == 800
+        && mid.pcm[0][0] == 1000 && mid.pcm[1][0] == 800,
+        "mid-side delta reconstructs both channels");
+  }
+
+  private static void helperEdges() throws Exception {
+    int[][] none = {{1, 2, 99}, {3, 4, 98}};
+    invoke("applyChannelDelta", new Class<?>[] {ChannelDelta.class, int[][].class, int.class},
+        ChannelDelta.NONE, none, 2);
+    check(Arrays.deepEquals(none, new int[][] {{1, 2, 99}, {3, 4, 98}}),
+        "NONE leaves all raw samples unchanged");
+    int[][] left = {{10, -20, 77}, {3, 5, 66}};
+    invoke("applyChannelDelta", new Class<?>[] {ChannelDelta.class, int[][].class, int.class},
+        ChannelDelta.LEFT_SIDE, left, 2);
+    check(Arrays.deepEquals(left, new int[][] {{10, -20, 77}, {7, -25, 66}}),
+        "delta helpers mutate only the requested sample prefix");
+    int[][] right = {{Integer.MAX_VALUE, -9}, {1, 4}};
+    invoke("applyChannelDelta", new Class<?>[] {ChannelDelta.class, int[][].class, int.class},
+        ChannelDelta.RIGHT_SIDE, right, 1);
+    check(right[0][0] == Integer.MIN_VALUE && right[0][1] == -9,
+        "right delta preserves Java integer overflow and sample bounds");
+    int[][] mid = {{-2, 5}, {-3, 8}};
+    invoke("applyChannelDelta", new Class<?>[] {ChannelDelta.class, int[][].class, int.class},
+        ChannelDelta.MID_SIDE, mid, 1);
+    check(mid[0][0] == -3 && mid[1][0] == 0 && mid[0][1] == 5 && mid[1][1] == 8,
+        "mid delta preserves signed shift behavior and sample bounds");
+    check(catchThrowable(() -> invoke("applyChannelDelta",
+        new Class<?>[] {ChannelDelta.class, int[][].class, int.class}, null, none, 0))
+        instanceof NullPointerException, "null channel delta fails before buffer access");
+
+    int[][] raw = {{-129, -128, 127, 128, 70_000}, {1, 2, 3, 4, 5}};
+    short[][] pcm = {{9, 9, 9, 9, 9}, {8, 8, 8, 8, 8}};
+    invoke("convertToShortPcm",
+        new Class<?>[] {FlacStreamInfo.class, int.class, int[][].class, short[][].class},
+        stream(2, 16), 4, raw, pcm);
+    check(Arrays.equals(pcm[0], new short[] {-129, -128, 127, 128, 9})
+        && Arrays.equals(pcm[1], new short[] {1, 2, 3, 4, 8}),
+        "16-bit conversion casts each channel and respects sample prefix");
+  }
+
+  private static void failures() throws Exception {
+    IOException scanFailure = new IOException("scan-failure");
+    check(catchThrowable(() -> FlacFrameReader.readFlacFrame(
+        new ThrowingInput(scanFailure), null, null, null, null, null)) == scanFailure,
+        "scan IO failure propagates with exact identity");
+
+    byte[] invalidHeader = frame(false, 4, 0, 16, new int[] {1}, false);
+    invalidHeader[2] = 0x09;
+    Throwable headerFailure = catchThrowable(() -> read(invalidHeader, 1, 16));
+    check(headerFailure instanceof IllegalStateException
+        && headerFailure.getMessage().contains("block size"),
+        "invalid frame header fails before subframe decoding");
+
+    byte[] truncated = frame(false, 4, 0, 16, new int[] {1}, false);
+    truncated = Arrays.copyOf(truncated, 7);
+    byte[] finalTruncated = truncated;
+    check(catchThrowable(() -> read(finalTruncated, 1, 16)) instanceof EOFException,
+        "truncated subframe propagates bit-reader EOF");
+  }
+
+  private static void reflection() throws Exception {
+    Class<FlacFrameReader> type = FlacFrameReader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete non-final reader metadata");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredMethods().length == 10
+        && type.getDeclaredConstructors().length == 1, "exact declared member counts");
+    Field constant = type.getDeclaredField("TEMPORARY_BUFFER_SIZE");
+    check(constant.getType() == int.class
+        && constant.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL)
+        && constant.getInt(null) == 32 && !constant.isSynthetic(),
+        "public temporary-buffer constant metadata and value");
+    Constructor<FlacFrameReader> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0,
+        "public zero-argument constructor metadata");
+    Method read = type.getDeclaredMethod("readFlacFrame", InputStream.class,
+        BitStreamReader.class, FlacStreamInfo.class, int[][].class, short[][].class, int[].class);
+    checkMethod(read, Modifier.PUBLIC | Modifier.STATIC, int.class, true);
+    checkMethod(type.getDeclaredMethod("findAndParseFrameHeader", InputStream.class,
+        BitStreamReader.class, FlacStreamInfo.class), Modifier.PRIVATE | Modifier.STATIC,
+        Class.forName("com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameInfo"), true);
+    checkMethod(type.getDeclaredMethod("skipToFrameSync", InputStream.class),
+        Modifier.PRIVATE | Modifier.STATIC, int.class, true);
+    checkMethod(type.getDeclaredMethod("applyChannelDelta", ChannelDelta.class,
+        int[][].class, int.class), Modifier.PRIVATE | Modifier.STATIC, void.class, false);
+    for (String name : new String[] {"applyLeftSideDelta", "applyRightSideDelta", "applyMidDelta"}) {
+      checkMethod(type.getDeclaredMethod(name, int[][].class, int.class),
+          Modifier.PRIVATE | Modifier.STATIC, void.class, false);
+    }
+    for (String name : new String[] {"convertToShortPcm", "increaseSampleSize", "decreaseSampleSize"}) {
+      checkMethod(type.getDeclaredMethod(name, FlacStreamInfo.class, int.class,
+          int[][].class, short[][].class), Modifier.PRIVATE | Modifier.STATIC, void.class, false);
+    }
+    FlacFrameReader first = new FlacFrameReader();
+    FlacFrameReader second = new FlacFrameReader();
+    check(first != second && !first.equals(second) && new Derived() instanceof FlacFrameReader,
+        "constructor retains Object identity and subclassability");
+  }
+
+  private static void checkMethod(Method method, int modifiers, Class<?> result,
+      boolean checkedIo) {
+    check(method.getModifiers() == modifiers && method.getReturnType() == result
+        && Arrays.equals(method.getExceptionTypes(),
+            checkedIo ? new Class<?>[] {IOException.class} : new Class<?>[0])
+        && !method.isSynthetic() && !method.isBridge() && !method.isVarArgs(),
+        method.getName() + " method metadata");
+  }
+
+  private static FrameResult read(byte[] bytes, int channels, int bits) throws Exception {
+    ByteArrayInputStream input = new ByteArrayInputStream(bytes);
+    int[][] raw = new int[channels][192];
+    short[][] pcm = new short[channels][192];
+    int count = FlacFrameReader.readFlacFrame(input, new BitStreamReader(input),
+        stream(channels, bits), raw, pcm, new int[FlacFrameReader.TEMPORARY_BUFFER_SIZE]);
+    return new FrameResult(count, raw, pcm, input.available());
+  }
+
+  private static byte[] frame(boolean variable, int sizeCode, int channelCode, int bits,
+      int[] values, boolean junkPrefix) {
+    Bits payload = new Bits();
+    payload.put(1, 4);
+    payload.put(9, 4);
+    payload.put(channelCode, 4);
+    payload.put(sizeCode, 3);
+    payload.put(0, 1);
+    payload.put(0, 8);
+    payload.put(0, 8);
+    int deltaChannel = channelCode == 9 ? 0 : channelCode == 8 || channelCode == 10 ? 1 : -1;
+    for (int channel = 0; channel < values.length; channel++) {
+      payload.put(0, 8);
+      payload.put(values[channel], bits + (channel == deltaChannel ? 1 : 0));
+    }
+    payload.align();
+    payload.put(0, 16);
+    byte[] body = payload.bytes();
+    byte[] result = new byte[body.length + (junkPrefix ? 6 : 3)];
+    int offset = 0;
+    if (junkPrefix) {
+      result[offset++] = 3;
+      result[offset++] = (byte) 0xFF;
+      result[offset++] = (byte) 0xF7;
+    }
+    result[offset++] = (byte) 0xFF;
+    result[offset++] = (byte) (variable ? 0xF9 : 0xF8);
+    System.arraycopy(body, 0, result, offset, body.length);
+    result[result.length - 1] = 0x55;
+    return result;
+  }
+
+  private static FlacStreamInfo stream(int channels, int bits) {
+    byte[] bytes = new byte[34];
+    bytes[2] = 0;
+    bytes[3] = (byte) 192;
+    long packed = ((long) 44_100 << 44) | ((long) (channels - 1) << 41)
+        | ((long) (bits - 1) << 36);
+    for (int index = 0; index < 8; index++) {
+      bytes[10 + index] = (byte) (packed >>> (56 - index * 8));
+    }
+    return new FlacStreamInfo(bytes, false);
+  }
+
+  private static Object invoke(String name, Class<?>[] parameters, Object... arguments)
+      throws Exception {
+    Method method = FlacFrameReader.class.getDeclaredMethod(name, parameters);
+    method.setAccessible(true);
+    try {
+      return method.invoke(null, arguments);
+    } catch (InvocationTargetException error) {
+      Throwable cause = error.getCause();
+      if (cause instanceof Exception) throw (Exception) cause;
+      if (cause instanceof Error) throw (Error) cause;
+      throw error;
+    }
+  }
+
+  private static Throwable catchThrowable(Operation operation) {
+    try { operation.run(); return null; } catch (Throwable error) { return error; }
+  }
+
+  private interface Operation { void run() throws Throwable; }
+
+  private static final class ThrowingInput extends InputStream {
+    private final IOException failure;
+    ThrowingInput(IOException failure) { this.failure = failure; }
+    public int read() throws IOException { throw failure; }
+  }
+
+  private static final class FrameResult {
+    final int count;
+    final int[][] raw;
+    final short[][] pcm;
+    final int remaining;
+    FrameResult(int count, int[][] raw, short[][] pcm, int remaining) {
+      this.count = count; this.raw = raw; this.pcm = pcm; this.remaining = remaining;
+    }
+  }
+
+  private static final class Bits {
+    private final java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+    private int current;
+    private int count;
+    void put(int value, int width) {
+      for (int bit = width - 1; bit >= 0; bit--) {
+        current = (current << 1) | ((value >>> bit) & 1);
+        if (++count == 8) { output.write(current); current = 0; count = 0; }
+      }
+    }
+    void align() { if (count != 0) { output.write(current << (8 - count)); current = 0; count = 0; } }
+    byte[] bytes() { align(); return output.toByteArray(); }
+  }
+
+  private static final class Derived extends FlacFrameReader {}
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

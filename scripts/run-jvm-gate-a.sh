@@ -275,6 +275,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-flac-frame-header-reader-consu
   --output "$WORK/GateFlacFrameHeaderReader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-frame-info-consumer \
   --output "$WORK/GateFlacFrameInfo.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-flac-frame-reader-consumer \
+  --output "$WORK/GateFlacFrameReader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -352,6 +354,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateFlacTrackProvider.java" \
   "$WORK/GateFlacFrameHeaderReader.java" \
   "$WORK/GateFlacFrameInfo.java" \
+  "$WORK/GateFlacFrameReader.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GateAdtsStreamReader.java" \
@@ -1477,6 +1480,17 @@ cmp "$WORK/flac-frame-info-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor-values,constructor-edges,null-channel,public-final-fields,identity-semantics,subclassable,enum-order,delta-channels,name-ordinal,defensive-values,value-of,lookup-failures,enum-collections,nested-enum,private-enum-state,generic-signature,reflection' \
   "$WORK/flac-frame-info-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateFlacFrameReader \
+  >"$WORK/flac-frame-reader-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateFlacFrameReader >"$WORK/flac-frame-reader-candidate.txt"
+cmp "$WORK/flac-frame-reader-reference.txt" \
+  "$WORK/flac-frame-reader-candidate.txt"
+grep --fixed-strings \
+  'contracts=temporary-buffer-constant,constructor,sync-scan,fixed-blocking,variable-blocking,eof,subframe-loop,crc-consumption,8-bit-increase,16-bit-copy,24-bit-decrease,left-side,right-side,mid-side,none-delta,sample-prefix,io-propagation,header-failure,subframe-failure,private-methods,throws,identity-semantics,subclassable,reflection' \
+  "$WORK/flac-frame-reader-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"

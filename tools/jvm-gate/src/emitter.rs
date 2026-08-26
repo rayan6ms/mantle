@@ -192,6 +192,8 @@ const FLAC_FRAME_INFO_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo";
 const FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta";
+const FLAC_FRAME_READER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameReader";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -544,6 +546,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     FLAC_FRAME_HEADER_READER_CLASS,
     FLAC_FRAME_INFO_CLASS,
     FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS,
+    FLAC_FRAME_READER_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -1152,6 +1155,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | FLAC_TRACK_PROVIDER_CLASS
             | FLAC_FRAME_HEADER_READER_CLASS
             | FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS
+            | FLAC_FRAME_READER_CLASS
             | AUDIO_PIPELINE_FACTORY_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
@@ -1479,6 +1483,9 @@ fn replacement_body(
     }
     if class_name == FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS {
         return flac_frame_info_channel_delta_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == FLAC_FRAME_READER_CLASS {
+        return flac_frame_reader_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -7169,6 +7176,657 @@ fn flac_frame_info_channel_delta_initializer(
     )?;
     instructions.extend([Instruction::Putstatic(values), Instruction::Return]);
     code(pool, 5, 0, instructions)
+}
+
+#[allow(clippy::too_many_lines)]
+fn flac_frame_reader_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        (
+            "readFlacFrame",
+            "(Ljava/io/InputStream;Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;[[I[[S[I)I",
+        ) => flac_frame_reader_read(pool),
+        (
+            "findAndParseFrameHeader",
+            "(Ljava/io/InputStream;Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;)Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo;",
+        ) => flac_frame_reader_find_header(pool),
+        ("skipToFrameSync", "(Ljava/io/InputStream;)I") => flac_frame_reader_skip_to_sync(pool),
+        (
+            "applyChannelDelta",
+            "(Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta;[[II)V",
+        ) => flac_frame_reader_apply_delta(pool),
+        ("applyLeftSideDelta", "([[II)V") => flac_frame_reader_left_delta(pool),
+        ("applyRightSideDelta", "([[II)V") => flac_frame_reader_right_delta(pool),
+        ("applyMidDelta", "([[II)V") => flac_frame_reader_mid_delta(pool),
+        (
+            "convertToShortPcm",
+            "(Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;I[[I[[S)V",
+        ) => flac_frame_reader_convert_pcm(pool),
+        (
+            "increaseSampleSize",
+            "(Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;I[[I[[S)V",
+        ) => flac_frame_reader_shift_pcm(pool, true),
+        (
+            "decreaseSampleSize",
+            "(Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;I[[I[[S)V",
+        ) => flac_frame_reader_shift_pcm(pool, false),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {FLAC_FRAME_READER_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+fn flac_frame_reader_read(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_FRAME_READER_CLASS)?;
+    let stream_info = pool.add_class(FLAC_STREAM_INFO_CLASS)?;
+    let channel_count = pool.add_field_ref(stream_info, "channelCount", "I")?;
+    let frame_info = pool.add_class(FLAC_FRAME_INFO_CLASS)?;
+    let sample_count = pool.add_field_ref(frame_info, "sampleCount", "I")?;
+    let channel_delta = pool.add_field_ref(
+        frame_info,
+        "channelDelta",
+        "Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta;",
+    )?;
+    let find_header = pool.add_method_ref(
+        owner,
+        "findAndParseFrameHeader",
+        "(Ljava/io/InputStream;Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;)Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo;",
+    )?;
+    let subframe =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/flac/frame/FlacSubFrameReader")?;
+    let read_subframe = pool.add_method_ref(
+        subframe,
+        "readSubFrame",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo;[II[I)V",
+    )?;
+    let reader = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader")?;
+    let remaining = pool.add_method_ref(reader, "readRemainingBits", "()I")?;
+    let as_integer = pool.add_method_ref(reader, "asInteger", "(I)I")?;
+    let apply_delta = pool.add_method_ref(
+        owner,
+        "applyChannelDelta",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta;[[II)V",
+    )?;
+    let convert = pool.add_method_ref(
+        owner,
+        "convertToShortPcm",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;I[[I[[S)V",
+    )?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Aload_1,
+        Instruction::Aload_2,
+        Instruction::Invokestatic(find_header),
+        Instruction::Astore(6),
+        Instruction::Aload(6),
+        Instruction::Ifnonnull(0),
+        Instruction::Iconst_0,
+        Instruction::Ireturn,
+    ];
+    let frame_target = instructions.len();
+    instructions.extend([Instruction::Iconst_0, Instruction::Istore(7)]);
+    let channel_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(7),
+        Instruction::Aload_2,
+        Instruction::Getfield(channel_count),
+        Instruction::If_icmpge(0),
+        Instruction::Aload_1,
+        Instruction::Aload_2,
+        Instruction::Aload(6),
+        Instruction::Aload_3,
+        Instruction::Iload(7),
+        Instruction::Aaload,
+        Instruction::Iload(7),
+        Instruction::Aload(5),
+        Instruction::Invokestatic(read_subframe),
+        Instruction::Iinc(7, 1),
+        Instruction::Goto(u16::try_from(channel_target)?),
+    ]);
+    let decoded_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(remaining),
+        Instruction::Pop,
+        Instruction::Aload_1,
+        Instruction::Bipush(16),
+        Instruction::Invokevirtual(as_integer),
+        Instruction::Pop,
+        Instruction::Aload(6),
+        Instruction::Getfield(channel_delta),
+        Instruction::Aload_3,
+        Instruction::Aload(6),
+        Instruction::Getfield(sample_count),
+        Instruction::Invokestatic(apply_delta),
+        Instruction::Aload_2,
+        Instruction::Aload(6),
+        Instruction::Getfield(sample_count),
+        Instruction::Aload_3,
+        Instruction::Aload(4),
+        Instruction::Invokestatic(convert),
+        Instruction::Aload(6),
+        Instruction::Getfield(sample_count),
+        Instruction::Ireturn,
+    ]);
+    instructions[6] = Instruction::Ifnonnull(u16::try_from(frame_target)?);
+    instructions[channel_target + 3] = Instruction::If_icmpge(u16::try_from(decoded_target)?);
+    let mut body = code(pool, 6, 8, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(frame_target)?,
+                locals: vec![VerificationType::Object {
+                    cpool_index: frame_info,
+                }],
+            },
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(channel_target - frame_target - 1)?,
+                locals: vec![VerificationType::Integer],
+            },
+            same_stack_frame(u16::try_from(decoded_target - channel_target - 1)?),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn flac_frame_reader_find_header(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_FRAME_READER_CLASS)?;
+    let skip = pool.add_method_ref(owner, "skipToFrameSync", "(Ljava/io/InputStream;)I")?;
+    let header = pool.add_class(FLAC_FRAME_HEADER_READER_CLASS)?;
+    let read = pool.add_method_ref(
+        header,
+        "readFrameHeader",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;Z)Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo;",
+    )?;
+    let instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Invokestatic(skip),
+        Instruction::Dup,
+        Instruction::Istore_3,
+        Instruction::Iconst_m1,
+        Instruction::If_icmpne(8),
+        Instruction::Aconst_null,
+        Instruction::Areturn,
+        Instruction::Aload_1,
+        Instruction::Aload_2,
+        Instruction::Iload_3,
+        Instruction::Invokestatic(read),
+        Instruction::Areturn,
+    ];
+    let mut body = code(pool, 3, 4, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::AppendFrame {
+            frame_type: 252,
+            offset_delta: 8,
+            locals: vec![VerificationType::Integer],
+        }],
+    )?;
+    Ok(body)
+}
+
+fn flac_frame_reader_skip_to_sync(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let input = pool.add_class("java/io/InputStream")?;
+    let read = pool.add_method_ref(input, "read", "()I")?;
+    let mut instructions = vec![Instruction::Iconst_m1, Instruction::Istore_1];
+    let loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Invokevirtual(read),
+        Instruction::Dup,
+        Instruction::Istore_2,
+        Instruction::Iconst_m1,
+        Instruction::If_icmpeq(0),
+        Instruction::Iload_1,
+        Instruction::Sipush(255),
+        Instruction::If_icmpne(0),
+        Instruction::Iload_2,
+        Instruction::Sipush(254),
+        Instruction::Iand,
+        Instruction::Sipush(248),
+        Instruction::If_icmpne(0),
+        Instruction::Iload_2,
+        Instruction::Iconst_1,
+        Instruction::Iand,
+        Instruction::Ireturn,
+    ]);
+    let update_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload_2,
+        Instruction::Istore_1,
+        Instruction::Goto(u16::try_from(loop_target)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.extend([Instruction::Iconst_m1, Instruction::Ireturn]);
+    instructions[loop_target + 5] = Instruction::If_icmpeq(u16::try_from(return_target)?);
+    instructions[loop_target + 8] = Instruction::If_icmpne(u16::try_from(update_target)?);
+    instructions[loop_target + 13] = Instruction::If_icmpne(u16::try_from(update_target)?);
+    let mut body = code(pool, 2, 3, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(loop_target)?,
+                locals: vec![VerificationType::Integer],
+            },
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(update_target - loop_target - 1)?,
+                locals: vec![VerificationType::Integer],
+            },
+            same_stack_frame(u16::try_from(return_target - update_target - 1)?),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn flac_frame_reader_apply_delta(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_FRAME_READER_CLASS)?;
+    let delta = pool.add_class(FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS)?;
+    let ordinal = pool.add_method_ref(delta, "ordinal", "()I")?;
+    let left = pool.add_method_ref(owner, "applyLeftSideDelta", "([[II)V")?;
+    let right = pool.add_method_ref(owner, "applyRightSideDelta", "([[II)V")?;
+    let mid = pool.add_method_ref(owner, "applyMidDelta", "([[II)V")?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Invokevirtual(ordinal),
+        Instruction::Istore_3,
+        Instruction::Iload_3,
+        Instruction::Iconst_1,
+        Instruction::If_icmpne(0),
+        Instruction::Aload_1,
+        Instruction::Iload_2,
+        Instruction::Invokestatic(left),
+        Instruction::Return,
+    ];
+    let right_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload_3,
+        Instruction::Iconst_2,
+        Instruction::If_icmpne(0),
+        Instruction::Aload_1,
+        Instruction::Iload_2,
+        Instruction::Invokestatic(right),
+        Instruction::Return,
+    ]);
+    let mid_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload_3,
+        Instruction::Iconst_3,
+        Instruction::If_icmpne(0),
+        Instruction::Aload_1,
+        Instruction::Iload_2,
+        Instruction::Invokestatic(mid),
+        Instruction::Return,
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[5] = Instruction::If_icmpne(u16::try_from(right_target)?);
+    instructions[right_target + 2] = Instruction::If_icmpne(u16::try_from(mid_target)?);
+    instructions[mid_target + 2] = Instruction::If_icmpne(u16::try_from(return_target)?);
+    let mut body = code(pool, 2, 4, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(right_target)?,
+                locals: vec![VerificationType::Integer],
+            },
+            same_stack_frame(u16::try_from(mid_target - right_target - 1)?),
+            same_stack_frame(u16::try_from(return_target - mid_target - 1)?),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn flac_frame_reader_left_delta(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    flac_frame_reader_simple_delta(pool, true)
+}
+
+fn flac_frame_reader_right_delta(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    flac_frame_reader_simple_delta(pool, false)
+}
+
+fn flac_frame_reader_simple_delta(
+    pool: &mut ConstantPool<'static>,
+    left_side: bool,
+) -> Result<Attribute> {
+    let mut instructions = vec![Instruction::Iconst_0, Instruction::Istore_2];
+    let loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload_2,
+        Instruction::Iload_1,
+        Instruction::If_icmpge(0),
+        Instruction::Aload_0,
+        if left_side {
+            Instruction::Iconst_1
+        } else {
+            Instruction::Iconst_0
+        },
+        Instruction::Aaload,
+        Instruction::Iload_2,
+        Instruction::Aload_0,
+        Instruction::Iconst_0,
+        Instruction::Aaload,
+        Instruction::Iload_2,
+        Instruction::Iaload,
+        Instruction::Aload_0,
+        Instruction::Iconst_1,
+        Instruction::Aaload,
+        Instruction::Iload_2,
+        Instruction::Iaload,
+        if left_side {
+            Instruction::Isub
+        } else {
+            Instruction::Iadd
+        },
+        Instruction::Iastore,
+        Instruction::Iinc(2, 1),
+        Instruction::Goto(u16::try_from(loop_target)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[loop_target + 2] = Instruction::If_icmpge(u16::try_from(return_target)?);
+    let mut body = code(pool, 5, 3, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(loop_target)?,
+                locals: vec![VerificationType::Integer],
+            },
+            same_stack_frame(u16::try_from(return_target - loop_target - 1)?),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn flac_frame_reader_mid_delta(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let mut instructions = vec![Instruction::Iconst_0, Instruction::Istore_2];
+    let loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload_2,
+        Instruction::Iload_1,
+        Instruction::If_icmpge(0),
+        Instruction::Aload_0,
+        Instruction::Iconst_1,
+        Instruction::Aaload,
+        Instruction::Iload_2,
+        Instruction::Iaload,
+        Instruction::Istore_3,
+        Instruction::Aload_0,
+        Instruction::Iconst_0,
+        Instruction::Aaload,
+        Instruction::Iload_2,
+        Instruction::Iaload,
+        Instruction::Iconst_1,
+        Instruction::Ishl,
+        Instruction::Iload_3,
+        Instruction::Iconst_1,
+        Instruction::Iand,
+        Instruction::Iadd,
+        Instruction::Istore(4),
+        Instruction::Aload_0,
+        Instruction::Iconst_0,
+        Instruction::Aaload,
+        Instruction::Iload_2,
+        Instruction::Iload(4),
+        Instruction::Iload_3,
+        Instruction::Iadd,
+        Instruction::Iconst_1,
+        Instruction::Ishr,
+        Instruction::Iastore,
+        Instruction::Aload_0,
+        Instruction::Iconst_1,
+        Instruction::Aaload,
+        Instruction::Iload_2,
+        Instruction::Iload(4),
+        Instruction::Iload_3,
+        Instruction::Isub,
+        Instruction::Iconst_1,
+        Instruction::Ishr,
+        Instruction::Iastore,
+        Instruction::Iinc(2, 1),
+        Instruction::Goto(u16::try_from(loop_target)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[loop_target + 2] = Instruction::If_icmpge(u16::try_from(return_target)?);
+    let mut body = code(pool, 5, 5, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(loop_target)?,
+                locals: vec![VerificationType::Integer],
+            },
+            same_stack_frame(u16::try_from(return_target - loop_target - 1)?),
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn flac_frame_reader_convert_pcm(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_FRAME_READER_CLASS)?;
+    let stream_info = pool.add_class(FLAC_STREAM_INFO_CLASS)?;
+    let bits = pool.add_field_ref(stream_info, "bitsPerSample", "I")?;
+    let channels = pool.add_field_ref(stream_info, "channelCount", "I")?;
+    let increase = pool.add_method_ref(
+        owner,
+        "increaseSampleSize",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;I[[I[[S)V",
+    )?;
+    let decrease = pool.add_method_ref(
+        owner,
+        "decreaseSampleSize",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;I[[I[[S)V",
+    )?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Getfield(bits),
+        Instruction::Bipush(16),
+        Instruction::If_icmpge(0),
+        Instruction::Aload_0,
+        Instruction::Iload_1,
+        Instruction::Aload_2,
+        Instruction::Aload_3,
+        Instruction::Invokestatic(increase),
+        Instruction::Return,
+    ];
+    let high_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Getfield(bits),
+        Instruction::Bipush(16),
+        Instruction::If_icmple(0),
+        Instruction::Aload_0,
+        Instruction::Iload_1,
+        Instruction::Aload_2,
+        Instruction::Aload_3,
+        Instruction::Invokestatic(decrease),
+        Instruction::Return,
+    ]);
+    let equal_target = instructions.len();
+    instructions.extend([Instruction::Iconst_0, Instruction::Istore(4)]);
+    let channel_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(4),
+        Instruction::Aload_0,
+        Instruction::Getfield(channels),
+        Instruction::If_icmpge(0),
+        Instruction::Iconst_0,
+        Instruction::Istore(5),
+    ]);
+    let sample_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(5),
+        Instruction::Iload_1,
+        Instruction::If_icmpge(0),
+        Instruction::Aload_3,
+        Instruction::Iload(4),
+        Instruction::Aaload,
+        Instruction::Iload(5),
+        Instruction::Aload_2,
+        Instruction::Iload(4),
+        Instruction::Aaload,
+        Instruction::Iload(5),
+        Instruction::Iaload,
+        Instruction::I2s,
+        Instruction::Sastore,
+        Instruction::Iinc(5, 1),
+        Instruction::Goto(u16::try_from(sample_target)?),
+    ]);
+    let channel_continue = instructions.len();
+    instructions.extend([
+        Instruction::Iinc(4, 1),
+        Instruction::Goto(u16::try_from(channel_target)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[3] = Instruction::If_icmpge(u16::try_from(high_target)?);
+    instructions[high_target + 3] = Instruction::If_icmple(u16::try_from(equal_target)?);
+    instructions[channel_target + 3] = Instruction::If_icmpge(u16::try_from(return_target)?);
+    instructions[sample_target + 2] = Instruction::If_icmpge(u16::try_from(channel_continue)?);
+    let mut body = code(pool, 5, 6, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            same_stack_frame(u16::try_from(high_target)?),
+            same_stack_frame(u16::try_from(equal_target - high_target - 1)?),
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(channel_target - equal_target - 1)?,
+                locals: vec![VerificationType::Integer],
+            },
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(sample_target - channel_target - 1)?,
+                locals: vec![VerificationType::Integer],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: u16::try_from(channel_continue - sample_target - 1)?,
+            },
+            same_stack_frame(u16::try_from(return_target - channel_continue - 1)?),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn flac_frame_reader_shift_pcm(
+    pool: &mut ConstantPool<'static>,
+    increase: bool,
+) -> Result<Attribute> {
+    let stream_info = pool.add_class(FLAC_STREAM_INFO_CLASS)?;
+    let bits = pool.add_field_ref(stream_info, "bitsPerSample", "I")?;
+    let channels = pool.add_field_ref(stream_info, "channelCount", "I")?;
+    let mut instructions = if increase {
+        vec![
+            Instruction::Bipush(16),
+            Instruction::Aload_0,
+            Instruction::Getfield(bits),
+            Instruction::Isub,
+            Instruction::Istore(4),
+        ]
+    } else {
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(bits),
+            Instruction::Bipush(16),
+            Instruction::Isub,
+            Instruction::Istore(4),
+        ]
+    };
+    instructions.extend([Instruction::Iconst_0, Instruction::Istore(5)]);
+    let channel_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(5),
+        Instruction::Aload_0,
+        Instruction::Getfield(channels),
+        Instruction::If_icmpge(0),
+        Instruction::Iconst_0,
+        Instruction::Istore(6),
+    ]);
+    let sample_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(6),
+        Instruction::Iload_1,
+        Instruction::If_icmpge(0),
+        Instruction::Aload_3,
+        Instruction::Iload(5),
+        Instruction::Aaload,
+        Instruction::Iload(6),
+        Instruction::Aload_2,
+        Instruction::Iload(5),
+        Instruction::Aaload,
+        Instruction::Iload(6),
+        Instruction::Iaload,
+        Instruction::Iload(4),
+        if increase {
+            Instruction::Ishl
+        } else {
+            Instruction::Ishr
+        },
+        Instruction::I2s,
+        Instruction::Sastore,
+        Instruction::Iinc(6, 1),
+        Instruction::Goto(u16::try_from(sample_target)?),
+    ]);
+    let channel_continue = instructions.len();
+    instructions.extend([
+        Instruction::Iinc(5, 1),
+        Instruction::Goto(u16::try_from(channel_target)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[channel_target + 3] = Instruction::If_icmpge(u16::try_from(return_target)?);
+    instructions[sample_target + 2] = Instruction::If_icmpge(u16::try_from(channel_continue)?);
+    let mut body = code(pool, 5, 7, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 253,
+                offset_delta: u16::try_from(channel_target)?,
+                locals: vec![VerificationType::Integer, VerificationType::Integer],
+            },
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(sample_target - channel_target - 1)?,
+                locals: vec![VerificationType::Integer],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: u16::try_from(channel_continue - sample_target - 1)?,
+            },
+            same_stack_frame(u16::try_from(return_target - channel_continue - 1)?),
+        ],
+    )?;
+    Ok(body)
 }
 
 #[allow(clippy::too_many_lines)]
