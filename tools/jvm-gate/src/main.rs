@@ -179,6 +179,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-flac-track-info-consumer" => Some(FLAC_TRACK_INFO_CONSUMER),
         "write-flac-track-info-builder-consumer" => Some(FLAC_TRACK_INFO_BUILDER_CONSUMER),
         "write-flac-track-provider-consumer" => Some(FLAC_TRACK_PROVIDER_CONSUMER),
+        "write-flac-frame-header-reader-consumer" => Some(FLAC_FRAME_HEADER_READER_CONSUMER),
         _ => None,
     }
 }
@@ -16283,6 +16284,153 @@ public final class GateFlacTrackInfoBuilder {
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }
+}
+"#;
+
+const FLAC_FRAME_HEADER_READER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacStreamInfo;
+import com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameHeaderReader;
+import com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameInfo;
+import com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameInfo.ChannelDelta;
+import com.sedmelluq.discord.lavaplayer.tools.io.BitStreamReader;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateFlacFrameHeaderReader {
+  public static void main(String[] args) throws Exception {
+    standardAndExplicit();
+    inheritedAndDeltas();
+    failures();
+    reflection();
+    System.out.println("contracts=constructor,block-mapping,rate-mapping,channel-mapping,size-mapping,standard,explicit,inherited,left-side,mid-side,utf8-variable,invalid-block,rate-mismatch,channel-mismatch,size-mismatch,io-propagation,private-fields,private-methods,throws,identity-semantics,subclassable,reflection");
+  }
+
+  private static void standardAndExplicit() throws Exception {
+    FlacStreamInfo stream = stream(8192, 2, 44100, 16);
+    FlacFrameInfo frame = read(header(1, 9, 1, 4, false), stream, false);
+    check(frame.sampleCount == 192 && frame.channelDelta == ChannelDelta.NONE,
+        "standard mapping returns sample count and no channel delta");
+    stream = stream(8192, 2, 44000, 16);
+    frame = read(header(6, 12, 8, 4, true, 4, 44), stream, true);
+    check(frame.sampleCount == 5 && frame.channelDelta == ChannelDelta.LEFT_SIDE,
+        "explicit block and rate values and left-side delta");
+  }
+
+  private static void inheritedAndDeltas() throws Exception {
+    FlacStreamInfo stream = stream(8192, 2, 48000, 16);
+    FlacFrameInfo frame = read(header(1, 0, 10, 0, false), stream, false);
+    check(frame.sampleCount == 192 && frame.channelDelta == ChannelDelta.MID_SIDE,
+        "inherited rate and sample size and mid-side delta");
+    check(read(header(1, 9, 9, 4, false), stream(8192, 2, 44100, 16), false).channelDelta
+        == ChannelDelta.RIGHT_SIDE, "right-side delta mapping");
+  }
+
+  private static void failures() throws Exception {
+    FlacStreamInfo stream = stream(8192, 2, 44100, 16);
+    Throwable invalidBlock = catchThrowable(() -> read(header(0, 9, 1, 4, false), stream, false));
+    check(invalidBlock instanceof IllegalStateException
+        && invalidBlock.getMessage().contains("Invalid value -2147483648 for block size"),
+        "invalid block size is rejected");
+    Throwable rate = catchThrowable(() -> read(header(1, 9, 1, 4, false), stream(8192, 2, 48000, 16), false));
+    check(rate instanceof IllegalStateException && rate.getMessage().contains("sample rate"),
+        "sample rate mismatch is rejected");
+    Throwable channels = catchThrowable(() -> read(header(1, 9, 1, 4, false), stream(8192, 1, 44100, 16), false));
+    check(channels instanceof IllegalStateException && channels.getMessage().contains("channel count"),
+        "channel mismatch is rejected");
+    Throwable size = catchThrowable(() -> read(header(1, 9, 1, 4, false), stream(8192, 2, 44100, 24), false));
+    check(size instanceof IllegalStateException && size.getMessage().contains("bits per sample"),
+        "sample size mismatch is rejected");
+    IOException failure = new IOException("header-io");
+    Throwable io = catchThrowable(() -> FlacFrameHeaderReader.readFrameHeader(
+        new BitStreamReader(new ThrowingInput(failure)), stream, false));
+    check(io == failure, "header IO failures propagate unchanged");
+  }
+
+  private static void reflection() throws Exception {
+    Class<FlacFrameHeaderReader> type = FlacFrameHeaderReader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredFields().length == 12
+        && type.getDeclaredMethods().length == 4, "class and member counts");
+    for (String name : new String[] {"VALUE_INVALID", "VALUE_INHERITED", "BLOCK_SIZE_EXPLICIT_8_BIT",
+        "BLOCK_SIZE_EXPLICIT_16_BIT", "SAMPLE_RATE_EXPLICIT_8_BIT", "SAMPLE_RATE_EXPLICIT_16_BIT",
+        "SAMPLE_RATE_EXPLICIT_10X_16_BIT", "blockSizeMapping", "sampleRateMapping",
+        "channelCountMapping", "channelDeltaMapping", "sampleSizeMapping"}) {
+      Field field = type.getDeclaredField(name);
+      check(field.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+          && !field.isSynthetic(), name + " field metadata");
+    }
+    int[] blocks = (int[]) field(type, "blockSizeMapping");
+    int[] rates = (int[]) field(type, "sampleRateMapping");
+    check(blocks[1] == 192 && blocks[6] == -2 && blocks[15] == 32768
+        && rates[0] == -1024 && rates[12] == -3 && rates[14] == -1,
+        "private mapping arrays retain reference values");
+    Method method = type.getDeclaredMethod("readFrameHeader", BitStreamReader.class,
+        FlacStreamInfo.class, boolean.class);
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && method.getExceptionTypes().length == 1 && method.getExceptionTypes()[0] == IOException.class
+        && !method.isSynthetic(), "reader method metadata");
+    for (String name : new String[] {"verifyNotInvalid", "verifyMatchesExpected", "readUtf8Value"}) {
+      check(Modifier.isPrivate(type.getDeclaredMethod(name,
+          name.equals("readUtf8Value") ? new Class<?>[] {boolean.class, BitStreamReader.class}
+              : name.equals("verifyNotInvalid") ? new Class<?>[] {int.class, String.class}
+              : new Class<?>[] {int.class, int.class, String.class}).getModifiers()), name + " is private");
+    }
+    check(new FlacFrameHeaderReader() != new FlacFrameHeaderReader(), "constructor creates ordinary identities");
+  }
+
+  private static FlacFrameInfo read(byte[] bytes, FlacStreamInfo stream, boolean variable) throws Exception {
+    return FlacFrameHeaderReader.readFrameHeader(new BitStreamReader(new ByteArrayInputStream(bytes)), stream, variable);
+  }
+
+  private static byte[] header(int block, int rate, int channel, int size, boolean variable, int... extras) {
+    return headerWithUtf(block, rate, channel, size, variable, 0, extras);
+  }
+
+  private static byte[] headerWithUtf(int block, int rate, int channel, int size, boolean variable,
+      int utfFirst, int... extras) {
+    Bits bits = new Bits();
+    bits.put(block, 4); bits.put(rate, 4); bits.put(channel, 4); bits.put(size, 3); bits.put(0, 1);
+    if (utfFirst == 0) bits.put(0, 8); else { bits.put(utfFirst & 255, 8); if (utfFirst == 0xC2) bits.put(extras.length > 0 ? extras[0] : 0, 8); }
+    int index = utfFirst == 0 ? 0 : 1;
+    if (block == 6) bits.put(extras[index++], 8);
+    if (block == 7) bits.put(extras[index++] , 16);
+    if (rate == 12) bits.put(extras[index++], 8);
+    if (rate == 13 || rate == 14) bits.put(extras[index++], 16);
+    bits.put(0, 8);
+    return bits.bytes();
+  }
+
+  private static FlacStreamInfo stream(int maxBlock, int channels, int rate, int bits) {
+    byte[] bytes = new byte[34];
+    bytes[2] = (byte) (maxBlock >>> 8); bytes[3] = (byte) maxBlock;
+    long packed = ((long) rate << 44) | ((long) (channels - 1) << 41)
+        | ((long) (bits - 1) << 36);
+    for (int index = 0; index < 8; index++) bytes[10 + index] = (byte) (packed >>> (56 - index * 8));
+    return new FlacStreamInfo(bytes, false);
+  }
+
+  private static Object field(Class<?> type, String name) throws Exception {
+    Field field = type.getDeclaredField(name); field.setAccessible(true); return field.get(null);
+  }
+  private static Throwable catchThrowable(Throwing action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private interface Throwing { void run() throws Throwable; }
+  private static final class ThrowingInput extends java.io.InputStream {
+    private final IOException failure; ThrowingInput(IOException failure) { this.failure = failure; }
+    public int read() throws IOException { throw failure; }
+  }
+  private static final class Bits {
+    private final java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+    private int current; private int count;
+    void put(int value, int width) { for (int bit = width - 1; bit >= 0; bit--) { current = (current << 1) | ((value >>> bit) & 1); if (++count == 8) { out.write(current); current = 0; count = 0; } } }
+    byte[] bytes() { if (count != 0) out.write(current << (8 - count)); return out.toByteArray(); }
+  }
+  private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
 }
 "#;
 

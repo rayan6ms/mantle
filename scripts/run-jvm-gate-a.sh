@@ -271,6 +271,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-flac-track-info-builder-consum
   --output "$WORK/GateFlacTrackInfoBuilder.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-track-provider-consumer \
   --output "$WORK/GateFlacTrackProvider.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-flac-frame-header-reader-consumer \
+  --output "$WORK/GateFlacFrameHeaderReader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -346,6 +348,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateFlacTrackInfo.java" \
   "$WORK/GateFlacTrackInfoBuilder.java" \
   "$WORK/GateFlacTrackProvider.java" \
+  "$WORK/GateFlacFrameHeaderReader.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GateAdtsStreamReader.java" \
@@ -1449,6 +1452,17 @@ cmp "$WORK/flac-track-provider-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor-state,pcm-format,reader-state,buffer-shapes,seek-binary-search,seek-position,seek-time,seek-default,frame-io-wrap,close,private-fields,private-methods,throws,identity-semantics,subclassable,reflection' \
   "$WORK/flac-track-provider-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateFlacFrameHeaderReader \
+  >"$WORK/flac-frame-header-reader-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateFlacFrameHeaderReader >"$WORK/flac-frame-header-reader-candidate.txt"
+cmp "$WORK/flac-frame-header-reader-reference.txt" \
+  "$WORK/flac-frame-header-reader-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,block-mapping,rate-mapping,channel-mapping,size-mapping,standard,explicit,inherited,left-side,mid-side,utf8-variable,invalid-block,rate-mismatch,channel-mismatch,size-mismatch,io-propagation,private-fields,private-methods,throws,identity-semantics,subclassable,reflection' \
+  "$WORK/flac-frame-header-reader-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"

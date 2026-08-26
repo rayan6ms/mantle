@@ -2411,27 +2411,42 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves the public concrete Object shell, private static mapping state, constructor, static frame-header reader descriptor, and exact reflection metadata; differential coverage proves mapped frame outputs and failure ordering.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameHeaderReader",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public no-argument construction retains ordinary Object identity and exact constructor metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameHeaderReader",
       "symbol_kind": "METHOD",
       "member_name": "readFrameHeader",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;Z)Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Maps standard, explicit, inherited, and channel-delta header values to FlacFrameInfo while preserving exact stream validation, UTF header consumption, CRC consumption, IO propagation, and throws metadata.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameInfo",
