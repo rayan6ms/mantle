@@ -178,6 +178,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-flac-stream-info-consumer" => Some(FLAC_STREAM_INFO_CONSUMER),
         "write-flac-track-info-consumer" => Some(FLAC_TRACK_INFO_CONSUMER),
         "write-flac-track-info-builder-consumer" => Some(FLAC_TRACK_INFO_BUILDER_CONSUMER),
+        "write-flac-track-provider-consumer" => Some(FLAC_TRACK_PROVIDER_CONSUMER),
         _ => None,
     }
 }
@@ -16277,6 +16278,209 @@ public final class GateFlacTrackInfoBuilder {
     Derived(FlacStreamInfo stream) {
       super(stream);
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const FLAC_TRACK_PROVIDER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacSeekPoint;
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacStreamInfo;
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacTrackInfo;
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacTrackProvider;
+import com.sedmelluq.discord.lavaplayer.filter.AudioFilter;
+import com.sedmelluq.discord.lavaplayer.filter.PcmFilterFactory;
+import com.sedmelluq.discord.lavaplayer.filter.UniversalPcmAudioFilter;
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.format.Pcm16AudioDataFormat;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerOptions;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.nio.ShortBuffer;
+
+public final class GateFlacTrackProvider {
+  public static void main(String[] args) throws Exception {
+    construction();
+    seeking();
+    emptySeekTable();
+    frameFailure();
+    closing();
+    reflection();
+    System.out.println("contracts=constructor-state,pcm-format,reader-state,buffer-shapes,seek-binary-search,seek-position,seek-time,seek-default,frame-io-wrap,close,private-fields,private-methods,throws,identity-semantics,subclassable,reflection");
+  }
+
+  private static void construction() throws Exception {
+    FlacStreamInfo stream = stream(4, 2, 1000, 16, 1000L);
+    FlacTrackInfo info = new FlacTrackInfo(stream, new FlacSeekPoint[0], 0,
+        Collections.emptyMap(), 33L);
+    MemoryStream input = new MemoryStream();
+    AudioProcessingContext context = context();
+    FlacTrackProvider provider = new FlacTrackProvider(context, info, input);
+    check(field(provider, "info") == info && field(provider, "inputStream") == input,
+        "constructor retains info and input identities");
+    check(field(provider, "downstream") != null && field(provider, "bitStreamReader") != null,
+        "constructor creates downstream pipeline and bit reader");
+    check(((int[]) field(provider, "decodingBuffer")).length == 32,
+        "constructor uses the fixed FLAC temporary buffer size");
+    check(((int[][]) field(provider, "rawSampleBuffers")).length == 2
+        && ((short[][]) field(provider, "sampleBuffers")).length == 2
+        && ((int[][]) field(provider, "rawSampleBuffers"))[0].length == 4
+        && ((short[][]) field(provider, "sampleBuffers"))[1].length == 4,
+        "constructor sizes per-channel buffers from stream metadata");
+  }
+
+  private static void seeking() throws Exception {
+    RecordingFilter filter = new RecordingFilter();
+    AudioProcessingContext context = context(filter);
+    FlacStreamInfo stream = stream(8, 2, 1000, 16, 1000L);
+    FlacSeekPoint[] points = {new FlacSeekPoint(7L, 0L, 1), new FlacSeekPoint(20L, 1000L, 1)};
+    FlacTrackInfo info = new FlacTrackInfo(stream, points, 2, Collections.emptyMap(), 33L);
+    MemoryStream input = new MemoryStream();
+    FlacTrackProvider provider = new FlacTrackProvider(context, info, input);
+    provider.seekToTimecode(1500L);
+    check(input.position == 1033L && filter.seekCalls == 1
+        && filter.requested == 1500L && filter.provided == 20L,
+        "seek chooses the greatest preceding point and reports exact times");
+    provider.seekToTimecode(-1L);
+    check(input.position == 33L && filter.requested == -1L && filter.provided == 7L,
+        "negative timecode preserves Java truncation and first-point selection");
+  }
+
+  private static void emptySeekTable() throws Exception {
+    RecordingFilter filter = new RecordingFilter();
+    FlacStreamInfo stream = stream(4, 1, 1000, 16, 100L);
+    FlacTrackInfo info = new FlacTrackInfo(stream, null, 0, Collections.emptyMap(), 9L);
+    MemoryStream input = new MemoryStream();
+    new FlacTrackProvider(context(filter), info, input).seekToTimecode(22L);
+    check(input.position == 9L && filter.provided == 0L,
+        "empty seek table uses the zero-offset synthetic point");
+  }
+
+  private static void frameFailure() throws Exception {
+    MemoryStream input = new MemoryStream();
+    IOException failure = new IOException("frame-failure");
+    input.failure = failure;
+    FlacStreamInfo stream = stream(4, 1, 1000, 16, 100L);
+    FlacTrackInfo info = new FlacTrackInfo(stream, null, 0, Collections.emptyMap(), 0L);
+    Throwable actual = catchThrowable(() -> new FlacTrackProvider(context(), info, input).provideFrames());
+    check(actual instanceof RuntimeException && actual.getCause() == failure,
+        "frame IO failures are wrapped with the exact cause");
+  }
+
+  private static void closing() throws Exception {
+    RecordingFilter filter = new RecordingFilter();
+    FlacStreamInfo stream = stream(4, 1, 1000, 16, 100L);
+    FlacTrackInfo info = new FlacTrackInfo(stream, null, 0, Collections.emptyMap(), 0L);
+    FlacTrackProvider provider = new FlacTrackProvider(context(filter), info, new MemoryStream());
+    provider.close();
+    check(filter.closeCalls == 1, "close delegates to the downstream pipeline");
+  }
+
+  private static void reflection() throws Exception {
+    Class<FlacTrackProvider> type = FlacTrackProvider.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getDeclaredFields().length == 7 && type.getDeclaredMethods().length == 6
+        && type.getDeclaredConstructors().length == 1, "class and member counts");
+    for (String name : new String[] {"info", "inputStream", "downstream", "bitStreamReader",
+        "decodingBuffer", "rawSampleBuffers", "sampleBuffers"}) {
+      Field field = type.getDeclaredField(name);
+      check(field.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+          && !field.isSynthetic(), name + " field metadata");
+    }
+    Constructor<FlacTrackProvider> ctor = type.getDeclaredConstructor(
+        AudioProcessingContext.class, FlacTrackInfo.class, SeekableInputStream.class);
+    check(ctor.getModifiers() == Modifier.PUBLIC && ctor.getExceptionTypes().length == 0,
+        "constructor descriptor and exceptions");
+    checkMethod(type.getDeclaredMethod("provideFrames"), void.class,
+        new Class<?>[0], new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("seekToTimecode", long.class), void.class,
+        new Class<?>[] {long.class}, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("close"), void.class, new Class<?>[0], new Class<?>[0]);
+    check(!new FlacTrackProvider(context(), new FlacTrackInfo(stream(1, 1, 1, 1, 1), null, 0,
+        Collections.emptyMap(), 0L), new MemoryStream()).equals(new Object()),
+        "Object identity equality is unchanged");
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, Class<?>[] params,
+      Class<?>[] failures) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), params)
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isVarArgs(), method.getName() + " metadata");
+  }
+
+  private static AudioProcessingContext context() { return context(null); }
+  private static AudioProcessingContext context(RecordingFilter filter) {
+    AudioConfiguration configuration = new AudioConfiguration();
+    AudioDataFormat format = new Pcm16AudioDataFormat(2, 1000, 1, false);
+    configuration.setOutputFormat(format);
+    AudioPlayerOptions options = new AudioPlayerOptions();
+    if (filter != null) {
+      options.filterFactory.set((track, input, output) -> Collections.singletonList(filter));
+    }
+    return new AudioProcessingContext(configuration, (AudioFrameBuffer) null, options, format);
+  }
+
+  private static FlacStreamInfo stream(int maxBlock, int channels, int rate, int bits, long samples) {
+    byte[] bytes = new byte[34];
+    bytes[2] = (byte) (maxBlock >>> 8);
+    bytes[3] = (byte) maxBlock;
+    long packed = ((long) rate << 44) | ((long) (channels - 1) << 41)
+        | ((long) (bits - 1) << 36) | samples;
+    for (int index = 0; index < 8; index++) bytes[10 + index] = (byte) (packed >>> (56 - index * 8));
+    return new FlacStreamInfo(bytes, false);
+  }
+
+  private static Object field(Object target, String name) throws Exception {
+    Field field = target.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
+  }
+
+  private static Throwable catchThrowable(Throwing action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private interface Throwing { void run() throws Throwable; }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    long position;
+    IOException failure;
+    MemoryStream() { super(0L, 0L); }
+    public int read() throws IOException { if (failure != null) throw failure; return -1; }
+    public long getPosition() { return position; }
+    protected void seekHard(long target) { position = target; }
+    public boolean canSeekHard() { return true; }
+    public List<AudioTrackInfoProvider> getTrackInfoProviders() { return Collections.emptyList(); }
+  }
+
+  private static final class RecordingFilter implements UniversalPcmAudioFilter {
+    int seekCalls;
+    int closeCalls;
+    long requested;
+    long provided;
+    public void process(float[][] input, int offset, int length) { }
+    public void process(short[] input, int offset, int length) { }
+    public void process(ShortBuffer input) { }
+    public void process(short[][] input, int offset, int length) { }
+    public void seekPerformed(long requestedTime, long providedTime) {
+      seekCalls++; requested = requestedTime; provided = providedTime;
+    }
+    public void flush() throws InterruptedException { }
+    public void close() { closeCalls++; }
   }
 
   private static void check(boolean condition, String message) {

@@ -184,6 +184,8 @@ const FLAC_STREAM_INFO_CLASS: &str =
 const FLAC_TRACK_INFO_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfo";
 const FLAC_TRACK_INFO_BUILDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfoBuilder";
+const FLAC_TRACK_PROVIDER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/flac/FlacTrackProvider";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -532,6 +534,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     FLAC_STREAM_INFO_CLASS,
     FLAC_TRACK_INFO_CLASS,
     FLAC_TRACK_INFO_BUILDER_CLASS,
+    FLAC_TRACK_PROVIDER_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -862,7 +865,8 @@ pub fn verify_structure(reference_jar: &Path, candidate_jar: &Path) -> Result<()
     for binary_name in REFERENCE_CLASSES.iter().chain(PRIVATE_SUPPORT_CLASSES) {
         let entry_name = format!("{binary_name}.class");
         let reference_class = read_class(&mut reference, &entry_name)?;
-        let candidate_class = read_class(&mut candidate, &entry_name)?;
+        let candidate_class = read_class(&mut candidate, &entry_name)
+            .map_err(|error| format!("reading candidate {binary_name} failed: {error}"))?;
         if reference_class.version != candidate_class.version
             || reference_class.access_flags != candidate_class.access_flags
             || reference_class.class_name()? != candidate_class.class_name()?
@@ -1014,6 +1018,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | FLAC_FILE_LOADER_CLASS
             | FLAC_METADATA_READER_CLASS
             | FLAC_TRACK_INFO_BUILDER_CLASS
+            | FLAC_TRACK_PROVIDER_CLASS
             | OPUS_AUDIO_DATA_FORMAT_CLASS
             | PCM16_AUDIO_DATA_FORMAT_CLASS
             | OPUS_CHUNK_DECODER_CLASS
@@ -1133,6 +1138,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | FLAC_CONTAINER_PROBE_CLASS
             | FLAC_FILE_LOADER_CLASS
             | FLAC_METADATA_READER_CLASS
+            | FLAC_TRACK_PROVIDER_CLASS
             | AUDIO_PIPELINE_FACTORY_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
@@ -1448,6 +1454,9 @@ fn replacement_body(
     }
     if class_name == FLAC_TRACK_INFO_BUILDER_CLASS {
         return flac_track_info_builder_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == FLAC_TRACK_PROVIDER_CLASS {
+        return flac_track_provider_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -6308,6 +6317,659 @@ fn flac_track_info_builder_build(pool: &mut ConstantPool<'static>) -> Result<Att
             Instruction::Getfield(first_frame_position),
             Instruction::Invokespecial(track_info_init),
             Instruction::Areturn,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn flac_track_provider_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfo;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)V",
+        ) => flac_track_provider_constructor(pool),
+        ("provideFrames", "()V") => flac_track_provider_provide_frames(pool),
+        ("readFlacFrame", "()I") => flac_track_provider_read_frame(pool),
+        ("seekToTimecode", "(J)V") => flac_track_provider_seek(pool),
+        (
+            "findSeekPointForTime",
+            "(J)Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacSeekPoint;",
+        ) => flac_track_provider_find_seek_point(pool),
+        (
+            "binarySearchSeekPoints",
+            "([Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacSeekPoint;IJ)Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacSeekPoint;",
+        ) => flac_track_provider_binary_search(pool),
+        ("close", "()V") => flac_track_provider_close(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {FLAC_TRACK_PROVIDER_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+fn flac_track_provider_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_TRACK_PROVIDER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let info = pool.add_field_ref(
+        owner,
+        "info",
+        "Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfo;",
+    )?;
+    let input = pool.add_field_ref(
+        owner,
+        "inputStream",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;",
+    )?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/AudioPipeline;",
+    )?;
+    let reader_field = pool.add_field_ref(
+        owner,
+        "bitStreamReader",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;",
+    )?;
+    let decoding = pool.add_field_ref(owner, "decodingBuffer", "[I")?;
+    let raw = pool.add_field_ref(owner, "rawSampleBuffers", "[[I")?;
+    let samples = pool.add_field_ref(owner, "sampleBuffers", "[[S")?;
+    let track_info = pool.add_class(FLAC_TRACK_INFO_CLASS)?;
+    let stream = pool.add_field_ref(
+        track_info,
+        "stream",
+        "Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;",
+    )?;
+    let stream_info = pool.add_class(FLAC_STREAM_INFO_CLASS)?;
+    let channels = pool.add_field_ref(stream_info, "channelCount", "I")?;
+    let sample_rate = pool.add_field_ref(stream_info, "sampleRate", "I")?;
+    let max_block = pool.add_field_ref(stream_info, "maximumBlockSize", "I")?;
+    let pcm = pool.add_class("com/sedmelluq/discord/lavaplayer/filter/PcmFormat")?;
+    let pcm_init = pool.add_method_ref(pcm, "<init>", "(II)V")?;
+    let factory = pool.add_class("com/sedmelluq/discord/lavaplayer/filter/AudioPipelineFactory")?;
+    let create = pool.add_method_ref(factory, "create", "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;Lcom/sedmelluq/discord/lavaplayer/filter/PcmFormat;)Lcom/sedmelluq/discord/lavaplayer/filter/AudioPipeline;")?;
+    let bit_reader = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader")?;
+    let bit_reader_init = pool.add_method_ref(bit_reader, "<init>", "(Ljava/io/InputStream;)V")?;
+    let frame_reader =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameReader")?;
+    let temporary = pool.add_field_ref(frame_reader, "TEMPORARY_BUFFER_SIZE", "I")?;
+    let int_array = pool.add_class("[I")?;
+    let short_array = pool.add_class("[S")?;
+    let context_class =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext")?;
+    let input_class =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream")?;
+    // Branch targets and exception ranges use the emitter's logical instruction indexes.
+    let loop_target = 45;
+    let loop_frame = 45;
+    let mut body = code(
+        pool,
+        6,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(info),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Putfield(input),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::New(pcm),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Getfield(stream),
+            Instruction::Getfield(channels),
+            Instruction::Aload_2,
+            Instruction::Getfield(stream),
+            Instruction::Getfield(sample_rate),
+            Instruction::Invokespecial(pcm_init),
+            Instruction::Invokestatic(create),
+            Instruction::Putfield(downstream),
+            Instruction::Aload_0,
+            Instruction::New(bit_reader),
+            Instruction::Dup,
+            Instruction::Aload_3,
+            Instruction::Invokespecial(bit_reader_init),
+            Instruction::Putfield(reader_field),
+            Instruction::Aload_0,
+            Instruction::Getstatic(temporary),
+            Instruction::Newarray(ArrayType::Int),
+            Instruction::Putfield(decoding),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Getfield(stream),
+            Instruction::Getfield(channels),
+            Instruction::Anewarray(int_array),
+            Instruction::Putfield(raw),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Getfield(stream),
+            Instruction::Getfield(channels),
+            Instruction::Anewarray(short_array),
+            Instruction::Putfield(samples),
+            Instruction::Iconst_0,
+            Instruction::Istore(4),
+            Instruction::Iload(4),
+            Instruction::Aload_0,
+            Instruction::Getfield(raw),
+            Instruction::Arraylength,
+            Instruction::If_icmplt(51),
+            Instruction::Return,
+            Instruction::Aload_0,
+            Instruction::Getfield(raw),
+            Instruction::Iload(4),
+            Instruction::Aload_2,
+            Instruction::Getfield(stream),
+            Instruction::Getfield(max_block),
+            Instruction::Newarray(ArrayType::Int),
+            Instruction::Aastore,
+            Instruction::Aload_0,
+            Instruction::Getfield(samples),
+            Instruction::Iload(4),
+            Instruction::Aload_2,
+            Instruction::Getfield(stream),
+            Instruction::Getfield(max_block),
+            Instruction::Newarray(ArrayType::Short),
+            Instruction::Aastore,
+            Instruction::Iload(4),
+            Instruction::Iconst_1,
+            Instruction::Iadd,
+            Instruction::Istore(4),
+            Instruction::Goto(loop_target),
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: loop_frame,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: context_class,
+                    },
+                    VerificationType::Object {
+                        cpool_index: track_info,
+                    },
+                    VerificationType::Object {
+                        cpool_index: input_class,
+                    },
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 5,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: context_class,
+                    },
+                    VerificationType::Object {
+                        cpool_index: track_info,
+                    },
+                    VerificationType::Object {
+                        cpool_index: input_class,
+                    },
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn flac_track_provider_read_frame(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_TRACK_PROVIDER_CLASS)?;
+    let input = pool.add_field_ref(
+        owner,
+        "inputStream",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;",
+    )?;
+    let reader = pool.add_field_ref(
+        owner,
+        "bitStreamReader",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;",
+    )?;
+    let info = pool.add_field_ref(
+        owner,
+        "info",
+        "Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfo;",
+    )?;
+    let track_info = pool.add_class(FLAC_TRACK_INFO_CLASS)?;
+    let stream = pool.add_field_ref(
+        track_info,
+        "stream",
+        "Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;",
+    )?;
+    let raw = pool.add_field_ref(owner, "rawSampleBuffers", "[[I")?;
+    let samples = pool.add_field_ref(owner, "sampleBuffers", "[[S")?;
+    let decoding = pool.add_field_ref(owner, "decodingBuffer", "[I")?;
+    let frame_reader =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameReader")?;
+    let read = pool.add_method_ref(frame_reader, "readFlacFrame", "(Ljava/io/InputStream;Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;[[I[[S[I)I")?;
+    code(
+        pool,
+        7,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(input),
+            Instruction::Aload_0,
+            Instruction::Getfield(reader),
+            Instruction::Aload_0,
+            Instruction::Getfield(info),
+            Instruction::Getfield(stream),
+            Instruction::Aload_0,
+            Instruction::Getfield(raw),
+            Instruction::Aload_0,
+            Instruction::Getfield(samples),
+            Instruction::Aload_0,
+            Instruction::Getfield(decoding),
+            Instruction::Invokestatic(read),
+            Instruction::Ireturn,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn flac_track_provider_provide_frames(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_TRACK_PROVIDER_CLASS)?;
+    let read = pool.add_method_ref(owner, "readFlacFrame", "()I")?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/AudioPipeline;",
+    )?;
+    let samples = pool.add_field_ref(owner, "sampleBuffers", "[[S")?;
+    let pipeline = pool.add_class("com/sedmelluq/discord/lavaplayer/filter/AudioPipeline")?;
+    let process = pool.add_method_ref(pipeline, "process", "([[SII)V")?;
+    let io = pool.add_class("java/io/IOException")?;
+    let runtime = pool.add_class("java/lang/RuntimeException")?;
+    let runtime_init = pool.add_method_ref(runtime, "<init>", "(Ljava/lang/Throwable;)V")?;
+    let handler = 14;
+    let end = 14;
+    let handler_frame = 12;
+    let return_frame = 20;
+    let mut body = code_with_exceptions(
+        pool,
+        4,
+        2,
+        vec![
+            Instruction::Nop,
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(read),
+            Instruction::Dup,
+            Instruction::Istore(1),
+            Instruction::Ifeq(20),
+            Instruction::Aload_0,
+            Instruction::Getfield(downstream),
+            Instruction::Aload_0,
+            Instruction::Getfield(samples),
+            Instruction::Iconst_0,
+            Instruction::Iload(1),
+            Instruction::Invokevirtual(process),
+            Instruction::Goto(1),
+            Instruction::Astore(1),
+            Instruction::New(runtime),
+            Instruction::Dup,
+            Instruction::Aload(1),
+            Instruction::Invokespecial(runtime_init),
+            Instruction::Athrow,
+            Instruction::Return,
+        ],
+        vec![ExceptionTableEntry {
+            range_pc: 1..end,
+            handler_pc: handler,
+            catch_type: io,
+        }],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 1,
+                locals: vec![VerificationType::Object { cpool_index: owner }],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: handler_frame,
+                locals: vec![VerificationType::Object { cpool_index: owner }],
+                stack: vec![VerificationType::Object { cpool_index: io }],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: return_frame - handler - 1,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn flac_track_provider_seek(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_TRACK_PROVIDER_CLASS)?;
+    let find = pool.add_method_ref(
+        owner,
+        "findSeekPointForTime",
+        "(J)Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacSeekPoint;",
+    )?;
+    let seek_point = pool.add_class(FLAC_SEEK_POINT_CLASS)?;
+    let byte_offset = pool.add_field_ref(seek_point, "byteOffset", "J")?;
+    let sample_index = pool.add_field_ref(seek_point, "sampleIndex", "J")?;
+    let input = pool.add_field_ref(
+        owner,
+        "inputStream",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;",
+    )?;
+    let info = pool.add_field_ref(
+        owner,
+        "info",
+        "Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfo;",
+    )?;
+    let track_info = pool.add_class(FLAC_TRACK_INFO_CLASS)?;
+    let first = pool.add_field_ref(track_info, "firstFramePosition", "J")?;
+    let stream = pool.add_field_ref(
+        track_info,
+        "stream",
+        "Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;",
+    )?;
+    let stream_info = pool.add_class(FLAC_STREAM_INFO_CLASS)?;
+    let rate = pool.add_field_ref(stream_info, "sampleRate", "I")?;
+    let input_class =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream")?;
+    let seek = pool.add_method_ref(input_class, "seek", "(J)V")?;
+    let pipeline = pool.add_class("com/sedmelluq/discord/lavaplayer/filter/AudioPipeline")?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/AudioPipeline;",
+    )?;
+    let performed = pool.add_method_ref(pipeline, "seekPerformed", "(JJ)V")?;
+    let thousand = pool.add_long(1000)?;
+    let io = pool.add_class("java/io/IOException")?;
+    let runtime = pool.add_class("java/lang/RuntimeException")?;
+    let runtime_init = pool.add_method_ref(runtime, "<init>", "(Ljava/lang/Throwable;)V")?;
+    let handler = 28;
+    let return_target = 34;
+    let handler_frame = 28;
+    let return_frame = 34;
+    let mut body = code_with_exceptions(
+        pool,
+        7,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Lload_1,
+            Instruction::Invokevirtual(find),
+            Instruction::Astore(3),
+            Instruction::Aload_0,
+            Instruction::Getfield(input),
+            Instruction::Aload_0,
+            Instruction::Getfield(info),
+            Instruction::Getfield(first),
+            Instruction::Aload(3),
+            Instruction::Getfield(byte_offset),
+            Instruction::Ladd,
+            Instruction::Invokevirtual(seek),
+            Instruction::Aload_0,
+            Instruction::Getfield(downstream),
+            Instruction::Lload_1,
+            Instruction::Aload(3),
+            Instruction::Getfield(sample_index),
+            Instruction::Ldc2_w(thousand),
+            Instruction::Lmul,
+            Instruction::Aload_0,
+            Instruction::Getfield(info),
+            Instruction::Getfield(stream),
+            Instruction::Getfield(rate),
+            Instruction::I2l,
+            Instruction::Ldiv,
+            Instruction::Invokevirtual(performed),
+            Instruction::Goto(return_target),
+            Instruction::Astore(3),
+            Instruction::New(runtime),
+            Instruction::Dup,
+            Instruction::Aload(3),
+            Instruction::Invokespecial(runtime_init),
+            Instruction::Athrow,
+            Instruction::Return,
+        ],
+        vec![ExceptionTableEntry {
+            range_pc: 0..27,
+            handler_pc: handler,
+            catch_type: io,
+        }],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: handler_frame,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Long,
+                    VerificationType::Top,
+                ],
+                stack: vec![VerificationType::Object { cpool_index: io }],
+            },
+            StackFrame::SameFrame {
+                frame_type: u8::try_from(return_frame - handler_frame - 1)?,
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn flac_track_provider_find_seek_point(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_TRACK_PROVIDER_CLASS)?;
+    let info_class = pool.add_class(FLAC_TRACK_INFO_CLASS)?;
+    let info = pool.add_field_ref(
+        owner,
+        "info",
+        "Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfo;",
+    )?;
+    let count = pool.add_field_ref(info_class, "seekPointCount", "I")?;
+    let stream = pool.add_field_ref(
+        info_class,
+        "stream",
+        "Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;",
+    )?;
+    let stream_info = pool.add_class(FLAC_STREAM_INFO_CLASS)?;
+    let rate = pool.add_field_ref(stream_info, "sampleRate", "I")?;
+    let points = pool.add_field_ref(
+        info_class,
+        "seekPoints",
+        "[Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacSeekPoint;",
+    )?;
+    let binary = pool.add_method_ref(owner, "binarySearchSeekPoints", "([Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacSeekPoint;IJ)Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacSeekPoint;")?;
+    let point = pool.add_class(FLAC_SEEK_POINT_CLASS)?;
+    let init = pool.add_method_ref(point, "<init>", "(JJI)V")?;
+    let target = 11;
+    let thousand = pool.add_long(1000)?;
+    let mut body = code(
+        pool,
+        7,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(info),
+            Instruction::Getfield(count),
+            Instruction::Ifne(target),
+            Instruction::New(point),
+            Instruction::Dup,
+            Instruction::Lconst_0,
+            Instruction::Lconst_0,
+            Instruction::Iconst_0,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+            Instruction::Lload_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(info),
+            Instruction::Getfield(stream),
+            Instruction::Getfield(rate),
+            Instruction::I2l,
+            Instruction::Lmul,
+            Instruction::Ldc2_w(thousand),
+            Instruction::Ldiv,
+            Instruction::Lstore(3),
+            Instruction::Aload_0,
+            Instruction::Aload_0,
+            Instruction::Getfield(info),
+            Instruction::Getfield(points),
+            Instruction::Aload_0,
+            Instruction::Getfield(info),
+            Instruction::Getfield(count),
+            Instruction::Lload_3,
+            Instruction::Invokevirtual(binary),
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::FullFrame {
+            frame_type: 255,
+            offset_delta: 11,
+            locals: vec![
+                VerificationType::Object { cpool_index: owner },
+                VerificationType::Long,
+                VerificationType::Top,
+            ],
+            stack: vec![],
+        }],
+    )?;
+    Ok(body)
+}
+
+fn flac_track_provider_binary_search(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_TRACK_PROVIDER_CLASS)?;
+    let info = pool.add_field_ref(
+        owner,
+        "info",
+        "Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacTrackInfo;",
+    )?;
+    let track_info = pool.add_class(FLAC_TRACK_INFO_CLASS)?;
+    let points_field = pool.add_field_ref(
+        track_info,
+        "seekPoints",
+        "[Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacSeekPoint;",
+    )?;
+    let point = pool.add_class(FLAC_SEEK_POINT_CLASS)?;
+    let sample = pool.add_field_ref(point, "sampleIndex", "J")?;
+    let return_target = 34;
+    let continue_target = 6;
+    let mut body = code(
+        pool,
+        4,
+        8,
+        vec![
+            Instruction::Iconst_0,
+            Instruction::Istore(5),
+            Instruction::Iload(2),
+            Instruction::Iconst_1,
+            Instruction::Isub,
+            Instruction::Istore(6),
+            Instruction::Iload(6),
+            Instruction::Iload(5),
+            Instruction::If_icmple(return_target),
+            Instruction::Iload(5),
+            Instruction::Iload(6),
+            Instruction::Iadd,
+            Instruction::Iconst_1,
+            Instruction::Iadd,
+            Instruction::Iconst_2,
+            Instruction::Idiv,
+            Instruction::Istore(7),
+            Instruction::Aload_0,
+            Instruction::Getfield(info),
+            Instruction::Getfield(points_field),
+            Instruction::Iload(7),
+            Instruction::Aaload,
+            Instruction::Getfield(sample),
+            Instruction::Lload_3,
+            Instruction::Lcmp,
+            Instruction::Ifle(31),
+            Instruction::Iload(7),
+            Instruction::Iconst_1,
+            Instruction::Isub,
+            Instruction::Istore(6),
+            Instruction::Goto(33),
+            Instruction::Iload(7),
+            Instruction::Istore(5),
+            Instruction::Goto(continue_target),
+            Instruction::Aload_1,
+            Instruction::Iload(5),
+            Instruction::Aaload,
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 253,
+                offset_delta: 6,
+                locals: vec![VerificationType::Integer, VerificationType::Integer],
+            },
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: 24,
+                locals: vec![VerificationType::Integer],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: 1,
+            },
+            StackFrame::SameFrame { frame_type: 0 },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn flac_track_provider_close(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_TRACK_PROVIDER_CLASS)?;
+    let downstream = pool.add_field_ref(
+        owner,
+        "downstream",
+        "Lcom/sedmelluq/discord/lavaplayer/filter/AudioPipeline;",
+    )?;
+    let pipeline = pool.add_class("com/sedmelluq/discord/lavaplayer/filter/AudioPipeline")?;
+    let close = pool.add_method_ref(pipeline, "close", "()V")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(downstream),
+            Instruction::Invokevirtual(close),
+            Instruction::Return,
         ],
     )
 }

@@ -269,6 +269,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-flac-track-info-consumer \
   --output "$WORK/GateFlacTrackInfo.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-track-info-builder-consumer \
   --output "$WORK/GateFlacTrackInfoBuilder.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-flac-track-provider-consumer \
+  --output "$WORK/GateFlacTrackProvider.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -343,6 +345,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateFlacStreamInfo.java" \
   "$WORK/GateFlacTrackInfo.java" \
   "$WORK/GateFlacTrackInfoBuilder.java" \
+  "$WORK/GateFlacTrackProvider.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GateAdtsStreamReader.java" \
@@ -1435,6 +1438,17 @@ cmp "$WORK/flac-track-info-builder-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor-identity,hash-map-default,get-stream-info,default-seek-points,default-count,default-position,set-seek-points,set-count,seek-array-identity,add-tag,tag-replacement,null-tags,set-first-frame-position,build-order,build-freshness,build-shared-state,build-duration,post-build-mutation,null-stream,zero-rate,identity-semantics,subclassable,private-fields,private-generic-field,public-methods,method-descriptors,no-throws,member-counts,reflection' \
   "$WORK/flac-track-info-builder-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateFlacTrackProvider \
+  >"$WORK/flac-track-provider-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateFlacTrackProvider >"$WORK/flac-track-provider-candidate.txt"
+cmp "$WORK/flac-track-provider-reference.txt" \
+  "$WORK/flac-track-provider-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor-state,pcm-format,reader-state,buffer-shapes,seek-binary-search,seek-position,seek-time,seek-default,frame-io-wrap,close,private-fields,private-methods,throws,identity-semantics,subclassable,reflection' \
+  "$WORK/flac-track-provider-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"
