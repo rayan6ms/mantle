@@ -194,6 +194,8 @@ const FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta";
 const FLAC_FRAME_READER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameReader";
+const FLAC_SUB_FRAME_READER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/flac/frame/FlacSubFrameReader";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -547,6 +549,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     FLAC_FRAME_INFO_CLASS,
     FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS,
     FLAC_FRAME_READER_CLASS,
+    FLAC_SUB_FRAME_READER_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -1156,6 +1159,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | FLAC_FRAME_HEADER_READER_CLASS
             | FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS
             | FLAC_FRAME_READER_CLASS
+            | FLAC_SUB_FRAME_READER_CLASS
             | AUDIO_PIPELINE_FACTORY_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
@@ -1486,6 +1490,9 @@ fn replacement_body(
     }
     if class_name == FLAC_FRAME_READER_CLASS {
         return flac_frame_reader_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == FLAC_SUB_FRAME_READER_CLASS {
+        return flac_sub_frame_reader_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -7824,6 +7831,1085 @@ fn flac_frame_reader_shift_pcm(
                 offset_delta: u16::try_from(channel_continue - sample_target - 1)?,
             },
             same_stack_frame(u16::try_from(return_target - channel_continue - 1)?),
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn flac_sub_frame_reader_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        (
+            "readSubFrame",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;Lcom/sedmelluq/discord/lavaplayer/container/flac/FlacStreamInfo;Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo;[II[I)V",
+        ) => flac_sub_frame_reader_read(pool),
+        (
+            "readSubFrameSamples",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;II[II[I)V",
+        ) => flac_sub_frame_reader_samples(pool),
+        (
+            "readSubFrameConstantData",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;I[II)V",
+        ) => flac_sub_frame_reader_constant(pool),
+        (
+            "readSubFrameVerbatimData",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;I[II)V",
+        ) => flac_sub_frame_reader_verbatim(pool),
+        (
+            "readSubFrameFixedData",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;II[II)V",
+        ) => flac_sub_frame_reader_fixed(pool),
+        ("restoreFixedSignal", "([III)V") => flac_sub_frame_reader_restore_fixed(pool),
+        (
+            "readSubFrameLpcData",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;II[II[I)V",
+        ) => flac_sub_frame_reader_lpc(pool),
+        ("restoreLpcSignal", "([IIII[I)V") => flac_sub_frame_reader_restore_lpc(pool),
+        ("readResidual", "(Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;I[III)V") => {
+            flac_sub_frame_reader_residual(pool)
+        }
+        (
+            "readResidualBlock",
+            "(Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;[IIII)V",
+        ) => flac_sub_frame_reader_residual_block(pool),
+        ("<clinit>", "()V") => code(pool, 0, 0, vec![Instruction::Return]),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {FLAC_SUB_FRAME_READER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+fn flac_sub_frame_reader_read(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_SUB_FRAME_READER_CLASS)?;
+    let reader = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader")?;
+    let as_integer = pool.add_method_ref(reader, "asInteger", "(I)I")?;
+    let read_zeroes = pool.add_method_ref(reader, "readAllZeroes", "()I")?;
+    let stream = pool.add_class(FLAC_STREAM_INFO_CLASS)?;
+    let bits_per_sample = pool.add_field_ref(stream, "bitsPerSample", "I")?;
+    let frame = pool.add_class(FLAC_FRAME_INFO_CLASS)?;
+    let sample_count = pool.add_field_ref(frame, "sampleCount", "I")?;
+    let channel_delta = pool.add_field_ref(
+        frame,
+        "channelDelta",
+        "Lcom/sedmelluq/discord/lavaplayer/container/flac/frame/FlacFrameInfo$ChannelDelta;",
+    )?;
+    let delta = pool.add_class(FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS)?;
+    let delta_channel = pool.add_field_ref(delta, "deltaChannel", "I")?;
+    let samples = pool.add_method_ref(
+        owner,
+        "readSubFrameSamples",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;II[II[I)V",
+    )?;
+    let exception = pool.add_class("java/lang/IllegalStateException")?;
+    let exception_init = pool.add_method_ref(exception, "<init>", "(Ljava/lang/String;)V")?;
+    let message = pool.add_string("Subframe header must start with 0 bit.")?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Iconst_1,
+        Instruction::Invokevirtual(as_integer),
+        Instruction::Iconst_1,
+        Instruction::If_icmpne(0),
+        Instruction::New(exception),
+        Instruction::Dup,
+        Instruction::Ldc_w(message),
+        Instruction::Invokespecial(exception_init),
+        Instruction::Athrow,
+    ];
+    let valid_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_2,
+        Instruction::Getfield(channel_delta),
+        Instruction::Getfield(delta_channel),
+        Instruction::Iload(4),
+        Instruction::If_icmpne(0),
+        Instruction::Iconst_1,
+        Instruction::Istore(6),
+        Instruction::Goto(0),
+    ]);
+    let not_delta_target = instructions.len();
+    instructions.extend([Instruction::Iconst_0, Instruction::Istore(6)]);
+    let delta_done = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Bipush(6),
+        Instruction::Invokevirtual(as_integer),
+        Instruction::Istore(7),
+        Instruction::Aload_0,
+        Instruction::Iconst_1,
+        Instruction::Invokevirtual(as_integer),
+        Instruction::Iconst_1,
+        Instruction::If_icmpeq(0),
+        Instruction::Iconst_0,
+        Instruction::Istore(8),
+        Instruction::Goto(0),
+    ]);
+    let wasted_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Invokevirtual(read_zeroes),
+        Instruction::Iconst_1,
+        Instruction::Iadd,
+        Instruction::Istore(8),
+    ]);
+    let wasted_done = instructions.len();
+    instructions.extend([
+        Instruction::Aload_1,
+        Instruction::Getfield(bits_per_sample),
+        Instruction::Iload(8),
+        Instruction::Isub,
+        Instruction::Iload(6),
+        Instruction::Iadd,
+        Instruction::Istore(9),
+        Instruction::Aload_0,
+        Instruction::Iload(7),
+        Instruction::Iload(9),
+        Instruction::Aload_3,
+        Instruction::Aload_2,
+        Instruction::Getfield(sample_count),
+        Instruction::Aload(5),
+        Instruction::Invokestatic(samples),
+        Instruction::Iload(8),
+        Instruction::Iconst_0,
+        Instruction::If_icmple(0),
+        Instruction::Iconst_0,
+        Instruction::Istore(10),
+    ]);
+    let shift_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(10),
+        Instruction::Aload_2,
+        Instruction::Getfield(sample_count),
+        Instruction::If_icmpge(0),
+        Instruction::Aload_3,
+        Instruction::Iload(10),
+        Instruction::Dup2,
+        Instruction::Iaload,
+        Instruction::Iload(8),
+        Instruction::Ishl,
+        Instruction::Iastore,
+        Instruction::Iinc(10, 1),
+        Instruction::Goto(u16::try_from(shift_target)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[4] = Instruction::If_icmpne(u16::try_from(valid_target)?);
+    instructions[valid_target + 4] = Instruction::If_icmpne(u16::try_from(not_delta_target)?);
+    instructions[valid_target + 7] = Instruction::Goto(u16::try_from(delta_done)?);
+    instructions[delta_done + 8] = Instruction::If_icmpeq(u16::try_from(wasted_target)?);
+    instructions[delta_done + 11] = Instruction::Goto(u16::try_from(wasted_done)?);
+    instructions[wasted_done + 17] = Instruction::If_icmple(u16::try_from(return_target)?);
+    instructions[shift_target + 3] = Instruction::If_icmpge(u16::try_from(return_target)?);
+    let mut body = code(pool, 7, 11, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            same_stack_frame(u16::try_from(valid_target)?),
+            same_stack_frame(u16::try_from(not_delta_target - valid_target - 1)?),
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(delta_done - not_delta_target - 1)?,
+                locals: vec![VerificationType::Integer],
+            },
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(wasted_target - delta_done - 1)?,
+                locals: vec![VerificationType::Integer],
+            },
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(wasted_done - wasted_target - 1)?,
+                locals: vec![VerificationType::Integer],
+            },
+            StackFrame::AppendFrame {
+                frame_type: 253,
+                offset_delta: u16::try_from(shift_target - wasted_done - 1)?,
+                locals: vec![VerificationType::Integer, VerificationType::Integer],
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: u16::try_from(return_target - shift_target - 1)?,
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn flac_sub_frame_reader_samples(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_SUB_FRAME_READER_CLASS)?;
+    let constant = pool.add_method_ref(
+        owner,
+        "readSubFrameConstantData",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;I[II)V",
+    )?;
+    let verbatim = pool.add_method_ref(
+        owner,
+        "readSubFrameVerbatimData",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;I[II)V",
+    )?;
+    let fixed = pool.add_method_ref(
+        owner,
+        "readSubFrameFixedData",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;II[II)V",
+    )?;
+    let lpc = pool.add_method_ref(
+        owner,
+        "readSubFrameLpcData",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;II[II[I)V",
+    )?;
+    let exception = pool.add_class("java/lang/RuntimeException")?;
+    let exception_init = pool.add_method_ref(exception, "<init>", "(Ljava/lang/String;)V")?;
+    let message = pool.add_string("Invalid subframe type.")?;
+    let mut instructions = vec![
+        Instruction::Iload_1,
+        Instruction::Iconst_0,
+        Instruction::If_icmpne(0),
+        Instruction::Aload_0,
+        Instruction::Iload_2,
+        Instruction::Aload_3,
+        Instruction::Iload(4),
+        Instruction::Invokestatic(constant),
+        Instruction::Return,
+    ];
+    let verbatim_check = instructions.len();
+    instructions.extend([
+        Instruction::Iload_1,
+        Instruction::Iconst_1,
+        Instruction::If_icmpne(0),
+        Instruction::Aload_0,
+        Instruction::Iload_2,
+        Instruction::Aload_3,
+        Instruction::Iload(4),
+        Instruction::Invokestatic(verbatim),
+        Instruction::Return,
+    ]);
+    let fixed_low_check = instructions.len();
+    instructions.extend([
+        Instruction::Iload_1,
+        Instruction::Bipush(8),
+        Instruction::If_icmplt(0),
+        Instruction::Iload_1,
+        Instruction::Bipush(15),
+        Instruction::If_icmpgt(0),
+        Instruction::Aload_0,
+        Instruction::Iload_1,
+        Instruction::Bipush(7),
+        Instruction::Iand,
+        Instruction::Iload_2,
+        Instruction::Aload_3,
+        Instruction::Iload(4),
+        Instruction::Invokestatic(fixed),
+        Instruction::Return,
+    ]);
+    let lpc_check = instructions.len();
+    instructions.extend([
+        Instruction::Iload_1,
+        Instruction::Bipush(32),
+        Instruction::If_icmplt(0),
+        Instruction::Aload_0,
+        Instruction::Iload_1,
+        Instruction::Bipush(31),
+        Instruction::Iand,
+        Instruction::Iconst_1,
+        Instruction::Iadd,
+        Instruction::Iload_2,
+        Instruction::Aload_3,
+        Instruction::Iload(4),
+        Instruction::Aload(5),
+        Instruction::Invokestatic(lpc),
+        Instruction::Return,
+    ]);
+    let invalid_target = instructions.len();
+    instructions.extend([
+        Instruction::New(exception),
+        Instruction::Dup,
+        Instruction::Ldc_w(message),
+        Instruction::Invokespecial(exception_init),
+        Instruction::Athrow,
+    ]);
+    instructions[2] = Instruction::If_icmpne(u16::try_from(verbatim_check)?);
+    instructions[verbatim_check + 2] = Instruction::If_icmpne(u16::try_from(fixed_low_check)?);
+    instructions[fixed_low_check + 2] = Instruction::If_icmplt(u16::try_from(invalid_target)?);
+    instructions[fixed_low_check + 5] = Instruction::If_icmpgt(u16::try_from(lpc_check)?);
+    instructions[lpc_check + 2] = Instruction::If_icmplt(u16::try_from(invalid_target)?);
+    let mut body = code(pool, 6, 6, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            same_stack_frame(u16::try_from(verbatim_check)?),
+            same_stack_frame(u16::try_from(fixed_low_check - verbatim_check - 1)?),
+            same_stack_frame(u16::try_from(lpc_check - fixed_low_check - 1)?),
+            same_stack_frame(u16::try_from(invalid_target - lpc_check - 1)?),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn flac_sub_frame_reader_constant(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let reader = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader")?;
+    let signed = pool.add_method_ref(reader, "asSignedInteger", "(I)I")?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Iload_1,
+        Instruction::Invokevirtual(signed),
+        Instruction::Istore(4),
+        Instruction::Iconst_0,
+        Instruction::Istore(5),
+    ];
+    let loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(5),
+        Instruction::Iload_3,
+        Instruction::If_icmpge(0),
+        Instruction::Aload_2,
+        Instruction::Iload(5),
+        Instruction::Iload(4),
+        Instruction::Iastore,
+        Instruction::Iinc(5, 1),
+        Instruction::Goto(u16::try_from(loop_target)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[loop_target + 2] = Instruction::If_icmpge(u16::try_from(return_target)?);
+    let mut body = code(pool, 3, 6, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 253,
+                offset_delta: u16::try_from(loop_target)?,
+                locals: vec![VerificationType::Integer, VerificationType::Integer],
+            },
+            same_stack_frame(u16::try_from(return_target - loop_target - 1)?),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn flac_sub_frame_reader_verbatim(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let reader = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader")?;
+    let signed = pool.add_method_ref(reader, "asSignedInteger", "(I)I")?;
+    let mut instructions = vec![Instruction::Iconst_0, Instruction::Istore(4)];
+    let loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(4),
+        Instruction::Iload_3,
+        Instruction::If_icmpge(0),
+        Instruction::Aload_2,
+        Instruction::Iload(4),
+        Instruction::Aload_0,
+        Instruction::Iload_1,
+        Instruction::Invokevirtual(signed),
+        Instruction::Iastore,
+        Instruction::Iinc(4, 1),
+        Instruction::Goto(u16::try_from(loop_target)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[loop_target + 2] = Instruction::If_icmpge(u16::try_from(return_target)?);
+    let mut body = code(pool, 4, 5, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(loop_target)?,
+                locals: vec![VerificationType::Integer],
+            },
+            same_stack_frame(u16::try_from(return_target - loop_target - 1)?),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn flac_sub_frame_reader_fixed(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_SUB_FRAME_READER_CLASS)?;
+    let reader = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader")?;
+    let signed = pool.add_method_ref(reader, "asSignedInteger", "(I)I")?;
+    let residual = pool.add_method_ref(
+        owner,
+        "readResidual",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;I[III)V",
+    )?;
+    let restore = pool.add_method_ref(owner, "restoreFixedSignal", "([III)V")?;
+    let mut instructions = vec![Instruction::Iconst_0, Instruction::Istore(5)];
+    let warm_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(5),
+        Instruction::Iload_1,
+        Instruction::If_icmpge(0),
+        Instruction::Aload_3,
+        Instruction::Iload(5),
+        Instruction::Aload_0,
+        Instruction::Iload_2,
+        Instruction::Invokevirtual(signed),
+        Instruction::Iastore,
+        Instruction::Iinc(5, 1),
+        Instruction::Goto(u16::try_from(warm_target)?),
+    ]);
+    let residual_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Iload_1,
+        Instruction::Aload_3,
+        Instruction::Iload_1,
+        Instruction::Iload(4),
+        Instruction::Invokestatic(residual),
+        Instruction::Aload_3,
+        Instruction::Iload(4),
+        Instruction::Iload_1,
+        Instruction::Invokestatic(restore),
+        Instruction::Return,
+    ]);
+    instructions[warm_target + 2] = Instruction::If_icmpge(u16::try_from(residual_target)?);
+    let mut body = code(pool, 5, 6, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(warm_target)?,
+                locals: vec![VerificationType::Integer],
+            },
+            same_stack_frame(u16::try_from(residual_target - warm_target - 1)?),
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn flac_sub_frame_reader_restore_fixed(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let mut instructions = Vec::new();
+    let mut check_branches = Vec::new();
+    let mut loop_exits = Vec::new();
+    let mut frame_points = Vec::new();
+    for order in 1..=4 {
+        let check_target = instructions.len();
+        if order > 1 {
+            frame_points.push((check_target, false));
+        }
+        instructions.extend([
+            Instruction::Iload_2,
+            small_integer_instruction(order)?,
+            Instruction::If_icmpne(0),
+            small_integer_instruction(order)?,
+            Instruction::Istore_3,
+        ]);
+        check_branches.push(instructions.len() - 3);
+        let loop_target = instructions.len();
+        frame_points.push((loop_target, true));
+        instructions.extend([
+            Instruction::Iload_3,
+            Instruction::Iload_1,
+            Instruction::If_icmpge(0),
+            Instruction::Aload_0,
+            Instruction::Iload_3,
+            Instruction::Dup2,
+            Instruction::Iaload,
+        ]);
+        loop_exits.push(instructions.len() - 5);
+        match order {
+            1 => instructions.extend([
+                Instruction::Aload_0,
+                Instruction::Iload_3,
+                Instruction::Iconst_1,
+                Instruction::Isub,
+                Instruction::Iaload,
+            ]),
+            2 => instructions.extend([
+                Instruction::Aload_0,
+                Instruction::Iload_3,
+                Instruction::Iconst_1,
+                Instruction::Isub,
+                Instruction::Iaload,
+                Instruction::Iconst_1,
+                Instruction::Ishl,
+                Instruction::Aload_0,
+                Instruction::Iload_3,
+                Instruction::Iconst_2,
+                Instruction::Isub,
+                Instruction::Iaload,
+                Instruction::Isub,
+            ]),
+            3 => instructions.extend([
+                Instruction::Aload_0,
+                Instruction::Iload_3,
+                Instruction::Iconst_1,
+                Instruction::Isub,
+                Instruction::Iaload,
+                Instruction::Aload_0,
+                Instruction::Iload_3,
+                Instruction::Iconst_2,
+                Instruction::Isub,
+                Instruction::Iaload,
+                Instruction::Isub,
+                Instruction::Dup,
+                Instruction::Iconst_1,
+                Instruction::Ishl,
+                Instruction::Iadd,
+                Instruction::Aload_0,
+                Instruction::Iload_3,
+                Instruction::Iconst_3,
+                Instruction::Isub,
+                Instruction::Iaload,
+                Instruction::Iadd,
+            ]),
+            4 => instructions.extend([
+                Instruction::Aload_0,
+                Instruction::Iload_3,
+                Instruction::Iconst_1,
+                Instruction::Isub,
+                Instruction::Iaload,
+                Instruction::Aload_0,
+                Instruction::Iload_3,
+                Instruction::Iconst_3,
+                Instruction::Isub,
+                Instruction::Iaload,
+                Instruction::Iadd,
+                Instruction::Iconst_2,
+                Instruction::Ishl,
+                Instruction::Aload_0,
+                Instruction::Iload_3,
+                Instruction::Iconst_2,
+                Instruction::Isub,
+                Instruction::Iaload,
+                Instruction::Iconst_2,
+                Instruction::Ishl,
+                Instruction::Aload_0,
+                Instruction::Iload_3,
+                Instruction::Iconst_2,
+                Instruction::Isub,
+                Instruction::Iaload,
+                Instruction::Iconst_1,
+                Instruction::Ishl,
+                Instruction::Iadd,
+                Instruction::Isub,
+                Instruction::Aload_0,
+                Instruction::Iload_3,
+                Instruction::Iconst_4,
+                Instruction::Isub,
+                Instruction::Iaload,
+                Instruction::Isub,
+            ]),
+            _ => unreachable!(),
+        }
+        instructions.extend([
+            Instruction::Iadd,
+            Instruction::Iastore,
+            Instruction::Iinc(3, 1),
+            Instruction::Goto(u16::try_from(loop_target)?),
+        ]);
+        let next_target = instructions.len();
+        instructions[check_branches[order - 1]] =
+            Instruction::If_icmpne(u16::try_from(next_target)?);
+    }
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    for branch in loop_exits {
+        instructions[branch] = Instruction::If_icmpge(u16::try_from(return_target)?);
+    }
+    let mut frames = Vec::new();
+    let mut previous = None;
+    for (target, append) in frame_points {
+        let offset_delta = previous.map_or(target, |value| target - value - 1);
+        frames.push(if append {
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(offset_delta)?,
+                locals: vec![VerificationType::Integer],
+            }
+        } else {
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: u16::try_from(offset_delta)?,
+            }
+        });
+        previous = Some(target);
+    }
+    let offset_delta = return_target - previous.ok_or("missing fixed restore frame")? - 1;
+    frames.push(StackFrame::ChopFrame {
+        frame_type: 250,
+        offset_delta: u16::try_from(offset_delta)?,
+    });
+    let mut body = code(pool, 8, 4, instructions)?;
+    add_stack_map_table(pool, &mut body, frames)?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn flac_sub_frame_reader_lpc(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_SUB_FRAME_READER_CLASS)?;
+    let reader = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader")?;
+    let signed = pool.add_method_ref(reader, "asSignedInteger", "(I)I")?;
+    let integer = pool.add_method_ref(reader, "asInteger", "(I)I")?;
+    let residual = pool.add_method_ref(
+        owner,
+        "readResidual",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;I[III)V",
+    )?;
+    let restore = pool.add_method_ref(owner, "restoreLpcSignal", "([IIII[I)V")?;
+    let mut instructions = vec![Instruction::Iconst_0, Instruction::Istore(6)];
+    let warm_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(6),
+        Instruction::Iload_1,
+        Instruction::If_icmpge(0),
+        Instruction::Aload_3,
+        Instruction::Iload(6),
+        Instruction::Aload_0,
+        Instruction::Iload_2,
+        Instruction::Invokevirtual(signed),
+        Instruction::Iastore,
+        Instruction::Iinc(6, 1),
+        Instruction::Goto(u16::try_from(warm_target)?),
+    ]);
+    let precision_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Iconst_4,
+        Instruction::Invokevirtual(integer),
+        Instruction::Iconst_1,
+        Instruction::Iadd,
+        Instruction::Istore(7),
+        Instruction::Aload_0,
+        Instruction::Iconst_5,
+        Instruction::Invokevirtual(integer),
+        Instruction::Istore(8),
+        Instruction::Iconst_0,
+        Instruction::Istore(6),
+    ]);
+    let coefficient_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(6),
+        Instruction::Iload_1,
+        Instruction::If_icmpge(0),
+        Instruction::Aload(5),
+        Instruction::Iload(6),
+        Instruction::Aload_0,
+        Instruction::Iload(7),
+        Instruction::Invokevirtual(signed),
+        Instruction::Iastore,
+        Instruction::Iinc(6, 1),
+        Instruction::Goto(u16::try_from(coefficient_target)?),
+    ]);
+    let residual_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Iload_1,
+        Instruction::Aload_3,
+        Instruction::Iload_1,
+        Instruction::Iload(4),
+        Instruction::Invokestatic(residual),
+        Instruction::Aload_3,
+        Instruction::Iload(4),
+        Instruction::Iload_1,
+        Instruction::Iload(8),
+        Instruction::Aload(5),
+        Instruction::Invokestatic(restore),
+        Instruction::Return,
+    ]);
+    instructions[warm_target + 2] = Instruction::If_icmpge(u16::try_from(precision_target)?);
+    instructions[coefficient_target + 2] = Instruction::If_icmpge(u16::try_from(residual_target)?);
+    let mut body = code(pool, 5, 9, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(warm_target)?,
+                locals: vec![VerificationType::Integer],
+            },
+            same_stack_frame(u16::try_from(precision_target - warm_target - 1)?),
+            StackFrame::AppendFrame {
+                frame_type: 253,
+                offset_delta: u16::try_from(coefficient_target - precision_target - 1)?,
+                locals: vec![VerificationType::Integer, VerificationType::Integer],
+            },
+            same_stack_frame(u16::try_from(residual_target - coefficient_target - 1)?),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn flac_sub_frame_reader_restore_lpc(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let mut instructions = vec![Instruction::Iload_2, Instruction::Istore(5)];
+    let outer_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(5),
+        Instruction::Iload_1,
+        Instruction::If_icmpge(0),
+        Instruction::Lconst_0,
+        Instruction::Lstore(6),
+        Instruction::Iconst_0,
+        Instruction::Istore(8),
+    ]);
+    let inner_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(8),
+        Instruction::Iload_2,
+        Instruction::If_icmpge(0),
+        Instruction::Lload(6),
+        Instruction::Aload(4),
+        Instruction::Iload(8),
+        Instruction::Iaload,
+        Instruction::I2l,
+        Instruction::Aload_0,
+        Instruction::Iload(5),
+        Instruction::Iload(8),
+        Instruction::Isub,
+        Instruction::Iconst_1,
+        Instruction::Isub,
+        Instruction::Iaload,
+        Instruction::I2l,
+        Instruction::Lmul,
+        Instruction::Ladd,
+        Instruction::Lstore(6),
+        Instruction::Iinc(8, 1),
+        Instruction::Goto(u16::try_from(inner_target)?),
+    ]);
+    let restore_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Iload(5),
+        Instruction::Dup2,
+        Instruction::Iaload,
+        Instruction::Lload(6),
+        Instruction::Iload_3,
+        Instruction::Lshr,
+        Instruction::L2i,
+        Instruction::Iadd,
+        Instruction::Iastore,
+    ]);
+    let continue_target = instructions.len();
+    instructions.extend([
+        Instruction::Iinc(5, 1),
+        Instruction::Goto(u16::try_from(outer_target)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[outer_target + 2] = Instruction::If_icmpge(u16::try_from(return_target)?);
+    instructions[inner_target + 2] = Instruction::If_icmpge(u16::try_from(restore_target)?);
+    let mut body = code(pool, 7, 9, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(outer_target)?,
+                locals: vec![VerificationType::Integer],
+            },
+            StackFrame::AppendFrame {
+                frame_type: 253,
+                offset_delta: u16::try_from(inner_target - outer_target - 1)?,
+                locals: vec![VerificationType::Long, VerificationType::Integer],
+            },
+            same_stack_frame(u16::try_from(restore_target - inner_target - 1)?),
+            StackFrame::ChopFrame {
+                frame_type: 249,
+                offset_delta: u16::try_from(continue_target - restore_target - 1)?,
+            },
+            StackFrame::ChopFrame {
+                frame_type: 250,
+                offset_delta: u16::try_from(return_target - continue_target - 1)?,
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn flac_sub_frame_reader_residual(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(FLAC_SUB_FRAME_READER_CLASS)?;
+    let reader = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader")?;
+    let buffer = pool.add_class("[I")?;
+    let integer = pool.add_method_ref(reader, "asInteger", "(I)I")?;
+    let signed = pool.add_method_ref(reader, "asSignedInteger", "(I)I")?;
+    let block = pool.add_method_ref(
+        owner,
+        "readResidualBlock",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader;[IIII)V",
+    )?;
+    let exception = pool.add_class("java/lang/RuntimeException")?;
+    let exception_init = pool.add_method_ref(exception, "<init>", "(Ljava/lang/String;)V")?;
+    let builder = pool.add_class("java/lang/StringBuilder")?;
+    let builder_init = pool.add_method_ref(builder, "<init>", "()V")?;
+    let append_string = pool.add_method_ref(
+        builder,
+        "append",
+        "(Ljava/lang/String;)Ljava/lang/StringBuilder;",
+    )?;
+    let append_int = pool.add_method_ref(builder, "append", "(I)Ljava/lang/StringBuilder;")?;
+    let to_string = pool.add_method_ref(builder, "toString", "()Ljava/lang/String;")?;
+    let message = pool.add_string("Invalid residual coding method ")?;
+    let mut instructions = vec![
+        Instruction::Aload_0,
+        Instruction::Iconst_2,
+        Instruction::Invokevirtual(integer),
+        Instruction::Istore(5),
+        Instruction::Iload(5),
+        Instruction::Iconst_1,
+        Instruction::If_icmple(0),
+        Instruction::New(exception),
+        Instruction::Dup,
+        Instruction::New(builder),
+        Instruction::Dup,
+        Instruction::Invokespecial(builder_init),
+        Instruction::Ldc_w(message),
+        Instruction::Invokevirtual(append_string),
+        Instruction::Iload(5),
+        Instruction::Invokevirtual(append_int),
+        Instruction::Invokevirtual(to_string),
+        Instruction::Invokespecial(exception_init),
+        Instruction::Athrow,
+    ];
+    let valid_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Iconst_4,
+        Instruction::Invokevirtual(integer),
+        Instruction::Istore(6),
+        Instruction::Iconst_1,
+        Instruction::Iload(6),
+        Instruction::Ishl,
+        Instruction::Istore(7),
+        Instruction::Iload(6),
+        Instruction::Iconst_0,
+        Instruction::If_icmple(0),
+        Instruction::Iload(4),
+        Instruction::Iload(6),
+        Instruction::Ishr,
+        Instruction::Istore(8),
+        Instruction::Goto(0),
+    ]);
+    let sample_zero_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(4),
+        Instruction::Iload_1,
+        Instruction::Isub,
+        Instruction::Istore(8),
+    ]);
+    let sample_done = instructions.len();
+    instructions.extend([
+        Instruction::Iload(5),
+        Instruction::Iconst_0,
+        Instruction::If_icmpne(0),
+        Instruction::Iconst_4,
+        Instruction::Istore(9),
+        Instruction::Goto(0),
+    ]);
+    let length_five_target = instructions.len();
+    instructions.extend([Instruction::Iconst_5, Instruction::Istore(9)]);
+    let length_done = instructions.len();
+    instructions.extend([
+        Instruction::Iconst_1,
+        Instruction::Iload(9),
+        Instruction::Ishl,
+        Instruction::Iconst_1,
+        Instruction::Isub,
+        Instruction::Istore(10),
+        Instruction::Iload_3,
+        Instruction::Istore(11),
+        Instruction::Iconst_0,
+        Instruction::Istore(12),
+    ]);
+    let partition_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(12),
+        Instruction::Iload(7),
+        Instruction::If_icmpge(0),
+        Instruction::Aload_0,
+        Instruction::Iload(9),
+        Instruction::Invokevirtual(integer),
+        Instruction::Istore(13),
+        Instruction::Iload(6),
+        Instruction::Ifeq(0),
+        Instruction::Iload(12),
+        Instruction::Ifne(0),
+        Instruction::Iload_1,
+        Instruction::Istore(14),
+        Instruction::Goto(0),
+    ]);
+    let value_zero_target = instructions.len();
+    instructions.extend([Instruction::Iconst_0, Instruction::Istore(14)]);
+    let value_done = instructions.len();
+    instructions.extend([
+        Instruction::Iload(13),
+        Instruction::Iload(10),
+        Instruction::If_icmpge(0),
+        Instruction::Iload(8),
+        Instruction::Iload(14),
+        Instruction::Isub,
+        Instruction::Istore(14),
+        Instruction::Aload_0,
+        Instruction::Aload_2,
+        Instruction::Iload(11),
+        Instruction::Iload(11),
+        Instruction::Iload(14),
+        Instruction::Iadd,
+        Instruction::Iload(13),
+        Instruction::Invokestatic(block),
+        Instruction::Iload(11),
+        Instruction::Iload(14),
+        Instruction::Iadd,
+        Instruction::Istore(11),
+        Instruction::Goto(0),
+    ]);
+    let escape_target = instructions.len();
+    instructions.extend([
+        Instruction::Aload_0,
+        Instruction::Iconst_5,
+        Instruction::Invokevirtual(integer),
+        Instruction::Istore(13),
+        Instruction::Iload(14),
+        Instruction::Istore(15),
+    ]);
+    let escape_loop = instructions.len();
+    instructions.extend([
+        Instruction::Iload(15),
+        Instruction::Iload(8),
+        Instruction::If_icmpge(0),
+        Instruction::Aload_2,
+        Instruction::Iload(11),
+        Instruction::Iinc(11, 1),
+        Instruction::Aload_0,
+        Instruction::Iload(13),
+        Instruction::Invokevirtual(signed),
+        Instruction::Iastore,
+        Instruction::Iinc(15, 1),
+        Instruction::Goto(u16::try_from(escape_loop)?),
+    ]);
+    let partition_continue = instructions.len();
+    instructions.extend([
+        Instruction::Iinc(12, 1),
+        Instruction::Goto(u16::try_from(partition_target)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+
+    instructions[6] = Instruction::If_icmple(u16::try_from(valid_target)?);
+    instructions[valid_target + 10] = Instruction::If_icmple(u16::try_from(sample_zero_target)?);
+    instructions[valid_target + 15] = Instruction::Goto(u16::try_from(sample_done)?);
+    instructions[sample_done + 2] = Instruction::If_icmpne(u16::try_from(length_five_target)?);
+    instructions[sample_done + 5] = Instruction::Goto(u16::try_from(length_done)?);
+    instructions[partition_target + 2] = Instruction::If_icmpge(u16::try_from(return_target)?);
+    instructions[partition_target + 8] = Instruction::Ifeq(u16::try_from(value_zero_target)?);
+    instructions[partition_target + 10] = Instruction::Ifne(u16::try_from(value_zero_target)?);
+    instructions[partition_target + 13] = Instruction::Goto(u16::try_from(value_done)?);
+    instructions[value_done + 2] = Instruction::If_icmpge(u16::try_from(escape_target)?);
+    instructions[value_done + 19] = Instruction::Goto(u16::try_from(partition_continue)?);
+    instructions[escape_loop + 2] = Instruction::If_icmpge(u16::try_from(partition_continue)?);
+
+    let base = vec![
+        VerificationType::Object {
+            cpool_index: reader,
+        },
+        VerificationType::Integer,
+        VerificationType::Object {
+            cpool_index: buffer,
+        },
+        VerificationType::Integer,
+        VerificationType::Integer,
+    ];
+    let locals = |count: usize| {
+        let mut values = base.clone();
+        values.extend(std::iter::repeat_n(VerificationType::Integer, count));
+        values
+    };
+    let targets = [
+        (valid_target, 1),
+        (sample_zero_target, 3),
+        (sample_done, 4),
+        (length_five_target, 4),
+        (length_done, 5),
+        (partition_target, 8),
+        (value_zero_target, 9),
+        (value_done, 10),
+        (escape_target, 10),
+        (escape_loop, 11),
+        (partition_continue, 10),
+        (return_target, 8),
+    ];
+    let mut frames = Vec::new();
+    let mut previous = None;
+    for (target, count) in targets {
+        frames.push(StackFrame::FullFrame {
+            frame_type: 255,
+            offset_delta: u16::try_from(previous.map_or(target, |value| target - value - 1))?,
+            locals: locals(count),
+            stack: vec![],
+        });
+        previous = Some(target);
+    }
+    let mut body = code(pool, 8, 16, instructions)?;
+    add_stack_map_table(pool, &mut body, frames)?;
+    Ok(body)
+}
+
+fn flac_sub_frame_reader_residual_block(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let reader = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader")?;
+    let zeroes = pool.add_method_ref(reader, "readAllZeroes", "()I")?;
+    let integer = pool.add_method_ref(reader, "asInteger", "(I)I")?;
+    let mut instructions = vec![Instruction::Iload_2, Instruction::Istore(5)];
+    let loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(5),
+        Instruction::Iload_3,
+        Instruction::If_icmpge(0),
+        Instruction::Aload_0,
+        Instruction::Invokevirtual(zeroes),
+        Instruction::Iload(4),
+        Instruction::Ishl,
+        Instruction::Aload_0,
+        Instruction::Iload(4),
+        Instruction::Invokevirtual(integer),
+        Instruction::Ior,
+        Instruction::Istore(6),
+        Instruction::Aload_1,
+        Instruction::Iload(5),
+        Instruction::Iload(6),
+        Instruction::Iconst_1,
+        Instruction::Ishr,
+        Instruction::Iload(6),
+        Instruction::Iconst_1,
+        Instruction::Iand,
+        Instruction::Ineg,
+        Instruction::Ixor,
+        Instruction::Iastore,
+        Instruction::Iinc(5, 1),
+        Instruction::Goto(u16::try_from(loop_target)?),
+    ]);
+    let return_target = instructions.len();
+    instructions.push(Instruction::Return);
+    instructions[loop_target + 2] = Instruction::If_icmpge(u16::try_from(return_target)?);
+    let mut body = code(pool, 5, 7, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::AppendFrame {
+                frame_type: 252,
+                offset_delta: u16::try_from(loop_target)?,
+                locals: vec![VerificationType::Integer],
+            },
+            same_stack_frame(u16::try_from(return_target - loop_target - 1)?),
         ],
     )?;
     Ok(body)

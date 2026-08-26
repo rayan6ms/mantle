@@ -182,6 +182,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-flac-frame-header-reader-consumer" => Some(FLAC_FRAME_HEADER_READER_CONSUMER),
         "write-flac-frame-info-consumer" => Some(FLAC_FRAME_INFO_CONSUMER),
         "write-flac-frame-reader-consumer" => Some(FLAC_FRAME_READER_CONSUMER),
+        "write-flac-sub-frame-reader-consumer" => Some(FLAC_SUB_FRAME_READER_CONSUMER),
         _ => None,
     }
 }
@@ -16885,6 +16886,303 @@ public final class GateFlacFrameReader {
   }
 
   private static final class Derived extends FlacFrameReader {}
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const FLAC_SUB_FRAME_READER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacStreamInfo;
+import com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameInfo;
+import com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameInfo.ChannelDelta;
+import com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacSubFrameReader;
+import com.sedmelluq.discord.lavaplayer.tools.io.BitStreamReader;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateFlacSubFrameReader {
+  public static void main(String[] args) throws Exception {
+    constantVerbatimAndWidths();
+    fixedPredictionAndRice();
+    lpcPrediction();
+    failures();
+    reflection();
+    System.out.println("contracts=constructor,constant,verbatim,signed-samples,wasted-bits,delta-width,fixed-orders,rice-signed,rice-partitions,rice2-escape,lpc-orders,lpc-coefficients,lpc-shift,temporary-buffer,invalid-header,invalid-descriptor,invalid-residual,io-propagation,private-methods,throws,identity-semantics,subclassable,reflection");
+  }
+
+  private static void constantVerbatimAndWidths() throws Exception {
+    Bits constant = header(0, 0);
+    constant.put(-17, 8);
+    check(Arrays.equals(decode(constant.bytes(), 8, 4, ChannelDelta.NONE, 0, new int[32]),
+        new int[] {-17, -17, -17, -17}), "constant samples retain signed values");
+
+    Bits verbatim = header(1, 0);
+    for (int value : new int[] {-128, -1, 0, 127}) verbatim.put(value, 8);
+    check(Arrays.equals(decode(verbatim.bytes(), 8, 4, ChannelDelta.NONE, 0, new int[32]),
+        new int[] {-128, -1, 0, 127}), "verbatim reads every signed sample");
+
+    Bits wasted = header(0, 3);
+    wasted.put(-3, 5);
+    check(Arrays.equals(decode(wasted.bytes(), 8, 3, ChannelDelta.NONE, 0, new int[32]),
+        new int[] {-24, -24, -24}), "wasted bits reduce read width and restore by shifting");
+
+    Bits delta = header(0, 0);
+    delta.put(200, 9);
+    check(Arrays.equals(decode(delta.bytes(), 8, 2, ChannelDelta.LEFT_SIDE, 1, new int[32]),
+        new int[] {200, 200}), "delta channel increases sample width by one bit");
+  }
+
+  private static void fixedPredictionAndRice() throws Exception {
+    int[][] warmups = {{}, {7}, {2, 5}, {1, 2, 4}, {1, 2, 4, 8}};
+    int[][] expected = {
+        {0, 0, 0, 0, 0, 0},
+        {7, 7, 7, 7, 7, 7},
+        {2, 5, 8, 11, 14, 17},
+        {1, 2, 4, 7, 11, 16},
+        {1, 2, 4, 8, 15, 26}
+    };
+    for (int order = 0; order <= 4; order++) {
+      Bits bits = header(8 + order, 0);
+      for (int value : warmups[order]) bits.put(value, 8);
+      bits.put(0, 2);
+      bits.put(0, 4);
+      bits.put(0, 4);
+      for (int index = order; index < 6; index++) bits.put(1, 1);
+      check(Arrays.equals(decode(bits.bytes(), 8, 6, ChannelDelta.NONE, 0, new int[32]),
+          expected[order]), "fixed predictor order " + order);
+    }
+
+    int[] residuals = {-3, -1, 0, 1, 4, -5};
+    Bits rice = header(8, 0);
+    rice.put(0, 2);
+    rice.put(0, 4);
+    rice.put(2, 4);
+    for (int value : residuals) rice(rice, value, 2);
+    check(Arrays.equals(decode(rice.bytes(), 12, residuals.length,
+        ChannelDelta.NONE, 0, new int[32]), residuals),
+        "Rice residuals restore positive, negative, and zero values");
+
+    Bits partitioned = header(9, 0);
+    partitioned.put(10, 8);
+    partitioned.put(0, 2);
+    partitioned.put(1, 4);
+    partitioned.put(0, 4);
+    partitioned.put(1, 1);
+    partitioned.put(1, 1);
+    partitioned.put(0, 4);
+    partitioned.put(1, 1);
+    partitioned.put(1, 1);
+    partitioned.put(1, 1);
+    check(Arrays.equals(decode(partitioned.bytes(), 8, 6,
+        ChannelDelta.NONE, 0, new int[32]), new int[] {10, 10, 10, 10, 10, 10}),
+        "partitioned residuals subtract warm-up samples only from the first partition");
+
+    int[] escaped = {-16, -2, 3, 15};
+    Bits escape = header(8, 0);
+    escape.put(1, 2);
+    escape.put(0, 4);
+    escape.put(31, 5);
+    escape.put(5, 5);
+    for (int value : escaped) escape.put(value, 5);
+    check(Arrays.equals(decode(escape.bytes(), 8, escaped.length,
+        ChannelDelta.NONE, 0, new int[32]), escaped),
+        "Rice2 escape coding reads raw signed residuals");
+  }
+
+  private static void lpcPrediction() throws Exception {
+    int[] coefficients = new int[32];
+    Arrays.fill(coefficients, 91);
+    Bits orderOne = header(32, 0);
+    orderOne.put(4, 8);
+    orderOne.put(3, 4);
+    orderOne.put(1, 5);
+    orderOne.put(2, 4);
+    orderOne.put(0, 2);
+    orderOne.put(0, 4);
+    orderOne.put(0, 4);
+    for (int index = 1; index < 5; index++) orderOne.put(1, 1);
+    check(Arrays.equals(decode(orderOne.bytes(), 8, 5,
+        ChannelDelta.NONE, 0, coefficients), new int[] {4, 4, 4, 4, 4})
+        && coefficients[0] == 2 && coefficients[1] == 91,
+        "LPC uses signed coefficients, arithmetic shift, and caller temporary storage");
+
+    Arrays.fill(coefficients, 77);
+    Bits orderTwo = header(33, 0);
+    orderTwo.put(1, 8);
+    orderTwo.put(2, 8);
+    orderTwo.put(3, 4);
+    orderTwo.put(0, 5);
+    orderTwo.put(2, 4);
+    orderTwo.put(-1, 4);
+    orderTwo.put(0, 2);
+    orderTwo.put(0, 4);
+    orderTwo.put(0, 4);
+    for (int index = 2; index < 6; index++) orderTwo.put(1, 1);
+    check(Arrays.equals(decode(orderTwo.bytes(), 8, 6,
+        ChannelDelta.NONE, 0, coefficients), new int[] {1, 2, 3, 4, 5, 6})
+        && coefficients[0] == 2 && coefficients[1] == -1 && coefficients[2] == 77,
+        "higher-order LPC accumulates in recurrence order");
+  }
+
+  private static void failures() throws Exception {
+    Bits badHeader = new Bits();
+    badHeader.put(1, 1);
+    Throwable header = catchThrowable(() -> decode(badHeader.bytes(), 8, 1,
+        ChannelDelta.NONE, 0, new int[32]));
+    check(header instanceof IllegalStateException
+        && "Subframe header must start with 0 bit.".equals(header.getMessage()),
+        "invalid header reports exact failure");
+
+    for (int descriptor : new int[] {2, 4, 16, 31}) {
+      Bits invalid = header(descriptor, 0);
+      Throwable error = catchThrowable(() -> decode(invalid.bytes(), 8, 1,
+          ChannelDelta.NONE, 0, new int[32]));
+      check(error instanceof RuntimeException
+          && "Invalid subframe type.".equals(error.getMessage()),
+          "reserved descriptor " + descriptor + " reports exact failure");
+    }
+
+    Bits residual = header(8, 0);
+    residual.put(2, 2);
+    Throwable method = catchThrowable(() -> decode(residual.bytes(), 8, 1,
+        ChannelDelta.NONE, 0, new int[32]));
+    check(method instanceof RuntimeException
+        && "Invalid residual coding method 2".equals(method.getMessage()),
+        "reserved residual method reports exact failure");
+
+    IOException failure = new IOException("subframe-read-failure");
+    Throwable propagated = catchThrowable(() -> FlacSubFrameReader.readSubFrame(
+        new BitStreamReader(new ThrowingInput(failure)), stream(1, 8),
+        new FlacFrameInfo(1, ChannelDelta.NONE), new int[1], 0, new int[32]));
+    check(propagated == failure, "bit-stream IO failure preserves exact identity");
+  }
+
+  private static void reflection() throws Exception {
+    Class<FlacSubFrameReader> type = FlacSubFrameReader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete non-final reader metadata");
+    check(type.getDeclaredMethods().length == 10 && type.getDeclaredConstructors().length == 1,
+        "declared constructor and method counts");
+    Constructor<FlacSubFrameReader> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0,
+        "public zero-argument constructor metadata");
+    checkMethod(type.getDeclaredMethod("readSubFrame", BitStreamReader.class,
+        FlacStreamInfo.class, FlacFrameInfo.class, int[].class, int.class, int[].class),
+        Modifier.PUBLIC | Modifier.STATIC, void.class, true);
+    checkMethod(type.getDeclaredMethod("readSubFrameSamples", BitStreamReader.class,
+        int.class, int.class, int[].class, int.class, int[].class),
+        Modifier.PRIVATE | Modifier.STATIC, void.class, true);
+    checkMethod(type.getDeclaredMethod("readSubFrameConstantData", BitStreamReader.class,
+        int.class, int[].class, int.class), Modifier.PRIVATE | Modifier.STATIC, void.class, true);
+    checkMethod(type.getDeclaredMethod("readSubFrameVerbatimData", BitStreamReader.class,
+        int.class, int[].class, int.class), Modifier.PRIVATE | Modifier.STATIC, void.class, true);
+    checkMethod(type.getDeclaredMethod("readSubFrameFixedData", BitStreamReader.class,
+        int.class, int.class, int[].class, int.class),
+        Modifier.PRIVATE | Modifier.STATIC, void.class, true);
+    checkMethod(type.getDeclaredMethod("restoreFixedSignal", int[].class, int.class, int.class),
+        Modifier.PRIVATE | Modifier.STATIC, void.class, false);
+    checkMethod(type.getDeclaredMethod("readSubFrameLpcData", BitStreamReader.class,
+        int.class, int.class, int[].class, int.class, int[].class),
+        Modifier.PRIVATE | Modifier.STATIC, void.class, true);
+    checkMethod(type.getDeclaredMethod("restoreLpcSignal", int[].class, int.class,
+        int.class, int.class, int[].class), Modifier.PRIVATE | Modifier.STATIC, void.class, false);
+    checkMethod(type.getDeclaredMethod("readResidual", BitStreamReader.class, int.class,
+        int[].class, int.class, int.class), Modifier.PRIVATE | Modifier.STATIC, void.class, true);
+    checkMethod(type.getDeclaredMethod("readResidualBlock", BitStreamReader.class, int[].class,
+        int.class, int.class, int.class), Modifier.PRIVATE | Modifier.STATIC, void.class, true);
+    FlacSubFrameReader first = new FlacSubFrameReader();
+    FlacSubFrameReader second = new FlacSubFrameReader();
+    check(first != second && !first.equals(second)
+        && new Derived() instanceof FlacSubFrameReader,
+        "constructor retains Object identity and subclassability");
+  }
+
+  private static int[] decode(byte[] bytes, int bitsPerSample, int count,
+      ChannelDelta delta, int channel, int[] temporary) throws Exception {
+    int[] samples = new int[count];
+    FlacSubFrameReader.readSubFrame(
+        new BitStreamReader(new ByteArrayInputStream(bytes)), stream(2, bitsPerSample),
+        new FlacFrameInfo(count, delta), samples, channel, temporary);
+    return samples;
+  }
+
+  private static Bits header(int descriptor, int wastedBits) {
+    Bits bits = new Bits();
+    bits.put(0, 1);
+    bits.put(descriptor, 6);
+    bits.put(wastedBits == 0 ? 0 : 1, 1);
+    if (wastedBits > 0) {
+      for (int index = 1; index < wastedBits; index++) bits.put(0, 1);
+      bits.put(1, 1);
+    }
+    return bits;
+  }
+
+  private static void rice(Bits bits, int value, int parameter) {
+    int folded = value >= 0 ? value << 1 : ((-value) << 1) - 1;
+    for (int index = 0; index < (folded >>> parameter); index++) bits.put(0, 1);
+    bits.put(1, 1);
+    bits.put(folded, parameter);
+  }
+
+  private static FlacStreamInfo stream(int channels, int bits) {
+    byte[] bytes = new byte[34];
+    long packed = ((long) 44_100 << 44) | ((long) (channels - 1) << 41)
+        | ((long) (bits - 1) << 36);
+    for (int index = 0; index < 8; index++) {
+      bytes[10 + index] = (byte) (packed >>> (56 - index * 8));
+    }
+    return new FlacStreamInfo(bytes, false);
+  }
+
+  private static void checkMethod(Method method, int modifiers, Class<?> result,
+      boolean checkedIo) {
+    check(method.getModifiers() == modifiers && method.getReturnType() == result
+        && Arrays.equals(method.getExceptionTypes(),
+            checkedIo ? new Class<?>[] {IOException.class} : new Class<?>[0])
+        && !method.isSynthetic() && !method.isBridge() && !method.isVarArgs(),
+        method.getName() + " method metadata");
+  }
+
+  private static Throwable catchThrowable(Operation operation) {
+    try { operation.run(); return null; } catch (Throwable error) { return error; }
+  }
+
+  private interface Operation { void run() throws Throwable; }
+
+  private static final class ThrowingInput extends InputStream {
+    private final IOException failure;
+    ThrowingInput(IOException failure) { this.failure = failure; }
+    public int read() throws IOException { throw failure; }
+  }
+
+  private static final class Bits {
+    private final java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+    private int current;
+    private int count;
+    void put(int value, int width) {
+      for (int bit = width - 1; bit >= 0; bit--) {
+        current = (current << 1) | ((value >>> bit) & 1);
+        if (++count == 8) { output.write(current); current = 0; count = 0; }
+      }
+    }
+    byte[] bytes() {
+      if (count != 0) { output.write(current << (8 - count)); current = 0; count = 0; }
+      return output.toByteArray();
+    }
+  }
+
+  private static final class Derived extends FlacSubFrameReader {}
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
