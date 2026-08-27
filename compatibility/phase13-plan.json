@@ -27,8 +27,8 @@
   },
   "existing_structural_slice": {
     "scope": "Gate A plus completed Phase 13 slices; only symbols classified in the canonical ledger carry a compatibility claim",
-    "classes": 58,
-    "symbols": 437,
+    "classes": 60,
+    "symbols": 498,
     "internal_runtime_classes": 11,
     "binary_names": [
       "com.sedmelluq.discord.lavaplayer.filter.PcmFilterFactory",
@@ -88,7 +88,9 @@
       "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaCuePoint",
       "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaEbmlReader",
       "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaEbmlReader$Type",
-      "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement"
+      "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement",
+      "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
+      "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType$DataType"
     ]
   },
   "cohorts": [
@@ -2557,8 +2559,8 @@
       "objective": "Cover public container, probe, seek, and media-facing extension contracts.",
       "exit_evidence": "Container fixtures, protected-extension tests, per-symbol ledger entries, and Revapi diff.",
       "status": "IN_PROGRESS",
-      "classified_symbols": 295,
-      "remaining_symbols": 529,
+      "classified_symbols": 356,
+      "remaining_symbols": 468,
       "completed_slices": [
         {
           "id": "formats-contracts",
@@ -3080,6 +3082,19 @@
             "tools/jvm-gate/src/emitter.rs",
             "tools/jvm-gate/src/main.rs"
           ]
+        },
+        {
+          "id": "matroska-element-type-contracts",
+          "classes": 2,
+          "fields": 54,
+          "methods": 5,
+          "symbols": 61,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
         }
       ]
     },
@@ -3174,7 +3189,7 @@
   "phase_entry": {
     "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
     "first_execution_cohort": "core-player-track",
-    "next_slice": "matroska-element-type-contracts",
+    "next_slice": "matroska-file-reader-contracts",
     "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
   }
 }

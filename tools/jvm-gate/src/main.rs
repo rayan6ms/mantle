@@ -195,6 +195,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-matroska-cue-point-consumer" => Some(MATROSKA_CUE_POINT_CONSUMER),
         "write-matroska-ebml-reader-consumer" => Some(MATROSKA_EBML_READER_CONSUMER),
         "write-matroska-element-consumer" => Some(MATROSKA_ELEMENT_CONSUMER),
+        "write-matroska-element-type-consumer" => Some(MATROSKA_ELEMENT_TYPE_CONSUMER),
         "write-matroska-streaming-file-consumer" => Some(MATROSKA_STREAMING_FILE_CONSUMER),
         "write-matroska-audio-track-consumer" => Some(MATROSKA_AUDIO_TRACK_CONSUMER),
         "write-matroska-audio-track-support-consumer" => {
@@ -18347,6 +18348,182 @@ public final class GateMatroskaElement {
       this.dataSize = dataSize;
     }
   }
+}
+"#;
+
+const MATROSKA_ELEMENT_TYPE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType;
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType.DataType;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.HashSet;
+import java.util.Set;
+
+public final class GateMatroskaElementType {
+  public static void main(String[] args) throws Exception {
+    elementTypes();
+    dataTypes();
+    lookupAndMutation();
+    failures();
+    reflection();
+    System.out.println("contracts=element-enum,data-type-enum,ordering,names,ordinals,byte-encodings,decoded-ids,data-types,find-known,find-unknown,values-clones,value-of,mutable-bytes,stable-id,reflection");
+  }
+
+  private static void elementTypes() {
+    MatroskaElementType[] values = MatroskaElementType.values();
+    check(values.length == 43 && values[0] == MatroskaElementType.Ebml
+        && values[42] == MatroskaElementType.Unknown, "element enum order and endpoints");
+    Set<Long> ids = new HashSet<>();
+    for (int index = 0; index < values.length; index++) {
+      MatroskaElementType value = values[index];
+      check(value.ordinal() == index && MatroskaElementType.valueOf(value.name()) == value,
+          "element name, ordinal, and valueOf identity");
+      if (value == MatroskaElementType.Unknown) {
+        check(value.bytes.length == 0 && value.id == -1L, "unknown sentinel encoding");
+      } else {
+        check(value.bytes.length >= 1 && value.bytes.length <= 4
+            && value.id == decode(value.bytes) && ids.add(value.id)
+            && MatroskaElementType.find(value.id) == value,
+            "exact unique encoding and lookup for " + value.name());
+      }
+      System.out.println("element[" + index + "]=" + value.name() + ":"
+          + hex(value.bytes) + ":" + value.id + ":" + value.dataType.name());
+    }
+    values[0] = MatroskaElementType.Unknown;
+    check(MatroskaElementType.values()[0] == MatroskaElementType.Ebml,
+        "element values returns a defensive array clone");
+  }
+
+  private static void dataTypes() {
+    String[] expected = {"MASTER", "UNSIGNED_INTEGER", "SIGNED_INTEGER", "STRING",
+        "UTF8_STRING", "BINARY", "FLOAT", "DATE"};
+    DataType[] values = DataType.values();
+    check(values.length == expected.length, "data type count");
+    for (int index = 0; index < values.length; index++) {
+      check(values[index].ordinal() == index && values[index].name().equals(expected[index])
+          && DataType.valueOf(expected[index]) == values[index],
+          "data type order, name, ordinal, and valueOf identity");
+      System.out.println("dataType[" + index + "]=" + values[index].name());
+    }
+    values[0] = DataType.DATE;
+    check(DataType.values()[0] == DataType.MASTER,
+        "data type values returns a defensive array clone");
+  }
+
+  private static void lookupAndMutation() {
+    check(MatroskaElementType.find(-1L) == MatroskaElementType.Unknown
+        && MatroskaElementType.find(0L) == MatroskaElementType.Unknown
+        && MatroskaElementType.find(Long.MIN_VALUE) == MatroskaElementType.Unknown
+        && MatroskaElementType.find(Long.MAX_VALUE) == MatroskaElementType.Unknown,
+        "unknown IDs use the singleton fallback");
+    MatroskaElementType value = MatroskaElementType.Ebml;
+    long id = value.id;
+    byte original = value.bytes[0];
+    value.bytes[0] ^= 0x7f;
+    check(value.bytes[0] != original && value.id == id
+        && MatroskaElementType.find(id) == value,
+        "public final byte array is mutable without changing the computed ID or map");
+    value.bytes[0] = original;
+    check(value.id == decode(value.bytes), "restored bytes retain the original ID");
+    System.out.println("mutation=" + hex(value.bytes) + ":" + value.id);
+  }
+
+  private static void failures() {
+    check(catchThrowable(() -> MatroskaElementType.valueOf(null))
+        instanceof NullPointerException, "null element valueOf failure");
+    check(catchThrowable(() -> MatroskaElementType.valueOf("unknown"))
+        instanceof IllegalArgumentException, "case-sensitive element valueOf failure");
+    check(catchThrowable(() -> DataType.valueOf(null)) instanceof NullPointerException,
+        "null data type valueOf failure");
+    check(catchThrowable(() -> DataType.valueOf("master")) instanceof IllegalArgumentException,
+        "case-sensitive data type valueOf failure");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MatroskaElementType> type = MatroskaElementType.class;
+    check(type.isEnum() && type.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL | 0x4000)
+        && type.getSuperclass() == Enum.class && type.getInterfaces().length == 0
+        && type.getDeclaredAnnotations().length == 0 && type.getDeclaredFields().length == 48
+        && type.getDeclaredMethods().length == 4 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredClasses().length == 1 && type.getDeclaredClasses()[0] == DataType.class,
+        "element enum class metadata");
+    for (MatroskaElementType value : MatroskaElementType.values()) {
+      Field field = type.getDeclaredField(value.name());
+      check(field.isEnumConstant() && field.getType() == type
+          && field.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL | 0x4000)
+          && field.getDeclaredAnnotations().length == 0, "element constant metadata");
+    }
+    checkPublicFinalField(type.getDeclaredField("bytes"), byte[].class);
+    checkPublicFinalField(type.getDeclaredField("id"), long.class);
+    checkPublicFinalField(type.getDeclaredField("dataType"), DataType.class);
+    checkStaticMethod(type.getDeclaredMethod("values"), MatroskaElementType[].class);
+    checkStaticMethod(type.getDeclaredMethod("valueOf", String.class), type);
+    checkStaticMethod(type.getDeclaredMethod("find", long.class), type);
+    Constructor<?> constructor = type.getDeclaredConstructors()[0];
+    check(constructor.getModifiers() == Modifier.PRIVATE && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0,
+        "element constructor metadata");
+
+    Class<DataType> dataType = DataType.class;
+    check(dataType.isEnum()
+        && dataType.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL | 0x4000)
+        && dataType.getSuperclass() == Enum.class && dataType.getDeclaringClass() == type
+        && dataType.getInterfaces().length == 0 && dataType.getDeclaredAnnotations().length == 0
+        && dataType.getDeclaredFields().length == 9 && dataType.getDeclaredMethods().length == 2
+        && dataType.getDeclaredConstructors().length == 1, "data type enum class metadata");
+    for (DataType value : DataType.values()) {
+      Field field = dataType.getDeclaredField(value.name());
+      check(field.isEnumConstant() && field.getType() == dataType
+          && field.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL | 0x4000),
+          "data type constant metadata");
+    }
+    checkStaticMethod(dataType.getDeclaredMethod("values"), DataType[].class);
+    checkStaticMethod(dataType.getDeclaredMethod("valueOf", String.class), dataType);
+    System.out.println("generic=" + type.getGenericSuperclass().getTypeName() + ":"
+        + dataType.getGenericSuperclass().getTypeName());
+  }
+
+  private static void checkPublicFinalField(Field field, Class<?> fieldType) {
+    check(field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && field.getType() == fieldType && !field.isSynthetic()
+        && field.getDeclaredAnnotations().length == 0, field.getName() + " field metadata");
+  }
+
+  private static void checkStaticMethod(Method method, Class<?> result) {
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && method.getReturnType() == result && method.getExceptionTypes().length == 0
+        && !method.isSynthetic() && !method.isBridge() && !method.isVarArgs()
+        && method.getDeclaredAnnotations().length == 0, method.getName() + " method metadata");
+  }
+
+  private static long decode(byte[] bytes) {
+    int first = bytes[0] & 0xff;
+    int marker = 0x80;
+    while ((first & marker) == 0) marker >>>= 1;
+    long value = first & (marker - 1);
+    for (int index = 1; index < bytes.length; index++) {
+      value = (value << 8) | (bytes[index] & 0xffL);
+    }
+    return value;
+  }
+
+  private static String hex(byte[] bytes) {
+    StringBuilder result = new StringBuilder();
+    for (byte value : bytes) result.append(String.format("%02x", value & 0xff));
+    return result.toString();
+  }
+
+  private static Throwable catchThrowable(Operation operation) {
+    try { operation.run(); return null; } catch (Throwable error) { return error; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+
+  private interface Operation { void run() throws Throwable; }
 }
 "#;
 

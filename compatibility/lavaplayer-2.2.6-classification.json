@@ -3737,549 +3737,610 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "Ebml",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "DocType",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "Segment",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "SeekHead",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "Seek",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "SeekId",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "SeekPosition",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "Info",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "Tags",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "Tag",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "SimpleTag",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "Duration",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "TimecodeScale",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "Cluster",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "Timecode",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "SimpleBlock",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "BlockGroup",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "Block",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "BlockDuration",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "ReferenceBlock",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "Tracks",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "TrackEntry",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "TrackNumber",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "TrackUid",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "TrackType",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "Name",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "CodecId",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "CodecPrivate",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "Audio",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "SamplingFrequency",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "OutputSamplingFrequency",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "Channels",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "BitDepth",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "Cues",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "CuePoint",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "CueTime",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "CueTrackPositions",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "CueTrack",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "CueClusterPosition",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "Title",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "TagName",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "TagString",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "Unknown",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "bytes",
       "descriptor": "[B",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "id",
       "descriptor": "J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "FIELD",
       "member_name": "dataType",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType$DataType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "METHOD",
       "member_name": "values",
       "descriptor": "()[Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "METHOD",
       "member_name": "valueOf",
       "descriptor": "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
       "symbol_kind": "METHOD",
       "member_name": "find",
       "descriptor": "(J)Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType$DataType",
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType$DataType",
       "symbol_kind": "FIELD",
       "member_name": "MASTER",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType$DataType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType$DataType",
       "symbol_kind": "FIELD",
       "member_name": "UNSIGNED_INTEGER",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType$DataType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType$DataType",
       "symbol_kind": "FIELD",
       "member_name": "SIGNED_INTEGER",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType$DataType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType$DataType",
       "symbol_kind": "FIELD",
       "member_name": "STRING",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType$DataType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType$DataType",
       "symbol_kind": "FIELD",
       "member_name": "UTF8_STRING",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType$DataType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType$DataType",
       "symbol_kind": "FIELD",
       "member_name": "BINARY",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType$DataType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType$DataType",
       "symbol_kind": "FIELD",
       "member_name": "FLOAT",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType$DataType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType$DataType",
       "symbol_kind": "FIELD",
       "member_name": "DATE",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType$DataType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType$DataType",
       "symbol_kind": "METHOD",
       "member_name": "values",
       "descriptor": "()[Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType$DataType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType$DataType",
       "symbol_kind": "METHOD",
       "member_name": "valueOf",
       "descriptor": "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType$DataType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Matroska element and data-type enums preserve the exact 43-entry ID registry, byte encodings, decoded IDs, data types, lookup fallback, enum semantics, mutable byte-array exposure, and reflection metadata under the Phase 13 matroska-element-type-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileReader",

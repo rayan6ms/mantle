@@ -296,6 +296,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-matroska-ebml-reader-consumer 
   --output "$WORK/GateMatroskaEbmlReader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-matroska-element-consumer \
   --output "$WORK/GateMatroskaElement.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-matroska-element-type-consumer \
+  --output "$WORK/GateMatroskaElementType.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-matroska-streaming-file-consumer \
   --output "$WORK/GateMatroskaStreamingFile.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-matroska-audio-track-consumer \
@@ -473,6 +475,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateMatroskaCuePoint.java" \
   "$WORK/GateMatroskaEbmlReader.java" \
   "$WORK/GateMatroskaElement.java" \
+  "$WORK/GateMatroskaElementType.java" \
   "$WORK/GateMatroskaStreamingFile.java" \
   "$WORK/GateOpusPacketRouter.java" \
   "$WORK/GateDefaultSoundCloudDataLoader.java" \
@@ -1634,6 +1637,17 @@ cmp "$WORK/matroska-element-reference.txt" \
 grep --fixed-strings \
   'contracts=protected-constructor,protected-fields,defaults,getters,id-matching,data-type-identity,null-failures,unchecked-arithmetic,frozen-snapshot,base-class-copy,type-identity,subclassable,reflection' \
   "$WORK/matroska-element-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMatroskaElementType >"$WORK/matroska-element-type-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMatroskaElementType >"$WORK/matroska-element-type-candidate.txt"
+cmp "$WORK/matroska-element-type-reference.txt" \
+  "$WORK/matroska-element-type-candidate.txt"
+grep --fixed-strings \
+  'contracts=element-enum,data-type-enum,ordering,names,ordinals,byte-encodings,decoded-ids,data-types,find-known,find-unknown,values-clones,value-of,mutable-bytes,stable-id,reflection' \
+  "$WORK/matroska-element-type-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateMatroskaStreamingFile >"$WORK/matroska-streaming-file-reference.txt"
