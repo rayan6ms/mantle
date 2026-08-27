@@ -222,6 +222,8 @@ const MATROSKA_EBML_READER_TYPE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaEbmlReader$Type";
 const MATROSKA_EBML_READER_SWITCH_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaEbmlReader$1";
+const MATROSKA_ELEMENT_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElement";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -588,6 +590,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MATROSKA_CUE_POINT_CLASS,
     MATROSKA_EBML_READER_CLASS,
     MATROSKA_EBML_READER_TYPE_CLASS,
+    MATROSKA_ELEMENT_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -1578,6 +1581,9 @@ fn replacement_body(
     }
     if class_name == MATROSKA_CUE_POINT_CLASS {
         return matroska_cue_point_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == MATROSKA_ELEMENT_CLASS {
+        return matroska_element_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == MATROSKA_STREAMING_FILE_CLASS {
         return matroska_streaming_file_replacement(pool, name, descriptor, required_locals);
@@ -9929,6 +9935,230 @@ fn matroska_cue_point_constructor(pool: &mut ConstantPool<'static>) -> Result<At
             Instruction::Aload_3,
             Instruction::Putfield(offsets),
             Instruction::Return,
+        ],
+    )
+}
+
+fn matroska_element_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(I)V") => matroska_element_constructor(pool),
+        ("getLevel", "()I") => int_getter(pool, MATROSKA_ELEMENT_CLASS, "level"),
+        ("getId", "()J") => long_getter(pool, MATROSKA_ELEMENT_CLASS, "id"),
+        (
+            "getType",
+            "()Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
+        ) => object_getter(
+            pool,
+            MATROSKA_ELEMENT_CLASS,
+            "type",
+            "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
+        ),
+        ("getPosition", "()J") => long_getter(pool, MATROSKA_ELEMENT_CLASS, "position"),
+        ("getHeaderSize", "()I") => int_getter(pool, MATROSKA_ELEMENT_CLASS, "headerSize"),
+        ("getDataSize", "()I") => int_getter(pool, MATROSKA_ELEMENT_CLASS, "dataSize"),
+        (
+            "is",
+            "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;)Z",
+        ) => matroska_element_is_type(pool),
+        (
+            "is",
+            "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType$DataType;)Z",
+        ) => matroska_element_is_data_type(pool),
+        ("getRemaining", "(J)J") => matroska_element_get_remaining(pool),
+        ("getDataPosition", "()J") => matroska_element_get_data_position(pool),
+        (
+            "frozen",
+            "()Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElement;",
+        ) => matroska_element_frozen(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {MATROSKA_ELEMENT_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn matroska_element_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_ELEMENT_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let level = pool.add_field_ref(owner, "level", "I")?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Iload_1,
+            Instruction::Putfield(level),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn matroska_element_is_type(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_ELEMENT_CLASS)?;
+    let element_type = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType",
+    )?;
+    let element_id = pool.add_field_ref(owner, "id", "J")?;
+    let type_id = pool.add_field_ref(element_type, "id", "J")?;
+    let mut body = code(
+        pool,
+        4,
+        2,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Getfield(type_id),
+            Instruction::Aload_0,
+            Instruction::Getfield(element_id),
+            Instruction::Lcmp,
+            Instruction::Ifne(8),
+            Instruction::Iconst_1,
+            Instruction::Ireturn,
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+        ],
+    )?;
+    add_same_frame(pool, &mut body, 8)?;
+    Ok(body)
+}
+
+fn matroska_element_is_data_type(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_ELEMENT_CLASS)?;
+    let element_type = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType",
+    )?;
+    let element = pool.add_field_ref(
+        owner,
+        "type",
+        "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
+    )?;
+    let data_type = pool.add_field_ref(
+        element_type,
+        "dataType",
+        "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType$DataType;",
+    )?;
+    let mut body = code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(element),
+            Instruction::Getfield(data_type),
+            Instruction::If_acmpne(7),
+            Instruction::Iconst_1,
+            Instruction::Ireturn,
+            Instruction::Iconst_0,
+            Instruction::Ireturn,
+        ],
+    )?;
+    add_same_frame(pool, &mut body, 7)?;
+    Ok(body)
+}
+
+fn matroska_element_get_remaining(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_ELEMENT_CLASS)?;
+    let position = pool.add_field_ref(owner, "position", "J")?;
+    let header_size = pool.add_field_ref(owner, "headerSize", "I")?;
+    let data_size = pool.add_field_ref(owner, "dataSize", "I")?;
+    code(
+        pool,
+        4,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(position),
+            Instruction::Aload_0,
+            Instruction::Getfield(header_size),
+            Instruction::I2l,
+            Instruction::Ladd,
+            Instruction::Aload_0,
+            Instruction::Getfield(data_size),
+            Instruction::I2l,
+            Instruction::Ladd,
+            Instruction::Lload_1,
+            Instruction::Lsub,
+            Instruction::Lreturn,
+        ],
+    )
+}
+
+fn matroska_element_get_data_position(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_ELEMENT_CLASS)?;
+    let position = pool.add_field_ref(owner, "position", "J")?;
+    let header_size = pool.add_field_ref(owner, "headerSize", "I")?;
+    code(
+        pool,
+        4,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(position),
+            Instruction::Aload_0,
+            Instruction::Getfield(header_size),
+            Instruction::I2l,
+            Instruction::Ladd,
+            Instruction::Lreturn,
+        ],
+    )
+}
+
+fn matroska_element_frozen(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_ELEMENT_CLASS)?;
+    let constructor = pool.add_method_ref(owner, "<init>", "(I)V")?;
+    let level = pool.add_field_ref(owner, "level", "I")?;
+    let id = pool.add_field_ref(owner, "id", "J")?;
+    let element_type = pool.add_field_ref(
+        owner,
+        "type",
+        "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
+    )?;
+    let position = pool.add_field_ref(owner, "position", "J")?;
+    let header_size = pool.add_field_ref(owner, "headerSize", "I")?;
+    let data_size = pool.add_field_ref(owner, "dataSize", "I")?;
+    code(
+        pool,
+        4,
+        2,
+        vec![
+            Instruction::New(owner),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(level),
+            Instruction::Invokespecial(constructor),
+            Instruction::Astore_1,
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(id),
+            Instruction::Putfield(id),
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(element_type),
+            Instruction::Putfield(element_type),
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(position),
+            Instruction::Putfield(position),
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(header_size),
+            Instruction::Putfield(header_size),
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Getfield(data_size),
+            Instruction::Putfield(data_size),
+            Instruction::Aload_1,
+            Instruction::Areturn,
         ],
     )
 }

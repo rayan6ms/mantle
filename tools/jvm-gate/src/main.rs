@@ -194,6 +194,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-matroska-block-consumer" => Some(MATROSKA_BLOCK_CONSUMER),
         "write-matroska-cue-point-consumer" => Some(MATROSKA_CUE_POINT_CONSUMER),
         "write-matroska-ebml-reader-consumer" => Some(MATROSKA_EBML_READER_CONSUMER),
+        "write-matroska-element-consumer" => Some(MATROSKA_ELEMENT_CONSUMER),
         "write-matroska-streaming-file-consumer" => Some(MATROSKA_STREAMING_FILE_CONSUMER),
         "write-matroska-audio-track-consumer" => Some(MATROSKA_AUDIO_TRACK_CONSUMER),
         "write-matroska-audio-track-support-consumer" => {
@@ -18183,6 +18184,169 @@ public final class GateMatroskaEbmlReader {
   }
 
   private interface Operation { void run() throws Throwable; }
+}
+"#;
+
+const MATROSKA_ELEMENT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement;
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType;
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType.DataType;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+
+public final class GateMatroskaElement {
+  public static void main(String[] args) throws Exception {
+    defaultsAndProtectedSurface();
+    matching();
+    arithmetic();
+    freezing();
+    reflection();
+    System.out.println("contracts=protected-constructor,protected-fields,defaults,getters,id-matching,data-type-identity,null-failures,unchecked-arithmetic,frozen-snapshot,base-class-copy,type-identity,subclassable,reflection");
+  }
+
+  private static void defaultsAndProtectedSurface() {
+    MutableElement element = new MutableElement(Integer.MIN_VALUE);
+    check(element.getLevel() == Integer.MIN_VALUE && element.getId() == 0L
+        && element.getType() == null && element.getPosition() == 0L
+        && element.getHeaderSize() == 0 && element.getDataSize() == 0,
+        "constructor initializes only final level");
+    element.configure(Long.MIN_VALUE + 7, MatroskaElementType.Cluster,
+        Long.MAX_VALUE - 8, Integer.MIN_VALUE, Integer.MAX_VALUE);
+    check(element.getLevel() == Integer.MIN_VALUE && element.getId() == Long.MIN_VALUE + 7
+        && element.getType() == MatroskaElementType.Cluster
+        && element.getPosition() == Long.MAX_VALUE - 8
+        && element.getHeaderSize() == Integer.MIN_VALUE
+        && element.getDataSize() == Integer.MAX_VALUE,
+        "protected fields retain exact primitive and enum values");
+  }
+
+  private static void matching() {
+    MutableElement element = new MutableElement(3);
+    element.configure(MatroskaElementType.Cluster.id, MatroskaElementType.DocType, 0, 0, 0);
+    check(element.is(MatroskaElementType.Cluster) && !element.is(MatroskaElementType.DocType),
+        "element-type matching uses the argument ID instead of enum identity");
+    check(element.is(DataType.STRING) && !element.is(DataType.MASTER)
+        && !element.is((DataType) null), "data-type matching uses enum identity");
+    check(catchThrowable(() -> element.is((MatroskaElementType) null))
+        instanceof NullPointerException, "null element type is dereferenced");
+    element.configure(0, null, 0, 0, 0);
+    check(catchThrowable(() -> element.is(DataType.MASTER)) instanceof NullPointerException,
+        "null stored element type is dereferenced");
+
+    for (MatroskaElementType type : MatroskaElementType.values()) {
+      element.configure(type.id, type, 0, 0, 0);
+      System.out.println("match[" + type.name() + "]=" + type.id + ":"
+          + element.is(type) + ":" + element.is(type.dataType));
+    }
+  }
+
+  private static void arithmetic() {
+    MutableElement element = new MutableElement(0);
+    element.configure(0, MatroskaElementType.Unknown, 1_000_000_000_000L, 17, 29);
+    check(element.getDataPosition() == 1_000_000_000_017L
+        && element.getRemaining(1_000_000_000_011L) == 35L,
+        "data position and remaining use absolute positions");
+    element.configure(0, MatroskaElementType.Unknown, Long.MAX_VALUE - 2,
+        Integer.MAX_VALUE, Integer.MIN_VALUE);
+    long expectedDataPosition = (Long.MAX_VALUE - 2) + (long) Integer.MAX_VALUE;
+    long expectedRemaining = expectedDataPosition + (long) Integer.MIN_VALUE - Long.MIN_VALUE;
+    check(element.getDataPosition() == expectedDataPosition
+        && element.getRemaining(Long.MIN_VALUE) == expectedRemaining,
+        "arithmetic retains Java long wrapping and signed sizes");
+    System.out.println("arithmetic=" + element.getDataPosition() + ":"
+        + element.getRemaining(Long.MIN_VALUE));
+  }
+
+  private static void freezing() {
+    MutableElement source = new MutableElement(Integer.MAX_VALUE);
+    source.configure(Long.MIN_VALUE, MatroskaElementType.CuePoint, Long.MAX_VALUE,
+        Integer.MIN_VALUE, Integer.MAX_VALUE);
+    MatroskaElement frozen = source.frozen();
+    check(frozen != source && frozen.getClass() == MatroskaElement.class
+        && frozen.getLevel() == Integer.MAX_VALUE && frozen.getId() == Long.MIN_VALUE
+        && frozen.getType() == MatroskaElementType.CuePoint
+        && frozen.getPosition() == Long.MAX_VALUE
+        && frozen.getHeaderSize() == Integer.MIN_VALUE
+        && frozen.getDataSize() == Integer.MAX_VALUE,
+        "frozen creates an exact independent base-class snapshot");
+    source.configure(9, MatroskaElementType.Unknown, 8, 7, 6);
+    check(frozen.getId() == Long.MIN_VALUE && frozen.getType() == MatroskaElementType.CuePoint
+        && frozen.getPosition() == Long.MAX_VALUE && frozen.getHeaderSize() == Integer.MIN_VALUE
+        && frozen.getDataSize() == Integer.MAX_VALUE,
+        "snapshot is independent of later source mutation");
+
+    MutableElement nullable = new MutableElement(-4);
+    MatroskaElement nullFrozen = nullable.frozen();
+    check(nullFrozen.getLevel() == -4 && nullFrozen.getType() == null,
+        "frozen preserves default and null state");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MatroskaElement> type = MatroskaElement.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredAnnotations().length == 0
+        && type.getDeclaredFields().length == 6 && type.getDeclaredMethods().length == 11
+        && type.getDeclaredConstructors().length == 1, "class metadata");
+    checkField(type.getDeclaredField("level"), int.class, true);
+    checkField(type.getDeclaredField("id"), long.class, false);
+    checkField(type.getDeclaredField("type"), MatroskaElementType.class, false);
+    checkField(type.getDeclaredField("position"), long.class, false);
+    checkField(type.getDeclaredField("headerSize"), int.class, false);
+    checkField(type.getDeclaredField("dataSize"), int.class, false);
+    Constructor<MatroskaElement> constructor = type.getDeclaredConstructor(int.class);
+    check(constructor.getModifiers() == Modifier.PROTECTED
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic()
+        && !constructor.isVarArgs(), "constructor metadata");
+    checkMethod(type.getDeclaredMethod("getLevel"), int.class);
+    checkMethod(type.getDeclaredMethod("getId"), long.class);
+    checkMethod(type.getDeclaredMethod("getType"), MatroskaElementType.class);
+    checkMethod(type.getDeclaredMethod("getPosition"), long.class);
+    checkMethod(type.getDeclaredMethod("getHeaderSize"), int.class);
+    checkMethod(type.getDeclaredMethod("getDataSize"), int.class);
+    checkMethod(type.getDeclaredMethod("is", MatroskaElementType.class), boolean.class);
+    checkMethod(type.getDeclaredMethod("is", DataType.class), boolean.class);
+    checkMethod(type.getDeclaredMethod("getRemaining", long.class), long.class);
+    checkMethod(type.getDeclaredMethod("getDataPosition"), long.class);
+    checkMethod(type.getDeclaredMethod("frozen"), MatroskaElement.class);
+  }
+
+  private static void checkField(Field field, Class<?> fieldType, boolean isFinal) {
+    int modifiers = Modifier.PROTECTED | (isFinal ? Modifier.FINAL : 0);
+    check(field.getModifiers() == modifiers && field.getType() == fieldType
+        && !field.isSynthetic() && field.getDeclaredAnnotations().length == 0,
+        field.getName() + " field metadata");
+  }
+
+  private static void checkMethod(Method method, Class<?> result) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == result
+        && method.getExceptionTypes().length == 0 && !method.isSynthetic() && !method.isBridge()
+        && !method.isVarArgs() && method.getDeclaredAnnotations().length == 0,
+        method.getName() + " method metadata");
+  }
+
+  private static Throwable catchThrowable(Operation operation) {
+    try { operation.run(); return null; } catch (Throwable error) { return error; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+
+  private interface Operation { void run() throws Throwable; }
+
+  private static final class MutableElement extends MatroskaElement {
+    MutableElement(int level) { super(level); }
+
+    void configure(long id, MatroskaElementType type, long position, int headerSize, int dataSize) {
+      this.id = id;
+      this.type = type;
+      this.position = position;
+      this.headerSize = headerSize;
+      this.dataSize = dataSize;
+    }
+  }
 }
 "#;
 

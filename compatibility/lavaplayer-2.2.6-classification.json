@@ -3547,171 +3547,190 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaElement shell preserves exact protected state, constructor defaults, getters, ID/data-type matching, unchecked arithmetic, frozen snapshot behavior, subclassability, and reflection metadata under the Phase 13 matroska-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement",
       "symbol_kind": "FIELD",
       "member_name": "level",
       "descriptor": "I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaElement shell preserves exact protected state, constructor defaults, getters, ID/data-type matching, unchecked arithmetic, frozen snapshot behavior, subclassability, and reflection metadata under the Phase 13 matroska-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement",
       "symbol_kind": "FIELD",
       "member_name": "id",
       "descriptor": "J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaElement shell preserves exact protected state, constructor defaults, getters, ID/data-type matching, unchecked arithmetic, frozen snapshot behavior, subclassability, and reflection metadata under the Phase 13 matroska-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement",
       "symbol_kind": "FIELD",
       "member_name": "type",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaElement shell preserves exact protected state, constructor defaults, getters, ID/data-type matching, unchecked arithmetic, frozen snapshot behavior, subclassability, and reflection metadata under the Phase 13 matroska-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement",
       "symbol_kind": "FIELD",
       "member_name": "position",
       "descriptor": "J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaElement shell preserves exact protected state, constructor defaults, getters, ID/data-type matching, unchecked arithmetic, frozen snapshot behavior, subclassability, and reflection metadata under the Phase 13 matroska-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement",
       "symbol_kind": "FIELD",
       "member_name": "headerSize",
       "descriptor": "I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaElement shell preserves exact protected state, constructor defaults, getters, ID/data-type matching, unchecked arithmetic, frozen snapshot behavior, subclassability, and reflection metadata under the Phase 13 matroska-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement",
       "symbol_kind": "FIELD",
       "member_name": "dataSize",
       "descriptor": "I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaElement shell preserves exact protected state, constructor defaults, getters, ID/data-type matching, unchecked arithmetic, frozen snapshot behavior, subclassability, and reflection metadata under the Phase 13 matroska-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(I)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaElement shell preserves exact protected state, constructor defaults, getters, ID/data-type matching, unchecked arithmetic, frozen snapshot behavior, subclassability, and reflection metadata under the Phase 13 matroska-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement",
       "symbol_kind": "METHOD",
       "member_name": "getLevel",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaElement shell preserves exact protected state, constructor defaults, getters, ID/data-type matching, unchecked arithmetic, frozen snapshot behavior, subclassability, and reflection metadata under the Phase 13 matroska-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement",
       "symbol_kind": "METHOD",
       "member_name": "getId",
       "descriptor": "()J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaElement shell preserves exact protected state, constructor defaults, getters, ID/data-type matching, unchecked arithmetic, frozen snapshot behavior, subclassability, and reflection metadata under the Phase 13 matroska-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement",
       "symbol_kind": "METHOD",
       "member_name": "getType",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaElement shell preserves exact protected state, constructor defaults, getters, ID/data-type matching, unchecked arithmetic, frozen snapshot behavior, subclassability, and reflection metadata under the Phase 13 matroska-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement",
       "symbol_kind": "METHOD",
       "member_name": "getPosition",
       "descriptor": "()J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaElement shell preserves exact protected state, constructor defaults, getters, ID/data-type matching, unchecked arithmetic, frozen snapshot behavior, subclassability, and reflection metadata under the Phase 13 matroska-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement",
       "symbol_kind": "METHOD",
       "member_name": "getHeaderSize",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaElement shell preserves exact protected state, constructor defaults, getters, ID/data-type matching, unchecked arithmetic, frozen snapshot behavior, subclassability, and reflection metadata under the Phase 13 matroska-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement",
       "symbol_kind": "METHOD",
       "member_name": "getDataSize",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaElement shell preserves exact protected state, constructor defaults, getters, ID/data-type matching, unchecked arithmetic, frozen snapshot behavior, subclassability, and reflection metadata under the Phase 13 matroska-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement",
       "symbol_kind": "METHOD",
       "member_name": "is",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaElement shell preserves exact protected state, constructor defaults, getters, ID/data-type matching, unchecked arithmetic, frozen snapshot behavior, subclassability, and reflection metadata under the Phase 13 matroska-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement",
       "symbol_kind": "METHOD",
       "member_name": "is",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType$DataType;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaElement shell preserves exact protected state, constructor defaults, getters, ID/data-type matching, unchecked arithmetic, frozen snapshot behavior, subclassability, and reflection metadata under the Phase 13 matroska-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement",
       "symbol_kind": "METHOD",
       "member_name": "getRemaining",
       "descriptor": "(J)J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaElement shell preserves exact protected state, constructor defaults, getters, ID/data-type matching, unchecked arithmetic, frozen snapshot behavior, subclassability, and reflection metadata under the Phase 13 matroska-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement",
       "symbol_kind": "METHOD",
       "member_name": "getDataPosition",
       "descriptor": "()J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaElement shell preserves exact protected state, constructor defaults, getters, ID/data-type matching, unchecked arithmetic, frozen snapshot behavior, subclassability, and reflection metadata under the Phase 13 matroska-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement",
       "symbol_kind": "METHOD",
       "member_name": "frozen",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElement;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaElement shell preserves exact protected state, constructor defaults, getters, ID/data-type matching, unchecked arithmetic, frozen snapshot behavior, subclassability, and reflection metadata under the Phase 13 matroska-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType",
