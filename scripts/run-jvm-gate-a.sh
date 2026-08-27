@@ -292,6 +292,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-matroska-block-consumer \
   --output "$WORK/GateMatroskaBlock.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-matroska-cue-point-consumer \
   --output "$WORK/GateMatroskaCuePoint.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-matroska-ebml-reader-consumer \
+  --output "$WORK/GateMatroskaEbmlReader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-matroska-streaming-file-consumer \
   --output "$WORK/GateMatroskaStreamingFile.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-matroska-audio-track-consumer \
@@ -467,6 +469,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateMatroskaVorbisTrackConsumer.java" \
   "$WORK/GateMatroskaBlock.java" \
   "$WORK/GateMatroskaCuePoint.java" \
+  "$WORK/GateMatroskaEbmlReader.java" \
   "$WORK/GateMatroskaStreamingFile.java" \
   "$WORK/GateOpusPacketRouter.java" \
   "$WORK/GateDefaultSoundCloudDataLoader.java" \
@@ -1606,6 +1609,17 @@ cmp "$WORK/matroska-cue-point-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,primitive-identity,array-identity,null-array,field-finality,reflection' \
   "$WORK/matroska-cue-point-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMatroskaEbmlReader >"$WORK/matroska-ebml-reader-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMatroskaEbmlReader >"$WORK/matroska-ebml-reader-candidate.txt"
+cmp "$WORK/matroska-ebml-reader-reference.txt" \
+  "$WORK/matroska-ebml-reader-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,type-enum,fixed-size,variable-size,unsigned-null,signed,lacing,lengths-1-to-8,consumption,truncation,invalid-prefix,failures,throws,reflection' \
+  "$WORK/matroska-ebml-reader-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateMatroskaStreamingFile >"$WORK/matroska-streaming-file-reference.txt"

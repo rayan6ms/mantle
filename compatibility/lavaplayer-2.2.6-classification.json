@@ -3437,99 +3437,110 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public EBML reader and Type enum preserve exact fixed/variable integer decoding, sign modes, byte consumption, failure behavior, checked throws, enum semantics, and reflection metadata under the Phase 13 matroska-ebml-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaEbmlReader",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public EBML reader and Type enum preserve exact fixed/variable integer decoding, sign modes, byte consumption, failure behavior, checked throws, enum semantics, and reflection metadata under the Phase 13 matroska-ebml-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaEbmlReader",
       "symbol_kind": "METHOD",
       "member_name": "readFixedSizeEbmlInteger",
       "descriptor": "(Ljava/io/DataInput;ILcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaEbmlReader$Type;)J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public EBML reader and Type enum preserve exact fixed/variable integer decoding, sign modes, byte consumption, failure behavior, checked throws, enum semantics, and reflection metadata under the Phase 13 matroska-ebml-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaEbmlReader",
       "symbol_kind": "METHOD",
       "member_name": "readEbmlInteger",
       "descriptor": "(Ljava/io/DataInput;Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaEbmlReader$Type;)J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public EBML reader and Type enum preserve exact fixed/variable integer decoding, sign modes, byte consumption, failure behavior, checked throws, enum semantics, and reflection metadata under the Phase 13 matroska-ebml-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaEbmlReader",
       "symbol_kind": "METHOD",
       "member_name": "readEbmlInteger",
       "descriptor": "(Ljava/nio/ByteBuffer;Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaEbmlReader$Type;)J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public EBML reader and Type enum preserve exact fixed/variable integer decoding, sign modes, byte consumption, failure behavior, checked throws, enum semantics, and reflection metadata under the Phase 13 matroska-ebml-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaEbmlReader$Type",
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public EBML reader and Type enum preserve exact fixed/variable integer decoding, sign modes, byte consumption, failure behavior, checked throws, enum semantics, and reflection metadata under the Phase 13 matroska-ebml-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaEbmlReader$Type",
       "symbol_kind": "FIELD",
       "member_name": "SIGNED",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaEbmlReader$Type;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public EBML reader and Type enum preserve exact fixed/variable integer decoding, sign modes, byte consumption, failure behavior, checked throws, enum semantics, and reflection metadata under the Phase 13 matroska-ebml-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaEbmlReader$Type",
       "symbol_kind": "FIELD",
       "member_name": "LACE_SIGNED",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaEbmlReader$Type;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public EBML reader and Type enum preserve exact fixed/variable integer decoding, sign modes, byte consumption, failure behavior, checked throws, enum semantics, and reflection metadata under the Phase 13 matroska-ebml-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaEbmlReader$Type",
       "symbol_kind": "FIELD",
       "member_name": "UNSIGNED",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaEbmlReader$Type;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public EBML reader and Type enum preserve exact fixed/variable integer decoding, sign modes, byte consumption, failure behavior, checked throws, enum semantics, and reflection metadata under the Phase 13 matroska-ebml-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaEbmlReader$Type",
       "symbol_kind": "METHOD",
       "member_name": "values",
       "descriptor": "()[Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaEbmlReader$Type;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public EBML reader and Type enum preserve exact fixed/variable integer decoding, sign modes, byte consumption, failure behavior, checked throws, enum semantics, and reflection metadata under the Phase 13 matroska-ebml-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaEbmlReader$Type",
       "symbol_kind": "METHOD",
       "member_name": "valueOf",
       "descriptor": "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaEbmlReader$Type;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public EBML reader and Type enum preserve exact fixed/variable integer decoding, sign modes, byte consumption, failure behavior, checked throws, enum semantics, and reflection metadata under the Phase 13 matroska-ebml-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement",

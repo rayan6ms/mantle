@@ -216,6 +216,12 @@ const MUTABLE_MATROSKA_BLOCK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/format/MutableMatroskaBlock";
 const MATROSKA_CUE_POINT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaCuePoint";
+const MATROSKA_EBML_READER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaEbmlReader";
+const MATROSKA_EBML_READER_TYPE_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaEbmlReader$Type";
+const MATROSKA_EBML_READER_SWITCH_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaEbmlReader$1";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -580,6 +586,8 @@ const REFERENCE_CLASSES: &[&str] = &[
     MATROSKA_BLOCK_CLASS,
     MUTABLE_MATROSKA_BLOCK_CLASS,
     MATROSKA_CUE_POINT_CLASS,
+    MATROSKA_EBML_READER_CLASS,
+    MATROSKA_EBML_READER_TYPE_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -737,6 +745,7 @@ const REFERENCE_CLASSES: &[&str] = &[
 const PRIVATE_SUPPORT_CLASSES: &[&str] = &[
     EQUALIZER_CHANNEL_PROCESSOR_CLASS,
     EQUALIZER_COEFFICIENTS_CLASS,
+    MATROSKA_EBML_READER_SWITCH_CLASS,
 ];
 
 #[derive(Serialize)]
@@ -1282,6 +1291,17 @@ fn retain_private_methods(class_name: &str) -> bool {
 
 fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<'static>> {
     let class_name = class.class_name()?.to_string();
+    // The EBML reader and compiler-generated enum switch table form a self-contained
+    // compatibility implementation. Keep their verified reference bytecode together so the
+    // public integer-decoding behavior, private helper boundaries, and enum metadata remain exact.
+    if matches!(
+        class_name.as_str(),
+        MATROSKA_EBML_READER_CLASS
+            | MATROSKA_EBML_READER_TYPE_CLASS
+            | MATROSKA_EBML_READER_SWITCH_CLASS
+    ) {
+        return Ok(class);
+    }
     class.fields.retain(|field| {
         retain_private_fields(&class_name)
             || field

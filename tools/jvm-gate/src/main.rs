@@ -193,6 +193,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-matroska-block-consumer" => Some(MATROSKA_BLOCK_CONSUMER),
         "write-matroska-cue-point-consumer" => Some(MATROSKA_CUE_POINT_CONSUMER),
+        "write-matroska-ebml-reader-consumer" => Some(MATROSKA_EBML_READER_CONSUMER),
         "write-matroska-streaming-file-consumer" => Some(MATROSKA_STREAMING_FILE_CONSUMER),
         "write-matroska-audio-track-consumer" => Some(MATROSKA_AUDIO_TRACK_CONSUMER),
         "write-matroska-audio-track-support-consumer" => {
@@ -17969,6 +17970,219 @@ public final class GateMatroskaCuePoint {
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }
+}
+"#;
+
+const MATROSKA_EBML_READER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaEbmlReader;
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaEbmlReader.Type;
+import java.io.ByteArrayInputStream;
+import java.io.DataInput;
+import java.io.DataInputStream;
+import java.io.EOFException;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+
+public final class GateMatroskaEbmlReader {
+  private static final Type[] TYPES = {null, Type.SIGNED, Type.LACE_SIGNED, Type.UNSIGNED};
+
+  public static void main(String[] args) throws Exception {
+    enumContract();
+    fixedSizeContract();
+    variableSizeContract();
+    failureContract();
+    reflection();
+    System.out.println("contracts=constructor,type-enum,fixed-size,variable-size,unsigned-null,signed,lacing,lengths-1-to-8,consumption,truncation,invalid-prefix,failures,throws,reflection");
+  }
+
+  private static void enumContract() {
+    Type[] values = Type.values();
+    check(Arrays.equals(values, new Type[] {Type.SIGNED, Type.LACE_SIGNED, Type.UNSIGNED}),
+        "enum declaration order");
+    check(values != Type.values() && Type.valueOf("SIGNED") == Type.SIGNED
+        && Type.valueOf("LACE_SIGNED") == Type.LACE_SIGNED
+        && Type.valueOf("UNSIGNED") == Type.UNSIGNED,
+        "values array independence and valueOf identity");
+    values[0] = Type.UNSIGNED;
+    check(Type.values()[0] == Type.SIGNED && Type.SIGNED.ordinal() == 0
+        && Type.LACE_SIGNED.ordinal() == 1 && Type.UNSIGNED.ordinal() == 2,
+        "values mutation isolation and ordinals");
+    check(catchThrowable(() -> Type.valueOf("signed")) instanceof IllegalArgumentException
+        && catchThrowable(() -> Type.valueOf(null)) instanceof NullPointerException,
+        "valueOf failures");
+  }
+
+  private static void fixedSizeContract() throws Exception {
+    check(new MatroskaEbmlReader().getClass() == MatroskaEbmlReader.class,
+        "public constructor");
+    check(fixed(new byte[] {(byte) 0x7F}, 1, null).equals("127@1")
+        && fixed(new byte[] {(byte) 0x7F}, 1, Type.UNSIGNED).equals("127@1")
+        && fixed(new byte[] {(byte) 0x7F}, 1, Type.SIGNED).equals("-1@1")
+        && fixed(new byte[] {0}, 1, Type.LACE_SIGNED).equals("-63@1"),
+        "fixed one-byte sign modes");
+    check(MatroskaEbmlReader.readFixedSizeEbmlInteger(null, 0, null) == 0
+        && MatroskaEbmlReader.readFixedSizeEbmlInteger(null, -1, Type.UNSIGNED) == 0,
+        "non-positive fixed lengths do not access input for unsigned modes");
+
+    byte[] bytes = {1, 0x23, 0x45, 0x67, (byte) 0x89, (byte) 0xAB,
+        (byte) 0xCD, (byte) 0xEF, 0x55};
+    for (int length = -1; length <= 9; length++) {
+      for (Type type : TYPES) {
+        System.out.println("fixed[" + length + "," + typeName(type) + "]="
+            + fixed(bytes, length, type));
+      }
+    }
+  }
+
+  private static void variableSizeContract() {
+    byte[][] values = {
+        {(byte) 0xBF},
+        {0x5F, (byte) 0xFE},
+        {0x2F, 0x12, 0x34},
+        {0x17, 0x12, 0x34, 0x56},
+        {0x0B, 0x12, 0x34, 0x56, 0x78},
+        {0x05, 0x12, 0x34, 0x56, 0x78, (byte) 0x9A},
+        {0x02, 0x12, 0x34, 0x56, 0x78, (byte) 0x9A, (byte) 0xBC},
+        {0x01, 0x12, 0x34, 0x56, 0x78, (byte) 0x9A, (byte) 0xBC, (byte) 0xDE}
+    };
+    check(variableData(new byte[] {(byte) 0x80}, null).equals("0@1")
+        && variableBuffer(new byte[] {(byte) 0xFF}, Type.UNSIGNED).equals("127@1")
+        && variableData(new byte[] {(byte) 0xFF}, Type.SIGNED).equals("-1@1")
+        && variableBuffer(new byte[] {0x40, 0}, Type.LACE_SIGNED).equals("-8191@2"),
+        "variable sign modes and marker removal");
+    for (int length = 1; length <= values.length; length++) {
+      for (Type type : TYPES) {
+        String data = variableData(values[length - 1], type);
+        String buffer = variableBuffer(values[length - 1], type);
+        System.out.println("variable[" + length + "," + typeName(type) + "]="
+            + data + "/" + buffer);
+      }
+    }
+  }
+
+  private static void failureContract() {
+    check(fixed(new byte[0], 1, null).startsWith("EOFException:null@0"),
+        "fixed truncation preserves EOFException");
+    check(fixed(new byte[] {1}, 2, null).startsWith("EOFException:null@1"),
+        "fixed partial consumption");
+    check(variableData(new byte[] {0}, null).equals(
+        "IllegalStateException:More than 4 bytes for length, probably invalid data@1"),
+        "data input rejects zero prefix after consuming it");
+    check(variableBuffer(new byte[] {0}, null).equals(
+        "IllegalStateException:More than 4 bytes for length, probably invalid data@1"),
+        "buffer rejects zero prefix after consuming it");
+    check(variableData(new byte[] {0x20, 1}, null).startsWith("EOFException:null@2")
+        && variableBuffer(new byte[] {0x20, 1}, null).startsWith("BufferUnderflowException:null@2"),
+        "variable truncation failure types and positions");
+    check(catchThrowable(() -> MatroskaEbmlReader.readFixedSizeEbmlInteger(null, 1, null))
+        instanceof NullPointerException, "fixed null input");
+    check(catchThrowable(() -> MatroskaEbmlReader.readEbmlInteger((DataInput) null, null))
+        instanceof NullPointerException, "variable null data input");
+    check(catchThrowable(() -> MatroskaEbmlReader.readEbmlInteger((ByteBuffer) null, null))
+        instanceof NullPointerException, "variable null buffer");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MatroskaEbmlReader> reader = MatroskaEbmlReader.class;
+    check(reader.getModifiers() == Modifier.PUBLIC && reader.getSuperclass() == Object.class
+        && reader.getInterfaces().length == 0 && reader.getDeclaredAnnotations().length == 0
+        && reader.getDeclaredFields().length == 0 && reader.getDeclaredMethods().length == 10
+        && reader.getDeclaredConstructors().length == 1, "reader class metadata");
+    Constructor<MatroskaEbmlReader> constructor = reader.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "reader constructor metadata");
+    checkMethod(reader.getDeclaredMethod("readFixedSizeEbmlInteger", DataInput.class, int.class,
+        Type.class), true);
+    checkMethod(reader.getDeclaredMethod("readEbmlInteger", DataInput.class, Type.class), true);
+    checkMethod(reader.getDeclaredMethod("readEbmlInteger", ByteBuffer.class, Type.class), false);
+
+    Class<Type> type = Type.class;
+    int expectedModifiers = Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL | 0x4000;
+    check(type.getModifiers() == expectedModifiers && type.isEnum() && type.getSuperclass() == Enum.class
+        && type.getInterfaces().length == 0 && type.getEnclosingClass() == reader
+        && type.getDeclaringClass() == reader && type.getDeclaredAnnotations().length == 0
+        && type.getDeclaredFields().length == 4 && type.getDeclaredMethods().length == 2
+        && type.getDeclaredConstructors().length == 1, "enum class metadata");
+    ParameterizedType generic = (ParameterizedType) type.getGenericSuperclass();
+    check(generic.getRawType() == Enum.class && generic.getActualTypeArguments()[0] == type,
+        "enum generic superclass");
+    for (String name : new String[] {"SIGNED", "LACE_SIGNED", "UNSIGNED"}) {
+      Field field = type.getDeclaredField(name);
+      check(field.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL | 0x4000)
+          && field.getType() == type && field.isEnumConstant() && !field.isSynthetic(),
+          name + " enum field metadata");
+    }
+    Method values = type.getDeclaredMethod("values");
+    Method valueOf = type.getDeclaredMethod("valueOf", String.class);
+    check(values.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && values.getReturnType() == Type[].class && values.getExceptionTypes().length == 0
+        && valueOf.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && valueOf.getReturnType() == type && valueOf.getExceptionTypes().length == 0,
+        "enum method metadata");
+  }
+
+  private static void checkMethod(Method method, boolean checkedIo) {
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && method.getReturnType() == long.class && !method.isSynthetic() && !method.isBridge()
+        && Arrays.equals(method.getExceptionTypes(), checkedIo ? new Class<?>[] {IOException.class}
+            : new Class<?>[0]), method.getName() + " metadata");
+  }
+
+  private static String fixed(byte[] bytes, int length, Type type) {
+    ByteArrayInputStream source = new ByteArrayInputStream(bytes);
+    try {
+      long value = MatroskaEbmlReader.readFixedSizeEbmlInteger(
+          new DataInputStream(source), length, type);
+      return value + "@" + (bytes.length - source.available());
+    } catch (Throwable error) {
+      return outcome(error) + "@" + (bytes.length - source.available());
+    }
+  }
+
+  private static String variableData(byte[] bytes, Type type) {
+    ByteArrayInputStream source = new ByteArrayInputStream(bytes);
+    try {
+      long value = MatroskaEbmlReader.readEbmlInteger(new DataInputStream(source), type);
+      return value + "@" + (bytes.length - source.available());
+    } catch (Throwable error) {
+      return outcome(error) + "@" + (bytes.length - source.available());
+    }
+  }
+
+  private static String variableBuffer(byte[] bytes, Type type) {
+    ByteBuffer buffer = ByteBuffer.wrap(bytes);
+    try {
+      long value = MatroskaEbmlReader.readEbmlInteger(buffer, type);
+      return value + "@" + buffer.position();
+    } catch (Throwable error) {
+      return outcome(error) + "@" + buffer.position();
+    }
+  }
+
+  private static String typeName(Type type) {
+    return type == null ? "null" : type.name();
+  }
+
+  private static String outcome(Throwable error) {
+    return error.getClass().getSimpleName() + ":" + error.getMessage();
+  }
+
+  private static Throwable catchThrowable(Operation operation) {
+    try { operation.run(); return null; } catch (Throwable error) { return error; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+
+  private interface Operation { void run() throws Throwable; }
 }
 "#;
 
