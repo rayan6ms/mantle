@@ -6317,18 +6317,20 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public abstract single-method interface has exact Java 11 classfile metadata, lambda compatibility, member counts, and no extra fields, constructors, parents, or annotations.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegSectionHandler",
       "symbol_kind": "METHOD",
       "member_name": "handle",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegSectionInfo;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Handle preserves exact nullable section identity and checked or unchecked failure identity, declares only IOException, and dispatches through real reader chains.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegSectionInfo",

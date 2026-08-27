@@ -191,6 +191,8 @@ const MPEG_READER_CHAIN_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegReader$Chain";
 const MPEG_READER_HANDLER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegReader$Handler";
+const MPEG_SECTION_HANDLER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegSectionHandler";
 const MPEG_AAC_TRACK_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegAacTrackConsumer";
 const ADTS_CONTAINER_PROBE_CLASS: &str =
@@ -631,6 +633,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MPEG_PARSE_STOP_CHECKER_CLASS,
     MPEG_READER_CLASS,
     MPEG_READER_CHAIN_CLASS,
+    MPEG_SECTION_HANDLER_CLASS,
     MPEG_AAC_TRACK_CONSUMER_CLASS,
     ADTS_CONTAINER_PROBE_CLASS,
     ADTS_PACKET_HEADER_CLASS,

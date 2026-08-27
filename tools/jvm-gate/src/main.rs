@@ -178,6 +178,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mpeg-parse-stop-checker-consumer" => Some(MPEG_PARSE_STOP_CHECKER_CONSUMER),
         "write-mpeg-reader-consumer" => Some(MPEG_READER_CONSUMER),
         "write-mpeg-reader-chain-consumer" => Some(MPEG_READER_CHAIN_CONSUMER),
+        "write-mpeg-section-handler-consumer" => Some(MPEG_SECTION_HANDLER_CONSUMER),
         "write-mpeg-noop-track-consumer-consumer" => Some(MPEG_NOOP_TRACK_CONSUMER_CONSUMER),
         "write-mpeg-track-consumer-consumer" => Some(MPEG_TRACK_CONSUMER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
@@ -16432,6 +16433,124 @@ public final class GateMpegReaderChain {
     }
     @Override public long getPosition() { return position; }
     @Override protected void seekHard(long position) { this.position = position; }
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      return Collections.emptyList();
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MPEG_SECTION_HANDLER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegReader;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegSectionHandler;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegSectionInfo;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateMpegSectionHandler {
+  public static void main(String[] args) throws Exception {
+    directImplementations();
+    lambdaAndFailures();
+    chainIntegration();
+    reflection();
+    System.out.println("contracts=public-abstract-interface,functional-interface,no-fields,no-constructors,one-method,section-identity,null-section,anonymous-implementation,lambda-compatibility,checked-failure-identity,unchecked-failure-identity,chain-dispatch,parent-identity,skip-after-handler,checked-throws,reflection");
+  }
+
+  private static void directImplementations() throws Exception {
+    MpegSectionInfo section = new MpegSectionInfo(Long.MIN_VALUE, Long.MAX_VALUE, new String("box1"));
+    MpegSectionInfo[] observed = new MpegSectionInfo[1];
+    int[] calls = new int[1];
+    MpegSectionHandler handler = new MpegSectionHandler() {
+      @Override public void handle(MpegSectionInfo value) {
+        calls[0]++; observed[0] = value;
+      }
+    };
+    handler.handle(section);
+    check(calls[0] == 1 && observed[0] == section,
+        "anonymous implementation receives exact section identity");
+    handler.handle(null);
+    check(calls[0] == 2 && observed[0] == null,
+        "interface dispatch permits null section values");
+  }
+
+  private static void lambdaAndFailures() throws Exception {
+    MpegSectionInfo section = new MpegSectionInfo(1L, 2L, "box2");
+    MpegSectionInfo[] observed = new MpegSectionInfo[1];
+    MpegSectionHandler lambda = value -> observed[0] = value;
+    lambda.handle(section);
+    check(observed[0] == section, "lambda implementation receives exact section identity");
+
+    IOException checked = new IOException("checked");
+    MpegSectionHandler checkedHandler = value -> { throw checked; };
+    check(catchThrowable(() -> checkedHandler.handle(section)) == checked,
+        "declared IOException identity crosses interface dispatch unchanged");
+    RuntimeException unchecked = new RuntimeException("unchecked");
+    MpegSectionHandler uncheckedHandler = value -> { throw unchecked; };
+    check(catchThrowable(() -> uncheckedHandler.handle(section)) == unchecked,
+        "unchecked failure identity crosses interface dispatch unchanged");
+  }
+
+  private static void chainIntegration() throws Exception {
+    MpegSectionInfo parent = new MpegSectionInfo(0L, 10L, "root");
+    MpegSectionInfo child = new MpegSectionInfo(0L, 8L, "box3");
+    OneReader reader = new OneReader(child);
+    MpegSectionInfo[] observed = new MpegSectionInfo[1];
+    reader.in(parent).handle("box3", value -> observed[0] = value).run();
+    check(observed[0] == child && reader.parent == parent && reader.nextCalls == 2
+        && reader.skipped == child,
+        "real chain dispatch preserves handler, child, parent and skip behavior");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MpegSectionHandler> type = MpegSectionHandler.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.INTERFACE | Modifier.ABSTRACT)
+        && type.isInterface() && type.getSuperclass() == null && type.getInterfaces().length == 0
+        && type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 1 && type.getDeclaredClasses().length == 0
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0,
+        "exact interface metadata and member counts");
+    Method method = type.getDeclaredMethod("handle", MpegSectionInfo.class);
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == void.class
+        && Arrays.equals(method.getParameterTypes(), new Class<?>[] {MpegSectionInfo.class})
+        && Arrays.equals(method.getExceptionTypes(), new Class<?>[] {IOException.class})
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), "exact handle descriptor and checked exception metadata");
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class OneReader extends MpegReader {
+    final MpegSectionInfo child;
+    MpegSectionInfo parent;
+    MpegSectionInfo skipped;
+    int nextCalls;
+    OneReader(MpegSectionInfo child) { super(new EmptyStream()); this.child = child; }
+    @Override public MpegSectionInfo nextChild(MpegSectionInfo value) {
+      nextCalls++; parent = value; return nextCalls == 1 ? child : null;
+    }
+    @Override public void skip(MpegSectionInfo value) { skipped = value; }
+  }
+
+  private static final class EmptyStream extends SeekableInputStream {
+    EmptyStream() { super(0L, 0L); }
+    @Override public int read() { return -1; }
+    @Override public long getPosition() { return 0L; }
+    @Override protected void seekHard(long position) {}
     @Override public boolean canSeekHard() { return true; }
     @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
       return Collections.emptyList();
