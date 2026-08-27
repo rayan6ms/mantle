@@ -273,6 +273,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-info-builder-consum
   --output "$WORK/GateMpegTrackInfoBuilder.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-file-track-provider-consumer \
   --output "$WORK/GateMpegFileTrackProvider.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-parse-stop-checker-consumer \
+  --output "$WORK/GateMpegParseStopChecker.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-noop-track-consumer-consumer \
   --output "$WORK/GateMpegNoopTrackConsumer.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-consumer-consumer \
@@ -445,6 +447,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateMpegTrackInfoBuilder.java" \
   "$WORK/GateMpegTrackConsumer.java" \
   "$WORK/GateMpegFileTrackProvider.java" \
+  "$WORK/GateMpegParseStopChecker.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GateAdtsStreamReader.java" \
@@ -1501,6 +1504,16 @@ cmp "$WORK/mpeg-file-track-provider-reference.txt" \
 grep --fixed-strings \
   'contracts=public-abstract-interface,no-fields,no-constructors,four-methods,consumer-identity,null-consumer,boolean-result,duration-result,full-width-duration,provide-dispatch,seek-dispatch,full-width-timecode,checked-failure-identity,implementation-compatibility,checked-throws,exception-order,reflection' \
   "$WORK/mpeg-file-track-provider-candidate.txt" >/dev/null
+java -Xverify:all -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegParseStopChecker >"$WORK/mpeg-parse-stop-checker-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegParseStopChecker >"$WORK/mpeg-parse-stop-checker-candidate.txt"
+cmp "$WORK/mpeg-parse-stop-checker-reference.txt" \
+  "$WORK/mpeg-parse-stop-checker-candidate.txt"
+grep --fixed-strings \
+  'contracts=public-abstract-interface,functional-interface,no-fields,no-constructors,one-method,section-identity,null-section,start-phase,end-phase,boolean-result,unchecked-failure-identity,lambda-compatibility,loader-implementation,root-stop-rules,no-checked-throws,reflection' \
+  "$WORK/mpeg-parse-stop-checker-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mp3_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMp3ConstantRateSeeker \
   >"$WORK/mp3-constant-rate-seeker-reference.txt"

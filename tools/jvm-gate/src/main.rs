@@ -175,6 +175,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mpeg-track-info-consumer" => Some(MPEG_TRACK_INFO_CONSUMER),
         "write-mpeg-track-info-builder-consumer" => Some(MPEG_TRACK_INFO_BUILDER_CONSUMER),
         "write-mpeg-file-track-provider-consumer" => Some(MPEG_FILE_TRACK_PROVIDER_CONSUMER),
+        "write-mpeg-parse-stop-checker-consumer" => Some(MPEG_PARSE_STOP_CHECKER_CONSUMER),
         "write-mpeg-noop-track-consumer-consumer" => Some(MPEG_NOOP_TRACK_CONSUMER_CONSUMER),
         "write-mpeg-track-consumer-consumer" => Some(MPEG_TRACK_CONSUMER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
@@ -15640,6 +15641,146 @@ public final class GateMpegFileTrackProvider {
       seekCalls++;
       if (seekCalls == 1) firstTimecode = timecode;
       lastTimecode = timecode;
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MPEG_PARSE_STOP_CHECKER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegFileLoader;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegParseStopChecker;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegSectionInfo;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+public final class GateMpegParseStopChecker {
+  public static void main(String[] args) throws Exception {
+    dispatchAndIdentity();
+    checkedFailureBoundary();
+    lambdaCompatibility();
+    loaderImplementation();
+    reflection();
+    System.out.println("contracts=public-abstract-interface,functional-interface,no-fields,no-constructors,one-method,section-identity,null-section,start-phase,end-phase,boolean-result,unchecked-failure-identity,lambda-compatibility,loader-implementation,root-stop-rules,no-checked-throws,reflection");
+  }
+
+  private static void dispatchAndIdentity() {
+    RecordingChecker implementation = new RecordingChecker();
+    MpegParseStopChecker checker = implementation;
+    MpegSectionInfo section = new MpegSectionInfo(Long.MIN_VALUE, Long.MAX_VALUE, "wide");
+    implementation.result = false;
+    check(!checker.check(section, true) && implementation.calls == 1
+        && implementation.lastSection == section && implementation.lastStart,
+        "start-phase dispatch preserves exact section identity and false result");
+    implementation.result = true;
+    check(checker.check(null, false) && implementation.calls == 2
+        && implementation.lastSection == null && !implementation.lastStart,
+        "end-phase dispatch preserves null section and true result");
+  }
+
+  private static void checkedFailureBoundary() {
+    RecordingChecker implementation = new RecordingChecker();
+    RuntimeException failure = new RuntimeException("check-failure");
+    implementation.failure = failure;
+    check(catchThrowable(() -> ((MpegParseStopChecker) implementation).check(null, true)) == failure,
+        "unchecked implementation failure identity crosses the interface unchanged");
+  }
+
+  private static void lambdaCompatibility() {
+    MpegSectionInfo first = new MpegSectionInfo(1L, 2L, "first");
+    MpegSectionInfo second = new MpegSectionInfo(3L, 4L, "second");
+    Object[] captured = new Object[2];
+    MpegParseStopChecker checker = (child, start) -> {
+      captured[0] = child;
+      captured[1] = start;
+      return child == second && !start;
+    };
+    check(!checker.check(first, true) && captured[0] == first
+        && Boolean.TRUE.equals(captured[1]), "lambda start dispatch preserves arguments");
+    check(checker.check(second, false) && captured[0] == second
+        && Boolean.FALSE.equals(captured[1]), "lambda end dispatch preserves arguments and result");
+  }
+
+  private static void loaderImplementation() throws Exception {
+    MpegFileLoader loader = new MpegFileLoader(new EmptyStream());
+    Method factory = MpegFileLoader.class.getDeclaredMethod(
+        "getRootStopChecker", AtomicBoolean.class);
+    factory.setAccessible(true);
+    AtomicBoolean movieSeen = new AtomicBoolean(false);
+    MpegParseStopChecker checker = (MpegParseStopChecker) factory.invoke(loader, movieSeen);
+    check(checker != null && MpegParseStopChecker.class.isInstance(checker),
+        "loader's real lambda implementation remains assignable");
+    check(checker.check(section("sidx"), false) && !checker.check(section("sidx"), true)
+        && !checker.check(section("emsg"), false)
+        && !checker.check(section("mdat"), true)
+        && !checker.check(section("free"), true)
+        && !checker.check(section("other"), false),
+        "root checker preserves pre-movie stop rules");
+    movieSeen.set(true);
+    check(checker.check(section("emsg"), false)
+        && checker.check(section("mdat"), true)
+        && checker.check(section("free"), true)
+        && !checker.check(section("emsg"), true)
+        && !checker.check(section("other"), false),
+        "root checker preserves post-movie stop rules");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MpegParseStopChecker> type = MpegParseStopChecker.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT | Modifier.INTERFACE)
+        && type.isInterface() && type.getSuperclass() == null && type.getInterfaces().length == 0
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0,
+        "exact public abstract interface metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 1, "exact functional-interface member shape");
+    Method check = type.getDeclaredMethod("check", MpegSectionInfo.class, boolean.class);
+    check(check.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && check.getReturnType() == boolean.class
+        && Arrays.equals(check.getParameterTypes(),
+            new Class<?>[] {MpegSectionInfo.class, boolean.class})
+        && check.getExceptionTypes().length == 0 && !check.isSynthetic() && !check.isBridge()
+        && !check.isDefault() && !check.isVarArgs(), "check method metadata");
+  }
+
+  private static MpegSectionInfo section(String type) {
+    return new MpegSectionInfo(0L, 0L, type);
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class RecordingChecker implements MpegParseStopChecker {
+    int calls;
+    MpegSectionInfo lastSection;
+    boolean lastStart;
+    boolean result;
+    RuntimeException failure;
+    @Override public boolean check(MpegSectionInfo section, boolean start) {
+      calls++; lastSection = section; lastStart = start;
+      if (failure != null) throw failure;
+      return result;
+    }
+  }
+
+  private static final class EmptyStream extends SeekableInputStream {
+    EmptyStream() { super(0L, 0L); }
+    @Override public int read() { return -1; }
+    @Override public long getPosition() { return 0L; }
+    @Override protected void seekHard(long position) {}
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      return Collections.emptyList();
     }
   }
 

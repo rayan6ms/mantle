@@ -6107,18 +6107,20 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public single-abstract-method interface metadata, lambda compatibility, zero-field and zero-constructor shape, real loader implementation assignability, and reflection match the reference.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegParseStopChecker",
       "symbol_kind": "METHOD",
       "member_name": "check",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegSectionInfo;Z)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Check dispatch preserves exact nullable section identity, start/end booleans, both boolean results, unchecked failure identity, no checked exceptions, and the loader's root stop rules.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegReader",
