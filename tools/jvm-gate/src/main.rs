@@ -188,6 +188,9 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
             Some(MATROSKA_OPUS_TRACK_CONSUMER_CONSUMER)
         }
         "write-matroska-track-consumer-consumer" => Some(MATROSKA_TRACK_CONSUMER_CONSUMER),
+        "write-matroska-vorbis-track-consumer-consumer" => {
+            Some(MATROSKA_VORBIS_TRACK_CONSUMER_CONSUMER)
+        }
         "write-matroska-streaming-file-consumer" => Some(MATROSKA_STREAMING_FILE_CONSUMER),
         "write-matroska-audio-track-consumer" => Some(MATROSKA_AUDIO_TRACK_CONSUMER),
         "write-matroska-audio-track-support-consumer" => {
@@ -17706,6 +17709,56 @@ public final class GateMatroskaTrackConsumer {
       if (closeFailure != null) throw closeFailure;
       closeCalls++;
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MATROSKA_VORBIS_TRACK_CONSUMER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaTrackConsumer;
+import com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaVorbisTrackConsumer;
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+
+public final class GateMatroskaVorbisTrackConsumer {
+  public static void main(String[] args) throws Exception {
+    reflection();
+    System.out.println("contracts=public-constructor,track-consumer-interface,method-signatures,checked-throws,subclassable,reflection");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MatroskaVorbisTrackConsumer> type = MatroskaVorbisTrackConsumer.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {MatroskaTrackConsumer.class})
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete class metadata");
+    Constructor<MatroskaVorbisTrackConsumer> constructor = type.getDeclaredConstructor(
+        AudioProcessingContext.class, MatroskaFileTrack.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
+    checkMethod(type.getDeclaredMethod("getTrack"), MatroskaFileTrack.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("initialise"), void.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("seekPerformed", long.class, long.class), void.class,
+        new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("flush"), void.class,
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("consume", ByteBuffer.class), void.class,
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("close"), void.class, new Class<?>[0]);
+  }
+
+  private static void checkMethod(Method method, Class<?> result, Class<?>[] failures) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == result
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isVarArgs(), method.getName() + " metadata");
   }
 
   private static void check(boolean condition, String message) {

@@ -286,6 +286,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-matroska-opus-track-consumer-c
   --output "$WORK/GateMatroskaOpusTrackConsumer.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-matroska-track-consumer-consumer \
   --output "$WORK/GateMatroskaTrackConsumer.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-matroska-vorbis-track-consumer-consumer \
+  --output "$WORK/GateMatroskaVorbisTrackConsumer.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-matroska-streaming-file-consumer \
   --output "$WORK/GateMatroskaStreamingFile.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-matroska-audio-track-consumer \
@@ -458,6 +460,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateMatroskaAacTrackConsumer.java" \
   "$WORK/GateMatroskaOpusTrackConsumer.java" \
   "$WORK/GateMatroskaTrackConsumer.java" \
+  "$WORK/GateMatroskaVorbisTrackConsumer.java" \
   "$WORK/GateMatroskaStreamingFile.java" \
   "$WORK/GateOpusPacketRouter.java" \
   "$WORK/GateDefaultSoundCloudDataLoader.java" \
@@ -1564,6 +1567,17 @@ cmp "$WORK/matroska-track-consumer-reference.txt" \
 grep --fixed-strings \
   'contracts=dispatch,track-identity,long-identity,buffer-identity,checked-failures,interface,auto-closeable,reflection' \
   "$WORK/matroska-track-consumer-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMatroskaVorbisTrackConsumer >"$WORK/matroska-vorbis-track-consumer-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMatroskaVorbisTrackConsumer >"$WORK/matroska-vorbis-track-consumer-candidate.txt"
+cmp "$WORK/matroska-vorbis-track-consumer-reference.txt" \
+  "$WORK/matroska-vorbis-track-consumer-candidate.txt"
+grep --fixed-strings \
+  'contracts=public-constructor,track-consumer-interface,method-signatures,checked-throws,subclassable,reflection' \
+  "$WORK/matroska-vorbis-track-consumer-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateMatroskaStreamingFile >"$WORK/matroska-streaming-file-reference.txt"

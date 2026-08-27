@@ -204,6 +204,8 @@ const MATROSKA_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaContainerProbe";
 const MATROSKA_OPUS_TRACK_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaOpusTrackConsumer";
+const MATROSKA_VORBIS_TRACK_CONSUMER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaVorbisTrackConsumer";
 const MATROSKA_TRACK_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaTrackConsumer";
 const MATROSKA_STREAMING_FILE_CLASS: &str =
@@ -566,6 +568,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MATROSKA_AUDIO_TRACK_CLASS,
     MATROSKA_CONTAINER_PROBE_CLASS,
     MATROSKA_OPUS_TRACK_CONSUMER_CLASS,
+    MATROSKA_VORBIS_TRACK_CONSUMER_CLASS,
     MATROSKA_TRACK_CONSUMER_CLASS,
     MATROSKA_STREAMING_FILE_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
@@ -1532,6 +1535,9 @@ fn replacement_body(
     }
     if class_name == MATROSKA_OPUS_TRACK_CONSUMER_CLASS {
         return matroska_opus_track_consumer_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == MATROSKA_VORBIS_TRACK_CONSUMER_CLASS {
+        return matroska_vorbis_track_consumer_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == MATROSKA_STREAMING_FILE_CLASS {
         return matroska_streaming_file_replacement(pool, name, descriptor, required_locals);
@@ -9793,6 +9799,58 @@ fn matroska_opus_track_consumer_replacement(
             required_locals,
         ),
     }
+}
+
+fn matroska_vorbis_track_consumer_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;)V",
+        ) => matroska_vorbis_track_consumer_constructor(pool),
+        (
+            "getTrack",
+            "()Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;",
+        ) => code(
+            pool,
+            1,
+            required_locals,
+            vec![Instruction::Aconst_null, Instruction::Areturn],
+        ),
+        ("initialise", "()V")
+        | ("seekPerformed", "(JJ)V")
+        | ("flush", "()V")
+        | ("consume", "(Ljava/nio/ByteBuffer;)V")
+        | ("close", "()V") => code(pool, 0, required_locals, vec![Instruction::Return]),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {MATROSKA_VORBIS_TRACK_CONSUMER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn matroska_vorbis_track_consumer_constructor(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    code(
+        pool,
+        1,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Return,
+        ],
+    )
 }
 
 fn matroska_opus_track_consumer_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
