@@ -2527,9 +2527,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[2].completed_slices[].symbols] | add) == .cohorts[2].classified_symbols and
   (.cohorts[2].classified_symbols + .cohorts[2].remaining_symbols) == .cohorts[2].symbols and
   .cohorts[3].status == "IN_PROGRESS" and
-  .cohorts[3].classified_symbols == 526 and
-  .cohorts[3].remaining_symbols == 298 and
-  (.cohorts[3].completed_slices | length) == 62 and
+  .cohorts[3].classified_symbols == 538 and
+  .cohorts[3].remaining_symbols == 286 and
+  (.cohorts[3].completed_slices | length) == 63 and
   .cohorts[3].completed_slices[0] == {
     id: "formats-contracts",
     classes: 1,
@@ -3025,6 +3025,19 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "tools/jvm-gate/src/main.rs"
     ]
   } and
+  .cohorts[3].completed_slices[62] == {
+    id: "mpeg-reader-contracts",
+    classes: 1,
+    fields: 2,
+    methods: 9,
+    symbols: 12,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
   .cohorts[3].completed_slices[1] == {
     id: "media-container-contracts",
     classes: 1,
@@ -3339,9 +3352,16 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   } and
   ([.cohorts[3].completed_slices[].symbols] | add) == .cohorts[3].classified_symbols and
   (.cohorts[3].classified_symbols + .cohorts[3].remaining_symbols) == .cohorts[3].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1978 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1990 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1831 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1843 and
+  ([$classifications.symbols[] |
+    select(.binary_name ==
+      "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegReader" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 12 and
   ([$classifications.symbols[] |
     select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 131 and
   ([$classifications.symbols[] |
@@ -4296,6 +4316,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackInfo$Builder",
         "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegFileTrackProvider",
         "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegParseStopChecker",
+        "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegReader",
         "com.sedmelluq.discord.lavaplayer.filter.AudioFilterChain",
         "com.sedmelluq.discord.lavaplayer.filter.AudioPipeline",
         "com.sedmelluq.discord.lavaplayer.filter.AudioPipelineFactory",
@@ -4778,7 +4799,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "mpeg-reader-contracts" and
+  .phase_entry.next_slice == "mpeg-reader-chain-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 JQ
@@ -4786,7 +4807,7 @@ JQ
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '280 reference classes / 1,983 symbols' \
+  '281 reference classes / 1,995 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -4796,4 +4817,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 1,978 classified symbols and 784 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 1,990 classified symbols and 772 unassessed symbols.\n'

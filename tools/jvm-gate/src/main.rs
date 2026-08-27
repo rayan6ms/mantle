@@ -176,6 +176,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mpeg-track-info-builder-consumer" => Some(MPEG_TRACK_INFO_BUILDER_CONSUMER),
         "write-mpeg-file-track-provider-consumer" => Some(MPEG_FILE_TRACK_PROVIDER_CONSUMER),
         "write-mpeg-parse-stop-checker-consumer" => Some(MPEG_PARSE_STOP_CHECKER_CONSUMER),
+        "write-mpeg-reader-consumer" => Some(MPEG_READER_CONSUMER),
         "write-mpeg-noop-track-consumer-consumer" => Some(MPEG_NOOP_TRACK_CONSUMER_CONSUMER),
         "write-mpeg-track-consumer-consumer" => Some(MPEG_TRACK_CONSUMER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
@@ -15782,6 +15783,335 @@ public final class GateMpegParseStopChecker {
     @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
       return Collections.emptyList();
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MPEG_READER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegReader;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegSectionInfo;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegVersionedSectionInfo;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.DataInput;
+import java.io.DataInputStream;
+import java.io.EOFException;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateMpegReader {
+  public static void main(String[] args) throws Exception {
+    construction();
+    childHeaders();
+    childBoundariesAndFailures();
+    skipping();
+    strings();
+    compressedIntegers();
+    flags();
+    chainsAndSubclassing();
+    reflection();
+    System.out.println("contracts=constructor,input-identity,data-wrapper,private-buffers,null-input,standard-child,unsigned-length,extended-length,zero-length,fourcc-bytes,parent-boundary,eof,truncated-header,io-identity,skip-target,skip-overflow,skip-wrapping,cause-identity,utf8,fourcc-charset,terminated-string,empty-string,malformed-replacement,negative-size,compressed-int,compressed-four-byte-limit,parse-flags,version-flags,section-copy,chain-freshness,chain-state,null-parent,subclassable,private-state,checked-throws,nested-metadata,reflection");
+  }
+
+  private static void construction() throws Exception {
+    MemoryStream stream = new MemoryStream(bytes(1, 2, 3));
+    MpegReader reader = new MpegReader(stream);
+    check(reader.seek == stream && reader.data instanceof DataInputStream,
+        "constructor retains exact seekable input and creates data wrapper");
+    check(field(reader, "fourCcBuffer") instanceof byte[]
+        && ((byte[]) field(reader, "fourCcBuffer")).length == 4
+        && field(reader, "readAttemptBuffer") instanceof ByteBuffer
+        && ((ByteBuffer) field(reader, "readAttemptBuffer")).capacity() == 4,
+        "constructor creates exact private parsing buffers");
+    MpegReader second = new MpegReader(stream);
+    check(field(reader, "fourCcBuffer") != field(second, "fourCcBuffer")
+        && field(reader, "readAttemptBuffer") != field(second, "readAttemptBuffer"),
+        "private parsing buffers are instance-local");
+    MpegReader nullReader = new MpegReader(null);
+    check(nullReader.seek == null && nullReader.data instanceof DataInputStream,
+        "constructor accepts null input without eager access");
+  }
+
+  private static void childHeaders() throws Exception {
+    MemoryStream standardStream = new MemoryStream(concat(intBytes(12), bytes('t', 'e', 's', 't')));
+    MpegSectionInfo standard = new MpegReader(standardStream)
+        .nextChild(new MpegSectionInfo(0L, 12L, "root"));
+    check(standard.offset == 0L && standard.length == 12L && "test".equals(standard.type)
+        && standardStream.position == 8L, "standard child header fields and position");
+
+    MemoryStream unsignedStream = new MemoryStream(concat(intBytes(-1), bytes('w', 'i', 'd', 'e')));
+    MpegSectionInfo unsigned = new MpegReader(unsignedStream)
+        .nextChild(new MpegSectionInfo(0L, 20L, "root"));
+    check(unsigned.length == 4294967295L && "wide".equals(unsigned.type),
+        "32-bit length field is widened unsigned");
+
+    byte[] extendedBytes = concat(intBytes(1), bytes('e', 'x', 't', 'd'), longBytes(Long.MIN_VALUE));
+    MemoryStream extendedStream = new MemoryStream(extendedBytes);
+    MpegSectionInfo extended = new MpegReader(extendedStream)
+        .nextChild(new MpegSectionInfo(0L, 24L, "root"));
+    check(extended.offset == 0L && extended.length == Long.MIN_VALUE
+        && "extd".equals(extended.type) && extendedStream.position == 16L,
+        "extended child retains exact signed 64-bit length");
+
+    MemoryStream zeroStream = new MemoryStream(concat(intBytes(0), bytes('z', 'e', 'r', 'o')));
+    MpegSectionInfo zero = new MpegReader(zeroStream)
+        .nextChild(new MpegSectionInfo(0L, 12L, "root"));
+    check(zero.length == 0L && "zero".equals(zero.type),
+        "zero length is returned without normalization");
+
+    MemoryStream binaryTypeStream = new MemoryStream(concat(intBytes(8), bytes(0, 255, 128, 'A')));
+    MpegSectionInfo binaryType = new MpegReader(binaryTypeStream)
+        .nextChild(new MpegSectionInfo(0L, 12L, "root"));
+    check(binaryType.type.length() == 4 && binaryType.type.charAt(0) == 0
+        && binaryType.type.charAt(1) == 255 && binaryType.type.charAt(2) == 128
+        && binaryType.type.charAt(3) == 'A', "FourCC uses exact ISO-8859-1 byte mapping");
+  }
+
+  private static void childBoundariesAndFailures() throws Exception {
+    MemoryStream boundaryStream = new MemoryStream(concat(intBytes(8), bytes('n', 'o', 'p', 'e')));
+    MpegReader boundaryReader = new MpegReader(boundaryStream);
+    check(boundaryReader.nextChild(new MpegSectionInfo(0L, 8L, "root")) == null
+        && boundaryStream.readCalls == 0 && boundaryStream.position == 0L,
+        "parent boundary returns null before reading");
+    MemoryStream eofStream = new MemoryStream(new byte[0]);
+    check(new MpegReader(eofStream).nextChild(new MpegSectionInfo(0L, 20L, "root")) == null
+        && eofStream.readCalls == 1, "clean EOF returns null after one read attempt");
+
+    MemoryStream shortLength = new MemoryStream(bytes(0, 0));
+    Throwable lengthFailure = catchThrowable(() -> new MpegReader(shortLength)
+        .nextChild(new MpegSectionInfo(0L, 20L, "root")));
+    check(lengthFailure instanceof EOFException, "truncated length propagates EOFException");
+    MemoryStream shortType = new MemoryStream(concat(intBytes(8), bytes('a', 'b')));
+    Throwable typeFailure = catchThrowable(() -> new MpegReader(shortType)
+        .nextChild(new MpegSectionInfo(0L, 20L, "root")));
+    check(typeFailure instanceof EOFException, "truncated FourCC propagates EOFException");
+    IOException readFailure = new IOException("read-failure");
+    MemoryStream failing = new MemoryStream(bytes(1, 2, 3, 4)); failing.readFailure = readFailure;
+    check(catchThrowable(() -> new MpegReader(failing)
+        .nextChild(new MpegSectionInfo(0L, 20L, "root"))) == readFailure,
+        "input failure identity crosses nextChild unchanged");
+    check(catchThrowable(() -> boundaryReader.nextChild(null)) instanceof NullPointerException,
+        "null parent fails before input access");
+  }
+
+  private static void skipping() {
+    MemoryStream stream = new MemoryStream(new byte[0]);
+    MpegReader reader = new MpegReader(stream);
+    reader.skip(new MpegSectionInfo(40L, 2L, "box"));
+    check(stream.seekCalls == 1 && stream.position == 42L, "skip seeks to exact section end");
+    reader.skip(new MpegSectionInfo(Long.MAX_VALUE, 2L, "wrap"));
+    check(stream.seekCalls == 2 && stream.position == Long.MIN_VALUE + 1L,
+        "skip preserves signed long overflow behavior");
+    stream.position = 0L;
+    IOException failure = new IOException("seek-failure"); stream.seekFailure = failure;
+    Throwable wrapped = catchThrowable(() -> reader.skip(new MpegSectionInfo(0L, 1L, "fail")));
+    check(wrapped instanceof RuntimeException && wrapped.getCause() == failure,
+        "skip wraps checked seek failure with exact cause identity");
+    check(catchThrowable(() -> reader.skip(null)) instanceof NullPointerException,
+        "null section fails without a declared checked exception");
+  }
+
+  private static void strings() throws Exception {
+    MpegReader fourCc = reader(bytes(0, 255, 128, 'A'));
+    String code = fourCc.readFourCC();
+    check(code.length() == 4 && code.charAt(0) == 0 && code.charAt(1) == 255
+        && code.charAt(2) == 128 && code.charAt(3) == 'A', "direct FourCC byte mapping");
+
+    byte[] utf = "A€😀".getBytes(StandardCharsets.UTF_8);
+    check("A€😀".equals(reader(utf).readUtfString(utf.length)),
+        "fixed-size UTF-8 decoding");
+    check("".equals(reader(new byte[0]).readUtfString(0)), "zero-size UTF string");
+    check("�".equals(reader(bytes(0xC3)).readUtfString(1)),
+        "malformed fixed UTF uses replacement character");
+    check(catchThrowable(() -> reader(new byte[0]).readUtfString(-1))
+        instanceof NegativeArraySizeException, "negative UTF size is not normalized");
+    check(catchThrowable(() -> reader(bytes('a')).readUtfString(2)) instanceof EOFException,
+        "truncated fixed UTF propagates EOFException");
+
+    check("hello".equals(reader(bytes('h', 'e', 'l', 'l', 'o', 0, 'x'))
+        .readTerminatedString()), "terminated UTF stops at first null");
+    check("".equals(reader(bytes(0)).readTerminatedString()), "empty terminated string");
+    check("�".equals(reader(bytes(0xC3, 0)).readTerminatedString()),
+        "malformed terminated UTF uses replacement character");
+    check(catchThrowable(() -> reader(bytes('n', 'o')).readTerminatedString())
+        instanceof EOFException, "unterminated string propagates EOFException");
+  }
+
+  private static void compressedIntegers() throws Exception {
+    check(reader(bytes(0x7F)).readCompressedInt() == 127, "single-byte compressed integer");
+    check(reader(bytes(0x81, 0)).readCompressedInt() == 128, "two-byte compressed integer");
+    check(reader(bytes(0xFF, 0xFF, 0xFF, 0x7F)).readCompressedInt() == 268435455,
+        "maximum four-byte compressed integer");
+    MemoryStream limitedStream = new MemoryStream(bytes(0x80, 0x80, 0x80, 0x80, 1));
+    check(new MpegReader(limitedStream).readCompressedInt() == 0 && limitedStream.position == 4L,
+        "four-byte limit leaves continuation byte unread");
+    check(catchThrowable(() -> reader(bytes(0x80)).readCompressedInt()) instanceof EOFException,
+        "truncated compressed integer propagates EOFException");
+  }
+
+  private static void flags() throws Exception {
+    String type = new String("flag");
+    MpegSectionInfo section = new MpegSectionInfo(Long.MIN_VALUE, Long.MAX_VALUE, type);
+    MpegVersionedSectionInfo parsed = reader(intBytes(0xFE123456)).parseFlags(section);
+    check(parsed.offset == Long.MIN_VALUE && parsed.length == Long.MAX_VALUE
+        && parsed.type == type && parsed.version == 254 && parsed.flags == 0x123456,
+        "version/flags parsing copies section values and preserves type identity");
+    check(catchThrowable(() -> reader(bytes(1, 2)).parseFlags(section)) instanceof EOFException,
+        "truncated flags propagate EOFException");
+    MemoryStream nullStream = new MemoryStream(intBytes(0));
+    check(catchThrowable(() -> new MpegReader(nullStream).parseFlags(null))
+        instanceof NullPointerException && nullStream.position == 4L,
+        "null section fails after consuming the version-and-flags word");
+  }
+
+  private static void chainsAndSubclassing() throws Exception {
+    MpegReader reader = reader(new byte[0]);
+    MpegSectionInfo parent = new MpegSectionInfo(1L, 2L, "parent");
+    MpegReader.Chain first = reader.in(parent);
+    MpegReader.Chain second = reader.in(parent);
+    MpegReader.Chain nullParent = reader.in(null);
+    check(first != second && field(first, "parent") == parent && field(first, "reader") == reader
+        && ((List<?>) field(first, "handlers")).isEmpty()
+        && field(first, "stopChecker") == null && field(nullParent, "parent") == null,
+        "in creates fresh chains with exact nullable parent and reader state");
+    Derived derived = new Derived(new MemoryStream(bytes('o', 'r', 'i', 'g')));
+    check("override".equals(((MpegReader) derived).readFourCC()) && derived.calls == 1,
+        "ordinary subclass override dispatch remains available");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MpegReader> type = MpegReader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0, "public non-final reader metadata");
+    check(type.getDeclaredFields().length == 4 && type.getDeclaredMethods().length == 10
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredClasses().length == 2,
+        "exact declared member and nested-class counts");
+    String[] fieldNames = Arrays.stream(type.getDeclaredFields()).map(Field::getName).toArray(String[]::new);
+    check(Arrays.equals(fieldNames, new String[] {"data", "seek", "fourCcBuffer", "readAttemptBuffer"}),
+        "exact declared field order");
+    checkField(type.getDeclaredField("data"), DataInput.class, Modifier.PUBLIC | Modifier.FINAL);
+    checkField(type.getDeclaredField("seek"), SeekableInputStream.class, Modifier.PUBLIC | Modifier.FINAL);
+    checkField(type.getDeclaredField("fourCcBuffer"), byte[].class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type.getDeclaredField("readAttemptBuffer"), ByteBuffer.class, Modifier.PRIVATE | Modifier.FINAL);
+    Constructor<MpegReader> constructor = type.getDeclaredConstructor(SeekableInputStream.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0,
+        "constructor descriptor metadata");
+    checkMethod(type.getDeclaredMethod("nextChild", MpegSectionInfo.class), MpegSectionInfo.class,
+        new Class<?>[] {MpegSectionInfo.class}, new Class<?>[] {IOException.class}, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("skip", MpegSectionInfo.class), void.class,
+        new Class<?>[] {MpegSectionInfo.class}, new Class<?>[0], Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("readFourCC"), String.class, new Class<?>[0],
+        new Class<?>[] {IOException.class}, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("readUtfString", int.class), String.class,
+        new Class<?>[] {int.class}, new Class<?>[] {IOException.class}, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("readTerminatedString"), String.class, new Class<?>[0],
+        new Class<?>[] {IOException.class}, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("readCompressedInt"), int.class, new Class<?>[0],
+        new Class<?>[] {IOException.class}, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("parseFlags", MpegSectionInfo.class),
+        MpegVersionedSectionInfo.class, new Class<?>[] {MpegSectionInfo.class},
+        new Class<?>[] {IOException.class}, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("in", MpegSectionInfo.class), MpegReader.Chain.class,
+        new Class<?>[] {MpegSectionInfo.class}, new Class<?>[0], Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("parseFlagsForSection", DataInput.class, MpegSectionInfo.class),
+        MpegVersionedSectionInfo.class, new Class<?>[] {DataInput.class, MpegSectionInfo.class},
+        new Class<?>[] {IOException.class}, Modifier.PRIVATE | Modifier.STATIC);
+    checkMethod(type.getDeclaredMethod("tryReadInt"), Integer.class, new Class<?>[0],
+        new Class<?>[] {IOException.class}, Modifier.PRIVATE);
+    Class<?> chain = Class.forName(type.getName() + "$Chain");
+    Class<?> handler = Class.forName(type.getName() + "$Handler");
+    check(chain.getDeclaringClass() == type
+        && chain.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && handler.getDeclaringClass() == type
+        && handler.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC),
+        "exact nested class metadata");
+  }
+
+  private static void checkField(Field field, Class<?> fieldType, int modifiers) {
+    check(field.getType() == fieldType && field.getModifiers() == modifiers && !field.isSynthetic(),
+        field.getName() + " field metadata");
+  }
+  private static void checkMethod(Method method, Class<?> returnType, Class<?>[] parameters,
+      Class<?>[] failures, int modifiers) {
+    check(method.getModifiers() == modifiers && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isDefault() && !method.isVarArgs(),
+        method.getName() + " method metadata");
+  }
+  private static Object field(Object owner, String name) throws Exception {
+    Field field = owner.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(owner);
+  }
+  private static MpegReader reader(byte[] data) { return new MpegReader(new MemoryStream(data)); }
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+  private interface ThrowingRunnable { void run() throws Throwable; }
+  private static byte[] bytes(int... values) {
+    byte[] result = new byte[values.length];
+    for (int i = 0; i < values.length; i++) result[i] = (byte) values[i];
+    return result;
+  }
+  private static byte[] intBytes(int value) {
+    return bytes(value >>> 24, value >>> 16, value >>> 8, value);
+  }
+  private static byte[] longBytes(long value) {
+    return bytes((int) (value >>> 56), (int) (value >>> 48), (int) (value >>> 40),
+        (int) (value >>> 32), (int) (value >>> 24), (int) (value >>> 16),
+        (int) (value >>> 8), (int) value);
+  }
+  private static byte[] concat(byte[]... arrays) {
+    int size = 0; for (byte[] array : arrays) size += array.length;
+    byte[] result = new byte[size]; int offset = 0;
+    for (byte[] array : arrays) { System.arraycopy(array, 0, result, offset, array.length); offset += array.length; }
+    return result;
+  }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    final byte[] bytes;
+    long position;
+    int readCalls;
+    int seekCalls;
+    IOException readFailure;
+    IOException seekFailure;
+    MemoryStream(byte[] bytes) { super(bytes.length, 0L); this.bytes = bytes; }
+    @Override public int read() throws IOException {
+      readCalls++;
+      if (readFailure != null) throw readFailure;
+      if (position < 0L || position >= bytes.length) return -1;
+      return bytes[(int) position++] & 0xFF;
+    }
+    @Override public long getPosition() { return position; }
+    @Override protected void seekHard(long target) throws IOException {
+      seekCalls++;
+      if (seekFailure != null) throw seekFailure;
+      position = target;
+    }
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      return Collections.emptyList();
+    }
+  }
+
+  private static final class Derived extends MpegReader {
+    int calls;
+    Derived(SeekableInputStream stream) { super(stream); }
+    @Override public String readFourCC() { calls++; return "override"; }
   }
 
   private static void check(boolean condition, String message) {
