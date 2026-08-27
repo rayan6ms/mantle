@@ -4347,135 +4347,150 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file reader preserves exact element traversal, typed payload decoding, block filtering, skip/seek behavior, checked I/O declarations, and reflection metadata under the Phase 13 matroska-file-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileReader",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file reader preserves exact element traversal, typed payload decoding, block filtering, skip/seek behavior, checked I/O declarations, and reflection metadata under the Phase 13 matroska-file-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileReader",
       "symbol_kind": "METHOD",
       "member_name": "readNextElement",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElement;)Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElement;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file reader preserves exact element traversal, typed payload decoding, block filtering, skip/seek behavior, checked I/O declarations, and reflection metadata under the Phase 13 matroska-file-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileReader",
       "symbol_kind": "METHOD",
       "member_name": "readBlockHeader",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElement;I)Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaBlock;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file reader preserves exact element traversal, typed payload decoding, block filtering, skip/seek behavior, checked I/O declarations, and reflection metadata under the Phase 13 matroska-file-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileReader",
       "symbol_kind": "METHOD",
       "member_name": "asInteger",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElement;)I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file reader preserves exact element traversal, typed payload decoding, block filtering, skip/seek behavior, checked I/O declarations, and reflection metadata under the Phase 13 matroska-file-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileReader",
       "symbol_kind": "METHOD",
       "member_name": "asLong",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElement;)J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file reader preserves exact element traversal, typed payload decoding, block filtering, skip/seek behavior, checked I/O declarations, and reflection metadata under the Phase 13 matroska-file-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileReader",
       "symbol_kind": "METHOD",
       "member_name": "asFloat",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElement;)F",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file reader preserves exact element traversal, typed payload decoding, block filtering, skip/seek behavior, checked I/O declarations, and reflection metadata under the Phase 13 matroska-file-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileReader",
       "symbol_kind": "METHOD",
       "member_name": "asDouble",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElement;)D",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file reader preserves exact element traversal, typed payload decoding, block filtering, skip/seek behavior, checked I/O declarations, and reflection metadata under the Phase 13 matroska-file-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileReader",
       "symbol_kind": "METHOD",
       "member_name": "asString",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElement;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file reader preserves exact element traversal, typed payload decoding, block filtering, skip/seek behavior, checked I/O declarations, and reflection metadata under the Phase 13 matroska-file-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileReader",
       "symbol_kind": "METHOD",
       "member_name": "asString",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElement;Ljava/nio/charset/Charset;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file reader preserves exact element traversal, typed payload decoding, block filtering, skip/seek behavior, checked I/O declarations, and reflection metadata under the Phase 13 matroska-file-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileReader",
       "symbol_kind": "METHOD",
       "member_name": "asBytes",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElement;)[B",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file reader preserves exact element traversal, typed payload decoding, block filtering, skip/seek behavior, checked I/O declarations, and reflection metadata under the Phase 13 matroska-file-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileReader",
       "symbol_kind": "METHOD",
       "member_name": "skip",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElement;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file reader preserves exact element traversal, typed payload decoding, block filtering, skip/seek behavior, checked I/O declarations, and reflection metadata under the Phase 13 matroska-file-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileReader",
       "symbol_kind": "METHOD",
       "member_name": "getPosition",
       "descriptor": "()J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file reader preserves exact element traversal, typed payload decoding, block filtering, skip/seek behavior, checked I/O declarations, and reflection metadata under the Phase 13 matroska-file-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileReader",
       "symbol_kind": "METHOD",
       "member_name": "seek",
       "descriptor": "(J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file reader preserves exact element traversal, typed payload decoding, block filtering, skip/seek behavior, checked I/O declarations, and reflection metadata under the Phase 13 matroska-file-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileReader",
       "symbol_kind": "METHOD",
       "member_name": "getDataInput",
       "descriptor": "()Ljava/io/DataInput;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file reader preserves exact element traversal, typed payload decoding, block filtering, skip/seek behavior, checked I/O declarations, and reflection metadata under the Phase 13 matroska-file-reader-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack",

@@ -298,6 +298,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-matroska-element-consumer \
   --output "$WORK/GateMatroskaElement.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-matroska-element-type-consumer \
   --output "$WORK/GateMatroskaElementType.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-matroska-file-reader-consumer \
+  --output "$WORK/GateMatroskaFileReader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-matroska-streaming-file-consumer \
   --output "$WORK/GateMatroskaStreamingFile.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-matroska-audio-track-consumer \
@@ -476,6 +478,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateMatroskaEbmlReader.java" \
   "$WORK/GateMatroskaElement.java" \
   "$WORK/GateMatroskaElementType.java" \
+  "$WORK/GateMatroskaFileReader.java" \
   "$WORK/GateMatroskaStreamingFile.java" \
   "$WORK/GateOpusPacketRouter.java" \
   "$WORK/GateDefaultSoundCloudDataLoader.java" \
@@ -1648,6 +1651,17 @@ cmp "$WORK/matroska-element-type-reference.txt" \
 grep --fixed-strings \
   'contracts=element-enum,data-type-enum,ordering,names,ordinals,byte-encodings,decoded-ids,data-types,find-known,find-unknown,values-clones,value-of,mutable-bytes,stable-id,reflection' \
   "$WORK/matroska-element-type-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMatroskaFileReader >"$WORK/matroska-file-reader-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMatroskaFileReader >"$WORK/matroska-file-reader-candidate.txt"
+cmp "$WORK/matroska-file-reader-reference.txt" \
+  "$WORK/matroska-file-reader-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,element-reading,parent-bounds,typed-integers,typed-floats,typed-strings,bytes,skip,seek,block-filter,data-input,failures,throws,reflection' \
+  "$WORK/matroska-file-reader-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateMatroskaStreamingFile >"$WORK/matroska-streaming-file-reference.txt"

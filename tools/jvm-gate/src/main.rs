@@ -196,6 +196,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-matroska-ebml-reader-consumer" => Some(MATROSKA_EBML_READER_CONSUMER),
         "write-matroska-element-consumer" => Some(MATROSKA_ELEMENT_CONSUMER),
         "write-matroska-element-type-consumer" => Some(MATROSKA_ELEMENT_TYPE_CONSUMER),
+        "write-matroska-file-reader-consumer" => Some(MATROSKA_FILE_READER_CONSUMER),
         "write-matroska-streaming-file-consumer" => Some(MATROSKA_STREAMING_FILE_CONSUMER),
         "write-matroska-audio-track-consumer" => Some(MATROSKA_AUDIO_TRACK_CONSUMER),
         "write-matroska-audio-track-support-consumer" => {
@@ -17535,6 +17536,163 @@ public final class GateMatroskaAacTrackConsumer {
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }
+}
+"#;
+
+const MATROSKA_FILE_READER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement;
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType;
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileReader;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import java.io.DataInput;
+import java.io.EOFException;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+
+public final class GateMatroskaFileReader {
+  public static void main(String[] args) throws Exception {
+    reflection();
+    constructorAndElements();
+    typedValues();
+    skipSeekAndBlock();
+    failures();
+    System.out.println("contracts=constructor,element-reading,parent-bounds,typed-integers,typed-floats,typed-strings,bytes,skip,seek,block-filter,data-input,failures,throws,reflection");
+  }
+
+  private static void constructorAndElements() throws Exception {
+    MemoryStream stream = new MemoryStream(new byte[] {(byte) 0x81, (byte) 0x82, 0x41, 0x42});
+    MatroskaFileReader reader = new MatroskaFileReader(stream);
+    check(reader.getPosition() == 0 && reader.getDataInput() == reader.getDataInput(), "constructor state");
+    MatroskaElement element = reader.readNextElement(null);
+    check(element != null && element.getLevel() == 0 && element.getId() == 1
+        && element.getType() == MatroskaElementType.Unknown && element.getPosition() == 0
+        && element.getHeaderSize() == 2 && element.getDataSize() == 2, "element header");
+    check(new String(reader.asBytes(element), StandardCharsets.US_ASCII).equals("AB")
+        && reader.readNextElement(null) == null, "binary payload and end");
+    MemoryStream childStream = new MemoryStream(new byte[] {(byte) 0x81, (byte) 0x81, 7});
+    MatroskaElement parent = element(0, MatroskaElementType.Segment, 0, 0, 3);
+    MatroskaElement child = new MatroskaFileReader(childStream).readNextElement(parent);
+    check(child.getLevel() == 1 && child.getDataSize() == 1, "parent level and bounds");
+  }
+
+  private static void typedValues() throws Exception {
+    check(new MatroskaFileReader(new MemoryStream(new byte[] {1, 2}))
+        .asInteger(element(0, MatroskaElementType.Timecode, 0, 0, 2)) == 258, "unsigned integer");
+    check(new MatroskaFileReader(new MemoryStream(new byte[] {(byte) 0xff}))
+        .asLong(element(0, MatroskaElementType.ReferenceBlock, 0, 0, 1)) == -1L, "signed integer");
+    byte[] floatBytes = ByteBuffer.allocate(8).putDouble(3.5).array();
+    check(new MatroskaFileReader(new MemoryStream(floatBytes)).asDouble(
+        element(0, MatroskaElementType.Duration, 0, 0, 8)) == 3.5, "double value");
+    check(new MatroskaFileReader(new MemoryStream(new byte[] {0x41, 0x42, 0x43})).asString(
+        element(0, MatroskaElementType.DocType, 0, 0, 3)).equals("ABC"), "ASCII string");
+    byte[] utf8 = "h\u00e9".getBytes(StandardCharsets.UTF_8);
+    check(new MatroskaFileReader(new MemoryStream(utf8)).asString(
+        element(0, MatroskaElementType.Name, 0, 0, utf8.length)).equals("h\u00e9"), "UTF8 string");
+  }
+
+  private static void skipSeekAndBlock() throws Exception {
+    MemoryStream stream = new MemoryStream(new byte[] {1, 2, 3, 4});
+    MatroskaFileReader reader = new MatroskaFileReader(stream);
+    MatroskaElement payload = element(0, MatroskaElementType.Unknown, 0, 2, 2);
+    reader.seek(2);
+    reader.skip(payload);
+    check(reader.getPosition() == 4, "skip and position");
+    DataInput input = reader.getDataInput();
+    check(input == reader.getDataInput(), "data input identity");
+    MemoryStream blockStream = new MemoryStream(new byte[] {(byte) 0x85, 0, 0, (byte) 0x80});
+    MatroskaElement blockParent = element(0, MatroskaElementType.SimpleBlock, 0, 0, 4);
+    check(new MatroskaFileReader(blockStream).readBlockHeader(blockParent, 6) == null,
+        "track filter rejection");
+  }
+
+  private static void failures() throws Exception {
+    check(new MatroskaFileReader(new MemoryStream(new byte[0])).readNextElement(null) == null,
+        "empty stream end");
+    check(catchThrowable(() -> new MatroskaFileReader(new MemoryStream(new byte[] {1}))
+        .asInteger(element(0, MatroskaElementType.DocType, 0, 0, 1)))
+        instanceof IllegalArgumentException, "wrong integer type");
+    check(catchThrowable(() -> new MatroskaFileReader(new MemoryStream(new byte[] {1, 2}))
+        .asFloat(element(0, MatroskaElementType.Duration, 0, 0, 2)))
+        instanceof IllegalStateException, "invalid float size");
+    MatroskaElement beyond = element(0, MatroskaElementType.Unknown, 0, 0, 1);
+    check(catchThrowable(() -> new MatroskaFileReader(new MemoryStream(new byte[0])).skip(beyond))
+        instanceof EOFException, "skip beyond element");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MatroskaFileReader> type = MatroskaFileReader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 4
+        && type.getDeclaredMethods().length == 13 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredAnnotations().length == 0, "reader class metadata");
+    Constructor<MatroskaFileReader> constructor = type.getDeclaredConstructor(SeekableInputStream.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    checkField(type.getDeclaredField("inputStream"), SeekableInputStream.class);
+    checkField(type.getDeclaredField("dataInput"), DataInput.class);
+    checkField(type.getDeclaredField("levels"), Class.forName(
+        "[Lcom.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaElement;"));
+    checkField(type.getDeclaredField("mutableBlock"), Class.forName(
+        "com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaBlock"));
+    checkMethod(type.getDeclaredMethod("readNextElement", MatroskaElement.class), MatroskaElement.class,
+        IOException.class);
+    checkMethod(type.getDeclaredMethod("readBlockHeader", MatroskaElement.class, int.class),
+        Class.forName("com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaBlock"), IOException.class);
+    checkMethod(type.getDeclaredMethod("asInteger", MatroskaElement.class), int.class, IOException.class);
+    checkMethod(type.getDeclaredMethod("asLong", MatroskaElement.class), long.class, IOException.class);
+    checkMethod(type.getDeclaredMethod("asFloat", MatroskaElement.class), float.class, IOException.class);
+    checkMethod(type.getDeclaredMethod("asDouble", MatroskaElement.class), double.class, IOException.class);
+    checkMethod(type.getDeclaredMethod("asString", MatroskaElement.class), String.class, IOException.class);
+    checkMethod(type.getDeclaredMethod("asString", MatroskaElement.class, java.nio.charset.Charset.class), String.class, IOException.class);
+    checkMethod(type.getDeclaredMethod("asBytes", MatroskaElement.class), byte[].class, IOException.class);
+    checkMethod(type.getDeclaredMethod("skip", MatroskaElement.class), void.class, IOException.class);
+    checkMethod(type.getDeclaredMethod("getPosition"), long.class);
+    checkMethod(type.getDeclaredMethod("seek", long.class), void.class, IOException.class);
+    checkMethod(type.getDeclaredMethod("getDataInput"), DataInput.class);
+  }
+
+  private static void checkField(Field field, Class<?> fieldType) {
+    check(field.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL) && field.getType() == fieldType
+        && !field.isSynthetic(), field.getName() + " metadata");
+  }
+  private static void checkMethod(Method method, Class<?> result, Class<?>... failures) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == result
+        && java.util.Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isVarArgs(), method.getName() + " metadata");
+  }
+  private static Throwable catchThrowable(Operation operation) {
+    try { operation.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private static MatroskaElement element(int level, MatroskaElementType type, long position,
+      int headerSize, int dataSize) { return new MutableElement(level, type, position, headerSize, dataSize); }
+  private interface Operation { void run() throws Throwable; }
+  private static final class MutableElement extends MatroskaElement {
+    MutableElement(int level, MatroskaElementType type, long position, int headerSize, int dataSize) {
+      super(level); this.id = type.id; this.type = type; this.position = position;
+      this.headerSize = headerSize; this.dataSize = dataSize;
+    }
+  }
+  private static final class MemoryStream extends SeekableInputStream {
+    private final byte[] data; private int position;
+    MemoryStream(byte[] data) { super(data.length, 0); this.data = data; }
+    public int read() { return position == data.length ? -1 : data[position++] & 0xff; }
+    public int read(byte[] target, int offset, int length) {
+      if (position == data.length) return -1; int count = Math.min(length, data.length - position);
+      System.arraycopy(data, position, target, offset, count); position += count; return count;
+    }
+    public long skip(long distance) { int count = (int) Math.min(distance, data.length - position); position += count; return count; }
+    public long getPosition() { return position; }
+    protected void seekHard(long target) throws IOException { if (target < 0 || target > data.length) throw new EOFException(); position = (int) target; }
+    public boolean canSeekHard() { return true; }
+    public java.util.List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider> getTrackInfoProviders() { return Collections.emptyList(); }
+  }
+  private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
 }
 "#;
 

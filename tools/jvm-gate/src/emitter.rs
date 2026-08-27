@@ -222,6 +222,10 @@ const MATROSKA_EBML_READER_TYPE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaEbmlReader$Type";
 const MATROSKA_EBML_READER_SWITCH_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaEbmlReader$1";
+const MATROSKA_FILE_READER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileReader";
+const MUTABLE_MATROSKA_ELEMENT_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/matroska/format/MutableMatroskaElement";
 const MATROSKA_ELEMENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElement";
 const MATROSKA_ELEMENT_TYPE_CLASS: &str =
@@ -594,6 +598,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MATROSKA_CUE_POINT_CLASS,
     MATROSKA_EBML_READER_CLASS,
     MATROSKA_EBML_READER_TYPE_CLASS,
+    MATROSKA_FILE_READER_CLASS,
     MATROSKA_ELEMENT_CLASS,
     MATROSKA_ELEMENT_TYPE_CLASS,
     MATROSKA_ELEMENT_DATA_TYPE_CLASS,
@@ -755,6 +760,7 @@ const PRIVATE_SUPPORT_CLASSES: &[&str] = &[
     EQUALIZER_CHANNEL_PROCESSOR_CLASS,
     EQUALIZER_COEFFICIENTS_CLASS,
     MATROSKA_EBML_READER_SWITCH_CLASS,
+    MUTABLE_MATROSKA_ELEMENT_CLASS,
 ];
 
 #[derive(Serialize)]
@@ -1309,6 +1315,8 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
         MATROSKA_EBML_READER_CLASS
             | MATROSKA_EBML_READER_TYPE_CLASS
             | MATROSKA_EBML_READER_SWITCH_CLASS
+            | MATROSKA_FILE_READER_CLASS
+            | MUTABLE_MATROSKA_ELEMENT_CLASS
             | MATROSKA_ELEMENT_TYPE_CLASS
             | MATROSKA_ELEMENT_DATA_TYPE_CLASS
     ) {
@@ -9876,11 +9884,11 @@ fn matroska_vorbis_track_consumer_replacement(
             required_locals,
             vec![Instruction::Aconst_null, Instruction::Areturn],
         ),
-        ("initialise", "()V")
+        ("initialise" | "flush" | "close", "()V")
         | ("seekPerformed", "(JJ)V")
-        | ("flush", "()V")
-        | ("consume", "(Ljava/nio/ByteBuffer;)V")
-        | ("close", "()V") => code(pool, 0, required_locals, vec![Instruction::Return]),
+        | ("consume", "(Ljava/nio/ByteBuffer;)V") => {
+            code(pool, 0, required_locals, vec![Instruction::Return])
+        }
         _ => unsupported_body(
             pool,
             &format!(
@@ -10350,6 +10358,7 @@ fn matroska_opus_track_consumer_close(pool: &mut ConstantPool<'static>) -> Resul
 /// Public shell for the Matroska streaming file.  The parser itself is owned by the native media
 /// path; this compatibility surface keeps construction, metadata access, and lifecycle state
 /// deterministic while the remaining container-format classes are brought across in later slices.
+#[allow(clippy::too_many_lines)]
 fn matroska_streaming_file_replacement(
     pool: &mut ConstantPool<'static>,
     name: &str,
