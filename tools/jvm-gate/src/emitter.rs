@@ -204,6 +204,8 @@ const MATROSKA_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaContainerProbe";
 const MATROSKA_OPUS_TRACK_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaOpusTrackConsumer";
+const MATROSKA_TRACK_CONSUMER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaTrackConsumer";
 const MATROSKA_STREAMING_FILE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaStreamingFile";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
@@ -564,6 +566,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MATROSKA_AUDIO_TRACK_CLASS,
     MATROSKA_CONTAINER_PROBE_CLASS,
     MATROSKA_OPUS_TRACK_CONSUMER_CLASS,
+    MATROSKA_TRACK_CONSUMER_CLASS,
     MATROSKA_STREAMING_FILE_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,

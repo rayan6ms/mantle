@@ -187,6 +187,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-matroska-opus-track-consumer-consumer" => {
             Some(MATROSKA_OPUS_TRACK_CONSUMER_CONSUMER)
         }
+        "write-matroska-track-consumer-consumer" => Some(MATROSKA_TRACK_CONSUMER_CONSUMER),
         "write-matroska-streaming-file-consumer" => Some(MATROSKA_STREAMING_FILE_CONSUMER),
         "write-matroska-audio-track-consumer" => Some(MATROSKA_AUDIO_TRACK_CONSUMER),
         "write-matroska-audio-track-support-consumer" => {
@@ -17594,6 +17595,121 @@ public final class GateMatroskaStreamingFile {
     @Override protected void seekHard(long position) { }
     @Override public boolean canSeekHard() { return true; }
     @Override public java.util.List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider> getTrackInfoProviders() { return Collections.emptyList(); }
+  }
+}
+"#;
+
+const MATROSKA_TRACK_CONSUMER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaTrackConsumer;
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+
+public final class GateMatroskaTrackConsumer {
+  public static void main(String[] args) throws Exception {
+    dispatch();
+    failures();
+    reflection();
+    System.out.println("contracts=dispatch,track-identity,long-identity,buffer-identity,checked-failures,interface,auto-closeable,reflection");
+  }
+
+  private static void dispatch() throws Exception {
+    Recording consumer = new Recording();
+    ByteBuffer data = ByteBuffer.allocate(3);
+    consumer.seekPerformed(Long.MIN_VALUE + 9, Long.MAX_VALUE - 11);
+    consumer.initialise();
+    consumer.consume(data);
+    consumer.flush();
+    consumer.close();
+    check(consumer.initialiseCalls == 1 && consumer.seekCalls == 1
+        && consumer.requested == Long.MIN_VALUE + 9 && consumer.provided == Long.MAX_VALUE - 11
+        && consumer.consumeCalls == 1 && consumer.data == data && consumer.flushCalls == 1
+        && consumer.closeCalls == 1, "dispatch preserves values and identity");
+    check(consumer.getTrack() == null, "nullable track result is returned directly");
+  }
+
+  private static void failures() {
+    Recording consumer = new Recording();
+    InterruptedException flush = new InterruptedException("flush-sentinel");
+    consumer.flushFailure = flush;
+    check(catchThrowable(consumer::flush) == flush, "flush failure identity");
+    InterruptedException consume = new InterruptedException("consume-sentinel");
+    consumer.consumeFailure = consume;
+    ByteBuffer data = ByteBuffer.allocate(1);
+    check(catchThrowable(() -> consumer.consume(data)) == consume, "consume failure identity");
+    Exception close = new Exception("close-sentinel");
+    consumer.closeFailure = close;
+    check(catchThrowable(consumer::close) == close, "close failure identity");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MatroskaTrackConsumer> type = MatroskaTrackConsumer.class;
+    check(type.isInterface() && Modifier.isPublic(type.getModifiers())
+        && Modifier.isAbstract(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == null && Arrays.equals(type.getInterfaces(),
+            new Class<?>[] {AutoCloseable.class}) && type.getDeclaredFields().length == 0
+        && type.getDeclaredConstructors().length == 0 && type.getDeclaredMethods().length == 6,
+        "interface metadata");
+    checkMethod(type.getDeclaredMethod("getTrack"), MatroskaFileTrack.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("initialise"), void.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("seekPerformed", long.class, long.class), void.class,
+        new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("flush"), void.class,
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("consume", ByteBuffer.class), void.class,
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("close"), void.class, new Class<?>[] {Exception.class});
+  }
+
+  private static void checkMethod(Method method, Class<?> result, Class<?>[] failures) {
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == result && Arrays.equals(method.getExceptionTypes(), failures)
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs(),
+        method.getName() + " metadata");
+  }
+
+  private static Throwable catchThrowable(Operation operation) {
+    try { operation.run(); return null; } catch (Throwable error) { return error; }
+  }
+
+  private interface Operation { void run() throws Throwable; }
+
+  private static final class Recording implements MatroskaTrackConsumer {
+    int initialiseCalls;
+    int seekCalls;
+    int consumeCalls;
+    int flushCalls;
+    int closeCalls;
+    long requested;
+    long provided;
+    ByteBuffer data;
+    InterruptedException flushFailure;
+    InterruptedException consumeFailure;
+    Exception closeFailure;
+
+    public MatroskaFileTrack getTrack() { return null; }
+    public void initialise() { initialiseCalls++; }
+    public void seekPerformed(long requested, long provided) {
+      seekCalls++; this.requested = requested; this.provided = provided;
+    }
+    public void flush() throws InterruptedException {
+      if (flushFailure != null) throw flushFailure;
+      flushCalls++;
+    }
+    public void consume(ByteBuffer data) throws InterruptedException {
+      if (consumeFailure != null) throw consumeFailure;
+      consumeCalls++; this.data = data;
+    }
+    public void close() throws Exception {
+      if (closeFailure != null) throw closeFailure;
+      closeCalls++;
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
   }
 }
 "#;
