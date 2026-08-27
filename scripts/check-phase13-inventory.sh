@@ -74,16 +74,16 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       .fields += $counts.fields |
       .methods += $counts.methods |
       .symbols += $counts.symbols)) == .totals and
-  .existing_structural_slice.classes == 54 and
-  .existing_structural_slice.symbols == 403 and
+  .existing_structural_slice.classes == 55 and
+  .existing_structural_slice.symbols == 407 and
   .existing_structural_slice.internal_runtime_classes == 11 and
-  (.existing_structural_slice.binary_names | length) == 54 and
-  (.existing_structural_slice.binary_names | unique | length) == 54 and
+  (.existing_structural_slice.binary_names | length) == 55 and
+  (.existing_structural_slice.binary_names | unique | length) == 55 and
   all(.existing_structural_slice.binary_names[];
     . as $name | any($inv.classes[]; .binary_name == $name)) and
   ([.existing_structural_slice.binary_names[] as $name |
     $inv.classes[] | select(.binary_name == $name) |
-    1 + (.fields | length) + (.methods | length)] | add) == 403 and
+    1 + (.fields | length) + (.methods | length)] | add) == 407 and
   .artifact_workstreams.resources.expected_count == $inv.counts.non_class_resources and
   (.artifact_workstreams.resources.paths | sort) == ([$inv.resources[].path] | sort) and
   .artifact_workstreams.pom_dependencies.expected_count == $inv.counts.pom_dependencies and
@@ -2527,9 +2527,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[2].completed_slices[].symbols] | add) == .cohorts[2].classified_symbols and
   (.cohorts[2].classified_symbols + .cohorts[2].remaining_symbols) == .cohorts[2].symbols and
   .cohorts[3].status == "IN_PROGRESS" and
-  .cohorts[3].classified_symbols == 261 and
-  .cohorts[3].remaining_symbols == 563 and
-  (.cohorts[3].completed_slices | length) == 37 and
+  .cohorts[3].classified_symbols == 265 and
+  .cohorts[3].remaining_symbols == 559 and
+  (.cohorts[3].completed_slices | length) == 38 and
   .cohorts[3].completed_slices[0] == {
     id: "formats-contracts",
     classes: 1,
@@ -2693,6 +2693,19 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
     fields: 0,
     methods: 12,
     symbols: 14,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
+  .cohorts[3].completed_slices[37] == {
+    id: "matroska-cue-point-contracts",
+    classes: 1,
+    fields: 2,
+    methods: 1,
+    symbols: 4,
     classification: "A_EXACT",
     evidence: [
       "scripts/run-jvm-gate-a.sh",
@@ -3014,9 +3027,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   } and
   ([.cohorts[3].completed_slices[].symbols] | add) == .cohorts[3].classified_symbols and
   (.cohorts[3].classified_symbols + .cohorts[3].remaining_symbols) == .cohorts[3].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1713 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1717 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1566 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1570 and
   ([$classifications.symbols[] |
     select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 131 and
   ([$classifications.symbols[] |
@@ -3058,6 +3071,13 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
       (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
       (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 14 and
+  ([$classifications.symbols[] |
+    select(.binary_name ==
+      "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaCuePoint" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 4 and
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.container.flac.FlacAudioTrack" and
@@ -3836,6 +3856,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaVorbisTrackConsumer",
         "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaBlock",
         "com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaBlock",
+        "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaCuePoint",
         "com.sedmelluq.discord.lavaplayer.filter.AudioFilterChain",
         "com.sedmelluq.discord.lavaplayer.filter.AudioPipeline",
         "com.sedmelluq.discord.lavaplayer.filter.AudioPipelineFactory",
@@ -4318,7 +4339,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "matroska-cue-point-contracts" and
+  .phase_entry.next_slice == "matroska-ebml-reader-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 JQ
@@ -4326,7 +4347,7 @@ JQ
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '252 reference classes / 1,725 symbols' \
+  '253 reference classes / 1,729 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -4336,4 +4357,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 1,713 classified symbols and 1,049 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 1,717 classified symbols and 1,045 unassessed symbols.\n'

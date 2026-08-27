@@ -192,6 +192,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
             Some(MATROSKA_VORBIS_TRACK_CONSUMER_CONSUMER)
         }
         "write-matroska-block-consumer" => Some(MATROSKA_BLOCK_CONSUMER),
+        "write-matroska-cue-point-consumer" => Some(MATROSKA_CUE_POINT_CONSUMER),
         "write-matroska-streaming-file-consumer" => Some(MATROSKA_STREAMING_FILE_CONSUMER),
         "write-matroska-audio-track-consumer" => Some(MATROSKA_AUDIO_TRACK_CONSUMER),
         "write-matroska-audio-track-support-consumer" => {
@@ -17915,6 +17916,58 @@ public final class GateMatroskaBlock {
     @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
       return Collections.emptyList();
     }
+  }
+}
+"#;
+
+const MATROSKA_CUE_POINT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaCuePoint;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateMatroskaCuePoint {
+  public static void main(String[] args) throws Exception {
+    construction();
+    reflection();
+    System.out.println("contracts=constructor,primitive-identity,array-identity,null-array,field-finality,reflection");
+  }
+
+  private static void construction() {
+    long[] offsets = {Long.MIN_VALUE, 0L, Long.MAX_VALUE};
+    MatroskaCuePoint point = new MatroskaCuePoint(Long.MIN_VALUE + 17, offsets);
+    check(point.timecode == Long.MIN_VALUE + 17 && point.trackClusterOffsets == offsets,
+        "constructor preserves primitive and array identity");
+    offsets[1] = 42L;
+    check(point.trackClusterOffsets[1] == 42L, "array remains caller-owned");
+    MatroskaCuePoint empty = new MatroskaCuePoint(0L, new long[0]);
+    MatroskaCuePoint nullable = new MatroskaCuePoint(Long.MAX_VALUE, null);
+    check(empty.trackClusterOffsets.length == 0 && nullable.trackClusterOffsets == null,
+        "empty and null arrays are preserved");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MatroskaCuePoint> type = MatroskaCuePoint.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredAnnotations().length == 0
+        && type.getDeclaredFields().length == 2 && type.getDeclaredMethods().length == 0
+        && type.getDeclaredConstructors().length == 1, "class metadata");
+    checkField(type.getDeclaredField("timecode"), long.class);
+    checkField(type.getDeclaredField("trackClusterOffsets"), long[].class);
+    Constructor<MatroskaCuePoint> constructor = type.getDeclaredConstructor(long.class, long[].class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
+  }
+
+  private static void checkField(Field field, Class<?> result) {
+    check(field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && field.getType() == result && !field.isSynthetic() && field.getDeclaredAnnotations().length == 0,
+        field.getName() + " metadata");
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
   }
 }
 "#;

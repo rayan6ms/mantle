@@ -214,6 +214,8 @@ const MATROSKA_BLOCK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaBlock";
 const MUTABLE_MATROSKA_BLOCK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/format/MutableMatroskaBlock";
+const MATROSKA_CUE_POINT_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaCuePoint";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -577,6 +579,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MATROSKA_STREAMING_FILE_CLASS,
     MATROSKA_BLOCK_CLASS,
     MUTABLE_MATROSKA_BLOCK_CLASS,
+    MATROSKA_CUE_POINT_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -1552,6 +1555,9 @@ fn replacement_body(
     }
     if class_name == MATROSKA_VORBIS_TRACK_CONSUMER_CLASS {
         return matroska_vorbis_track_consumer_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == MATROSKA_CUE_POINT_CLASS {
+        return matroska_cue_point_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == MATROSKA_STREAMING_FILE_CLASS {
         return matroska_streaming_file_replacement(pool, name, descriptor, required_locals);
@@ -9862,6 +9868,46 @@ fn matroska_vorbis_track_consumer_constructor(
         vec![
             Instruction::Aload_0,
             Instruction::Invokespecial(object_init),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn matroska_cue_point_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(J[J)V") => matroska_cue_point_constructor(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {MATROSKA_CUE_POINT_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn matroska_cue_point_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_CUE_POINT_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let timecode = pool.add_field_ref(owner, "timecode", "J")?;
+    let offsets = pool.add_field_ref(owner, "trackClusterOffsets", "[J")?;
+    code(
+        pool,
+        3,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Lload_1,
+            Instruction::Putfield(timecode),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Putfield(offsets),
             Instruction::Return,
         ],
     )
