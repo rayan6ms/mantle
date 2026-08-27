@@ -161,6 +161,8 @@ const MP3_CONSTANT_RATE_SEEKER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mp3/Mp3ConstantRateSeeker";
 const MP3_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mp3/Mp3ContainerProbe";
+const MP3_FRAME_READER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/mp3/Mp3FrameReader";
 const ADTS_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/adts/AdtsContainerProbe";
 const ADTS_PACKET_HEADER_CLASS: &str =
@@ -583,6 +585,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MP3_AUDIO_TRACK_CLASS,
     MP3_CONSTANT_RATE_SEEKER_CLASS,
     MP3_CONTAINER_PROBE_CLASS,
+    MP3_FRAME_READER_CLASS,
     ADTS_CONTAINER_PROBE_CLASS,
     ADTS_PACKET_HEADER_CLASS,
     ADTS_STREAM_PROVIDER_CLASS,
@@ -810,11 +813,15 @@ pub fn emit(
 ) -> Result<()> {
     let mut source = ZipArchive::new(File::open(reference_jar)?)?;
     let mut classes = Vec::new();
+    let mut mp3_frame_reader_bytes = None;
     for binary_name in REFERENCE_CLASSES.iter().chain(PRIVATE_SUPPORT_CLASSES) {
         let mut entry = source.by_name(&format!("{binary_name}.class"))?;
         let mut bytes = Vec::new();
         entry.read_to_end(&mut bytes)?;
         let class = ClassFile::from_bytes(&bytes)?;
+        if *binary_name == MP3_FRAME_READER_CLASS {
+            mp3_frame_reader_bytes = Some(bytes);
+        }
         classes.push(transform_reference_class(class)?);
     }
     classes.extend(internal_classes(expected_abi)?);
@@ -842,7 +849,14 @@ pub fn emit(
         })?;
         let name = format!("{}.class", class.class_name()?);
         let mut bytes = Vec::new();
-        class.to_bytes(&mut bytes)?;
+        if name == format!("{MP3_FRAME_READER_CLASS}.class") {
+            bytes = mp3_frame_reader_bytes
+                .as_ref()
+                .expect("MP3 frame reader source bytes are retained")
+                .clone();
+        } else {
+            class.to_bytes(&mut bytes)?;
+        }
         jar.start_file(name, options)?;
         jar.write_all(&bytes)?;
     }
@@ -1351,6 +1365,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | MATROSKA_ELEMENT_DATA_TYPE_CLASS
             | MP3_CONSTANT_RATE_SEEKER_CLASS
             | MP3_CONTAINER_PROBE_CLASS
+            | MP3_FRAME_READER_CLASS
     ) {
         return Ok(class);
     }

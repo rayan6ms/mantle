@@ -162,6 +162,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mp3-audio-track-support-consumer" => Some(MP3_AUDIO_TRACK_SUPPORT_CONSUMER),
         "write-mp3-constant-rate-seeker-consumer" => Some(MP3_CONSTANT_RATE_SEEKER_CONSUMER),
         "write-mp3-container-probe-consumer" => Some(MP3_CONTAINER_PROBE_CONSUMER),
+        "write-mp3-frame-reader-consumer" => Some(MP3_FRAME_READER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
         "write-adts-packet-header-consumer" => Some(ADTS_PACKET_HEADER_CONSUMER),
         "write-adts-stream-provider-consumer" => Some(ADTS_STREAM_PROVIDER_CONSUMER),
@@ -13843,6 +13844,165 @@ public final class GateMp3ContainerProbe {
 
   private static final class Derived extends Mp3ContainerProbe {
     @Override public String getName() { return "derived-mp3"; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MP3_FRAME_READER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mp3.Mp3FrameReader;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import java.io.DataInput;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateMp3FrameReader {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "expected MP3 fixture path");
+    byte[] raw = stripId3(Files.readAllBytes(Path.of(args[0])));
+    frameLifecycle(raw);
+    scanLimits();
+    appendAndFailures(raw);
+    reflection();
+    System.out.println(
+        "contracts=constructor,buffer-identity,scan-success,frame-header,frame-size,frame-start,fill-buffer,next-frame,second-frame,scan-miss,scan-limit,append-scan-buffer,io-identity,private-state,reflection");
+  }
+
+  private static void frameLifecycle(byte[] raw) throws Exception {
+    check(raw.length > 16, "fixture contains raw MP3 frames");
+    byte[] frame = new byte[4096];
+    MemoryStream stream = new MemoryStream(raw);
+    Mp3FrameReader reader = new Mp3FrameReader(stream, frame);
+    check(reader.scanForFrame(4, false) && stream.position == 4L,
+        "scan finds a frame header within the limit");
+    int size = reader.getFrameSize();
+    check(size > 4 && reader.getFrameStartPosition() == 0L
+        && Arrays.equals(Arrays.copyOf(frame, 4), Arrays.copyOf(raw, 4)),
+        "header bytes, frame size, and start position are exposed");
+    check(reader.fillFrameBuffer() && stream.position == size
+        && Arrays.equals(Arrays.copyOf(frame, size), Arrays.copyOf(raw, size)),
+        "fillFrameBuffer reads the complete frame into the caller buffer");
+    reader.nextFrame();
+    check(reader.getFrameStartPosition() == (long) size,
+        "nextFrame resets the current frame position");
+    check(reader.fillFrameBuffer() && reader.getFrameStartPosition() >= size
+        && reader.getFrameSize() > 4,
+        "next frame can be scanned and filled");
+  }
+
+  private static void scanLimits() throws Exception {
+    MemoryStream missStream = new MemoryStream(new byte[32]);
+    Mp3FrameReader miss = new Mp3FrameReader(missStream, new byte[64]);
+    check(!miss.scanForFrame(5, false) && missStream.position == 5L,
+        "non-throwing scan reports a bounded miss");
+    MemoryStream limitStream = new MemoryStream(new byte[32]);
+    Mp3FrameReader limited = new Mp3FrameReader(limitStream, new byte[64]);
+    Throwable failure = catchThrowable(() -> limited.scanForFrame(5, true));
+    check(failure instanceof IllegalStateException
+        && failure.getMessage().equals("Mp3 frame not found.") && limitStream.position == 5L,
+        "throwing scan reports the exact limit failure");
+  }
+
+  private static void appendAndFailures(byte[] raw) throws Exception {
+    byte[] header = Arrays.copyOf(raw, 4);
+    MemoryStream appendedStream = new MemoryStream(raw);
+    byte[] firstTwo = new byte[2];
+    check(appendedStream.read(firstTwo) == 2, "external header bytes are consumed");
+    Mp3FrameReader appended = new Mp3FrameReader(appendedStream, new byte[4096]);
+    appended.appendToScanBuffer(firstTwo, 0, 2);
+    check(appended.scanForFrame(4, false) && appended.getFrameSize() > 4,
+        "appendToScanBuffer completes a split frame header");
+    check(Arrays.equals(Arrays.copyOf(new byte[] {header[0], header[1],
+        (byte) raw[2], (byte) raw[3]}, 4), Arrays.copyOf(header, 4)),
+        "split header retains exact bytes");
+    MemoryStream ioStream = new MemoryStream(new byte[8]);
+    IOException ioFailure = new IOException("scan-failure");
+    ioStream.ioFailure = ioFailure;
+    Mp3FrameReader ioReader = new Mp3FrameReader(ioStream, new byte[32]);
+    check(catchThrowable(() -> ioReader.scanForFrame(4, false)) == ioFailure,
+        "scan preserves checked I/O identity");
+  }
+
+  private static byte[] stripId3(byte[] data) {
+    if (data.length < 10 || data[0] != 'I' || data[1] != 'D' || data[2] != '3') return data;
+    int size = ((data[6] & 0x7f) << 21) | ((data[7] & 0x7f) << 14)
+        | ((data[8] & 0x7f) << 7) | (data[9] & 0x7f);
+    return Arrays.copyOfRange(data, Math.min(data.length, 10 + size), data.length);
+  }
+
+  private static void reflection() throws Exception {
+    Class<Mp3FrameReader> type = Mp3FrameReader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredAnnotations().length == 0,
+        "public concrete reader metadata");
+    check(type.getDeclaredFields().length == 8 && type.getDeclaredMethods().length == 9
+        && type.getDeclaredConstructors().length == 1, "exact declared member counts");
+    for (String name : new String[] {"inputStream", "dataInput", "scanBuffer", "frameBuffer"}) {
+      Field field = type.getDeclaredField(name);
+      check(field.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL) && !field.isSynthetic(),
+          "final private state " + name);
+    }
+    for (String name : new String[] {"frameSize", "frameBufferPosition", "scanBufferPosition",
+        "frameHeaderRead"}) {
+      Field field = type.getDeclaredField(name);
+      check(field.getModifiers() == Modifier.PRIVATE && !field.isSynthetic(),
+          "private mutable state " + name);
+    }
+    Constructor<Mp3FrameReader> constructor = type.getDeclaredConstructor(
+        SeekableInputStream.class, byte[].class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0,
+        "constructor descriptor metadata");
+    checkMethod(type.getDeclaredMethod("scanForFrame", int.class, boolean.class), boolean.class,
+        new Class<?>[] {int.class, boolean.class}, new Class<?>[] {IOException.class});
+    checkMethod(type.getDeclaredMethod("fillFrameBuffer"), boolean.class, new Class<?>[0],
+        new Class<?>[] {IOException.class});
+    checkMethod(type.getDeclaredMethod("nextFrame"), void.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("getFrameStartPosition"), long.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("getFrameSize"), int.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("appendToScanBuffer", byte[].class, int.class, int.class),
+        void.class, new Class<?>[] {byte[].class, int.class, int.class});
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, Class<?>[] parameters,
+      Class<?>... failures) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isDefault() && !method.isVarArgs(),
+        method.getName() + " method metadata");
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    final byte[] data;
+    long position;
+    IOException ioFailure;
+    MemoryStream(byte[] data) { super(data.length, 0L); this.data = data; }
+    @Override public int read() throws IOException {
+      if (ioFailure != null) throw ioFailure;
+      return position < data.length ? data[(int) position++] & 0xff : -1;
+    }
+    @Override public long getPosition() { return position; }
+    @Override protected void seekHard(long target) { position = target; }
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider>
+        getTrackInfoProviders() { return Collections.emptyList(); }
   }
 
   private static void check(boolean condition, String message) {

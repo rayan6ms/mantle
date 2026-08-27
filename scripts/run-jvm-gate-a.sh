@@ -243,6 +243,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mp3-constant-rate-seeker-consu
   --output "$WORK/GateMp3ConstantRateSeeker.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mp3-container-probe-consumer \
   --output "$WORK/GateMp3ContainerProbe.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mp3-frame-reader-consumer \
+  --output "$WORK/GateMp3FrameReader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-container-probe-consumer \
   --output "$WORK/GateAdtsContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-packet-header-consumer \
@@ -401,6 +403,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateFlacFrameReader.java" \
   "$WORK/GateFlacSubFrameReader.java" \
   "$WORK/GateMp3ContainerProbe.java" \
+  "$WORK/GateMp3FrameReader.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GateAdtsStreamReader.java" \
@@ -1388,6 +1391,18 @@ cmp "$WORK/mp3-container-probe-reference.txt" "$WORK/mp3-container-probe-candida
 grep --fixed-strings \
   'contracts=name,hint-presence,mime,extension,case-insensitive,combined-hints,null-hints,scan-miss,scan-boundary,reference-null,stream-null,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,id3-tag-state,private-state,throws,reflection' \
   "$WORK/mp3-container-probe-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMp3FrameReader \
+  "$ROOT/tests/media/fixtures/tone-mp3-vbr-id3.mp3" \
+  >"$WORK/mp3-frame-reader-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMp3FrameReader "$ROOT/tests/media/fixtures/tone-mp3-vbr-id3.mp3" \
+  >"$WORK/mp3-frame-reader-candidate.txt"
+cmp "$WORK/mp3-frame-reader-reference.txt" "$WORK/mp3-frame-reader-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,buffer-identity,scan-success,frame-header,frame-size,frame-start,fill-buffer,next-frame,second-frame,scan-miss,scan-limit,append-scan-buffer,io-identity,private-state,reflection' \
+  "$WORK/mp3-frame-reader-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateAdtsContainerProbe \
   >"$WORK/adts-container-probe-reference.txt"
