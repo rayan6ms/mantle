@@ -161,6 +161,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mp3-audio-track-consumer" => Some(MP3_AUDIO_TRACK_CONSUMER),
         "write-mp3-audio-track-support-consumer" => Some(MP3_AUDIO_TRACK_SUPPORT_CONSUMER),
         "write-mp3-constant-rate-seeker-consumer" => Some(MP3_CONSTANT_RATE_SEEKER_CONSUMER),
+        "write-mp3-container-probe-consumer" => Some(MP3_CONTAINER_PROBE_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
         "write-adts-packet-header-consumer" => Some(ADTS_PACKET_HEADER_CONSUMER),
         "write-adts-stream-provider-consumer" => Some(ADTS_STREAM_PROVIDER_CONSUMER),
@@ -13633,6 +13634,215 @@ public final class GateMediaContainerRegistry {
 
   private static final class Derived extends MediaContainerRegistry {
     Derived(List<MediaContainerProbe> probes) { super(probes); }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MP3_CONTAINER_PROBE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerHints;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerProbe;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult;
+import com.sedmelluq.discord.lavaplayer.container.mp3.Mp3AudioTrack;
+import com.sedmelluq.discord.lavaplayer.container.mp3.Mp3ContainerProbe;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateMp3ContainerProbe {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "expected MP3 fixture path");
+    namesAndHints();
+    missesAndFailures();
+    successfulProbe(Path.of(args[0]));
+    trackFactory();
+    subclassUse();
+    reflection();
+    System.out.println(
+        "contracts=name,hint-presence,mime,extension,case-insensitive,combined-hints,null-hints,scan-miss,scan-boundary,reference-null,stream-null,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,id3-tag-state,private-state,throws,reflection");
+  }
+
+  private static void namesAndHints() {
+    Mp3ContainerProbe probe = new Mp3ContainerProbe();
+    check(probe.getName().equals("mp3") && probe.getName() == "mp3",
+        "stable interned lower-case probe name");
+    check(!probe.matchesHints(MediaContainerHints.from(null, null)),
+        "empty hints do not match");
+    check(probe.matchesHints(MediaContainerHints.from("audio/mpeg", null))
+        && probe.matchesHints(MediaContainerHints.from("AuDiO/MpEg", null)),
+        "MPEG MIME matches case-insensitively");
+    check(probe.matchesHints(MediaContainerHints.from(null, "mp3"))
+        && probe.matchesHints(MediaContainerHints.from(null, "Mp3")),
+        "MP3 extension matches case-insensitively");
+    check(probe.matchesHints(MediaContainerHints.from("audio/mpeg", "mp3")),
+        "both valid hints match");
+    check(!probe.matchesHints(MediaContainerHints.from("audio/aac", "mp3"))
+        && !probe.matchesHints(MediaContainerHints.from("audio/mpeg", "aac"))
+        && !probe.matchesHints(MediaContainerHints.from("audio/mpeg; codecs=mp3", "mp3"))
+        && !probe.matchesHints(MediaContainerHints.from("", "")),
+        "either invalid non-null hint rejects the match");
+    expect(NullPointerException.class, () -> probe.matchesHints(null));
+  }
+
+  private static void missesAndFailures() throws Exception {
+    Mp3ContainerProbe probe = new Mp3ContainerProbe();
+    MemoryStream miss = new MemoryStream(new byte[1000]);
+    check(probe.probe(null, miss) == null && miss.position == 1000L,
+        "non-MP3 input scans the bounded distance and returns null");
+    MemoryStream empty = new MemoryStream(new byte[0]);
+    check(probe.probe(null, empty) == null && empty.readCalls == 2 && empty.position == 0L,
+        "empty input returns null without dereferencing the reference");
+    expect(NullPointerException.class, () -> probe.probe(null, null));
+    MemoryStream io = new MemoryStream(new byte[0]);
+    IOException failure = new IOException("read-failure");
+    io.ioFailure = failure;
+    check(catchThrowable(() -> probe.probe(null, io)) == failure,
+        "checked scan failure preserves IOException identity");
+  }
+
+  private static void successfulProbe(Path fixture) throws Exception {
+    byte[] data = Files.readAllBytes(fixture);
+    Mp3ContainerProbe probe = new Mp3ContainerProbe();
+    MemoryStream stream = new MemoryStream(data);
+    AudioReference reference = new AudioReference("fixture-id", "fixture-title");
+    MediaContainerDetectionResult result = probe.probe(reference, stream);
+    check(result != null && result.isContainerDetected() && result.isSupportedFile()
+        && result.getContainerDescriptor().probe == probe
+        && result.getContainerDescriptor().parameters == null,
+        "ID3 MP3 fixture produces a supported result retaining probe identity");
+    AudioTrackInfo info = result.getTrackInfo();
+    check(info != null && info.identifier.equals("fixture-id") && info.title != null
+        && info.author != null && info.length > 0L,
+        "supported result carries populated track metadata");
+    check(stream.position > 0L && stream.readCalls > 0,
+        "successful probe consumes the input while parsing headers");
+  }
+
+  private static void trackFactory() throws Exception {
+    Mp3ContainerProbe probe = new Mp3ContainerProbe();
+    AudioTrackInfo info = new AudioTrackInfo(
+        "title", "author", 1L, "track-id", false, "uri", "artwork", "isrc");
+    MemoryStream stream = new MemoryStream(new byte[0]);
+    AudioTrack first = probe.createTrack("ignored-one", info, stream);
+    AudioTrack second = probe.createTrack("ignored-two", info, stream);
+    check(first instanceof Mp3AudioTrack && second instanceof Mp3AudioTrack && first != second
+        && first.getInfo() == info && second.getInfo() == info
+        && input((Mp3AudioTrack) first) == stream && input((Mp3AudioTrack) second) == stream,
+        "factory creates fresh MP3 tracks retaining info and stream identities");
+    Mp3AudioTrack nulls = (Mp3AudioTrack) probe.createTrack(null, null, null);
+    check(nulls.getInfo() == null && input(nulls) == null,
+        "factory ignores parameters and accepts null track arguments");
+  }
+
+  private static void subclassUse() {
+    Derived derived = new Derived();
+    check(derived instanceof MediaContainerProbe && derived.getName().equals("derived-mp3"),
+        "ordinary subclass dispatch remains available");
+  }
+
+  private static void reflection() throws Exception {
+    Class<Mp3ContainerProbe> type = Mp3ContainerProbe.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {MediaContainerProbe.class})
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0,
+        "public concrete non-final probe metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredMethods().length == 4
+        && type.getDeclaredConstructors().length == 1, "exact declared member counts");
+    Field log = type.getDeclaredField("log");
+    log.setAccessible(true);
+    Object expectedLogger = Class.forName("org.slf4j.LoggerFactory")
+        .getMethod("getLogger", Class.class).invoke(null, type);
+    check(log.getType().getName().equals("org.slf4j.Logger")
+        && log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && log.get(null) == expectedLogger, "eager logger identity and metadata");
+    Field tag = type.getDeclaredField("ID3_TAG");
+    tag.setAccessible(true);
+    check(tag.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && Arrays.equals((int[]) tag.get(null), new int[] {0x49, 0x44, 0x33}),
+        "private ID3 tag state and metadata");
+    checkMethod(type.getDeclaredConstructor(), new Class<?>[0], new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("getName"), String.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("matchesHints", MediaContainerHints.class), boolean.class,
+        new Class<?>[] {MediaContainerHints.class});
+    checkMethod(type.getDeclaredMethod("probe", AudioReference.class, SeekableInputStream.class),
+        MediaContainerDetectionResult.class,
+        new Class<?>[] {AudioReference.class, SeekableInputStream.class},
+        new Class<?>[] {IOException.class});
+    checkMethod(type.getDeclaredMethod("createTrack", String.class, AudioTrackInfo.class,
+        SeekableInputStream.class), AudioTrack.class,
+        new Class<?>[] {String.class, AudioTrackInfo.class, SeekableInputStream.class});
+  }
+
+  private static void checkMethod(Constructor<?> constructor, Class<?>[] parameters,
+      Class<?>[] failures) {
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && Arrays.equals(constructor.getParameterTypes(), parameters)
+        && Arrays.equals(constructor.getExceptionTypes(), failures), "constructor metadata");
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, Class<?>[] parameters,
+      Class<?>... failures) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isDefault() && !method.isVarArgs(),
+        method.getName() + " method metadata");
+  }
+
+  private static InputStream input(Mp3AudioTrack track) throws Exception {
+    Field field = Mp3AudioTrack.class.getDeclaredField("inputStream");
+    field.setAccessible(true);
+    return (InputStream) field.get(track);
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+
+  private static void expect(Class<? extends Throwable> type, ThrowingRunnable action) {
+    Throwable failure = catchThrowable(action);
+    check(type.isInstance(failure), "expected " + type.getName() + " but got "
+        + (failure == null ? "no failure" : failure.getClass().getName()));
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    final byte[] data;
+    long position;
+    int readCalls;
+    IOException ioFailure;
+
+    MemoryStream(byte[] data) { super(data.length, 0L); this.data = data; }
+    @Override public int read() throws IOException {
+      readCalls++;
+      if (ioFailure != null) throw ioFailure;
+      return position < data.length ? data[(int) position++] & 0xff : -1;
+    }
+    @Override public long getPosition() { return position; }
+    @Override protected void seekHard(long target) { position = target; }
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider>
+        getTrackInfoProviders() { return Collections.emptyList(); }
+  }
+
+  private static final class Derived extends Mp3ContainerProbe {
+    @Override public String getName() { return "derived-mp3"; }
   }
 
   private static void check(boolean condition, String message) {
