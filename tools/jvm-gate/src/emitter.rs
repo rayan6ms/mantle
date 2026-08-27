@@ -200,6 +200,8 @@ const MATROSKA_AAC_TRACK_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaAacTrackConsumer";
 const MATROSKA_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaAudioTrack";
+const MATROSKA_CONTAINER_PROBE_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaContainerProbe";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -556,6 +558,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     FLAC_SUB_FRAME_READER_CLASS,
     MATROSKA_AAC_TRACK_CONSUMER_CLASS,
     MATROSKA_AUDIO_TRACK_CLASS,
+    MATROSKA_CONTAINER_PROBE_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -1044,6 +1047,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS
             | MATROSKA_AAC_TRACK_CONSUMER_CLASS
             | MATROSKA_AUDIO_TRACK_CLASS
+            | MATROSKA_CONTAINER_PROBE_CLASS
             | OPUS_AUDIO_DATA_FORMAT_CLASS
             | PCM16_AUDIO_DATA_FORMAT_CLASS
             | OPUS_CHUNK_DECODER_CLASS
@@ -1171,6 +1175,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | FLAC_SUB_FRAME_READER_CLASS
             | MATROSKA_AAC_TRACK_CONSUMER_CLASS
             | MATROSKA_AUDIO_TRACK_CLASS
+            | MATROSKA_CONTAINER_PROBE_CLASS
             | AUDIO_PIPELINE_FACTORY_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
@@ -1510,6 +1515,9 @@ fn replacement_body(
     }
     if class_name == MATROSKA_AUDIO_TRACK_CLASS {
         return matroska_audio_track_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == MATROSKA_CONTAINER_PROBE_CLASS {
+        return matroska_container_probe_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -8930,6 +8938,413 @@ fn flac_sub_frame_reader_residual_block(pool: &mut ConstantPool<'static>) -> Res
         ],
     )?;
     Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn matroska_container_probe_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        ("getName", "()Ljava/lang/String;") => {
+            string_return(pool, "matroska/webm", required_locals)
+        }
+        ("matchesHints", "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerHints;)Z") => {
+            boolean_return(pool, false, required_locals)
+        }
+        (
+            "probe",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioReference;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
+        ) => matroska_container_probe_probe(pool),
+        (
+            "createTrack",
+            "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+        ) => matroska_container_probe_create_track(pool),
+        (
+            "hasSupportedAudioTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/MatroskaStreamingFile;)Z",
+        ) => matroska_container_probe_has_supported_audio_track(pool),
+        ("<clinit>", "()V") => matroska_container_probe_clinit(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {MATROSKA_CONTAINER_PROBE_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+fn matroska_container_probe_probe(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_CONTAINER_PROBE_CLASS)?;
+    let reference = pool.add_class(AUDIO_REFERENCE_CLASS)?;
+    let stream = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream")?;
+    let detection = pool.add_class(MEDIA_CONTAINER_DETECTION_CLASS)?;
+    let check_next_bytes = pool.add_method_ref(
+        detection,
+        "checkNextBytes",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;[I)Z",
+    )?;
+    let ebml_tag = pool.add_field_ref(owner, "EBML_TAG", "[I")?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let logger = pool.add_class("org/slf4j/Logger")?;
+    let debug =
+        pool.add_interface_method_ref(logger, "debug", "(Ljava/lang/String;Ljava/lang/Object;)V")?;
+    let message = pool.add_string("Track {} is a matroska file.")?;
+    let identifier = pool.add_field_ref(reference, "identifier", "Ljava/lang/String;")?;
+    let file = pool
+        .add_class("com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaStreamingFile")?;
+    let file_init = pool.add_method_ref(
+        file,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)V",
+    )?;
+    let read_file = pool.add_method_ref(file, "readFile", "()V")?;
+    let has_supported = pool.add_method_ref(
+        owner,
+        "hasSupportedAudioTrack",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/MatroskaStreamingFile;)Z",
+    )?;
+    let result = pool.add_class(MEDIA_CONTAINER_DETECTION_RESULT_CLASS)?;
+    let unsupported = pool.add_method_ref(
+        result,
+        "unsupportedFormat",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
+    )?;
+    let unsupported_reason = pool.add_string("No supported audio tracks present in the file.")?;
+    let get_title = pool.add_method_ref(file, "getTitle", "()Ljava/lang/String;")?;
+    let get_artist = pool.add_method_ref(file, "getArtist", "()Ljava/lang/String;")?;
+    let get_duration = pool.add_method_ref(file, "getDuration", "()D")?;
+    let get_isrc = pool.add_method_ref(file, "getIsrc", "()Ljava/lang/String;")?;
+    let tools = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/DataFormatTools")?;
+    let default_on_null = pool.add_method_ref(
+        tools,
+        "defaultOnNull",
+        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+    )?;
+    let unknown_title = pool.add_string("Unknown title")?;
+    let unknown_artist = pool.add_string("Unknown artist")?;
+    let string = pool.add_class("java/lang/String")?;
+    let info = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo")?;
+    let info_init = pool.add_method_ref(
+        info,
+        "<init>",
+        "(Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+    )?;
+    let result = pool.add_class(MEDIA_CONTAINER_DETECTION_RESULT_CLASS)?;
+    let supported = pool.add_method_ref(
+        result,
+        "supportedFormat",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerProbe;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)Lcom/sedmelluq/discord/lavaplayer/container/MediaContainerDetectionResult;",
+    )?;
+    let detected_target = 6usize;
+    let mut body = code(
+        pool,
+        16,
+        7,
+        vec![
+            Instruction::Aload_2,
+            Instruction::Getstatic(ebml_tag),
+            Instruction::Invokestatic(check_next_bytes),
+            Instruction::Ifne(u16::try_from(detected_target)?),
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+            Instruction::Getstatic(log),
+            Instruction::Ldc_w(message),
+            Instruction::Aload_1,
+            Instruction::Getfield(identifier),
+            Instruction::Invokeinterface(debug, 3),
+            Instruction::New(file),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Invokespecial(file_init),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(read_file),
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(has_supported),
+            Instruction::Ifne(26),
+            Instruction::Aload_0,
+            Instruction::Ldc_w(unsupported_reason),
+            Instruction::Invokestatic(unsupported),
+            Instruction::Areturn,
+            Instruction::Nop,
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(get_title),
+            Instruction::Ldc_w(unknown_title),
+            Instruction::Invokestatic(default_on_null),
+            Instruction::Checkcast(string),
+            Instruction::Astore(4),
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(get_artist),
+            Instruction::Ldc_w(unknown_artist),
+            Instruction::Invokestatic(default_on_null),
+            Instruction::Checkcast(string),
+            Instruction::Astore(5),
+            Instruction::Aload_0,
+            Instruction::Aconst_null,
+            Instruction::New(info),
+            Instruction::Dup,
+            Instruction::Aload(4),
+            Instruction::Aload(5),
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(get_duration),
+            Instruction::D2l,
+            Instruction::Aload_1,
+            Instruction::Getfield(identifier),
+            Instruction::Iconst_0,
+            Instruction::Aload_1,
+            Instruction::Getfield(identifier),
+            Instruction::Aconst_null,
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(get_isrc),
+            Instruction::Invokespecial(info_init),
+            Instruction::Invokestatic(supported),
+            Instruction::Areturn,
+        ],
+    )?;
+    // The branch target above is the first instruction after the unsupported return.
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: u16::try_from(detected_target)?,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: reference,
+                    },
+                    VerificationType::Object {
+                        cpool_index: stream,
+                    },
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 19,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: reference,
+                    },
+                    VerificationType::Object {
+                        cpool_index: stream,
+                    },
+                    VerificationType::Object { cpool_index: file },
+                ],
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn matroska_container_probe_has_supported_audio_track(
+    pool: &mut ConstantPool<'static>,
+) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_CONTAINER_PROBE_CLASS)?;
+    let file = pool
+        .add_class("com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaStreamingFile")?;
+    let tracks = pool.add_method_ref(
+        file,
+        "getTrackList",
+        "()[Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;",
+    )?;
+    let track = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack",
+    )?;
+    let track_array = pool.add_class(
+        "[Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;",
+    )?;
+    let type_field = pool.add_field_ref(
+        track,
+        "type",
+        "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$Type;",
+    )?;
+    let codec_field = pool.add_field_ref(track, "codecId", "Ljava/lang/String;")?;
+    let ty = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$Type",
+    )?;
+    let audio = pool.add_field_ref(
+        ty,
+        "AUDIO",
+        "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$Type;",
+    )?;
+    let supported = pool.add_field_ref(owner, "supportedCodecs", "Ljava/util/List;")?;
+    let list = pool.add_class("java/util/List")?;
+    let contains = pool.add_interface_method_ref(list, "contains", "(Ljava/lang/Object;)Z")?;
+    let mut instructions = vec![
+        Instruction::Aload_1,
+        Instruction::Invokevirtual(tracks),
+        Instruction::Astore_2,
+        Instruction::Aload_2,
+        Instruction::Arraylength,
+        Instruction::Istore_3,
+        Instruction::Iconst_0,
+        Instruction::Istore(4),
+    ];
+    let loop_target = instructions.len();
+    instructions.extend([
+        Instruction::Iload(4),
+        Instruction::Iload_3,
+        Instruction::If_icmpge(0),
+        Instruction::Aload_2,
+        Instruction::Iload(4),
+        Instruction::Aaload,
+        Instruction::Astore(5),
+        Instruction::Aload(5),
+        Instruction::Getfield(type_field),
+        Instruction::Getstatic(audio),
+        Instruction::If_acmpne(0),
+        Instruction::Getstatic(supported),
+        Instruction::Aload(5),
+        Instruction::Getfield(codec_field),
+        Instruction::Invokeinterface(contains, 2),
+        Instruction::Ifeq(0),
+        Instruction::Iconst_1,
+        Instruction::Ireturn,
+    ]);
+    let continue_target = instructions.len();
+    instructions.extend([
+        Instruction::Iinc(4, 1),
+        Instruction::Goto(u16::try_from(loop_target)?),
+    ]);
+    let false_target = instructions.len();
+    instructions.extend([Instruction::Iconst_0, Instruction::Ireturn]);
+    instructions[loop_target + 2] = Instruction::If_icmpge(u16::try_from(false_target)?);
+    instructions[loop_target + 10] = Instruction::If_acmpne(u16::try_from(continue_target)?);
+    instructions[loop_target + 15] = Instruction::Ifeq(u16::try_from(continue_target)?);
+    let mut body = code(pool, 2, 6, instructions)?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: u16::try_from(loop_target)?,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object { cpool_index: file },
+                    VerificationType::Object {
+                        cpool_index: track_array,
+                    },
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: u16::try_from(continue_target - loop_target - 1)?,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object { cpool_index: file },
+                    VerificationType::Object {
+                        cpool_index: track_array,
+                    },
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 1,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object { cpool_index: file },
+                    VerificationType::Object {
+                        cpool_index: track_array,
+                    },
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn matroska_container_probe_create_track(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let track = pool.add_class(MATROSKA_AUDIO_TRACK_CLASS)?;
+    let init = pool.add_method_ref(
+        track,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)V",
+    )?;
+    code(
+        pool,
+        4,
+        4,
+        vec![
+            Instruction::New(track),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Aload_3,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn matroska_container_probe_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_CONTAINER_PROBE_CLASS)?;
+    let logger_factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        logger_factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let ebml_tag = pool.add_field_ref(owner, "EBML_TAG", "[I")?;
+    let string = pool.add_class("java/lang/String")?;
+    let arrays = pool.add_class("java/util/Arrays")?;
+    let as_list = pool.add_method_ref(arrays, "asList", "([Ljava/lang/Object;)Ljava/util/List;")?;
+    let codecs = pool.add_field_ref(owner, "supportedCodecs", "Ljava/util/List;")?;
+    let mut body = vec![
+        Instruction::Ldc_w(owner),
+        Instruction::Invokestatic(get_logger),
+        Instruction::Putstatic(log),
+        Instruction::Bipush(4),
+        Instruction::Newarray(ArrayType::Int),
+    ];
+    for (index, value) in [26, 69, 223, 163].into_iter().enumerate() {
+        body.extend([
+            Instruction::Dup,
+            small_integer_instruction(index)?,
+            Instruction::Sipush(value),
+            Instruction::Iastore,
+        ]);
+    }
+    body.extend([
+        Instruction::Putstatic(ebml_tag),
+        Instruction::Bipush(3),
+        Instruction::Anewarray(string),
+    ]);
+    for (index, value) in ["A_OPUS", "A_VORBIS", "A_AAC"].into_iter().enumerate() {
+        body.extend([
+            Instruction::Dup,
+            small_integer_instruction(index)?,
+            Instruction::Ldc_w(pool.add_string(value)?),
+            Instruction::Aastore,
+        ]);
+    }
+    body.extend([
+        Instruction::Invokestatic(as_list),
+        Instruction::Putstatic(codecs),
+        Instruction::Return,
+    ]);
+    code(pool, 4, 0, body)
 }
 
 #[allow(clippy::too_many_lines)]

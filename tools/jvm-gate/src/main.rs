@@ -188,6 +188,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-matroska-audio-track-support-consumer" => {
             Some(MATROSKA_AUDIO_TRACK_SUPPORT_CONSUMER)
         }
+        "write-matroska-container-probe-consumer" => Some(MATROSKA_CONTAINER_PROBE_CONSUMER),
         _ => None,
     }
 }
@@ -17554,6 +17555,9 @@ public final class MatroskaGateSupport {
   public static int seekTrack;
   public static long seekTimecode;
   public static double duration;
+  public static String title;
+  public static String artist;
+  public static String isrc;
   public static boolean reportNullTrack;
   public static IOException readFileFailure;
   public static RuntimeException readFileRuntimeFailure;
@@ -17583,6 +17587,9 @@ public final class MatroskaGateSupport {
     seekTrack = 0;
     seekTimecode = 0L;
     duration = 0.0;
+    title = null;
+    artist = null;
+    isrc = null;
     reportNullTrack = false;
     readFileFailure = null;
     readFileRuntimeFailure = null;
@@ -17631,6 +17638,21 @@ class MatroskaStreamingFile {
     MatroskaGateSupport.event("tracks");
     if (MatroskaGateSupport.trackListFailure != null) throw MatroskaGateSupport.trackListFailure;
     return MatroskaGateSupport.tracks;
+  }
+
+  public String getTitle() {
+    MatroskaGateSupport.event("title");
+    return MatroskaGateSupport.title;
+  }
+
+  public String getArtist() {
+    MatroskaGateSupport.event("artist");
+    return MatroskaGateSupport.artist;
+  }
+
+  public String getIsrc() {
+    MatroskaGateSupport.event("isrc");
+    return MatroskaGateSupport.isrc;
   }
 
   public void provideFrames(MatroskaTrackConsumer trackConsumer) throws InterruptedException {
@@ -17711,6 +17733,191 @@ class MatroskaAacTrackConsumer extends GateMatroskaConsumer {
   MatroskaAacTrackConsumer(AudioProcessingContext context, MatroskaFileTrack track) {
     super("aac", context, track);
   }
+}
+"#;
+
+const MATROSKA_CONTAINER_PROBE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDescriptor;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerHints;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerProbe;
+import com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaAudioTrack;
+import com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaContainerProbe;
+import com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaGateSupport;
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+
+public final class GateMatroskaContainerProbe {
+  private static final byte[] EBML = {(byte) 0x1A, 0x45, (byte) 0xDF, (byte) 0xA3};
+
+  public static void main(String[] args) throws Exception {
+    namesAndHints();
+    missesAndRewind();
+    supportedAndMetadata();
+    unsupportedAndFailures();
+    trackFactory();
+    subclassUse();
+    reflection();
+    System.out.println("contracts=name,ignored-hints,null-hints,ebml,case-sensitive,rewind-match,rewind-miss,initial-position,logging-order,read-order,supported-codecs,unsupported-result,metadata-fallback,duration-truncation,result-shape,self-probe,null-settings,failures,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,constant-fields,private-state,throws,reflection");
+  }
+
+  private static void namesAndHints() {
+    MatroskaContainerProbe probe = new MatroskaContainerProbe();
+    check(probe.getName().equals("matroska/webm") && probe.getName() == "matroska/webm",
+        "stable interned probe name");
+    check(!probe.matchesHints(null) && !probe.matchesHints(MediaContainerHints.from(null, null))
+        && !probe.matchesHints(MediaContainerHints.from("video/webm", "mkv")),
+        "all hints are ignored");
+  }
+
+  private static void missesAndRewind() throws Exception {
+    MatroskaContainerProbe probe = new MatroskaContainerProbe();
+    MatroskaGateSupport.reset();
+    MemoryStream wrong = new MemoryStream(new byte[] {0, 0x45, (byte) 0xDF, (byte) 0xA3}, 3);
+    check(probe.probe(null, wrong) == null && wrong.readCalls == 1 && wrong.seekHardCalls == 1
+        && wrong.getPosition() == 3L && MatroskaGateSupport.fileConstructions == 0,
+        "EBML mismatch rewinds and avoids reference/file access");
+    MatroskaGateSupport.reset();
+    MemoryStream wrongCase = new MemoryStream(new byte[] {0x1A, 0x65, (byte) 0xDF, (byte) 0xA3}, 0);
+    check(probe.probe(null, wrongCase) == null && wrongCase.readCalls == 2
+        && wrongCase.seekHardCalls == 1 && wrongCase.getPosition() == 0L,
+        "EBML comparison is case-sensitive and stops at first mismatch");
+    MatroskaGateSupport.reset();
+    MemoryStream shortInput = new MemoryStream(new byte[] {0x1A, 0x45}, 0);
+    check(probe.probe(null, shortInput) == null && shortInput.readCalls == 3
+        && shortInput.seekHardCalls == 1 && shortInput.getPosition() == 0L,
+        "short EBML input rewinds after EOF");
+  }
+
+  private static void supportedAndMetadata() throws Exception {
+    MatroskaContainerProbe probe = new MatroskaContainerProbe();
+    MatroskaGateSupport.reset();
+    MatroskaGateSupport.tracks = new MatroskaFileTrack[] {
+        track(MatroskaFileTrack.Type.VIDEO, "A_OPUS"),
+        track(MatroskaFileTrack.Type.AUDIO, "A_OPUS")};
+    MatroskaGateSupport.title = null;
+    MatroskaGateSupport.artist = "artist";
+    MatroskaGateSupport.duration = 1234.75;
+    MatroskaGateSupport.isrc = "isrc";
+    AudioReference reference = new AudioReference("id", "fallback-title");
+    MemoryStream stream = new MemoryStream(EBML, 0);
+    MediaContainerDetectionResult result = probe.probe(reference, stream);
+    check(result != null && result.isContainerDetected() && result.isSupportedFile()
+        && result.getReference() == null && result.getUnsupportedReason() == null,
+        "supported codec produces supported result");
+    MediaContainerDescriptor descriptor = result.getContainerDescriptor();
+    AudioTrackInfo info = result.getTrackInfo();
+    check(descriptor.probe == probe && descriptor.parameters == null
+        && info.title.equals("Unknown title") && info.author.equals("artist")
+        && info.length == 1234L && info.identifier.equals("id") && !info.isStream
+        && info.uri.equals("id") && info.artworkUrl == null && info.isrc.equals("isrc"),
+        "metadata fallback and Java double-to-long truncation");
+    check(stream.readCalls == 4 && stream.seekHardCalls == 1 && stream.getPosition() == 0L
+        && MatroskaGateSupport.events.toString().equals("file,readFile,tracks,title,artist,duration,isrc"),
+        "match rewinds before file construction and follows read/track/duration order");
+  }
+
+  private static void unsupportedAndFailures() throws Exception {
+    MatroskaContainerProbe probe = new MatroskaContainerProbe();
+    MatroskaGateSupport.reset();
+    MatroskaGateSupport.tracks = new MatroskaFileTrack[] {track(MatroskaFileTrack.Type.AUDIO, "A_OPUSX")};
+    MediaContainerDetectionResult unsupported = probe.probe(new AudioReference("id", null),
+        new MemoryStream(EBML, 0));
+    check(unsupported != null && unsupported.isContainerDetected() && !unsupported.isSupportedFile()
+        && unsupported.getUnsupportedReason().equals("No supported audio tracks present in the file."),
+        "unsupported codec produces exact reason");
+    IOException readFailure = new IOException("read-failure");
+    MatroskaGateSupport.reset(); MatroskaGateSupport.readFileFailure = readFailure;
+    check(catchThrowable(() -> probe.probe(new AudioReference("id", null), new MemoryStream(EBML, 0))) == readFailure,
+        "read failure identity is preserved");
+    MatroskaGateSupport.reset();
+    check(catchThrowable(() -> probe.probe(null, null)) instanceof NullPointerException,
+        "null stream fails before file construction");
+  }
+
+  private static void trackFactory() {
+    MatroskaContainerProbe probe = new MatroskaContainerProbe();
+    AudioTrackInfo info = new AudioTrackInfo("t", "a", 1L, "id", false, "uri", null, null);
+    MemoryStream stream = new MemoryStream(new byte[0], 0);
+    AudioTrack first = probe.createTrack("ignored", info, stream);
+    AudioTrack second = probe.createTrack(null, null, null);
+    check(first.getClass() == MatroskaAudioTrack.class && first != second && first.getInfo() == info
+        && second.getInfo() == null, "factory creates fresh tracks and ignores parameters");
+  }
+
+  private static void subclassUse() throws Exception {
+    MatroskaGateSupport.reset();
+    MatroskaGateSupport.tracks = new MatroskaFileTrack[] {track(MatroskaFileTrack.Type.AUDIO, "A_AAC")};
+    Derived derived = new Derived();
+    MediaContainerDetectionResult result = ((MediaContainerProbe) derived).probe(
+        new AudioReference("derived", null), new MemoryStream(EBML, 0));
+    check(derived.getName().equals("derived-matroska") && result.getContainerDescriptor().probe == derived,
+        "subclass dispatch retains self identity");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MatroskaContainerProbe> type = MatroskaContainerProbe.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {MediaContainerProbe.class})
+        && type.getDeclaredFields().length == 6 && type.getDeclaredMethods().length == 5
+        && type.getDeclaredConstructors().length == 1, "class and member counts");
+    checkConstant(type, "OPUS_CODEC", "A_OPUS", Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
+    checkConstant(type, "VORBIS_CODEC", "A_VORBIS", Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
+    checkConstant(type, "AAC_CODEC", "A_AAC", Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
+    checkConstant(type, "EBML_TAG", new int[] {0x1A, 0x45, 0xDF, 0xA3},
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    for (Method method : new Method[] {
+        type.getDeclaredMethod("getName"), type.getDeclaredMethod("matchesHints", MediaContainerHints.class),
+        type.getDeclaredMethod("probe", AudioReference.class, SeekableInputStream.class),
+        type.getDeclaredMethod("createTrack", String.class, AudioTrackInfo.class, SeekableInputStream.class)}) {
+      check(Modifier.isPublic(method.getModifiers()) && !method.isSynthetic() && !method.isBridge(),
+          "public method metadata " + method.getName());
+    }
+    Constructor<MatroskaContainerProbe> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+  }
+
+  private static void checkConstant(Class<?> type, String name, Object value, int modifiers) throws Exception {
+    Field field = type.getDeclaredField(name); field.setAccessible(true);
+    Object actual = field.get(null);
+    check(field.getModifiers() == modifiers && !field.isSynthetic()
+        && (value instanceof int[] ? Arrays.equals((int[]) actual, (int[]) value) : actual == value),
+        "constant metadata " + name);
+  }
+
+  private static MatroskaFileTrack track(MatroskaFileTrack.Type type, String codec) {
+    return new MatroskaFileTrack(1, type, 2L, "name", codec, null, null);
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable runnable) {
+    try { runnable.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    final byte[] data; long position; int readCalls; int seekHardCalls;
+    MemoryStream(byte[] data, long position) { super(data.length, 0L); this.data = data; this.position = position; }
+    @Override public int read() { readCalls++; if (position >= data.length) return -1; return data[(int) position++] & 0xFF; }
+    @Override public long getPosition() { return position; }
+    @Override protected void seekHard(long position) { seekHardCalls++; this.position = position; }
+    @Override public boolean canSeekHard() { return true; }
+    @Override public java.util.List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider> getTrackInfoProviders() { return Collections.emptyList(); }
+  }
+  private static final class Derived extends MatroskaContainerProbe {
+    @Override public String getName() { return "derived-matroska"; }
+  }
+  private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
 }
 "#;
 

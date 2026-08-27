@@ -286,6 +286,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-matroska-audio-track-consumer 
   --output "$WORK/GateMatroskaAudioTrack.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-matroska-audio-track-support-consumer \
   --output "$WORK/MatroskaGateSupport.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-matroska-container-probe-consumer \
+  --output "$WORK/GateMatroskaContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -441,6 +443,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   -d "$MATROSKA_CLASSES" \
   "$WORK/GateMatroskaAudioTrack.java" \
+  "$WORK/GateMatroskaContainerProbe.java" \
   "$WORK/MatroskaGateSupport.java"
 
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
@@ -1546,6 +1549,17 @@ java -Xverify:all \
   GateMatroskaAudioTrack safety >"$WORK/matroska-audio-track-safety.txt"
 grep --fixed-strings 'safety=single-selected-consumer' \
   "$WORK/matroska-audio-track-safety.txt" >/dev/null
+java -Xverify:all \
+  -cp "$matroska_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMatroskaContainerProbe >"$WORK/matroska-container-probe-reference.txt"
+java -Xverify:all \
+  -cp "$matroska_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMatroskaContainerProbe >"$WORK/matroska-container-probe-candidate.txt"
+cmp "$WORK/matroska-container-probe-reference.txt" \
+  "$WORK/matroska-container-probe-candidate.txt"
+grep --fixed-strings \
+  'contracts=name,ignored-hints,null-hints,ebml,case-sensitive,rewind-match,rewind-miss,initial-position,logging-order,read-order,supported-codecs,unsupported-result,metadata-fallback,duration-truncation,result-shape,self-probe,null-settings,failures,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,constant-fields,private-state,throws,reflection' \
+  "$WORK/matroska-container-probe-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"
