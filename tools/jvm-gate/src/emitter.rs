@@ -163,6 +163,7 @@ const MP3_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mp3/Mp3ContainerProbe";
 const MP3_FRAME_READER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mp3/Mp3FrameReader";
+const MP3_SEEKER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/mp3/Mp3Seeker";
 const ADTS_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/adts/AdtsContainerProbe";
 const ADTS_PACKET_HEADER_CLASS: &str =
@@ -586,6 +587,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MP3_CONSTANT_RATE_SEEKER_CLASS,
     MP3_CONTAINER_PROBE_CLASS,
     MP3_FRAME_READER_CLASS,
+    MP3_SEEKER_CLASS,
     ADTS_CONTAINER_PROBE_CLASS,
     ADTS_PACKET_HEADER_CLASS,
     ADTS_STREAM_PROVIDER_CLASS,

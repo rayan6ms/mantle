@@ -163,6 +163,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mp3-constant-rate-seeker-consumer" => Some(MP3_CONSTANT_RATE_SEEKER_CONSUMER),
         "write-mp3-container-probe-consumer" => Some(MP3_CONTAINER_PROBE_CONSUMER),
         "write-mp3-frame-reader-consumer" => Some(MP3_FRAME_READER_CONSUMER),
+        "write-mp3-seeker-consumer" => Some(MP3_SEEKER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
         "write-adts-packet-header-consumer" => Some(ADTS_PACKET_HEADER_CONSUMER),
         "write-adts-stream-provider-consumer" => Some(ADTS_STREAM_PROVIDER_CONSUMER),
@@ -13844,6 +13845,116 @@ public final class GateMp3ContainerProbe {
 
   private static final class Derived extends Mp3ContainerProbe {
     @Override public String getName() { return "derived-mp3"; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MP3_SEEKER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mp3.Mp3ConstantRateSeeker;
+import com.sedmelluq.discord.lavaplayer.container.mp3.Mp3Seeker;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateMp3Seeker {
+  public static void main(String[] args) throws Exception {
+    dispatchAndIdentity();
+    reflection();
+    System.out.println(
+        "contracts=public-interface,constant-rate-implementation,duration-dispatch,seekable-dispatch,frame-index-dispatch,full-width-timecode,checked-io,reflection");
+  }
+
+  private static void dispatchAndIdentity() throws Exception {
+    RecordingSeeker seeker = new RecordingSeeker();
+    Mp3Seeker contract = seeker;
+    check(contract == seeker && contract.getDuration() == Long.MIN_VALUE
+        && contract.isSeekable() && contract.seekAndGetFrameIndex(Long.MAX_VALUE, new MemoryStream())
+            == Long.MAX_VALUE,
+        "interface dispatch preserves implementation identity and full-width values");
+    check(seeker.durationCalls == 1 && seeker.seekableCalls == 1 && seeker.frameCalls == 1
+        && seeker.timecode == Long.MAX_VALUE,
+        "all interface methods dispatch exactly once with the original timecode");
+    IOException failure = new IOException("seek-failure");
+    seeker.failure = failure;
+    check(catchThrowable(() -> contract.seekAndGetFrameIndex(Long.MIN_VALUE, new MemoryStream()))
+        == failure && seeker.frameCalls == 2 && seeker.timecode == Long.MIN_VALUE,
+        "checked seek failure preserves exact IOException identity");
+
+    byte[] frame = {(byte) 0xff, (byte) 0xfb, (byte) 0xb4, 0x64,
+        0, 0, 4, (byte) 0xbc, 0x1a, 0x4d, 0x0d, 0x67, 0, 2, 0, 0,
+        0x0d, 0x20, (byte) 0xa0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0};
+    Mp3Seeker constant = Mp3ConstantRateSeeker.createFromFrame(0L, 100_000L, frame);
+    check(constant instanceof Mp3Seeker && constant.isSeekable() && constant.getDuration() > 0L,
+        "constant-rate implementation satisfies the public seeker contract");
+  }
+
+  private static void reflection() throws Exception {
+    Class<Mp3Seeker> type = Mp3Seeker.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT | Modifier.INTERFACE)
+        && type.getSuperclass() == null && type.getInterfaces().length == 0
+        && type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 3 && type.getDeclaredAnnotations().length == 0,
+        "public abstract interface metadata");
+    checkMethod(type.getDeclaredMethod("getDuration"), long.class, new Class<?>[0],
+        new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("isSeekable"), boolean.class, new Class<?>[0],
+        new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("seekAndGetFrameIndex", long.class,
+        SeekableInputStream.class), long.class,
+        new Class<?>[] {long.class, SeekableInputStream.class},
+        new Class<?>[] {IOException.class});
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, Class<?>[] parameters,
+      Class<?>[] failures) {
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isDefault() && !method.isVarArgs(),
+        method.getName() + " method metadata");
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class RecordingSeeker implements Mp3Seeker {
+    int durationCalls;
+    int seekableCalls;
+    int frameCalls;
+    long timecode;
+    IOException failure;
+    @Override public long getDuration() { durationCalls++; return Long.MIN_VALUE; }
+    @Override public boolean isSeekable() { seekableCalls++; return true; }
+    @Override public long seekAndGetFrameIndex(long value, SeekableInputStream input)
+        throws IOException {
+      frameCalls++;
+      timecode = value;
+      if (failure != null) throw failure;
+      return value;
+    }
+  }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    MemoryStream() { super(0L, 0L); }
+    @Override public int read() { return -1; }
+    @Override public long getPosition() { return 0L; }
+    @Override protected void seekHard(long position) {}
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider>
+        getTrackInfoProviders() { return Collections.emptyList(); }
   }
 
   private static void check(boolean condition, String message) {

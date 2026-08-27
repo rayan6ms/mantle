@@ -245,6 +245,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mp3-container-probe-consumer \
   --output "$WORK/GateMp3ContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mp3-frame-reader-consumer \
   --output "$WORK/GateMp3FrameReader.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mp3-seeker-consumer \
+  --output "$WORK/GateMp3Seeker.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-container-probe-consumer \
   --output "$WORK/GateAdtsContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-packet-header-consumer \
@@ -404,6 +406,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateFlacSubFrameReader.java" \
   "$WORK/GateMp3ContainerProbe.java" \
   "$WORK/GateMp3FrameReader.java" \
+  "$WORK/GateMp3Seeker.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GateAdtsStreamReader.java" \
@@ -1403,6 +1406,16 @@ cmp "$WORK/mp3-frame-reader-reference.txt" "$WORK/mp3-frame-reader-candidate.txt
 grep --fixed-strings \
   'contracts=constructor,buffer-identity,scan-success,frame-header,frame-size,frame-start,fill-buffer,next-frame,second-frame,scan-miss,scan-limit,append-scan-buffer,io-identity,private-state,reflection' \
   "$WORK/mp3-frame-reader-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMp3Seeker \
+  >"$WORK/mp3-seeker-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMp3Seeker >"$WORK/mp3-seeker-candidate.txt"
+cmp "$WORK/mp3-seeker-reference.txt" "$WORK/mp3-seeker-candidate.txt"
+grep --fixed-strings \
+  'contracts=public-interface,constant-rate-implementation,duration-dispatch,seekable-dispatch,frame-index-dispatch,full-width-timecode,checked-io,reflection' \
+  "$WORK/mp3-seeker-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateAdtsContainerProbe \
   >"$WORK/adts-container-probe-reference.txt"
