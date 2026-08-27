@@ -170,6 +170,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mpeg-aac-track-consumer" => Some(MPEG_AAC_TRACK_CONSUMER),
         "write-mpeg-audio-track-consumer" => Some(MPEG_AUDIO_TRACK_CONSUMER),
         "write-mpeg-audio-track-support-consumer" => Some(MPEG_AUDIO_TRACK_SUPPORT_CONSUMER),
+        "write-mpeg-container-probe-consumer" => Some(MPEG_CONTAINER_PROBE_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
         "write-adts-packet-header-consumer" => Some(ADTS_PACKET_HEADER_CONSUMER),
         "write-adts-stream-provider-consumer" => Some(ADTS_STREAM_PROVIDER_CONSUMER),
@@ -14823,6 +14824,128 @@ public final class GateMp3ConstantRateSeeker {
 }
 "#;
 
+const MPEG_CONTAINER_PROBE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerHints;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerProbe;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegAudioTrack;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegContainerProbe;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegGateSupport;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateMpegContainerProbe {
+  public static void main(String[] args) throws Exception {
+    namesAndHints();
+    missesAndFailures();
+    unsupportedAndSuccess();
+    trackFactory();
+    subclassUse();
+    reflection();
+    System.out.println("contracts=name,constant-hints,always-no-hints,iso-tag,wildcard,rewind,scan-miss,short-input,unsupported-audio,unsupported-reader,metadata,duration,probe-identity,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,private-state,throws,reflection");
+  }
+  private static void namesAndHints() {
+    MpegContainerProbe probe = new MpegContainerProbe();
+    check(probe.getName().equals("mp4") && probe.getName() == "mp4", "stable MP4 probe name");
+    check(!probe.matchesHints(null) && !probe.matchesHints(MediaContainerHints.from(null, null))
+        && !probe.matchesHints(MediaContainerHints.from("video/mp4", "mp4")),
+        "MPEG probe never claims hint-based detection");
+  }
+  private static void missesAndFailures() throws Exception {
+    MpegContainerProbe probe = new MpegContainerProbe();
+    MemoryStream miss = new MemoryStream(new byte[] {0, 0, 0, 1, 'm', 'p', '4', '2'});
+    check(probe.probe(new AudioReference("id", "title"), miss) == null && miss.position == 0L,
+        "non-MP4 input returns null and rewinds the scan");
+    MemoryStream shortInput = new MemoryStream(new byte[] {0, 0, 0});
+    check(probe.probe(new AudioReference("id", "title"), shortInput) == null && shortInput.position == 0L,
+        "short input returns null and rewinds");
+    expect(NullPointerException.class, () -> probe.probe(null, new MemoryStream(iso())));
+    expect(NullPointerException.class, () -> probe.probe(new AudioReference("id", "title"), null));
+    MemoryStream io = new MemoryStream(iso()); io.ioFailure = new IOException("read-failure");
+    check(catchThrowable(() -> probe.probe(new AudioReference("id", "title"), io)) == io.ioFailure,
+        "checked ISO scan failure preserves IOException identity");
+  }
+  private static void unsupportedAndSuccess() throws Exception {
+    MpegContainerProbe probe = new MpegContainerProbe();
+    MpegGateSupport.reset(); MpegGateSupport.setTracks("video|avc1");
+    MediaContainerDetectionResult unsupported = probe.probe(new AudioReference("id", "title"), new MemoryStream(iso()));
+    check(unsupported != null && unsupported.isContainerDetected() && !unsupported.isSupportedFile()
+        && unsupported.getContainerDescriptor().probe == probe
+        && unsupported.getUnsupportedReason().equals("No supported audio format in the MP4 file."),
+        "recognized MP4 without AAC returns the exact unsupported reason");
+    MpegGateSupport.reset(); MpegGateSupport.setTracks("soun|mp4a"); MpegGateSupport.title = "Track title"; MpegGateSupport.artist = "Track artist"; MpegGateSupport.duration = 987654L;
+    AudioReference reference = new AudioReference("fixture-id", "fallback-title");
+    MemoryStream stream = new MemoryStream(iso());
+    MediaContainerDetectionResult result = probe.probe(reference, stream);
+    AudioTrackInfo info = result.getTrackInfo();
+    check(result.isContainerDetected() && result.isSupportedFile() && result.getContainerDescriptor().probe == probe
+        && result.getContainerDescriptor().parameters == null && info != null
+        && info.identifier.equals("fixture-id") && info.title.equals("Track title")
+        && info.author.equals("Track artist") && info.length == 987654L,
+        "supported MP4 returns probe identity and metadata-derived track info");
+    check(MpegGateSupport.readerConsumer != null && MpegGateSupport.parseCalls == 1
+        && MpegGateSupport.readerCalls == 1 && MpegGateSupport.metadataCalls == 2,
+        "successful probe parses once, loads one reader, and reads title/artist metadata");
+    MpegGateSupport.reset(); MpegGateSupport.setTracks("soun|mp4a"); MpegGateSupport.readerNull = true;
+    MediaContainerDetectionResult noReader = probe.probe(reference, new MemoryStream(iso()));
+    check(!noReader.isSupportedFile() && noReader.getUnsupportedReason().equals("MP4 file uses an unsupported format."),
+        "null reader produces the exact unsupported reason");
+    MpegGateSupport.reset(); MpegGateSupport.parseFailure = new RuntimeException("parse-failure");
+    check(catchThrowable(() -> probe.probe(reference, new MemoryStream(iso()))) == MpegGateSupport.parseFailure,
+        "header parse IOException preserves identity");
+  }
+  private static void trackFactory() throws Exception {
+    MpegContainerProbe probe = new MpegContainerProbe();
+    AudioTrackInfo info = new AudioTrackInfo("title", "author", 1L, "track-id", false, "uri");
+    MemoryStream stream = new MemoryStream(iso());
+    AudioTrack first = probe.createTrack("one", info, stream); AudioTrack second = probe.createTrack("two", info, stream);
+    check(first instanceof MpegAudioTrack && second instanceof MpegAudioTrack && first != second
+        && first.getInfo() == info && input((MpegAudioTrack) first) == stream
+        && input((MpegAudioTrack) second) == stream, "factory creates fresh tracks retaining info and stream");
+    MpegAudioTrack nulls = (MpegAudioTrack) probe.createTrack(null, null, null);
+    check(nulls.getInfo() == null && input(nulls) == null, "factory accepts null track arguments");
+  }
+  private static void subclassUse() { Derived derived = new Derived(); check(derived.getName().equals("derived-mp4"), "subclass dispatch remains available"); }
+  private static void reflection() throws Exception {
+    Class<MpegContainerProbe> type = MpegContainerProbe.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {MediaContainerProbe.class})
+        && type.getDeclaredFields().length == 2 && type.getDeclaredMethods().length == 5
+        && type.getDeclaredConstructors().length == 1, "exact public shape and declared counts");
+    Field log = type.getDeclaredField("log"); log.setAccessible(true);
+    Object expected = Class.forName("org.slf4j.LoggerFactory").getMethod("getLogger", Class.class).invoke(null, type);
+    check(log.getType().getName().equals("org.slf4j.Logger") && log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL) && log.get(null) == expected, "eager logger metadata");
+    Field tag = type.getDeclaredField("ISO_TAG"); tag.setAccessible(true);
+    check(tag.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL) && Arrays.equals((int[]) tag.get(null), new int[] {0, 0, 0, -1, 'f', 't', 'y', 'p'}), "private ISO tag metadata");
+    checkMethod(type.getDeclaredConstructor(), new Class<?>[0], new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("getName"), String.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("matchesHints", MediaContainerHints.class), boolean.class, new Class<?>[] {MediaContainerHints.class});
+    checkMethod(type.getDeclaredMethod("probe", AudioReference.class, SeekableInputStream.class), MediaContainerDetectionResult.class, new Class<?>[] {AudioReference.class, SeekableInputStream.class}, new Class<?>[] {IOException.class});
+    checkMethod(type.getDeclaredMethod("createTrack", String.class, AudioTrackInfo.class, SeekableInputStream.class), AudioTrack.class, new Class<?>[] {String.class, AudioTrackInfo.class, SeekableInputStream.class});
+  }
+  private static byte[] iso() { return new byte[] {0, 0, 0, 0x42, 'f', 't', 'y', 'p', 1, 2}; }
+  private static java.io.InputStream input(MpegAudioTrack track) throws Exception { Field field = MpegAudioTrack.class.getDeclaredField("inputStream"); field.setAccessible(true); return (java.io.InputStream) field.get(track); }
+  private static void checkMethod(Constructor<?> c, Class<?>[] p, Class<?>[] e) { check(c.getModifiers() == Modifier.PUBLIC && Arrays.equals(c.getParameterTypes(), p) && Arrays.equals(c.getExceptionTypes(), e), "constructor metadata"); }
+  private static void checkMethod(Method m, Class<?> r, Class<?>[] p, Class<?>... e) { check(m.getModifiers() == Modifier.PUBLIC && m.getReturnType() == r && Arrays.equals(m.getParameterTypes(), p) && Arrays.equals(m.getExceptionTypes(), e) && !m.isSynthetic() && !m.isBridge(), m.getName() + " metadata"); }
+  private static Throwable catchThrowable(ThrowingRunnable action) { try { action.run(); return null; } catch (Throwable t) { return t; } }
+  private static void expect(Class<? extends Throwable> type, ThrowingRunnable action) { Throwable t = catchThrowable(action); check(type.isInstance(t), "expected " + type.getName()); }
+  private interface ThrowingRunnable { void run() throws Throwable; }
+  private static final class MemoryStream extends SeekableInputStream { final byte[] data; long position; IOException ioFailure; MemoryStream(byte[] data) { super(data.length, 0L); this.data = data; } @Override public int read() throws IOException { if (ioFailure != null) throw ioFailure; return position < data.length ? data[(int) position++] & 0xff : -1; } @Override public long getPosition() { return position; } @Override protected void seekHard(long target) { position = target; } @Override public boolean canSeekHard() { return true; } @Override public List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider> getTrackInfoProviders() { return Collections.emptyList(); } }
+  private static final class Derived extends MpegContainerProbe { @Override public String getName() { return "derived-mp4"; } }
+  private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
+}
+"#;
+
 const MPEG_AUDIO_TRACK_CONSUMER: &str = r#"
 import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegAudioTrack;
 import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegGateSupport;
@@ -15055,14 +15178,17 @@ public final class MpegGateSupport {
   public static MpegTrackConsumer consumer;
   public static MpegTrackConsumer readerConsumer;
   public static int consumerCreations, initialiseCalls, readCalls, seekCalls, closeCalls;
+  public static int parseCalls, readerCalls, metadataCalls;
   public static long seekTimecode, duration = 654321L;
-  public static RuntimeException parseFailure, contextFailure, initialiseFailure, readerFailure, loopFailure, closeFailure;
+  public static String title, artist;
+  public static RuntimeException parseFailure;
+  public static RuntimeException contextFailure, initialiseFailure, readerFailure, loopFailure, closeFailure;
   public static InterruptedException readFailure;
   public static boolean readerNull;
   public static final StringBuilder events = new StringBuilder();
   static String[] trackSpecs = {"soun|mp4a"};
   private MpegGateSupport() {}
-  public static void reset() { consumerContext = null; consumerTrack = null; consumer = null; readerConsumer = null; consumerCreations = initialiseCalls = readCalls = seekCalls = closeCalls = 0; seekTimecode = 0L; duration = 654321L; parseFailure = contextFailure = initialiseFailure = readerFailure = loopFailure = closeFailure = null; readFailure = null; readerNull = false; trackSpecs = new String[] {"soun|mp4a"}; events.setLength(0); }
+  public static void reset() { consumerContext = null; consumerTrack = null; consumer = null; readerConsumer = null; consumerCreations = initialiseCalls = readCalls = seekCalls = closeCalls = parseCalls = readerCalls = metadataCalls = 0; seekTimecode = 0L; duration = 654321L; title = artist = null; parseFailure = null; contextFailure = initialiseFailure = readerFailure = loopFailure = closeFailure = null; readFailure = null; readerNull = false; trackSpecs = new String[] {"soun|mp4a"}; events.setLength(0); }
   public static void setTracks(String... specs) { trackSpecs = specs; }
   public static void event(String value) { if (events.length() > 0) events.append(','); events.append(value); }
 }
@@ -15071,8 +15197,9 @@ class MpegFileLoader {
   private final List<MpegTrackInfo> tracks = new ArrayList<>();
   MpegFileLoader(SeekableInputStream input) { MpegGateSupport.event("loader"); for (String spec : MpegGateSupport.trackSpecs) { String[] pair = spec.split("\\|", -1); tracks.add(new MpegTrackInfo(0, pair[0], pair[1], 2, 44100, new byte[] {1, 2})); } }
   List<MpegTrackInfo> getTrackList() { return tracks; }
-  void parseHeaders() { MpegGateSupport.event("parse"); if (MpegGateSupport.parseFailure != null) throw MpegGateSupport.parseFailure; }
-  MpegFileTrackProvider loadReader(MpegTrackConsumer trackConsumer) { MpegGateSupport.readerConsumer = trackConsumer; MpegGateSupport.event("reader"); if (MpegGateSupport.readerFailure != null) throw MpegGateSupport.readerFailure; return MpegGateSupport.readerNull ? null : new MpegGateProvider(); }
+  void parseHeaders() { MpegGateSupport.parseCalls++; MpegGateSupport.event("parse"); if (MpegGateSupport.parseFailure != null) throw MpegGateSupport.parseFailure; }
+  String getTextMetadata(String key) { MpegGateSupport.metadataCalls++; return "Title".equals(key) ? MpegGateSupport.title : MpegGateSupport.artist; }
+  MpegFileTrackProvider loadReader(MpegTrackConsumer trackConsumer) { MpegGateSupport.readerCalls++; MpegGateSupport.readerConsumer = trackConsumer; MpegGateSupport.event("reader"); if (MpegGateSupport.readerFailure != null) throw MpegGateSupport.readerFailure; return MpegGateSupport.readerNull ? null : new MpegGateProvider(); }
 }
 
 class MpegAacTrackConsumer implements MpegTrackConsumer {

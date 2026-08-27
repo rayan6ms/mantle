@@ -171,6 +171,8 @@ const MP3_TRACK_PROVIDER_CLASS: &str =
 const MP3_XING_SEEKER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/mp3/Mp3XingSeeker";
 const MPEG_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegAudioTrack";
+const MPEG_CONTAINER_PROBE_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegContainerProbe";
 const MPEG_AAC_TRACK_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegAacTrackConsumer";
 const ADTS_CONTAINER_PROBE_CLASS: &str =
@@ -601,6 +603,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MP3_TRACK_PROVIDER_CLASS,
     MP3_XING_SEEKER_CLASS,
     MPEG_AUDIO_TRACK_CLASS,
+    MPEG_CONTAINER_PROBE_CLASS,
     MPEG_AAC_TRACK_CONSUMER_CLASS,
     ADTS_CONTAINER_PROBE_CLASS,
     ADTS_PACKET_HEADER_CLASS,
@@ -834,6 +837,7 @@ pub fn emit(
     let mut mp3_xing_seeker_bytes = None;
     let mut mpeg_aac_track_consumer_bytes = None;
     let mut mpeg_audio_track_bytes = None;
+    let mut mpeg_container_probe_bytes = None;
     for binary_name in REFERENCE_CLASSES.iter().chain(PRIVATE_SUPPORT_CLASSES) {
         let mut entry = source.by_name(&format!("{binary_name}.class"))?;
         let mut bytes = Vec::new();
@@ -849,6 +853,8 @@ pub fn emit(
             mpeg_aac_track_consumer_bytes = Some(bytes);
         } else if *binary_name == MPEG_AUDIO_TRACK_CLASS {
             mpeg_audio_track_bytes = Some(bytes);
+        } else if *binary_name == MPEG_CONTAINER_PROBE_CLASS {
+            mpeg_container_probe_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -901,6 +907,11 @@ pub fn emit(
             bytes = mpeg_audio_track_bytes
                 .as_ref()
                 .expect("MPEG audio track source bytes are retained")
+                .clone();
+        } else if name == format!("{MPEG_CONTAINER_PROBE_CLASS}.class") {
+            bytes = mpeg_container_probe_bytes
+                .as_ref()
+                .expect("MPEG container probe source bytes are retained")
                 .clone();
         } else {
             class.to_bytes(&mut bytes)?;
@@ -1417,6 +1428,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | MP3_TRACK_PROVIDER_CLASS
             | MP3_XING_SEEKER_CLASS
             | MPEG_AUDIO_TRACK_CLASS
+            | MPEG_CONTAINER_PROBE_CLASS
             | MPEG_AAC_TRACK_CONSUMER_CLASS
     ) {
         return Ok(class);

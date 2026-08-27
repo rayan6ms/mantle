@@ -260,6 +260,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-audio-track-consumer \
   --output "$WORK/GateMpegAudioTrack.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-audio-track-support-consumer \
   --output "$WORK/MpegGateSupport.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-container-probe-consumer \
+  --output "$WORK/GateMpegContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-container-probe-consumer \
   --output "$WORK/GateAdtsContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-packet-header-consumer \
@@ -497,6 +499,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$MP3_CLASSES" \
   "$WORK/GateMp3ConstantRateSeeker.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$MPEG_CLASSES" \
   "$WORK/GateMpegAudioTrack.java" \
+  "$WORK/GateMpegContainerProbe.java" \
   "$WORK/MpegGateSupport.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   -d "$FLAC_LOADER_CLASSES" \
@@ -1402,6 +1405,16 @@ cmp "$WORK/mpeg-audio-track-reference.txt" "$WORK/mpeg-audio-track-candidate.txt
 grep --fixed-strings \
   'contracts=track-info,input-identity,null-construction,track-selection,context,initialise,reader,duration,read-callback,seek-callback,full-width-timecode,executor-control,input-ownership,unsupported,parse-failure,context-failure,initialise-failure,reader-failure,loop-failure,callback-failure,close-finally,close-replacement,subclassable,eager-logger,private-state,throws,reflection' \
   "$WORK/mpeg-audio-track-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$MPEG_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMpegContainerProbe \
+  >"$WORK/mpeg-container-probe-reference.txt"
+java -Xverify:all \
+  -cp "$MPEG_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegContainerProbe >"$WORK/mpeg-container-probe-candidate.txt"
+cmp "$WORK/mpeg-container-probe-reference.txt" "$WORK/mpeg-container-probe-candidate.txt"
+grep --fixed-strings \
+  'contracts=name,constant-hints,always-no-hints,iso-tag,wildcard,rewind,scan-miss,short-input,unsupported-audio,unsupported-reader,metadata,duration,probe-identity,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,private-state,throws,reflection' \
+  "$WORK/mpeg-container-probe-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mp3_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMp3ConstantRateSeeker \
   >"$WORK/mp3-constant-rate-seeker-reference.txt"
