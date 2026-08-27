@@ -191,6 +191,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-matroska-vorbis-track-consumer-consumer" => {
             Some(MATROSKA_VORBIS_TRACK_CONSUMER_CONSUMER)
         }
+        "write-matroska-block-consumer" => Some(MATROSKA_BLOCK_CONSUMER),
         "write-matroska-streaming-file-consumer" => Some(MATROSKA_STREAMING_FILE_CONSUMER),
         "write-matroska-audio-track-consumer" => Some(MATROSKA_AUDIO_TRACK_CONSUMER),
         "write-matroska-audio-track-support-consumer" => {
@@ -17763,6 +17764,157 @@ public final class GateMatroskaVorbisTrackConsumer {
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MATROSKA_BLOCK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaBlock;
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement;
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaBlock;
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaElement;
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileReader;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateMatroskaBlock {
+  public static void main(String[] args) throws Exception {
+    reflection();
+    defaultsAndFilter();
+    singleFrame();
+    fixedLacing();
+    xiphLacing();
+    System.out.println("contracts=interface,constructor,defaults,track-filter,single-frame,fixed-lacing,xiph-lacing,buffer-reuse,bounds,reflection");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MatroskaBlock> block = MatroskaBlock.class;
+    check(block.getModifiers() == (Modifier.PUBLIC | Modifier.INTERFACE | Modifier.ABSTRACT)
+        && block.getSuperclass() == null && block.getDeclaredFields().length == 0
+        && block.getDeclaredMethods().length == 5, "interface metadata");
+    checkMethod(block.getDeclaredMethod("getTimecode"), int.class, new Class<?>[0]);
+    checkMethod(block.getDeclaredMethod("getTrackNumber"), int.class, new Class<?>[0]);
+    checkMethod(block.getDeclaredMethod("isKeyFrame"), boolean.class, new Class<?>[0]);
+    checkMethod(block.getDeclaredMethod("getFrameCount"), int.class, new Class<?>[0]);
+    checkMethod(block.getDeclaredMethod("getNextFrameBuffer", MatroskaFileReader.class, int.class),
+        ByteBuffer.class, new Class<?>[] {IOException.class});
+
+    Class<MutableMatroskaBlock> type = MutableMatroskaBlock.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {MatroskaBlock.class})
+        && type.getDeclaredFields().length == 7 && type.getDeclaredMethods().length == 11
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredAnnotations().length == 0,
+        "mutable class metadata");
+    Constructor<MutableMatroskaBlock> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    checkConcreteMethod(type.getDeclaredMethod("parseHeader", MatroskaFileReader.class,
+        MatroskaElement.class, int.class), boolean.class, new Class<?>[] {IOException.class});
+  }
+
+  private static void defaultsAndFilter() throws Exception {
+    MutableMatroskaBlock block = new MutableMatroskaBlock();
+    check(block.getTimecode() == 0 && block.getTrackNumber() == 0 && !block.isKeyFrame()
+        && block.getFrameCount() == 0, "zero-value defaults");
+    MemoryStream stream = new MemoryStream(new byte[] {(byte) 0x85, 0, 1, (byte) 0x80, 9});
+    MatroskaFileReader reader = new MatroskaFileReader(stream);
+    check(!block.parseHeader(reader, element(5), 6) && block.getTrackNumber() == 5
+        && block.getFrameCount() == 0 && stream.getPosition() == 1,
+        "track filter rejects after reading track number");
+  }
+
+  private static void singleFrame() throws Exception {
+    MutableMatroskaBlock block = new MutableMatroskaBlock();
+    byte[] bytes = {(byte) 0x85, 0x12, 0x34, (byte) 0x80, 1, 2, 3, 4};
+    MemoryStream stream = new MemoryStream(bytes);
+    MatroskaFileReader reader = new MatroskaFileReader(stream);
+    check(block.parseHeader(reader, element(bytes.length), 5) && block.getTrackNumber() == 5
+        && block.getTimecode() == 0x1234 && block.isKeyFrame() && block.getFrameCount() == 1,
+        "single-frame header");
+    ByteBuffer buffer = block.getNextFrameBuffer(reader, 0);
+    check(buffer.position() == 0 && buffer.limit() == 4 && !buffer.isDirect()
+        && buffer.get(0) == 1 && buffer.get(3) == 4, "single-frame buffer");
+    check(catchThrowable(() -> block.getNextFrameBuffer(reader, 1)) instanceof IllegalArgumentException
+        && catchThrowable(() -> block.getNextFrameBuffer(reader, 1)).getMessage()
+            .equals("Frame index out of bounds."), "bounds failure");
+  }
+
+  private static void fixedLacing() throws Exception {
+    MutableMatroskaBlock block = new MutableMatroskaBlock();
+    byte[] bytes = {(byte) 0x86, 0, 7, 0x04, 1, 10, 11, 12, 13, 14, 15};
+    MatroskaFileReader reader = new MatroskaFileReader(new MemoryStream(bytes));
+    check(block.parseHeader(reader, element(bytes.length), 6) && block.getFrameCount() == 2,
+        "fixed lace count");
+    ByteBuffer first = block.getNextFrameBuffer(reader, 0);
+    ByteBuffer second = block.getNextFrameBuffer(reader, 1);
+    check(first == second && first.limit() == 3 && first.get(0) == 13 && first.get(2) == 15,
+        "fixed lacing reuses buffer and reads frame payload");
+  }
+
+  private static void xiphLacing() throws Exception {
+    MutableMatroskaBlock block = new MutableMatroskaBlock();
+    byte[] bytes = {(byte) 0x87, 0, 8, 0x02, 1, 2, 20, 21, 22, 23, 24, 25};
+    MatroskaFileReader reader = new MatroskaFileReader(new MemoryStream(bytes));
+    check(block.parseHeader(reader, element(bytes.length), 7) && block.getFrameCount() == 2,
+        "xiph lace count");
+    ByteBuffer first = block.getNextFrameBuffer(reader, 0);
+    check(first.limit() == 2 && first.get(0) == 20 && first.get(1) == 21,
+        "xiph first frame size");
+    ByteBuffer second = block.getNextFrameBuffer(reader, 1);
+    check(second.limit() == 4 && second.get(0) == 22 && second.get(3) == 25,
+        "xiph remainder frame size");
+  }
+
+  private static MutableMatroskaElement element(int size) throws Exception {
+    Constructor<MutableMatroskaElement> constructor = MutableMatroskaElement.class
+        .getDeclaredConstructor(int.class);
+    constructor.setAccessible(true);
+    MutableMatroskaElement element = constructor.newInstance(0);
+    element.setPosition(0); element.setHeaderSize(0); element.setDataSize(size);
+    return element;
+  }
+
+  private static void checkMethod(Method method, Class<?> result, Class<?>[] failures) {
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == result && Arrays.equals(method.getExceptionTypes(), failures)
+        && !method.isSynthetic() && !method.isBridge(), method.getName() + " metadata");
+  }
+
+  private static void checkConcreteMethod(Method method, Class<?> result, Class<?>[] failures) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == result
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge(), method.getName() + " metadata");
+  }
+
+  private static Throwable catchThrowable(Operation operation) {
+    try { operation.run(); return null; } catch (Throwable error) { return error; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+
+  private interface Operation { void run() throws Throwable; }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    private final byte[] data;
+    private int position;
+    MemoryStream(byte[] data) { super(data.length, 1_000_000); this.data = data; }
+    @Override public int read() { return position == data.length ? -1 : data[position++] & 0xFF; }
+    @Override public long getPosition() { return position; }
+    @Override protected void seekHard(long position) { this.position = (int) position; }
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      return Collections.emptyList();
+    }
   }
 }
 "#;

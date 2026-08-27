@@ -3337,54 +3337,60 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaBlock interface and MutableMatroskaBlock parser preserve exact descriptors, frame-header filtering/lacing behavior, reusable frame buffers, bounds failures, and reflection metadata under the Phase 13 matroska-block-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaBlock",
       "symbol_kind": "METHOD",
       "member_name": "getTimecode",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaBlock interface and MutableMatroskaBlock parser preserve exact descriptors, frame-header filtering/lacing behavior, reusable frame buffers, bounds failures, and reflection metadata under the Phase 13 matroska-block-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaBlock",
       "symbol_kind": "METHOD",
       "member_name": "getTrackNumber",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaBlock interface and MutableMatroskaBlock parser preserve exact descriptors, frame-header filtering/lacing behavior, reusable frame buffers, bounds failures, and reflection metadata under the Phase 13 matroska-block-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaBlock",
       "symbol_kind": "METHOD",
       "member_name": "isKeyFrame",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaBlock interface and MutableMatroskaBlock parser preserve exact descriptors, frame-header filtering/lacing behavior, reusable frame buffers, bounds failures, and reflection metadata under the Phase 13 matroska-block-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaBlock",
       "symbol_kind": "METHOD",
       "member_name": "getFrameCount",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaBlock interface and MutableMatroskaBlock parser preserve exact descriptors, frame-header filtering/lacing behavior, reusable frame buffers, bounds failures, and reflection metadata under the Phase 13 matroska-block-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaBlock",
       "symbol_kind": "METHOD",
       "member_name": "getNextFrameBuffer",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileReader;I)Ljava/nio/ByteBuffer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaBlock interface and MutableMatroskaBlock parser preserve exact descriptors, frame-header filtering/lacing behavior, reusable frame buffers, bounds failures, and reflection metadata under the Phase 13 matroska-block-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaCuePoint",
@@ -4633,72 +4639,80 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaBlock interface and MutableMatroskaBlock parser preserve exact descriptors, frame-header filtering/lacing behavior, reusable frame buffers, bounds failures, and reflection metadata under the Phase 13 matroska-block-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaBlock",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaBlock interface and MutableMatroskaBlock parser preserve exact descriptors, frame-header filtering/lacing behavior, reusable frame buffers, bounds failures, and reflection metadata under the Phase 13 matroska-block-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaBlock",
       "symbol_kind": "METHOD",
       "member_name": "getTimecode",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaBlock interface and MutableMatroskaBlock parser preserve exact descriptors, frame-header filtering/lacing behavior, reusable frame buffers, bounds failures, and reflection metadata under the Phase 13 matroska-block-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaBlock",
       "symbol_kind": "METHOD",
       "member_name": "getTrackNumber",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaBlock interface and MutableMatroskaBlock parser preserve exact descriptors, frame-header filtering/lacing behavior, reusable frame buffers, bounds failures, and reflection metadata under the Phase 13 matroska-block-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaBlock",
       "symbol_kind": "METHOD",
       "member_name": "isKeyFrame",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaBlock interface and MutableMatroskaBlock parser preserve exact descriptors, frame-header filtering/lacing behavior, reusable frame buffers, bounds failures, and reflection metadata under the Phase 13 matroska-block-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaBlock",
       "symbol_kind": "METHOD",
       "member_name": "getFrameCount",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaBlock interface and MutableMatroskaBlock parser preserve exact descriptors, frame-header filtering/lacing behavior, reusable frame buffers, bounds failures, and reflection metadata under the Phase 13 matroska-block-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaBlock",
       "symbol_kind": "METHOD",
       "member_name": "getNextFrameBuffer",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileReader;I)Ljava/nio/ByteBuffer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaBlock interface and MutableMatroskaBlock parser preserve exact descriptors, frame-header filtering/lacing behavior, reusable frame buffers, bounds failures, and reflection metadata under the Phase 13 matroska-block-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaBlock",
       "symbol_kind": "METHOD",
       "member_name": "parseHeader",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileReader;Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElement;I)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MatroskaBlock interface and MutableMatroskaBlock parser preserve exact descriptors, frame-header filtering/lacing behavior, reusable frame buffers, bounds failures, and reflection metadata under the Phase 13 matroska-block-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaElement",
