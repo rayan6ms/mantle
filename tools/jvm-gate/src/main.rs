@@ -166,6 +166,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mp3-seeker-consumer" => Some(MP3_SEEKER_CONSUMER),
         "write-mp3-stream-seeker-consumer" => Some(MP3_STREAM_SEEKER_CONSUMER),
         "write-mp3-track-provider-consumer" => Some(MP3_TRACK_PROVIDER_CONSUMER),
+        "write-mp3-xing-seeker-consumer" => Some(MP3_XING_SEEKER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
         "write-adts-packet-header-consumer" => Some(ADTS_PACKET_HEADER_CONSUMER),
         "write-adts-stream-provider-consumer" => Some(ADTS_STREAM_PROVIDER_CONSUMER),
@@ -14204,6 +14205,130 @@ public final class GateMp3TrackProvider {
     @Override protected void seekHard(long position) { }
     @Override public boolean canSeekHard() { return true; }
     @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() { return Collections.emptyList(); }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MP3_XING_SEEKER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mp3.Mp3Seeker;
+import com.sedmelluq.discord.lavaplayer.container.mp3.Mp3XingSeeker;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateMp3XingSeeker {
+  public static void main(String[] args) throws Exception {
+    invalidFrames();
+    validFrame();
+    reflection();
+    System.out.println(
+        "contracts=invalid-tag,missing-flags,xing-tag,required-flags,factory,interface,duration,seekable,percentile-mapping,position-clamp,frame-index,long-timecode,checked-io,reflection");
+  }
+
+  private static void invalidFrames() {
+    byte[] frame = frame();
+    check(Mp3XingSeeker.createFromFrame(0L, 100000L, frame) == null,
+        "ordinary frame is rejected");
+    putInt(frame, 36, 0x58696e67);
+    check(Mp3XingSeeker.createFromFrame(0L, 100000L, frame) == null,
+        "Xing frame without all required flags is rejected");
+  }
+
+  private static void validFrame() throws Exception {
+    byte[] frame = frame();
+    putInt(frame, 36, 0x58696e67);
+    putInt(frame, 40, 7);
+    putInt(frame, 44, 1000);
+    putInt(frame, 48, 100000);
+    for (int index = 0; index < 100; index++) frame[52 + index] = (byte) (index * 2);
+    frame[52 + 83] = (byte) 255;
+    Mp3XingSeeker seeker = Mp3XingSeeker.createFromFrame(100L, 90000L, frame);
+    check(seeker instanceof Mp3Seeker && seeker.isSeekable()
+        && seeker.getDuration() == 24000L,
+        "factory creates a seekable Xing seeker with MPEG-1 duration");
+    MemoryStream input = new MemoryStream();
+    long index = seeker.seekAndGetFrameIndex(5000L, input);
+    check(index == 200L && input.position == 100L + 100000L * 40L / 256L,
+        "percentile mapping computes frame index and seeks to the mapped byte position");
+    long later = seeker.seekAndGetFrameIndex(20000L, input);
+    check(later == 830L && input.position == 90000L,
+        "large mapped positions clamp to content length");
+    IOException failure = new IOException("xing-seek-failure");
+    input.failure = failure;
+    check(catchThrowable(() -> seeker.seekAndGetFrameIndex(5000L, input)) == failure,
+        "checked seek I/O preserves exact IOException identity");
+  }
+
+  private static byte[] frame() {
+    byte[] frame = new byte[160];
+    frame[0] = (byte) 0xff;
+    frame[1] = (byte) 0xfb;
+    frame[2] = (byte) 0xb4;
+    frame[3] = 0x64;
+    return frame;
+  }
+
+  private static void putInt(byte[] data, int offset, int value) {
+    data[offset] = (byte) (value >>> 24);
+    data[offset + 1] = (byte) (value >>> 16);
+    data[offset + 2] = (byte) (value >>> 8);
+    data[offset + 3] = (byte) value;
+  }
+
+  private static void reflection() throws Exception {
+    Class<Mp3XingSeeker> type = Mp3XingSeeker.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {Mp3Seeker.class})
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredMethods().length == 4
+        && type.getDeclaredAnnotations().length == 0,
+        "public Xing seeker metadata");
+    Constructor<?> constructor = type.getDeclaredConstructors()[0];
+    check(Modifier.isPrivate(constructor.getModifiers()) && constructor.getExceptionTypes().length == 0,
+        "private state constructor metadata");
+    Method factory = type.getDeclaredMethod("createFromFrame", long.class, long.class, byte[].class);
+    check(factory.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && factory.getReturnType() == Mp3XingSeeker.class && factory.getExceptionTypes().length == 0,
+        "factory metadata");
+    checkMethod(type.getDeclaredMethod("getDuration"), long.class, new Class<?>[0], new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("isSeekable"), boolean.class, new Class<?>[0], new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("seekAndGetFrameIndex", long.class, SeekableInputStream.class),
+        long.class, new Class<?>[] {long.class, SeekableInputStream.class},
+        new Class<?>[] {IOException.class});
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, Class<?>[] parameters,
+      Class<?>[] failures) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isVarArgs(), method.getName() + " method metadata");
+  }
+
+  private static Throwable catchThrowable(Throwing action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+
+  private interface Throwing { void run() throws Throwable; }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    long position;
+    IOException failure;
+    MemoryStream() { super(0L, 0L); }
+    @Override public int read() throws IOException { if (failure != null) throw failure; return -1; }
+    @Override public long getPosition() { return position; }
+    @Override protected void seekHard(long target) throws IOException { if (failure != null) throw failure; position = target; }
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider>
+        getTrackInfoProviders() { return Collections.emptyList(); }
   }
 
   private static void check(boolean condition, String message) {

@@ -5417,45 +5417,50 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Mp3XingSeeker preserves Xing-header detection, required-field validation, VBR duration/seeking, state, and reflection under the Phase 13 mp3-xing-seeker-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mp3.Mp3XingSeeker",
       "symbol_kind": "METHOD",
       "member_name": "createFromFrame",
       "descriptor": "(JJ[B)Lcom/sedmelluq/discord/lavaplayer/container/mp3/Mp3XingSeeker;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public factory preserves Xing-tag recognition, all-required-flags validation, frame/data extraction, mapping copy, and null rejection.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mp3.Mp3XingSeeker",
       "symbol_kind": "METHOD",
       "member_name": "getDuration",
       "descriptor": "()J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Duration preserves frame-count and MPEG-1 sample-rate arithmetic.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mp3.Mp3XingSeeker",
       "symbol_kind": "METHOD",
       "member_name": "isSeekable",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The Xing seeker preserves its constant true seekability result.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mp3.Mp3XingSeeker",
       "symbol_kind": "METHOD",
       "member_name": "seekAndGetFrameIndex",
       "descriptor": "(JLcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Seeking preserves percentile mapping, frame-index arithmetic, content-length clamping, input seek delegation, and checked IOException identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegAacTrackConsumer",

@@ -251,6 +251,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mp3-stream-seeker-consumer \
   --output "$WORK/GateMp3StreamSeeker.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mp3-track-provider-consumer \
   --output "$WORK/GateMp3TrackProvider.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mp3-xing-seeker-consumer \
+  --output "$WORK/GateMp3XingSeeker.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-container-probe-consumer \
   --output "$WORK/GateAdtsContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-packet-header-consumer \
@@ -413,6 +415,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateMp3Seeker.java" \
   "$WORK/GateMp3StreamSeeker.java" \
   "$WORK/GateMp3TrackProvider.java" \
+  "$WORK/GateMp3XingSeeker.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GateAdtsStreamReader.java" \
@@ -1442,6 +1445,16 @@ cmp "$WORK/mp3-track-provider-reference.txt" "$WORK/mp3-track-provider-candidate
 grep --fixed-strings \
   'contracts=constructor-state,metadata-defaults,id3-tags,provider-interface,seeker-dispatch,unknown-duration,non-seekable,parse-io,close,private-state,checked-io,reflection' \
   "$WORK/mp3-track-provider-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMp3XingSeeker \
+  >"$WORK/mp3-xing-seeker-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMp3XingSeeker >"$WORK/mp3-xing-seeker-candidate.txt"
+cmp "$WORK/mp3-xing-seeker-reference.txt" "$WORK/mp3-xing-seeker-candidate.txt"
+grep --fixed-strings \
+  'contracts=invalid-tag,missing-flags,xing-tag,required-flags,factory,interface,duration,seekable,percentile-mapping,position-clamp,frame-index,long-timecode,checked-io,reflection' \
+  "$WORK/mp3-xing-seeker-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateAdtsContainerProbe \
   >"$WORK/adts-container-probe-reference.txt"
