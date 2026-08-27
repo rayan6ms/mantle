@@ -182,6 +182,8 @@ const MPEG_TRACK_CONSUMER_CLASS: &str =
 const MPEG_TRACK_INFO_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegTrackInfo";
 const MPEG_TRACK_INFO_BUILDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegTrackInfo$Builder";
+const MPEG_FILE_TRACK_PROVIDER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegFileTrackProvider";
 const MPEG_AAC_TRACK_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegAacTrackConsumer";
 const ADTS_CONTAINER_PROBE_CLASS: &str =
@@ -618,6 +620,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MPEG_TRACK_CONSUMER_CLASS,
     MPEG_TRACK_INFO_CLASS,
     MPEG_TRACK_INFO_BUILDER_CLASS,
+    MPEG_FILE_TRACK_PROVIDER_CLASS,
     MPEG_AAC_TRACK_CONSUMER_CLASS,
     ADTS_CONTAINER_PROBE_CLASS,
     ADTS_PACKET_HEADER_CLASS,
@@ -40868,6 +40871,7 @@ fn mpeg_track_info_replacement(
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn mpeg_track_info_builder_replacement(
     pool: &mut ConstantPool<'static>,
     name: &str,

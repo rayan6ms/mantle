@@ -2527,9 +2527,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[2].completed_slices[].symbols] | add) == .cohorts[2].classified_symbols and
   (.cohorts[2].classified_symbols + .cohorts[2].remaining_symbols) == .cohorts[2].symbols and
   .cohorts[3].status == "IN_PROGRESS" and
-  .cohorts[3].classified_symbols == 519 and
-  .cohorts[3].remaining_symbols == 305 and
-  (.cohorts[3].completed_slices | length) == 60 and
+  .cohorts[3].classified_symbols == 524 and
+  .cohorts[3].remaining_symbols == 300 and
+  (.cohorts[3].completed_slices | length) == 61 and
   .cohorts[3].completed_slices[0] == {
     id: "formats-contracts",
     classes: 1,
@@ -2999,6 +2999,19 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "tools/jvm-gate/src/main.rs"
     ]
   } and
+  .cohorts[3].completed_slices[60] == {
+    id: "mpeg-file-track-provider-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 4,
+    symbols: 5,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
   .cohorts[3].completed_slices[1] == {
     id: "media-container-contracts",
     classes: 1,
@@ -3313,9 +3326,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   } and
   ([.cohorts[3].completed_slices[].symbols] | add) == .cohorts[3].classified_symbols and
   (.cohorts[3].classified_symbols + .cohorts[3].remaining_symbols) == .cohorts[3].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1971 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1976 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1824 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1829 and
   ([$classifications.symbols[] |
     select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 131 and
   ([$classifications.symbols[] |
@@ -4750,7 +4763,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "mpeg-file-track-provider-contracts" and
+  .phase_entry.next_slice == "mpeg-parse-stop-checker-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 JQ
@@ -4758,7 +4771,7 @@ JQ
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '278 reference classes / 1,976 symbols' \
+  '279 reference classes / 1,981 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -4768,4 +4781,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 1,971 classified symbols and 791 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 1,976 classified symbols and 786 unassessed symbols.\n'

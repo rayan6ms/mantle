@@ -174,6 +174,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
         "write-mpeg-track-info-consumer" => Some(MPEG_TRACK_INFO_CONSUMER),
         "write-mpeg-track-info-builder-consumer" => Some(MPEG_TRACK_INFO_BUILDER_CONSUMER),
+        "write-mpeg-file-track-provider-consumer" => Some(MPEG_FILE_TRACK_PROVIDER_CONSUMER),
         "write-mpeg-noop-track-consumer-consumer" => Some(MPEG_NOOP_TRACK_CONSUMER_CONSUMER),
         "write-mpeg-track-consumer-consumer" => Some(MPEG_TRACK_CONSUMER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
@@ -15499,6 +15500,147 @@ public final class GateMpegTrackConsumer {
     @Override public int read(ByteBuffer target) throws IOException { readCalls++; return -1; }
     @Override public boolean isOpen() { return true; }
     @Override public void close() { closeCalls++; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MPEG_FILE_TRACK_PROVIDER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegNoopTrackConsumer;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackConsumer;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegFileTrackProvider;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateMpegFileTrackProvider {
+  public static void main(String[] args) throws Exception {
+    dispatchAndIdentity();
+    checkedFailures();
+    implementationCompatibility();
+    reflection();
+    System.out.println("contracts=public-abstract-interface,no-fields,no-constructors,four-methods,consumer-identity,null-consumer,boolean-result,duration-result,full-width-duration,provide-dispatch,seek-dispatch,full-width-timecode,checked-failure-identity,implementation-compatibility,checked-throws,exception-order,reflection");
+  }
+
+  private static void dispatchAndIdentity() throws Exception {
+    RecordingProvider implementation = new RecordingProvider();
+    MpegFileTrackProvider provider = implementation;
+    MpegTrackConsumer consumer = new MpegNoopTrackConsumer(null);
+    implementation.initialiseResult = false;
+    check(!provider.initialise(null) && implementation.initialiseCalls == 1
+        && implementation.lastConsumer == null,
+        "nullable consumer and false initialisation result cross the interface unchanged");
+    implementation.initialiseResult = true;
+    check(provider.initialise(consumer) && implementation.initialiseCalls == 2
+        && implementation.lastConsumer == consumer,
+        "exact consumer identity and true initialisation result cross the interface unchanged");
+
+    implementation.duration = Long.MIN_VALUE;
+    check(provider.getDuration() == Long.MIN_VALUE && implementation.durationCalls == 1,
+        "minimum full-width duration crosses the interface unchanged");
+    implementation.duration = Long.MAX_VALUE;
+    check(provider.getDuration() == Long.MAX_VALUE && implementation.durationCalls == 2,
+        "maximum full-width duration crosses the interface unchanged");
+
+    provider.provideFrames();
+    provider.seekToTimecode(Long.MIN_VALUE + 1L);
+    provider.seekToTimecode(Long.MAX_VALUE - 1L);
+    check(implementation.provideCalls == 1 && implementation.seekCalls == 2
+        && implementation.firstTimecode == Long.MIN_VALUE + 1L
+        && implementation.lastTimecode == Long.MAX_VALUE - 1L,
+        "provide and seek dispatch preserve call count and full-width timecodes");
+  }
+
+  private static void checkedFailures() {
+    RecordingProvider implementation = new RecordingProvider();
+    MpegFileTrackProvider provider = implementation;
+    InterruptedException interrupted = new InterruptedException("interrupted");
+    implementation.interruptedFailure = interrupted;
+    check(catchThrowable(provider::provideFrames) == interrupted,
+        "provideFrames preserves InterruptedException identity");
+    IOException io = new IOException("io");
+    implementation.interruptedFailure = null;
+    implementation.ioFailure = io;
+    check(catchThrowable(provider::provideFrames) == io,
+        "provideFrames preserves IOException identity");
+  }
+
+  private static void implementationCompatibility() throws Exception {
+    Class<MpegFileTrackProvider> type = MpegFileTrackProvider.class;
+    ClassLoader loader = type.getClassLoader();
+    Class<?> standard = Class.forName(
+        "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.standard.MpegStandardFileTrackProvider",
+        false, loader);
+    Class<?> fragmented = Class.forName(
+        "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.fragmented.MpegFragmentedFileTrackProvider",
+        false, loader);
+    check(type.isAssignableFrom(standard) && type.isAssignableFrom(fragmented),
+        "both reference file-provider implementations remain assignable to the emitted interface");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MpegFileTrackProvider> type = MpegFileTrackProvider.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT | Modifier.INTERFACE)
+        && type.isInterface() && type.getSuperclass() == null && type.getInterfaces().length == 0
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0,
+        "exact public abstract interface metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 4, "exact zero-field, zero-constructor shape");
+    checkMethod(type.getDeclaredMethod("initialise", MpegTrackConsumer.class), boolean.class,
+        new Class<?>[] {MpegTrackConsumer.class}, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("getDuration"), long.class,
+        new Class<?>[0], new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("provideFrames"), void.class, new Class<?>[0],
+        new Class<?>[] {InterruptedException.class, IOException.class});
+    checkMethod(type.getDeclaredMethod("seekToTimecode", long.class), void.class,
+        new Class<?>[] {long.class}, new Class<?>[0]);
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, Class<?>[] parameters,
+      Class<?>[] failures) {
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isDefault() && !method.isVarArgs(),
+        method.getName() + " method metadata");
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class RecordingProvider implements MpegFileTrackProvider {
+    boolean initialiseResult;
+    int initialiseCalls;
+    MpegTrackConsumer lastConsumer;
+    long duration;
+    int durationCalls;
+    int provideCalls;
+    int seekCalls;
+    long firstTimecode;
+    long lastTimecode;
+    InterruptedException interruptedFailure;
+    IOException ioFailure;
+    @Override public boolean initialise(MpegTrackConsumer consumer) {
+      initialiseCalls++; lastConsumer = consumer; return initialiseResult;
+    }
+    @Override public long getDuration() { durationCalls++; return duration; }
+    @Override public void provideFrames() throws InterruptedException, IOException {
+      provideCalls++;
+      if (interruptedFailure != null) throw interruptedFailure;
+      if (ioFailure != null) throw ioFailure;
+    }
+    @Override public void seekToTimecode(long timecode) {
+      seekCalls++;
+      if (seekCalls == 1) firstTimecode = timecode;
+      lastTimecode = timecode;
+    }
   }
 
   private static void check(boolean condition, String message) {
