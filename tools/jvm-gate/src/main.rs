@@ -179,6 +179,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mpeg-reader-consumer" => Some(MPEG_READER_CONSUMER),
         "write-mpeg-reader-chain-consumer" => Some(MPEG_READER_CHAIN_CONSUMER),
         "write-mpeg-section-handler-consumer" => Some(MPEG_SECTION_HANDLER_CONSUMER),
+        "write-mpeg-section-info-consumer" => Some(MPEG_SECTION_INFO_CONSUMER),
         "write-mpeg-noop-track-consumer-consumer" => Some(MPEG_NOOP_TRACK_CONSUMER_CONSUMER),
         "write-mpeg-track-consumer-consumer" => Some(MPEG_TRACK_CONSUMER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
@@ -16555,6 +16556,91 @@ public final class GateMpegSectionHandler {
     @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
       return Collections.emptyList();
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MPEG_SECTION_INFO_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegSectionInfo;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateMpegSectionInfo {
+  public static void main(String[] args) throws Exception {
+    constructionAndIdentity();
+    nullsAndEdges();
+    objectSemanticsAndSubclassing();
+    reflection();
+    System.out.println("contracts=field-order,offset-storage,length-storage,type-identity,null-type,full-width-longs,empty-type,no-validation,identity-equality,object-hash,object-string,subclassable,public-final-fields,constructor-descriptor,no-throws,member-counts,reflection");
+  }
+
+  private static void constructionAndIdentity() {
+    String type = new String("wide");
+    MpegSectionInfo info = new MpegSectionInfo(Long.MIN_VALUE, Long.MAX_VALUE, type);
+    check(info.offset == Long.MIN_VALUE && info.length == Long.MAX_VALUE && info.type == type,
+        "constructor stores full-width scalars and exact type identity");
+  }
+
+  private static void nullsAndEdges() {
+    MpegSectionInfo nullable = new MpegSectionInfo(0L, 0L, null);
+    check(nullable.offset == 0L && nullable.length == 0L && nullable.type == null,
+        "constructor accepts null type and zero values");
+    String empty = new String("");
+    MpegSectionInfo unusual = new MpegSectionInfo(Long.MAX_VALUE, -1L, empty);
+    check(unusual.offset == Long.MAX_VALUE && unusual.length == -1L && unusual.type == empty,
+        "constructor performs no length validation or type normalization");
+  }
+
+  private static void objectSemanticsAndSubclassing() {
+    MpegSectionInfo first = new MpegSectionInfo(1L, 2L, "box1");
+    MpegSectionInfo second = new MpegSectionInfo(1L, 2L, "box1");
+    check(first != second && first.equals(first) && !first.equals(second)
+        && first.hashCode() == System.identityHashCode(first)
+        && first.toString().startsWith(MpegSectionInfo.class.getName() + "@"),
+        "class retains Object identity equality, hash and string behavior");
+    Derived derived = new Derived(-2L, -3L, null);
+    check(derived.offset == -2L && derived.length == -3L && derived.type == null,
+        "ordinary subclass inherits exact construction");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MpegSectionInfo> type = MpegSectionInfo.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public non-final value class metadata");
+    check(type.getDeclaredFields().length == 3 && type.getDeclaredMethods().length == 0
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredClasses().length == 0,
+        "exact declared member counts");
+    String[] names = Arrays.stream(type.getDeclaredFields()).map(Field::getName).toArray(String[]::new);
+    check(Arrays.equals(names, new String[] {"offset", "length", "type"}),
+        "exact declared field order");
+    checkField(type.getDeclaredField("offset"), long.class);
+    checkField(type.getDeclaredField("length"), long.class);
+    checkField(type.getDeclaredField("type"), String.class);
+    Constructor<MpegSectionInfo> constructor =
+        type.getDeclaredConstructor(long.class, long.class, String.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && Arrays.equals(constructor.getParameterTypes(),
+            new Class<?>[] {long.class, long.class, String.class})
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic()
+        && !constructor.isVarArgs(), "exact public constructor descriptor and metadata");
+  }
+
+  private static void checkField(Field field, Class<?> fieldType) {
+    check(field.getType() == fieldType
+        && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL) && !field.isSynthetic(),
+        field.getName() + " field metadata");
+  }
+
+  private static final class Derived extends MpegSectionInfo {
+    Derived(long offset, long length, String type) { super(offset, length, type); }
   }
 
   private static void check(boolean condition, String message) {

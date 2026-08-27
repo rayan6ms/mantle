@@ -193,6 +193,8 @@ const MPEG_READER_HANDLER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegReader$Handler";
 const MPEG_SECTION_HANDLER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegSectionHandler";
+const MPEG_SECTION_INFO_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegSectionInfo";
 const MPEG_AAC_TRACK_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegAacTrackConsumer";
 const ADTS_CONTAINER_PROBE_CLASS: &str =
@@ -634,6 +636,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MPEG_READER_CLASS,
     MPEG_READER_CHAIN_CLASS,
     MPEG_SECTION_HANDLER_CLASS,
+    MPEG_SECTION_INFO_CLASS,
     MPEG_AAC_TRACK_CONSUMER_CLASS,
     ADTS_CONTAINER_PROBE_CLASS,
     ADTS_PACKET_HEADER_CLASS,
@@ -1667,6 +1670,9 @@ fn replacement_body(
     }
     if class_name == MPEG_TRACK_INFO_CLASS {
         return mpeg_track_info_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == MPEG_SECTION_INFO_CLASS {
+        return mpeg_section_info_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == MPEG_TRACK_INFO_BUILDER_CLASS {
         return mpeg_track_info_builder_replacement(pool, name, descriptor, required_locals);
@@ -40883,6 +40889,48 @@ fn mpeg_track_info_replacement(
         _ => unsupported_body(
             pool,
             &format!("Phase 13 does not implement {MPEG_TRACK_INFO_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn mpeg_section_info_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(JJLjava/lang/String;)V") => {
+            let owner = pool.add_class(MPEG_SECTION_INFO_CLASS)?;
+            let object = pool.add_class("java/lang/Object")?;
+            let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+            let offset = pool.add_field_ref(owner, "offset", "J")?;
+            let length = pool.add_field_ref(owner, "length", "J")?;
+            let section_type = pool.add_field_ref(owner, "type", "Ljava/lang/String;")?;
+            code(
+                pool,
+                3,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Invokespecial(object_init),
+                    Instruction::Aload_0,
+                    Instruction::Lload_1,
+                    Instruction::Putfield(offset),
+                    Instruction::Aload_0,
+                    Instruction::Lload_3,
+                    Instruction::Putfield(length),
+                    Instruction::Aload_0,
+                    Instruction::Aload(5),
+                    Instruction::Putfield(section_type),
+                    Instruction::Return,
+                ],
+            )
+        }
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {MPEG_SECTION_INFO_CLASS}.{name}{descriptor}"),
             required_locals,
         ),
     }
