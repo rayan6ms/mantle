@@ -187,6 +187,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-matroska-opus-track-consumer-consumer" => {
             Some(MATROSKA_OPUS_TRACK_CONSUMER_CONSUMER)
         }
+        "write-matroska-streaming-file-consumer" => Some(MATROSKA_STREAMING_FILE_CONSUMER),
         "write-matroska-audio-track-consumer" => Some(MATROSKA_AUDIO_TRACK_CONSUMER),
         "write-matroska-audio-track-support-consumer" => {
             Some(MATROSKA_AUDIO_TRACK_SUPPORT_CONSUMER)
@@ -17524,6 +17525,75 @@ public final class GateMatroskaAacTrackConsumer {
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MATROSKA_STREAMING_FILE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaStreamingFile;
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Collections;
+
+public final class GateMatroskaStreamingFile {
+  public static void main(String[] args) throws Exception {
+    MemoryStream input = new MemoryStream();
+    MatroskaStreamingFile file = new MatroskaStreamingFile(input);
+    check(file.getTimecodeScale() == 1_000_000L && file.getDuration() == 0.0,
+        "constructor defaults");
+    check(file.getTitle() == null && file.getArtist() == null && file.getIsrc() == null,
+        "metadata defaults");
+    check(file.getTrackList() != null && file.getTrackList().length == 0,
+        "empty track list is a fresh typed array");
+    check(file.getTrackList() != file.getTrackList(), "track list access does not leak an array");
+    Field tracks = MatroskaStreamingFile.class.getDeclaredField("trackList");
+    tracks.setAccessible(true);
+    MatroskaFileTrack track = new MatroskaFileTrack(1, MatroskaFileTrack.Type.AUDIO, 2L,
+        "name", "A_OPUS", null, null);
+    ((java.util.ArrayList<MatroskaFileTrack>) tracks.get(file)).add(track);
+    MatroskaFileTrack[] copy = file.getTrackList();
+    check(copy.length == 1 && copy[0] == track, "track list preserves element identity");
+    copy[0] = null;
+    check(file.getTrackList()[0] == track, "track list access returns an independent array");
+    try { file.seekToTimecode(7, Long.MAX_VALUE - 4); } catch (Throwable ignored) { }
+    Field minimum = MatroskaStreamingFile.class.getDeclaredField("minimumTimecode");
+    minimum.setAccessible(true);
+    Field seeking = MatroskaStreamingFile.class.getDeclaredField("seeking");
+    seeking.setAccessible(true);
+    check(minimum.getLong(file) == Long.MAX_VALUE - 4 && seeking.getBoolean(file),
+        "seek records full-width timecode and pending state");
+    Class<MatroskaStreamingFile> type = MatroskaStreamingFile.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getDeclaredConstructors().length == 1,
+        "public concrete subclassable shell");
+    checkMethod(type.getDeclaredMethod("getTimecodeScale"), long.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("getTitle"), String.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("getArtist"), String.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("getIsrc"), String.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("getDuration"), double.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("getTrackList"), MatroskaFileTrack[].class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("readFile"), void.class, new Class<?>[] {java.io.IOException.class});
+    checkMethod(type.getDeclaredMethod("seekToTimecode", int.class, long.class), void.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("provideFrames", Class.forName("com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaTrackConsumer")), void.class, new Class<?>[] {InterruptedException.class});
+    System.out.println("contracts=constructor,defaults,metadata,track-list,track-identity,array-independence,seek-state,public-methods,subclassable,reflection");
+  }
+  private static void checkMethod(Method method, Class<?> result, Class<?>[] failures) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == result
+        && java.util.Arrays.equals(method.getExceptionTypes(), failures)
+        && !method.isSynthetic() && !method.isBridge() && !method.isVarArgs(),
+        method.getName() + " metadata");
+  }
+  private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
+  private static final class MemoryStream extends SeekableInputStream {
+    MemoryStream() { super(0L, 0L); }
+    @Override public int read() { return -1; }
+    @Override public long getPosition() { return 0L; }
+    @Override protected void seekHard(long position) { }
+    @Override public boolean canSeekHard() { return true; }
+    @Override public java.util.List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider> getTrackInfoProviders() { return Collections.emptyList(); }
   }
 }
 "#;

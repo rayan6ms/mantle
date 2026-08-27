@@ -284,6 +284,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-matroska-aac-track-consumer-co
   --output "$WORK/GateMatroskaAacTrackConsumer.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-matroska-opus-track-consumer-consumer \
   --output "$WORK/GateMatroskaOpusTrackConsumer.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-matroska-streaming-file-consumer \
+  --output "$WORK/GateMatroskaStreamingFile.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-matroska-audio-track-consumer \
   --output "$WORK/GateMatroskaAudioTrack.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-matroska-audio-track-support-consumer \
@@ -453,6 +455,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateAacPacketRouter.java" \
   "$WORK/GateMatroskaAacTrackConsumer.java" \
   "$WORK/GateMatroskaOpusTrackConsumer.java" \
+  "$WORK/GateMatroskaStreamingFile.java" \
   "$WORK/GateOpusPacketRouter.java" \
   "$WORK/GateDefaultSoundCloudDataLoader.java" \
   "$WORK/GateDefaultSoundCloudPlaylistLoader.java" \
@@ -1547,6 +1550,17 @@ cmp "$WORK/matroska-opus-track-consumer-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,track-identity,router-construction,input-frequency,float-to-int,input-channels,initialise,get-track,seek-forwarding,flush-forwarding,consume-forwarding,close-forwarding,null-input,failure-identity,private-fields,interface,throws,identity-semantics,subclassable,reflection' \
   "$WORK/matroska-opus-track-consumer-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMatroskaStreamingFile >"$WORK/matroska-streaming-file-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMatroskaStreamingFile >"$WORK/matroska-streaming-file-candidate.txt"
+cmp "$WORK/matroska-streaming-file-reference.txt" \
+  "$WORK/matroska-streaming-file-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,defaults,metadata,track-list,track-identity,array-independence,seek-state,public-methods,subclassable,reflection' \
+  "$WORK/matroska-streaming-file-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$matroska_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateMatroskaAudioTrack >"$WORK/matroska-audio-track-reference.txt"

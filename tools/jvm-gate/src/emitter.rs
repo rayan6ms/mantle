@@ -204,6 +204,8 @@ const MATROSKA_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaContainerProbe";
 const MATROSKA_OPUS_TRACK_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaOpusTrackConsumer";
+const MATROSKA_STREAMING_FILE_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaStreamingFile";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -562,6 +564,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MATROSKA_AUDIO_TRACK_CLASS,
     MATROSKA_CONTAINER_PROBE_CLASS,
     MATROSKA_OPUS_TRACK_CONSUMER_CLASS,
+    MATROSKA_STREAMING_FILE_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -1052,6 +1055,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | MATROSKA_AUDIO_TRACK_CLASS
             | MATROSKA_CONTAINER_PROBE_CLASS
             | MATROSKA_OPUS_TRACK_CONSUMER_CLASS
+            | MATROSKA_STREAMING_FILE_CLASS
             | OPUS_AUDIO_DATA_FORMAT_CLASS
             | PCM16_AUDIO_DATA_FORMAT_CLASS
             | OPUS_CHUNK_DECODER_CLASS
@@ -1525,6 +1529,9 @@ fn replacement_body(
     }
     if class_name == MATROSKA_OPUS_TRACK_CONSUMER_CLASS {
         return matroska_opus_track_consumer_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == MATROSKA_STREAMING_FILE_CLASS {
+        return matroska_streaming_file_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -9956,6 +9963,232 @@ fn matroska_opus_track_consumer_close(pool: &mut ConstantPool<'static>) -> Resul
             Instruction::Getfield(packet_router),
             Instruction::Invokevirtual(close),
             Instruction::Return,
+        ],
+    )
+}
+
+/// Public shell for the Matroska streaming file.  The parser itself is owned by the native media
+/// path; this compatibility surface keeps construction, metadata access, and lifecycle state
+/// deterministic while the remaining container-format classes are brought across in later slices.
+fn matroska_streaming_file_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)V") => {
+            let owner = pool.add_class(MATROSKA_STREAMING_FILE_CLASS)?;
+            let object = pool.add_class("java/lang/Object")?;
+            let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+            let reader = pool.add_class(
+                "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileReader",
+            )?;
+            let reader_init = pool.add_method_ref(
+                reader,
+                "<init>",
+                "(Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)V",
+            )?;
+            let reader_field = pool.add_field_ref(
+                owner,
+                "reader",
+                "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileReader;",
+            )?;
+            let scale = pool.add_field_ref(owner, "timecodeScale", "J")?;
+            let tracks = pool.add_field_ref(owner, "trackList", "Ljava/util/ArrayList;")?;
+            let list = pool.add_class("java/util/ArrayList")?;
+            let list_init = pool.add_method_ref(list, "<init>", "()V")?;
+            let min_timecode = pool.add_field_ref(owner, "minimumTimecode", "J")?;
+            let seeking = pool.add_field_ref(owner, "seeking", "Z")?;
+            let null_fields = [
+                (
+                    "segmentElement",
+                    "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElement;",
+                ),
+                (
+                    "firstClusterElement",
+                    "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElement;",
+                ),
+                ("cueElementPosition", "Ljava/lang/Long;"),
+                ("cuePoints", "Ljava/util/List;"),
+            ];
+            let mut instructions = vec![
+                Instruction::Aload_0,
+                Instruction::Invokespecial(object_init),
+                Instruction::Aload_0,
+                Instruction::Ldc2_w(pool.add_long(1_000_000)?),
+                Instruction::Putfield(scale),
+                Instruction::Aload_0,
+                Instruction::New(list),
+                Instruction::Dup,
+                Instruction::Invokespecial(list_init),
+                Instruction::Putfield(tracks),
+                Instruction::Aload_0,
+                Instruction::Lconst_0,
+                Instruction::Putfield(min_timecode),
+                Instruction::Aload_0,
+                Instruction::Iconst_0,
+                Instruction::Putfield(seeking),
+            ];
+            for field in null_fields {
+                let field_ref = pool.add_field_ref(owner, field.0, field.1)?;
+                instructions.extend([
+                    Instruction::Aload_0,
+                    Instruction::Aconst_null,
+                    Instruction::Putfield(field_ref),
+                ]);
+            }
+            instructions.extend([
+                Instruction::Aload_0,
+                Instruction::New(reader),
+                Instruction::Dup,
+                Instruction::Aload_1,
+                Instruction::Invokespecial(reader_init),
+                Instruction::Putfield(reader_field),
+                Instruction::Return,
+            ]);
+            code(pool, 4, 2, instructions)
+        }
+        ("getTimecodeScale", "()J") => {
+            let owner = pool.add_class(MATROSKA_STREAMING_FILE_CLASS)?;
+            let field = pool.add_field_ref(owner, "timecodeScale", "J")?;
+            code(
+                pool,
+                2,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Getfield(field),
+                    Instruction::Lreturn,
+                ],
+            )
+        }
+        ("getTitle", "()Ljava/lang/String;") => {
+            matroska_streaming_file_string_getter(pool, "title")
+        }
+        ("getArtist", "()Ljava/lang/String;") => {
+            matroska_streaming_file_string_getter(pool, "artist")
+        }
+        ("getIsrc", "()Ljava/lang/String;") => matroska_streaming_file_string_getter(pool, "isrc"),
+        ("getDuration", "()D") => {
+            let owner = pool.add_class(MATROSKA_STREAMING_FILE_CLASS)?;
+            let field = pool.add_field_ref(owner, "duration", "D")?;
+            code(
+                pool,
+                2,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Getfield(field),
+                    Instruction::Dreturn,
+                ],
+            )
+        }
+        (
+            "getTrackList",
+            "()[Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;",
+        ) => {
+            let owner = pool.add_class(MATROSKA_STREAMING_FILE_CLASS)?;
+            let list = pool.add_field_ref(owner, "trackList", "Ljava/util/ArrayList;")?;
+            let array = pool.add_class(
+                "[Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;",
+            )?;
+            let component = pool.add_class(
+                "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack",
+            )?;
+            let list_class = pool.add_class("java/util/ArrayList")?;
+            let to_array = pool.add_method_ref(
+                list_class,
+                "toArray",
+                "([Ljava/lang/Object;)[Ljava/lang/Object;",
+            )?;
+            code(
+                pool,
+                4,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Getfield(list),
+                    Instruction::Iconst_0,
+                    Instruction::Anewarray(component),
+                    Instruction::Invokevirtual(to_array),
+                    Instruction::Checkcast(array),
+                    Instruction::Areturn,
+                ],
+            )
+        }
+        ("readFile", "()V") => {
+            let owner = pool.add_class(MATROSKA_STREAMING_FILE_CLASS)?;
+            let reader = pool.add_field_ref(
+                owner,
+                "reader",
+                "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileReader;",
+            )?;
+            let reader_class = pool.add_class(
+                "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileReader",
+            )?;
+            let read = pool.add_method_ref(reader_class, "readNextElement", "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElement;)Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElement;")?;
+            code(
+                pool,
+                2,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Getfield(reader),
+                    Instruction::Aconst_null,
+                    Instruction::Invokevirtual(read),
+                    Instruction::Pop,
+                    Instruction::Return,
+                ],
+            )
+        }
+        ("seekToTimecode", "(IJ)V") => {
+            let owner = pool.add_class(MATROSKA_STREAMING_FILE_CLASS)?;
+            let min = pool.add_field_ref(owner, "minimumTimecode", "J")?;
+            let seeking = pool.add_field_ref(owner, "seeking", "Z")?;
+            code(
+                pool,
+                3,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Lload_2,
+                    Instruction::Putfield(min),
+                    Instruction::Aload_0,
+                    Instruction::Iconst_1,
+                    Instruction::Putfield(seeking),
+                    Instruction::Return,
+                ],
+            )
+        }
+        (
+            "provideFrames",
+            "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/MatroskaTrackConsumer;)V",
+        ) => code(pool, 1, required_locals, vec![Instruction::Return]),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {MATROSKA_STREAMING_FILE_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn matroska_streaming_file_string_getter(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_STREAMING_FILE_CLASS)?;
+    let field = pool.add_field_ref(owner, name, "Ljava/lang/String;")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(field),
+            Instruction::Areturn,
         ],
     )
 }

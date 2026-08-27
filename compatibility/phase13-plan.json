@@ -27,8 +27,8 @@
   },
   "existing_structural_slice": {
     "scope": "Gate A plus completed Phase 13 slices; only symbols classified in the canonical ledger carry a compatibility claim",
-    "classes": 49,
-    "symbols": 363,
+    "classes": 50,
+    "symbols": 374,
     "internal_runtime_classes": 11,
     "binary_names": [
       "com.sedmelluq.discord.lavaplayer.filter.PcmFilterFactory",
@@ -79,7 +79,8 @@
       "com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame",
       "com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame",
       "com.sedmelluq.discord.lavaplayer.track.playback.ReferenceMutableAudioFrame",
-      "com.sedmelluq.discord.lavaplayer.track.playback.TerminatorAudioFrame"
+      "com.sedmelluq.discord.lavaplayer.track.playback.TerminatorAudioFrame",
+      "com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaStreamingFile"
     ]
   },
   "cohorts": [
@@ -2548,8 +2549,8 @@
       "objective": "Cover public container, probe, seek, and media-facing extension contracts.",
       "exit_evidence": "Container fixtures, protected-extension tests, per-symbol ledger entries, and Revapi diff.",
       "status": "IN_PROGRESS",
-      "classified_symbols": 221,
-      "remaining_symbols": 603,
+      "classified_symbols": 232,
+      "remaining_symbols": 592,
       "completed_slices": [
         {
           "id": "formats-contracts",
@@ -2980,6 +2981,19 @@
             "tools/jvm-gate/src/emitter.rs",
             "tools/jvm-gate/src/main.rs"
           ]
+        },
+        {
+          "id": "matroska-streaming-file-contracts",
+          "classes": 1,
+          "fields": 0,
+          "methods": 10,
+          "symbols": 11,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
         }
       ]
     },
@@ -3074,7 +3088,7 @@
   "phase_entry": {
     "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
     "first_execution_cohort": "core-player-track",
-    "next_slice": "matroska-streaming-file-contracts",
+  "next_slice": "matroska-track-consumer-contracts",
     "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
   }
 }
