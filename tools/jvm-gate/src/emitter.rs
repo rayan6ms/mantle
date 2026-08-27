@@ -202,6 +202,8 @@ const MATROSKA_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaAudioTrack";
 const MATROSKA_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaContainerProbe";
+const MATROSKA_OPUS_TRACK_CONSUMER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaOpusTrackConsumer";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -559,6 +561,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MATROSKA_AAC_TRACK_CONSUMER_CLASS,
     MATROSKA_AUDIO_TRACK_CLASS,
     MATROSKA_CONTAINER_PROBE_CLASS,
+    MATROSKA_OPUS_TRACK_CONSUMER_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -1048,6 +1051,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | MATROSKA_AAC_TRACK_CONSUMER_CLASS
             | MATROSKA_AUDIO_TRACK_CLASS
             | MATROSKA_CONTAINER_PROBE_CLASS
+            | MATROSKA_OPUS_TRACK_CONSUMER_CLASS
             | OPUS_AUDIO_DATA_FORMAT_CLASS
             | PCM16_AUDIO_DATA_FORMAT_CLASS
             | OPUS_CHUNK_DECODER_CLASS
@@ -1518,6 +1522,9 @@ fn replacement_body(
     }
     if class_name == MATROSKA_CONTAINER_PROBE_CLASS {
         return matroska_container_probe_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == MATROSKA_OPUS_TRACK_CONSUMER_CLASS {
+        return matroska_opus_track_consumer_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -9743,6 +9750,211 @@ fn matroska_aac_track_consumer_class_init(pool: &mut ConstantPool<'static>) -> R
             Instruction::Ldc_w(logger_owner),
             Instruction::Invokestatic(get_logger),
             Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn matroska_opus_track_consumer_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;)V",
+        ) => matroska_opus_track_consumer_constructor(pool),
+        (
+            "getTrack",
+            "()Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;",
+        ) => matroska_opus_track_consumer_get_track(pool),
+        ("initialise", "()V") => matroska_opus_track_consumer_initialise(pool),
+        ("seekPerformed", "(JJ)V") => matroska_opus_track_consumer_seek(pool),
+        ("flush", "()V") => matroska_opus_track_consumer_flush(pool),
+        ("consume", "(Ljava/nio/ByteBuffer;)V") => matroska_opus_track_consumer_consume(pool),
+        ("close", "()V") => matroska_opus_track_consumer_close(pool),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {MATROSKA_OPUS_TRACK_CONSUMER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
+fn matroska_opus_track_consumer_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_OPUS_TRACK_CONSUMER_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let track = pool.add_field_ref(
+        owner,
+        "track",
+        "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;",
+    )?;
+    let router = pool.add_class(OPUS_PACKET_ROUTER_CLASS)?;
+    let router_init = pool.add_method_ref(
+        router,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;II)V",
+    )?;
+    let packet_router = pool.add_field_ref(
+        owner,
+        "opusPacketRouter",
+        "Lcom/sedmelluq/discord/lavaplayer/container/common/OpusPacketRouter;",
+    )?;
+    let file_track = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack",
+    )?;
+    let audio = pool.add_field_ref(
+        file_track,
+        "audio",
+        "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$AudioDetails;",
+    )?;
+    let details = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$AudioDetails",
+    )?;
+    let sampling_frequency = pool.add_field_ref(details, "samplingFrequency", "F")?;
+    let channels = pool.add_field_ref(details, "channels", "I")?;
+    code(
+        pool,
+        6,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(track),
+            Instruction::Aload_0,
+            Instruction::New(router),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Getfield(audio),
+            Instruction::Getfield(sampling_frequency),
+            Instruction::F2i,
+            Instruction::Aload_2,
+            Instruction::Getfield(audio),
+            Instruction::Getfield(channels),
+            Instruction::Invokespecial(router_init),
+            Instruction::Putfield(packet_router),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn matroska_opus_track_consumer_get_track(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_OPUS_TRACK_CONSUMER_CLASS)?;
+    let track = pool.add_field_ref(
+        owner,
+        "track",
+        "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(track),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn matroska_opus_track_consumer_initialise(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    code(pool, 0, 1, vec![Instruction::Return])
+}
+
+fn matroska_opus_track_consumer_seek(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_OPUS_TRACK_CONSUMER_CLASS)?;
+    let router = pool.add_class(OPUS_PACKET_ROUTER_CLASS)?;
+    let seek = pool.add_method_ref(router, "seekPerformed", "(JJ)V")?;
+    let packet_router = pool.add_field_ref(
+        owner,
+        "opusPacketRouter",
+        "Lcom/sedmelluq/discord/lavaplayer/container/common/OpusPacketRouter;",
+    )?;
+    code(
+        pool,
+        5,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(packet_router),
+            Instruction::Lload_1,
+            Instruction::Lload_3,
+            Instruction::Invokevirtual(seek),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn matroska_opus_track_consumer_flush(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_OPUS_TRACK_CONSUMER_CLASS)?;
+    let router = pool.add_class(OPUS_PACKET_ROUTER_CLASS)?;
+    let flush = pool.add_method_ref(router, "flush", "()V")?;
+    let packet_router = pool.add_field_ref(
+        owner,
+        "opusPacketRouter",
+        "Lcom/sedmelluq/discord/lavaplayer/container/common/OpusPacketRouter;",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(packet_router),
+            Instruction::Invokevirtual(flush),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn matroska_opus_track_consumer_consume(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_OPUS_TRACK_CONSUMER_CLASS)?;
+    let router = pool.add_class(OPUS_PACKET_ROUTER_CLASS)?;
+    let process = pool.add_method_ref(router, "process", "(Ljava/nio/ByteBuffer;)V")?;
+    let packet_router = pool.add_field_ref(
+        owner,
+        "opusPacketRouter",
+        "Lcom/sedmelluq/discord/lavaplayer/container/common/OpusPacketRouter;",
+    )?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(packet_router),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(process),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn matroska_opus_track_consumer_close(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_OPUS_TRACK_CONSUMER_CLASS)?;
+    let router = pool.add_class(OPUS_PACKET_ROUTER_CLASS)?;
+    let close = pool.add_method_ref(router, "close", "()V")?;
+    let packet_router = pool.add_field_ref(
+        owner,
+        "opusPacketRouter",
+        "Lcom/sedmelluq/discord/lavaplayer/container/common/OpusPacketRouter;",
+    )?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(packet_router),
+            Instruction::Invokevirtual(close),
             Instruction::Return,
         ],
     )

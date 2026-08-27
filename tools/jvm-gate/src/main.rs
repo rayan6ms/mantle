@@ -184,6 +184,9 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-flac-frame-reader-consumer" => Some(FLAC_FRAME_READER_CONSUMER),
         "write-flac-sub-frame-reader-consumer" => Some(FLAC_SUB_FRAME_READER_CONSUMER),
         "write-matroska-aac-track-consumer-consumer" => Some(MATROSKA_AAC_TRACK_CONSUMER_CONSUMER),
+        "write-matroska-opus-track-consumer-consumer" => {
+            Some(MATROSKA_OPUS_TRACK_CONSUMER_CONSUMER)
+        }
         "write-matroska-audio-track-consumer" => Some(MATROSKA_AUDIO_TRACK_CONSUMER),
         "write-matroska-audio-track-support-consumer" => {
             Some(MATROSKA_AUDIO_TRACK_SUPPORT_CONSUMER)
@@ -17517,6 +17520,230 @@ public final class GateMatroskaAacTrackConsumer {
     int initialiseCalls;
     Derived() { super(null, null); }
     @Override public void initialise() { initialiseCalls++; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MATROSKA_OPUS_TRACK_CONSUMER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.common.OpusPacketRouter;
+import com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaOpusTrackConsumer;
+import com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaTrackConsumer;
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack;
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack.AudioDetails;
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack.Type;
+import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+
+public final class GateMatroskaOpusTrackConsumer {
+  private static final Object UNSAFE = loadUnsafe();
+
+  public static void main(String[] args) throws Exception {
+    construction();
+    forwarding();
+    reflection();
+    System.out.println("contracts=constructor,track-identity,router-construction,input-frequency,float-to-int,input-channels,initialise,get-track,seek-forwarding,flush-forwarding,consume-forwarding,close-forwarding,null-input,failure-identity,private-fields,interface,throws,identity-semantics,subclassable,reflection");
+  }
+
+  private static void construction() throws Exception {
+    MatroskaFileTrack track = track(new AudioDetails(44_100.75f, 48_000, 2, 16));
+    AudioProcessingContext context = context();
+    MatroskaOpusTrackConsumer consumer = new MatroskaOpusTrackConsumer(context, track);
+    Object router = field(consumer, "opusPacketRouter");
+    check(consumer.getTrack() == track && field(consumer, "track") == track,
+        "constructor and getter retain exact track identity");
+    check(router.getClass() == OpusPacketRouter.class && field(router, "context") == context
+        && intField(router, "inputFrequency") == 44_100
+        && intField(router, "inputChannels") == 2,
+        "constructor creates router with Java float-to-int frequency and exact channels");
+    consumer.initialise();
+    check(catchThrowable(() -> new MatroskaOpusTrackConsumer(context, null)) instanceof NullPointerException,
+        "null track fails while constructing the router");
+    check(catchThrowable(() -> new MatroskaOpusTrackConsumer(context,
+        track(null))) instanceof NullPointerException,
+        "null audio details fail before router construction");
+    consumer.close();
+  }
+
+  private static void forwarding() throws Exception {
+    MatroskaOpusTrackConsumer consumer = new MatroskaOpusTrackConsumer(context(), track(
+        new AudioDetails(48_000, 48_000, 1, 16)));
+    RecordingRouter router = allocate(RecordingRouter.class);
+    putObject(consumer, "opusPacketRouter", router);
+    ByteBuffer data = ByteBuffer.wrap(new byte[] {1, 2, 3});
+    consumer.seekPerformed(Long.MIN_VALUE + 3, Long.MAX_VALUE - 5);
+    consumer.flush();
+    consumer.consume(data);
+    consumer.close();
+    check(router.seekCalls == 1 && router.requested == Long.MIN_VALUE + 3
+        && router.provided == Long.MAX_VALUE - 5 && router.flushCalls == 1
+        && router.processCalls == 1 && router.data == data && router.closeCalls == 1,
+        "lifecycle and packet methods forward exact values and identity");
+    check(catchThrowable(() -> consumer.consume(null)) == router.processFailure,
+        "null input is passed directly to the router");
+
+    RuntimeException seek = new RuntimeException("seek-sentinel");
+    router.seekFailure = seek;
+    check(catchThrowable(() -> consumer.seekPerformed(1, 2)) == seek,
+        "seek failure preserves exact identity");
+    InterruptedException flush = new InterruptedException("flush-sentinel");
+    router.flushFailure = flush;
+    check(catchThrowable(consumer::flush) == flush,
+        "flush interruption preserves exact identity");
+    RuntimeException process = new RuntimeException("process-sentinel");
+    router.processFailure = process;
+    check(catchThrowable(() -> consumer.consume(data)) == process,
+        "consume failure preserves exact identity");
+    RuntimeException close = new RuntimeException("close-sentinel");
+    router.closeFailure = close;
+    check(catchThrowable(consumer::close) == close,
+        "close failure preserves exact identity");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MatroskaOpusTrackConsumer> type = MatroskaOpusTrackConsumer.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {MatroskaTrackConsumer.class})
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0
+        && type.getDeclaredFields().length == 2 && type.getDeclaredMethods().length == 6
+        && type.getDeclaredConstructors().length == 1,
+        "exact class, interface, and declared-member metadata");
+    checkField(type, "track", MatroskaFileTrack.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "opusPacketRouter", OpusPacketRouter.class, Modifier.PRIVATE | Modifier.FINAL);
+    Constructor<MatroskaOpusTrackConsumer> constructor = type.getDeclaredConstructor(
+        AudioProcessingContext.class, MatroskaFileTrack.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
+    checkMethod(type.getDeclaredMethod("getTrack"), Modifier.PUBLIC, MatroskaFileTrack.class,
+        new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("initialise"), Modifier.PUBLIC, void.class,
+        new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("seekPerformed", long.class, long.class), Modifier.PUBLIC,
+        void.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("flush"), Modifier.PUBLIC, void.class,
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("consume", ByteBuffer.class), Modifier.PUBLIC, void.class,
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("close"), Modifier.PUBLIC, void.class,
+        new Class<?>[0]);
+    MatroskaOpusTrackConsumer first = new MatroskaOpusTrackConsumer(context(), track(
+        new AudioDetails(48_000, 48_000, 2, 16)));
+    MatroskaOpusTrackConsumer second = new MatroskaOpusTrackConsumer(context(), track(
+        new AudioDetails(48_000, 48_000, 2, 16)));
+    Derived derived = new Derived();
+    check(first != second && !first.equals(second) && derived.getTrack() != null,
+        "Object identity and subclassability are preserved");
+  }
+
+  private static AudioProcessingContext context() {
+    return new AudioProcessingContext(new AudioConfiguration(), null, null, null);
+  }
+
+  private static MatroskaFileTrack track(AudioDetails audio) {
+    return new MatroskaFileTrack(7, Type.AUDIO, 91L, "track", "A_OPUS", null, audio);
+  }
+
+  private static Object field(Object target, String name) throws Exception {
+    Field field = target instanceof MatroskaOpusTrackConsumer
+        ? MatroskaOpusTrackConsumer.class.getDeclaredField(name)
+        : OpusPacketRouter.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
+  }
+
+  private static int intField(Object target, String name) throws Exception {
+    Field field = OpusPacketRouter.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.getInt(target);
+  }
+
+  private static void putObject(Object target, String name, Object value) throws Exception {
+    Field field = MatroskaOpusTrackConsumer.class.getDeclaredField(name);
+    long offset = (Long) UNSAFE.getClass().getMethod("objectFieldOffset", Field.class)
+        .invoke(UNSAFE, field);
+    UNSAFE.getClass().getMethod("putObject", Object.class, long.class, Object.class)
+        .invoke(UNSAFE, target, offset, value);
+  }
+
+  private static <T> T allocate(Class<T> type) throws Exception {
+    return type.cast(UNSAFE.getClass().getMethod("allocateInstance", Class.class)
+        .invoke(UNSAFE, type));
+  }
+
+  private static Object loadUnsafe() {
+    try {
+      Class<?> type = Class.forName("sun.misc.Unsafe");
+      Field field = type.getDeclaredField("theUnsafe");
+      field.setAccessible(true);
+      return field.get(null);
+    } catch (ReflectiveOperationException error) {
+      throw new ExceptionInInitializerError(error);
+    }
+  }
+
+  private static Field checkField(Class<?> owner, String name, Class<?> fieldType, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getModifiers() == modifiers
+        && !field.isSynthetic() && field.getDeclaredAnnotations().length == 0,
+        name + " field metadata");
+    return field;
+  }
+
+  private static void checkMethod(Method method, int modifiers, Class<?> result,
+      Class<?>[] failures) {
+    check(method.getModifiers() == modifiers && method.getReturnType() == result
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isDefault() && !method.isVarArgs(),
+        method.getName() + " method metadata");
+  }
+
+  private static Throwable catchThrowable(Operation operation) {
+    try { operation.run(); return null; } catch (Throwable error) { return error; }
+  }
+
+  private interface Operation { void run() throws Throwable; }
+
+  private static final class RecordingRouter extends OpusPacketRouter {
+    int seekCalls;
+    long requested;
+    long provided;
+    RuntimeException seekFailure;
+    int flushCalls;
+    InterruptedException flushFailure;
+    int processCalls;
+    ByteBuffer data;
+    RuntimeException processFailure;
+    int closeCalls;
+    RuntimeException closeFailure;
+
+    RecordingRouter() { super(null, 48_000, 2); }
+    @Override public void seekPerformed(long requested, long provided) {
+      seekCalls++; this.requested = requested; this.provided = provided;
+      if (seekFailure != null) throw seekFailure;
+    }
+    @Override public void flush() throws InterruptedException {
+      flushCalls++; if (flushFailure != null) throw flushFailure;
+    }
+    @Override public void process(ByteBuffer data) throws InterruptedException {
+      processCalls++; this.data = data; if (processFailure != null) throw processFailure;
+    }
+    @Override public void close() {
+      closeCalls++; if (closeFailure != null) throw closeFailure;
+    }
+  }
+
+  private static final class Derived extends MatroskaOpusTrackConsumer {
+    Derived() { super(context(), track(new AudioDetails(48_000, 48_000, 2, 16))); }
   }
 
   private static void check(boolean condition, String message) {
