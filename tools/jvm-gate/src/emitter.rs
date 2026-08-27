@@ -164,6 +164,8 @@ const MP3_CONTAINER_PROBE_CLASS: &str =
 const MP3_FRAME_READER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mp3/Mp3FrameReader";
 const MP3_SEEKER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/mp3/Mp3Seeker";
+const MP3_STREAM_SEEKER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/mp3/Mp3StreamSeeker";
 const ADTS_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/adts/AdtsContainerProbe";
 const ADTS_PACKET_HEADER_CLASS: &str =
@@ -588,6 +590,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MP3_CONTAINER_PROBE_CLASS,
     MP3_FRAME_READER_CLASS,
     MP3_SEEKER_CLASS,
+    MP3_STREAM_SEEKER_CLASS,
     ADTS_CONTAINER_PROBE_CLASS,
     ADTS_PACKET_HEADER_CLASS,
     ADTS_STREAM_PROVIDER_CLASS,
@@ -1569,6 +1572,9 @@ fn replacement_body(
     }
     if class_name == MP3_AUDIO_TRACK_CLASS {
         return mp3_audio_track_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == MP3_STREAM_SEEKER_CLASS {
+        return mp3_stream_seeker_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == ADTS_CONTAINER_PROBE_CLASS {
         return adts_container_probe_replacement(pool, name, descriptor, required_locals);
@@ -5393,6 +5399,76 @@ fn mp3_audio_track_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute>
             Instruction::Invokestatic(get_logger),
             Instruction::Putstatic(log),
             Instruction::Return,
+        ],
+    )
+}
+
+fn mp3_stream_seeker_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => mp3_stream_seeker_constructor(pool),
+        ("getDuration", "()J") => mp3_stream_seeker_duration(pool),
+        ("isSeekable", "()Z") => code(
+            pool,
+            1,
+            1,
+            vec![Instruction::Iconst_0, Instruction::Ireturn],
+        ),
+        (
+            "seekAndGetFrameIndex",
+            "(JLcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)J",
+        ) => mp3_stream_seeker_seek(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {MP3_STREAM_SEEKER_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn mp3_stream_seeker_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn mp3_stream_seeker_duration(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let unknown = pool.add_long(i64::MAX)?;
+    code(
+        pool,
+        2,
+        1,
+        vec![Instruction::Ldc2_w(unknown), Instruction::Lreturn],
+    )
+}
+
+fn mp3_stream_seeker_seek(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let exception = pool.add_class("java/lang/UnsupportedOperationException")?;
+    let exception_init = pool.add_method_ref(exception, "<init>", "(Ljava/lang/String;)V")?;
+    let message = pool.add_string("Cannot seek on a stream.")?;
+    code(
+        pool,
+        3,
+        4,
+        vec![
+            Instruction::New(exception),
+            Instruction::Dup,
+            Instruction::Ldc_w(message),
+            Instruction::Invokespecial(exception_init),
+            Instruction::Athrow,
         ],
     )
 }

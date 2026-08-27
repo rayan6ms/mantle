@@ -164,6 +164,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mp3-container-probe-consumer" => Some(MP3_CONTAINER_PROBE_CONSUMER),
         "write-mp3-frame-reader-consumer" => Some(MP3_FRAME_READER_CONSUMER),
         "write-mp3-seeker-consumer" => Some(MP3_SEEKER_CONSUMER),
+        "write-mp3-stream-seeker-consumer" => Some(MP3_STREAM_SEEKER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
         "write-adts-packet-header-consumer" => Some(ADTS_PACKET_HEADER_CONSUMER),
         "write-adts-stream-provider-consumer" => Some(ADTS_STREAM_PROVIDER_CONSUMER),
@@ -13952,6 +13953,107 @@ public final class GateMp3Seeker {
     @Override public int read() { return -1; }
     @Override public long getPosition() { return 0L; }
     @Override protected void seekHard(long position) {}
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider>
+        getTrackInfoProviders() { return Collections.emptyList(); }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MP3_STREAM_SEEKER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mp3.Mp3Seeker;
+import com.sedmelluq.discord.lavaplayer.container.mp3.Mp3StreamSeeker;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateMp3StreamSeeker {
+  public static void main(String[] args) throws Exception {
+    behavior();
+    reflection();
+    System.out.println(
+        "contracts=constructor,interface,duration-unknown,non-seekable,unsupported-seek,exception-message,input-untouched,null-input,full-width-timecode,checked-io,reflection");
+  }
+
+  private static void behavior() throws Exception {
+    Mp3StreamSeeker implementation = new Mp3StreamSeeker();
+    Mp3Seeker seeker = implementation;
+    check(seeker == implementation && seeker.getDuration() == Long.MAX_VALUE
+        && !seeker.isSeekable(),
+        "stream seeker preserves identity, unknown duration, and non-seekability");
+
+    MemoryStream input = new MemoryStream();
+    Throwable maximum = catchThrowable(
+        () -> seeker.seekAndGetFrameIndex(Long.MAX_VALUE, input));
+    checkUnsupported(maximum);
+    check(input.readCalls == 0 && input.seekCalls == 0,
+        "unsupported seek does not inspect or reposition the input");
+
+    Throwable minimum = catchThrowable(
+        () -> seeker.seekAndGetFrameIndex(Long.MIN_VALUE, null));
+    checkUnsupported(minimum);
+  }
+
+  private static void reflection() throws Exception {
+    Class<Mp3StreamSeeker> type = Mp3StreamSeeker.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {Mp3Seeker.class})
+        && type.getDeclaredFields().length == 0 && type.getDeclaredMethods().length == 3
+        && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete no-field seeker metadata");
+    Constructor<Mp3StreamSeeker> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0,
+        "public no-argument constructor metadata");
+    checkMethod(type.getDeclaredMethod("getDuration"), long.class, new Class<?>[0],
+        new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("isSeekable"), boolean.class, new Class<?>[0],
+        new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("seekAndGetFrameIndex", long.class,
+        SeekableInputStream.class), long.class,
+        new Class<?>[] {long.class, SeekableInputStream.class},
+        new Class<?>[] {IOException.class});
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, Class<?>[] parameters,
+      Class<?>[] failures) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isDefault() && !method.isVarArgs(),
+        method.getName() + " method metadata");
+  }
+
+  private static void checkUnsupported(Throwable throwable) {
+    check(throwable != null && throwable.getClass() == UnsupportedOperationException.class
+        && "Cannot seek on a stream.".equals(throwable.getMessage())
+        && throwable.getCause() == null,
+        "seek preserves the exact unsupported-operation failure and message");
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    int readCalls;
+    int seekCalls;
+    MemoryStream() { super(0L, 0L); }
+    @Override public int read() { readCalls++; return -1; }
+    @Override public long getPosition() { return 0L; }
+    @Override protected void seekHard(long position) { seekCalls++; }
     @Override public boolean canSeekHard() { return true; }
     @Override public List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider>
         getTrackInfoProviders() { return Collections.emptyList(); }
