@@ -180,6 +180,9 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mpeg-reader-chain-consumer" => Some(MPEG_READER_CHAIN_CONSUMER),
         "write-mpeg-section-handler-consumer" => Some(MPEG_SECTION_HANDLER_CONSUMER),
         "write-mpeg-section-info-consumer" => Some(MPEG_SECTION_INFO_CONSUMER),
+        "write-mpeg-versioned-section-handler-consumer" => {
+            Some(MPEG_VERSIONED_SECTION_HANDLER_CONSUMER)
+        }
         "write-mpeg-noop-track-consumer-consumer" => Some(MPEG_NOOP_TRACK_CONSUMER_CONSUMER),
         "write-mpeg-track-consumer-consumer" => Some(MPEG_TRACK_CONSUMER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
@@ -16641,6 +16644,144 @@ public final class GateMpegSectionInfo {
 
   private static final class Derived extends MpegSectionInfo {
     Derived(long offset, long length, String type) { super(offset, length, type); }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MPEG_VERSIONED_SECTION_HANDLER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegReader;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegSectionInfo;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegVersionedSectionHandler;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegVersionedSectionInfo;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateMpegVersionedSectionHandler {
+  public static void main(String[] args) throws Exception {
+    directImplementations();
+    lambdaAndFailures();
+    chainIntegration();
+    reflection();
+    System.out.println("contracts=public-abstract-interface,functional-interface,no-fields,no-constructors,one-method,section-identity,null-section,anonymous-implementation,lambda-compatibility,checked-failure-identity,unchecked-failure-identity,chain-dispatch,version-flags,section-copy,parent-identity,skip-after-handler,checked-throws,reflection");
+  }
+
+  private static void directImplementations() throws Exception {
+    MpegSectionInfo source = new MpegSectionInfo(Long.MIN_VALUE, Long.MAX_VALUE, new String("box1"));
+    MpegVersionedSectionInfo section = new MpegVersionedSectionInfo(
+        source, Integer.MIN_VALUE, Integer.MAX_VALUE);
+    MpegVersionedSectionInfo[] observed = new MpegVersionedSectionInfo[1];
+    int[] calls = new int[1];
+    MpegVersionedSectionHandler handler = new MpegVersionedSectionHandler() {
+      @Override public void handle(MpegVersionedSectionInfo value) {
+        calls[0]++; observed[0] = value;
+      }
+    };
+    handler.handle(section);
+    check(calls[0] == 1 && observed[0] == section,
+        "anonymous implementation receives exact versioned section identity");
+    handler.handle(null);
+    check(calls[0] == 2 && observed[0] == null,
+        "interface dispatch permits null versioned section values");
+  }
+
+  private static void lambdaAndFailures() throws Exception {
+    MpegVersionedSectionInfo section = new MpegVersionedSectionInfo(
+        new MpegSectionInfo(1L, 2L, "box2"), 3, 4);
+    MpegVersionedSectionInfo[] observed = new MpegVersionedSectionInfo[1];
+    MpegVersionedSectionHandler lambda = value -> observed[0] = value;
+    lambda.handle(section);
+    check(observed[0] == section, "lambda receives exact versioned section identity");
+
+    IOException checked = new IOException("checked");
+    MpegVersionedSectionHandler checkedHandler = value -> { throw checked; };
+    check(catchThrowable(() -> checkedHandler.handle(section)) == checked,
+        "declared IOException identity crosses interface dispatch unchanged");
+    RuntimeException unchecked = new RuntimeException("unchecked");
+    MpegVersionedSectionHandler uncheckedHandler = value -> { throw unchecked; };
+    check(catchThrowable(() -> uncheckedHandler.handle(section)) == unchecked,
+        "unchecked failure identity crosses interface dispatch unchanged");
+  }
+
+  private static void chainIntegration() throws Exception {
+    MpegSectionInfo parent = new MpegSectionInfo(0L, 10L, "root");
+    String type = new String("box3");
+    MpegSectionInfo child = new MpegSectionInfo(Long.MIN_VALUE, Long.MAX_VALUE, type);
+    OneReader reader = new OneReader(child, new byte[] {(byte) 0xFE, 0x12, 0x34, 0x56});
+    MpegVersionedSectionInfo[] observed = new MpegVersionedSectionInfo[1];
+    reader.in(parent).handleVersioned("box3", value -> observed[0] = value).run();
+    check(observed[0] != null && observed[0].offset == Long.MIN_VALUE
+        && observed[0].length == Long.MAX_VALUE && observed[0].type == type
+        && observed[0].version == 254 && observed[0].flags == 0x123456,
+        "real chain dispatch copies section values and parses version flags");
+    check(reader.parent == parent && reader.nextCalls == 2 && reader.skipped == child
+        && reader.stream.position == 4L,
+        "real chain preserves parent identity, consumes flags and skips after handler");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MpegVersionedSectionHandler> type = MpegVersionedSectionHandler.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.INTERFACE | Modifier.ABSTRACT)
+        && type.isInterface() && type.getSuperclass() == null && type.getInterfaces().length == 0
+        && type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 1 && type.getDeclaredClasses().length == 0
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0,
+        "exact interface metadata and member counts");
+    Method method = type.getDeclaredMethod("handle", MpegVersionedSectionInfo.class);
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == void.class
+        && Arrays.equals(method.getParameterTypes(),
+            new Class<?>[] {MpegVersionedSectionInfo.class})
+        && Arrays.equals(method.getExceptionTypes(), new Class<?>[] {IOException.class})
+        && !method.isDefault() && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), "exact handle descriptor and checked exception metadata");
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class OneReader extends MpegReader {
+    final MemoryStream stream;
+    final MpegSectionInfo child;
+    MpegSectionInfo parent;
+    MpegSectionInfo skipped;
+    int nextCalls;
+    OneReader(MpegSectionInfo child, byte[] bytes) {
+      this(new MemoryStream(bytes), child);
+    }
+    private OneReader(MemoryStream stream, MpegSectionInfo child) {
+      super(stream); this.stream = stream; this.child = child;
+    }
+    @Override public MpegSectionInfo nextChild(MpegSectionInfo value) {
+      nextCalls++; parent = value; return nextCalls == 1 ? child : null;
+    }
+    @Override public void skip(MpegSectionInfo value) { skipped = value; }
+  }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    final byte[] bytes;
+    long position;
+    MemoryStream(byte[] bytes) { super(bytes.length, 0L); this.bytes = bytes; }
+    @Override public int read() {
+      return position >= bytes.length ? -1 : bytes[(int) position++] & 0xFF;
+    }
+    @Override public long getPosition() { return position; }
+    @Override protected void seekHard(long position) { this.position = position; }
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      return Collections.emptyList();
+    }
   }
 
   private static void check(boolean condition, String message) {
