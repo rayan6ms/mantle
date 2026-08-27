@@ -179,6 +179,7 @@ const MPEG_NOOP_TRACK_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegNoopTrackConsumer";
 const MPEG_TRACK_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegTrackConsumer";
+const MPEG_TRACK_INFO_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegTrackInfo";
 const MPEG_AAC_TRACK_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegAacTrackConsumer";
 const ADTS_CONTAINER_PROBE_CLASS: &str =
@@ -613,6 +614,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MPEG_FILE_LOADER_CLASS,
     MPEG_NOOP_TRACK_CONSUMER_CLASS,
     MPEG_TRACK_CONSUMER_CLASS,
+    MPEG_TRACK_INFO_CLASS,
     MPEG_AAC_TRACK_CONSUMER_CLASS,
     ADTS_CONTAINER_PROBE_CLASS,
     ADTS_PACKET_HEADER_CLASS,
@@ -1638,6 +1640,9 @@ fn replacement_body(
     }
     if class_name == FORMATS_CLASS {
         return formats_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == MPEG_TRACK_INFO_CLASS {
+        return mpeg_track_info_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == MEDIA_CONTAINER_CLASS {
         return media_container_replacement(pool, name, descriptor, required_locals);
@@ -40799,6 +40804,60 @@ fn m3u_stream_audio_track_replacement(
             "Phase 13 does not implement {M3U_STREAM_AUDIO_TRACK_CLASS}.{name}{descriptor}"
         )
         .into()),
+    }
+}
+
+fn mpeg_track_info_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(ILjava/lang/String;Ljava/lang/String;II[B)V") => {
+            let owner = pool.add_class(MPEG_TRACK_INFO_CLASS)?;
+            let object = pool.add_class("java/lang/Object")?;
+            let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+            let track_id = pool.add_field_ref(owner, "trackId", "I")?;
+            let handler = pool.add_field_ref(owner, "handler", "Ljava/lang/String;")?;
+            let codec_name = pool.add_field_ref(owner, "codecName", "Ljava/lang/String;")?;
+            let channel_count = pool.add_field_ref(owner, "channelCount", "I")?;
+            let sample_rate = pool.add_field_ref(owner, "sampleRate", "I")?;
+            let decoder_config = pool.add_field_ref(owner, "decoderConfig", "[B")?;
+            code(
+                pool,
+                2,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Invokespecial(object_init),
+                    Instruction::Aload_0,
+                    Instruction::Iload_1,
+                    Instruction::Putfield(track_id),
+                    Instruction::Aload_0,
+                    Instruction::Aload_2,
+                    Instruction::Putfield(handler),
+                    Instruction::Aload_0,
+                    Instruction::Aload_3,
+                    Instruction::Putfield(codec_name),
+                    Instruction::Aload_0,
+                    Instruction::Iload(4),
+                    Instruction::Putfield(channel_count),
+                    Instruction::Aload_0,
+                    Instruction::Iload(5),
+                    Instruction::Putfield(sample_rate),
+                    Instruction::Aload_0,
+                    Instruction::Aload(6),
+                    Instruction::Putfield(decoder_config),
+                    Instruction::Return,
+                ],
+            )
+        }
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {MPEG_TRACK_INFO_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
     }
 }
 

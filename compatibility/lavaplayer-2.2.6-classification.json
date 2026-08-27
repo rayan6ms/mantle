@@ -5867,72 +5867,80 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public concrete non-final track-info shell preserves six public final fields, direct scalar/reference retention, identity semantics, subclassability, nested Builder metadata, descriptors, member counts, and reflection.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackInfo",
       "symbol_kind": "FIELD",
       "member_name": "trackId",
       "descriptor": "I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Track ID is stored as the exact constructor int without validation or normalization.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackInfo",
       "symbol_kind": "FIELD",
       "member_name": "handler",
       "descriptor": "Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Handler retains the exact nullable String reference supplied to the constructor.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackInfo",
       "symbol_kind": "FIELD",
       "member_name": "codecName",
       "descriptor": "Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Codec name retains the exact nullable String reference supplied to the constructor.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackInfo",
       "symbol_kind": "FIELD",
       "member_name": "channelCount",
       "descriptor": "I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Channel count is stored as the exact constructor int without validation or normalization.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackInfo",
       "symbol_kind": "FIELD",
       "member_name": "sampleRate",
       "descriptor": "I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Sample rate is stored as the exact constructor int without validation or normalization.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackInfo",
       "symbol_kind": "FIELD",
       "member_name": "decoderConfig",
       "descriptor": "[B",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Decoder configuration retains the exact nullable byte-array reference without copying.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackInfo",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(ILjava/lang/String;Ljava/lang/String;II[B)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public constructor stores all six arguments directly, accepts null and edge values, declares no checked exceptions, and matches the reference descriptor.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackInfo$Builder",

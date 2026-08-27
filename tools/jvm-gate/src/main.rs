@@ -172,6 +172,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mpeg-audio-track-support-consumer" => Some(MPEG_AUDIO_TRACK_SUPPORT_CONSUMER),
         "write-mpeg-container-probe-consumer" => Some(MPEG_CONTAINER_PROBE_CONSUMER),
         "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
+        "write-mpeg-track-info-consumer" => Some(MPEG_TRACK_INFO_CONSUMER),
         "write-mpeg-noop-track-consumer-consumer" => Some(MPEG_NOOP_TRACK_CONSUMER_CONSUMER),
         "write-mpeg-track-consumer-consumer" => Some(MPEG_TRACK_CONSUMER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
@@ -15497,6 +15498,113 @@ public final class GateMpegTrackConsumer {
     @Override public int read(ByteBuffer target) throws IOException { readCalls++; return -1; }
     @Override public boolean isOpen() { return true; }
     @Override public void close() { closeCalls++; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MPEG_TRACK_INFO_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackInfo;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateMpegTrackInfo {
+  public static void main(String[] args) throws Exception {
+    constructionAndIdentity();
+    nullsAndEdges();
+    identityAndSubclassing();
+    reflection();
+    System.out.println(
+        "contracts=field-order,scalar-storage,string-identity,decoder-config-identity,null-members,mutation-visibility,no-validation,identity-equality,subclassable,public-final-fields,nested-builder,constructor-descriptor,no-throws,member-counts,reflection");
+  }
+
+  private static void constructionAndIdentity() {
+    byte[] decoderConfig = {1, 2, 3};
+    String handler = new String("soun");
+    String codecName = new String("mp4a");
+    MpegTrackInfo info = new MpegTrackInfo(
+        Integer.MIN_VALUE, handler, codecName, Integer.MAX_VALUE, 44_100, decoderConfig);
+    check(info.trackId == Integer.MIN_VALUE && info.handler == handler
+        && info.codecName == codecName && info.channelCount == Integer.MAX_VALUE
+        && info.sampleRate == 44_100 && info.decoderConfig == decoderConfig,
+        "constructor stores scalar and reference arguments exactly");
+
+    decoderConfig[0] = 9;
+    check(info.decoderConfig[0] == 9, "decoder configuration is not copied");
+  }
+
+  private static void nullsAndEdges() {
+    MpegTrackInfo nullable = new MpegTrackInfo(
+        0, null, null, 0, 0, null);
+    check(nullable.handler == null && nullable.codecName == null
+        && nullable.decoderConfig == null,
+        "nullable reference members are accepted");
+    MpegTrackInfo unusual = new MpegTrackInfo(
+        7, "", "", -1, -2, new byte[0]);
+    check(unusual.trackId == 7 && unusual.channelCount == -1 && unusual.sampleRate == -2
+        && unusual.decoderConfig.length == 0,
+        "constructor performs no validation or normalization");
+  }
+
+  private static void identityAndSubclassing() {
+    MpegTrackInfo first = new MpegTrackInfo(1, "a", "b", 2, 3, null);
+    MpegTrackInfo second = new MpegTrackInfo(1, "a", "b", 2, 3, null);
+    check(first != second && !first.equals(second) && first.equals(first),
+        "value object retains Object identity equality");
+    Derived derived = new Derived(5, null, null, 1, 2, null);
+    check(derived.trackId == 5 && derived.sampleRate == 2,
+        "ordinary subclass inherits construction");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MpegTrackInfo> type = MpegTrackInfo.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete non-final class metadata");
+    check(type.getDeclaredClasses().length == 1
+        && type.getDeclaredClasses()[0].getName().equals(type.getName() + "$Builder"),
+        "public static Builder nesting metadata");
+    check(type.getDeclaredFields().length == 6 && type.getDeclaredMethods().length == 0
+        && type.getDeclaredConstructors().length == 1,
+        "exact declared member counts");
+    check(Arrays.equals(Arrays.stream(type.getDeclaredFields()).map(Field::getName).toArray(),
+        new String[] {"trackId", "handler", "codecName", "channelCount", "sampleRate",
+            "decoderConfig"}),
+        "public field declaration order");
+    checkField(type.getDeclaredField("trackId"), int.class);
+    checkField(type.getDeclaredField("handler"), String.class);
+    checkField(type.getDeclaredField("codecName"), String.class);
+    checkField(type.getDeclaredField("channelCount"), int.class);
+    checkField(type.getDeclaredField("sampleRate"), int.class);
+    checkField(type.getDeclaredField("decoderConfig"), byte[].class);
+
+    Constructor<MpegTrackInfo> constructor = type.getDeclaredConstructor(
+        int.class, String.class, String.class, int.class, int.class, byte[].class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0
+        && Arrays.equals(constructor.getParameterTypes(), new Class<?>[] {
+            int.class, String.class, String.class, int.class, int.class, byte[].class}),
+        "constructor descriptor and no checked failures");
+  }
+
+  private static void checkField(Field field, Class<?> fieldType) {
+    check(field.getType() == fieldType
+        && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && !field.isSynthetic() && field.getDeclaredAnnotations().length == 0,
+        field.getName() + " field metadata");
+  }
+
+  private static final class Derived extends MpegTrackInfo {
+    Derived(int trackId, String handler, String codecName, int channelCount, int sampleRate,
+        byte[] decoderConfig) {
+      super(trackId, handler, codecName, channelCount, sampleRate, decoderConfig);
+    }
   }
 
   private static void check(boolean condition, String message) {
