@@ -269,6 +269,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-file-loader-consumer \
   --output "$WORK/GateMpegFileLoader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-noop-track-consumer-consumer \
   --output "$WORK/GateMpegNoopTrackConsumer.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-consumer-consumer \
+  --output "$WORK/GateMpegTrackConsumer.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-container-probe-consumer \
   --output "$WORK/GateAdtsContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-packet-header-consumer \
@@ -433,6 +435,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateMp3TrackProvider.java" \
   "$WORK/GateMp3XingSeeker.java" \
   "$WORK/GateMpegNoopTrackConsumer.java" \
+  "$WORK/GateMpegTrackConsumer.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GateAdtsStreamReader.java" \
@@ -1451,6 +1454,15 @@ cmp "$WORK/mpeg-noop-track-consumer-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,track-identity,null-track,initialise,seek-extremes,flush,consume,null-channel,length-extremes,channel-untouched,close,idempotent,interrupt-preserved,interface-dispatch,subclassable,private-final-state,checked-throws,reflection' \
   "$WORK/mpeg-noop-track-consumer-candidate.txt" >/dev/null
+java -Xverify:all -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegTrackConsumer >"$WORK/mpeg-track-consumer-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegTrackConsumer >"$WORK/mpeg-track-consumer-candidate.txt"
+cmp "$WORK/mpeg-track-consumer-reference.txt" "$WORK/mpeg-track-consumer-candidate.txt"
+grep --fixed-strings \
+  'contracts=public-abstract-interface,no-fields,no-constructors,six-methods,track-return-identity,initialise-dispatch,seek-argument-order,full-width-timecodes,flush-dispatch,consume-channel-identity,null-channel,length-extremes,close-dispatch,checked-failure-identity,implementation-compatibility,checked-throws,reflection' \
+  "$WORK/mpeg-track-consumer-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mp3_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMp3ConstantRateSeeker \
   >"$WORK/mp3-constant-rate-seeker-reference.txt"

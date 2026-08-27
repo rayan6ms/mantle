@@ -173,6 +173,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mpeg-container-probe-consumer" => Some(MPEG_CONTAINER_PROBE_CONSUMER),
         "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
         "write-mpeg-noop-track-consumer-consumer" => Some(MPEG_NOOP_TRACK_CONSUMER_CONSUMER),
+        "write-mpeg-track-consumer-consumer" => Some(MPEG_TRACK_CONSUMER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
         "write-adts-packet-header-consumer" => Some(ADTS_PACKET_HEADER_CONSUMER),
         "write-adts-stream-provider-consumer" => Some(ADTS_STREAM_PROVIDER_CONSUMER),
@@ -15336,6 +15337,165 @@ public final class GateMpegNoopTrackConsumer {
   private static final class Derived extends MpegNoopTrackConsumer {
     int closeCalls;
     Derived(MpegTrackInfo track) { super(track); }
+    @Override public void close() { closeCalls++; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MPEG_TRACK_CONSUMER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegNoopTrackConsumer;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackConsumer;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackInfo;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.nio.channels.ReadableByteChannel;
+import java.util.Arrays;
+
+public final class GateMpegTrackConsumer {
+  public static void main(String[] args) throws Exception {
+    dispatchAndIdentity();
+    checkedFailures();
+    implementationCompatibility();
+    reflection();
+    System.out.println("contracts=public-abstract-interface,no-fields,no-constructors,six-methods,track-return-identity,initialise-dispatch,seek-argument-order,full-width-timecodes,flush-dispatch,consume-channel-identity,null-channel,length-extremes,close-dispatch,checked-failure-identity,implementation-compatibility,checked-throws,reflection");
+  }
+
+  private static void dispatchAndIdentity() throws Exception {
+    MpegTrackInfo track = new MpegTrackInfo(7, "soun", "mp4a", 2, 48000, new byte[] {1, 2});
+    RecordingConsumer implementation = new RecordingConsumer(track);
+    MpegTrackConsumer consumer = implementation;
+    RecordingChannel channel = new RecordingChannel();
+    check(consumer.getTrack() == track && implementation.getTrackCalls == 1,
+        "interface returns exact implementation track identity");
+    consumer.initialise();
+    consumer.seekPerformed(Long.MIN_VALUE + 1L, Long.MAX_VALUE - 1L);
+    consumer.flush();
+    consumer.consume(channel, Integer.MAX_VALUE);
+    consumer.consume(null, Integer.MIN_VALUE);
+    consumer.close();
+    check(implementation.initialiseCalls == 1 && implementation.seekCalls == 1
+        && implementation.requested == Long.MIN_VALUE + 1L
+        && implementation.provided == Long.MAX_VALUE - 1L
+        && implementation.flushCalls == 1 && implementation.consumeCalls == 2
+        && implementation.firstChannel == channel && implementation.lastChannel == null
+        && implementation.firstLength == Integer.MAX_VALUE
+        && implementation.lastLength == Integer.MIN_VALUE && implementation.closeCalls == 1,
+        "all callbacks preserve exact arguments and dispatch once");
+    check(channel.readCalls == 0 && channel.closeCalls == 0,
+        "interface dispatch imposes no channel reads or ownership");
+
+    RecordingConsumer nullTrack = new RecordingConsumer(null);
+    check(((MpegTrackConsumer) nullTrack).getTrack() == null,
+        "nullable implementation return crosses interface unchanged");
+  }
+
+  private static void checkedFailures() {
+    RecordingConsumer implementation = new RecordingConsumer(null);
+    MpegTrackConsumer consumer = implementation;
+    InterruptedException flushFailure = new InterruptedException("flush-failure");
+    implementation.flushFailure = flushFailure;
+    check(catchThrowable(consumer::flush) == flushFailure,
+        "flush preserves checked failure identity");
+    InterruptedException consumeFailure = new InterruptedException("consume-failure");
+    implementation.flushFailure = null;
+    implementation.consumeFailure = consumeFailure;
+    check(catchThrowable(() -> consumer.consume(null, -1)) == consumeFailure,
+        "consume preserves checked failure identity");
+  }
+
+  private static void implementationCompatibility() throws Exception {
+    MpegTrackInfo track = new MpegTrackInfo(9, null, null, 0, 0, null);
+    MpegTrackConsumer noop = new MpegNoopTrackConsumer(track);
+    noop.initialise();
+    noop.seekPerformed(0L, 0L);
+    noop.flush();
+    noop.consume(null, 0);
+    noop.close();
+    check(noop.getTrack() == track,
+        "reference no-op implementation remains assignable and callable through the interface");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MpegTrackConsumer> type = MpegTrackConsumer.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT | Modifier.INTERFACE)
+        && type.isInterface() && type.getSuperclass() == null && type.getInterfaces().length == 0
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0,
+        "exact public abstract interface metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 6, "exact zero-field, zero-constructor shape");
+    checkMethod(type.getDeclaredMethod("getTrack"), MpegTrackInfo.class, new Class<?>[0], new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("initialise"), void.class, new Class<?>[0], new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("seekPerformed", long.class, long.class), void.class,
+        new Class<?>[] {long.class, long.class}, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("flush"), void.class, new Class<?>[0],
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("consume", ReadableByteChannel.class, int.class), void.class,
+        new Class<?>[] {ReadableByteChannel.class, int.class},
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("close"), void.class, new Class<?>[0], new Class<?>[0]);
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, Class<?>[] parameters,
+      Class<?>[] failures) {
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isDefault() && !method.isVarArgs(),
+        method.getName() + " method metadata");
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class RecordingConsumer implements MpegTrackConsumer {
+    final MpegTrackInfo track;
+    int getTrackCalls;
+    int initialiseCalls;
+    int seekCalls;
+    int flushCalls;
+    int consumeCalls;
+    int closeCalls;
+    long requested;
+    long provided;
+    ReadableByteChannel firstChannel;
+    ReadableByteChannel lastChannel;
+    int firstLength;
+    int lastLength;
+    InterruptedException flushFailure;
+    InterruptedException consumeFailure;
+    RecordingConsumer(MpegTrackInfo track) { this.track = track; }
+    @Override public MpegTrackInfo getTrack() { getTrackCalls++; return track; }
+    @Override public void initialise() { initialiseCalls++; }
+    @Override public void seekPerformed(long requested, long provided) {
+      seekCalls++; this.requested = requested; this.provided = provided;
+    }
+    @Override public void flush() throws InterruptedException {
+      flushCalls++; if (flushFailure != null) throw flushFailure;
+    }
+    @Override public void consume(ReadableByteChannel channel, int length)
+        throws InterruptedException {
+      consumeCalls++;
+      if (consumeCalls == 1) { firstChannel = channel; firstLength = length; }
+      lastChannel = channel; lastLength = length;
+      if (consumeFailure != null) throw consumeFailure;
+    }
+    @Override public void close() { closeCalls++; }
+  }
+
+  private static final class RecordingChannel implements ReadableByteChannel {
+    int readCalls;
+    int closeCalls;
+    @Override public int read(ByteBuffer target) throws IOException { readCalls++; return -1; }
+    @Override public boolean isOpen() { return true; }
     @Override public void close() { closeCalls++; }
   }
 
