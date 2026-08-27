@@ -198,6 +198,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-matroska-element-type-consumer" => Some(MATROSKA_ELEMENT_TYPE_CONSUMER),
         "write-matroska-file-reader-consumer" => Some(MATROSKA_FILE_READER_CONSUMER),
         "write-matroska-file-track-consumer" => Some(MATROSKA_FILE_TRACK_CONSUMER),
+        "write-matroska-mutable-element-consumer" => Some(MATROSKA_MUTABLE_ELEMENT_CONSUMER),
         "write-matroska-streaming-file-consumer" => Some(MATROSKA_STREAMING_FILE_CONSUMER),
         "write-matroska-audio-track-consumer" => Some(MATROSKA_AUDIO_TRACK_CONSUMER),
         "write-matroska-audio-track-support-consumer" => {
@@ -17747,6 +17748,58 @@ public final class GateMatroskaFileTrack {
   private interface Operation{void run() throws Throwable;} private static final class MutableElement extends MatroskaElement{MutableElement(int l,MatroskaElementType t,long p,int h,int d){super(l);id=t.id;type=t;position=p;headerSize=h;dataSize=d;}}
   private static final class MemoryStream extends SeekableInputStream{final byte[] d;int p;MemoryStream(byte[] d){super(d.length,0);this.d=d;}public int read(){return p==d.length?-1:d[p++]&255;}public int read(byte[] b,int o,int l){if(p==d.length)return -1;int n=Math.min(l,d.length-p);System.arraycopy(d,p,b,o,n);p+=n;return n;}public long skip(long n){int k=(int)Math.min(n,d.length-p);p+=k;return k;}public long getPosition(){return p;}protected void seekHard(long n)throws IOException{if(n<0||n>d.length)throw new EOFException();p=(int)n;}public boolean canSeekHard(){return true;}public java.util.List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider> getTrackInfoProviders(){return Collections.emptyList();}}
   private static void check(boolean b,String m){if(!b)throw new AssertionError(m);}
+}
+"#;
+const MATROSKA_MUTABLE_ELEMENT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElementType;
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaElement;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+
+public final class GateMatroskaMutableElement {
+  public static void main(String[] args) throws Exception {
+    mutation(); reflection();
+    System.out.println("contracts=protected-constructor,subclassable,mutators,inherited-getters,full-width-state,null-state,reflection");
+  }
+  private static void mutation() {
+    Derived element = new Derived(3);
+    check(element.getLevel() == 3 && element.getId() == 0L && element.getType() == null
+        && element.getPosition() == 0L && element.getHeaderSize() == 0 && element.getDataSize() == 0,
+        "constructor and inherited defaults");
+    element.setId(Long.MIN_VALUE + 9); element.setType(MatroskaElementType.Cluster);
+    element.setPosition(Long.MAX_VALUE - 11); element.setHeaderSize(-17); element.setDataSize(Integer.MAX_VALUE);
+    check(element.getId() == Long.MIN_VALUE + 9 && element.getType() == MatroskaElementType.Cluster
+        && element.getPosition() == Long.MAX_VALUE - 11 && element.getHeaderSize() == -17
+        && element.getDataSize() == Integer.MAX_VALUE, "mutator state");
+    element.setType(null); element.setId(Long.MAX_VALUE); element.setPosition(Long.MIN_VALUE);
+    element.setHeaderSize(0); element.setDataSize(-1);
+    check(element.getType() == null && element.getId() == Long.MAX_VALUE && element.getPosition() == Long.MIN_VALUE
+        && element.getHeaderSize() == 0 && element.getDataSize() == -1, "null and full-width state");
+  }
+  private static void reflection() throws Exception {
+    Class<MutableMatroskaElement> type = MutableMatroskaElement.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Class.forName(
+        "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaElement")
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 0
+        && type.getDeclaredMethods().length == 5 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredAnnotations().length == 0, "mutable class metadata");
+    Constructor<MutableMatroskaElement> constructor = type.getDeclaredConstructor(int.class);
+    check(constructor.getModifiers() == Modifier.PROTECTED && constructor.getExceptionTypes().length == 0,
+        "protected constructor metadata");
+    checkMethod(type.getDeclaredMethod("setId", long.class));
+    checkMethod(type.getDeclaredMethod("setType", MatroskaElementType.class));
+    checkMethod(type.getDeclaredMethod("setPosition", long.class));
+    checkMethod(type.getDeclaredMethod("setHeaderSize", int.class));
+    checkMethod(type.getDeclaredMethod("setDataSize", int.class));
+  }
+  private static void checkMethod(Method method) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == void.class
+        && method.getExceptionTypes().length == 0 && !method.isSynthetic() && !method.isBridge()
+        && !method.isVarArgs(), method.getName() + " metadata");
+  }
+  private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
+  private static final class Derived extends MutableMatroskaElement { Derived(int level) { super(level); } }
 }
 "#;
 const MATROSKA_STREAMING_FILE_CONSUMER: &str = r#"

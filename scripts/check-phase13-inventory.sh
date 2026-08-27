@@ -2527,9 +2527,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[2].completed_slices[].symbols] | add) == .cohorts[2].classified_symbols and
   (.cohorts[2].classified_symbols + .cohorts[2].remaining_symbols) == .cohorts[2].symbols and
   .cohorts[3].status == "IN_PROGRESS" and
-  .cohorts[3].classified_symbols == 399 and
-  .cohorts[3].remaining_symbols == 425 and
-  (.cohorts[3].completed_slices | length) == 43 and
+  .cohorts[3].classified_symbols == 406 and
+  .cohorts[3].remaining_symbols == 418 and
+  (.cohorts[3].completed_slices | length) == 44 and
   .cohorts[3].completed_slices[0] == {
     id: "formats-contracts",
     classes: 1,
@@ -2771,6 +2771,19 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
     fields: 19,
     methods: 6,
     symbols: 28,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
+  .cohorts[3].completed_slices[43] == {
+    id: "matroska-mutable-element-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 6,
+    symbols: 7,
     classification: "A_EXACT",
     evidence: [
       "scripts/run-jvm-gate-a.sh",
@@ -3092,9 +3105,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   } and
   ([.cohorts[3].completed_slices[].symbols] | add) == .cohorts[3].classified_symbols and
   (.cohorts[3].classified_symbols + .cohorts[3].remaining_symbols) == .cohorts[3].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1851 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1858 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1704 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1711 and
   ([$classifications.symbols[] |
     select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 131 and
   ([$classifications.symbols[] |
@@ -3179,6 +3192,13 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
       (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
       (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 28 and
+  ([$classifications.symbols[] |
+    select(.binary_name ==
+      "com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaElement" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 7 and
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.container.flac.FlacAudioTrack" and
@@ -3967,6 +3987,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack",
         "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack$AudioDetails",
         "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack$Type",
+        "com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaElement",
         "com.sedmelluq.discord.lavaplayer.filter.AudioFilterChain",
         "com.sedmelluq.discord.lavaplayer.filter.AudioPipeline",
         "com.sedmelluq.discord.lavaplayer.filter.AudioPipelineFactory",
@@ -4449,7 +4470,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "matroska-mutable-element-contracts" and
+  .phase_entry.next_slice == "mp3-audio-track-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 JQ
@@ -4467,4 +4488,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 1,851 classified symbols and 911 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 1,858 classified symbols and 904 unassessed symbols.\n'

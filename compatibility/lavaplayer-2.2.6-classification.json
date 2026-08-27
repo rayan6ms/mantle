@@ -4857,63 +4857,70 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MutableMatroskaElement shell preserves its protected constructor, subclassability, inherited state getters, all mutator assignments including full-width and null values, and reflection metadata under the Phase 13 matroska-mutable-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaElement",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(I)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MutableMatroskaElement shell preserves its protected constructor, subclassability, inherited state getters, all mutator assignments including full-width and null values, and reflection metadata under the Phase 13 matroska-mutable-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaElement",
       "symbol_kind": "METHOD",
       "member_name": "setId",
       "descriptor": "(J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MutableMatroskaElement shell preserves its protected constructor, subclassability, inherited state getters, all mutator assignments including full-width and null values, and reflection metadata under the Phase 13 matroska-mutable-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaElement",
       "symbol_kind": "METHOD",
       "member_name": "setType",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElementType;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MutableMatroskaElement shell preserves its protected constructor, subclassability, inherited state getters, all mutator assignments including full-width and null values, and reflection metadata under the Phase 13 matroska-mutable-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaElement",
       "symbol_kind": "METHOD",
       "member_name": "setPosition",
       "descriptor": "(J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MutableMatroskaElement shell preserves its protected constructor, subclassability, inherited state getters, all mutator assignments including full-width and null values, and reflection metadata under the Phase 13 matroska-mutable-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaElement",
       "symbol_kind": "METHOD",
       "member_name": "setHeaderSize",
       "descriptor": "(I)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MutableMatroskaElement shell preserves its protected constructor, subclassability, inherited state getters, all mutator assignments including full-width and null values, and reflection metadata under the Phase 13 matroska-mutable-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaElement",
       "symbol_kind": "METHOD",
       "member_name": "setDataSize",
       "descriptor": "(I)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public MutableMatroskaElement shell preserves its protected constructor, subclassability, inherited state getters, all mutator assignments including full-width and null values, and reflection metadata under the Phase 13 matroska-mutable-element-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mp3.Mp3AudioTrack",
