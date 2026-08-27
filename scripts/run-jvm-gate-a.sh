@@ -277,6 +277,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-parse-stop-checker-consum
   --output "$WORK/GateMpegParseStopChecker.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-reader-consumer \
   --output "$WORK/GateMpegReader.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-reader-chain-consumer \
+  --output "$WORK/GateMpegReaderChain.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-noop-track-consumer-consumer \
   --output "$WORK/GateMpegNoopTrackConsumer.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-consumer-consumer \
@@ -451,6 +453,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateMpegFileTrackProvider.java" \
   "$WORK/GateMpegParseStopChecker.java" \
   "$WORK/GateMpegReader.java" \
+  "$WORK/GateMpegReaderChain.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GateAdtsStreamReader.java" \
@@ -1526,6 +1529,15 @@ cmp "$WORK/mpeg-reader-reference.txt" "$WORK/mpeg-reader-candidate.txt"
 grep --fixed-strings \
   'contracts=constructor,input-identity,data-wrapper,private-buffers,null-input,standard-child,unsigned-length,extended-length,zero-length,fourcc-bytes,parent-boundary,eof,truncated-header,io-identity,skip-target,skip-overflow,skip-wrapping,cause-identity,utf8,fourcc-charset,terminated-string,empty-string,malformed-replacement,negative-size,compressed-int,compressed-four-byte-limit,parse-flags,version-flags,section-copy,chain-freshness,chain-state,null-parent,subclassable,private-state,checked-throws,nested-metadata,reflection' \
   "$WORK/mpeg-reader-candidate.txt" >/dev/null
+java -Xverify:all -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegReaderChain >"$WORK/mpeg-reader-chain-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegReaderChain >"$WORK/mpeg-reader-chain-candidate.txt"
+cmp "$WORK/mpeg-reader-chain-reference.txt" "$WORK/mpeg-reader-chain-candidate.txt"
+grep --fixed-strings \
+  'contracts=fluent-registration,handler-order,handler-state,nullable-registration,stop-replacement,ordinary-dispatch,exact-type-match,multiple-handlers,terminator-metadata,terminator-inert,skip-all-sections,parent-identity,versioned-dispatch,per-handler-flags,section-copy,pre-stop,post-stop,stop-phase-order,skip-after-stop,next-failure,checker-failure,handler-failure,skip-failure,failure-identity,null-type,null-handler,private-constructor,private-handler,checked-throws,member-counts,reflection' \
+  "$WORK/mpeg-reader-chain-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mp3_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMp3ConstantRateSeeker \
   >"$WORK/mp3-constant-rate-seeker-reference.txt"

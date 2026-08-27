@@ -6247,63 +6247,70 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public static nested chain metadata, private state and constructor, private handler companion, and all exported fluent and execution methods match the reference exactly.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegReader$Chain",
       "symbol_kind": "METHOD",
       "member_name": "handle",
       "descriptor": "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegSectionHandler;)Lcom/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegReader$Chain;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The two-argument ordinary handler overload appends exact nullable type and callback identity with a false terminator and returns this chain.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegReader$Chain",
       "symbol_kind": "METHOD",
       "member_name": "handle",
       "descriptor": "(Ljava/lang/String;ZLcom/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegSectionHandler;)Lcom/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegReader$Chain;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The three-argument ordinary handler overload appends exact nullable registration state and terminator metadata in order and returns this chain.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegReader$Chain",
       "symbol_kind": "METHOD",
       "member_name": "handleVersioned",
       "descriptor": "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegVersionedSectionHandler;)Lcom/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegReader$Chain;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The two-argument versioned handler overload appends exact nullable registration state with a false terminator and returns this chain.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegReader$Chain",
       "symbol_kind": "METHOD",
       "member_name": "handleVersioned",
       "descriptor": "(Ljava/lang/String;ZLcom/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegVersionedSectionHandler;)Lcom/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegReader$Chain;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The three-argument versioned handler overload appends exact nullable registration state and terminator metadata in order and returns this chain.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegReader$Chain",
       "symbol_kind": "METHOD",
       "member_name": "stopChecker",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegParseStopChecker;)Lcom/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegReader$Chain;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Stop-checker registration fluently replaces the previous checker, preserves exact nullable identity, and returns this chain.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegReader$Chain",
       "symbol_kind": "METHOD",
       "member_name": "run",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Run preserves ordered exact-type dispatch, per-handler flag parsing, pre/post stop timing, unconditional section skips, EOF termination, and checked or unchecked failure identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegSectionHandler",

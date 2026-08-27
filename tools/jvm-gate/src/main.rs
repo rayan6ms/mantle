@@ -177,6 +177,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mpeg-file-track-provider-consumer" => Some(MPEG_FILE_TRACK_PROVIDER_CONSUMER),
         "write-mpeg-parse-stop-checker-consumer" => Some(MPEG_PARSE_STOP_CHECKER_CONSUMER),
         "write-mpeg-reader-consumer" => Some(MPEG_READER_CONSUMER),
+        "write-mpeg-reader-chain-consumer" => Some(MPEG_READER_CHAIN_CONSUMER),
         "write-mpeg-noop-track-consumer-consumer" => Some(MPEG_NOOP_TRACK_CONSUMER_CONSUMER),
         "write-mpeg-track-consumer-consumer" => Some(MPEG_TRACK_CONSUMER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
@@ -16112,6 +16113,329 @@ public final class GateMpegReader {
     int calls;
     Derived(SeekableInputStream stream) { super(stream); }
     @Override public String readFourCC() { calls++; return "override"; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MPEG_READER_CHAIN_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegParseStopChecker;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegReader;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegSectionHandler;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegSectionInfo;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegVersionedSectionHandler;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegVersionedSectionInfo;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateMpegReaderChain {
+  public static void main(String[] args) throws Exception {
+    fluentRegistration();
+    ordinaryDispatch();
+    versionedDispatch();
+    stopping();
+    failuresAndNulls();
+    reflection();
+    System.out.println("contracts=fluent-registration,handler-order,handler-state,nullable-registration,stop-replacement,ordinary-dispatch,exact-type-match,multiple-handlers,terminator-metadata,terminator-inert,skip-all-sections,parent-identity,versioned-dispatch,per-handler-flags,section-copy,pre-stop,post-stop,stop-phase-order,skip-after-stop,next-failure,checker-failure,handler-failure,skip-failure,failure-identity,null-type,null-handler,private-constructor,private-handler,checked-throws,member-counts,reflection");
+  }
+
+  private static void fluentRegistration() throws Exception {
+    ScriptedReader reader = new ScriptedReader(new byte[0]);
+    MpegReader.Chain chain = reader.in(new MpegSectionInfo(0L, 0L, "root"));
+    MpegSectionHandler first = section -> {};
+    MpegSectionHandler second = section -> {};
+    MpegVersionedSectionHandler third = section -> {};
+    MpegVersionedSectionHandler fourth = section -> {};
+    check(chain.handle("one", first) == chain
+        && chain.handle("two", true, second) == chain
+        && chain.handleVersioned("three", third) == chain
+        && chain.handleVersioned("four", true, fourth) == chain,
+        "all registration methods return the exact chain");
+    List<?> handlers = (List<?>) field(chain, "handlers");
+    check(handlers.size() == 4, "registrations append one handler each");
+    checkHandler(handlers.get(0), "one", false, first);
+    checkHandler(handlers.get(1), "two", true, second);
+    checkHandler(handlers.get(2), "three", false, third);
+    checkHandler(handlers.get(3), "four", true, fourth);
+
+    MpegParseStopChecker firstChecker = (section, start) -> false;
+    MpegParseStopChecker secondChecker = (section, start) -> true;
+    check(chain.stopChecker(firstChecker) == chain && field(chain, "stopChecker") == firstChecker
+        && chain.stopChecker(secondChecker) == chain && field(chain, "stopChecker") == secondChecker
+        && chain.stopChecker(null) == chain && field(chain, "stopChecker") == null,
+        "stop checker is fluently replaced and nullable");
+    check(chain.handle(null, (MpegSectionHandler) null) == chain
+        && chain.handleVersioned(null, true, (MpegVersionedSectionHandler) null) == chain
+        && handlers.size() == 6,
+        "registrations accept null type and handler without eager validation");
+  }
+
+  private static void ordinaryDispatch() throws Exception {
+    MpegSectionInfo first = new MpegSectionInfo(1L, 2L, "same");
+    MpegSectionInfo other = new MpegSectionInfo(3L, 4L, "other");
+    MpegSectionInfo second = new MpegSectionInfo(5L, 6L, "same");
+    MpegSectionInfo caseMismatch = new MpegSectionInfo(7L, 8L, "SAME");
+    ScriptedReader reader = new ScriptedReader(new byte[0], first, other, second, caseMismatch);
+    MpegSectionInfo parent = new MpegSectionInfo(10L, 20L, "root");
+    List<String> calls = new ArrayList<>();
+    List<MpegSectionInfo> identities = new ArrayList<>();
+    MpegReader.Chain chain = reader.in(parent)
+        .handle("same", section -> { calls.add("first:" + section.offset); identities.add(section); })
+        .handle("same", true,
+            section -> { calls.add("terminator:" + section.offset); identities.add(section); })
+        .handle("other", section -> { calls.add("other:" + section.offset); identities.add(section); });
+    chain.run();
+    check(calls.equals(Arrays.asList(
+        "first:1", "terminator:1", "other:3", "first:5", "terminator:5")),
+        "matching handlers run in registration and section order");
+    check(identities.equals(Arrays.asList(first, first, other, second, second)),
+        "ordinary handlers receive exact section identities");
+    check(reader.skipped.equals(Arrays.asList(first, other, second, caseMismatch))
+        && reader.nextCalls == 5 && reader.parents.size() == 5
+        && reader.parents.stream().allMatch(value -> value == parent),
+        "every section is skipped and every child read receives the exact parent");
+  }
+
+  private static void versionedDispatch() throws Exception {
+    MpegSectionInfo section = new MpegSectionInfo(Long.MIN_VALUE, Long.MAX_VALUE, new String("vers"));
+    ScriptedReader reader = new ScriptedReader(
+        concat(intBytes(0xFE123456), intBytes(0x017ABCDE)), section);
+    List<MpegVersionedSectionInfo> versioned = new ArrayList<>();
+    List<MpegSectionInfo> ordinary = new ArrayList<>();
+    reader.in(new MpegSectionInfo(0L, 1L, "root"))
+        .handleVersioned("vers", versioned::add)
+        .handle("vers", ordinary::add)
+        .handleVersioned("vers", true, versioned::add)
+        .run();
+    check(versioned.size() == 2
+        && versioned.get(0).version == 254 && versioned.get(0).flags == 0x123456
+        && versioned.get(1).version == 1 && versioned.get(1).flags == 0x7ABCDE,
+        "each matching versioned handler consumes its own flags word");
+    check(versioned.stream().allMatch(value -> value.offset == Long.MIN_VALUE
+            && value.length == Long.MAX_VALUE && value.type == section.type)
+        && ordinary.equals(Collections.singletonList(section)),
+        "versioned handlers receive copied values while ordinary handler retains identity");
+    check(reader.stream.position == 8L && reader.skipped.equals(Collections.singletonList(section)),
+        "version parsing consumes eight bytes and the section is skipped");
+  }
+
+  private static void stopping() throws Exception {
+    MpegSectionInfo first = new MpegSectionInfo(0L, 1L, "box1");
+    MpegSectionInfo second = new MpegSectionInfo(1L, 1L, "box2");
+    List<String> events = new ArrayList<>();
+    ScriptedReader preReader = new ScriptedReader(new byte[0], first, second);
+    preReader.in(new MpegSectionInfo(0L, 2L, "root"))
+        .handle("box1", section -> events.add("handle"))
+        .stopChecker((section, start) -> { events.add(start ? "pre" : "post"); return start; })
+        .run();
+    check(events.equals(Collections.singletonList("pre")) && preReader.nextCalls == 1
+        && preReader.skipped.equals(Collections.singletonList(first)),
+        "pre-stop suppresses handlers and post-check but still skips current section");
+
+    events.clear();
+    ScriptedReader postReader = new ScriptedReader(new byte[0], first, second);
+    postReader.in(new MpegSectionInfo(0L, 2L, "root"))
+        .handle("box1", section -> events.add("handle"))
+        .stopChecker((section, start) -> { events.add(start ? "pre" : "post"); return !start; })
+        .run();
+    check(events.equals(Arrays.asList("pre", "handle", "post")) && postReader.nextCalls == 1
+        && postReader.skipped.equals(Collections.singletonList(first)),
+        "post-stop follows handlers and still skips current section");
+  }
+
+  private static void failuresAndNulls() throws Exception {
+    MpegSectionInfo section = new MpegSectionInfo(0L, 1L, "box");
+    IOException nextFailure = new IOException("next");
+    ScriptedReader nextReader = new ScriptedReader(new byte[0]);
+    nextReader.nextFailure = nextFailure;
+    check(catchThrowable(() -> nextReader.in(null).run()) == nextFailure
+        && nextReader.skipped.isEmpty(), "nextChild failure propagates unchanged without skip");
+
+    RuntimeException checkerFailure = new RuntimeException("checker");
+    ScriptedReader checkerReader = new ScriptedReader(new byte[0], section);
+    check(catchThrowable(() -> checkerReader.in(null)
+        .stopChecker((value, start) -> { throw checkerFailure; }).run()) == checkerFailure
+        && checkerReader.skipped.isEmpty(),
+        "stop checker failure propagates unchanged before skip");
+
+    IOException handlerFailure = new IOException("handler");
+    ScriptedReader handlerReader = new ScriptedReader(new byte[0], section);
+    check(catchThrowable(() -> handlerReader.in(null)
+        .handle("box", value -> { throw handlerFailure; }).run()) == handlerFailure
+        && handlerReader.skipped.isEmpty(), "handler failure propagates unchanged before skip");
+
+    RuntimeException skipFailure = new RuntimeException("skip");
+    ScriptedReader skipReader = new ScriptedReader(new byte[0], section);
+    skipReader.skipFailure = skipFailure;
+    check(catchThrowable(() -> skipReader.in(null).handle("box", value -> {}).run()) == skipFailure
+        && skipReader.skipAttempts == 1, "skip failure propagates unchanged after dispatch");
+
+    ScriptedReader nullTypeReader = new ScriptedReader(new byte[0], section);
+    check(catchThrowable(() -> nullTypeReader.in(null)
+        .handle(null, value -> {}).run()) instanceof NullPointerException
+        && nullTypeReader.skipped.isEmpty(), "null registered type fails during matching");
+    ScriptedReader nullHandlerReader = new ScriptedReader(new byte[0], section);
+    check(catchThrowable(() -> nullHandlerReader.in(null)
+        .handle("box", (MpegSectionHandler) null).run()) instanceof NullPointerException
+        && nullHandlerReader.skipped.isEmpty(), "null registered handler fails during dispatch");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MpegReader.Chain> type = MpegReader.Chain.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && type.getDeclaringClass() == MpegReader.class && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public static non-final nested class metadata");
+    check(type.getDeclaredFields().length == 4 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 8 && type.getDeclaredClasses().length == 0,
+        "exact chain declared member counts");
+    String[] names = Arrays.stream(type.getDeclaredFields()).map(Field::getName).toArray(String[]::new);
+    check(Arrays.equals(names, new String[] {"parent", "handlers", "reader", "stopChecker"}),
+        "exact private field order");
+    checkField(type.getDeclaredField("parent"), MpegSectionInfo.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type.getDeclaredField("handlers"), List.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type.getDeclaredField("reader"), MpegReader.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type.getDeclaredField("stopChecker"), MpegParseStopChecker.class, Modifier.PRIVATE);
+    Constructor<MpegReader.Chain> constructor =
+        type.getDeclaredConstructor(MpegSectionInfo.class, MpegReader.class);
+    check(constructor.getModifiers() == Modifier.PRIVATE
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "exact private constructor metadata");
+    checkMethod(type.getDeclaredMethod("handle", String.class, MpegSectionHandler.class), type,
+        new Class<?>[] {String.class, MpegSectionHandler.class}, new Class<?>[0], Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod(
+        "handle", String.class, boolean.class, MpegSectionHandler.class), type,
+        new Class<?>[] {String.class, boolean.class, MpegSectionHandler.class},
+        new Class<?>[0], Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod(
+        "handleVersioned", String.class, MpegVersionedSectionHandler.class), type,
+        new Class<?>[] {String.class, MpegVersionedSectionHandler.class},
+        new Class<?>[0], Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod(
+        "handleVersioned", String.class, boolean.class, MpegVersionedSectionHandler.class), type,
+        new Class<?>[] {String.class, boolean.class, MpegVersionedSectionHandler.class},
+        new Class<?>[0], Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("stopChecker", MpegParseStopChecker.class), type,
+        new Class<?>[] {MpegParseStopChecker.class}, new Class<?>[0], Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("run"), void.class, new Class<?>[0],
+        new Class<?>[] {IOException.class}, Modifier.PUBLIC);
+    checkMethod(type.getDeclaredMethod("processHandlers", MpegSectionInfo.class), void.class,
+        new Class<?>[] {MpegSectionInfo.class}, new Class<?>[] {IOException.class}, Modifier.PRIVATE);
+
+    Class<?> handler = Class.forName(MpegReader.class.getName() + "$Handler");
+    check(handler.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC)
+        && handler.getDeclaringClass() == MpegReader.class && handler.getSuperclass() == Object.class
+        && handler.getDeclaredFields().length == 3 && handler.getDeclaredConstructors().length == 1
+        && handler.getDeclaredMethods().length == 0 && handler.getDeclaredClasses().length == 0,
+        "exact private handler class metadata");
+    checkField(handler.getDeclaredField("type"), String.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(handler.getDeclaredField("terminator"), boolean.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(handler.getDeclaredField("sectionHandler"), Object.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    Constructor<?> handlerConstructor =
+        handler.getDeclaredConstructor(String.class, boolean.class, Object.class);
+    check(handlerConstructor.getModifiers() == Modifier.PRIVATE
+        && handlerConstructor.getExceptionTypes().length == 0 && !handlerConstructor.isSynthetic(),
+        "exact private handler constructor metadata");
+    Method privateDispatch = type.getDeclaredMethod("handleSection", MpegSectionInfo.class, handler);
+    checkMethod(privateDispatch, boolean.class, new Class<?>[] {MpegSectionInfo.class, handler},
+        new Class<?>[] {IOException.class}, Modifier.PRIVATE);
+  }
+
+  private static void checkHandler(Object handler, String type, boolean terminator, Object callback)
+      throws Exception {
+    check(field(handler, "type") == type && ((Boolean) field(handler, "terminator")) == terminator
+        && field(handler, "sectionHandler") == callback,
+        "handler retains exact registration state");
+  }
+  private static void checkField(Field field, Class<?> fieldType, int modifiers) {
+    check(field.getType() == fieldType && field.getModifiers() == modifiers && !field.isSynthetic(),
+        field.getName() + " field metadata");
+  }
+  private static void checkMethod(Method method, Class<?> returnType, Class<?>[] parameters,
+      Class<?>[] failures, int modifiers) {
+    check(method.getModifiers() == modifiers && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isDefault() && !method.isVarArgs(),
+        method.getName() + " method metadata");
+  }
+  private static Object field(Object owner, String name) throws Exception {
+    Field field = owner.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(owner);
+  }
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+  private interface ThrowingRunnable { void run() throws Throwable; }
+  private static byte[] intBytes(int value) {
+    return new byte[] {(byte) (value >>> 24), (byte) (value >>> 16),
+        (byte) (value >>> 8), (byte) value};
+  }
+  private static byte[] concat(byte[]... arrays) {
+    int size = 0; for (byte[] array : arrays) size += array.length;
+    byte[] result = new byte[size]; int offset = 0;
+    for (byte[] array : arrays) {
+      System.arraycopy(array, 0, result, offset, array.length); offset += array.length;
+    }
+    return result;
+  }
+
+  private static final class ScriptedReader extends MpegReader {
+    final MemoryStream stream;
+    final MpegSectionInfo[] sections;
+    final List<MpegSectionInfo> skipped = new ArrayList<>();
+    final List<MpegSectionInfo> parents = new ArrayList<>();
+    int sectionIndex;
+    int nextCalls;
+    int skipAttempts;
+    IOException nextFailure;
+    RuntimeException skipFailure;
+    ScriptedReader(byte[] data, MpegSectionInfo... sections) {
+      this(new MemoryStream(data), sections);
+    }
+    private ScriptedReader(MemoryStream stream, MpegSectionInfo[] sections) {
+      super(stream); this.stream = stream; this.sections = sections;
+    }
+    @Override public MpegSectionInfo nextChild(MpegSectionInfo parent) throws IOException {
+      nextCalls++; parents.add(parent);
+      if (nextFailure != null) throw nextFailure;
+      return sectionIndex < sections.length ? sections[sectionIndex++] : null;
+    }
+    @Override public void skip(MpegSectionInfo section) {
+      skipAttempts++;
+      if (skipFailure != null) throw skipFailure;
+      skipped.add(section);
+    }
+  }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    final byte[] bytes;
+    long position;
+    MemoryStream(byte[] bytes) { super(bytes.length, 0L); this.bytes = bytes; }
+    @Override public int read() {
+      return position >= bytes.length ? -1 : bytes[(int) position++] & 0xFF;
+    }
+    @Override public long getPosition() { return position; }
+    @Override protected void seekHard(long position) { this.position = position; }
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      return Collections.emptyList();
+    }
   }
 
   private static void check(boolean condition, String message) {

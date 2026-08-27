@@ -187,6 +187,10 @@ const MPEG_FILE_TRACK_PROVIDER_CLASS: &str =
 const MPEG_PARSE_STOP_CHECKER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegParseStopChecker";
 const MPEG_READER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegReader";
+const MPEG_READER_CHAIN_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegReader$Chain";
+const MPEG_READER_HANDLER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegReader$Handler";
 const MPEG_AAC_TRACK_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegAacTrackConsumer";
 const ADTS_CONTAINER_PROBE_CLASS: &str =
@@ -626,6 +630,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MPEG_FILE_TRACK_PROVIDER_CLASS,
     MPEG_PARSE_STOP_CHECKER_CLASS,
     MPEG_READER_CLASS,
+    MPEG_READER_CHAIN_CLASS,
     MPEG_AAC_TRACK_CONSUMER_CLASS,
     ADTS_CONTAINER_PROBE_CLASS,
     ADTS_PACKET_HEADER_CLASS,
@@ -828,6 +833,7 @@ const PRIVATE_SUPPORT_CLASSES: &[&str] = &[
     MUTABLE_MATROSKA_ELEMENT_CLASS,
     MATROSKA_FILE_TRACK_BUILDER_CLASS,
     MATROSKA_FILE_TRACK_AUDIO_BUILDER_CLASS,
+    MPEG_READER_HANDLER_CLASS,
 ];
 
 #[derive(Serialize)]
@@ -1479,6 +1485,8 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | MPEG_CONTAINER_PROBE_CLASS
             | MPEG_FILE_LOADER_CLASS
             | MPEG_READER_CLASS
+            | MPEG_READER_CHAIN_CLASS
+            | MPEG_READER_HANDLER_CLASS
             | MPEG_NOOP_TRACK_CONSUMER_CLASS
             | MPEG_AAC_TRACK_CONSUMER_CLASS
     ) {
