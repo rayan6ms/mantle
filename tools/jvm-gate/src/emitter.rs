@@ -175,6 +175,8 @@ const MPEG_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegContainerProbe";
 const MPEG_FILE_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegFileLoader";
+const MPEG_NOOP_TRACK_CONSUMER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegNoopTrackConsumer";
 const MPEG_AAC_TRACK_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegAacTrackConsumer";
 const ADTS_CONTAINER_PROBE_CLASS: &str =
@@ -607,6 +609,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MPEG_AUDIO_TRACK_CLASS,
     MPEG_CONTAINER_PROBE_CLASS,
     MPEG_FILE_LOADER_CLASS,
+    MPEG_NOOP_TRACK_CONSUMER_CLASS,
     MPEG_AAC_TRACK_CONSUMER_CLASS,
     ADTS_CONTAINER_PROBE_CLASS,
     ADTS_PACKET_HEADER_CLASS,
@@ -843,6 +846,7 @@ pub fn emit(
     let mut mpeg_audio_track_bytes = None;
     let mut mpeg_container_probe_bytes = None;
     let mut mpeg_file_loader_bytes = None;
+    let mut mpeg_noop_track_consumer_bytes = None;
     for binary_name in REFERENCE_CLASSES.iter().chain(PRIVATE_SUPPORT_CLASSES) {
         let mut entry = source.by_name(&format!("{binary_name}.class"))?;
         let mut bytes = Vec::new();
@@ -862,6 +866,8 @@ pub fn emit(
             mpeg_container_probe_bytes = Some(bytes);
         } else if *binary_name == MPEG_FILE_LOADER_CLASS {
             mpeg_file_loader_bytes = Some(bytes);
+        } else if *binary_name == MPEG_NOOP_TRACK_CONSUMER_CLASS {
+            mpeg_noop_track_consumer_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -931,6 +937,12 @@ pub fn emit(
                 mpeg_file_loader_bytes
                     .as_ref()
                     .expect("MPEG file loader source bytes are retained"),
+            );
+        } else if name == format!("{MPEG_NOOP_TRACK_CONSUMER_CLASS}.class") {
+            bytes.clone_from(
+                mpeg_noop_track_consumer_bytes
+                    .as_ref()
+                    .expect("MPEG no-op track consumer source bytes are retained"),
             );
         } else {
             class.to_bytes(&mut bytes)?;
@@ -1449,6 +1461,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | MPEG_AUDIO_TRACK_CLASS
             | MPEG_CONTAINER_PROBE_CLASS
             | MPEG_FILE_LOADER_CLASS
+            | MPEG_NOOP_TRACK_CONSUMER_CLASS
             | MPEG_AAC_TRACK_CONSUMER_CLASS
     ) {
         return Ok(class);

@@ -267,6 +267,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-container-probe-consumer 
   --output "$WORK/GateMpegContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-file-loader-consumer \
   --output "$WORK/GateMpegFileLoader.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-noop-track-consumer-consumer \
+  --output "$WORK/GateMpegNoopTrackConsumer.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-container-probe-consumer \
   --output "$WORK/GateAdtsContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-packet-header-consumer \
@@ -430,6 +432,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateMp3StreamSeeker.java" \
   "$WORK/GateMp3TrackProvider.java" \
   "$WORK/GateMp3XingSeeker.java" \
+  "$WORK/GateMpegNoopTrackConsumer.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GateAdtsStreamReader.java" \
@@ -1438,6 +1441,16 @@ cmp "$WORK/mpeg-file-loader-reference.txt" "$WORK/mpeg-file-loader-candidate.txt
 grep --fixed-strings \
   'contracts=constructor,input-identity,root-bounds,private-state,mutable-track-list,metadata-types,standard-headers,fragmented-headers,track-fields,decoder-config,standard-reader,fragmented-reader,consumer-identity,duration,event-message,last-event,io-wrapping,cause-identity,empty-file,null-input,subclassable,generics,throws,reflection' \
   "$WORK/mpeg-file-loader-candidate.txt" >/dev/null
+java -Xverify:all -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegNoopTrackConsumer >"$WORK/mpeg-noop-track-consumer-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegNoopTrackConsumer >"$WORK/mpeg-noop-track-consumer-candidate.txt"
+cmp "$WORK/mpeg-noop-track-consumer-reference.txt" \
+  "$WORK/mpeg-noop-track-consumer-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,track-identity,null-track,initialise,seek-extremes,flush,consume,null-channel,length-extremes,channel-untouched,close,idempotent,interrupt-preserved,interface-dispatch,subclassable,private-final-state,checked-throws,reflection' \
+  "$WORK/mpeg-noop-track-consumer-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mp3_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMp3ConstantRateSeeker \
   >"$WORK/mp3-constant-rate-seeker-reference.txt"

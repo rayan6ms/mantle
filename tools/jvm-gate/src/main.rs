@@ -172,6 +172,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mpeg-audio-track-support-consumer" => Some(MPEG_AUDIO_TRACK_SUPPORT_CONSUMER),
         "write-mpeg-container-probe-consumer" => Some(MPEG_CONTAINER_PROBE_CONSUMER),
         "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
+        "write-mpeg-noop-track-consumer-consumer" => Some(MPEG_NOOP_TRACK_CONSUMER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
         "write-adts-packet-header-consumer" => Some(ADTS_PACKET_HEADER_CONSUMER),
         "write-adts-stream-provider-consumer" => Some(ADTS_STREAM_PROVIDER_CONSUMER),
@@ -15196,6 +15197,146 @@ public final class GateMpegFileLoader {
   private static final class Derived extends MpegFileLoader {
     Derived(SeekableInputStream input) { super(input); }
     @Override public String getTextMetadata(String name) { return "derived"; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MPEG_NOOP_TRACK_CONSUMER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegNoopTrackConsumer;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackConsumer;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackInfo;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.nio.channels.ReadableByteChannel;
+import java.util.Arrays;
+
+public final class GateMpegNoopTrackConsumer {
+  public static void main(String[] args) throws Exception {
+    identity();
+    noOpCallbacks();
+    interruptedThread();
+    interfaceAndSubclass();
+    reflection();
+    System.out.println("contracts=constructor,track-identity,null-track,initialise,seek-extremes,flush,consume,null-channel,length-extremes,channel-untouched,close,idempotent,interrupt-preserved,interface-dispatch,subclassable,private-final-state,checked-throws,reflection");
+  }
+
+  private static void identity() {
+    byte[] config = new byte[] {1, 2, 3};
+    MpegTrackInfo track = new MpegTrackInfo(17, "soun", "mp4a", 2, 48000, config);
+    MpegNoopTrackConsumer consumer = new MpegNoopTrackConsumer(track);
+    check(consumer.getTrack() == track && consumer.getTrack().decoderConfig == config,
+        "constructor and getter retain exact track identity");
+    MpegNoopTrackConsumer nullTrack = new MpegNoopTrackConsumer(null);
+    check(nullTrack.getTrack() == null, "null track identity is accepted");
+  }
+
+  private static void noOpCallbacks() throws Exception {
+    MpegTrackInfo track = new MpegTrackInfo(1, "soun", "mp4a", 2, 44100, new byte[0]);
+    MpegNoopTrackConsumer consumer = new MpegNoopTrackConsumer(track);
+    RecordingChannel channel = new RecordingChannel();
+    consumer.initialise();
+    consumer.seekPerformed(Long.MIN_VALUE, Long.MAX_VALUE);
+    consumer.flush();
+    consumer.consume(channel, Integer.MIN_VALUE);
+    consumer.consume(channel, Integer.MAX_VALUE);
+    consumer.consume(null, -1);
+    consumer.close();
+    consumer.close();
+    check(channel.readCalls == 0 && channel.closeCalls == 0 && channel.isOpen()
+        && consumer.getTrack() == track,
+        "all callbacks are idempotent no-ops and never touch channel or track state");
+  }
+
+  private static void interruptedThread() throws Exception {
+    MpegNoopTrackConsumer consumer = new MpegNoopTrackConsumer(null);
+    Thread.currentThread().interrupt();
+    try {
+      consumer.flush();
+      consumer.consume(null, 0);
+      check(Thread.currentThread().isInterrupted(),
+          "declared interruptible callbacks preserve pre-existing interrupt state");
+    } finally {
+      Thread.interrupted();
+    }
+  }
+
+  private static void interfaceAndSubclass() throws Exception {
+    MpegTrackInfo track = new MpegTrackInfo(2, "soun", "mp4a", 1, 22050, null);
+    MpegTrackConsumer view = new MpegNoopTrackConsumer(track);
+    view.initialise();
+    view.seekPerformed(1L, 2L);
+    view.flush();
+    view.consume(null, 0);
+    view.close();
+    check(view.getTrack() == track, "MpegTrackConsumer interface dispatch preserves identity");
+
+    Derived derived = new Derived(track);
+    MpegTrackConsumer derivedView = derived;
+    derivedView.close();
+    check(derived.closeCalls == 1 && derivedView.getTrack() == track,
+        "ordinary subclass override dispatch remains available");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MpegNoopTrackConsumer> type = MpegNoopTrackConsumer.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {MpegTrackConsumer.class})
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0,
+        "public concrete consumer metadata");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredMethods().length == 6
+        && type.getDeclaredConstructors().length == 1, "exact declared member counts");
+    Field state = type.getDeclaredField("trackInfo");
+    check(state.getType() == MpegTrackInfo.class
+        && state.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && !state.isSynthetic(), "private final track state metadata");
+    Constructor<MpegNoopTrackConsumer> constructor = type.getDeclaredConstructor(MpegTrackInfo.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "constructor descriptor metadata");
+    checkMethod(type.getDeclaredMethod("getTrack"), MpegTrackInfo.class, new Class<?>[0], new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("initialise"), void.class, new Class<?>[0], new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("seekPerformed", long.class, long.class), void.class,
+        new Class<?>[] {long.class, long.class}, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("flush"), void.class, new Class<?>[0],
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("consume", ReadableByteChannel.class, int.class), void.class,
+        new Class<?>[] {ReadableByteChannel.class, int.class},
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("close"), void.class, new Class<?>[0], new Class<?>[0]);
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, Class<?>[] parameters,
+      Class<?>[] failures) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isDefault() && !method.isVarArgs(),
+        method.getName() + " method metadata");
+  }
+
+  private static final class RecordingChannel implements ReadableByteChannel {
+    int readCalls;
+    int closeCalls;
+    boolean open = true;
+    @Override public int read(ByteBuffer target) throws IOException {
+      readCalls++;
+      throw new IOException("channel must not be read");
+    }
+    @Override public boolean isOpen() { return open; }
+    @Override public void close() { closeCalls++; open = false; }
+  }
+
+  private static final class Derived extends MpegNoopTrackConsumer {
+    int closeCalls;
+    Derived(MpegTrackInfo track) { super(track); }
+    @Override public void close() { closeCalls++; }
   }
 
   private static void check(boolean condition, String message) {
