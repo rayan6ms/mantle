@@ -269,6 +269,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-file-loader-consumer \
   --output "$WORK/GateMpegFileLoader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-info-consumer \
   --output "$WORK/GateMpegTrackInfo.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-info-builder-consumer \
+  --output "$WORK/GateMpegTrackInfoBuilder.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-noop-track-consumer-consumer \
   --output "$WORK/GateMpegNoopTrackConsumer.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-consumer-consumer \
@@ -438,6 +440,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateMp3XingSeeker.java" \
   "$WORK/GateMpegNoopTrackConsumer.java" \
   "$WORK/GateMpegTrackInfo.java" \
+  "$WORK/GateMpegTrackInfoBuilder.java" \
   "$WORK/GateMpegTrackConsumer.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
@@ -1475,6 +1478,16 @@ cmp "$WORK/mpeg-track-info-reference.txt" "$WORK/mpeg-track-info-candidate.txt"
 grep --fixed-strings \
   'contracts=field-order,scalar-storage,string-identity,decoder-config-identity,null-members,mutation-visibility,no-validation,identity-equality,subclassable,public-final-fields,nested-builder,constructor-descriptor,no-throws,member-counts,reflection' \
   "$WORK/mpeg-track-info-candidate.txt" >/dev/null
+java -Xverify:all -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegTrackInfoBuilder >"$WORK/mpeg-track-info-builder-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegTrackInfoBuilder >"$WORK/mpeg-track-info-builder-candidate.txt"
+cmp "$WORK/mpeg-track-info-builder-reference.txt" \
+  "$WORK/mpeg-track-info-builder-candidate.txt"
+grep --fixed-strings \
+  'contracts=defaults,setter-storage,getter-storage,scalar-edges,reference-identity,build-order,build-freshness,build-shared-array,post-build-mutation,null-members,no-validation,identity-semantics,subclassable,private-fields,private-field-order,public-methods,method-descriptors,no-throws,member-counts,reflection' \
+  "$WORK/mpeg-track-info-builder-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mp3_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMp3ConstantRateSeeker \
   >"$WORK/mp3-constant-rate-seeker-reference.txt"

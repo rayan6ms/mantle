@@ -173,6 +173,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mpeg-container-probe-consumer" => Some(MPEG_CONTAINER_PROBE_CONSUMER),
         "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
         "write-mpeg-track-info-consumer" => Some(MPEG_TRACK_INFO_CONSUMER),
+        "write-mpeg-track-info-builder-consumer" => Some(MPEG_TRACK_INFO_BUILDER_CONSUMER),
         "write-mpeg-noop-track-consumer-consumer" => Some(MPEG_NOOP_TRACK_CONSUMER_CONSUMER),
         "write-mpeg-track-consumer-consumer" => Some(MPEG_TRACK_CONSUMER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
@@ -15606,6 +15607,152 @@ public final class GateMpegTrackInfo {
       super(trackId, handler, codecName, channelCount, sampleRate, decoderConfig);
     }
   }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MPEG_TRACK_INFO_BUILDER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackInfo;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackInfo.Builder;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateMpegTrackInfoBuilder {
+  public static void main(String[] args) throws Exception {
+    defaultsAndSetters();
+    buildFreshnessAndSharing();
+    nullsAndEdges();
+    identityAndSubclassing();
+    reflection();
+    System.out.println(
+        "contracts=defaults,setter-storage,getter-storage,scalar-edges,reference-identity,build-order,build-freshness,build-shared-array,post-build-mutation,null-members,no-validation,identity-semantics,subclassable,private-fields,private-field-order,public-methods,method-descriptors,no-throws,member-counts,reflection");
+  }
+
+  private static void defaultsAndSetters() {
+    Builder builder = new Builder();
+    check(builder.getTrackId() == 0 && builder.getHandler() == null,
+        "default scalar and nullable state");
+    String handler = new String("soun");
+    String codecName = new String("mp4a");
+    byte[] decoderConfig = {1, 2, 3};
+    builder.setTrackId(Integer.MIN_VALUE);
+    builder.setHandler(handler);
+    builder.setCodecName(codecName);
+    builder.setChannelCount(Integer.MAX_VALUE);
+    builder.setSampleRate(-7);
+    builder.setDecoderConfig(decoderConfig);
+    MpegTrackInfo info = builder.build();
+    check(info.trackId == Integer.MIN_VALUE && info.handler == handler
+        && info.codecName == codecName && info.channelCount == Integer.MAX_VALUE
+        && info.sampleRate == -7 && info.decoderConfig == decoderConfig,
+        "setters store exact scalar and reference values");
+    check(builder.getTrackId() == Integer.MIN_VALUE && builder.getHandler() == handler,
+        "public getters expose current builder state");
+  }
+
+  private static void buildFreshnessAndSharing() {
+    Builder builder = new Builder();
+    byte[] decoderConfig = {4, 5};
+    builder.setTrackId(11);
+    builder.setDecoderConfig(decoderConfig);
+    MpegTrackInfo first = builder.build();
+    builder.setTrackId(12);
+    MpegTrackInfo second = builder.build();
+    check(first != second && first.trackId == 11 && second.trackId == 12,
+        "build returns fresh snapshots in call order");
+    check(first.decoderConfig == decoderConfig && second.decoderConfig == decoderConfig,
+        "build shares the builder decoder-array reference");
+    decoderConfig[0] = 9;
+    check(first.decoderConfig[0] == 9 && second.decoderConfig[0] == 9,
+        "post-build array mutation remains visible");
+  }
+
+  private static void nullsAndEdges() {
+    Builder builder = new Builder();
+    builder.setHandler(null);
+    builder.setCodecName(null);
+    builder.setDecoderConfig(null);
+    builder.setChannelCount(Integer.MIN_VALUE);
+    builder.setSampleRate(Integer.MAX_VALUE);
+    MpegTrackInfo info = builder.build();
+    check(info.handler == null && info.codecName == null && info.decoderConfig == null
+        && info.channelCount == Integer.MIN_VALUE && info.sampleRate == Integer.MAX_VALUE,
+        "nullable members and edge values are accepted without validation");
+  }
+
+  private static void identityAndSubclassing() {
+    Builder first = new Builder();
+    Builder second = new Builder();
+    check(first != second && !first.equals(second) && first.equals(first),
+        "builder retains Object identity equality");
+    Derived derived = new Derived();
+    derived.setTrackId(23);
+    check(derived.build().trackId == 23, "ordinary subclass remains constructible and callable");
+  }
+
+  private static void reflection() throws Exception {
+    Class<Builder> type = Builder.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete non-final builder metadata");
+    check(type.getDeclaredFields().length == 6 && type.getDeclaredMethods().length == 9
+        && type.getDeclaredConstructors().length == 1,
+        "exact declared member counts");
+    check(Arrays.equals(Arrays.stream(type.getDeclaredFields()).map(Field::getName).toArray(),
+        new String[] {"trackId", "handler", "codecName", "channelCount", "sampleRate",
+            "decoderConfig"}),
+        "private field declaration order");
+    checkField(type.getDeclaredField("trackId"), int.class);
+    checkField(type.getDeclaredField("handler"), String.class);
+    checkField(type.getDeclaredField("codecName"), String.class);
+    checkField(type.getDeclaredField("channelCount"), int.class);
+    checkField(type.getDeclaredField("sampleRate"), int.class);
+    checkField(type.getDeclaredField("decoderConfig"), byte[].class);
+
+    Constructor<Builder> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0,
+        "public default constructor metadata");
+    checkMethod(type.getDeclaredMethod("setTrackId", int.class), void.class,
+        new Class<?>[] {int.class});
+    checkMethod(type.getDeclaredMethod("getTrackId"), int.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("getHandler"), String.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("setHandler", String.class), void.class,
+        new Class<?>[] {String.class});
+    checkMethod(type.getDeclaredMethod("setCodecName", String.class), void.class,
+        new Class<?>[] {String.class});
+    checkMethod(type.getDeclaredMethod("setChannelCount", int.class), void.class,
+        new Class<?>[] {int.class});
+    checkMethod(type.getDeclaredMethod("setSampleRate", int.class), void.class,
+        new Class<?>[] {int.class});
+    checkMethod(type.getDeclaredMethod("setDecoderConfig", byte[].class), void.class,
+        new Class<?>[] {byte[].class});
+    checkMethod(type.getDeclaredMethod("build"), MpegTrackInfo.class, new Class<?>[0]);
+  }
+
+  private static void checkField(Field field, Class<?> fieldType) {
+    check(field.getType() == fieldType && field.getModifiers() == Modifier.PRIVATE
+        && !field.isSynthetic() && field.getDeclaredAnnotations().length == 0,
+        field.getName() + " private field metadata");
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, Class<?>[] parameters) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && !method.isSynthetic()
+        && !method.isBridge() && !method.isDefault() && !method.isVarArgs(),
+        method.getName() + " method metadata");
+  }
+
+  private static final class Derived extends Builder {}
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

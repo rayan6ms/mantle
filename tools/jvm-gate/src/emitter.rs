@@ -180,6 +180,8 @@ const MPEG_NOOP_TRACK_CONSUMER_CLASS: &str =
 const MPEG_TRACK_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegTrackConsumer";
 const MPEG_TRACK_INFO_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegTrackInfo";
+const MPEG_TRACK_INFO_BUILDER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegTrackInfo$Builder";
 const MPEG_AAC_TRACK_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegAacTrackConsumer";
 const ADTS_CONTAINER_PROBE_CLASS: &str =
@@ -615,6 +617,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MPEG_NOOP_TRACK_CONSUMER_CLASS,
     MPEG_TRACK_CONSUMER_CLASS,
     MPEG_TRACK_INFO_CLASS,
+    MPEG_TRACK_INFO_BUILDER_CLASS,
     MPEG_AAC_TRACK_CONSUMER_CLASS,
     ADTS_CONTAINER_PROBE_CLASS,
     ADTS_PACKET_HEADER_CLASS,
@@ -1220,6 +1223,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | FLAC_FILE_LOADER_CLASS
             | FLAC_METADATA_READER_CLASS
             | FLAC_TRACK_INFO_BUILDER_CLASS
+            | MPEG_TRACK_INFO_BUILDER_CLASS
             | FLAC_TRACK_PROVIDER_CLASS
             | FLAC_FRAME_HEADER_READER_CLASS
             | FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS
@@ -1643,6 +1647,9 @@ fn replacement_body(
     }
     if class_name == MPEG_TRACK_INFO_CLASS {
         return mpeg_track_info_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == MPEG_TRACK_INFO_BUILDER_CLASS {
+        return mpeg_track_info_builder_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == MEDIA_CONTAINER_CLASS {
         return media_container_replacement(pool, name, descriptor, required_locals);
@@ -40856,6 +40863,193 @@ fn mpeg_track_info_replacement(
         _ => unsupported_body(
             pool,
             &format!("Phase 13 does not implement {MPEG_TRACK_INFO_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn mpeg_track_info_builder_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => {
+            let object = pool.add_class("java/lang/Object")?;
+            let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+            code(
+                pool,
+                1,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Invokespecial(object_init),
+                    Instruction::Return,
+                ],
+            )
+        }
+        ("setTrackId", "(I)V") => {
+            let owner = pool.add_class(MPEG_TRACK_INFO_BUILDER_CLASS)?;
+            let field = pool.add_field_ref(owner, "trackId", "I")?;
+            code(
+                pool,
+                2,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Iload_1,
+                    Instruction::Putfield(field),
+                    Instruction::Return,
+                ],
+            )
+        }
+        ("getTrackId", "()I") => {
+            let owner = pool.add_class(MPEG_TRACK_INFO_BUILDER_CLASS)?;
+            let field = pool.add_field_ref(owner, "trackId", "I")?;
+            code(
+                pool,
+                1,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Getfield(field),
+                    Instruction::Ireturn,
+                ],
+            )
+        }
+        ("getHandler", "()Ljava/lang/String;") => {
+            let owner = pool.add_class(MPEG_TRACK_INFO_BUILDER_CLASS)?;
+            let field = pool.add_field_ref(owner, "handler", "Ljava/lang/String;")?;
+            code(
+                pool,
+                1,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Getfield(field),
+                    Instruction::Areturn,
+                ],
+            )
+        }
+        ("setHandler", "(Ljava/lang/String;)V") => {
+            let owner = pool.add_class(MPEG_TRACK_INFO_BUILDER_CLASS)?;
+            let field = pool.add_field_ref(owner, "handler", "Ljava/lang/String;")?;
+            code(
+                pool,
+                2,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Aload_1,
+                    Instruction::Putfield(field),
+                    Instruction::Return,
+                ],
+            )
+        }
+        ("setCodecName", "(Ljava/lang/String;)V") => {
+            let owner = pool.add_class(MPEG_TRACK_INFO_BUILDER_CLASS)?;
+            let field = pool.add_field_ref(owner, "codecName", "Ljava/lang/String;")?;
+            code(
+                pool,
+                2,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Aload_1,
+                    Instruction::Putfield(field),
+                    Instruction::Return,
+                ],
+            )
+        }
+        ("setChannelCount", "(I)V") => {
+            let owner = pool.add_class(MPEG_TRACK_INFO_BUILDER_CLASS)?;
+            let field = pool.add_field_ref(owner, "channelCount", "I")?;
+            code(
+                pool,
+                2,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Iload_1,
+                    Instruction::Putfield(field),
+                    Instruction::Return,
+                ],
+            )
+        }
+        ("setSampleRate", "(I)V") => {
+            let owner = pool.add_class(MPEG_TRACK_INFO_BUILDER_CLASS)?;
+            let field = pool.add_field_ref(owner, "sampleRate", "I")?;
+            code(
+                pool,
+                2,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Iload_1,
+                    Instruction::Putfield(field),
+                    Instruction::Return,
+                ],
+            )
+        }
+        ("setDecoderConfig", "([B)V") => {
+            let owner = pool.add_class(MPEG_TRACK_INFO_BUILDER_CLASS)?;
+            let field = pool.add_field_ref(owner, "decoderConfig", "[B")?;
+            code(
+                pool,
+                2,
+                required_locals,
+                vec![
+                    Instruction::Aload_0,
+                    Instruction::Aload_1,
+                    Instruction::Putfield(field),
+                    Instruction::Return,
+                ],
+            )
+        }
+        ("build", "()Lcom/sedmelluq/discord/lavaplayer/container/mpeg/MpegTrackInfo;") => {
+            let owner = pool.add_class(MPEG_TRACK_INFO_BUILDER_CLASS)?;
+            let track_info = pool.add_class(MPEG_TRACK_INFO_CLASS)?;
+            let constructor = pool.add_method_ref(
+                track_info,
+                "<init>",
+                "(ILjava/lang/String;Ljava/lang/String;II[B)V",
+            )?;
+            let track_id = pool.add_field_ref(owner, "trackId", "I")?;
+            let handler = pool.add_field_ref(owner, "handler", "Ljava/lang/String;")?;
+            let codec_name = pool.add_field_ref(owner, "codecName", "Ljava/lang/String;")?;
+            let channel_count = pool.add_field_ref(owner, "channelCount", "I")?;
+            let sample_rate = pool.add_field_ref(owner, "sampleRate", "I")?;
+            let decoder_config = pool.add_field_ref(owner, "decoderConfig", "[B")?;
+            code(
+                pool,
+                8,
+                required_locals,
+                vec![
+                    Instruction::New(track_info),
+                    Instruction::Dup,
+                    Instruction::Aload_0,
+                    Instruction::Getfield(track_id),
+                    Instruction::Aload_0,
+                    Instruction::Getfield(handler),
+                    Instruction::Aload_0,
+                    Instruction::Getfield(codec_name),
+                    Instruction::Aload_0,
+                    Instruction::Getfield(channel_count),
+                    Instruction::Aload_0,
+                    Instruction::Getfield(sample_rate),
+                    Instruction::Aload_0,
+                    Instruction::Getfield(decoder_config),
+                    Instruction::Invokespecial(constructor),
+                    Instruction::Areturn,
+                ],
+            )
+        }
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {MPEG_TRACK_INFO_BUILDER_CLASS}.{name}{descriptor}"
+            ),
             required_locals,
         ),
     }
