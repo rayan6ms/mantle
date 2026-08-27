@@ -7,6 +7,7 @@ readonly REFERENCE_JAR="${MANTLE_REFERENCE_JAR:-$ROOT/.cache/reference/lavaplaye
 readonly WORK="$ROOT/target/gate-a"
 readonly CLASSES="$WORK/consumer-classes"
 readonly FLAC_CLASSES="$WORK/flac-consumer-classes"
+readonly MP3_CLASSES="$WORK/mp3-consumer-classes"
 readonly FLAC_LOADER_CLASSES="$WORK/flac-loader-consumer-classes"
 readonly FLAC_METADATA_READER_CLASSES="$WORK/flac-metadata-reader-consumer-classes"
 readonly MATROSKA_CLASSES="$WORK/matroska-consumer-classes"
@@ -18,9 +19,9 @@ if [[ ! -f "$REFERENCE_JAR" ]]; then
   exit 1
 fi
 
-rm -rf -- "$CLASSES" "$FLAC_CLASSES" "$FLAC_LOADER_CLASSES" \
+rm -rf -- "$CLASSES" "$FLAC_CLASSES" "$MP3_CLASSES" "$FLAC_LOADER_CLASSES" \
   "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES"
-mkdir -p "$CLASSES" "$FLAC_CLASSES" "$FLAC_LOADER_CLASSES" \
+mkdir -p "$CLASSES" "$FLAC_CLASSES" "$MP3_CLASSES" "$FLAC_LOADER_CLASSES" \
   "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES"
 cargo build --locked -p mantle-jvm --features gate-a-direct-attachment
 cargo run --locked -q -p mantle-jvm-gate -- emit \
@@ -234,6 +235,10 @@ cargo run --locked -q -p mantle-jvm-gate -- write-media-container-registry-consu
   --output "$WORK/GateMediaContainerRegistry.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-audio-track-consumer \
   --output "$WORK/GateAdtsAudioTrack.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mp3-audio-track-consumer \
+  --output "$WORK/GateMp3AudioTrack.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mp3-audio-track-support-consumer \
+  --output "$WORK/Mp3GateSupport.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-container-probe-consumer \
   --output "$WORK/GateAdtsContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-packet-header-consumer \
@@ -425,6 +430,7 @@ if command -v cygpath >/dev/null 2>&1; then
   native="$(cygpath -w "$native")"
   classes_argument="$(cygpath -w "$CLASSES")"
   flac_classes_argument="$(cygpath -w "$FLAC_CLASSES")"
+  mp3_classes_argument="$(cygpath -w "$MP3_CLASSES")"
   flac_loader_classes_argument="$(cygpath -w "$FLAC_LOADER_CLASSES")"
   flac_metadata_reader_classes_argument="$(cygpath -w "$FLAC_METADATA_READER_CLASSES")"
   matroska_classes_argument="$(cygpath -w "$MATROSKA_CLASSES")"
@@ -434,6 +440,7 @@ else
   native="$(cd "$(dirname "$native")" && pwd)/$(basename "$native")"
   classes_argument="$CLASSES"
   flac_classes_argument="$FLAC_CLASSES"
+  mp3_classes_argument="$MP3_CLASSES"
   flac_loader_classes_argument="$FLAC_LOADER_CLASSES"
   flac_metadata_reader_classes_argument="$FLAC_METADATA_READER_CLASSES"
   matroska_classes_argument="$MATROSKA_CLASSES"
@@ -456,6 +463,9 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$FLAC_CLASSES" 
   "$WORK/GateFlacAudioTrack.java" \
   "$WORK/GateFlacContainerProbe.java" \
   "$WORK/FlacGateSupport.java"
+javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$MP3_CLASSES" \
+  "$WORK/GateMp3AudioTrack.java" \
+  "$WORK/Mp3GateSupport.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   -d "$FLAC_LOADER_CLASSES" \
   "$WORK/GateFlacFileLoader.java" \
@@ -1339,6 +1349,16 @@ cmp "$WORK/adts-audio-track-reference.txt" "$WORK/adts-audio-track-candidate.txt
 grep --fixed-strings \
   'contracts=track-info,input-identity,null-construction,processing-context,read-callback,non-seekable,empty-stream,input-ownership,context-order,null-executor,null-input,io-wrapping,failure-identity,identifier-dispatch,subclassable,eager-logger,private-state,throws,reflection' \
   "$WORK/adts-audio-track-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$mp3_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMp3AudioTrack \
+  >"$WORK/mp3-audio-track-reference.txt"
+java -Xverify:all \
+  -cp "$mp3_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMp3AudioTrack >"$WORK/mp3-audio-track-candidate.txt"
+cmp "$WORK/mp3-audio-track-reference.txt" "$WORK/mp3-audio-track-candidate.txt"
+grep --fixed-strings \
+  'contracts=track-info,input-identity,null-construction,processing-context,header-parse,read-callback,seek-callback,full-timecode,executor-control,input-ownership,context-failure,null-executor,identifier-dispatch,loop-failure,callback-failure,parse-failure,close-finally,close-replacement,subclassable,eager-logger,private-state,throws,reflection' \
+  "$WORK/mp3-audio-track-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateAdtsContainerProbe \
   >"$WORK/adts-container-probe-reference.txt"

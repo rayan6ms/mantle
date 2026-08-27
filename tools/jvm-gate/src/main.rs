@@ -158,6 +158,8 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-media-container-probe-consumer" => Some(MEDIA_CONTAINER_PROBE_CONSUMER),
         "write-media-container-registry-consumer" => Some(MEDIA_CONTAINER_REGISTRY_CONSUMER),
         "write-adts-audio-track-consumer" => Some(ADTS_AUDIO_TRACK_CONSUMER),
+        "write-mp3-audio-track-consumer" => Some(MP3_AUDIO_TRACK_CONSUMER),
+        "write-mp3-audio-track-support-consumer" => Some(MP3_AUDIO_TRACK_SUPPORT_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
         "write-adts-packet-header-consumer" => Some(ADTS_PACKET_HEADER_CONSUMER),
         "write-adts-stream-provider-consumer" => Some(ADTS_STREAM_PROVIDER_CONSUMER),
@@ -13635,6 +13637,292 @@ public final class GateMediaContainerRegistry {
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }
+}
+"#;
+
+const MP3_AUDIO_TRACK_SUPPORT_CONSUMER: &str = r#"
+package com.sedmelluq.discord.lavaplayer.container.mp3;
+
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+
+public final class Mp3GateSupport {
+  public static AudioProcessingContext context;
+  public static SeekableInputStream input;
+  public static int providerCreations;
+  public static int parseCalls;
+  public static int readCalls;
+  public static int seekCalls;
+  public static int closeCalls;
+  public static long seekTimecode;
+  public static RuntimeException parseFailure;
+  public static InterruptedException readFailure;
+  public static RuntimeException seekFailure;
+  public static RuntimeException closeFailure;
+  public static boolean returnNull;
+  public static final StringBuilder events = new StringBuilder();
+
+  private Mp3GateSupport() {}
+
+  public static void reset() {
+    context = null;
+    input = null;
+    providerCreations = parseCalls = readCalls = seekCalls = closeCalls = 0;
+    seekTimecode = 0L;
+    parseFailure = null;
+    readFailure = null;
+    seekFailure = null;
+    closeFailure = null;
+    returnNull = false;
+    events.setLength(0);
+  }
+
+  public static void event(String value) {
+    if (events.length() > 0) events.append(',');
+    events.append(value);
+  }
+}
+
+class Mp3TrackProvider {
+  Mp3TrackProvider(AudioProcessingContext context, SeekableInputStream input) {
+    Mp3GateSupport.providerCreations++;
+    Mp3GateSupport.context = context;
+    Mp3GateSupport.input = input;
+    Mp3GateSupport.event("provider");
+  }
+
+  void parseHeaders() {
+    Mp3GateSupport.parseCalls++;
+    Mp3GateSupport.event("parse");
+    if (Mp3GateSupport.parseFailure != null) throw Mp3GateSupport.parseFailure;
+  }
+
+  public void provideFrames() throws InterruptedException {
+    Mp3GateSupport.readCalls++;
+    Mp3GateSupport.event("read");
+    if (Mp3GateSupport.readFailure != null) throw Mp3GateSupport.readFailure;
+  }
+
+  public void seekToTimecode(long timecode) {
+    Mp3GateSupport.seekCalls++;
+    Mp3GateSupport.seekTimecode = timecode;
+    Mp3GateSupport.event("seek");
+    if (Mp3GateSupport.seekFailure != null) throw Mp3GateSupport.seekFailure;
+  }
+
+  public void close() {
+    Mp3GateSupport.closeCalls++;
+    Mp3GateSupport.event("close");
+    if (Mp3GateSupport.closeFailure != null) throw Mp3GateSupport.closeFailure;
+  }
+}
+"#;
+
+const MP3_AUDIO_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mp3.Mp3AudioTrack;
+import com.sedmelluq.discord.lavaplayer.container.mp3.Mp3GateSupport;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateMp3AudioTrack {
+  private static final Object UNSAFE = loadUnsafe();
+
+  public static void main(String[] args) throws Exception {
+    construction();
+    processing();
+    failures();
+    subclassUse();
+    reflection();
+    System.out.println("contracts=track-info,input-identity,null-construction,processing-context,header-parse,read-callback,seek-callback,full-timecode,executor-control,input-ownership,context-failure,null-executor,identifier-dispatch,loop-failure,callback-failure,parse-failure,close-finally,close-replacement,subclassable,eager-logger,private-state,throws,reflection");
+  }
+
+  private static void construction() throws Exception {
+    AudioTrackInfo info = info("constructor-id");
+    MemoryStream input = new MemoryStream();
+    Mp3AudioTrack track = new Mp3AudioTrack(info, input);
+    check(track.getInfo() == info && track.getIdentifier() == info.identifier,
+        "base constructor retains exact track info identity");
+    check(field(track, "inputStream") == input, "constructor retains exact seekable input identity");
+    Mp3AudioTrack nullInput = new Mp3AudioTrack(info, null);
+    Mp3AudioTrack nullInfo = new Mp3AudioTrack(null, input);
+    check(field(nullInput, "inputStream") == null && nullInfo.getInfo() == null,
+        "constructor accepts null input and track info");
+  }
+
+  private static void processing() throws Exception {
+    Mp3GateSupport.reset();
+    MemoryStream input = new MemoryStream();
+    Derived track = new Derived(info("process-id"), input, null);
+    RecordingExecutor executor = executor();
+    executor.context = allocate(AudioProcessingContext.class);
+    executor.invokeRead = true;
+    executor.invokeSeek = true;
+    executor.seekTimecode = Long.MIN_VALUE + 37L;
+    track.process(executor);
+    check(Mp3GateSupport.context == executor.context && Mp3GateSupport.input == input,
+        "provider receives exact context and input identities");
+    check(executor.contextCalls == 1 && executor.loopCalls == 1
+        && executor.readExecutor != null && executor.seekExecutor != null,
+        "processing acquires context once and publishes both callbacks");
+    check(Mp3GateSupport.events.toString().equals("provider,parse,identifier,loop,read,seek,close")
+        && Mp3GateSupport.seekTimecode == Long.MIN_VALUE + 37L,
+        "header parsing, logging, callbacks, full-width seek, and cleanup retain order");
+    check(Mp3GateSupport.closeCalls == 1 && input.closeCalls == 0,
+        "provider cleanup does not take ownership of caller input");
+
+    Mp3GateSupport.reset();
+    RecordingExecutor passive = executor();
+    passive.context = allocate(AudioProcessingContext.class);
+    new Mp3AudioTrack(info("passive-id"), input).process(passive);
+    check(passive.loopCalls == 1 && passive.readExecutor != null && passive.seekExecutor != null
+        && Mp3GateSupport.readCalls == 0 && Mp3GateSupport.seekCalls == 0,
+        "executor exclusively controls callback invocation");
+  }
+
+  private static void failures() throws Exception {
+    MemoryStream input = new MemoryStream();
+    RuntimeException contextFailure = new RuntimeException("context-failure");
+    Mp3GateSupport.reset();
+    RecordingExecutor context = executor();
+    context.contextFailure = contextFailure;
+    check(catchThrowable(() -> new Mp3AudioTrack(info("context-id"), input).process(context)) == contextFailure
+        && Mp3GateSupport.providerCreations == 0, "context failure precedes provider construction");
+
+    Mp3GateSupport.reset();
+    RuntimeException parseFailure = new RuntimeException("parse-failure");
+    Mp3GateSupport.parseFailure = parseFailure;
+    RecordingExecutor parse = executor();
+    parse.context = allocate(AudioProcessingContext.class);
+    check(catchThrowable(() -> new Mp3AudioTrack(info("parse-id"), input).process(parse)) == parseFailure
+        && Mp3GateSupport.closeCalls == 1 && Mp3GateSupport.events.toString().equals("provider,parse,close"),
+        "header parse failure closes provider and preserves identity");
+
+    RuntimeException identifierFailure = new RuntimeException("identifier-failure");
+    Mp3GateSupport.reset();
+    RecordingExecutor identifier = executor();
+    identifier.context = allocate(AudioProcessingContext.class);
+    Derived failingIdentifier = new Derived(info("identifier-id"), input, identifierFailure);
+    check(catchThrowable(() -> failingIdentifier.process(identifier)) == identifierFailure
+        && Mp3GateSupport.closeCalls == 1, "virtual identifier failure propagates through cleanup");
+
+    RuntimeException loopFailure = new RuntimeException("loop-failure");
+    Mp3GateSupport.reset();
+    RecordingExecutor loop = executor();
+    loop.context = allocate(AudioProcessingContext.class);
+    loop.loopFailure = loopFailure;
+    check(catchThrowable(() -> new Mp3AudioTrack(info("loop-id"), input).process(loop)) == loopFailure
+        && Mp3GateSupport.closeCalls == 1, "loop failure preserves identity through finally cleanup");
+
+    InterruptedException readFailure = new InterruptedException("read-failure");
+    Mp3GateSupport.reset();
+    Mp3GateSupport.readFailure = readFailure;
+    RecordingExecutor read = executor();
+    read.context = allocate(AudioProcessingContext.class);
+    read.invokeRead = true;
+    check(catchThrowable(() -> new Mp3AudioTrack(info("read-id"), input).process(read)) == readFailure
+        && Mp3GateSupport.closeCalls == 1, "checked callback failure closes provider");
+
+    RuntimeException closeFailure = new RuntimeException("close-failure");
+    Mp3GateSupport.reset();
+    Mp3GateSupport.closeFailure = closeFailure;
+    RecordingExecutor close = executor();
+    close.context = allocate(AudioProcessingContext.class);
+    Throwable replacement = catchThrowable(() -> new Mp3AudioTrack(info("close-id"), input).process(close));
+    check(replacement == closeFailure, "finally close failure replaces active completion");
+  }
+
+  private static void subclassUse() throws Exception {
+    Mp3GateSupport.reset();
+    Derived derived = new Derived(info("derived-id"), new MemoryStream(), null);
+    RecordingExecutor executor = executor();
+    executor.context = allocate(AudioProcessingContext.class);
+    ((BaseAudioTrack) derived).process(executor);
+    check(derived.processCalls == 1 && derived.identifierCalls == 1 && executor.loopCalls == 1,
+        "ordinary subclass participates in virtual dispatch");
+  }
+
+  private static void reflection() throws Exception {
+    Class<Mp3AudioTrack> type = Mp3AudioTrack.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == BaseAudioTrack.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0, "public concrete non-final metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredMethods().length == 1
+        && type.getDeclaredConstructors().length == 1, "exact declared member counts");
+    Field log = type.getDeclaredField("log");
+    log.setAccessible(true);
+    Object expectedLogger = Class.forName("org.slf4j.LoggerFactory").getMethod("getLogger", Class.class).invoke(null, type);
+    check(log.getType().getName().equals("org.slf4j.Logger")
+        && log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && !log.isSynthetic() && log.get(null) == expectedLogger, "eager logger metadata");
+    Field input = type.getDeclaredField("inputStream");
+    check(input.getType() == SeekableInputStream.class
+        && input.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL) && !input.isSynthetic(),
+        "private seekable input metadata");
+    Constructor<Mp3AudioTrack> constructor = type.getDeclaredConstructor(AudioTrackInfo.class, SeekableInputStream.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    Method process = type.getDeclaredMethod("process", LocalAudioTrackExecutor.class);
+    check(process.getModifiers() == Modifier.PUBLIC && process.getReturnType() == void.class
+        && Arrays.equals(process.getParameterTypes(), new Class<?>[] {LocalAudioTrackExecutor.class})
+        && Arrays.equals(process.getExceptionTypes(), new Class<?>[] {Exception.class})
+        && !process.isSynthetic() && !process.isBridge() && !process.isDefault() && !process.isVarArgs(),
+        "process descriptor and checked exception metadata");
+  }
+
+  private static AudioTrackInfo info(String identifier) {
+    return new AudioTrackInfo("title", "author", 123L, identifier, true, "uri", "artwork", "isrc");
+  }
+  private static Object field(Object owner, String name) throws Exception {
+    Field field = Mp3AudioTrack.class.getDeclaredField(name); field.setAccessible(true); return field.get(owner);
+  }
+  private static RecordingExecutor executor() throws Exception { return allocate(RecordingExecutor.class); }
+  private static <T> T allocate(Class<T> type) throws Exception {
+    return type.cast(UNSAFE.getClass().getMethod("allocateInstance", Class.class).invoke(UNSAFE, type));
+  }
+  private static Object loadUnsafe() {
+    try { Class<?> type = Class.forName("sun.misc.Unsafe"); Field field = type.getDeclaredField("theUnsafe"); field.setAccessible(true); return field.get(null); }
+    catch (ReflectiveOperationException error) { throw new ExceptionInInitializerError(error); }
+  }
+  private static Throwable catchThrowable(ThrowingRunnable action) { try { action.run(); return null; } catch (Throwable throwable) { return throwable; } }
+  @SuppressWarnings("unchecked") private static <E extends Throwable> void sneakyThrow(Throwable failure) throws E { throw (E) failure; }
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    int closeCalls;
+    MemoryStream() { super(0L, 0L); }
+    @Override public int read() { return -1; }
+    @Override public long getPosition() { return 0L; }
+    @Override protected void seekHard(long position) {}
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider> getTrackInfoProviders() { return Collections.emptyList(); }
+    @Override public void close() { closeCalls++; }
+  }
+
+  private static final class RecordingExecutor extends LocalAudioTrackExecutor {
+    AudioProcessingContext context; int contextCalls; int loopCalls; boolean invokeRead; boolean invokeSeek; long seekTimecode;
+    RuntimeException contextFailure; RuntimeException loopFailure; ReadExecutor readExecutor; SeekExecutor seekExecutor;
+    private RecordingExecutor() { super(null, null, null, false, 0); }
+    @Override public AudioProcessingContext getProcessingContext() { contextCalls++; if (contextFailure != null) throw contextFailure; return context; }
+    @Override public void executeProcessingLoop(ReadExecutor read, SeekExecutor seek) { loopCalls++; readExecutor = read; seekExecutor = seek; Mp3GateSupport.event("loop"); if (loopFailure != null) throw loopFailure; try { if (invokeRead) read.performRead(); if (invokeSeek) seek.performSeek(seekTimecode); } catch (Throwable failure) { GateMp3AudioTrack.<RuntimeException>sneakyThrow(failure); } }
+  }
+
+  private static final class Derived extends Mp3AudioTrack {
+    final RuntimeException identifierFailure; int processCalls; int identifierCalls;
+    Derived(AudioTrackInfo info, SeekableInputStream input, RuntimeException failure) { super(info, input); identifierFailure = failure; }
+    @Override public void process(LocalAudioTrackExecutor executor) throws Exception { processCalls++; super.process(executor); }
+    @Override public String getIdentifier() { identifierCalls++; Mp3GateSupport.event("identifier"); if (identifierFailure != null) throw identifierFailure; return super.getIdentifier(); }
+  }
+  private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
 }
 "#;
 
