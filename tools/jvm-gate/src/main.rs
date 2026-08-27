@@ -197,6 +197,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-matroska-element-consumer" => Some(MATROSKA_ELEMENT_CONSUMER),
         "write-matroska-element-type-consumer" => Some(MATROSKA_ELEMENT_TYPE_CONSUMER),
         "write-matroska-file-reader-consumer" => Some(MATROSKA_FILE_READER_CONSUMER),
+        "write-matroska-file-track-consumer" => Some(MATROSKA_FILE_TRACK_CONSUMER),
         "write-matroska-streaming-file-consumer" => Some(MATROSKA_STREAMING_FILE_CONSUMER),
         "write-matroska-audio-track-consumer" => Some(MATROSKA_AUDIO_TRACK_CONSUMER),
         "write-matroska-audio-track-support-consumer" => {
@@ -17696,6 +17697,58 @@ public final class GateMatroskaFileReader {
 }
 "#;
 
+const MATROSKA_FILE_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.*;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import java.io.*;
+import java.lang.reflect.*;
+import java.nio.ByteBuffer;
+import java.util.Collections;
+
+public final class GateMatroskaFileTrack {
+  public static void main(String[] args) throws Exception {
+    reflection(); constructor(); enums(); parse(); failures();
+    System.out.println("contracts=constructor,field-identity,audio-details,enum-order,enum-lookup,parse,audio-parse,unknown-fields,defaults,malformed,throws,reflection");
+  }
+  private static void constructor() {
+    byte[] bytes = {1,2,3}; MatroskaFileTrack.AudioDetails audio = new MatroskaFileTrack.AudioDetails(48000.5f,44100.25f,2,24);
+    MatroskaFileTrack t = new MatroskaFileTrack(7, MatroskaFileTrack.Type.AUDIO, 99L, null, "A_OPUS", bytes, audio);
+    check(t.index==7 && t.type==MatroskaFileTrack.Type.AUDIO && t.trackUid==99L && t.name==null && t.codecId.equals("A_OPUS") && t.codecPrivate==bytes && t.audio==audio,"constructor field identity");
+    check(audio.samplingFrequency==48000.5f && audio.outputSamplingFrequency==44100.25f && audio.channels==2 && audio.bitDepth==24,"audio details fields");
+  }
+  private static void enums() {
+    MatroskaFileTrack.Type[] v=MatroskaFileTrack.Type.values(); long[] ids={1,2,3,16,17,18,32};
+    check(v.length==7 && v[0]==MatroskaFileTrack.Type.VIDEO && v[6]==MatroskaFileTrack.Type.CONTROL,"enum order");
+    for(int i=0;i<v.length;i++) check(v[i].ordinal()==i && v[i].id==ids[i] && MatroskaFileTrack.Type.valueOf(v[i].name())==v[i] && MatroskaFileTrack.Type.fromId(ids[i])==v[i],"enum entry");
+    check(MatroskaFileTrack.Type.fromId(0)==null && MatroskaFileTrack.Type.fromId(Long.MAX_VALUE)==null,"unknown enum id");
+    v[0]=MatroskaFileTrack.Type.CONTROL; check(MatroskaFileTrack.Type.values()[0]==MatroskaFileTrack.Type.VIDEO,"enum values clone");
+  }
+  private static void parse() throws Exception {
+    byte[] a=concat(element(0xB5,ByteBuffer.allocate(8).putDouble(48000).array()),element(0x78B5,ByteBuffer.allocate(4).putFloat(44100).array()),element(0x9F,new byte[]{2}),element(0x6264,new byte[]{24}));
+    byte[] p=concat(element(0xD7,new byte[]{7}),element(0x73C5,new byte[]{0,0,0,0,0,0,0,99}),element(0x83,new byte[]{2}),element(0x536E,"Track name".getBytes("US-ASCII")),element(0x86,"A_OPUS".getBytes("US-ASCII")),element(0x63A2,new byte[]{9,8,7}),element(0xE1,a),element(0xEC,new byte[]{5,4,3}));
+    MatroskaFileTrack t=MatroskaFileTrack.parse(parent(p.length),new MatroskaFileReader(new MemoryStream(p)));
+    check(t.index==7&&t.type==MatroskaFileTrack.Type.AUDIO&&t.trackUid==99&&t.name.equals("Track name")&&t.codecId.equals("A_OPUS")&&t.codecPrivate.length==3&&t.codecPrivate[0]==9&&t.audio!=null&&t.audio.samplingFrequency==48000&&t.audio.outputSamplingFrequency==44100&&t.audio.channels==2&&t.audio.bitDepth==24,"parsed track and audio");
+    byte[] d=concat(element(0xD7,new byte[]{1}),element(0x83,new byte[]{1})); MatroskaFileTrack e=MatroskaFileTrack.parse(parent(d.length),new MatroskaFileReader(new MemoryStream(d)));
+    check(e.index==1&&e.type==MatroskaFileTrack.Type.VIDEO&&e.trackUid==0&&e.name==null&&e.codecId==null&&e.codecPrivate==null&&e.audio==null,"builder defaults");
+  }
+  private static void failures() throws Exception {
+    byte[] x={(byte)0xD7,(byte)0x82,1}; check(catchError(()->MatroskaFileTrack.parse(parent(x.length),new MatroskaFileReader(new MemoryStream(x)))) instanceof EOFException,"truncated payload");
+    check(catchError(()->MatroskaFileTrack.parse(parent(1),new MatroskaFileReader(new MemoryStream(new byte[]{(byte)0xD7})))) instanceof EOFException,"truncated header");
+  }
+  private static void reflection() throws Exception {
+    Class<MatroskaFileTrack> c=MatroskaFileTrack.class; check(c.getModifiers()==Modifier.PUBLIC&&c.getSuperclass()==Object.class&&c.getInterfaces().length==0&&c.getDeclaredFields().length==7&&c.getDeclaredMethods().length==2&&c.getDeclaredConstructors().length==1&&c.getDeclaredAnnotations().length==0,"track metadata");
+    ctor(c.getDeclaredConstructor(int.class,MatroskaFileTrack.Type.class,long.class,String.class,String.class,byte[].class,MatroskaFileTrack.AudioDetails.class)); method(c.getDeclaredMethod("parse",MatroskaElement.class,MatroskaFileReader.class),MatroskaFileTrack.class,IOException.class);
+    for(String n:new String[]{"index","type","trackUid","name","codecId","codecPrivate","audio"}) field(c.getDeclaredField(n),Modifier.PUBLIC|Modifier.FINAL);
+    Class<MatroskaFileTrack.AudioDetails> a=MatroskaFileTrack.AudioDetails.class; check(a.getModifiers()==(Modifier.PUBLIC|Modifier.STATIC)&&a.getDeclaredFields().length==4&&a.getDeclaredMethods().length==0&&a.getDeclaredConstructors().length==1,"audio metadata"); ctor(a.getDeclaredConstructor(float.class,float.class,int.class,int.class)); for(String n:new String[]{"samplingFrequency","outputSamplingFrequency","channels","bitDepth"}) field(a.getDeclaredField(n),Modifier.PUBLIC|Modifier.FINAL);
+    Class<MatroskaFileTrack.Type> e=MatroskaFileTrack.Type.class; check((e.getModifiers()&~0x4000)==(Modifier.PUBLIC|Modifier.STATIC|Modifier.FINAL)&&e.isEnum()&&e.getSuperclass()==Enum.class&&e.getDeclaredMethods().length==3,"enum metadata"); field(e.getDeclaredField("id"),Modifier.PUBLIC|Modifier.FINAL); method(e.getDeclaredMethod("fromId",long.class),e); method(e.getDeclaredMethod("values"),MatroskaFileTrack.Type[].class); method(e.getDeclaredMethod("valueOf",String.class),e);
+  }
+  private static void ctor(Constructor<?> x){check(x.getModifiers()==Modifier.PUBLIC&&x.getExceptionTypes().length==0,"constructor metadata");} private static void field(Field x,int m){check(x.getModifiers()==m&&!x.isSynthetic(),x.getName()+" metadata");} private static void method(Method x,Class<?> r,Class<?>... f){check((x.getModifiers()&Modifier.PUBLIC)!=0&&x.getReturnType()==r&&java.util.Arrays.equals(x.getExceptionTypes(),f)&&!x.isSynthetic(),x.getName()+" metadata");}
+  private static MatroskaElement parent(int n){return new MutableElement(0,MatroskaElementType.TrackEntry,0,0,n);} private static byte[] element(int id,byte[] p){ByteArrayOutputStream o=new ByteArrayOutputStream();if(id>255)o.write(id>>>8);o.write(id&255);if(p.length>127)throw new IllegalArgumentException();o.write(128|p.length);o.write(p,0,p.length);return o.toByteArray();} private static byte[] concat(byte[]... p){ByteArrayOutputStream o=new ByteArrayOutputStream();for(byte[] x:p)o.write(x,0,x.length);return o.toByteArray();} private static Throwable catchError(Operation o){try{o.run();return null;}catch(Throwable x){return x;}}
+  private interface Operation{void run() throws Throwable;} private static final class MutableElement extends MatroskaElement{MutableElement(int l,MatroskaElementType t,long p,int h,int d){super(l);id=t.id;type=t;position=p;headerSize=h;dataSize=d;}}
+  private static final class MemoryStream extends SeekableInputStream{final byte[] d;int p;MemoryStream(byte[] d){super(d.length,0);this.d=d;}public int read(){return p==d.length?-1:d[p++]&255;}public int read(byte[] b,int o,int l){if(p==d.length)return -1;int n=Math.min(l,d.length-p);System.arraycopy(d,p,b,o,n);p+=n;return n;}public long skip(long n){int k=(int)Math.min(n,d.length-p);p+=k;return k;}public long getPosition(){return p;}protected void seekHard(long n)throws IOException{if(n<0||n>d.length)throw new EOFException();p=(int)n;}public boolean canSeekHard(){return true;}public java.util.List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider> getTrackInfoProviders(){return Collections.emptyList();}}
+  private static void check(boolean b,String m){if(!b)throw new AssertionError(m);}
+}
+"#;
 const MATROSKA_STREAMING_FILE_CONSUMER: &str = r#"
 import com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaStreamingFile;
 import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack;

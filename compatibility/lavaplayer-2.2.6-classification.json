@@ -4497,252 +4497,280 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack",
       "symbol_kind": "FIELD",
       "member_name": "index",
       "descriptor": "I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack",
       "symbol_kind": "FIELD",
       "member_name": "type",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$Type;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack",
       "symbol_kind": "FIELD",
       "member_name": "trackUid",
       "descriptor": "J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack",
       "symbol_kind": "FIELD",
       "member_name": "name",
       "descriptor": "Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack",
       "symbol_kind": "FIELD",
       "member_name": "codecId",
       "descriptor": "Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack",
       "symbol_kind": "FIELD",
       "member_name": "codecPrivate",
       "descriptor": "[B",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack",
       "symbol_kind": "FIELD",
       "member_name": "audio",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$AudioDetails;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(ILcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$Type;JLjava/lang/String;Ljava/lang/String;[BLcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$AudioDetails;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack",
       "symbol_kind": "METHOD",
       "member_name": "parse",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaElement;Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileReader;)Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack$AudioDetails",
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack$AudioDetails",
       "symbol_kind": "FIELD",
       "member_name": "samplingFrequency",
       "descriptor": "F",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack$AudioDetails",
       "symbol_kind": "FIELD",
       "member_name": "outputSamplingFrequency",
       "descriptor": "F",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack$AudioDetails",
       "symbol_kind": "FIELD",
       "member_name": "channels",
       "descriptor": "I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack$AudioDetails",
       "symbol_kind": "FIELD",
       "member_name": "bitDepth",
       "descriptor": "I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack$AudioDetails",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(FFII)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack$Type",
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack$Type",
       "symbol_kind": "FIELD",
       "member_name": "VIDEO",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$Type;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack$Type",
       "symbol_kind": "FIELD",
       "member_name": "AUDIO",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$Type;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack$Type",
       "symbol_kind": "FIELD",
       "member_name": "COMPLEX",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$Type;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack$Type",
       "symbol_kind": "FIELD",
       "member_name": "LOGO",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$Type;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack$Type",
       "symbol_kind": "FIELD",
       "member_name": "SUBTITLE",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$Type;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack$Type",
       "symbol_kind": "FIELD",
       "member_name": "BUTTONS",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$Type;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack$Type",
       "symbol_kind": "FIELD",
       "member_name": "CONTROL",
       "descriptor": "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$Type;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack$Type",
       "symbol_kind": "FIELD",
       "member_name": "id",
       "descriptor": "J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack$Type",
       "symbol_kind": "METHOD",
       "member_name": "values",
       "descriptor": "()[Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$Type;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack$Type",
       "symbol_kind": "METHOD",
       "member_name": "valueOf",
       "descriptor": "(Ljava/lang/String;)Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$Type;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack$Type",
       "symbol_kind": "METHOD",
       "member_name": "fromId",
       "descriptor": "(J)Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$Type;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Matroska file track value classes and parser preserve exact constructor field identity, audio details, track-type enum lookup, nested element decoding, defaults, checked parsing failures, and reflection metadata under the Phase 13 matroska-file-track-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaBlock",

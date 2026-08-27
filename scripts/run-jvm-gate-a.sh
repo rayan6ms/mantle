@@ -300,6 +300,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-matroska-element-type-consumer
   --output "$WORK/GateMatroskaElementType.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-matroska-file-reader-consumer \
   --output "$WORK/GateMatroskaFileReader.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-matroska-file-track-consumer \
+  --output "$WORK/GateMatroskaFileTrack.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-matroska-streaming-file-consumer \
   --output "$WORK/GateMatroskaStreamingFile.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-matroska-audio-track-consumer \
@@ -479,6 +481,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateMatroskaElement.java" \
   "$WORK/GateMatroskaElementType.java" \
   "$WORK/GateMatroskaFileReader.java" \
+  "$WORK/GateMatroskaFileTrack.java" \
   "$WORK/GateMatroskaStreamingFile.java" \
   "$WORK/GateOpusPacketRouter.java" \
   "$WORK/GateDefaultSoundCloudDataLoader.java" \
@@ -1662,6 +1665,17 @@ cmp "$WORK/matroska-file-reader-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,element-reading,parent-bounds,typed-integers,typed-floats,typed-strings,bytes,skip,seek,block-filter,data-input,failures,throws,reflection' \
   "$WORK/matroska-file-reader-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMatroskaFileTrack >"$WORK/matroska-file-track-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMatroskaFileTrack >"$WORK/matroska-file-track-candidate.txt"
+cmp "$WORK/matroska-file-track-reference.txt" \
+  "$WORK/matroska-file-track-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,field-identity,audio-details,enum-order,enum-lookup,parse,audio-parse,unknown-fields,defaults,malformed,throws,reflection' \
+  "$WORK/matroska-file-track-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateMatroskaStreamingFile >"$WORK/matroska-streaming-file-reference.txt"

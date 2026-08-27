@@ -224,6 +224,16 @@ const MATROSKA_EBML_READER_SWITCH_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaEbmlReader$1";
 const MATROSKA_FILE_READER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileReader";
+const MATROSKA_FILE_TRACK_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack";
+const MATROSKA_FILE_TRACK_AUDIO_DETAILS_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$AudioDetails";
+const MATROSKA_FILE_TRACK_TYPE_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$Type";
+const MATROSKA_FILE_TRACK_BUILDER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$Builder";
+const MATROSKA_FILE_TRACK_AUDIO_BUILDER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$AudioBuilder";
 const MUTABLE_MATROSKA_ELEMENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/format/MutableMatroskaElement";
 const MATROSKA_ELEMENT_CLASS: &str =
@@ -599,6 +609,9 @@ const REFERENCE_CLASSES: &[&str] = &[
     MATROSKA_EBML_READER_CLASS,
     MATROSKA_EBML_READER_TYPE_CLASS,
     MATROSKA_FILE_READER_CLASS,
+    MATROSKA_FILE_TRACK_CLASS,
+    MATROSKA_FILE_TRACK_AUDIO_DETAILS_CLASS,
+    MATROSKA_FILE_TRACK_TYPE_CLASS,
     MATROSKA_ELEMENT_CLASS,
     MATROSKA_ELEMENT_TYPE_CLASS,
     MATROSKA_ELEMENT_DATA_TYPE_CLASS,
@@ -761,6 +774,8 @@ const PRIVATE_SUPPORT_CLASSES: &[&str] = &[
     EQUALIZER_COEFFICIENTS_CLASS,
     MATROSKA_EBML_READER_SWITCH_CLASS,
     MUTABLE_MATROSKA_ELEMENT_CLASS,
+    MATROSKA_FILE_TRACK_BUILDER_CLASS,
+    MATROSKA_FILE_TRACK_AUDIO_BUILDER_CLASS,
 ];
 
 #[derive(Serialize)]
@@ -1316,6 +1331,11 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | MATROSKA_EBML_READER_TYPE_CLASS
             | MATROSKA_EBML_READER_SWITCH_CLASS
             | MATROSKA_FILE_READER_CLASS
+            | MATROSKA_FILE_TRACK_CLASS
+            | MATROSKA_FILE_TRACK_AUDIO_DETAILS_CLASS
+            | MATROSKA_FILE_TRACK_TYPE_CLASS
+            | MATROSKA_FILE_TRACK_BUILDER_CLASS
+            | MATROSKA_FILE_TRACK_AUDIO_BUILDER_CLASS
             | MUTABLE_MATROSKA_ELEMENT_CLASS
             | MATROSKA_ELEMENT_TYPE_CLASS
             | MATROSKA_ELEMENT_DATA_TYPE_CLASS
