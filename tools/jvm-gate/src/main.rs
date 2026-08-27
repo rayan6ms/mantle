@@ -167,6 +167,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mp3-stream-seeker-consumer" => Some(MP3_STREAM_SEEKER_CONSUMER),
         "write-mp3-track-provider-consumer" => Some(MP3_TRACK_PROVIDER_CONSUMER),
         "write-mp3-xing-seeker-consumer" => Some(MP3_XING_SEEKER_CONSUMER),
+        "write-mpeg-aac-track-consumer" => Some(MPEG_AAC_TRACK_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
         "write-adts-packet-header-consumer" => Some(ADTS_PACKET_HEADER_CONSUMER),
         "write-adts-stream-provider-consumer" => Some(ADTS_STREAM_PROVIDER_CONSUMER),
@@ -14334,6 +14335,258 @@ public final class GateMp3XingSeeker {
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }
+}
+"#;
+
+const MPEG_AAC_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.common.AacPacketRouter;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegAacTrackConsumer;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackConsumer;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackInfo;
+import com.sedmelluq.discord.lavaplayer.natives.aac.AacDecoder;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.nio.channels.ClosedByInterruptException;
+import java.nio.channels.ReadableByteChannel;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import org.slf4j.LoggerFactory;
+
+public final class GateMpegAacTrackConsumer {
+  private static final Object UNSAFE = loadUnsafe();
+
+  public static void main(String[] args) throws Exception {
+    constructionAndConfiguration();
+    chunkingAndFailures();
+    forwarding();
+    reflection();
+    System.out.println("contracts=constructor,track-identity,direct-buffer,buffer-capacity,router-construction,decoder-config,default-config,initialise,get-track,chunking,remainder-chunk,input-position,reused-buffer,direct-chunks,empty-input,io-wrap,interruption,seek-forwarding,flush-forwarding,close-forwarding,private-fields,logger-owner,interface,throws,reflection");
+  }
+
+  private static void constructionAndConfiguration() throws Exception {
+    byte[] decoderConfig = {9, 8, 7, 6};
+    MpegTrackInfo track = track(decoderConfig, 44_100, 2);
+    MpegAacTrackConsumer consumer = new MpegAacTrackConsumer(null, track);
+    check(consumer instanceof MpegTrackConsumer && consumer.getTrack() == track
+        && field(consumer, "track") == track,
+        "constructor retains track identity and implements consumer interface");
+    ByteBuffer input = (ByteBuffer) field(consumer, "inputBuffer");
+    Object router = field(consumer, "packetRouter");
+    check(input.isDirect() && input.capacity() == 4_096 && input.position() == 0
+        && input.limit() == input.capacity() && router.getClass() == AacPacketRouter.class
+        && field(router, AacPacketRouter.class, "context") == null,
+        "constructor creates exact direct staging buffer and router");
+    RecordingDecoder decoder = allocate(RecordingDecoder.class);
+    decoder.configureResult = -12;
+    @SuppressWarnings("unchecked")
+    java.util.function.Consumer<AacDecoder> configurer =
+        (java.util.function.Consumer<AacDecoder>) field(router, AacPacketRouter.class, "decoderConfigurer");
+    configurer.accept(decoder);
+    check(decoder.byteCalls == 1 && decoder.codecPrivate == decoderConfig
+        && decoder.intCalls == 0 && decoder.lastResult == -12,
+        "configured decoder receives exact caller-owned bytes and ignores result");
+    MpegAacTrackConsumer defaults = new MpegAacTrackConsumer(null, track(null, 48_000, 6));
+    Object defaultRouter = field(defaults, "packetRouter");
+    RecordingDecoder defaultDecoder = allocate(RecordingDecoder.class);
+    configurer = (java.util.function.Consumer<AacDecoder>) field(
+        defaultRouter, AacPacketRouter.class, "decoderConfigurer");
+    configurer.accept(defaultDecoder);
+    check(defaultDecoder.intCalls == 1 && defaultDecoder.codecPrivate == null
+        && defaultDecoder.lastCodec == AacDecoder.AAC_LC && defaultDecoder.lastRate == 48_000
+        && defaultDecoder.lastChannels == 6,
+        "missing decoder config selects AAC LC with track parameters");
+  }
+
+  private static void chunkingAndFailures() throws Exception {
+    MpegAacTrackConsumer consumer = new MpegAacTrackConsumer(
+        null, track(new byte[] {1}, 48_000, 2));
+    RecordingRouter router = new RecordingRouter();
+    putObject(consumer, "packetRouter", router);
+    byte[] values = new byte[9_000];
+    for (int index = 0; index < values.length; index++) values[index] = (byte) (index * 31 + 7);
+    ByteArrayChannel channel = new ByteArrayChannel(values, 3, 8_506, 777);
+    consumer.consume(channel, 8_503);
+    check(channel.source.position() == 8_506 && router.chunks.size() == 3
+        && router.chunks.get(0).length == 4_096 && router.chunks.get(1).length == 4_096
+        && router.chunks.get(2).length == 311,
+        "consume reads two full chunks and one remainder");
+    check(Arrays.equals(router.chunks.get(0), Arrays.copyOfRange(values, 3, 4_099))
+        && Arrays.equals(router.chunks.get(1), Arrays.copyOfRange(values, 4_099, 8_195))
+        && Arrays.equals(router.chunks.get(2), Arrays.copyOfRange(values, 8_195, 8_506))
+        && router.sameBuffer && router.directBuffers && router.zeroPositions
+        && router.capacities4096 && router.limits.equals(Arrays.asList(4_096, 4_096, 311)),
+        "chunk content, ordering, and reused direct buffer are exact");
+    int calls = router.calls;
+    consumer.consume(new ByteArrayChannel(new byte[0], 0, 0, 10), 0);
+    check(router.calls == calls, "empty input performs no router call");
+
+    IOException io = new IOException("read-sentinel");
+    RuntimeException wrapped = (RuntimeException) catchThrowable(() ->
+        consumer.consume(new ByteArrayChannel(io), 1));
+    check(wrapped != null && wrapped.getCause() == io,
+        "ordinary channel I/O is wrapped with the exact cause");
+
+    router.reset();
+    ByteArrayChannel interrupted = new ByteArrayChannel(values, 3, 8_506, 4_096);
+    interrupted.failWithInterruptAt = 2;
+    Throwable failure = catchThrowable(() -> consumer.consume(interrupted, 8_503));
+    check(failure instanceof InterruptedException && interrupted.source.position() == 4_099
+        && router.calls == 1 && Thread.interrupted(),
+        "closed-by-interrupt becomes InterruptedException after the committed chunk");
+  }
+
+  private static void forwarding() throws Exception {
+    MpegAacTrackConsumer consumer = new MpegAacTrackConsumer(null, track(null, 1, 1));
+    RecordingRouter router = new RecordingRouter();
+    putObject(consumer, "packetRouter", router);
+    consumer.seekPerformed(Long.MIN_VALUE + 3, Long.MAX_VALUE - 5);
+    consumer.flush();
+    consumer.close();
+    check(router.seekCalls == 1 && router.requested == Long.MIN_VALUE + 3
+        && router.provided == Long.MAX_VALUE - 5 && router.flushCalls == 1
+        && router.closeCalls == 1, "lifecycle methods forward exact values");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MpegAacTrackConsumer> type = MpegAacTrackConsumer.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {MpegTrackConsumer.class})
+        && type.getDeclaredAnnotations().length == 0 && type.getDeclaredFields().length == 4
+        && type.getDeclaredMethods().length == 7 && type.getDeclaredConstructors().length == 1,
+        "exact class and declared-member metadata");
+    Field log = checkField(type, "log", org.slf4j.Logger.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    log.setAccessible(true);
+    check(log.get(null) == LoggerFactory.getLogger(MpegAacTrackConsumer.class),
+        "logger uses the MPEG AAC consumer category");
+    checkField(type, "track", MpegTrackInfo.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "inputBuffer", ByteBuffer.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "packetRouter", AacPacketRouter.class, Modifier.PRIVATE | Modifier.FINAL);
+    Constructor<MpegAacTrackConsumer> constructor = type.getDeclaredConstructor(
+        AudioProcessingContext.class, MpegTrackInfo.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    checkMethod(type.getDeclaredMethod("initialise"), Modifier.PUBLIC, void.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("getTrack"), Modifier.PUBLIC, MpegTrackInfo.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("seekPerformed", long.class, long.class),
+        Modifier.PUBLIC, void.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("flush"), Modifier.PUBLIC, void.class,
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("consume", ReadableByteChannel.class, int.class),
+        Modifier.PUBLIC, void.class, new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("close"), Modifier.PUBLIC, void.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("configureDecoder", AacDecoder.class),
+        Modifier.PRIVATE, void.class, new Class<?>[0]);
+  }
+
+  private static MpegTrackInfo track(byte[] config, int rate, int channels) {
+    return new MpegTrackInfo(7, "soun", "mp4a", channels, rate, config);
+  }
+
+  private static Object field(Object target, String name) throws Exception {
+    return field(target, MpegAacTrackConsumer.class, name);
+  }
+  private static Object field(Object target, Class<?> owner, String name) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
+  }
+  private static void putObject(Object target, String name, Object value) throws Exception {
+    Field field = MpegAacTrackConsumer.class.getDeclaredField(name);
+    long offset = (Long) UNSAFE.getClass().getMethod("objectFieldOffset", Field.class)
+        .invoke(UNSAFE, field);
+    UNSAFE.getClass().getMethod("putObject", Object.class, long.class, Object.class)
+        .invoke(UNSAFE, target, offset, value);
+  }
+  private static <T> T allocate(Class<T> type) throws Exception {
+    return type.cast(UNSAFE.getClass().getMethod("allocateInstance", Class.class)
+        .invoke(UNSAFE, type));
+  }
+  private static Object loadUnsafe() {
+    try {
+      Class<?> type = Class.forName("sun.misc.Unsafe");
+      Field field = type.getDeclaredField("theUnsafe");
+      field.setAccessible(true);
+      return field.get(null);
+    } catch (ReflectiveOperationException error) { throw new ExceptionInInitializerError(error); }
+  }
+  private static Field checkField(Class<?> owner, String name, Class<?> fieldType, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getModifiers() == modifiers
+        && !field.isSynthetic() && field.getDeclaredAnnotations().length == 0,
+        name + " field metadata");
+    return field;
+  }
+  private static void checkMethod(Method method, int modifiers, Class<?> result, Class<?>[] failures) {
+    check(method.getModifiers() == modifiers && method.getReturnType() == result
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isVarArgs(), method.getName() + " method metadata");
+  }
+  private static Throwable catchThrowable(Operation operation) {
+    try { operation.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private interface Operation { void run() throws Throwable; }
+
+  private static final class RecordingDecoder extends AacDecoder {
+    int byteCalls, intCalls, lastCodec, lastRate, lastChannels, configureResult;
+    int lastResult;
+    byte[] codecPrivate;
+    @Override public int configure(byte[] data) { byteCalls++; codecPrivate = data; lastResult = configureResult; return configureResult; }
+    @Override public int configure(int codec, int rate, int channels) { intCalls++; lastCodec = codec; lastRate = rate; lastChannels = channels; lastResult = configureResult; return configureResult; }
+  }
+
+  private static final class RecordingRouter extends AacPacketRouter {
+    int calls, seekCalls, flushCalls, closeCalls;
+    long requested, provided;
+    final List<byte[]> chunks = new ArrayList<>();
+    final List<Integer> limits = new ArrayList<>();
+    ByteBuffer firstBuffer;
+    boolean sameBuffer = true, directBuffers = true, zeroPositions = true, capacities4096 = true;
+    RecordingRouter() { super(null, ignored -> {}); }
+    @Override public void processInput(ByteBuffer buffer) throws InterruptedException {
+      calls++; if (firstBuffer == null) firstBuffer = buffer; else sameBuffer &= firstBuffer == buffer;
+      directBuffers &= buffer.isDirect(); zeroPositions &= buffer.position() == 0;
+      capacities4096 &= buffer.capacity() == 4_096; limits.add(buffer.limit());
+      ByteBuffer copy = buffer.duplicate(); byte[] bytes = new byte[copy.remaining()]; copy.get(bytes); chunks.add(bytes);
+    }
+    @Override public void seekPerformed(long requested, long provided) { seekCalls++; this.requested = requested; this.provided = provided; }
+    @Override public void flush() { flushCalls++; }
+    @Override public void close() { closeCalls++; }
+    void reset() { calls = 0; chunks.clear(); limits.clear(); firstBuffer = null; sameBuffer = directBuffers = zeroPositions = capacities4096 = true; }
+  }
+
+  private static final class ByteArrayChannel implements ReadableByteChannel {
+    final ByteBuffer source;
+    final int maxRead;
+    int reads;
+    int failWithInterruptAt;
+    IOException failure;
+    boolean open = true;
+    ByteArrayChannel(byte[] data, int start, int end, int maxRead) {
+      source = ByteBuffer.wrap(data); source.position(start); source.limit(end); this.maxRead = maxRead;
+    }
+    ByteArrayChannel(IOException failure) { source = ByteBuffer.allocate(0); maxRead = 1; this.failure = failure; }
+    @Override public int read(ByteBuffer target) throws IOException {
+      reads++;
+      if (failure != null) throw failure;
+      if (failWithInterruptAt == reads) throw new ClosedByInterruptException();
+      if (!source.hasRemaining()) return -1;
+      int count = Math.min(Math.min(source.remaining(), target.remaining()), maxRead);
+      ByteBuffer slice = source.duplicate(); slice.limit(slice.position() + count); target.put(slice); source.position(source.position() + count); return count;
+    }
+    @Override public boolean isOpen() { return open; }
+    @Override public void close() { open = false; }
+  }
+
+  private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
 }
 "#;
 

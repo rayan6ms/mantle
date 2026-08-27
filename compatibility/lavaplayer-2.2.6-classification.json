@@ -5467,72 +5467,80 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public MPEG AAC consumer preserves constructor state, router wiring, lifecycle dispatch, chunked channel consumption, interruption handling, decoder configuration, and reflection metadata under the differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegAacTrackConsumer",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;Lcom/sedmelluq/discord/lavaplayer/container/mpeg/MpegTrackInfo;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Constructor preserves exact track identity, direct 4096-byte staging allocation, router context, and decoder configurer binding.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegAacTrackConsumer",
       "symbol_kind": "METHOD",
       "member_name": "initialise",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Initialisation preserves logger evaluation and track sample-rate/channel access.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegAacTrackConsumer",
       "symbol_kind": "METHOD",
       "member_name": "getTrack",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/container/mpeg/MpegTrackInfo;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Track getter returns the exact associated MpegTrackInfo identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegAacTrackConsumer",
       "symbol_kind": "METHOD",
       "member_name": "seekPerformed",
       "descriptor": "(JJ)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Seek lifecycle forwarding preserves full-width requested and provided timecodes and router dispatch.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegAacTrackConsumer",
       "symbol_kind": "METHOD",
       "member_name": "flush",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Flush forwards to the packet router with the checked InterruptedException contract.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegAacTrackConsumer",
       "symbol_kind": "METHOD",
       "member_name": "consume",
       "descriptor": "(Ljava/nio/channels/ReadableByteChannel;I)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Consume preserves 4096-byte chunking, direct-buffer reuse, IO wrapping, and ClosedByInterruptException conversion.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegAacTrackConsumer",
       "symbol_kind": "METHOD",
       "member_name": "close",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Close forwards exactly once to the packet router and preserves runtime failures.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegAudioTrack",

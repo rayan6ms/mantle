@@ -253,6 +253,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mp3-track-provider-consumer \
   --output "$WORK/GateMp3TrackProvider.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mp3-xing-seeker-consumer \
   --output "$WORK/GateMp3XingSeeker.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-aac-track-consumer \
+  --output "$WORK/GateMpegAacTrackConsumer.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-container-probe-consumer \
   --output "$WORK/GateAdtsContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-packet-header-consumer \
@@ -505,6 +507,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateAdtsStreamProvider.java" \
   "$WORK/GateAacPacketRouter.java" \
+  "$WORK/GateMpegAacTrackConsumer.java" \
   "$WORK/GateMatroskaAacTrackConsumer.java" \
   "$WORK/GateMatroskaOpusTrackConsumer.java" \
   "$WORK/GateMatroskaTrackConsumer.java" \
@@ -1455,6 +1458,16 @@ cmp "$WORK/mp3-xing-seeker-reference.txt" "$WORK/mp3-xing-seeker-candidate.txt"
 grep --fixed-strings \
   'contracts=invalid-tag,missing-flags,xing-tag,required-flags,factory,interface,duration,seekable,percentile-mapping,position-clamp,frame-index,long-timecode,checked-io,reflection' \
   "$WORK/mp3-xing-seeker-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMpegAacTrackConsumer \
+  >"$WORK/mpeg-aac-track-consumer-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegAacTrackConsumer >"$WORK/mpeg-aac-track-consumer-candidate.txt"
+cmp "$WORK/mpeg-aac-track-consumer-reference.txt" "$WORK/mpeg-aac-track-consumer-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,track-identity,direct-buffer,buffer-capacity,router-construction,decoder-config,default-config,initialise,get-track,chunking,remainder-chunk,input-position,reused-buffer,direct-chunks,empty-input,io-wrap,interruption,seek-forwarding,flush-forwarding,close-forwarding,private-fields,logger-owner,interface,throws,reflection' \
+  "$WORK/mpeg-aac-track-consumer-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateAdtsContainerProbe \
   >"$WORK/adts-container-probe-reference.txt"
