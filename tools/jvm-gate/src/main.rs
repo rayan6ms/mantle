@@ -165,6 +165,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mp3-frame-reader-consumer" => Some(MP3_FRAME_READER_CONSUMER),
         "write-mp3-seeker-consumer" => Some(MP3_SEEKER_CONSUMER),
         "write-mp3-stream-seeker-consumer" => Some(MP3_STREAM_SEEKER_CONSUMER),
+        "write-mp3-track-provider-consumer" => Some(MP3_TRACK_PROVIDER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
         "write-adts-packet-header-consumer" => Some(ADTS_PACKET_HEADER_CONSUMER),
         "write-adts-stream-provider-consumer" => Some(ADTS_STREAM_PROVIDER_CONSUMER),
@@ -14057,6 +14058,152 @@ public final class GateMp3StreamSeeker {
     @Override public boolean canSeekHard() { return true; }
     @Override public List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider>
         getTrackInfoProviders() { return Collections.emptyList(); }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MP3_TRACK_PROVIDER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mp3.Mp3Seeker;
+import com.sedmelluq.discord.lavaplayer.container.mp3.Mp3StreamSeeker;
+import com.sedmelluq.discord.lavaplayer.container.mp3.Mp3TrackProvider;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public final class GateMp3TrackProvider {
+  public static void main(String[] args) throws Exception {
+    constructionAndMetadata();
+    seekerDispatch();
+    parseFailure();
+    reflection();
+    System.out.println(
+        "contracts=constructor-state,metadata-defaults,id3-tags,provider-interface,seeker-dispatch,unknown-duration,non-seekable,parse-io,close,private-state,checked-io,reflection");
+  }
+
+  private static void constructionAndMetadata() throws Exception {
+    MemoryStream input = new MemoryStream();
+    Mp3TrackProvider provider = new Mp3TrackProvider(null, input);
+    check(field(provider, "context") == null && field(provider, "inputStream") == input,
+        "constructor retains context and input identities");
+    check(field(provider, "dataInput") != null && field(provider, "frameReader") != null
+        && field(provider, "tags") instanceof Map && ((Map<?, ?>) field(provider, "tags")).isEmpty(),
+        "constructor creates the data reader, frame reader, and empty tag map");
+    check(provider instanceof AudioTrackInfoProvider && provider.getTitle() == null
+        && provider.getAuthor() == null && provider.getIdentifier() == null
+        && provider.getUri() == null && provider.getArtworkUrl() == null
+        && provider.getISRC() == null,
+        "metadata provider defaults are null before ID3 parsing");
+
+    @SuppressWarnings("unchecked") Map<String, String> tags = (Map<String, String>) field(provider, "tags");
+    tags.put("TIT2", "Title");
+    tags.put("TPE1", "Artist");
+    tags.put("TSRC", "ISRC");
+    check("Title".equals(provider.getIdv3Tag("TIT2")) && "Title".equals(provider.getTitle())
+        && "Artist".equals(provider.getAuthor()) && "ISRC".equals(provider.getISRC())
+        && provider.getIdv3Tag("missing") == null,
+        "fixed ID3 tag access preserves map values and unknown-tag nulls");
+
+    setField(provider, "seeker", new Mp3StreamSeeker());
+    check(!provider.isSeekable() && provider.getDuration() == Long.MAX_VALUE
+        && provider.getLength() == Long.MAX_VALUE,
+        "metadata duration and seekability delegate to the configured seeker");
+  }
+
+  private static void seekerDispatch() throws Exception {
+    Mp3TrackProvider provider = new Mp3TrackProvider(null, new MemoryStream());
+    setField(provider, "seeker", new Mp3StreamSeeker());
+    Throwable failure = catchThrowable(() -> provider.seekToTimecode(Long.MAX_VALUE));
+    check(failure != null && failure.getClass() == UnsupportedOperationException.class
+        && "Cannot seek on a stream.".equals(failure.getMessage()),
+        "seek delegates full-width timecodes and preserves stream-seeker failure");
+  }
+
+  private static void parseFailure() throws Exception {
+    IOException failure = new IOException("header-failure");
+    MemoryStream input = new MemoryStream();
+    input.failure = failure;
+    Mp3TrackProvider provider = new Mp3TrackProvider(null, input);
+    Throwable actual = catchThrowable(provider::parseHeaders);
+    check(actual == failure, "header parsing preserves checked I/O identity");
+  }
+
+  private static void reflection() throws Exception {
+    Class<Mp3TrackProvider> type = Mp3TrackProvider.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {AudioTrackInfoProvider.class})
+        && type.getDeclaredFields().length == 20 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredAnnotations().length == 0,
+        "public provider class and private implementation state metadata");
+    Constructor<Mp3TrackProvider> constructor = type.getDeclaredConstructor(
+        com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext.class,
+        SeekableInputStream.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0,
+        "constructor descriptor and checked exceptions");
+    checkMethod(type.getDeclaredMethod("parseHeaders"), void.class, new Class<?>[0],
+        new Class<?>[] {IOException.class});
+    checkMethod(type.getDeclaredMethod("provideFrames"), void.class, new Class<?>[0],
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("seekToTimecode", long.class), void.class,
+        new Class<?>[] {long.class}, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("recordSeek", long.class, long.class), void.class,
+        new Class<?>[] {long.class, long.class}, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("getIdv3Tag", String.class), String.class,
+        new Class<?>[] {String.class}, new Class<?>[0]);
+    for (String name : new String[] {"isSeekable", "getDuration", "close", "getTitle",
+        "getAuthor", "getLength", "getIdentifier", "getUri", "getArtworkUrl", "getISRC"}) {
+      Method method = Arrays.stream(type.getDeclaredMethods()).filter(candidate ->
+          candidate.getName().equals(name)).findFirst().orElseThrow();
+      checkMethod(method, method.getReturnType(), method.getParameterTypes(), new Class<?>[0]);
+    }
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, Class<?>[] parameters,
+      Class<?>[] failures) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isVarArgs(), method.getName() + " method metadata");
+  }
+
+  private static Object field(Object target, String name) throws Exception {
+    Field field = target.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
+  }
+
+  private static void setField(Object target, String name, Object value) throws Exception {
+    Field field = target.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    field.set(target, value);
+  }
+
+  private static Throwable catchThrowable(Throwing action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+
+  private interface Throwing { void run() throws Throwable; }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    IOException failure;
+    MemoryStream() { super(0L, 0L); }
+    @Override public int read() throws IOException { if (failure != null) throw failure; return -1; }
+    @Override public long getPosition() { return 0L; }
+    @Override protected void seekHard(long position) { }
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() { return Collections.emptyList(); }
   }
 
   private static void check(boolean condition, String message) {
