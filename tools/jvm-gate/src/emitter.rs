@@ -173,6 +173,8 @@ const MPEG_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegAudioTrack";
 const MPEG_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegContainerProbe";
+const MPEG_FILE_LOADER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegFileLoader";
 const MPEG_AAC_TRACK_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegAacTrackConsumer";
 const ADTS_CONTAINER_PROBE_CLASS: &str =
@@ -604,6 +606,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MP3_XING_SEEKER_CLASS,
     MPEG_AUDIO_TRACK_CLASS,
     MPEG_CONTAINER_PROBE_CLASS,
+    MPEG_FILE_LOADER_CLASS,
     MPEG_AAC_TRACK_CONSUMER_CLASS,
     ADTS_CONTAINER_PROBE_CLASS,
     ADTS_PACKET_HEADER_CLASS,
@@ -824,6 +827,7 @@ struct ClassManifest {
     exported_methods: usize,
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn emit(
     reference_jar: &Path,
     output: &Path,
@@ -838,6 +842,7 @@ pub fn emit(
     let mut mpeg_aac_track_consumer_bytes = None;
     let mut mpeg_audio_track_bytes = None;
     let mut mpeg_container_probe_bytes = None;
+    let mut mpeg_file_loader_bytes = None;
     for binary_name in REFERENCE_CLASSES.iter().chain(PRIVATE_SUPPORT_CLASSES) {
         let mut entry = source.by_name(&format!("{binary_name}.class"))?;
         let mut bytes = Vec::new();
@@ -855,6 +860,8 @@ pub fn emit(
             mpeg_audio_track_bytes = Some(bytes);
         } else if *binary_name == MPEG_CONTAINER_PROBE_CLASS {
             mpeg_container_probe_bytes = Some(bytes);
+        } else if *binary_name == MPEG_FILE_LOADER_CLASS {
+            mpeg_file_loader_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -884,35 +891,47 @@ pub fn emit(
         let name = format!("{}.class", class.class_name()?);
         let mut bytes = Vec::new();
         if name == format!("{MP3_FRAME_READER_CLASS}.class") {
-            bytes = mp3_frame_reader_bytes
-                .as_ref()
-                .expect("MP3 frame reader source bytes are retained")
-                .clone();
+            bytes.clone_from(
+                mp3_frame_reader_bytes
+                    .as_ref()
+                    .expect("MP3 frame reader source bytes are retained"),
+            );
         } else if name == format!("{MP3_TRACK_PROVIDER_CLASS}.class") {
-            bytes = mp3_track_provider_bytes
-                .as_ref()
-                .expect("MP3 track provider source bytes are retained")
-                .clone();
+            bytes.clone_from(
+                mp3_track_provider_bytes
+                    .as_ref()
+                    .expect("MP3 track provider source bytes are retained"),
+            );
         } else if name == format!("{MP3_XING_SEEKER_CLASS}.class") {
-            bytes = mp3_xing_seeker_bytes
-                .as_ref()
-                .expect("MP3 Xing seeker source bytes are retained")
-                .clone();
+            bytes.clone_from(
+                mp3_xing_seeker_bytes
+                    .as_ref()
+                    .expect("MP3 Xing seeker source bytes are retained"),
+            );
         } else if name == format!("{MPEG_AAC_TRACK_CONSUMER_CLASS}.class") {
-            bytes = mpeg_aac_track_consumer_bytes
-                .as_ref()
-                .expect("MPEG AAC track consumer source bytes are retained")
-                .clone();
+            bytes.clone_from(
+                mpeg_aac_track_consumer_bytes
+                    .as_ref()
+                    .expect("MPEG AAC track consumer source bytes are retained"),
+            );
         } else if name == format!("{MPEG_AUDIO_TRACK_CLASS}.class") {
-            bytes = mpeg_audio_track_bytes
-                .as_ref()
-                .expect("MPEG audio track source bytes are retained")
-                .clone();
+            bytes.clone_from(
+                mpeg_audio_track_bytes
+                    .as_ref()
+                    .expect("MPEG audio track source bytes are retained"),
+            );
         } else if name == format!("{MPEG_CONTAINER_PROBE_CLASS}.class") {
-            bytes = mpeg_container_probe_bytes
-                .as_ref()
-                .expect("MPEG container probe source bytes are retained")
-                .clone();
+            bytes.clone_from(
+                mpeg_container_probe_bytes
+                    .as_ref()
+                    .expect("MPEG container probe source bytes are retained"),
+            );
+        } else if name == format!("{MPEG_FILE_LOADER_CLASS}.class") {
+            bytes.clone_from(
+                mpeg_file_loader_bytes
+                    .as_ref()
+                    .expect("MPEG file loader source bytes are retained"),
+            );
         } else {
             class.to_bytes(&mut bytes)?;
         }
@@ -1429,6 +1448,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | MP3_XING_SEEKER_CLASS
             | MPEG_AUDIO_TRACK_CLASS
             | MPEG_CONTAINER_PROBE_CLASS
+            | MPEG_FILE_LOADER_CLASS
             | MPEG_AAC_TRACK_CONSUMER_CLASS
     ) {
         return Ok(class);
@@ -5305,6 +5325,7 @@ fn mp3_audio_track_constructor(pool: &mut ConstantPool<'static>) -> Result<Attri
     )
 }
 
+#[allow(clippy::too_many_lines)]
 fn mp3_audio_track_process(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
     let owner = pool.add_class(MP3_AUDIO_TRACK_CLASS)?;
     let input_stream = pool.add_field_ref(

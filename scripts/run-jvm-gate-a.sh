@@ -12,6 +12,7 @@ readonly FLAC_LOADER_CLASSES="$WORK/flac-loader-consumer-classes"
 readonly FLAC_METADATA_READER_CLASSES="$WORK/flac-metadata-reader-consumer-classes"
 readonly MATROSKA_CLASSES="$WORK/matroska-consumer-classes"
 readonly MPEG_CLASSES="$WORK/mpeg-consumer-classes"
+readonly MPEG_FILE_LOADER_CLASSES="$WORK/mpeg-file-loader-consumer-classes"
 readonly JAR="$WORK/mantle-gate-a.jar"
 readonly MISMATCH_JAR="$WORK/mantle-gate-a-mismatch.jar"
 
@@ -21,9 +22,11 @@ if [[ ! -f "$REFERENCE_JAR" ]]; then
 fi
 
 rm -rf -- "$CLASSES" "$FLAC_CLASSES" "$MP3_CLASSES" "$FLAC_LOADER_CLASSES" \
-  "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES" "$MPEG_CLASSES"
+  "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES" "$MPEG_CLASSES" \
+  "$MPEG_FILE_LOADER_CLASSES"
 mkdir -p "$CLASSES" "$FLAC_CLASSES" "$MP3_CLASSES" "$FLAC_LOADER_CLASSES" \
-  "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES" "$MPEG_CLASSES"
+  "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES" "$MPEG_CLASSES" \
+  "$MPEG_FILE_LOADER_CLASSES"
 cargo build --locked -p mantle-jvm --features gate-a-direct-attachment
 cargo run --locked -q -p mantle-jvm-gate -- emit \
   --reference-jar "$REFERENCE_JAR" --output "$JAR" --expected-abi 1 \
@@ -262,6 +265,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-audio-track-support-consu
   --output "$WORK/MpegGateSupport.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-container-probe-consumer \
   --output "$WORK/GateMpegContainerProbe.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-file-loader-consumer \
+  --output "$WORK/GateMpegFileLoader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-container-probe-consumer \
   --output "$WORK/GateAdtsContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-packet-header-consumer \
@@ -463,6 +468,7 @@ if command -v cygpath >/dev/null 2>&1; then
   flac_loader_classes_argument="$(cygpath -w "$FLAC_LOADER_CLASSES")"
   flac_metadata_reader_classes_argument="$(cygpath -w "$FLAC_METADATA_READER_CLASSES")"
   matroska_classes_argument="$(cygpath -w "$MATROSKA_CLASSES")"
+  mpeg_file_loader_classes_argument="$(cygpath -w "$MPEG_FILE_LOADER_CLASSES")"
   jar_argument="$(cygpath -w "$JAR")"
   reference_argument="$(cygpath -w "$REFERENCE_JAR")"
 else
@@ -473,6 +479,7 @@ else
   flac_loader_classes_argument="$FLAC_LOADER_CLASSES"
   flac_metadata_reader_classes_argument="$FLAC_METADATA_READER_CLASSES"
   matroska_classes_argument="$MATROSKA_CLASSES"
+  mpeg_file_loader_classes_argument="$MPEG_FILE_LOADER_CLASSES"
   jar_argument="$JAR"
   reference_argument="$REFERENCE_JAR"
 fi
@@ -501,6 +508,8 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$MPEG_CLASSES" 
   "$WORK/GateMpegAudioTrack.java" \
   "$WORK/GateMpegContainerProbe.java" \
   "$WORK/MpegGateSupport.java"
+javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -d "$MPEG_FILE_LOADER_CLASSES" "$WORK/GateMpegFileLoader.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   -d "$FLAC_LOADER_CLASSES" \
   "$WORK/GateFlacFileLoader.java" \
@@ -1415,6 +1424,20 @@ cmp "$WORK/mpeg-container-probe-reference.txt" "$WORK/mpeg-container-probe-candi
 grep --fixed-strings \
   'contracts=name,constant-hints,always-no-hints,iso-tag,wildcard,rewind,scan-miss,short-input,unsupported-audio,unsupported-reader,metadata,duration,probe-identity,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,private-state,throws,reflection' \
   "$WORK/mpeg-container-probe-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$mpeg_file_loader_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegFileLoader "$ROOT/tests/media/fixtures/tone-aac-lc-metadata.m4a" \
+  "$ROOT/tests/media/fixtures/tone-aac-lc-fragmented.m4a" \
+  >"$WORK/mpeg-file-loader-reference.txt"
+java -Xverify:all \
+  -cp "$mpeg_file_loader_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegFileLoader "$ROOT/tests/media/fixtures/tone-aac-lc-metadata.m4a" \
+  "$ROOT/tests/media/fixtures/tone-aac-lc-fragmented.m4a" \
+  >"$WORK/mpeg-file-loader-candidate.txt"
+cmp "$WORK/mpeg-file-loader-reference.txt" "$WORK/mpeg-file-loader-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,input-identity,root-bounds,private-state,mutable-track-list,metadata-types,standard-headers,fragmented-headers,track-fields,decoder-config,standard-reader,fragmented-reader,consumer-identity,duration,event-message,last-event,io-wrapping,cause-identity,empty-file,null-input,subclassable,generics,throws,reflection' \
+  "$WORK/mpeg-file-loader-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mp3_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMp3ConstantRateSeeker \
   >"$WORK/mp3-constant-rate-seeker-reference.txt"

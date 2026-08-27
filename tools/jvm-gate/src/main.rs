@@ -171,6 +171,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mpeg-audio-track-consumer" => Some(MPEG_AUDIO_TRACK_CONSUMER),
         "write-mpeg-audio-track-support-consumer" => Some(MPEG_AUDIO_TRACK_SUPPORT_CONSUMER),
         "write-mpeg-container-probe-consumer" => Some(MPEG_CONTAINER_PROBE_CONSUMER),
+        "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
         "write-adts-packet-header-consumer" => Some(ADTS_PACKET_HEADER_CONSUMER),
         "write-adts-stream-provider-consumer" => Some(ADTS_STREAM_PROVIDER_CONSUMER),
@@ -14943,6 +14944,263 @@ public final class GateMpegContainerProbe {
   private static final class MemoryStream extends SeekableInputStream { final byte[] data; long position; IOException ioFailure; MemoryStream(byte[] data) { super(data.length, 0L); this.data = data; } @Override public int read() throws IOException { if (ioFailure != null) throw ioFailure; return position < data.length ? data[(int) position++] & 0xff : -1; } @Override public long getPosition() { return position; } @Override protected void seekHard(long target) { position = target; } @Override public boolean canSeekHard() { return true; } @Override public List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider> getTrackInfoProviders() { return Collections.emptyList(); } }
   private static final class Derived extends MpegContainerProbe { @Override public String getName() { return "derived-mp4"; } }
   private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
+}
+"#;
+
+const MPEG_FILE_LOADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegFileLoader;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegNoopTrackConsumer;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackConsumer;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackInfo;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegFileTrackProvider;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegReader;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegSectionInfo;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
+public final class GateMpegFileLoader {
+  public static void main(String[] args) throws Exception {
+    check(args.length == 2, "expected standard and fragmented MP4 fixtures");
+    constructionAndViews();
+    standardFile(Path.of(args[0]));
+    fragmentedFile(Path.of(args[1]));
+    eventMessages();
+    failures();
+    subclassUse();
+    reflection();
+    System.out.println("contracts=constructor,input-identity,root-bounds,private-state,mutable-track-list,metadata-types,standard-headers,fragmented-headers,track-fields,decoder-config,standard-reader,fragmented-reader,consumer-identity,duration,event-message,last-event,io-wrapping,cause-identity,empty-file,null-input,subclassable,generics,throws,reflection");
+  }
+
+  private static void constructionAndViews() throws Exception {
+    MemoryStream input = new MemoryStream(new byte[] {1, 2, 3, 4});
+    MpegFileLoader loader = new MpegFileLoader(input);
+    List<MpegTrackInfo> tracks = loader.getTrackList();
+    check(tracks == loader.getTrackList() && tracks.isEmpty(),
+        "track list is a stable initially empty mutable view");
+    tracks.add(null);
+    check(loader.getTrackList().size() == 1 && loader.getTrackList().get(0) == null,
+        "caller mutations affect the loader-owned list");
+    tracks.clear();
+
+    MpegReader reader = (MpegReader) field(loader, "reader");
+    MpegSectionInfo root = (MpegSectionInfo) field(loader, "root");
+    check(reader.seek == input && root.offset == 0L && root.length == 4L
+        && root.type.equals("root"), "constructor retains input and exact root bounds");
+    check(field(loader, "fragmentedFileReader") != null
+        && field(loader, "standardFileReader") != null
+        && ((Map<?, ?>) field(loader, "metadata")).isEmpty()
+        && loader.getLastEventMessage() == null, "constructor eagerly creates parser state");
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> metadata = (Map<String, Object>) field(loader, "metadata");
+    metadata.put("Title", "Injected title");
+    metadata.put("Artist", Integer.valueOf(7));
+    metadata.put(null, "Null key");
+    check(loader.getTextMetadata("Title").equals("Injected title")
+        && loader.getTextMetadata("Artist") == null
+        && loader.getTextMetadata("Missing") == null
+        && loader.getTextMetadata(null).equals("Null key"),
+        "metadata getter returns only string values with ordinary map lookup semantics");
+    check(catchThrowable(() -> new MpegFileLoader(null)) instanceof NullPointerException,
+        "null input fails during construction");
+  }
+
+  private static void standardFile(Path path) throws Exception {
+    MpegFileLoader loader = parsed(Files.readAllBytes(path));
+    MpegTrackInfo track = onlyAudioTrack(loader);
+    check(track.trackId > 0 && track.handler.equals("soun") && track.codecName.equals("mp4a")
+        && track.channelCount == 2 && track.sampleRate == 48000
+        && Arrays.equals(track.decoderConfig,
+            new byte[] {17, (byte) 144, 86, (byte) 229, 0}),
+        "standard MP4 publishes exact AAC track fields and decoder config");
+    check(loader.getTextMetadata("Title").equals("Mantle MP4 Title")
+        && loader.getTextMetadata("Artist").equals("Mantle MP4 Artist")
+        && loader.getTextMetadata("title") == null && loader.getLastEventMessage() == null,
+        "standard MP4 publishes recognized case-sensitive text metadata");
+    MpegTrackConsumer consumer = new MpegNoopTrackConsumer(track);
+    MpegFileTrackProvider provider = loader.loadReader(consumer);
+    long duration = provider == null ? -1L : provider.getDuration();
+    check(provider != null && provider.getClass().getName().endsWith("MpegStandardFileTrackProvider")
+        && duration == 2026L && field(provider, "consumer") == consumer,
+        "standard provider is selected with exact consumer identity and duration: " + duration);
+  }
+
+  private static void fragmentedFile(Path path) throws Exception {
+    MpegFileLoader loader = parsed(Files.readAllBytes(path));
+    MpegTrackInfo track = onlyAudioTrack(loader);
+    check(track.handler.equals("soun") && track.codecName.equals("mp4a")
+        && track.channelCount == 2 && track.sampleRate == 48000
+        && Arrays.equals(track.decoderConfig,
+            new byte[] {17, (byte) 144, 86, (byte) 229, 0}),
+        "fragmented MP4 publishes exact AAC track fields and decoder config");
+    check(loader.getTextMetadata("Title").equals("Mantle Fragmented Title")
+        && loader.getTextMetadata("Artist").equals("Mantle Fragmented Artist"),
+        "fragmented MP4 publishes text metadata");
+    MpegTrackConsumer consumer = new MpegNoopTrackConsumer(track);
+    MpegFileTrackProvider provider = loader.loadReader(consumer);
+    long duration = provider == null ? -1L : provider.getDuration();
+    check(provider != null && provider.getClass().getName().endsWith("MpegFragmentedFileTrackProvider")
+        && duration == 4032L && field(provider, "consumer") == consumer,
+        "fragmented provider wins selection with exact consumer identity and duration: " + duration);
+  }
+
+  private static void eventMessages() throws Exception {
+    byte[] first = new byte[] {1, 2, 3};
+    byte[] second = new byte[] {9, 8, 7, 6};
+    MpegFileLoader loader = parsed(concat(emsg(first), emsg(second)));
+    byte[] result = loader.getLastEventMessage();
+    check(Arrays.equals(result, second) && result == loader.getLastEventMessage(),
+        "the last emsg payload is retained and returned without copying");
+    result[0] = 42;
+    check(loader.getLastEventMessage()[0] == 42 && loader.getTrackList().isEmpty(),
+        "event payload view is mutable and event-only files add no tracks");
+  }
+
+  private static void failures() throws Exception {
+    MemoryStream failing = new MemoryStream(new byte[9]);
+    IOException cause = new IOException("header-failure");
+    failing.failure = cause;
+    MpegFileLoader loader = new MpegFileLoader(failing);
+    Throwable wrapped = catchThrowable(loader::parseHeaders);
+    check(wrapped instanceof RuntimeException && wrapped.getClass() == RuntimeException.class
+        && wrapped.getCause() == cause && wrapped.getMessage().equals(cause.toString()),
+        "parseHeaders wraps checked I/O once while retaining cause identity: " + wrapped
+            + ", cause=" + (wrapped == null ? null : wrapped.getCause()));
+
+    MpegFileLoader empty = parsed(new byte[0]);
+    MpegTrackInfo absent = new MpegTrackInfo(99, "soun", "mp4a", 2, 48000, new byte[] {1});
+    check(empty.getTrackList().isEmpty()
+        && empty.loadReader(new MpegNoopTrackConsumer(absent)) == null,
+        "empty files parse cleanly and select no provider");
+  }
+
+  private static void subclassUse() {
+    Derived derived = new Derived(new MemoryStream(new byte[0]));
+    check(derived.getTextMetadata("anything").equals("derived"),
+        "ordinary subclass virtual dispatch remains available");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MpegFileLoader> type = MpegFileLoader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete class metadata");
+    check(type.getDeclaredFields().length == 7 && type.getDeclaredMethods().length == 26
+        && type.getDeclaredConstructors().length == 1, "exact declared member counts");
+    for (String name : new String[] {"tracks", "fragmentedFileReader", "standardFileReader",
+        "reader", "root", "metadata"}) {
+      Field state = type.getDeclaredField(name);
+      check(state.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL) && !state.isSynthetic(),
+          "private final state " + name);
+    }
+    Field event = type.getDeclaredField("lastEventMessage");
+    check(event.getType() == byte[].class && event.getModifiers() == Modifier.PRIVATE
+        && !event.isSynthetic(), "mutable event state metadata");
+
+    Constructor<MpegFileLoader> constructor = type.getDeclaredConstructor(SeekableInputStream.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "constructor descriptor metadata");
+    Method tracks = checkMethod(type.getDeclaredMethod("getTrackList"), List.class, new Class<?>[0]);
+    ParameterizedType generic = (ParameterizedType) tracks.getGenericReturnType();
+    check(generic.getRawType() == List.class
+        && Arrays.equals(generic.getActualTypeArguments(), new Object[] {MpegTrackInfo.class}),
+        "track list retains its generic element signature");
+    checkMethod(type.getDeclaredMethod("parseHeaders"), void.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("getTextMetadata", String.class), String.class,
+        new Class<?>[] {String.class});
+    checkMethod(type.getDeclaredMethod("getLastEventMessage"), byte[].class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("loadReader", MpegTrackConsumer.class),
+        MpegFileTrackProvider.class, new Class<?>[] {MpegTrackConsumer.class});
+  }
+
+  private static MpegFileLoader parsed(byte[] data) {
+    MpegFileLoader loader = new MpegFileLoader(new MemoryStream(data));
+    loader.parseHeaders();
+    return loader;
+  }
+
+  private static MpegTrackInfo onlyAudioTrack(MpegFileLoader loader) {
+    check(loader.getTrackList().size() == 1, "fixture exposes one track");
+    return loader.getTrackList().get(0);
+  }
+
+  private static byte[] emsg(byte[] payload) throws IOException {
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    DataOutputStream data = new DataOutputStream(bytes);
+    data.writeInt(28 + payload.length);
+    data.writeBytes("emsg");
+    data.writeInt(0);
+    data.writeByte('s'); data.writeByte(0);
+    data.writeByte('v'); data.writeByte(0);
+    data.writeInt(1000); data.writeInt(10); data.writeInt(20);
+    data.write(payload);
+    return bytes.toByteArray();
+  }
+
+  private static byte[] concat(byte[] first, byte[] second) {
+    byte[] result = Arrays.copyOf(first, first.length + second.length);
+    System.arraycopy(second, 0, result, first.length, second.length);
+    return result;
+  }
+
+  private static Object field(Object owner, String name) throws Exception {
+    Field field = owner.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(owner);
+  }
+
+  private static Method checkMethod(Method method, Class<?> returnType, Class<?>[] parameters) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && !method.isSynthetic()
+        && !method.isBridge() && !method.isDefault() && !method.isVarArgs(),
+        method.getName() + " method metadata");
+    return method;
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    final byte[] data;
+    long position;
+    IOException failure;
+    MemoryStream(byte[] data) { super(data.length, 0L); this.data = data; }
+    @Override public int read() throws IOException {
+      if (failure != null) throw failure;
+      return position < data.length ? data[(int) position++] & 0xff : -1;
+    }
+    @Override public long getPosition() { return position; }
+    @Override protected void seekHard(long target) { position = target; }
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider>
+        getTrackInfoProviders() { return Collections.emptyList(); }
+  }
+
+  private static final class Derived extends MpegFileLoader {
+    Derived(SeekableInputStream input) { super(input); }
+    @Override public String getTextMetadata(String name) { return "derived"; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
 }
 "#;
 
