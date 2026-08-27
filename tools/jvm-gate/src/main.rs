@@ -184,6 +184,10 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-flac-frame-reader-consumer" => Some(FLAC_FRAME_READER_CONSUMER),
         "write-flac-sub-frame-reader-consumer" => Some(FLAC_SUB_FRAME_READER_CONSUMER),
         "write-matroska-aac-track-consumer-consumer" => Some(MATROSKA_AAC_TRACK_CONSUMER_CONSUMER),
+        "write-matroska-audio-track-consumer" => Some(MATROSKA_AUDIO_TRACK_CONSUMER),
+        "write-matroska-audio-track-support-consumer" => {
+            Some(MATROSKA_AUDIO_TRACK_SUPPORT_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -17512,6 +17516,649 @@ public final class GateMatroskaAacTrackConsumer {
     int initialiseCalls;
     Derived() { super(null, null); }
     @Override public void initialise() { initialiseCalls++; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MATROSKA_AUDIO_TRACK_SUPPORT_CONSUMER: &str = r#"
+package com.sedmelluq.discord.lavaplayer.container.matroska;
+
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+
+public final class MatroskaGateSupport {
+  public static SeekableInputStream constructorInput;
+  public static AudioProcessingContext constructorContext;
+  public static MatroskaFileTrack constructorTrack;
+  public static MatroskaFileTrack reportedTrack;
+  public static MatroskaTrackConsumer consumer;
+  public static MatroskaFileTrack[] tracks;
+  public static String consumerKind;
+  public static int fileConstructions;
+  public static int readFileCalls;
+  public static int durationCalls;
+  public static int trackListCalls;
+  public static int consumerConstructions;
+  public static int getTrackCalls;
+  public static int initialiseCalls;
+  public static int provideCalls;
+  public static int seekCalls;
+  public static int closeCalls;
+  public static int seekTrack;
+  public static long seekTimecode;
+  public static double duration;
+  public static boolean reportNullTrack;
+  public static IOException readFileFailure;
+  public static RuntimeException readFileRuntimeFailure;
+  public static RuntimeException durationFailure;
+  public static RuntimeException trackListFailure;
+  public static RuntimeException consumerConstructionFailure;
+  public static RuntimeException getTrackFailure;
+  public static RuntimeException initialiseFailure;
+  public static InterruptedException provideFailure;
+  public static RuntimeException seekFailure;
+  public static RuntimeException closeFailure;
+  public static final StringBuilder events = new StringBuilder();
+
+  private MatroskaGateSupport() {}
+
+  public static void reset() {
+    constructorInput = null;
+    constructorContext = null;
+    constructorTrack = null;
+    reportedTrack = null;
+    consumer = null;
+    tracks = new MatroskaFileTrack[0];
+    consumerKind = null;
+    fileConstructions = readFileCalls = durationCalls = trackListCalls = 0;
+    consumerConstructions = getTrackCalls = initialiseCalls = 0;
+    provideCalls = seekCalls = closeCalls = 0;
+    seekTrack = 0;
+    seekTimecode = 0L;
+    duration = 0.0;
+    reportNullTrack = false;
+    readFileFailure = null;
+    readFileRuntimeFailure = null;
+    durationFailure = null;
+    trackListFailure = null;
+    consumerConstructionFailure = null;
+    getTrackFailure = null;
+    initialiseFailure = null;
+    provideFailure = null;
+    seekFailure = null;
+    closeFailure = null;
+    events.setLength(0);
+  }
+
+  static void event(String value) {
+    if (events.length() > 0) events.append(',');
+    events.append(value);
+  }
+}
+
+class MatroskaStreamingFile {
+  MatroskaStreamingFile(SeekableInputStream input) {
+    MatroskaGateSupport.fileConstructions++;
+    MatroskaGateSupport.constructorInput = input;
+    MatroskaGateSupport.event("file");
+  }
+
+  public void readFile() throws IOException {
+    MatroskaGateSupport.readFileCalls++;
+    MatroskaGateSupport.event("readFile");
+    if (MatroskaGateSupport.readFileFailure != null) throw MatroskaGateSupport.readFileFailure;
+    if (MatroskaGateSupport.readFileRuntimeFailure != null) {
+      throw MatroskaGateSupport.readFileRuntimeFailure;
+    }
+  }
+
+  public double getDuration() {
+    MatroskaGateSupport.durationCalls++;
+    MatroskaGateSupport.event("duration");
+    if (MatroskaGateSupport.durationFailure != null) throw MatroskaGateSupport.durationFailure;
+    return MatroskaGateSupport.duration;
+  }
+
+  public MatroskaFileTrack[] getTrackList() {
+    MatroskaGateSupport.trackListCalls++;
+    MatroskaGateSupport.event("tracks");
+    if (MatroskaGateSupport.trackListFailure != null) throw MatroskaGateSupport.trackListFailure;
+    return MatroskaGateSupport.tracks;
+  }
+
+  public void provideFrames(MatroskaTrackConsumer trackConsumer) throws InterruptedException {
+    MatroskaGateSupport.provideCalls++;
+    MatroskaGateSupport.event("read");
+    if (trackConsumer != MatroskaGateSupport.consumer) {
+      throw new AssertionError("read callback received a different consumer");
+    }
+    if (MatroskaGateSupport.provideFailure != null) throw MatroskaGateSupport.provideFailure;
+  }
+
+  public void seekToTimecode(int track, long timecode) {
+    MatroskaGateSupport.seekCalls++;
+    MatroskaGateSupport.seekTrack = track;
+    MatroskaGateSupport.seekTimecode = timecode;
+    MatroskaGateSupport.event("seek");
+    if (MatroskaGateSupport.seekFailure != null) throw MatroskaGateSupport.seekFailure;
+  }
+}
+
+abstract class GateMatroskaConsumer implements MatroskaTrackConsumer {
+  private final MatroskaFileTrack track;
+
+  GateMatroskaConsumer(String kind, AudioProcessingContext context, MatroskaFileTrack track) {
+    MatroskaGateSupport.consumerConstructions++;
+    MatroskaGateSupport.consumerKind = kind;
+    MatroskaGateSupport.constructorContext = context;
+    MatroskaGateSupport.constructorTrack = track;
+    MatroskaGateSupport.event(kind);
+    if (MatroskaGateSupport.consumerConstructionFailure != null) {
+      throw MatroskaGateSupport.consumerConstructionFailure;
+    }
+    this.track = track;
+    MatroskaGateSupport.consumer = this;
+  }
+
+  @Override
+  public MatroskaFileTrack getTrack() {
+    MatroskaGateSupport.getTrackCalls++;
+    MatroskaGateSupport.event("getTrack");
+    if (MatroskaGateSupport.getTrackFailure != null) throw MatroskaGateSupport.getTrackFailure;
+    if (MatroskaGateSupport.reportNullTrack) return null;
+    return MatroskaGateSupport.reportedTrack == null ? track : MatroskaGateSupport.reportedTrack;
+  }
+
+  @Override
+  public void initialise() {
+    MatroskaGateSupport.initialiseCalls++;
+    MatroskaGateSupport.event("initialise");
+    if (MatroskaGateSupport.initialiseFailure != null) throw MatroskaGateSupport.initialiseFailure;
+  }
+
+  @Override public void seekPerformed(long requested, long provided) {}
+  @Override public void flush() throws InterruptedException {}
+  @Override public void consume(ByteBuffer data) throws InterruptedException {}
+
+  @Override
+  public void close() {
+    MatroskaGateSupport.closeCalls++;
+    MatroskaGateSupport.event("close");
+    if (MatroskaGateSupport.closeFailure != null) throw MatroskaGateSupport.closeFailure;
+  }
+}
+
+class MatroskaOpusTrackConsumer extends GateMatroskaConsumer {
+  MatroskaOpusTrackConsumer(AudioProcessingContext context, MatroskaFileTrack track) {
+    super("opus", context, track);
+  }
+}
+
+class MatroskaVorbisTrackConsumer extends GateMatroskaConsumer {
+  MatroskaVorbisTrackConsumer(AudioProcessingContext context, MatroskaFileTrack track) {
+    super("vorbis", context, track);
+  }
+}
+
+class MatroskaAacTrackConsumer extends GateMatroskaConsumer {
+  MatroskaAacTrackConsumer(AudioProcessingContext context, MatroskaFileTrack track) {
+    super("aac", context, track);
+  }
+}
+"#;
+
+const MATROSKA_AUDIO_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaAudioTrack;
+import com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaGateSupport;
+import com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateMatroskaAudioTrack {
+  private static final Object UNSAFE = loadUnsafe();
+
+  public static void main(String[] args) throws Exception {
+    if (args.length > 0 && args[0].equals("safety")) {
+      safeSingleConstruction();
+      System.out.println("safety=single-selected-consumer");
+      return;
+    }
+    construction();
+    processing();
+    selection();
+    durationConversion();
+    failures();
+    subclassUse();
+    reflection();
+    System.out.println("contracts=track-info,input-identity,null-construction,file-read,duration-cast,processing-context,audio-only,codec-selection,opus-priority,last-fallback,initialise,read-callback,seek-callback,seek-track-index,full-timecode,executor-control,input-ownership,io-wrap,runtime-identity,context-failure,null-executor,no-supported-track,construction-failure,get-track-failure,initialise-cleanup,loop-cleanup,callback-cleanup,warning-close,subclassable,eager-logger,private-state,private-helpers,throws,reflection");
+  }
+
+  private static void construction() throws Exception {
+    AudioTrackInfo info = info("constructor-id");
+    MemoryStream input = new MemoryStream();
+    MatroskaAudioTrack track = new MatroskaAudioTrack(info, input);
+    check(track.getInfo() == info && track.getIdentifier() == info.identifier,
+        "base constructor retains track info identity");
+    check(field(track, "inputStream") == input, "constructor retains input identity");
+    check(field(new MatroskaAudioTrack(info, null), "inputStream") == null
+        && new MatroskaAudioTrack(null, input).getInfo() == null,
+        "constructor accepts null arguments");
+  }
+
+  private static void processing() throws Exception {
+    MatroskaGateSupport.reset();
+    MemoryStream input = new MemoryStream();
+    MatroskaFileTrack video = track(2, MatroskaFileTrack.Type.VIDEO, "A_OPUS");
+    MatroskaFileTrack opus = track(7, MatroskaFileTrack.Type.AUDIO, "A_OPUS");
+    MatroskaGateSupport.tracks = new MatroskaFileTrack[] {
+        video, opus, track(9, MatroskaFileTrack.Type.AUDIO, "A_AAC")};
+    MatroskaGateSupport.duration = 987.75;
+    RecordingExecutor executor = executor();
+    executor.context = allocate(AudioProcessingContext.class);
+    executor.invokeRead = executor.invokeSeek = true;
+    executor.seekTimecode = Long.MIN_VALUE + 41L;
+    MatroskaAudioTrack value = new MatroskaAudioTrack(info("process-id"), input);
+    value.process(executor);
+    check(MatroskaGateSupport.constructorInput == input
+        && MatroskaGateSupport.constructorContext == executor.context
+        && MatroskaGateSupport.constructorTrack == opus,
+        "file and selected consumer retain exact input, context, and track identities");
+    check(value.getDuration() == 987L && executor.contextCalls == 1
+        && executor.loopCalls == 1 && MatroskaGateSupport.initialiseCalls == 1,
+        "file parsing updates duration before one context and loop dispatch");
+    check(MatroskaGateSupport.provideCalls == 1 && MatroskaGateSupport.seekCalls == 1
+        && MatroskaGateSupport.seekTrack == 7
+        && MatroskaGateSupport.seekTimecode == Long.MIN_VALUE + 41L,
+        "callbacks preserve consumer, track index, and full-width timecode");
+    check(MatroskaGateSupport.getTrackCalls == 2 && MatroskaGateSupport.closeCalls == 1,
+        "logging and seek query the selected track and cleanup once");
+    check(MatroskaGateSupport.events.toString().equals(
+        "file,readFile,duration,context,tracks,opus,getTrack,initialise,loop,read,getTrack,seek,close"),
+        "file, selection, callbacks, and cleanup retain order");
+    check(input.readCalls == 0 && input.seekCalls == 0 && input.closeCalls == 0,
+        "track does not take ownership of the caller stream");
+
+    MatroskaGateSupport.reset();
+    MatroskaGateSupport.tracks = new MatroskaFileTrack[] {track(4, MatroskaFileTrack.Type.AUDIO, "A_AAC")};
+    RecordingExecutor passive = executor();
+    passive.context = allocate(AudioProcessingContext.class);
+    new MatroskaAudioTrack(info("passive-id"), input).process(passive);
+    check(passive.readExecutor != null && passive.seekExecutor != null
+        && MatroskaGateSupport.provideCalls == 0 && MatroskaGateSupport.seekCalls == 0
+        && MatroskaGateSupport.closeCalls == 1,
+        "executor exclusively controls callback invocation");
+  }
+
+  private static void selection() throws Exception {
+    check(selected(new MatroskaFileTrack[] {
+        track(1, MatroskaFileTrack.Type.AUDIO, "A_VORBIS"),
+        track(2, MatroskaFileTrack.Type.AUDIO, "A_AAC")}).equals("aac"),
+        "last AAC/Vorbis fallback wins");
+    check(selected(new MatroskaFileTrack[] {
+        track(1, MatroskaFileTrack.Type.AUDIO, "A_AAC"),
+        track(2, MatroskaFileTrack.Type.AUDIO, "A_VORBIS")}).equals("vorbis"),
+        "last supported fallback is order-sensitive");
+    check(selected(new MatroskaFileTrack[] {
+        track(1, MatroskaFileTrack.Type.AUDIO, "A_AAC"),
+        track(2, MatroskaFileTrack.Type.AUDIO, "A_OPUS"),
+        track(3, MatroskaFileTrack.Type.AUDIO, "A_VORBIS")}).equals("opus"),
+        "first Opus track has priority and stops selection");
+  }
+
+  private static String selected(MatroskaFileTrack[] tracks) throws Exception {
+    MatroskaGateSupport.reset();
+    MatroskaGateSupport.tracks = tracks;
+    RecordingExecutor executor = executor();
+    executor.context = allocate(AudioProcessingContext.class);
+    new MatroskaAudioTrack(info("selection-id"), new MemoryStream()).process(executor);
+    return MatroskaGateSupport.consumerKind;
+  }
+
+  private static void durationConversion() throws Exception {
+    MatroskaGateSupport.reset();
+    MatroskaGateSupport.duration = Double.NaN;
+    MatroskaGateSupport.tracks = new MatroskaFileTrack[] {track(1, MatroskaFileTrack.Type.AUDIO, "A_AAC")};
+    RecordingExecutor first = executor();
+    first.context = allocate(AudioProcessingContext.class);
+    MatroskaAudioTrack nan = new MatroskaAudioTrack(info("nan"), new MemoryStream());
+    nan.process(first);
+    check(accurateDuration(nan) == 0L, "NaN duration follows Java double-to-int conversion");
+
+    MatroskaGateSupport.reset();
+    MatroskaGateSupport.duration = Double.POSITIVE_INFINITY;
+    MatroskaGateSupport.tracks = new MatroskaFileTrack[] {track(1, MatroskaFileTrack.Type.AUDIO, "A_AAC")};
+    RecordingExecutor second = executor();
+    second.context = allocate(AudioProcessingContext.class);
+    MatroskaAudioTrack infinity = new MatroskaAudioTrack(info("infinity"), new MemoryStream());
+    infinity.process(second);
+    check(accurateDuration(infinity) == Integer.MAX_VALUE,
+        "infinite duration saturates through Java int conversion");
+  }
+
+  private static void failures() throws Exception {
+    IOException io = new IOException("read-file");
+    MatroskaGateSupport.reset();
+    MatroskaGateSupport.readFileFailure = io;
+    Throwable wrapped = catchThrowable(() ->
+        new MatroskaAudioTrack(info("io"), new MemoryStream()).process(executor()));
+    check(wrapped instanceof RuntimeException && wrapped.getCause() == io
+        && MatroskaGateSupport.trackListCalls == 0,
+        "file IO failure is wrapped with exact cause before selection");
+
+    RuntimeException readRuntime = new RuntimeException("read-runtime");
+    MatroskaGateSupport.reset();
+    MatroskaGateSupport.readFileRuntimeFailure = readRuntime;
+    check(catchThrowable(() ->
+        new MatroskaAudioTrack(info("runtime"), new MemoryStream()).process(executor())) == readRuntime,
+        "unchecked file failure keeps identity");
+
+    MatroskaGateSupport.reset();
+    MatroskaGateSupport.tracks = oneAac();
+    check(catchThrowable(() ->
+        new MatroskaAudioTrack(info("null-executor"), new MemoryStream()).process(null))
+        instanceof NullPointerException && MatroskaGateSupport.durationCalls == 1
+        && MatroskaGateSupport.trackListCalls == 0,
+        "null executor fails after file load and duration update");
+
+    RuntimeException contextFailure = new RuntimeException("context");
+    MatroskaGateSupport.reset();
+    MatroskaGateSupport.tracks = oneAac();
+    RecordingExecutor context = executor();
+    context.contextFailure = contextFailure;
+    check(catchThrowable(() ->
+        new MatroskaAudioTrack(info("context"), new MemoryStream()).process(context)) == contextFailure
+        && MatroskaGateSupport.trackListCalls == 0 && MatroskaGateSupport.closeCalls == 0,
+        "context failure precedes selection and consumer cleanup");
+
+    MatroskaGateSupport.reset();
+    MatroskaGateSupport.tracks = new MatroskaFileTrack[] {
+        track(1, MatroskaFileTrack.Type.VIDEO, "A_OPUS"),
+        track(2, MatroskaFileTrack.Type.AUDIO, null),
+        track(3, MatroskaFileTrack.Type.AUDIO, "unsupported")};
+    RecordingExecutor unsupported = executor();
+    unsupported.context = allocate(AudioProcessingContext.class);
+    Throwable missing = catchThrowable(() ->
+        new MatroskaAudioTrack(info("missing"), new MemoryStream()).process(unsupported));
+    check(missing instanceof IllegalStateException
+        && missing.getMessage().equals("No supported audio tracks in the file.")
+        && unsupported.loopCalls == 0 && MatroskaGateSupport.closeCalls == 0,
+        "non-audio, null, and unknown codecs produce the exact missing-track failure");
+
+    RuntimeException constructorFailure = new RuntimeException("consumer-constructor");
+    MatroskaGateSupport.reset();
+    MatroskaGateSupport.tracks = oneAac();
+    MatroskaGateSupport.consumerConstructionFailure = constructorFailure;
+    RecordingExecutor constructor = executor();
+    constructor.context = allocate(AudioProcessingContext.class);
+    check(catchThrowable(() ->
+        new MatroskaAudioTrack(info("constructor"), new MemoryStream()).process(constructor))
+        == constructorFailure && MatroskaGateSupport.closeCalls == 0,
+        "consumer construction failure propagates before publication");
+
+    RuntimeException getTrackFailure = new RuntimeException("get-track");
+    MatroskaGateSupport.reset();
+    MatroskaGateSupport.tracks = oneAac();
+    MatroskaGateSupport.getTrackFailure = getTrackFailure;
+    RecordingExecutor getter = executor();
+    getter.context = allocate(AudioProcessingContext.class);
+    check(catchThrowable(() ->
+        new MatroskaAudioTrack(info("get-track"), new MemoryStream()).process(getter))
+        == getTrackFailure && MatroskaGateSupport.closeCalls == 1 && getter.loopCalls == 0,
+        "logging getTrack failure closes the selected consumer");
+
+    RuntimeException initialiseFailure = new RuntimeException("initialise");
+    RuntimeException closeFailure = new RuntimeException("close");
+    MatroskaGateSupport.reset();
+    MatroskaGateSupport.tracks = oneAac();
+    MatroskaGateSupport.initialiseFailure = initialiseFailure;
+    MatroskaGateSupport.closeFailure = closeFailure;
+    RecordingExecutor initialise = executor();
+    initialise.context = allocate(AudioProcessingContext.class);
+    check(catchThrowable(() ->
+        new MatroskaAudioTrack(info("initialise"), new MemoryStream()).process(initialise))
+        == initialiseFailure && MatroskaGateSupport.closeCalls == 1,
+        "initialise failure keeps identity while warning cleanup swallows close failure");
+
+    RuntimeException loopFailure = new RuntimeException("loop");
+    MatroskaGateSupport.reset();
+    MatroskaGateSupport.tracks = oneAac();
+    RecordingExecutor loop = executor();
+    loop.context = allocate(AudioProcessingContext.class);
+    loop.loopFailure = loopFailure;
+    check(catchThrowable(() ->
+        new MatroskaAudioTrack(info("loop"), new MemoryStream()).process(loop)) == loopFailure
+        && MatroskaGateSupport.closeCalls == 1,
+        "loop failure keeps identity through final cleanup");
+
+    InterruptedException callbackFailure = new InterruptedException("read");
+    MatroskaGateSupport.reset();
+    MatroskaGateSupport.tracks = oneAac();
+    MatroskaGateSupport.provideFailure = callbackFailure;
+    RecordingExecutor read = executor();
+    read.context = allocate(AudioProcessingContext.class);
+    read.invokeRead = true;
+    check(catchThrowable(() ->
+        new MatroskaAudioTrack(info("read"), new MemoryStream()).process(read)) == callbackFailure
+        && MatroskaGateSupport.closeCalls == 1,
+        "checked read callback failure keeps identity through cleanup");
+  }
+
+  private static void safeSingleConstruction() throws Exception {
+    MatroskaGateSupport.reset();
+    MatroskaGateSupport.tracks = new MatroskaFileTrack[] {
+        track(1, MatroskaFileTrack.Type.AUDIO, "A_VORBIS"),
+        track(2, MatroskaFileTrack.Type.AUDIO, "A_AAC")};
+    RecordingExecutor executor = executor();
+    executor.context = allocate(AudioProcessingContext.class);
+    new MatroskaAudioTrack(info("safe-selection"), new MemoryStream()).process(executor);
+    check(MatroskaGateSupport.consumerKind.equals("aac")
+        && MatroskaGateSupport.consumerConstructions == 1
+        && MatroskaGateSupport.closeCalls == 1,
+        "selection constructs and closes only the final consumer");
+  }
+
+  private static void subclassUse() throws Exception {
+    MatroskaGateSupport.reset();
+    MatroskaGateSupport.tracks = oneAac();
+    Derived derived = new Derived(info("derived"), new MemoryStream());
+    RecordingExecutor executor = executor();
+    executor.context = allocate(AudioProcessingContext.class);
+    BaseAudioTrack dynamic = derived;
+    dynamic.process(executor);
+    check(derived.processCalls == 1 && executor.loopCalls == 1
+        && MatroskaGateSupport.closeCalls == 1,
+        "ordinary subclass participates in virtual process dispatch");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MatroskaAudioTrack> type = MatroskaAudioTrack.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == BaseAudioTrack.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete non-final class metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredMethods().length == 6
+        && type.getDeclaredConstructors().length == 1, "exact declared member counts");
+    Field log = type.getDeclaredField("log");
+    log.setAccessible(true);
+    Object expectedLogger = Class.forName("org.slf4j.LoggerFactory")
+        .getMethod("getLogger", Class.class).invoke(null, type);
+    check(log.getType().getName().equals("org.slf4j.Logger")
+        && log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && log.get(null) != null && log.get(null) == expectedLogger,
+        "eager class logger identity and metadata");
+    Field input = type.getDeclaredField("inputStream");
+    check(input.getType() == SeekableInputStream.class
+        && input.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL),
+        "private final input field metadata");
+    Constructor<MatroskaAudioTrack> constructor =
+        type.getDeclaredConstructor(AudioTrackInfo.class, SeekableInputStream.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "constructor metadata");
+    Method process = type.getDeclaredMethod("process", LocalAudioTrackExecutor.class);
+    check(process.getModifiers() == Modifier.PUBLIC && process.getReturnType() == void.class
+        && process.getExceptionTypes().length == 0 && !process.isSynthetic()
+        && !process.isBridge() && !process.isVarArgs(), "process metadata");
+    Method loadFile = type.getDeclaredMethod("loadMatroskaFile");
+    Method loadAudio = type.getDeclaredMethod("loadAudioTrack",
+        Class.forName("com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaStreamingFile"),
+        AudioProcessingContext.class);
+    Method select = type.getDeclaredMethod("selectAudioTrack",
+        MatroskaFileTrack[].class, AudioProcessingContext.class);
+    check(loadFile.getModifiers() == Modifier.PRIVATE
+        && loadAudio.getModifiers() == Modifier.PRIVATE
+        && select.getModifiers() == Modifier.PRIVATE
+        && loadFile.getExceptionTypes().length == 0
+        && loadAudio.getExceptionTypes().length == 0
+        && select.getExceptionTypes().length == 0,
+        "private helper metadata");
+    Method[] synthetic = Arrays.stream(type.getDeclaredMethods())
+        .filter(Method::isSynthetic).toArray(Method[]::new);
+    check(synthetic.length == 2
+        && Arrays.stream(synthetic).allMatch(method -> Modifier.isPrivate(method.getModifiers())
+            && Modifier.isStatic(method.getModifiers())
+            && Arrays.equals(method.getExceptionTypes(), new Class<?>[] {Exception.class})),
+        "two private static synthetic callback bridges retain throws metadata");
+  }
+
+  private static MatroskaFileTrack[] oneAac() {
+    return new MatroskaFileTrack[] {track(3, MatroskaFileTrack.Type.AUDIO, "A_AAC")};
+  }
+
+  private static MatroskaFileTrack track(int index, MatroskaFileTrack.Type type, String codec) {
+    return new MatroskaFileTrack(index, type, index, "track-" + index, codec, null, null);
+  }
+
+  private static AudioTrackInfo info(String identifier) {
+    return new AudioTrackInfo("title", "author", 123L, identifier, true,
+        "uri", "artwork", "isrc");
+  }
+
+  private static Object field(Object owner, String name) throws Exception {
+    Field field = MatroskaAudioTrack.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(owner);
+  }
+
+  private static long accurateDuration(MatroskaAudioTrack track) throws Exception {
+    Field field = BaseAudioTrack.class.getDeclaredField("accurateDuration");
+    field.setAccessible(true);
+    return ((java.util.concurrent.atomic.AtomicLong) field.get(track)).get();
+  }
+
+  private static RecordingExecutor executor() throws Exception {
+    return allocate(RecordingExecutor.class);
+  }
+
+  private static <T> T allocate(Class<T> type) throws Exception {
+    return type.cast(UNSAFE.getClass().getMethod("allocateInstance", Class.class)
+        .invoke(UNSAFE, type));
+  }
+
+  private static Object loadUnsafe() {
+    try {
+      Class<?> type = Class.forName("sun.misc.Unsafe");
+      Field field = type.getDeclaredField("theUnsafe");
+      field.setAccessible(true);
+      return field.get(null);
+    } catch (ReflectiveOperationException error) {
+      throw new ExceptionInInitializerError(error);
+    }
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try {
+      action.run();
+      return null;
+    } catch (Throwable throwable) {
+      return throwable;
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <E extends Throwable> void sneakyThrow(Throwable failure) throws E {
+    throw (E) failure;
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    long position;
+    int readCalls;
+    int seekCalls;
+    int closeCalls;
+    MemoryStream() { super(0L, 0L); }
+    @Override public int read() { readCalls++; return -1; }
+    @Override public long getPosition() { return position; }
+    @Override protected void seekHard(long position) { seekCalls++; this.position = position; }
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      return Collections.emptyList();
+    }
+    @Override public void close() { closeCalls++; }
+  }
+
+  private static final class RecordingExecutor extends LocalAudioTrackExecutor {
+    AudioProcessingContext context;
+    int contextCalls;
+    int loopCalls;
+    boolean invokeRead;
+    boolean invokeSeek;
+    long seekTimecode;
+    RuntimeException contextFailure;
+    RuntimeException loopFailure;
+    ReadExecutor readExecutor;
+    SeekExecutor seekExecutor;
+    private RecordingExecutor() { super(null, null, null, false, 0); }
+    @Override public AudioProcessingContext getProcessingContext() {
+      contextCalls++;
+      MatroskaGateSupport.events.append(
+          MatroskaGateSupport.events.length() == 0 ? "context" : ",context");
+      if (contextFailure != null) throw contextFailure;
+      return context;
+    }
+    @Override public void executeProcessingLoop(ReadExecutor read, SeekExecutor seek) {
+      loopCalls++;
+      readExecutor = read;
+      seekExecutor = seek;
+      MatroskaGateSupport.events.append(
+          MatroskaGateSupport.events.length() == 0 ? "loop" : ",loop");
+      if (loopFailure != null) throw loopFailure;
+      try {
+        if (invokeRead) read.performRead();
+        if (invokeSeek) seek.performSeek(seekTimecode);
+      } catch (Throwable failure) {
+        GateMatroskaAudioTrack.<RuntimeException>sneakyThrow(failure);
+      }
+    }
+  }
+
+  private static final class Derived extends MatroskaAudioTrack {
+    int processCalls;
+    Derived(AudioTrackInfo info, SeekableInputStream input) { super(info, input); }
+    @Override public void process(LocalAudioTrackExecutor executor) {
+      processCalls++;
+      super.process(executor);
+    }
   }
 
   private static void check(boolean condition, String message) {

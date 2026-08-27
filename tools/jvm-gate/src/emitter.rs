@@ -198,6 +198,8 @@ const FLAC_SUB_FRAME_READER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/frame/FlacSubFrameReader";
 const MATROSKA_AAC_TRACK_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaAacTrackConsumer";
+const MATROSKA_AUDIO_TRACK_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaAudioTrack";
 const AUDIO_FILTER_CHAIN_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioFilterChain";
 const AUDIO_PIPELINE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/filter/AudioPipeline";
 const AUDIO_PIPELINE_FACTORY_CLASS: &str =
@@ -553,6 +555,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     FLAC_FRAME_READER_CLASS,
     FLAC_SUB_FRAME_READER_CLASS,
     MATROSKA_AAC_TRACK_CONSUMER_CLASS,
+    MATROSKA_AUDIO_TRACK_CLASS,
     "com/sedmelluq/discord/lavaplayer/source/AudioSourceManager",
     AUDIO_SOURCE_MANAGERS_CLASS,
     PROBING_AUDIO_SOURCE_MANAGER_CLASS,
@@ -1040,6 +1043,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | FLAC_FRAME_HEADER_READER_CLASS
             | FLAC_FRAME_INFO_CHANNEL_DELTA_CLASS
             | MATROSKA_AAC_TRACK_CONSUMER_CLASS
+            | MATROSKA_AUDIO_TRACK_CLASS
             | OPUS_AUDIO_DATA_FORMAT_CLASS
             | PCM16_AUDIO_DATA_FORMAT_CLASS
             | OPUS_CHUNK_DECODER_CLASS
@@ -1166,6 +1170,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | FLAC_FRAME_READER_CLASS
             | FLAC_SUB_FRAME_READER_CLASS
             | MATROSKA_AAC_TRACK_CONSUMER_CLASS
+            | MATROSKA_AUDIO_TRACK_CLASS
             | AUDIO_PIPELINE_FACTORY_CLASS
             | CHANNEL_COUNT_PCM_AUDIO_FILTER_CLASS
             | COMPOSITE_AUDIO_FILTER_CLASS
@@ -1502,6 +1507,9 @@ fn replacement_body(
     }
     if class_name == MATROSKA_AAC_TRACK_CONSUMER_CLASS {
         return matroska_aac_track_consumer_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == MATROSKA_AUDIO_TRACK_CLASS {
+        return matroska_audio_track_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == PCM_FORMAT_CLASS {
         return pcm_format_replacement(pool, name, descriptor, required_locals);
@@ -9318,6 +9326,849 @@ fn matroska_aac_track_consumer_class_init(pool: &mut ConstantPool<'static>) -> R
         0,
         vec![
             Instruction::Ldc_w(logger_owner),
+            Instruction::Invokestatic(get_logger),
+            Instruction::Putstatic(log),
+            Instruction::Return,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn matroska_audio_track_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)V",
+        ) => matroska_audio_track_constructor(pool),
+        (
+            "process",
+            "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
+        ) => matroska_audio_track_process(pool),
+        (
+            "loadMatroskaFile",
+            "()Lcom/sedmelluq/discord/lavaplayer/container/matroska/MatroskaStreamingFile;",
+        ) => matroska_audio_track_load_file(pool),
+        (
+            "loadAudioTrack",
+            "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/MatroskaStreamingFile;Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;)Lcom/sedmelluq/discord/lavaplayer/container/matroska/MatroskaTrackConsumer;",
+        ) => matroska_audio_track_load_audio(pool),
+        (
+            "selectAudioTrack",
+            "([Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;)Lcom/sedmelluq/discord/lavaplayer/container/matroska/MatroskaTrackConsumer;",
+        ) => matroska_audio_track_select_audio(pool),
+        (
+            "lambda$process$1",
+            "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/MatroskaStreamingFile;Lcom/sedmelluq/discord/lavaplayer/container/matroska/MatroskaTrackConsumer;J)V",
+        ) => matroska_audio_track_seek_callback(pool),
+        (
+            "lambda$process$0",
+            "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/MatroskaStreamingFile;Lcom/sedmelluq/discord/lavaplayer/container/matroska/MatroskaTrackConsumer;)V",
+        ) => matroska_audio_track_read_callback(pool),
+        ("<clinit>", "()V") => matroska_audio_track_class_init(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {MATROSKA_AUDIO_TRACK_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn matroska_audio_track_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let parent = pool.add_class(BASE_AUDIO_TRACK_CLASS)?;
+    let parent_init = pool.add_method_ref(
+        parent,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;)V",
+    )?;
+    let owner = pool.add_class(MATROSKA_AUDIO_TRACK_CLASS)?;
+    let input = pool.add_field_ref(
+        owner,
+        "inputStream",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;",
+    )?;
+    code(
+        pool,
+        2,
+        3,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(parent_init),
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Putfield(input),
+            Instruction::Return,
+        ],
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn matroska_audio_track_process(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_AUDIO_TRACK_CLASS)?;
+    let file = pool
+        .add_class("com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaStreamingFile")?;
+    let consumer = pool
+        .add_class("com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaTrackConsumer")?;
+    let executor = pool.add_class(LOCAL_TRACK_EXECUTOR_CLASS)?;
+    let load_file = pool.add_method_ref(
+        owner,
+        "loadMatroskaFile",
+        "()Lcom/sedmelluq/discord/lavaplayer/container/matroska/MatroskaStreamingFile;",
+    )?;
+    let get_context = pool.add_method_ref(
+        executor,
+        "getProcessingContext",
+        "()Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;",
+    )?;
+    let load_audio = pool.add_method_ref(
+        owner,
+        "loadAudioTrack",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/MatroskaStreamingFile;Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;)Lcom/sedmelluq/discord/lavaplayer/container/matroska/MatroskaTrackConsumer;",
+    )?;
+    let read = pool.add_invoke_dynamic(
+        0,
+        "performRead",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/MatroskaStreamingFile;Lcom/sedmelluq/discord/lavaplayer/container/matroska/MatroskaTrackConsumer;)Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor$ReadExecutor;",
+    )?;
+    let seek = pool.add_invoke_dynamic(
+        1,
+        "performSeek",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/MatroskaStreamingFile;Lcom/sedmelluq/discord/lavaplayer/container/matroska/MatroskaTrackConsumer;)Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor$SeekExecutor;",
+    )?;
+    let execute_loop = pool.add_method_ref(
+        executor,
+        "executeProcessingLoop",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor$ReadExecutor;Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor$SeekExecutor;)V",
+    )?;
+    let tools = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/ExceptionTools")?;
+    let close = pool.add_method_ref(tools, "closeWithWarnings", "(Ljava/lang/AutoCloseable;)V")?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let handler_target = 20;
+    let return_target = 25;
+    let mut body = code_with_exceptions(
+        pool,
+        4,
+        5,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(load_file),
+            Instruction::Astore_2,
+            Instruction::Aload_0,
+            Instruction::Aload_2,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(get_context),
+            Instruction::Invokevirtual(load_audio),
+            Instruction::Astore_3,
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Aload_3,
+            Instruction::Invokedynamic(read),
+            Instruction::Aload_2,
+            Instruction::Aload_3,
+            Instruction::Invokedynamic(seek),
+            Instruction::Invokevirtual(execute_loop),
+            Instruction::Aload_3,
+            Instruction::Invokestatic(close),
+            Instruction::Goto(return_target),
+            Instruction::Astore(4),
+            Instruction::Aload_3,
+            Instruction::Invokestatic(close),
+            Instruction::Aload(4),
+            Instruction::Athrow,
+            Instruction::Return,
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 9..17,
+                handler_pc: handler_target,
+                catch_type: throwable,
+            },
+            ExceptionTableEntry {
+                range_pc: 20..21,
+                handler_pc: handler_target,
+                catch_type: throwable,
+            },
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: handler_target,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: executor,
+                    },
+                    VerificationType::Object { cpool_index: file },
+                    VerificationType::Object {
+                        cpool_index: consumer,
+                    },
+                ],
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+            same_stack_frame(return_target - handler_target - 1),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn matroska_audio_track_load_file(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_AUDIO_TRACK_CLASS)?;
+    let file = pool
+        .add_class("com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaStreamingFile")?;
+    let input = pool.add_field_ref(
+        owner,
+        "inputStream",
+        "Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;",
+    )?;
+    let init = pool.add_method_ref(
+        file,
+        "<init>",
+        "(Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)V",
+    )?;
+    let read_file = pool.add_method_ref(file, "readFile", "()V")?;
+    let get_duration = pool.add_method_ref(file, "getDuration", "()D")?;
+    let duration = pool.add_field_ref(
+        owner,
+        "accurateDuration",
+        "Ljava/util/concurrent/atomic/AtomicLong;",
+    )?;
+    let atomic = pool.add_class("java/util/concurrent/atomic/AtomicLong")?;
+    let set = pool.add_method_ref(atomic, "set", "(J)V")?;
+    let io = pool.add_class("java/io/IOException")?;
+    let runtime = pool.add_class("java/lang/RuntimeException")?;
+    let runtime_init = pool.add_method_ref(runtime, "<init>", "(Ljava/lang/Throwable;)V")?;
+    let mut body = code_with_exceptions(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::New(file),
+            Instruction::Dup,
+            Instruction::Aload_0,
+            Instruction::Getfield(input),
+            Instruction::Invokespecial(init),
+            Instruction::Astore_1,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(read_file),
+            Instruction::Aload_0,
+            Instruction::Getfield(duration),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(get_duration),
+            Instruction::D2i,
+            Instruction::I2l,
+            Instruction::Invokevirtual(set),
+            Instruction::Aload_1,
+            Instruction::Areturn,
+            Instruction::Astore_1,
+            Instruction::New(runtime),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Invokespecial(runtime_init),
+            Instruction::Athrow,
+        ],
+        vec![ExceptionTableEntry {
+            range_pc: 0..15,
+            handler_pc: 17,
+            catch_type: io,
+        }],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::FullFrame {
+            frame_type: 255,
+            offset_delta: 17,
+            locals: vec![VerificationType::Object { cpool_index: owner }],
+            stack: vec![VerificationType::Object { cpool_index: io }],
+        }],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn matroska_audio_track_load_audio(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_AUDIO_TRACK_CLASS)?;
+    let file = pool
+        .add_class("com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaStreamingFile")?;
+    let context =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext")?;
+    let consumer = pool
+        .add_class("com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaTrackConsumer")?;
+    let get_tracks = pool.add_method_ref(
+        file,
+        "getTrackList",
+        "()[Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;",
+    )?;
+    let select = pool.add_method_ref(
+        owner,
+        "selectAudioTrack",
+        "([Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;)Lcom/sedmelluq/discord/lavaplayer/container/matroska/MatroskaTrackConsumer;",
+    )?;
+    let illegal = pool.add_class("java/lang/IllegalStateException")?;
+    let illegal_init = pool.add_method_ref(illegal, "<init>", "(Ljava/lang/String;)V")?;
+    let missing = pool.add_string("No supported audio tracks in the file.")?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    let logger = pool.add_class("org/slf4j/Logger")?;
+    let debug =
+        pool.add_interface_method_ref(logger, "debug", "(Ljava/lang/String;Ljava/lang/Object;)V")?;
+    let message = pool.add_string("Starting to play track with codec {}")?;
+    let get_track = pool.add_interface_method_ref(
+        consumer,
+        "getTrack",
+        "()Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;",
+    )?;
+    let track = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack",
+    )?;
+    let codec = pool.add_field_ref(track, "codecId", "Ljava/lang/String;")?;
+    let initialise = pool.add_interface_method_ref(consumer, "initialise", "()V")?;
+    let tools = pool.add_class("com/sedmelluq/discord/lavaplayer/tools/ExceptionTools")?;
+    let close = pool.add_method_ref(tools, "closeWithWarnings", "(Ljava/lang/AutoCloseable;)V")?;
+    let throwable = pool.add_class("java/lang/Throwable")?;
+    let init_target = 17;
+    let handler_target = 34;
+    let rethrow_target = 41;
+    let return_target = 43;
+    let mut body = code_with_exceptions(
+        pool,
+        4,
+        6,
+        vec![
+            Instruction::Aconst_null,
+            Instruction::Astore_3,
+            Instruction::Iconst_0,
+            Instruction::Istore(4),
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(get_tracks),
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(select),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Ifnonnull(init_target),
+            Instruction::New(illegal),
+            Instruction::Dup,
+            Instruction::Ldc_w(missing),
+            Instruction::Invokespecial(illegal_init),
+            Instruction::Athrow,
+            Instruction::Getstatic(log),
+            Instruction::Ldc_w(message),
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(get_track, 1),
+            Instruction::Getfield(codec),
+            Instruction::Invokeinterface(debug, 3),
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(initialise, 1),
+            Instruction::Iconst_1,
+            Instruction::Istore(4),
+            Instruction::Iload(4),
+            Instruction::Ifne(return_target),
+            Instruction::Aload_3,
+            Instruction::Ifnull(return_target),
+            Instruction::Aload_3,
+            Instruction::Invokestatic(close),
+            Instruction::Goto(return_target),
+            Instruction::Astore(5),
+            Instruction::Iload(4),
+            Instruction::Ifne(rethrow_target),
+            Instruction::Aload_3,
+            Instruction::Ifnull(rethrow_target),
+            Instruction::Aload_3,
+            Instruction::Invokestatic(close),
+            Instruction::Aload(5),
+            Instruction::Athrow,
+            Instruction::Aload_3,
+            Instruction::Areturn,
+        ],
+        vec![
+            ExceptionTableEntry {
+                range_pc: 4..27,
+                handler_pc: handler_target,
+                catch_type: throwable,
+            },
+            ExceptionTableEntry {
+                range_pc: 34..35,
+                handler_pc: handler_target,
+                catch_type: throwable,
+            },
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: init_target,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object { cpool_index: file },
+                    VerificationType::Object {
+                        cpool_index: context,
+                    },
+                    VerificationType::Object {
+                        cpool_index: consumer,
+                    },
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: handler_target - init_target - 1,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object { cpool_index: file },
+                    VerificationType::Object {
+                        cpool_index: context,
+                    },
+                    VerificationType::Object {
+                        cpool_index: consumer,
+                    },
+                    VerificationType::Integer,
+                ],
+                stack: vec![VerificationType::Object {
+                    cpool_index: throwable,
+                }],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: rethrow_target - handler_target - 1,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object { cpool_index: file },
+                    VerificationType::Object {
+                        cpool_index: context,
+                    },
+                    VerificationType::Object {
+                        cpool_index: consumer,
+                    },
+                    VerificationType::Integer,
+                    VerificationType::Object {
+                        cpool_index: throwable,
+                    },
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: return_target - rethrow_target - 1,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object { cpool_index: file },
+                    VerificationType::Object {
+                        cpool_index: context,
+                    },
+                    VerificationType::Object {
+                        cpool_index: consumer,
+                    },
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn matroska_audio_track_select_audio(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_AUDIO_TRACK_CLASS)?;
+    let tracks = pool.add_class(
+        "[Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;",
+    )?;
+    let context =
+        pool.add_class("com/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext")?;
+    let track = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack",
+    )?;
+    let track_type = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$Type",
+    )?;
+    let type_field = pool.add_field_ref(
+        track,
+        "type",
+        "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$Type;",
+    )?;
+    let audio = pool.add_field_ref(
+        track_type,
+        "AUDIO",
+        "Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack$Type;",
+    )?;
+    let codec = pool.add_field_ref(track, "codecId", "Ljava/lang/String;")?;
+    let string = pool.add_class("java/lang/String")?;
+    let equals = pool.add_method_ref(string, "equals", "(Ljava/lang/Object;)Z")?;
+    let opus_name = pool.add_string("A_OPUS")?;
+    let vorbis_name = pool.add_string("A_VORBIS")?;
+    let aac_name = pool.add_string("A_AAC")?;
+    let opus = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaOpusTrackConsumer",
+    )?;
+    let vorbis = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaVorbisTrackConsumer",
+    )?;
+    let aac = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaAacTrackConsumer",
+    )?;
+    let constructor = "(Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;)V";
+    let opus_init = pool.add_method_ref(opus, "<init>", constructor)?;
+    let vorbis_init = pool.add_method_ref(vorbis, "<init>", constructor)?;
+    let aac_init = pool.add_method_ref(aac, "<init>", constructor)?;
+    let loop_target = 11;
+    let vorbis_target = 32;
+    let aac_target = 42;
+    let continue_target = 51;
+    let construct_target = 53;
+    let vorbis_construct_target = 62;
+    let aac_construct_target = 71;
+    let null_target = 80;
+    let mut body = code(
+        pool,
+        4,
+        9,
+        vec![
+            Instruction::Aconst_null,
+            Instruction::Astore_3,
+            Instruction::Iconst_0,
+            Instruction::Istore(4),
+            Instruction::Aload_1,
+            Instruction::Astore(5),
+            Instruction::Aload(5),
+            Instruction::Arraylength,
+            Instruction::Istore(6),
+            Instruction::Iconst_0,
+            Instruction::Istore(7),
+            Instruction::Iload(7),
+            Instruction::Iload(6),
+            Instruction::If_icmpge(construct_target),
+            Instruction::Aload(5),
+            Instruction::Iload(7),
+            Instruction::Aaload,
+            Instruction::Astore(8),
+            Instruction::Aload(8),
+            Instruction::Getfield(type_field),
+            Instruction::Getstatic(audio),
+            Instruction::If_acmpne(continue_target),
+            Instruction::Ldc_w(opus_name),
+            Instruction::Aload(8),
+            Instruction::Getfield(codec),
+            Instruction::Invokevirtual(equals),
+            Instruction::Ifeq(vorbis_target),
+            Instruction::Aload(8),
+            Instruction::Astore_3,
+            Instruction::Iconst_1,
+            Instruction::Istore(4),
+            Instruction::Goto(construct_target),
+            Instruction::Ldc_w(vorbis_name),
+            Instruction::Aload(8),
+            Instruction::Getfield(codec),
+            Instruction::Invokevirtual(equals),
+            Instruction::Ifeq(aac_target),
+            Instruction::Aload(8),
+            Instruction::Astore_3,
+            Instruction::Iconst_2,
+            Instruction::Istore(4),
+            Instruction::Goto(continue_target),
+            Instruction::Ldc_w(aac_name),
+            Instruction::Aload(8),
+            Instruction::Getfield(codec),
+            Instruction::Invokevirtual(equals),
+            Instruction::Ifeq(continue_target),
+            Instruction::Aload(8),
+            Instruction::Astore_3,
+            Instruction::Iconst_3,
+            Instruction::Istore(4),
+            Instruction::Iinc(7, 1),
+            Instruction::Goto(loop_target),
+            Instruction::Iload(4),
+            Instruction::Iconst_1,
+            Instruction::If_icmpne(vorbis_construct_target),
+            Instruction::New(opus),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Aload_3,
+            Instruction::Invokespecial(opus_init),
+            Instruction::Areturn,
+            Instruction::Iload(4),
+            Instruction::Iconst_2,
+            Instruction::If_icmpne(aac_construct_target),
+            Instruction::New(vorbis),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Aload_3,
+            Instruction::Invokespecial(vorbis_init),
+            Instruction::Areturn,
+            Instruction::Iload(4),
+            Instruction::Iconst_3,
+            Instruction::If_icmpne(null_target),
+            Instruction::New(aac),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Aload_3,
+            Instruction::Invokespecial(aac_init),
+            Instruction::Areturn,
+            Instruction::Aconst_null,
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: loop_target,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: tracks,
+                    },
+                    VerificationType::Object {
+                        cpool_index: context,
+                    },
+                    VerificationType::Object { cpool_index: track },
+                    VerificationType::Integer,
+                    VerificationType::Object {
+                        cpool_index: tracks,
+                    },
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: vorbis_target - loop_target - 1,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: tracks,
+                    },
+                    VerificationType::Object {
+                        cpool_index: context,
+                    },
+                    VerificationType::Object { cpool_index: track },
+                    VerificationType::Integer,
+                    VerificationType::Object {
+                        cpool_index: tracks,
+                    },
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                    VerificationType::Object { cpool_index: track },
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: aac_target - vorbis_target - 1,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: tracks,
+                    },
+                    VerificationType::Object {
+                        cpool_index: context,
+                    },
+                    VerificationType::Object { cpool_index: track },
+                    VerificationType::Integer,
+                    VerificationType::Object {
+                        cpool_index: tracks,
+                    },
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                    VerificationType::Object { cpool_index: track },
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: continue_target - aac_target - 1,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: tracks,
+                    },
+                    VerificationType::Object {
+                        cpool_index: context,
+                    },
+                    VerificationType::Object { cpool_index: track },
+                    VerificationType::Integer,
+                    VerificationType::Object {
+                        cpool_index: tracks,
+                    },
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                    VerificationType::Object { cpool_index: track },
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: construct_target - continue_target - 1,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: tracks,
+                    },
+                    VerificationType::Object {
+                        cpool_index: context,
+                    },
+                    VerificationType::Object { cpool_index: track },
+                    VerificationType::Integer,
+                    VerificationType::Object {
+                        cpool_index: tracks,
+                    },
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: vorbis_construct_target - construct_target - 1,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: tracks,
+                    },
+                    VerificationType::Object {
+                        cpool_index: context,
+                    },
+                    VerificationType::Object { cpool_index: track },
+                    VerificationType::Integer,
+                    VerificationType::Object {
+                        cpool_index: tracks,
+                    },
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: aac_construct_target - vorbis_construct_target - 1,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: tracks,
+                    },
+                    VerificationType::Object {
+                        cpool_index: context,
+                    },
+                    VerificationType::Object { cpool_index: track },
+                    VerificationType::Integer,
+                    VerificationType::Object {
+                        cpool_index: tracks,
+                    },
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: null_target - aac_construct_target - 1,
+                locals: vec![
+                    VerificationType::Object { cpool_index: owner },
+                    VerificationType::Object {
+                        cpool_index: tracks,
+                    },
+                    VerificationType::Object {
+                        cpool_index: context,
+                    },
+                    VerificationType::Object { cpool_index: track },
+                    VerificationType::Integer,
+                    VerificationType::Object {
+                        cpool_index: tracks,
+                    },
+                    VerificationType::Integer,
+                    VerificationType::Integer,
+                ],
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
+fn matroska_audio_track_seek_callback(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let file = pool
+        .add_class("com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaStreamingFile")?;
+    let consumer = pool
+        .add_class("com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaTrackConsumer")?;
+    let get_track = pool.add_interface_method_ref(
+        consumer,
+        "getTrack",
+        "()Lcom/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack;",
+    )?;
+    let track = pool.add_class(
+        "com/sedmelluq/discord/lavaplayer/container/matroska/format/MatroskaFileTrack",
+    )?;
+    let index = pool.add_field_ref(track, "index", "I")?;
+    let seek = pool.add_method_ref(file, "seekToTimecode", "(IJ)V")?;
+    code(
+        pool,
+        4,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(get_track, 1),
+            Instruction::Getfield(index),
+            Instruction::Lload_2,
+            Instruction::Invokevirtual(seek),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn matroska_audio_track_read_callback(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let file = pool
+        .add_class("com/sedmelluq/discord/lavaplayer/container/matroska/MatroskaStreamingFile")?;
+    let provide = pool.add_method_ref(
+        file,
+        "provideFrames",
+        "(Lcom/sedmelluq/discord/lavaplayer/container/matroska/MatroskaTrackConsumer;)V",
+    )?;
+    code(
+        pool,
+        2,
+        2,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(provide),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn matroska_audio_track_class_init(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(MATROSKA_AUDIO_TRACK_CLASS)?;
+    let logger_factory = pool.add_class("org/slf4j/LoggerFactory")?;
+    let get_logger = pool.add_method_ref(
+        logger_factory,
+        "getLogger",
+        "(Ljava/lang/Class;)Lorg/slf4j/Logger;",
+    )?;
+    let log = pool.add_field_ref(owner, "log", "Lorg/slf4j/Logger;")?;
+    code(
+        pool,
+        1,
+        0,
+        vec![
+            Instruction::Ldc_w(owner),
             Instruction::Invokestatic(get_logger),
             Instruction::Putstatic(log),
             Instruction::Return,

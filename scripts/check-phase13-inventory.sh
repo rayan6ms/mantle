@@ -2527,9 +2527,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[2].completed_slices[].symbols] | add) == .cohorts[2].classified_symbols and
   (.cohorts[2].classified_symbols + .cohorts[2].remaining_symbols) == .cohorts[2].symbols and
   .cohorts[3].status == "IN_PROGRESS" and
-  .cohorts[3].classified_symbols == 201 and
-  .cohorts[3].remaining_symbols == 623 and
-  (.cohorts[3].completed_slices | length) == 30 and
+  .cohorts[3].classified_symbols == 204 and
+  .cohorts[3].remaining_symbols == 620 and
+  (.cohorts[3].completed_slices | length) == 31 and
   .cohorts[3].completed_slices[0] == {
     id: "formats-contracts",
     classes: 1,
@@ -2606,6 +2606,20 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "scripts/run-jvm-gate-a.sh",
       "tools/jvm-gate/src/emitter.rs",
       "tools/jvm-gate/src/main.rs"
+    ]
+  } and
+  .cohorts[3].completed_slices[30] == {
+    id: "matroska-audio-track-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 2,
+    symbols: 3,
+    classification: "MIXED_A_EXACT_C_SEMANTIC",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs",
+      "docs/architecture/ADR-0023-bounded-matroska-track-selection.md"
     ]
   } and
   .cohorts[3].completed_slices[1] == {
@@ -2922,11 +2936,11 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   } and
   ([.cohorts[3].completed_slices[].symbols] | add) == .cohorts[3].classified_symbols and
   (.cohorts[3].classified_symbols + .cohorts[3].remaining_symbols) == .cohorts[3].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1653 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 1656 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1508 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1509 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 129 and
+    select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 131 and
   ([$classifications.symbols[] |
     select(.assessment == "CLASSIFIED" and .classification == "D_LEGACY")] | length) == 16 and
   ([$classifications.symbols[] |
@@ -3050,6 +3064,17 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
       (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
       (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 8 and
+  ([$classifications.symbols[] |
+    select(.binary_name ==
+      "com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaAudioTrack" and
+      .assessment == "CLASSIFIED" and
+      (if .member_name == "<init>" then .classification == "A_EXACT"
+       else .classification == "C_SEMANTIC" and
+         (.tests | index("docs/architecture/ADR-0023-bounded-matroska-track-selection.md")) != null
+       end) and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 3 and
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.container.Formats" and
@@ -3681,6 +3706,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameReader",
         "com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacSubFrameReader",
         "com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaAacTrackConsumer",
+        "com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaAudioTrack",
         "com.sedmelluq.discord.lavaplayer.filter.AudioFilterChain",
         "com.sedmelluq.discord.lavaplayer.filter.AudioPipeline",
         "com.sedmelluq.discord.lavaplayer.filter.AudioPipelineFactory",
@@ -4148,6 +4174,11 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         (.tests | index("crates/mantle-media/tests/phase12_soundcloud.rs")) != null and
         (.tests | index("docs/architecture/ADR-0015-bounded-soundcloud-source.md")) != null
       elif $symbol.binary_name ==
+          "com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaAudioTrack" and
+          ($symbol.symbol_kind == "CLASS" or $symbol.member_name == "process")
+      then .classification == "C_SEMANTIC" and
+        (.tests | index("docs/architecture/ADR-0023-bounded-matroska-track-selection.md")) != null
+      elif $symbol.binary_name ==
           "com.sedmelluq.discord.lavaplayer.source.soundcloud.SoundCloudOpusSegmentDecoder" and
           ($symbol.symbol_kind == "CLASS" or
             ($symbol.member_name | IN("prepareStream", "playStream")))
@@ -4158,7 +4189,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "matroska-audio-track-contracts" and
+  .phase_entry.next_slice == "matroska-container-probe-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 JQ
@@ -4166,7 +4197,7 @@ JQ
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '244 reference classes / 1,665 symbols' \
+  '245 reference classes / 1,668 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -4176,4 +4207,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 1,653 classified symbols and 1,109 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 1,656 classified symbols and 1,106 unassessed symbols.\n'

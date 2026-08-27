@@ -9,6 +9,7 @@ readonly CLASSES="$WORK/consumer-classes"
 readonly FLAC_CLASSES="$WORK/flac-consumer-classes"
 readonly FLAC_LOADER_CLASSES="$WORK/flac-loader-consumer-classes"
 readonly FLAC_METADATA_READER_CLASSES="$WORK/flac-metadata-reader-consumer-classes"
+readonly MATROSKA_CLASSES="$WORK/matroska-consumer-classes"
 readonly JAR="$WORK/mantle-gate-a.jar"
 readonly MISMATCH_JAR="$WORK/mantle-gate-a-mismatch.jar"
 
@@ -18,9 +19,9 @@ if [[ ! -f "$REFERENCE_JAR" ]]; then
 fi
 
 rm -rf -- "$CLASSES" "$FLAC_CLASSES" "$FLAC_LOADER_CLASSES" \
-  "$FLAC_METADATA_READER_CLASSES"
+  "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES"
 mkdir -p "$CLASSES" "$FLAC_CLASSES" "$FLAC_LOADER_CLASSES" \
-  "$FLAC_METADATA_READER_CLASSES"
+  "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES"
 cargo build --locked -p mantle-jvm --features gate-a-direct-attachment
 cargo run --locked -q -p mantle-jvm-gate -- emit \
   --reference-jar "$REFERENCE_JAR" --output "$JAR" --expected-abi 1 \
@@ -281,6 +282,10 @@ cargo run --locked -q -p mantle-jvm-gate -- write-flac-sub-frame-reader-consumer
   --output "$WORK/GateFlacSubFrameReader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-matroska-aac-track-consumer-consumer \
   --output "$WORK/GateMatroskaAacTrackConsumer.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-matroska-audio-track-consumer \
+  --output "$WORK/GateMatroskaAudioTrack.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-matroska-audio-track-support-consumer \
+  --output "$WORK/MatroskaGateSupport.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-consumer \
   --output "$WORK/GateYoutubeTrackFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-json-data-consumer \
@@ -396,6 +401,7 @@ if command -v cygpath >/dev/null 2>&1; then
   flac_classes_argument="$(cygpath -w "$FLAC_CLASSES")"
   flac_loader_classes_argument="$(cygpath -w "$FLAC_LOADER_CLASSES")"
   flac_metadata_reader_classes_argument="$(cygpath -w "$FLAC_METADATA_READER_CLASSES")"
+  matroska_classes_argument="$(cygpath -w "$MATROSKA_CLASSES")"
   jar_argument="$(cygpath -w "$JAR")"
   reference_argument="$(cygpath -w "$REFERENCE_JAR")"
 else
@@ -404,6 +410,7 @@ else
   flac_classes_argument="$FLAC_CLASSES"
   flac_loader_classes_argument="$FLAC_LOADER_CLASSES"
   flac_metadata_reader_classes_argument="$FLAC_METADATA_READER_CLASSES"
+  matroska_classes_argument="$MATROSKA_CLASSES"
   jar_argument="$JAR"
   reference_argument="$REFERENCE_JAR"
 fi
@@ -431,6 +438,10 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   -d "$FLAC_METADATA_READER_CLASSES" \
   "$WORK/GateFlacMetadataReader.java" \
   "$WORK/FlacMetadataReaderGateSupport.java"
+javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -d "$MATROSKA_CLASSES" \
+  "$WORK/GateMatroskaAudioTrack.java" \
+  "$WORK/MatroskaGateSupport.java"
 
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateAdtsStreamProvider.java" \
@@ -1519,6 +1530,22 @@ cmp "$WORK/matroska-aac-track-consumer-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,track-identity,direct-buffer,buffer-capacity,router-construction,bound-configurer,codec-private-identity,configure-result-ignored,initialise,get-track,chunking,remainder-chunk,input-position,reused-buffer,direct-chunks,empty-input,null-input,interruption-position,seek-forwarding,flush-forwarding,close-forwarding,failure-identity,private-fields,private-method,logger-owner,interface,throws,identity-semantics,subclassable,reflection' \
   "$WORK/matroska-aac-track-consumer-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$matroska_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMatroskaAudioTrack >"$WORK/matroska-audio-track-reference.txt"
+java -Xverify:all \
+  -cp "$matroska_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMatroskaAudioTrack >"$WORK/matroska-audio-track-candidate.txt"
+cmp "$WORK/matroska-audio-track-reference.txt" \
+  "$WORK/matroska-audio-track-candidate.txt"
+grep --fixed-strings \
+  'contracts=track-info,input-identity,null-construction,file-read,duration-cast,processing-context,audio-only,codec-selection,opus-priority,last-fallback,initialise,read-callback,seek-callback,seek-track-index,full-timecode,executor-control,input-ownership,io-wrap,runtime-identity,context-failure,null-executor,no-supported-track,construction-failure,get-track-failure,initialise-cleanup,loop-cleanup,callback-cleanup,warning-close,subclassable,eager-logger,private-state,private-helpers,throws,reflection' \
+  "$WORK/matroska-audio-track-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$matroska_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMatroskaAudioTrack safety >"$WORK/matroska-audio-track-safety.txt"
+grep --fixed-strings 'safety=single-selected-consumer' \
+  "$WORK/matroska-audio-track-safety.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmFilterFactory \
   >"$WORK/pcm-filter-factory-reference.txt"
