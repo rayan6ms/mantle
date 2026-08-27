@@ -4957,54 +4957,60 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public Mp3ConstantRateSeeker shell preserves its Mp3Seeker interface, constant-rate factory, metadata-tag detection, duration and seek calculations, state, and reflection metadata under the Phase 13 mp3-constant-rate-seeker-contracts differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mp3.Mp3ConstantRateSeeker",
       "symbol_kind": "METHOD",
       "member_name": "createFromFrame",
       "descriptor": "(JJ[B)Lcom/sedmelluq/discord/lavaplayer/container/mp3/Mp3ConstantRateSeeker;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public factory preserves constant-rate seeker construction from MP3 frame metadata, including sample-rate and average-frame-size derivation.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mp3.Mp3ConstantRateSeeker",
       "symbol_kind": "METHOD",
       "member_name": "isMetaFrame",
       "descriptor": "([B)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public metadata-frame detector preserves fixed-offset Info and LAME tag recognition and ordinary-frame rejection.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mp3.Mp3ConstantRateSeeker",
       "symbol_kind": "METHOD",
       "member_name": "getDuration",
       "descriptor": "()J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public duration calculation preserves MPEG-1 frame-count scaling and sample-rate arithmetic.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mp3.Mp3ConstantRateSeeker",
       "symbol_kind": "METHOD",
       "member_name": "isSeekable",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public seekability flag remains true for constant-rate files.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mp3.Mp3ConstantRateSeeker",
       "symbol_kind": "METHOD",
       "member_name": "seekAndGetFrameIndex",
       "descriptor": "(JLcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public seek operation preserves timecode-to-frame conversion, maximum-frame clamping, input-stream seek delegation, full-width arithmetic, and IOException metadata.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mp3.Mp3ContainerProbe",

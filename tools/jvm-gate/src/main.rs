@@ -160,6 +160,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-adts-audio-track-consumer" => Some(ADTS_AUDIO_TRACK_CONSUMER),
         "write-mp3-audio-track-consumer" => Some(MP3_AUDIO_TRACK_CONSUMER),
         "write-mp3-audio-track-support-consumer" => Some(MP3_AUDIO_TRACK_SUPPORT_CONSUMER),
+        "write-mp3-constant-rate-seeker-consumer" => Some(MP3_CONSTANT_RATE_SEEKER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
         "write-adts-packet-header-consumer" => Some(ADTS_PACKET_HEADER_CONSUMER),
         "write-adts-stream-provider-consumer" => Some(ADTS_STREAM_PROVIDER_CONSUMER),
@@ -13636,6 +13637,78 @@ public final class GateMediaContainerRegistry {
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MP3_CONSTANT_RATE_SEEKER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mp3.Mp3ConstantRateSeeker;
+import com.sedmelluq.discord.lavaplayer.container.mp3.Mp3Seeker;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+
+public final class GateMp3ConstantRateSeeker {
+  public static void main(String[] args) throws Exception {
+    byte[] frame = frame();
+    check(!Mp3ConstantRateSeeker.isMetaFrame(frame), "ordinary frame is not metadata");
+    byte[] info = frame.clone();
+    info[36] = 'I'; info[37] = 'n'; info[38] = 'f'; info[39] = 'o';
+    byte[] lame = frame.clone();
+    lame[36] = 'L'; lame[37] = 'A'; lame[38] = 'M'; lame[39] = 'E';
+    check(Mp3ConstantRateSeeker.isMetaFrame(info) && Mp3ConstantRateSeeker.isMetaFrame(lame),
+        "Info and LAME metadata tags are recognized at the fixed offset");
+    Mp3ConstantRateSeeker seeker = Mp3ConstantRateSeeker.createFromFrame(20L, 100000L, frame);
+    check(seeker instanceof Mp3Seeker && seeker.isSeekable() && seeker.getDuration() > 0L,
+        "factory returns a seekable constant-rate seeker with duration");
+    MemoryStream input = new MemoryStream();
+    long frameIndex = seeker.seekAndGetFrameIndex(5000L, input);
+    check(frameIndex >= 0L && input.seekCalls == 1,
+        "seek computes a bounded frame index and delegates exactly once");
+    long secondIndex = seeker.seekAndGetFrameIndex(60_000L, input);
+    check(secondIndex >= frameIndex && input.seekCalls == 2,
+        "large timecodes clamp to the maximum frame count");
+    reflection();
+    System.out.println("contracts=meta-tags,offset,ordinary-frame,factory,interface,seekable,duration,frame-index,seek-delegation,full-width-timecode,clamping,reflection");
+  }
+
+  private static byte[] frame() {
+    return new byte[] {(byte) 0xff, (byte) 0xfb, (byte) 0xb4, 0x64,
+        0, 0, 4, (byte) 0xbc, 0x1a, 0x4d, 0x0d, 0x67, 0, 2, 0, 0,
+        0x0d, 0x20, (byte) 0xa0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0};
+  }
+
+  private static void reflection() throws Exception {
+    Class<Mp3ConstantRateSeeker> type = Mp3ConstantRateSeeker.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 1 && type.getInterfaces()[0] == Mp3Seeker.class
+        && type.getDeclaredAnnotations().length == 0, "public concrete seeker metadata");
+    check(type.getDeclaredField("averageFrameSize").getModifiers()
+        == (Modifier.PRIVATE | Modifier.FINAL), "private final state metadata");
+    Method factory = type.getDeclaredMethod("createFromFrame", long.class, long.class, byte[].class);
+    check(factory.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && factory.getExceptionTypes().length == 0, "factory metadata");
+    Method seek = type.getDeclaredMethod("seekAndGetFrameIndex", long.class, SeekableInputStream.class);
+    check(seek.getModifiers() == Modifier.PUBLIC && seek.getExceptionTypes().length == 1
+        && seek.getExceptionTypes()[0] == IOException.class, "seek descriptor metadata");
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    int seekCalls;
+    MemoryStream() { super(0L, 0L); }
+    @Override public int read() { return -1; }
+    @Override public long getPosition() { return 0L; }
+    @Override protected void seekHard(long position) { seekCalls++; }
+    @Override public boolean canSeekHard() { return true; }
+    @Override public java.util.List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider> getTrackInfoProviders() { return java.util.Collections.emptyList(); }
+    @Override public void close() {}
   }
 }
 "#;

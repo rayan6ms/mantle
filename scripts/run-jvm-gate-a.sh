@@ -239,6 +239,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mp3-audio-track-consumer \
   --output "$WORK/GateMp3AudioTrack.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mp3-audio-track-support-consumer \
   --output "$WORK/Mp3GateSupport.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mp3-constant-rate-seeker-consumer \
+  --output "$WORK/GateMp3ConstantRateSeeker.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-container-probe-consumer \
   --output "$WORK/GateAdtsContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-packet-header-consumer \
@@ -466,6 +468,8 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$FLAC_CLASSES" 
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$MP3_CLASSES" \
   "$WORK/GateMp3AudioTrack.java" \
   "$WORK/Mp3GateSupport.java"
+javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$MP3_CLASSES" \
+  "$WORK/GateMp3ConstantRateSeeker.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   -d "$FLAC_LOADER_CLASSES" \
   "$WORK/GateFlacFileLoader.java" \
@@ -1359,6 +1363,16 @@ cmp "$WORK/mp3-audio-track-reference.txt" "$WORK/mp3-audio-track-candidate.txt"
 grep --fixed-strings \
   'contracts=track-info,input-identity,null-construction,processing-context,header-parse,read-callback,seek-callback,full-timecode,executor-control,input-ownership,context-failure,null-executor,identifier-dispatch,loop-failure,callback-failure,parse-failure,close-finally,close-replacement,subclassable,eager-logger,private-state,throws,reflection' \
   "$WORK/mp3-audio-track-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$mp3_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMp3ConstantRateSeeker \
+  >"$WORK/mp3-constant-rate-seeker-reference.txt"
+java -Xverify:all \
+  -cp "$mp3_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMp3ConstantRateSeeker >"$WORK/mp3-constant-rate-seeker-candidate.txt"
+cmp "$WORK/mp3-constant-rate-seeker-reference.txt" "$WORK/mp3-constant-rate-seeker-candidate.txt"
+grep --fixed-strings \
+  'contracts=meta-tags,offset,ordinary-frame,factory,interface,seekable,duration,frame-index,seek-delegation,full-width-timecode,clamping,reflection' \
+  "$WORK/mp3-constant-rate-seeker-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateAdtsContainerProbe \
   >"$WORK/adts-container-probe-reference.txt"

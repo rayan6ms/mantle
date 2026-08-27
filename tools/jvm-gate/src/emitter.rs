@@ -157,6 +157,8 @@ const MEDIA_CONTAINER_REGISTRY_CLASS: &str =
 const ADTS_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/adts/AdtsAudioTrack";
 const MP3_AUDIO_TRACK_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/mp3/Mp3AudioTrack";
+const MP3_CONSTANT_RATE_SEEKER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/mp3/Mp3ConstantRateSeeker";
 const ADTS_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/adts/AdtsContainerProbe";
 const ADTS_PACKET_HEADER_CLASS: &str =
@@ -577,6 +579,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MEDIA_CONTAINER_REGISTRY_CLASS,
     ADTS_AUDIO_TRACK_CLASS,
     MP3_AUDIO_TRACK_CLASS,
+    MP3_CONSTANT_RATE_SEEKER_CLASS,
     ADTS_CONTAINER_PROBE_CLASS,
     ADTS_PACKET_HEADER_CLASS,
     ADTS_STREAM_PROVIDER_CLASS,
@@ -1343,6 +1346,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | MUTABLE_MATROSKA_ELEMENT_CLASS
             | MATROSKA_ELEMENT_TYPE_CLASS
             | MATROSKA_ELEMENT_DATA_TYPE_CLASS
+            | MP3_CONSTANT_RATE_SEEKER_CLASS
     ) {
         return Ok(class);
     }
