@@ -168,6 +168,8 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mp3-track-provider-consumer" => Some(MP3_TRACK_PROVIDER_CONSUMER),
         "write-mp3-xing-seeker-consumer" => Some(MP3_XING_SEEKER_CONSUMER),
         "write-mpeg-aac-track-consumer" => Some(MPEG_AAC_TRACK_CONSUMER),
+        "write-mpeg-audio-track-consumer" => Some(MPEG_AUDIO_TRACK_CONSUMER),
+        "write-mpeg-audio-track-support-consumer" => Some(MPEG_AUDIO_TRACK_SUPPORT_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
         "write-adts-packet-header-consumer" => Some(ADTS_PACKET_HEADER_CONSUMER),
         "write-adts-stream-provider-consumer" => Some(ADTS_STREAM_PROVIDER_CONSUMER),
@@ -14818,6 +14820,277 @@ public final class GateMp3ConstantRateSeeker {
     @Override public java.util.List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider> getTrackInfoProviders() { return java.util.Collections.emptyList(); }
     @Override public void close() {}
   }
+}
+"#;
+
+const MPEG_AUDIO_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegAudioTrack;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegGateSupport;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateMpegAudioTrack {
+  private static final Object UNSAFE = loadUnsafe();
+
+  public static void main(String[] args) throws Exception {
+    construction();
+    processing();
+    failures();
+    subclassUse();
+    reflection();
+    System.out.println("contracts=track-info,input-identity,null-construction,track-selection,context,initialise,reader,duration,read-callback,seek-callback,full-width-timecode,executor-control,input-ownership,unsupported,parse-failure,context-failure,initialise-failure,reader-failure,loop-failure,callback-failure,close-finally,close-replacement,subclassable,eager-logger,private-state,throws,reflection");
+  }
+
+  private static void construction() throws Exception {
+    AudioTrackInfo info = info("constructor-id");
+    MemoryStream input = new MemoryStream();
+    MpegAudioTrack track = new MpegAudioTrack(info, input);
+    check(track.getInfo() == info && track.getIdentifier() == info.identifier,
+        "base constructor retains exact track info identity");
+    check(field(track, "inputStream") == input, "constructor retains exact input identity");
+    MpegAudioTrack nullInput = new MpegAudioTrack(info, null);
+    MpegAudioTrack nullInfo = new MpegAudioTrack(null, input);
+    check(field(nullInput, "inputStream") == null && nullInfo.getInfo() == null,
+        "constructor accepts null input and track info");
+  }
+
+  private static void processing() throws Exception {
+    MpegGateSupport.reset();
+    MpegGateSupport.setTracks("meta|avc1", "soun|mp4a", "soun|opus");
+    MemoryStream input = new MemoryStream();
+    RecordingExecutor executor = executor();
+    executor.context = allocate(AudioProcessingContext.class);
+    executor.invokeRead = true;
+    executor.invokeSeek = true;
+    executor.seekTimecode = Long.MIN_VALUE + 41L;
+    MpegAudioTrack track = new MpegAudioTrack(info("process-id"), input);
+    track.process(executor);
+    check(MpegGateSupport.consumerContext == executor.context
+        && MpegGateSupport.consumerTrack != null
+        && MpegGateSupport.consumerTrack.codecName.equals("mp4a"),
+        "AAC selection forwards exact context and matching track");
+    check(MpegGateSupport.readerConsumer == MpegGateSupport.consumer
+        && MpegGateSupport.duration == 654321L && track.getDuration() == 654321L,
+        "reader receives the selected consumer and publishes exact duration");
+    check(executor.contextCalls == 1 && executor.loopCalls == 1
+        && executor.readExecutor != null && executor.seekExecutor != null
+        && MpegGateSupport.readCalls == 1 && MpegGateSupport.seekCalls == 1
+        && MpegGateSupport.seekTimecode == Long.MIN_VALUE + 41L,
+        "processing context and full-width read/seek callbacks are forwarded");
+    check(MpegGateSupport.events.toString().equals("loader,parse,consumer,initialise,reader,duration,loop,read,seek,close")
+        && MpegGateSupport.closeCalls == 1 && input.closeCalls == 0,
+        "selection, lifecycle order, and caller input ownership are preserved");
+
+    MpegGateSupport.reset();
+    MpegGateSupport.setTracks("soun|mp4a");
+    RecordingExecutor passive = executor();
+    passive.context = allocate(AudioProcessingContext.class);
+    new MpegAudioTrack(info("passive-id"), input).process(passive);
+    check(passive.loopCalls == 1 && passive.readExecutor != null && passive.seekExecutor != null
+        && MpegGateSupport.readCalls == 0 && MpegGateSupport.seekCalls == 0,
+        "executor exclusively controls callback invocation");
+  }
+
+  private static void failures() throws Exception {
+    MemoryStream input = new MemoryStream();
+    MpegGateSupport.reset();
+    MpegGateSupport.setTracks("video|avc1");
+    Throwable unsupported = catchThrowable(() -> new MpegAudioTrack(info("unsupported"), input)
+        .process(executorWithContext()));
+    check(unsupported instanceof FriendlyException
+        && ((FriendlyException) unsupported).severity == FriendlyException.Severity.SUSPICIOUS
+        && unsupported.getMessage().contains("video|avc1")
+        && MpegGateSupport.consumerCreations == 0,
+        "unsupported codecs produce the suspicious diagnostic without a consumer");
+
+    MpegGateSupport.reset();
+    MpegGateSupport.parseFailure = new RuntimeException("parse-failure");
+    check(catchThrowable(() -> new MpegAudioTrack(info("parse"), input).process(executorWithContext()))
+        == MpegGateSupport.parseFailure && MpegGateSupport.consumerCreations == 0,
+        "header parse failure precedes selection");
+
+    MpegGateSupport.reset();
+    RuntimeException contextFailure = new RuntimeException("context-failure");
+    RecordingExecutor context = executor(); context.contextFailure = contextFailure;
+    check(catchThrowable(() -> new MpegAudioTrack(info("context"), input).process(context)) == contextFailure
+        && MpegGateSupport.consumerCreations == 0,
+        "context failure precedes consumer construction");
+
+    MpegGateSupport.reset(); MpegGateSupport.setTracks("soun|mp4a");
+    RuntimeException initialiseFailure = new RuntimeException("initialise-failure");
+    MpegGateSupport.initialiseFailure = initialiseFailure;
+    Throwable wrapped = catchThrowable(() -> new MpegAudioTrack(info("initialise"), input).process(executorWithContext()));
+    check(wrapped instanceof FriendlyException && wrapped.getCause() == initialiseFailure
+        && MpegGateSupport.closeCalls == 1,
+        "initialise failure is wrapped and closes the partially created consumer");
+
+    MpegGateSupport.reset(); MpegGateSupport.setTracks("soun|mp4a");
+    RuntimeException readerFailure = new RuntimeException("reader-failure");
+    MpegGateSupport.readerFailure = readerFailure;
+    check(catchThrowable(() -> new MpegAudioTrack(info("reader"), input).process(executorWithContext())) == readerFailure
+        && MpegGateSupport.closeCalls == 1,
+        "reader failure preserves identity through finally cleanup");
+
+    MpegGateSupport.reset(); MpegGateSupport.setTracks("soun|mp4a");
+    RuntimeException loopFailure = new RuntimeException("loop-failure");
+    RecordingExecutor loop = executorWithContext(); loop.loopFailure = loopFailure;
+    check(catchThrowable(() -> new MpegAudioTrack(info("loop"), input).process(loop)) == loopFailure
+        && MpegGateSupport.closeCalls == 1,
+        "loop failure preserves identity through finally cleanup");
+
+    MpegGateSupport.reset(); MpegGateSupport.setTracks("soun|mp4a");
+    MpegGateSupport.readFailure = new InterruptedException("read-failure");
+    RecordingExecutor read = executorWithContext(); read.invokeRead = true;
+    check(catchThrowable(() -> new MpegAudioTrack(info("read"), input).process(read)) == MpegGateSupport.readFailure
+        && MpegGateSupport.closeCalls == 1,
+        "checked callback failure closes the consumer");
+
+    MpegGateSupport.reset(); MpegGateSupport.setTracks("soun|mp4a");
+    RuntimeException closeFailure = new RuntimeException("close-failure");
+    MpegGateSupport.closeFailure = closeFailure;
+    check(catchThrowable(() -> new MpegAudioTrack(info("close"), input).process(executorWithContext())) == closeFailure,
+        "finally close failure replaces active completion");
+  }
+
+  private static void subclassUse() throws Exception {
+    MpegGateSupport.reset(); MpegGateSupport.setTracks("soun|mp4a");
+    Derived derived = new Derived(info("derived"), new MemoryStream());
+    derived.process(executorWithContext());
+    check(derived.processCalls == 1, "ordinary subclass participates in virtual dispatch");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MpegAudioTrack> type = MpegAudioTrack.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == BaseAudioTrack.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0, "public concrete class metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredMethods().length == 4
+        && type.getDeclaredConstructors().length == 1, "exact declared member counts");
+    Field log = type.getDeclaredField("log"); log.setAccessible(true);
+    Object expected = Class.forName("org.slf4j.LoggerFactory").getMethod("getLogger", Class.class).invoke(null, type);
+    check(log.getType().getName().equals("org.slf4j.Logger")
+        && log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && !log.isSynthetic() && log.get(null) == expected, "eager logger metadata");
+    Field input = type.getDeclaredField("inputStream");
+    check(input.getType() == SeekableInputStream.class
+        && input.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL) && !input.isSynthetic(),
+        "private seekable input metadata");
+    Constructor<MpegAudioTrack> constructor = type.getDeclaredConstructor(AudioTrackInfo.class, SeekableInputStream.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    Method process = type.getDeclaredMethod("process", LocalAudioTrackExecutor.class);
+    check(process.getModifiers() == Modifier.PUBLIC && process.getReturnType() == void.class
+        && Arrays.equals(process.getParameterTypes(), new Class<?>[] {LocalAudioTrackExecutor.class})
+        && process.getExceptionTypes().length == 0 && !process.isSynthetic() && !process.isBridge(),
+        "process descriptor metadata");
+    Method load = type.getDeclaredMethod("loadAudioTrack", Class.forName("com.sedmelluq.discord.lavaplayer.container.mpeg.MpegFileLoader"), AudioProcessingContext.class);
+    check(load.getModifiers() == Modifier.PROTECTED && load.getReturnType().getName().endsWith("MpegTrackConsumer")
+        && load.getExceptionTypes().length == 0, "protected loader descriptor metadata");
+  }
+
+  private static RecordingExecutor executorWithContext() throws Exception {
+    RecordingExecutor executor = executor(); executor.context = allocate(AudioProcessingContext.class); return executor;
+  }
+  private static AudioTrackInfo info(String identifier) { return new AudioTrackInfo("title", "author", 123L, identifier, true, "uri", "artwork", "isrc"); }
+  private static Object field(Object owner, String name) throws Exception { Field field = MpegAudioTrack.class.getDeclaredField(name); field.setAccessible(true); return field.get(owner); }
+  private static RecordingExecutor executor() throws Exception { return allocate(RecordingExecutor.class); }
+  private static <T> T allocate(Class<T> type) throws Exception { return type.cast(UNSAFE.getClass().getMethod("allocateInstance", Class.class).invoke(UNSAFE, type)); }
+  private static Object loadUnsafe() { try { Class<?> type = Class.forName("sun.misc.Unsafe"); Field field = type.getDeclaredField("theUnsafe"); field.setAccessible(true); return field.get(null); } catch (ReflectiveOperationException error) { throw new ExceptionInInitializerError(error); } }
+  private static Throwable catchThrowable(ThrowingRunnable action) { try { action.run(); return null; } catch (Throwable throwable) { return throwable; } }
+  @SuppressWarnings("unchecked") private static <E extends Throwable> void sneakyThrow(Throwable failure) throws E { throw (E) failure; }
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    int closeCalls;
+    MemoryStream() { super(0L, 0L); }
+    @Override public int read() { return -1; }
+    @Override public long getPosition() { return 0L; }
+    @Override protected void seekHard(long position) {}
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider> getTrackInfoProviders() { return Collections.emptyList(); }
+    @Override public void close() { closeCalls++; }
+  }
+
+  private static final class RecordingExecutor extends LocalAudioTrackExecutor {
+    AudioProcessingContext context; int contextCalls; int loopCalls; boolean invokeRead; boolean invokeSeek; long seekTimecode;
+    RuntimeException contextFailure; RuntimeException loopFailure; ReadExecutor readExecutor; SeekExecutor seekExecutor;
+    private RecordingExecutor() { super(null, null, null, false, 0); }
+    @Override public AudioProcessingContext getProcessingContext() { contextCalls++; if (contextFailure != null) throw contextFailure; return context; }
+    @Override public void executeProcessingLoop(ReadExecutor read, SeekExecutor seek) { loopCalls++; readExecutor = read; seekExecutor = seek; MpegGateSupport.event("loop"); if (loopFailure != null) throw loopFailure; try { if (invokeRead) read.performRead(); if (invokeSeek) seek.performSeek(seekTimecode); } catch (Throwable failure) { GateMpegAudioTrack.<RuntimeException>sneakyThrow(failure); } }
+  }
+
+  private static final class Derived extends MpegAudioTrack {
+    int processCalls;
+    Derived(AudioTrackInfo info, SeekableInputStream input) { super(info, input); }
+    @Override public void process(LocalAudioTrackExecutor executor) { processCalls++; super.process(executor); }
+  }
+  private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
+}
+"#;
+
+const MPEG_AUDIO_TRACK_SUPPORT_CONSUMER: &str = r#"
+package com.sedmelluq.discord.lavaplayer.container.mpeg;
+
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegFileTrackProvider;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+public final class MpegGateSupport {
+  public static AudioProcessingContext consumerContext;
+  public static MpegTrackInfo consumerTrack;
+  public static MpegTrackConsumer consumer;
+  public static MpegTrackConsumer readerConsumer;
+  public static int consumerCreations, initialiseCalls, readCalls, seekCalls, closeCalls;
+  public static long seekTimecode, duration = 654321L;
+  public static RuntimeException parseFailure, contextFailure, initialiseFailure, readerFailure, loopFailure, closeFailure;
+  public static InterruptedException readFailure;
+  public static boolean readerNull;
+  public static final StringBuilder events = new StringBuilder();
+  static String[] trackSpecs = {"soun|mp4a"};
+  private MpegGateSupport() {}
+  public static void reset() { consumerContext = null; consumerTrack = null; consumer = null; readerConsumer = null; consumerCreations = initialiseCalls = readCalls = seekCalls = closeCalls = 0; seekTimecode = 0L; duration = 654321L; parseFailure = contextFailure = initialiseFailure = readerFailure = loopFailure = closeFailure = null; readFailure = null; readerNull = false; trackSpecs = new String[] {"soun|mp4a"}; events.setLength(0); }
+  public static void setTracks(String... specs) { trackSpecs = specs; }
+  public static void event(String value) { if (events.length() > 0) events.append(','); events.append(value); }
+}
+
+class MpegFileLoader {
+  private final List<MpegTrackInfo> tracks = new ArrayList<>();
+  MpegFileLoader(SeekableInputStream input) { MpegGateSupport.event("loader"); for (String spec : MpegGateSupport.trackSpecs) { String[] pair = spec.split("\\|", -1); tracks.add(new MpegTrackInfo(0, pair[0], pair[1], 2, 44100, new byte[] {1, 2})); } }
+  List<MpegTrackInfo> getTrackList() { return tracks; }
+  void parseHeaders() { MpegGateSupport.event("parse"); if (MpegGateSupport.parseFailure != null) throw MpegGateSupport.parseFailure; }
+  MpegFileTrackProvider loadReader(MpegTrackConsumer trackConsumer) { MpegGateSupport.readerConsumer = trackConsumer; MpegGateSupport.event("reader"); if (MpegGateSupport.readerFailure != null) throw MpegGateSupport.readerFailure; return MpegGateSupport.readerNull ? null : new MpegGateProvider(); }
+}
+
+class MpegAacTrackConsumer implements MpegTrackConsumer {
+  private final MpegTrackInfo track;
+  MpegAacTrackConsumer(AudioProcessingContext context, MpegTrackInfo track) { MpegGateSupport.consumerCreations++; MpegGateSupport.consumerContext = context; MpegGateSupport.consumerTrack = track; MpegGateSupport.consumer = this; this.track = track; MpegGateSupport.event("consumer"); }
+  public MpegTrackInfo getTrack() { return track; }
+  public void initialise() { MpegGateSupport.initialiseCalls++; MpegGateSupport.event("initialise"); if (MpegGateSupport.initialiseFailure != null) throw MpegGateSupport.initialiseFailure; }
+  public void seekPerformed(long actual, long requested) {}
+  public void flush() throws InterruptedException {}
+  public void consume(java.nio.channels.ReadableByteChannel channel, int length) throws InterruptedException {}
+  public void close() { MpegGateSupport.closeCalls++; MpegGateSupport.event("close"); if (MpegGateSupport.closeFailure != null) throw MpegGateSupport.closeFailure; }
+}
+
+class MpegGateProvider implements MpegFileTrackProvider {
+  public boolean initialise(MpegTrackConsumer consumer) { return true; }
+  public long getDuration() { MpegGateSupport.event("duration"); return MpegGateSupport.duration; }
+  public void provideFrames() throws InterruptedException, IOException { MpegGateSupport.readCalls++; MpegGateSupport.event("read"); if (MpegGateSupport.readFailure != null) throw MpegGateSupport.readFailure; }
+  public void seekToTimecode(long timecode) { MpegGateSupport.seekCalls++; MpegGateSupport.seekTimecode = timecode; MpegGateSupport.event("seek"); }
 }
 "#;
 

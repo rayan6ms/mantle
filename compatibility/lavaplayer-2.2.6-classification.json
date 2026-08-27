@@ -5547,36 +5547,40 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public concrete BaseAudioTrack shell, member ownership, and reflection metadata are emitted byte-for-byte from the verified reference class.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Constructor forwards exact track-info identity to BaseAudioTrack and retains the supplied SeekableInputStream, including null arguments.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "process",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/playback/LocalAudioTrackExecutor;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Process preserves MPEG header parsing, soun/mp4a selection, AAC consumer initialisation, duration publication, executor callbacks, checked failures, and finally-close behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegAudioTrack",
       "symbol_kind": "METHOD",
       "member_name": "loadAudioTrack",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/mpeg/MpegFileLoader;Lcom/sedmelluq/discord/lavaplayer/track/playback/AudioProcessingContext;)Lcom/sedmelluq/discord/lavaplayer/container/mpeg/MpegTrackConsumer;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Protected loader selects the first supported soun/mp4a track, reports unsupported codecs with the reference diagnostic, wraps initialisation failures, and closes unsuccessful consumers.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegContainerProbe",

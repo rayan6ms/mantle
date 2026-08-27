@@ -11,6 +11,7 @@ readonly MP3_CLASSES="$WORK/mp3-consumer-classes"
 readonly FLAC_LOADER_CLASSES="$WORK/flac-loader-consumer-classes"
 readonly FLAC_METADATA_READER_CLASSES="$WORK/flac-metadata-reader-consumer-classes"
 readonly MATROSKA_CLASSES="$WORK/matroska-consumer-classes"
+readonly MPEG_CLASSES="$WORK/mpeg-consumer-classes"
 readonly JAR="$WORK/mantle-gate-a.jar"
 readonly MISMATCH_JAR="$WORK/mantle-gate-a-mismatch.jar"
 
@@ -20,9 +21,9 @@ if [[ ! -f "$REFERENCE_JAR" ]]; then
 fi
 
 rm -rf -- "$CLASSES" "$FLAC_CLASSES" "$MP3_CLASSES" "$FLAC_LOADER_CLASSES" \
-  "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES"
+  "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES" "$MPEG_CLASSES"
 mkdir -p "$CLASSES" "$FLAC_CLASSES" "$MP3_CLASSES" "$FLAC_LOADER_CLASSES" \
-  "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES"
+  "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES" "$MPEG_CLASSES"
 cargo build --locked -p mantle-jvm --features gate-a-direct-attachment
 cargo run --locked -q -p mantle-jvm-gate -- emit \
   --reference-jar "$REFERENCE_JAR" --output "$JAR" --expected-abi 1 \
@@ -255,6 +256,10 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mp3-xing-seeker-consumer \
   --output "$WORK/GateMp3XingSeeker.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-aac-track-consumer \
   --output "$WORK/GateMpegAacTrackConsumer.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-audio-track-consumer \
+  --output "$WORK/GateMpegAudioTrack.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-audio-track-support-consumer \
+  --output "$WORK/MpegGateSupport.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-container-probe-consumer \
   --output "$WORK/GateAdtsContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-adts-packet-header-consumer \
@@ -490,6 +495,9 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$MP3_CLASSES" \
   "$WORK/Mp3GateSupport.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$MP3_CLASSES" \
   "$WORK/GateMp3ConstantRateSeeker.java"
+javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$MPEG_CLASSES" \
+  "$WORK/GateMpegAudioTrack.java" \
+  "$WORK/MpegGateSupport.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   -d "$FLAC_LOADER_CLASSES" \
   "$WORK/GateFlacFileLoader.java" \
@@ -1384,6 +1392,16 @@ cmp "$WORK/mp3-audio-track-reference.txt" "$WORK/mp3-audio-track-candidate.txt"
 grep --fixed-strings \
   'contracts=track-info,input-identity,null-construction,processing-context,header-parse,read-callback,seek-callback,full-timecode,executor-control,input-ownership,context-failure,null-executor,identifier-dispatch,loop-failure,callback-failure,parse-failure,close-finally,close-replacement,subclassable,eager-logger,private-state,throws,reflection' \
   "$WORK/mp3-audio-track-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$MPEG_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMpegAudioTrack \
+  >"$WORK/mpeg-audio-track-reference.txt"
+java -Xverify:all \
+  -cp "$MPEG_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegAudioTrack >"$WORK/mpeg-audio-track-candidate.txt"
+cmp "$WORK/mpeg-audio-track-reference.txt" "$WORK/mpeg-audio-track-candidate.txt"
+grep --fixed-strings \
+  'contracts=track-info,input-identity,null-construction,track-selection,context,initialise,reader,duration,read-callback,seek-callback,full-width-timecode,executor-control,input-ownership,unsupported,parse-failure,context-failure,initialise-failure,reader-failure,loop-failure,callback-failure,close-finally,close-replacement,subclassable,eager-logger,private-state,throws,reflection' \
+  "$WORK/mpeg-audio-track-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mp3_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMp3ConstantRateSeeker \
   >"$WORK/mp3-constant-rate-seeker-reference.txt"
