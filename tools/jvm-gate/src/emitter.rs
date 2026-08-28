@@ -351,6 +351,7 @@ const EXCEPTION_TOOLS_ERROR_DEBUG_INFO_HANDLER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/ExceptionTools$ErrorDebugInfoHandler";
 const FRIENDLY_EXCEPTION_SEVERITY_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity";
+const FUTURE_TOOLS_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/FutureTools";
 const ABSTRACT_MUTABLE_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AbstractMutableAudioFrame";
 const IMMUTABLE_FRAME_CLASS: &str =
@@ -954,6 +955,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     EXCEPTION_TOOLS_ERROR_DEBUG_INFO_HANDLER_CLASS,
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
+    FUTURE_TOOLS_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/AudioItem",
     AUDIO_REFERENCE_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/AudioPlaylist",
@@ -1084,6 +1086,7 @@ pub fn emit(
     let mut exception_tools_error_debug_info_handler_bytes = None;
     let mut friendly_exception_bytes = None;
     let mut friendly_exception_severity_bytes = None;
+    let mut future_tools_bytes = None;
     let mut vorbis_comment_parser_bytes = None;
     let mut extended_m3u_parser_bytes = None;
     let mut extended_m3u_line_bytes = None;
@@ -1241,6 +1244,8 @@ pub fn emit(
             friendly_exception_bytes = Some(bytes);
         } else if *binary_name == FRIENDLY_EXCEPTION_SEVERITY_CLASS {
             friendly_exception_severity_bytes = Some(bytes);
+        } else if *binary_name == FUTURE_TOOLS_CLASS {
+            future_tools_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -1365,6 +1370,12 @@ pub fn emit(
                 friendly_exception_severity_bytes
                     .as_ref()
                     .expect("friendly exception severity source bytes are retained"),
+            );
+        } else if name == format!("{FUTURE_TOOLS_CLASS}.class") {
+            bytes.clone_from(
+                future_tools_bytes
+                    .as_ref()
+                    .expect("future tools source bytes are retained"),
             );
         } else if name == format!("{MPEG_AUDIO_TRACK_CLASS}.class") {
             bytes.clone_from(
@@ -2305,6 +2316,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | EXCEPTION_TOOLS_ERROR_DEBUG_INFO_HANDLER_CLASS
             | FRIENDLY_EXCEPTION_CLASS
             | FRIENDLY_EXCEPTION_SEVERITY_CLASS
+            | FUTURE_TOOLS_CLASS
             | OGG_FLAC_CODEC_HANDLER_CLASS
             | OGG_FLAC_CODEC_HANDLER_BLUEPRINT_CLASS
             | OGG_FLAC_TRACK_HANDLER_CLASS

@@ -168,6 +168,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-friendly-exception-consumer" => Some(FRIENDLY_EXCEPTION_CONSUMER),
         "write-friendly-exception-severity-consumer" => Some(FRIENDLY_EXCEPTION_SEVERITY_CONSUMER),
+        "write-future-tools-consumer" => Some(FUTURE_TOOLS_CONSUMER),
         _ => None,
     }
 }
@@ -27513,6 +27514,214 @@ public final class GateFriendlyExceptionSeverity {
         && method.getExceptionTypes().length == 0, name + " metadata");
   }
 
+  private static Throwable catchThrowable(Throwing action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+  private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const FUTURE_TOOLS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.FutureTools;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
+import java.util.AbstractList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletionService;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
+
+public final class GateFutureTools {
+  public static void main(String[] args) throws Exception {
+    construction(); resultOrderAndFiltering(); takeFailures(); collectionFailures(); reflection();
+    System.out.println("contracts=constructor,subclassable,take-count,input-order,done-filter,null-filter,get-failure,interruption-stop,runtime-stop,null-service,stream-fallback,null-futures,mutable-result,generics,private-state,synthetic-lambda,reflection");
+  }
+
+  private static void construction() {
+    check(new FutureTools().getClass() == FutureTools.class, "public constructor");
+    check(new Derived() instanceof FutureTools, "subclassability");
+  }
+
+  private static void resultOrderAndFiltering() {
+    AudioTrack alpha = track("alpha");
+    AudioTrack beta = track("beta");
+    TestFuture first = new TestFuture(true, alpha, false);
+    TestFuture pending = new TestFuture(false, track("pending"), false);
+    TestFuture failed = new TestFuture(true, null, true);
+    TestFuture nullValue = new TestFuture(true, null, false);
+    TestFuture last = new TestFuture(true, beta, false);
+    List<Future<AudioTrack>> futures = Arrays.asList(first, pending, failed, nullValue, last);
+    TestCompletionService service = new TestCompletionService(0, first);
+
+    List<AudioTrack> result = FutureTools.awaitList(service, futures);
+    check(service.takeCalls == futures.size(), "one completion take per input future");
+    check(result.size() == 2 && result.get(0) == alpha && result.get(1) == beta,
+        "done results retain input-list order");
+    check(first.getCalls == 1 && pending.getCalls == 0 && failed.getCalls == 1
+        && nullValue.getCalls == 1 && last.getCalls == 1,
+        "done filter, get failures, and null filtering");
+  }
+
+  private static void takeFailures() {
+    AudioTrack value = track("value");
+    TestFuture done = new TestFuture(true, value, false);
+    List<Future<AudioTrack>> futures = Collections.singletonList(done);
+    Thread.interrupted();
+    TestCompletionService interrupted = new TestCompletionService(1, done);
+    List<AudioTrack> interruptedResult = FutureTools.awaitList(interrupted, futures);
+    check(interrupted.takeCalls == 1 && interruptedResult.size() == 1
+        && interruptedResult.get(0) == value && !Thread.currentThread().isInterrupted(),
+        "interruption stops takes and still collects completed futures");
+
+    TestCompletionService runtime = new TestCompletionService(2, done);
+    List<AudioTrack> runtimeResult = FutureTools.awaitList(runtime, futures);
+    check(runtime.takeCalls == 1 && runtimeResult.size() == 1 && runtimeResult.get(0) == value,
+        "runtime take failure stops takes and still collects");
+
+    List<AudioTrack> nullService = FutureTools.awaitList(null, futures);
+    check(nullService.size() == 1 && nullService.get(0) == value,
+        "null completion service is caught after the first take");
+  }
+
+  private static void collectionFailures() {
+    List<AudioTrack> fallback = FutureTools.awaitList(
+        new TestCompletionService(0, null), new StreamFailingList());
+    check(fallback == Collections.<AudioTrack>emptyList(), "stream failure singleton fallback");
+    check(catchThrowable(() -> FutureTools.awaitList(null, null)) instanceof NullPointerException,
+        "null futures fail before collection recovery");
+
+    List<AudioTrack> mutable = FutureTools.awaitList(null, Collections.emptyList());
+    AudioTrack added = track("added");
+    mutable.add(added);
+    check(mutable.size() == 1 && mutable.get(0) == added, "collector result is mutable");
+  }
+
+  private static void reflection() throws Exception {
+    Class<FutureTools> type = FutureTools.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 1
+        && type.getDeclaredMethods().length == 2 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredClasses().length == 0, "exact class shape");
+    Field log = type.getDeclaredField("log");
+    check(log.getType().getName().equals("org.slf4j.Logger")
+        && log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && !log.isSynthetic(), "logger field metadata");
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
+
+    Method await = type.getDeclaredMethod("awaitList", CompletionService.class, List.class);
+    check(await.getReturnType() == List.class
+        && await.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && await.getExceptionTypes().length == 0
+        && !await.isSynthetic() && !await.isBridge() && !await.isVarArgs(),
+        "awaitList metadata");
+    TypeVariable<Method>[] variables = await.getTypeParameters();
+    check(variables.length == 1 && variables[0].getName().equals("T")
+        && Arrays.equals(variables[0].getBounds(), new Type[] {Object.class}),
+        "method type variable");
+    ParameterizedType result = (ParameterizedType) await.getGenericReturnType();
+    Type[] parameters = await.getGenericParameterTypes();
+    ParameterizedType completion = (ParameterizedType) parameters[0];
+    ParameterizedType futureList = (ParameterizedType) parameters[1];
+    ParameterizedType future = (ParameterizedType) futureList.getActualTypeArguments()[0];
+    check(result.getRawType() == List.class && result.getActualTypeArguments()[0] == variables[0]
+        && completion.getRawType() == CompletionService.class
+        && completion.getActualTypeArguments()[0] == variables[0]
+        && futureList.getRawType() == List.class && future.getRawType() == Future.class
+        && future.getActualTypeArguments()[0] == AudioTrack.class, "generic signature");
+
+    Method lambda = Arrays.stream(type.getDeclaredMethods())
+        .filter(method -> method.getName().equals("lambda$awaitList$0")).findFirst().orElseThrow();
+    check(lambda.getReturnType() == AudioTrack.class
+        && Arrays.equals(lambda.getParameterTypes(), new Class<?>[] {Future.class})
+        && lambda.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | 0x1000)
+        && lambda.isSynthetic() && !lambda.isBridge() && !lambda.isVarArgs()
+        && lambda.getExceptionTypes().length == 0, "synthetic lambda metadata");
+  }
+
+  private static AudioTrack track(String label) {
+    return (AudioTrack) Proxy.newProxyInstance(AudioTrack.class.getClassLoader(),
+        new Class<?>[] {AudioTrack.class}, (proxy, method, args) -> {
+          if (method.getName().equals("toString")) return label;
+          if (method.getReturnType() == boolean.class) return false;
+          if (method.getReturnType() == int.class) return 0;
+          if (method.getReturnType() == long.class) return 0L;
+          return null;
+        });
+  }
+
+  private static final class TestFuture implements Future<AudioTrack> {
+    final boolean done;
+    final AudioTrack value;
+    final boolean fail;
+    int getCalls;
+    TestFuture(boolean done, AudioTrack value, boolean fail) {
+      this.done = done; this.value = value; this.fail = fail;
+    }
+    @Override public boolean cancel(boolean mayInterruptIfRunning) { return false; }
+    @Override public boolean isCancelled() { return false; }
+    @Override public boolean isDone() { return done; }
+    @Override public AudioTrack get() throws ExecutionException {
+      getCalls++;
+      if (fail) throw new ExecutionException(new IllegalStateException("failed"));
+      return value;
+    }
+    @Override public AudioTrack get(long timeout, TimeUnit unit) throws ExecutionException {
+      return get();
+    }
+  }
+
+  private static final class TestCompletionService implements CompletionService<AudioTrack> {
+    final int failureMode;
+    final Future<AudioTrack> returned;
+    int takeCalls;
+    TestCompletionService(int failureMode, Future<AudioTrack> returned) {
+      this.failureMode = failureMode; this.returned = returned;
+    }
+    @Override public Future<AudioTrack> take() throws InterruptedException {
+      takeCalls++;
+      if (failureMode == 1) throw new InterruptedException("stop");
+      if (failureMode == 2) throw new IllegalStateException("stop");
+      return returned;
+    }
+    @Override public Future<AudioTrack> submit(Callable<AudioTrack> task) {
+      throw new UnsupportedOperationException();
+    }
+    @Override public Future<AudioTrack> submit(Runnable task, AudioTrack result) {
+      throw new UnsupportedOperationException();
+    }
+    @Override public Future<AudioTrack> poll() { throw new UnsupportedOperationException(); }
+    @Override public Future<AudioTrack> poll(long timeout, TimeUnit unit) {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  private static final class StreamFailingList extends AbstractList<Future<AudioTrack>> {
+    @Override public Future<AudioTrack> get(int index) { throw new IndexOutOfBoundsException(); }
+    @Override public int size() { return 0; }
+    @Override public Stream<Future<AudioTrack>> stream() {
+      throw new IllegalStateException("stream failed");
+    }
+  }
+
+  private static final class Derived extends FutureTools {}
   private static Throwable catchThrowable(Throwing action) {
     try { action.run(); return null; } catch (Throwable failure) { return failure; }
   }
