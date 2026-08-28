@@ -192,6 +192,8 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-ogg-track-loader-consumer" => Some(OGG_TRACK_LOADER_CONSUMER),
         "write-ogg-flac-codec-handler-consumer" => Some(OGG_FLAC_CODEC_HANDLER_CONSUMER),
         "write-ogg-opus-codec-handler-consumer" => Some(OGG_OPUS_CODEC_HANDLER_CONSUMER),
+        "write-ogg-opus-track-handler-consumer" => Some(OGG_OPUS_TRACK_HANDLER_CONSUMER),
+        "write-ogg-opus-router-support-consumer" => Some(OGG_OPUS_ROUTER_SUPPORT_CONSUMER),
         "write-ogg-flac-track-handler-consumer" => Some(OGG_FLAC_TRACK_HANDLER_CONSUMER),
         "write-ogg-flac-track-handler-support-consumer" => {
             Some(OGG_FLAC_TRACK_HANDLER_SUPPORT_CONSUMER)
@@ -18430,6 +18432,332 @@ public final class FlacFrameReader {
     calls++; lastInput = input; lastBits = bits; lastInfo = info; lastRaw = raw; lastSamples = samples; lastDecoding = decoding;
     if (ioFailure != null) throw ioFailure; if (runtimeFailure != null) throw runtimeFailure; return sampleCount;
   }
+}
+";
+
+const OGG_OPUS_TRACK_HANDLER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.common.OpusPacketRouter;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream;
+import com.sedmelluq.discord.lavaplayer.container.ogg.opus.OggOpusTrackHandler;
+import com.sedmelluq.discord.lavaplayer.tools.io.DirectBufferStreamBroker;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateOggOpusTrackHandler {
+  public static void main(String[] args) throws Exception {
+    construction();
+    initialise();
+    frames();
+    failuresAndSeek();
+    closeAndReflection();
+    System.out.println("contracts=constructor,nullable-identities,signed-channel-rate,router-default,initialise-context,router-rate-channel,full-width-timecodes,initialise-order,reinitialise,packet-loop,integer-max-bounds,consume-result-ignored,buffer-identity,empty-packet-skip,no-flush,interruption-identity,io-wrapping,runtime-identity,seek-order,seek-result,preinit-seek-order,close-before-init,close-dispatch,close-repeat,public-shape,private-state,throws,reflection");
+  }
+
+  private static void construction() throws Exception {
+    ScriptedStream stream = new ScriptedStream();
+    RecordingBroker broker = new RecordingBroker();
+    int channels = Integer.MIN_VALUE + 3;
+    int rate = Integer.MAX_VALUE - 5;
+    OggOpusTrackHandler handler = new OggOpusTrackHandler(stream, broker, channels, rate);
+    check(field(handler, "packetInputStream") == stream && field(handler, "broker") == broker
+        && ((Integer) field(handler, "channelCount")) == channels
+        && ((Integer) field(handler, "sampleRate")) == rate
+        && field(handler, "opusPacketRouter") == null,
+        "constructor retains exact references, signed primitives, and null router default");
+    OggOpusTrackHandler nullable = new OggOpusTrackHandler(null, null, -1, -2);
+    check(field(nullable, "packetInputStream") == null && field(nullable, "broker") == null,
+        "constructor accepts nullable stream and broker identities");
+    check(new Derived(stream, broker).marker() == 43, "public handler remains subclassable");
+  }
+
+  private static void initialise() throws Exception {
+    OpusPacketRouter.reset();
+    ScriptedStream stream = new ScriptedStream();
+    RecordingBroker broker = new RecordingBroker();
+    int channels = -17;
+    int rate = 192_000;
+    OggOpusTrackHandler handler = new OggOpusTrackHandler(stream, broker, channels, rate);
+    AudioProcessingContext context = allocate(AudioProcessingContext.class);
+    long initial = Long.MIN_VALUE + 31L;
+    long desired = Long.MAX_VALUE - 17L;
+    handler.initialise(context, initial, desired);
+    OpusPacketRouter first = OpusPacketRouter.last;
+    check(OpusPacketRouter.constructionCalls == 1 && first.context == context
+        && first.inputFrequency == rate && first.inputChannels == channels
+        && field(handler, "opusPacketRouter") == first,
+        "initialise constructs and retains the exact router arguments");
+    check(first.seekCalls == 1 && first.requested[0] == desired && first.provided[0] == initial,
+        "initialise forwards desired then actual full-width timecodes");
+
+    AudioProcessingContext replacementContext = allocate(AudioProcessingContext.class);
+    handler.initialise(replacementContext, 7L, 9L);
+    OpusPacketRouter replacement = OpusPacketRouter.last;
+    check(replacement != first && OpusPacketRouter.constructionCalls == 2
+        && replacement.context == replacementContext && replacement.seekCalls == 1
+        && replacement.requested[0] == 9L && replacement.provided[0] == 7L
+        && first.closeCalls == 0 && field(handler, "opusPacketRouter") == replacement,
+        "reinitialise replaces without closing the previous router");
+  }
+
+  private static void frames() throws Exception {
+    OpusPacketRouter.reset();
+    ScriptedStream stream = new ScriptedStream(); stream.packetCount = 3;
+    ByteBuffer first = ByteBuffer.wrap(new byte[] {1, 2, 3});
+    ByteBuffer empty = ByteBuffer.allocate(0);
+    ByteBuffer third = ByteBuffer.allocateDirect(2); third.put((byte) 4).put((byte) 5).flip();
+    RecordingBroker broker = new RecordingBroker(first, empty, third);
+    broker.consumeResult = false;
+    OggOpusTrackHandler handler = new OggOpusTrackHandler(stream, broker, 2, 48_000);
+    handler.initialise(allocate(AudioProcessingContext.class), 0L, 0L);
+    OpusPacketRouter router = OpusPacketRouter.last;
+    handler.provideFrames();
+    check(stream.startCalls == 4 && broker.consumeCalls == 3 && broker.bufferCalls == 3,
+        "provideFrames iterates all packets through the broker");
+    for (int index = 0; index < 3; index++) {
+      check(broker.inputs[index] == stream
+          && broker.savedLengths[index] == Integer.MAX_VALUE
+          && broker.readLengths[index] == Integer.MAX_VALUE,
+          "packet broker receives exact stream and unbounded integer caps");
+    }
+    check(router.processCalls == 2 && router.processed[0] == first && router.processed[1] == third
+        && router.flushCalls == 0,
+        "consume result is ignored, buffers retain identity, empty packets are skipped, and no flush occurs");
+  }
+
+  private static void failuresAndSeek() throws Exception {
+    OpusPacketRouter.reset();
+    ScriptedStream interruptedStream = new ScriptedStream(); interruptedStream.packetCount = 1;
+    RecordingBroker interruptedBroker = new RecordingBroker(ByteBuffer.wrap(new byte[] {1}));
+    OggOpusTrackHandler interruptedHandler = initialised(interruptedStream, interruptedBroker);
+    InterruptedException interrupted = new InterruptedException("process");
+    OpusPacketRouter.last.processInterruptedFailure = interrupted;
+    expectSame(interrupted, interruptedHandler::provideFrames);
+
+    IOException startFailure = new IOException("start");
+    ScriptedStream startStream = new ScriptedStream(); startStream.startFailure = startFailure;
+    Throwable wrappedStart = catchThrowable(() -> initialised(startStream,
+        new RecordingBroker()).provideFrames());
+    check(wrappedStart != null && wrappedStart.getClass() == RuntimeException.class
+        && wrappedStart.getCause() == startFailure, "packet-start IOException is wrapped exactly");
+
+    IOException consumeFailure = new IOException("consume");
+    ScriptedStream consumeStream = new ScriptedStream(); consumeStream.packetCount = 1;
+    RecordingBroker consumeBroker = new RecordingBroker(ByteBuffer.wrap(new byte[] {1}));
+    consumeBroker.consumeFailure = consumeFailure;
+    Throwable wrappedConsume = catchThrowable(() -> initialised(consumeStream,
+        consumeBroker).provideFrames());
+    check(wrappedConsume != null && wrappedConsume.getClass() == RuntimeException.class
+        && wrappedConsume.getCause() == consumeFailure, "broker IOException is wrapped exactly");
+
+    RuntimeException bufferFailure = new RuntimeException("buffer");
+    ScriptedStream runtimeStream = new ScriptedStream(); runtimeStream.packetCount = 1;
+    RecordingBroker runtimeBroker = new RecordingBroker(ByteBuffer.wrap(new byte[] {1}));
+    runtimeBroker.bufferFailure = bufferFailure;
+    expectSame(bufferFailure, () -> initialised(runtimeStream, runtimeBroker).provideFrames());
+
+    OpusPacketRouter.reset();
+    ScriptedStream seekStream = new ScriptedStream(); seekStream.seekResult = Long.MIN_VALUE + 9L;
+    OggOpusTrackHandler seekHandler = initialised(seekStream, new RecordingBroker());
+    long target = Long.MAX_VALUE - 5L;
+    seekHandler.seekToTimecode(target);
+    OpusPacketRouter seekRouter = OpusPacketRouter.last;
+    check(seekStream.seekCalls == 1 && seekStream.seekTimecode == target
+        && seekRouter.seekCalls == 2 && seekRouter.requested[1] == target
+        && seekRouter.provided[1] == seekStream.seekResult,
+        "seek forwards full-width target and actual result in order");
+
+    IOException seekFailure = new IOException("seek"); seekStream.seekFailure = seekFailure;
+    Throwable wrappedSeek = catchThrowable(() -> seekHandler.seekToTimecode(12L));
+    check(wrappedSeek != null && wrappedSeek.getClass() == RuntimeException.class
+        && wrappedSeek.getCause() == seekFailure, "seek IOException is wrapped exactly");
+
+    RuntimeException seekRuntime = new RuntimeException("seek-runtime");
+    seekStream.seekFailure = null; seekStream.seekRuntimeFailure = seekRuntime;
+    expectSame(seekRuntime, () -> seekHandler.seekToTimecode(13L));
+
+    ScriptedStream preinitStream = new ScriptedStream(); preinitStream.seekResult = 77L;
+    OggOpusTrackHandler preinit = new OggOpusTrackHandler(preinitStream,
+        new RecordingBroker(), 1, 8_000);
+    Throwable preinitFailure = catchThrowable(() -> preinit.seekToTimecode(19L));
+    check(preinitFailure != null && preinitFailure.getClass() == NullPointerException.class
+        && preinitStream.seekCalls == 1 && preinitStream.seekTimecode == 19L,
+        "preinitialisation seek performs the stream seek before null-router failure");
+
+    OpusPacketRouter.reset();
+    RuntimeException initialiseFailure = new RuntimeException("initialise-seek");
+    OpusPacketRouter.constructorSeekFailure = initialiseFailure;
+    OggOpusTrackHandler failingInitialise = new OggOpusTrackHandler(new ScriptedStream(),
+        new RecordingBroker(), 2, 48_000);
+    expectSame(initialiseFailure, () -> failingInitialise.initialise(
+        allocate(AudioProcessingContext.class), 1L, 2L));
+    check(field(failingInitialise, "opusPacketRouter") == OpusPacketRouter.last,
+        "router is installed before initialise seek dispatch");
+  }
+
+  private static void closeAndReflection() throws Exception {
+    OpusPacketRouter.reset();
+    OggOpusTrackHandler handler = new OggOpusTrackHandler(new ScriptedStream(),
+        new RecordingBroker(), 2, 48_000);
+    handler.close();
+    check(OpusPacketRouter.last == null, "close before initialise is a no-op");
+    handler.initialise(allocate(AudioProcessingContext.class), 0L, 0L);
+    OpusPacketRouter router = OpusPacketRouter.last;
+    handler.close(); handler.close();
+    check(router.closeCalls == 2, "close dispatches repeatedly without clearing router state");
+    RuntimeException closeFailure = new RuntimeException("close"); router.closeFailure = closeFailure;
+    expectSame(closeFailure, handler::close);
+
+    Class<OggOpusTrackHandler> type = OggOpusTrackHandler.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {
+            com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackHandler.class})
+        && type.getDeclaredFields().length == 5 && type.getDeclaredMethods().length == 4
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredClasses().length == 0,
+        "exact public handler shape");
+    Constructor<OggOpusTrackHandler> constructor = type.getDeclaredConstructor(
+        OggPacketInputStream.class, DirectBufferStreamBroker.class, int.class, int.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0, "exact public constructor metadata");
+    checkField(type, "packetInputStream", OggPacketInputStream.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "broker", DirectBufferStreamBroker.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "channelCount", int.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "sampleRate", int.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "opusPacketRouter", OpusPacketRouter.class, Modifier.PRIVATE);
+    checkMethod(type.getDeclaredMethod("initialise", AudioProcessingContext.class,
+        long.class, long.class), new Class<?>[] {AudioProcessingContext.class, long.class, long.class});
+    checkMethod(type.getDeclaredMethod("provideFrames"), new Class<?>[0], InterruptedException.class);
+    checkMethod(type.getDeclaredMethod("seekToTimecode", long.class), new Class<?>[] {long.class});
+    checkMethod(type.getDeclaredMethod("close"), new Class<?>[0]);
+  }
+
+  private static OggOpusTrackHandler initialised(ScriptedStream stream, RecordingBroker broker)
+      throws Exception {
+    OggOpusTrackHandler handler = new OggOpusTrackHandler(stream, broker, 2, 48_000);
+    handler.initialise(allocate(AudioProcessingContext.class), 0L, 0L);
+    return handler;
+  }
+  private static Object field(Object target, String name) throws Exception {
+    Field field = target.getClass().getDeclaredField(name); field.setAccessible(true); return field.get(target);
+  }
+  private static <T> T allocate(Class<T> type) throws Exception {
+    Field unsafeField = Class.forName("sun.misc.Unsafe").getDeclaredField("theUnsafe");
+    unsafeField.setAccessible(true); Object unsafe = unsafeField.get(null);
+    return type.cast(unsafe.getClass().getMethod("allocateInstance", Class.class).invoke(unsafe, type));
+  }
+  private static void checkField(Class<?> type, String name, Class<?> fieldType, int modifiers)
+      throws Exception {
+    Field field = type.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getModifiers() == modifiers
+        && !field.isSynthetic(), name + " field metadata");
+  }
+  private static void checkMethod(Method method, Class<?>[] parameters,
+      Class<?>... exceptions) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == void.class
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isSynthetic() && !method.isBridge(), method.getName() + " method metadata");
+  }
+  private static Throwable catchThrowable(Throwing action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+  private static void expectSame(Throwable expected, Throwing action) {
+    check(catchThrowable(action) == expected, "failure identity for " + expected.getMessage());
+  }
+  private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+
+  private static final class Derived extends OggOpusTrackHandler {
+    Derived(OggPacketInputStream stream, DirectBufferStreamBroker broker) {
+      super(stream, broker, 1, 8_000);
+    }
+    int marker() { return 43; }
+  }
+  private static final class RecordingBroker extends DirectBufferStreamBroker {
+    final ByteBuffer[] buffers; int consumeCalls; int bufferCalls;
+    final InputStream[] inputs = new InputStream[8];
+    final int[] savedLengths = new int[8]; final int[] readLengths = new int[8];
+    boolean consumeResult = true; IOException consumeFailure; RuntimeException bufferFailure;
+    RecordingBroker(ByteBuffer... buffers) { super(1); this.buffers = buffers; }
+    @Override public boolean consumeNext(InputStream input, int savedLength, int readLength)
+        throws IOException {
+      inputs[consumeCalls] = input; savedLengths[consumeCalls] = savedLength;
+      readLengths[consumeCalls++] = readLength;
+      if (consumeFailure != null) throw consumeFailure; return consumeResult;
+    }
+    @Override public ByteBuffer getBuffer() {
+      if (bufferFailure != null) throw bufferFailure; return buffers[bufferCalls++];
+    }
+  }
+  private static final class ScriptedStream extends OggPacketInputStream {
+    int packetCount; int startCalls; int seekCalls; long seekTimecode; long seekResult;
+    IOException startFailure; IOException seekFailure;
+    RuntimeException startRuntimeFailure; RuntimeException seekRuntimeFailure;
+    ScriptedStream() { super(new EmptyStream(), false); }
+    @Override public boolean startNewPacket() throws IOException {
+      startCalls++; if (startFailure != null) throw startFailure;
+      if (startRuntimeFailure != null) throw startRuntimeFailure; return startCalls <= packetCount;
+    }
+    @Override public long seek(long timecode) throws IOException {
+      seekCalls++; seekTimecode = timecode; if (seekFailure != null) throw seekFailure;
+      if (seekRuntimeFailure != null) throw seekRuntimeFailure; return seekResult;
+    }
+  }
+  private static final class EmptyStream extends SeekableInputStream {
+    EmptyStream() { super(0L, 0L); }
+    @Override public int read() { return -1; }
+    @Override public long getPosition() { return 0L; }
+    @Override protected void seekHard(long position) {}
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      return Collections.emptyList();
+    }
+  }
+}
+"#;
+
+const OGG_OPUS_ROUTER_SUPPORT_CONSUMER: &str = r"
+package com.sedmelluq.discord.lavaplayer.container.common;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.nio.ByteBuffer;
+public class OpusPacketRouter {
+  public static int constructionCalls; public static OpusPacketRouter last;
+  public static RuntimeException constructorSeekFailure;
+  public final AudioProcessingContext context; public final int inputFrequency; public final int inputChannels;
+  public int seekCalls; public long[] requested = new long[8]; public long[] provided = new long[8];
+  public int processCalls; public ByteBuffer[] processed = new ByteBuffer[8];
+  public int flushCalls; public int closeCalls;
+  public InterruptedException processInterruptedFailure; public RuntimeException processRuntimeFailure;
+  public RuntimeException seekFailure; public RuntimeException closeFailure;
+  public OpusPacketRouter(AudioProcessingContext context, int inputFrequency, int inputChannels) {
+    constructionCalls++; last = this; this.context = context; this.inputFrequency = inputFrequency;
+    this.inputChannels = inputChannels; this.seekFailure = constructorSeekFailure;
+  }
+  public static void reset() { constructionCalls = 0; last = null; constructorSeekFailure = null; }
+  public void seekPerformed(long requestedTimecode, long providedTimecode) {
+    if (seekFailure != null) throw seekFailure;
+    requested[seekCalls] = requestedTimecode; provided[seekCalls++] = providedTimecode;
+  }
+  public void process(ByteBuffer buffer) throws InterruptedException {
+    if (processInterruptedFailure != null) throw processInterruptedFailure;
+    if (processRuntimeFailure != null) throw processRuntimeFailure; processed[processCalls++] = buffer;
+  }
+  public void flush() throws InterruptedException { flushCalls++; }
+  public void close() { if (closeFailure != null) throw closeFailure; closeCalls++; }
 }
 ";
 

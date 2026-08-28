@@ -14,6 +14,7 @@ readonly MATROSKA_CLASSES="$WORK/matroska-consumer-classes"
 readonly MPEG_CLASSES="$WORK/mpeg-consumer-classes"
 readonly OGG_CODEC_CLASSES="$WORK/ogg-codec-consumer-classes"
 readonly OGG_FLAC_CLASSES="$WORK/ogg-flac-consumer-classes"
+readonly OGG_OPUS_CLASSES="$WORK/ogg-opus-consumer-classes"
 readonly OGG_PROBE_CLASSES="$WORK/ogg-probe-consumer-classes"
 readonly MPEG_FILE_LOADER_CLASSES="$WORK/mpeg-file-loader-consumer-classes"
 readonly JAR="$WORK/mantle-gate-a.jar"
@@ -26,10 +27,12 @@ fi
 
 rm -rf -- "$CLASSES" "$FLAC_CLASSES" "$MP3_CLASSES" "$FLAC_LOADER_CLASSES" \
   "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES" "$MPEG_CLASSES" \
-  "$MPEG_FILE_LOADER_CLASSES" "$OGG_CODEC_CLASSES" "$OGG_FLAC_CLASSES" "$OGG_PROBE_CLASSES"
+  "$MPEG_FILE_LOADER_CLASSES" "$OGG_CODEC_CLASSES" "$OGG_FLAC_CLASSES" \
+  "$OGG_OPUS_CLASSES" "$OGG_PROBE_CLASSES"
 mkdir -p "$CLASSES" "$FLAC_CLASSES" "$MP3_CLASSES" "$FLAC_LOADER_CLASSES" \
   "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES" "$MPEG_CLASSES" \
-  "$MPEG_FILE_LOADER_CLASSES" "$OGG_CODEC_CLASSES" "$OGG_FLAC_CLASSES" "$OGG_PROBE_CLASSES"
+  "$MPEG_FILE_LOADER_CLASSES" "$OGG_CODEC_CLASSES" "$OGG_FLAC_CLASSES" \
+  "$OGG_OPUS_CLASSES" "$OGG_PROBE_CLASSES"
 cargo build --locked -p mantle-jvm --features gate-a-direct-attachment
 cargo run --locked -q -p mantle-jvm-gate -- emit \
   --reference-jar "$REFERENCE_JAR" --output "$JAR" --expected-abi 1 \
@@ -304,6 +307,10 @@ cargo run --locked -q -p mantle-jvm-gate -- write-ogg-flac-codec-handler-consume
   --output "$WORK/GateOggFlacCodecHandler.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ogg-opus-codec-handler-consumer \
   --output "$WORK/GateOggOpusCodecHandler.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-ogg-opus-track-handler-consumer \
+  --output "$WORK/GateOggOpusTrackHandler.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-ogg-opus-router-support-consumer \
+  --output "$WORK/OpusPacketRouter.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ogg-flac-track-handler-consumer \
   --output "$WORK/GateOggFlacTrackHandler.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ogg-flac-track-handler-support-consumer \
@@ -572,6 +579,7 @@ if command -v cygpath >/dev/null 2>&1; then
   matroska_classes_argument="$(cygpath -w "$MATROSKA_CLASSES")"
   mpeg_file_loader_classes_argument="$(cygpath -w "$MPEG_FILE_LOADER_CLASSES")"
   ogg_flac_classes_argument="$(cygpath -w "$OGG_FLAC_CLASSES")"
+  ogg_opus_classes_argument="$(cygpath -w "$OGG_OPUS_CLASSES")"
   jar_argument="$(cygpath -w "$JAR")"
   reference_argument="$(cygpath -w "$REFERENCE_JAR")"
 else
@@ -584,6 +592,7 @@ else
   matroska_classes_argument="$MATROSKA_CLASSES"
   mpeg_file_loader_classes_argument="$MPEG_FILE_LOADER_CLASSES"
   ogg_flac_classes_argument="$OGG_FLAC_CLASSES"
+  ogg_opus_classes_argument="$OGG_OPUS_CLASSES"
   jar_argument="$JAR"
   reference_argument="$REFERENCE_JAR"
 fi
@@ -640,6 +649,9 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_FLAC_CLASS
   "$WORK/AudioPipelineFactory.java" \
   "$WORK/PcmFormat.java" \
   "$WORK/FlacFrameReader.java"
+javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_OPUS_CLASSES" \
+  "$WORK/GateOggOpusTrackHandler.java" \
+  "$WORK/OpusPacketRouter.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   -d "$MPEG_FILE_LOADER_CLASSES" "$WORK/GateMpegFileLoader.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
@@ -1731,6 +1743,16 @@ cmp "$WORK/ogg-opus-codec-handler-reference.txt" "$WORK/ogg-opus-codec-handler-c
 grep --fixed-strings \
   'contracts=identifier,maximum-length,public-construction,opus-head,little-endian-rate,unsigned-channels,comment-skip-bound,comment-save-bound,comment-read-bound,tag-parse,empty-tags,metadata-duration,unknown-duration,size-rate,seek-table,seek-point-identity,blueprint-state,blueprint-sample-rate,broker-clear,handler-stream-identity,handler-broker-identity,handler-channel-rate,missing-comments,oversized-comments,complete-long-comments,checked-failure-identity,runtime-failure-identity,subclassable,private-blueprint,private-methods,throws,reflection' \
   "$WORK/ogg-opus-codec-handler-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$ogg_opus_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOggOpusTrackHandler >"$WORK/ogg-opus-track-handler-reference.txt"
+java -Xverify:all \
+  -cp "$ogg_opus_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOggOpusTrackHandler >"$WORK/ogg-opus-track-handler-candidate.txt"
+cmp "$WORK/ogg-opus-track-handler-reference.txt" "$WORK/ogg-opus-track-handler-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,nullable-identities,signed-channel-rate,router-default,initialise-context,router-rate-channel,full-width-timecodes,initialise-order,reinitialise,packet-loop,integer-max-bounds,consume-result-ignored,buffer-identity,empty-packet-skip,no-flush,interruption-identity,io-wrapping,runtime-identity,seek-order,seek-result,preinit-seek-order,close-before-init,close-dispatch,close-repeat,public-shape,private-state,throws,reflection' \
+  "$WORK/ogg-opus-track-handler-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_flac_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggFlacTrackHandler >"$WORK/ogg-flac-track-handler-reference.txt"
