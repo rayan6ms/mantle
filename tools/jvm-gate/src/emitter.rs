@@ -235,6 +235,9 @@ const WAV_AUDIO_TRACK_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/
 const WAV_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/wav/WavContainerProbe";
 const WAV_FILE_INFO_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/wav/WavFileInfo";
+const WAV_FILE_LOADER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/wav/WavFileLoader";
+const WAV_FILE_INFO_BUILDER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/wav/WavFileLoader$InfoBuilder";
 const FLAC_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/FlacContainerProbe";
 const FLAC_FILE_LOADER_CLASS: &str =
@@ -748,6 +751,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     WAV_AUDIO_TRACK_CLASS,
     WAV_CONTAINER_PROBE_CLASS,
     WAV_FILE_INFO_CLASS,
+    WAV_FILE_LOADER_CLASS,
     FLAC_CONTAINER_PROBE_CLASS,
     FLAC_FILE_LOADER_CLASS,
     FLAC_METADATA_HEADER_CLASS,
@@ -982,6 +986,7 @@ const PRIVATE_SUPPORT_CLASSES: &[&str] = &[
     OGG_FLAC_CODEC_HANDLER_BLUEPRINT_CLASS,
     OGG_OPUS_CODEC_HANDLER_BLUEPRINT_CLASS,
     OGG_VORBIS_CODEC_HANDLER_BLUEPRINT_CLASS,
+    WAV_FILE_INFO_BUILDER_CLASS,
 ];
 
 #[derive(Serialize)]
@@ -1881,6 +1886,8 @@ fn retain_private_fields(class_name: &str) -> bool {
             | FLAC_AUDIO_TRACK_CLASS
             | WAV_AUDIO_TRACK_CLASS
             | WAV_CONTAINER_PROBE_CLASS
+            | WAV_FILE_LOADER_CLASS
+            | WAV_FILE_INFO_BUILDER_CLASS
             | FLAC_CONTAINER_PROBE_CLASS
             | FLAC_FILE_LOADER_CLASS
             | FLAC_METADATA_READER_CLASS
@@ -2015,6 +2022,8 @@ fn retain_private_methods(class_name: &str) -> bool {
             | FLAC_AUDIO_TRACK_CLASS
             | WAV_AUDIO_TRACK_CLASS
             | WAV_CONTAINER_PROBE_CLASS
+            | WAV_FILE_LOADER_CLASS
+            | WAV_FILE_INFO_BUILDER_CLASS
             | FLAC_CONTAINER_PROBE_CLASS
             | FLAC_FILE_LOADER_CLASS
             | FLAC_METADATA_READER_CLASS
@@ -2234,6 +2243,11 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
         // its verified reference bytecode intact while the native parser boundary is brought
         // across; all public structure and differential behavior remain covered by Gate A.
         if class_name == MUTABLE_MATROSKA_BLOCK_CLASS {
+            continue;
+        }
+        // WAV header parsing retains its private builder implementation and package-private
+        // constants verbatim; its exported behavior is exercised by the focused Gate A oracle.
+        if class_name == WAV_FILE_LOADER_CLASS || class_name == WAV_FILE_INFO_BUILDER_CLASS {
             continue;
         }
         let had_code = method

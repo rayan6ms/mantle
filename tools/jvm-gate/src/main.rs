@@ -272,6 +272,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-wav-audio-track-support-consumer" => Some(WAV_AUDIO_TRACK_SUPPORT_CONSUMER),
         "write-wav-container-probe-consumer" => Some(WAV_CONTAINER_PROBE_CONSUMER),
         "write-wav-file-info-consumer" => Some(WAV_FILE_INFO_CONSUMER),
+        "write-wav-file-loader-consumer" => Some(WAV_FILE_LOADER_CONSUMER),
         "write-flac-container-probe-consumer" => Some(FLAC_CONTAINER_PROBE_CONSUMER),
         "write-flac-file-loader-consumer" => Some(FLAC_FILE_LOADER_CONSUMER),
         "write-flac-file-loader-support-consumer" => Some(FLAC_FILE_LOADER_SUPPORT_CONSUMER),
@@ -26264,6 +26265,105 @@ public final class GateWavAudioTrack {
   }
   private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
   @SuppressWarnings("unchecked") private static <E extends Throwable> void sneakyThrow(Throwable t) throws E { throw (E) t; }
+}
+"#;
+
+const WAV_FILE_LOADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.wav.WavFileInfo;
+import com.sedmelluq.discord.lavaplayer.container.wav.WavFileLoader;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+
+public final class GateWavFileLoader {
+  public static void main(String[] args) throws Exception {
+    constantsAndConstruction(); parseHeaders(); failures(); loadTrack(); reflection();
+    System.out.println("contracts=constants,constructor,input-identity,pcm-parse,position,duration,unknown-format,bad-alignment,non-wav,load-track-order,load-track-failure,private-builder,reflection");
+  }
+  private static void constantsAndConstruction() throws Exception {
+    Field header = WavFileLoader.class.getDeclaredField("WAV_RIFF_HEADER"); header.setAccessible(true);
+    int[] expected = {0x52,0x49,0x46,0x46,-1,-1,-1,-1,0x57,0x41,0x56,0x45};
+    check(Arrays.equals((int[]) header.get(null), expected), "RIFF header constant");
+    Field subtype = WavFileLoader.class.getDeclaredField("FORMAT_SUBTYPE_PCM"); subtype.setAccessible(true);
+    check(((byte[]) subtype.get(null)).length == 16, "PCM subtype constant");
+    MemoryStream stream = new MemoryStream(wav()); WavFileLoader loader = new WavFileLoader(stream);
+    Field input = WavFileLoader.class.getDeclaredField("inputStream"); input.setAccessible(true);
+    check(input.get(loader) == stream, "constructor input identity");
+  }
+  private static void parseHeaders() throws Exception {
+    MemoryStream stream = new MemoryStream(wav()); WavFileInfo info = new WavFileLoader(stream).parseHeaders();
+    check(info.channelCount == 2 && info.sampleRate == 8000 && info.bitsPerSample == 16
+        && info.blockAlign == 4 && info.blockCount == 800L && info.startOffset == 44L
+        && info.getDuration() == 100L && stream.position == 44, "PCM header parse and position");
+    byte[] padded = wav(); padded[34] = 24; padded[35] = 0;
+    check(catchThrowable(() -> new WavFileLoader(new MemoryStream(padded)).parseHeaders()) instanceof IllegalStateException,
+        "unsupported bit depth validation");
+  }
+  private static void failures() throws Exception {
+    byte[] wrong = wav(); wrong[0] = 0;
+    MemoryStream nonWav = new MemoryStream(wrong); WavFileLoader loader = new WavFileLoader(nonWav);
+    check(catchThrowable(loader::parseHeaders) instanceof IllegalStateException && nonWav.position == 1,
+        "non-WAV header failure after non-rewound check");
+    byte[] badAlign = wav(); badAlign[32] = 2; badAlign[33] = 0;
+    check(catchThrowable(() -> new WavFileLoader(new MemoryStream(badAlign)).parseHeaders()) instanceof IllegalStateException,
+        "bad block alignment failure");
+    check(catchThrowable(() -> new WavFileLoader(null).parseHeaders()) instanceof NullPointerException,
+        "null stream failure");
+  }
+  private static void loadTrack() throws Exception {
+    MemoryStream invalid = new MemoryStream(wav()); invalid.data[0] = 0;
+    WavFileLoader loader = new WavFileLoader(invalid);
+    check(catchThrowable(() -> loader.loadTrack(null)) instanceof IllegalStateException && invalid.position == 1,
+        "loadTrack parses before provider construction");
+  }
+  private static void reflection() throws Exception {
+    Class<WavFileLoader> type = WavFileLoader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 3
+        && type.getDeclaredMethods().length == 4 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredClasses().length == 1, "exact loader shape");
+    checkField(type, "WAV_RIFF_HEADER", int[].class, Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "FORMAT_SUBTYPE_PCM", byte[].class, Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "inputStream", SeekableInputStream.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkMethod(type, "parseHeaders", WavFileInfo.class, new Class<?>[0], new Class<?>[] {IOException.class});
+    checkMethod(type, "loadTrack", Class.forName("com.sedmelluq.discord.lavaplayer.container.wav.WavTrackProvider"),
+        new Class<?>[] {Class.forName("com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext")}, new Class<?>[] {IOException.class});
+  }
+  private static void checkField(Class<?> owner, String name, Class<?> fieldType, int modifiers) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getModifiers() == modifiers && !field.isSynthetic(), name + " metadata");
+  }
+  private static void checkMethod(Class<?> owner, String name, Class<?> result, Class<?>[] params, Class<?>[] exceptions) throws Exception {
+    Method method = owner.getDeclaredMethod(name, params);
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == result
+        && Arrays.equals(method.getExceptionTypes(), exceptions) && !method.isSynthetic() && !method.isBridge(), name + " metadata");
+  }
+  private static Throwable catchThrowable(Throwing action) { try { action.run(); return null; } catch (Throwable failure) { return failure; } }
+  private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean value, String message) { if (!value) throw new AssertionError(message); }
+  private static byte[] wav() {
+    byte[] value = new byte[44]; putAscii(value, 0, "RIFF"); putLeInt(value, 4, 3236); putAscii(value, 8, "WAVE");
+    putAscii(value, 12, "fmt "); putLeInt(value, 16, 16); putLeShort(value, 20, 1); putLeShort(value, 22, 2);
+    putLeInt(value, 24, 8000); putLeInt(value, 28, 32000); putLeShort(value, 32, 4); putLeShort(value, 34, 16);
+    putAscii(value, 36, "data"); putLeInt(value, 40, 3200); return value;
+  }
+  private static void putAscii(byte[] value, int offset, String text) { for (int i = 0; i < text.length(); i++) value[offset + i] = (byte) text.charAt(i); }
+  private static void putLeInt(byte[] value, int offset, int number) { for (int i = 0; i < 4; i++) value[offset + i] = (byte) (number >>> (8 * i)); }
+  private static void putLeShort(byte[] value, int offset, int number) { value[offset] = (byte) number; value[offset + 1] = (byte) (number >>> 8); }
+  private static final class MemoryStream extends SeekableInputStream {
+    final byte[] data; int position;
+    MemoryStream(byte[] data) { super(data.length, 0L); this.data = data; }
+    public int read() { return position < data.length ? data[position++] & 0xff : -1; }
+    public long getPosition() { return position; }
+    protected void seekHard(long target) { position = (int) target; }
+    public boolean canSeekHard() { return true; }
+    public java.util.List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider> getTrackInfoProviders() { return Collections.emptyList(); }
+  }
 }
 "#;
 
