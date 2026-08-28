@@ -185,6 +185,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-ogg-packet-input-stream-consumer" => Some(OGG_PACKET_INPUT_STREAM_CONSUMER),
         "write-ogg-page-header-consumer" => Some(OGG_PAGE_HEADER_CONSUMER),
         "write-ogg-page-scanner-consumer" => Some(OGG_PAGE_SCANNER_CONSUMER),
+        "write-ogg-seek-point-consumer" => Some(OGG_SEEK_POINT_CONSUMER),
         "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
         "write-mpeg-track-info-consumer" => Some(MPEG_TRACK_INFO_CONSUMER),
         "write-mpeg-track-info-builder-consumer" => Some(MPEG_TRACK_INFO_BUILDER_CONSUMER),
@@ -17654,6 +17655,109 @@ public final class GateOggPageScanner {
       calls++;
       return result;
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const OGG_SEEK_POINT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggSeekPoint;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateOggSeekPoint {
+  public static void main(String[] args) throws Exception {
+    constructorAndGetters();
+    objectBehavior();
+    reflection();
+    System.out.println("contracts=public-value,4-fields,1-constructor,4-getters,direct-assignment,full-width-values,negative-values,independent-values,stable-getters,immutable-private-state,identity-semantics,subclassable,override-dispatch,field-order,throws,reflection");
+  }
+
+  private static void constructorAndGetters() {
+    OggSeekPoint extremes = new OggSeekPoint(Long.MIN_VALUE, Long.MAX_VALUE, -1L, 0L);
+    check(extremes.getPosition() == Long.MIN_VALUE
+        && extremes.getGranulePosition() == Long.MAX_VALUE
+        && extremes.getTimecode() == -1L
+        && extremes.getPageSequence() == 0L, "full-width values map independently");
+    check(extremes.getPosition() == Long.MIN_VALUE
+        && extremes.getGranulePosition() == Long.MAX_VALUE
+        && extremes.getTimecode() == -1L
+        && extremes.getPageSequence() == 0L, "getters remain stable");
+    OggSeekPoint ordered = new OggSeekPoint(11L, 22L, 33L, 44L);
+    check(ordered.getPosition() == 11L && ordered.getGranulePosition() == 22L
+        && ordered.getTimecode() == 33L && ordered.getPageSequence() == 44L,
+        "constructor order is exact");
+  }
+
+  private static void objectBehavior() {
+    OggSeekPoint first = new OggSeekPoint(1L, 2L, 3L, 4L);
+    OggSeekPoint second = new OggSeekPoint(1L, 2L, 3L, 4L);
+    check(first != second && !first.equals(second), "Object identity semantics");
+    Derived derived = new Derived(5L, 6L, 7L, 8L);
+    OggSeekPoint view = derived;
+    check(view.getPosition() == 99L && derived.calls == 1
+        && view.getGranulePosition() == 6L && view.getTimecode() == 7L
+        && view.getPageSequence() == 8L, "ordinary subclass override dispatch");
+  }
+
+  private static void reflection() throws Exception {
+    Class<OggSeekPoint> type = OggSeekPoint.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0 && type.getDeclaredClasses().length == 0,
+        "class metadata");
+    check(type.getDeclaredFields().length == 4 && type.getDeclaredMethods().length == 4
+        && type.getDeclaredConstructors().length == 1, "declared member counts");
+    String[] fields = Arrays.stream(type.getDeclaredFields()).map(Field::getName)
+        .toArray(String[]::new);
+    check(Arrays.equals(fields, new String[] {"position", "granulePosition", "timecode",
+        "pageSequence"}), "declared field order");
+    checkField(type, "position");
+    checkField(type, "granulePosition");
+    checkField(type, "timecode");
+    checkField(type, "pageSequence");
+
+    Constructor<OggSeekPoint> constructor = type.getDeclaredConstructor(long.class, long.class,
+        long.class, long.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0
+        && constructor.getTypeParameters().length == 0
+        && constructor.getDeclaredAnnotations().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
+    checkGetter(type.getDeclaredMethod("getPosition"));
+    checkGetter(type.getDeclaredMethod("getGranulePosition"));
+    checkGetter(type.getDeclaredMethod("getTimecode"));
+    checkGetter(type.getDeclaredMethod("getPageSequence"));
+  }
+
+  private static void checkField(Class<OggSeekPoint> type, String name) throws Exception {
+    Field field = type.getDeclaredField(name);
+    check(field.getType() == long.class
+        && field.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && !field.isSynthetic() && field.getDeclaredAnnotations().length == 0,
+        name + " field metadata");
+  }
+
+  private static void checkGetter(Method method) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == long.class
+        && method.getParameterTypes().length == 0 && method.getExceptionTypes().length == 0
+        && method.getTypeParameters().length == 0 && method.getDeclaredAnnotations().length == 0
+        && !method.isSynthetic() && !method.isBridge() && !method.isDefault()
+        && !method.isVarArgs(), method.getName() + " getter metadata");
+  }
+
+  private static final class Derived extends OggSeekPoint {
+    int calls;
+    Derived(long position, long granulePosition, long timecode, long pageSequence) {
+      super(position, granulePosition, timecode, pageSequence);
+    }
+    @Override public long getPosition() { calls++; return 99L; }
   }
 
   private static void check(boolean condition, String message) {
