@@ -189,6 +189,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-mpeg-global-seek-info-consumer" => Some(MPEG_GLOBAL_SEEK_INFO_CONSUMER),
         "write-mpeg-segment-entry-consumer" => Some(MPEG_SEGMENT_ENTRY_CONSUMER),
+        "write-mpeg-track-fragment-header-consumer" => Some(MPEG_TRACK_FRAGMENT_HEADER_CONSUMER),
         "write-mpeg-noop-track-consumer-consumer" => Some(MPEG_NOOP_TRACK_CONSUMER_CONSUMER),
         "write-mpeg-track-consumer-consumer" => Some(MPEG_TRACK_CONSUMER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
@@ -17207,6 +17208,198 @@ public final class GateMpegSegmentEntry {
 
   private static final class Derived extends MpegSegmentEntry {
     Derived(int type, int size, int duration) { super(type, size, duration); }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MPEG_TRACK_FRAGMENT_HEADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.fragmented.MpegTrackFragmentHeader;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.fragmented.MpegTrackFragmentHeader.Builder;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateMpegTrackFragmentHeader {
+  public static void main(String[] args) throws Exception {
+    directConstruction();
+    builderDefaultsAndSetters();
+    arraysAndDefaultSizes();
+    failuresAndEdges();
+    reflection();
+    System.out.println("contracts=constructor,scalar-storage,array-identity,signed-extrema,identity-equality,subclassable,builder-default,builder-setters,array-allocation,array-identity-through-build,default-size-fill,zero-default-null,flag-retention,unchecked-failures,negative-size-failure,public-final-fields,private-builder-state,field-order,method-descriptors,constructor-descriptors,no-throws,member-counts,reflection");
+  }
+
+  private static void directConstruction() {
+    int[] durations = {10, Integer.MIN_VALUE};
+    int[] sizes = {20, Integer.MAX_VALUE};
+    MpegTrackFragmentHeader header = new MpegTrackFragmentHeader(
+        Integer.MIN_VALUE, Long.MIN_VALUE, Integer.MAX_VALUE, durations, sizes);
+    check(header.trackId == Integer.MIN_VALUE && header.baseTimecode == Long.MIN_VALUE
+        && header.dataOffset == Integer.MAX_VALUE && header.sampleDurations == durations
+        && header.sampleSizes == sizes, "constructor stores scalars and arrays exactly");
+    durations[0] = 99;
+    sizes[1] = -7;
+    check(header.sampleDurations[0] == 99 && header.sampleSizes[1] == -7,
+        "header retains direct array identity");
+    check(header.equals(header) && !header.equals(new MpegTrackFragmentHeader(
+        header.trackId, header.baseTimecode, header.dataOffset, durations, sizes)),
+        "header retains Object identity equality");
+    Derived derived = new Derived(7, 8L, 9, null, null);
+    check(derived.trackId == 7 && derived.baseTimecode == 8L && derived.dataOffset == 9,
+        "ordinary subclass inherits construction");
+  }
+
+  private static void builderDefaultsAndSetters() {
+    Builder builder = new Builder();
+    check(builder.getTrackId() == -1, "builder defaults track ID to minus one");
+    builder.setTrackId(Integer.MIN_VALUE);
+    builder.setBaseTimecode(Long.MAX_VALUE);
+    builder.setDataOffset(Integer.MAX_VALUE);
+    builder.setDefaultSampleSize(-3);
+    check(builder.getTrackId() == Integer.MIN_VALUE, "builder setter stores track ID");
+    builder.createSampleArrays(true, true, 2);
+    builder.setDuration(0, Integer.MIN_VALUE);
+    builder.setDuration(1, Integer.MAX_VALUE);
+    builder.setSize(0, -4);
+    builder.setSize(1, 5);
+    MpegTrackFragmentHeader header = builder.build();
+    check(header.trackId == Integer.MIN_VALUE && header.baseTimecode == Long.MAX_VALUE
+        && header.dataOffset == Integer.MAX_VALUE
+        && Arrays.equals(header.sampleDurations, new int[] {Integer.MIN_VALUE, Integer.MAX_VALUE})
+        && Arrays.equals(header.sampleSizes, new int[] {-4, 5}),
+        "builder setters and explicit arrays flow into header");
+  }
+
+  private static void arraysAndDefaultSizes() {
+    Builder defaults = new Builder();
+    defaults.setDefaultSampleSize(7);
+    defaults.createSampleArrays(true, false, 3);
+    defaults.setDuration(0, 1);
+    defaults.setDuration(1, 2);
+    defaults.setDuration(2, 3);
+    MpegTrackFragmentHeader filled = defaults.build();
+    check(filled.sampleDurations != null && filled.sampleSizes != null
+        && Arrays.equals(filled.sampleDurations, new int[] {1, 2, 3})
+        && Arrays.equals(filled.sampleSizes, new int[] {7, 7, 7}),
+        "nonzero default size fills missing size array");
+    MpegTrackFragmentHeader filledAgain = defaults.build();
+    check(filled.sampleSizes != filledAgain.sampleSizes, "default-size array is fresh at build");
+
+    Builder zero = new Builder();
+    zero.setDefaultSampleSize(0);
+    zero.createSampleArrays(false, false, 2);
+    MpegTrackFragmentHeader noSizes = zero.build();
+    check(noSizes.sampleDurations == null && noSizes.sampleSizes == null,
+        "zero default leaves absent arrays null");
+
+    Builder retained = new Builder();
+    retained.createSampleArrays(true, true, 2);
+    retained.setDuration(0, 11);
+    retained.setSize(0, 22);
+    retained.createSampleArrays(false, false, 4);
+    MpegTrackFragmentHeader stale = retained.build();
+    check(stale.sampleDurations.length == 2 && stale.sampleSizes.length == 2
+        && stale.sampleDurations[0] == 11 && stale.sampleSizes[0] == 22,
+        "false array flags retain previously allocated arrays");
+  }
+
+  private static void failuresAndEdges() {
+    Builder noArrays = new Builder();
+    check(catchThrowable(() -> noArrays.setDuration(0, 1)) instanceof NullPointerException,
+        "setDuration without duration array fails naturally");
+    check(catchThrowable(() -> noArrays.setSize(0, 1)) instanceof NullPointerException,
+        "setSize without size array fails naturally");
+    noArrays.createSampleArrays(true, true, 1);
+    check(catchThrowable(() -> noArrays.setDuration(1, 1)) instanceof ArrayIndexOutOfBoundsException,
+        "duration index failure remains unchecked");
+    check(catchThrowable(() -> noArrays.setSize(-1, 1)) instanceof ArrayIndexOutOfBoundsException,
+        "size index failure remains unchecked");
+    check(catchThrowable(() -> noArrays.createSampleArrays(true, false, -1))
+        instanceof NegativeArraySizeException, "negative sample count fails during allocation");
+    Builder empty = new Builder();
+    empty.setDefaultSampleSize(Integer.MIN_VALUE);
+    empty.createSampleArrays(false, false, 0);
+    MpegTrackFragmentHeader emptyHeader = empty.build();
+    check(emptyHeader.sampleSizes != null && emptyHeader.sampleSizes.length == 0,
+        "nonzero default creates an empty size array for zero samples");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MpegTrackFragmentHeader> type = MpegTrackFragmentHeader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredClasses().length == 1
+        && type.getDeclaredMethods().length == 0 && type.getDeclaredConstructors().length == 1,
+        "header class metadata and member counts");
+    check(Arrays.equals(Arrays.stream(type.getDeclaredFields()).map(Field::getName).toArray(),
+        new String[] {"trackId", "baseTimecode", "dataOffset", "sampleDurations", "sampleSizes"}),
+        "header field declaration order");
+    checkField(type.getDeclaredField("trackId"), int.class);
+    checkField(type.getDeclaredField("baseTimecode"), long.class);
+    checkField(type.getDeclaredField("dataOffset"), int.class);
+    checkField(type.getDeclaredField("sampleDurations"), int[].class);
+    checkField(type.getDeclaredField("sampleSizes"), int[].class);
+    Constructor<MpegTrackFragmentHeader> constructor = type.getDeclaredConstructor(
+        int.class, long.class, int.class, int[].class, int[].class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0,
+        "header constructor metadata");
+
+    Class<Builder> builder = Builder.class;
+    check(builder.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && builder.getSuperclass() == Object.class && builder.getDeclaredClasses().length == 0
+        && builder.getDeclaredFields().length == 7 && builder.getDeclaredMethods().length == 9
+        && builder.getDeclaredConstructors().length == 1,
+        "builder class and member counts");
+    check(Arrays.equals(Arrays.stream(builder.getDeclaredFields()).map(Field::getName).toArray(),
+        new String[] {"trackId", "baseTimecode", "dataOffset", "defaultSampleSize",
+            "sampleCount", "sampleDurations", "sampleSizes"}), "builder field declaration order");
+    for (Field field : builder.getDeclaredFields()) {
+      check(field.getModifiers() == Modifier.PRIVATE && !field.isSynthetic(),
+          field.getName() + " builder field metadata");
+    }
+    checkMethod(builder, "getTrackId", new Class<?>[] {}, int.class);
+    checkMethod(builder, "setTrackId", new Class<?>[] {int.class}, void.class);
+    checkMethod(builder, "setBaseTimecode", new Class<?>[] {long.class}, void.class);
+    checkMethod(builder, "setDataOffset", new Class<?>[] {int.class}, void.class);
+    checkMethod(builder, "setDefaultSampleSize", new Class<?>[] {int.class}, void.class);
+    checkMethod(builder, "createSampleArrays", new Class<?>[] {boolean.class, boolean.class, int.class}, void.class);
+    checkMethod(builder, "setDuration", new Class<?>[] {int.class, int.class}, void.class);
+    checkMethod(builder, "setSize", new Class<?>[] {int.class, int.class}, void.class);
+    checkMethod(builder, "build", new Class<?>[] {}, MpegTrackFragmentHeader.class);
+    Constructor<Builder> builderConstructor = builder.getDeclaredConstructor();
+    check(builderConstructor.getModifiers() == Modifier.PUBLIC
+        && builderConstructor.getExceptionTypes().length == 0,
+        "builder constructor metadata");
+  }
+
+  private static void checkField(Field field, Class<?> expectedType) {
+    check(field.getType() == expectedType
+        && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL) && !field.isSynthetic(),
+        field.getName() + " header field metadata");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?>[] parameters,
+                                  Class<?> returnType) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == returnType
+        && !method.isSynthetic() && !method.isBridge() && method.getExceptionTypes().length == 0,
+        name + " method metadata");
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class Derived extends MpegTrackFragmentHeader {
+    Derived(int trackId, long baseTimecode, int dataOffset, int[] durations, int[] sizes) {
+      super(trackId, baseTimecode, dataOffset, durations, sizes);
+    }
   }
 
   private static void check(boolean condition, String message) {

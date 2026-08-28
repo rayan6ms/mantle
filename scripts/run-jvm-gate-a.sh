@@ -293,6 +293,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-global-seek-info-consumer
   --output "$WORK/GateMpegGlobalSeekInfo.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-segment-entry-consumer \
   --output "$WORK/GateMpegSegmentEntry.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-fragment-header-consumer \
+  --output "$WORK/GateMpegTrackFragmentHeader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-noop-track-consumer-consumer \
   --output "$WORK/GateMpegNoopTrackConsumer.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-consumer-consumer \
@@ -475,6 +477,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateMpegFragmentedFileTrackProvider.java" \
   "$WORK/GateMpegGlobalSeekInfo.java" \
   "$WORK/GateMpegSegmentEntry.java" \
+  "$WORK/GateMpegTrackFragmentHeader.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GateAdtsStreamReader.java" \
@@ -1625,6 +1628,16 @@ cmp "$WORK/mpeg-segment-entry-reference.txt" "$WORK/mpeg-segment-entry-candidate
 grep --fixed-strings \
   'contracts=constructor,type-storage,size-storage,duration-storage,signed-extrema,no-validation,identity-equality,subclassable,public-final-fields,field-order,constructor-descriptor,no-throws,member-counts,reflection' \
   "$WORK/mpeg-segment-entry-candidate.txt" >/dev/null
+java -Xverify:all -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegTrackFragmentHeader >"$WORK/mpeg-track-fragment-header-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegTrackFragmentHeader >"$WORK/mpeg-track-fragment-header-candidate.txt"
+cmp "$WORK/mpeg-track-fragment-header-reference.txt" \
+  "$WORK/mpeg-track-fragment-header-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,scalar-storage,array-identity,signed-extrema,identity-equality,subclassable,builder-default,builder-setters,array-allocation,array-identity-through-build,default-size-fill,zero-default-null,flag-retention,unchecked-failures,negative-size-failure,public-final-fields,private-builder-state,field-order,method-descriptors,constructor-descriptors,no-throws,member-counts,reflection' \
+  "$WORK/mpeg-track-fragment-header-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mp3_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMp3ConstantRateSeeker \
   >"$WORK/mp3-constant-rate-seeker-reference.txt"
