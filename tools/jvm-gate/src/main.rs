@@ -201,6 +201,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-hls-stream-segment-url-provider-consumer" => {
             Some(HLS_STREAM_SEGMENT_URL_PROVIDER_CONSUMER)
         }
+        "write-hls-stream-track-consumer" => Some(HLS_STREAM_TRACK_CONSUMER),
         "write-vorbis-comment-parser-consumer" => Some(VORBIS_COMMENT_PARSER_CONSUMER),
         "write-ogg-vorbis-track-handler-support-consumer" => {
             Some(OGG_VORBIS_TRACK_HANDLER_SUPPORT_CONSUMER)
@@ -19408,6 +19409,211 @@ public final class GateHlsStreamSegmentUrlProvider {
   }
 }
 "##;
+
+const HLS_STREAM_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamSegmentUrlProvider;
+import com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamTrack;
+import com.sedmelluq.discord.lavaplayer.source.stream.M3uStreamSegmentUrlProvider;
+import com.sedmelluq.discord.lavaplayer.source.stream.MpegTsM3uStreamAudioTrack;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.http.client.protocol.HttpClientContext;
+
+public final class GateHlsStreamTrack {
+  public static void main(String[] args) throws Exception {
+    constructorRouting();
+    httpDelegation();
+    nullBehavior();
+    reflection();
+    System.out.println("contracts=public-concrete,subclassable,mpeg-ts-m3u-super,constructor-info-identity,inner-url-routing,outer-url-routing,provider-freshness,string-identity,http-manager-identity,http-per-call-delegation,null-url,null-manager-deferred-failure,private-final-fields,protected-methods,reflection");
+  }
+
+  private static void constructorRouting() throws Exception {
+    AudioTrackInfo info = new AudioTrackInfo(
+        "title", "author", Long.MAX_VALUE, "identifier", true, "uri", "art", null);
+    String innerUrl = new String("https://media.example/segments/index.m3u8");
+    HttpInterfaceManager manager = manager(new RecordingHttpInterface(), new AtomicInteger());
+    ExposedTrack inner = new ExposedTrack(info, innerUrl, manager, true);
+    check(inner.getInfo() == info && field("httpInterfaceManager").get(inner) == manager,
+        "constructor preserves info and manager identities");
+    HlsStreamSegmentUrlProvider innerProvider = provider(inner);
+    check(inner.provider() == innerProvider
+        && providerField("streamListUrl").get(innerProvider) == null
+        && providerField("segmentPlaylistUrl").get(innerProvider) == innerUrl,
+        "inner URL becomes the cached segment playlist by identity");
+
+    String outerUrl = new String("https://media.example/master.m3u8");
+    ExposedTrack outer = new ExposedTrack(info, outerUrl, manager, false);
+    HlsStreamSegmentUrlProvider outerProvider = provider(outer);
+    check(outer.provider() == outerProvider && outerProvider != innerProvider
+        && providerField("streamListUrl").get(outerProvider) == outerUrl
+        && providerField("segmentPlaylistUrl").get(outerProvider) == null,
+        "outer URL becomes the stream list by identity with a fresh provider");
+    check(new Derived(info, outerUrl, manager, false).marker() == 47,
+        "class remains subclassable");
+  }
+
+  private static void httpDelegation() throws Exception {
+    RecordingHttpInterface first = new RecordingHttpInterface();
+    RecordingHttpInterface second = new RecordingHttpInterface();
+    AtomicInteger calls = new AtomicInteger();
+    HttpInterfaceManager manager = (HttpInterfaceManager) Proxy.newProxyInstance(
+        HttpInterfaceManager.class.getClassLoader(), new Class<?>[] {HttpInterfaceManager.class},
+        (instance, method, arguments) -> {
+          if (method.getName().equals("getInterface")) {
+            return calls.getAndIncrement() == 0 ? first : second;
+          }
+          return defaultValue(method.getReturnType());
+        });
+    ExposedTrack track = new ExposedTrack(info(), "stream", manager, true);
+    check(track.http() == first && track.http() == second && calls.get() == 2,
+        "each HTTP accessor call delegates to the manager");
+  }
+
+  private static void nullBehavior() throws Exception {
+    HttpInterfaceManager manager = manager(null, new AtomicInteger());
+    ExposedTrack inner = new ExposedTrack(info(), null, manager, true);
+    HlsStreamSegmentUrlProvider innerProvider = provider(inner);
+    check(providerField("streamListUrl").get(innerProvider) == null
+        && providerField("segmentPlaylistUrl").get(innerProvider) == null,
+        "null inner URL is preserved without eager validation");
+    ExposedTrack outer = new ExposedTrack(info(), null, manager, false);
+    HlsStreamSegmentUrlProvider outerProvider = provider(outer);
+    check(providerField("streamListUrl").get(outerProvider) == null
+        && providerField("segmentPlaylistUrl").get(outerProvider) == null,
+        "null outer URL is preserved without eager validation");
+    ExposedTrack nullManager = new ExposedTrack(info(), "https://media.example/stream", null, false);
+    check(field("httpInterfaceManager").get(nullManager) == null,
+        "null manager is retained by the constructor");
+    expect(NullPointerException.class, nullManager::http);
+  }
+
+  private static void reflection() throws Exception {
+    Class<HlsStreamTrack> type = HlsStreamTrack.class;
+    check(type.getModifiers() == Modifier.PUBLIC
+        && type.getSuperclass() == MpegTsM3uStreamAudioTrack.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 2
+        && type.getDeclaredMethods().length == 2 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredClasses().length == 0, "exact class shape");
+    checkField(type, "segmentUrlProvider", HlsStreamSegmentUrlProvider.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "httpInterfaceManager", HttpInterfaceManager.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        AudioTrackInfo.class, String.class, HttpInterfaceManager.class, boolean.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && constructor.getTypeParameters().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
+    checkMethod(type, "getSegmentUrlProvider", M3uStreamSegmentUrlProvider.class,
+        new Class<?>[0]);
+    checkMethod(type, "getHttpInterface", HttpInterface.class, new Class<?>[0]);
+  }
+
+  private static AudioTrackInfo info() {
+    return new AudioTrackInfo("title", "author", 1L, "id", true, null, null, null);
+  }
+
+  private static HlsStreamSegmentUrlProvider provider(ExposedTrack track) throws Exception {
+    return (HlsStreamSegmentUrlProvider) field("segmentUrlProvider").get(track);
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = HlsStreamTrack.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static Field providerField(String name) throws Exception {
+    Field field = HlsStreamSegmentUrlProvider.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static HttpInterfaceManager manager(HttpInterface http, AtomicInteger calls) {
+    return (HttpInterfaceManager) Proxy.newProxyInstance(
+        HttpInterfaceManager.class.getClassLoader(), new Class<?>[] {HttpInterfaceManager.class},
+        (instance, method, arguments) -> {
+          if (method.getName().equals("getInterface")) {
+            calls.incrementAndGet();
+            return http;
+          }
+          return defaultValue(method.getReturnType());
+        });
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> type, int modifiers)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == type && field.getGenericType() == type
+        && field.getModifiers() == modifiers && !field.isSynthetic(), name + " metadata");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+                                  Class<?>[] parameters) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getModifiers() == Modifier.PROTECTED
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs(),
+        method + " metadata");
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
+  }
+
+  private static void expect(Class<? extends Throwable> type, Throwing action) {
+    Throwable failure = catchThrowable(action);
+    check(type.isInstance(failure), "expected " + type.getName());
+  }
+
+  private static Throwable catchThrowable(Throwing action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+
+  private static final class RecordingHttpInterface extends HttpInterface {
+    RecordingHttpInterface() { super(null, HttpClientContext.create(), false, null); }
+  }
+
+  private static class ExposedTrack extends HlsStreamTrack {
+    ExposedTrack(AudioTrackInfo info, String streamUrl, HttpInterfaceManager manager,
+                 boolean inner) {
+      super(info, streamUrl, manager, inner);
+    }
+    M3uStreamSegmentUrlProvider provider() { return super.getSegmentUrlProvider(); }
+    HttpInterface http() { return super.getHttpInterface(); }
+  }
+
+  private static final class Derived extends ExposedTrack {
+    Derived(AudioTrackInfo info, String streamUrl, HttpInterfaceManager manager, boolean inner) {
+      super(info, streamUrl, manager, inner);
+    }
+    int marker() { return 47; }
+  }
+
+  private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
 
 const VORBIS_COMMENT_PARSER_CONSUMER: &str = r#"
 import com.sedmelluq.discord.lavaplayer.container.ogg.vorbis.VorbisCommentParser;

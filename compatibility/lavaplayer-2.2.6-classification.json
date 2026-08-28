@@ -8547,36 +8547,40 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact concrete MPEG-TS HLS track shape, URL-routing constructor, provider identities, HTTP-manager delegation, and reflection are covered by the Phase 13 HLS stream track contract slice.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamTrack",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager;Z)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Constructor preserves track-info and manager identities and routes inner versus outer URLs into the exact HLS segment provider slots without validation.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamTrack",
       "symbol_kind": "METHOD",
       "member_name": "getSegmentUrlProvider",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/source/stream/M3uStreamSegmentUrlProvider;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Protected accessor returns the constructor-created HLS provider with its declared interface type.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamTrack",
       "symbol_kind": "METHOD",
       "member_name": "getHttpInterface",
       "descriptor": "()Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Protected accessor delegates on every call to the retained HttpInterfaceManager and preserves null-manager failure timing.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.playlists.M3uPlaylistContainerProbe",
