@@ -7897,54 +7897,60 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves FLAC identifier detection, 51-byte first-packet bound, stream-info and comment-block parsing, seek-table forwarding, metadata duration selection, blueprint and handler identity, failure behavior, and reflection.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.flac.OggFlacCodecHandler",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves the public no-argument constructor and exact class shape.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.flac.OggFlacCodecHandler",
       "symbol_kind": "METHOD",
       "member_name": "isMatchingIdentifier",
       "descriptor": "(I)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves exact 0x7F464C41 FLAC mapping and nearby-identifier rejection.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.flac.OggFlacCodecHandler",
       "symbol_kind": "METHOD",
       "member_name": "getMaximumFirstPacketLength",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves the computed 51-byte maximum first-packet length.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.flac.OggFlacCodecHandler",
       "symbol_kind": "METHOD",
       "member_name": "loadBlueprint",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/ogg/OggPacketInputStream;Lcom/sedmelluq/discord/lavaplayer/tools/io/DirectBufferStreamBroker;)Lcom/sedmelluq/discord/lavaplayer/container/ogg/OggTrackBlueprint;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves native FLAC header validation, stream-info/comment parsing, seek-table installation, blueprint sample-rate and handler identities, and checked failures.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.flac.OggFlacCodecHandler",
       "symbol_kind": "METHOD",
       "member_name": "loadMetadata",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/ogg/OggPacketInputStream;Lcom/sedmelluq/discord/lavaplayer/tools/io/DirectBufferStreamBroker;)Lcom/sedmelluq/discord/lavaplayer/container/ogg/OggMetadata;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves metadata tags, known-sample duration, unknown-sample OGG size lookup, nullable results, and checked failures.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.flac.OggFlacTrackHandler",

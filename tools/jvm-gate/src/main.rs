@@ -190,6 +190,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-ogg-track-blueprint-consumer" => Some(OGG_TRACK_BLUEPRINT_CONSUMER),
         "write-ogg-track-handler-consumer" => Some(OGG_TRACK_HANDLER_CONSUMER),
         "write-ogg-track-loader-consumer" => Some(OGG_TRACK_LOADER_CONSUMER),
+        "write-ogg-flac-codec-handler-consumer" => Some(OGG_FLAC_CODEC_HANDLER_CONSUMER),
         "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
         "write-mpeg-track-info-consumer" => Some(MPEG_TRACK_INFO_CONSUMER),
         "write-mpeg-track-info-builder-consumer" => Some(MPEG_TRACK_INFO_BUILDER_CONSUMER),
@@ -18152,6 +18153,233 @@ public final class GateOggTrackHandler {
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const OGG_FLAC_CODEC_HANDLER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacStreamInfo;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggMetadata;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggSeekPoint;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggStreamSizeInfo;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackBlueprint;
+import com.sedmelluq.discord.lavaplayer.container.ogg.flac.OggFlacCodecHandler;
+import com.sedmelluq.discord.lavaplayer.tools.io.DirectBufferStreamBroker;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateOggFlacCodecHandler {
+  private static final int IDENTIFIER = 0x7F464C41;
+
+  public static void main(String[] args) throws Exception {
+    matchingAndLength();
+    blueprintAndMetadata();
+    failures();
+    reflection();
+    System.out.println("contracts=identifier,maximum-length,public-construction,stream-info,metadata-blocks,tag-parse,metadata-duration,seek-table,seek-point-forwarding,blueprint-sample-rate,handler-info-identity,handler-stream-identity,empty-tags,unknown-identifier,short-native-header,wrong-native-header,missing-metadata,metadata-io-identity,blueprint-io-identity,metadata-size-lookup,subclassable,private-blueprint,private-methods,throws,reflection");
+  }
+
+  private static void matchingAndLength() {
+    OggFlacCodecHandler handler = new OggFlacCodecHandler();
+    check(handler.isMatchingIdentifier(IDENTIFIER), "FLAC mapping identifier");
+    check(!handler.isMatchingIdentifier(0x7F464C40)
+        && !handler.isMatchingIdentifier(0x464C4143), "nearby identifiers rejected");
+    check(handler.getMaximumFirstPacketLength() == 51, "maximum first packet length");
+  }
+
+  private static void blueprintAndMetadata() throws Exception {
+    OggFlacCodecHandler handler = new OggFlacCodecHandler();
+    DirectBufferStreamBroker broker = broker(firstPacket(44_100, 44_100L, true));
+    OggSeekPoint point = new OggSeekPoint(19L, 20L, 21L, 22L);
+    ScriptedStream stream = new ScriptedStream(new byte[][] {commentPacket("TITLE=Blue")});
+    stream.seekTable = Collections.singletonList(point);
+    OggTrackBlueprint blueprint = handler.loadBlueprint(stream, broker);
+    check(blueprint != null && blueprint.getSampleRate() == 44_100,
+        "blueprint preserves parsed sample rate");
+    check(stream.createSeekTableCalls == 1 && stream.seekTableSet == stream.seekTable,
+        "blueprint creates and forwards the exact seek table");
+    Object trackHandler = blueprint.loadTrackHandler(stream);
+    check(trackHandler.getClass().getName().equals(
+        "com.sedmelluq.discord.lavaplayer.container.ogg.flac.OggFlacTrackHandler"),
+        "blueprint constructs the FLAC track handler");
+    check(field(trackHandler, "info") != null && field(trackHandler, "packetInputStream") == stream,
+        "handler receives parsed info and exact packet stream");
+    FlacStreamInfo streamInfo = ((com.sedmelluq.discord.lavaplayer.container.flac.FlacTrackInfo)
+        field(trackHandler, "info")).stream;
+    check(streamInfo.sampleRate == 44_100 && streamInfo.sampleCount == 44_100L,
+        "handler info retains stream fields");
+
+    DirectBufferStreamBroker metadataBroker = broker(firstPacket(48_000, 96_000L, true));
+    ScriptedStream metadataStream = new ScriptedStream(new byte[][] {commentPacket("TITLE=Meta")});
+    OggMetadata metadata = handler.loadMetadata(metadataStream, metadataBroker);
+    check("Meta".equals(metadata.getTitle()) && metadata.getAuthor() == null
+        && metadata.getLength() == 2_000L, "metadata tags and duration");
+    check(metadataStream.seekForSizeInfoCalls == 0, "known sample count avoids size scan");
+
+    DirectBufferStreamBroker emptyBroker = broker(firstPacket(48_000, 0L, false));
+    ScriptedStream emptyStream = new ScriptedStream(new byte[0][]);
+    emptyStream.sizeInfo = new OggStreamSizeInfo(1L, 12_345L, 2L, 3L, 48_000);
+    OggMetadata empty = handler.loadMetadata(emptyStream, emptyBroker);
+    check(empty.getTitle() == null && empty.getLength() == 257L
+        && emptyStream.seekForSizeInfoCalls == 1, "unknown sample count uses OGG size scan");
+  }
+
+  private static void failures() throws Exception {
+    OggFlacCodecHandler handler = new OggFlacCodecHandler();
+    DirectBufferStreamBroker wrong = broker(firstPacket(44_100, 1L, false));
+    ByteBuffer wrongBuffer = wrong.getBuffer();
+    wrongBuffer.put(9, (byte) 'X');
+    expect(IllegalStateException.class, () -> handler.loadMetadata(
+        new ScriptedStream(new byte[0][]), wrong), "wrong native FLAC header");
+
+    DirectBufferStreamBroker shortBroker = broker(new byte[] {1, 2, 3});
+    expect(IndexOutOfBoundsException.class, () -> handler.loadMetadata(
+        new ScriptedStream(new byte[0][]), shortBroker), "short native header");
+
+    IOException failure = new IOException("metadata-read");
+    ScriptedStream failing = new ScriptedStream(new byte[][] {commentPacket("TITLE=Fail")});
+    failing.readFailure = failure;
+    expectSame(failure, () -> handler.loadMetadata(failing,
+        broker(firstPacket(44_100, 1L, true))), "metadata read failure identity");
+
+    IOException blueprintFailure = new IOException("blueprint-read");
+    ScriptedStream failingBlueprint = new ScriptedStream(
+        new byte[][] {commentPacket("TITLE=Fail")});
+    failingBlueprint.readFailure = blueprintFailure;
+    expectSame(blueprintFailure, () -> handler.loadBlueprint(failingBlueprint,
+        broker(firstPacket(44_100, 1L, true))), "blueprint read failure identity");
+
+    IOException missing = new IOException("not-used");
+    ScriptedStream noMetadata = new ScriptedStream(new byte[0][]);
+    expect(IllegalStateException.class, () -> handler.loadMetadata(noMetadata,
+        broker(firstPacket(44_100, 1L, true))), "missing metadata packet");
+    check(missing.getMessage().equals("not-used"), "failure fixture remains untouched");
+  }
+
+  private static void reflection() throws Exception {
+    Class<OggFlacCodecHandler> type = OggFlacCodecHandler.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {
+            com.sedmelluq.discord.lavaplayer.container.ogg.OggCodecHandler.class})
+        && type.getDeclaredFields().length == 3 && type.getDeclaredMethods().length == 7
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredClasses().length == 1,
+        "exact public class shape");
+    checkMethod(type.getDeclaredMethod("isMatchingIdentifier", int.class), boolean.class,
+        new Class<?>[] {int.class});
+    checkMethod(type.getDeclaredMethod("getMaximumFirstPacketLength"), int.class,
+        new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("loadBlueprint", OggPacketInputStream.class,
+        DirectBufferStreamBroker.class), OggTrackBlueprint.class,
+        new Class<?>[] {OggPacketInputStream.class, DirectBufferStreamBroker.class}, IOException.class);
+    checkMethod(type.getDeclaredMethod("loadMetadata", OggPacketInputStream.class,
+        DirectBufferStreamBroker.class), OggMetadata.class,
+        new Class<?>[] {OggPacketInputStream.class, DirectBufferStreamBroker.class}, IOException.class);
+    checkPrivate(type.getDeclaredMethod("load", OggPacketInputStream.class,
+        DirectBufferStreamBroker.class), IOException.class);
+    checkPrivate(type.getDeclaredMethod("detectLength",
+        com.sedmelluq.discord.lavaplayer.container.flac.FlacTrackInfo.class,
+        OggPacketInputStream.class), IOException.class);
+    checkPrivate(type.getDeclaredMethod("readHeaders", ByteBuffer.class,
+        OggPacketInputStream.class), IOException.class);
+    Class<?> blueprint = type.getDeclaredClasses()[0];
+    check(blueprint.getName().equals(type.getName() + "$Blueprint")
+        && blueprint.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC)
+        && blueprint.getDeclaredFields().length == 1
+        && blueprint.getDeclaredMethods().length == 2,
+        "private blueprint shape");
+  }
+
+  private static DirectBufferStreamBroker broker(byte[] bytes) throws IOException {
+    DirectBufferStreamBroker broker = new DirectBufferStreamBroker(64);
+    broker.consumeNext(new ByteArrayInputStream(bytes), bytes.length, bytes.length + 1);
+    return broker;
+  }
+
+  private static byte[] firstPacket(int rate, long count, boolean more) {
+    byte[] packet = new byte[51];
+    packet[0] = 0x7F; packet[1] = 'F'; packet[2] = 'L'; packet[3] = 'A';
+    packet[9] = 'f'; packet[10] = 'L'; packet[11] = 'a'; packet[12] = 'C';
+    packet[13] = (byte) (more ? 0 : 0x80); packet[14] = 0; packet[15] = 0; packet[16] = 34;
+    packet[17] = 0; packet[18] = 16; packet[19] = 0; packet[20] = 16;
+    long packed = ((long) rate << 44) | count;
+    for (int index = 34; index >= 27; index--) { packet[index] = (byte) packed; packed >>>= 8; }
+    return packet;
+  }
+
+  private static byte[] commentPacket(String comment) throws IOException {
+    byte[] text = comment.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    DataOutputStream output = new DataOutputStream(bytes);
+    output.writeByte(0x84); output.writeByte(0); output.writeByte(0); output.writeByte(12 + text.length);
+    output.writeInt(Integer.reverseBytes(0));
+    output.writeInt(Integer.reverseBytes(1));
+    output.writeInt(Integer.reverseBytes(text.length)); output.write(text);
+    return bytes.toByteArray();
+  }
+
+  private static Object field(Object target, String name) throws Exception {
+    Field field = target.getClass().getDeclaredField(name); field.setAccessible(true); return field.get(target);
+  }
+  private static void checkMethod(Method method, Class<?> result, Class<?>[] parameters,
+      Class<?>... exceptions) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == result
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions) && !method.isSynthetic(),
+        method.getName() + " metadata");
+  }
+  private static void checkPrivate(Method method, Class<?>... exceptions) {
+    check((method.getModifiers() & (Modifier.PRIVATE | Modifier.STATIC)) == Modifier.PRIVATE
+        && Arrays.equals(method.getExceptionTypes(), exceptions) && !method.isSynthetic(),
+        method.getName() + " private metadata");
+  }
+  private static void expect(Class<? extends Throwable> type, Throwing action, String message) {
+    Throwable failure = catchThrowable(action);
+    check(failure != null && failure.getClass() == type, message + " failure");
+  }
+  private static void expectSame(Throwable expected, Throwing action, String message) {
+    check(catchThrowable(action) == expected, message + " identity");
+  }
+  private static Throwable catchThrowable(Throwing action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+  private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
+
+  private static final class ScriptedStream extends OggPacketInputStream {
+    final byte[][] packets; int index; byte[] active; int position;
+    List<OggSeekPoint> seekTable; List<OggSeekPoint> seekTableSet; OggStreamSizeInfo sizeInfo;
+    int createSeekTableCalls; int seekForSizeInfoCalls; IOException readFailure;
+    ScriptedStream(byte[][] packets) { super(new EmptyStream(), false); this.packets = packets; }
+    @Override public boolean startNewPacket() { if (index >= packets.length) return false; active = packets[index++]; position = 0; return true; }
+    @Override public int read(byte[] target, int offset, int length) throws IOException {
+      if (readFailure != null) throw readFailure; if (active == null || position == active.length) return -1;
+      int count = Math.min(length, active.length - position); System.arraycopy(active, position, target, offset, count); position += count; return count;
+    }
+    @Override public int read() throws IOException { byte[] one = new byte[1]; return read(one, 0, 1) < 0 ? -1 : one[0] & 0xFF; }
+    @Override public List<OggSeekPoint> createSeekTable(int sampleRate) { createSeekTableCalls++; return seekTable; }
+    @Override public void setSeekPoints(List<OggSeekPoint> points) { seekTableSet = points; }
+    @Override public OggStreamSizeInfo seekForSizeInfo(int sampleRate) { seekForSizeInfoCalls++; return sizeInfo; }
+  }
+  private static final class EmptyStream extends SeekableInputStream {
+    EmptyStream() { super(0L, 0L); }
+    @Override public int read() { return -1; }
+    @Override public long getPosition() { return 0L; }
+    @Override protected void seekHard(long position) {}
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() { return Collections.emptyList(); }
   }
 }
 "#;
