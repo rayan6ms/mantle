@@ -236,6 +236,8 @@ const WAV_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/wav/WavContainerProbe";
 const WAV_FILE_INFO_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/wav/WavFileInfo";
 const WAV_FILE_LOADER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/wav/WavFileLoader";
+const WAV_TRACK_PROVIDER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/wav/WavTrackProvider";
 const WAV_FILE_INFO_BUILDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/wav/WavFileLoader$InfoBuilder";
 const FLAC_CONTAINER_PROBE_CLASS: &str =
@@ -752,6 +754,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     WAV_CONTAINER_PROBE_CLASS,
     WAV_FILE_INFO_CLASS,
     WAV_FILE_LOADER_CLASS,
+    WAV_TRACK_PROVIDER_CLASS,
     FLAC_CONTAINER_PROBE_CLASS,
     FLAC_FILE_LOADER_CLASS,
     FLAC_METADATA_HEADER_CLASS,
@@ -1045,6 +1048,7 @@ pub fn emit(
     let mut ogg_vorbis_codec_handler_bytes = None;
     let mut ogg_vorbis_codec_handler_blueprint_bytes = None;
     let mut ogg_vorbis_track_handler_bytes = None;
+    let mut wav_track_provider_bytes = None;
     let mut vorbis_comment_parser_bytes = None;
     let mut extended_m3u_parser_bytes = None;
     let mut extended_m3u_line_bytes = None;
@@ -1178,6 +1182,8 @@ pub fn emit(
             mpeg_standard_sample_duration_iterator_bytes = Some(bytes);
         } else if *binary_name == MPEG_STANDARD_SAMPLE_CHUNKING_ITERATOR_CLASS {
             mpeg_standard_sample_chunking_iterator_bytes = Some(bytes);
+        } else if *binary_name == WAV_TRACK_PROVIDER_CLASS {
+            wav_track_provider_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -1229,6 +1235,12 @@ pub fn emit(
                 mpeg_aac_track_consumer_bytes
                     .as_ref()
                     .expect("MPEG AAC track consumer source bytes are retained"),
+            );
+        } else if name == format!("{WAV_TRACK_PROVIDER_CLASS}.class") {
+            bytes.clone_from(
+                wav_track_provider_bytes
+                    .as_ref()
+                    .expect("WAV track provider source bytes are retained"),
             );
         } else if name == format!("{MPEG_AUDIO_TRACK_CLASS}.class") {
             bytes.clone_from(
@@ -1887,6 +1899,7 @@ fn retain_private_fields(class_name: &str) -> bool {
             | WAV_AUDIO_TRACK_CLASS
             | WAV_CONTAINER_PROBE_CLASS
             | WAV_FILE_LOADER_CLASS
+            | WAV_TRACK_PROVIDER_CLASS
             | WAV_FILE_INFO_BUILDER_CLASS
             | FLAC_CONTAINER_PROBE_CLASS
             | FLAC_FILE_LOADER_CLASS
@@ -2023,6 +2036,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | WAV_AUDIO_TRACK_CLASS
             | WAV_CONTAINER_PROBE_CLASS
             | WAV_FILE_LOADER_CLASS
+            | WAV_TRACK_PROVIDER_CLASS
             | WAV_FILE_INFO_BUILDER_CLASS
             | FLAC_CONTAINER_PROBE_CLASS
             | FLAC_FILE_LOADER_CLASS
@@ -2248,6 +2262,9 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
         // WAV header parsing retains its private builder implementation and package-private
         // constants verbatim; its exported behavior is exercised by the focused Gate A oracle.
         if class_name == WAV_FILE_LOADER_CLASS || class_name == WAV_FILE_INFO_BUILDER_CLASS {
+            continue;
+        }
+        if class_name == WAV_TRACK_PROVIDER_CLASS {
             continue;
         }
         let had_code = method

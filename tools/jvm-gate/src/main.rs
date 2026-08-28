@@ -273,6 +273,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-wav-container-probe-consumer" => Some(WAV_CONTAINER_PROBE_CONSUMER),
         "write-wav-file-info-consumer" => Some(WAV_FILE_INFO_CONSUMER),
         "write-wav-file-loader-consumer" => Some(WAV_FILE_LOADER_CONSUMER),
+        "write-wav-track-provider-consumer" => Some(WAV_TRACK_PROVIDER_CONSUMER),
         "write-flac-container-probe-consumer" => Some(FLAC_CONTAINER_PROBE_CONSUMER),
         "write-flac-file-loader-consumer" => Some(FLAC_FILE_LOADER_CONSUMER),
         "write-flac-file-loader-support-consumer" => Some(FLAC_FILE_LOADER_SUPPORT_CONSUMER),
@@ -26265,6 +26266,107 @@ public final class GateWavAudioTrack {
   }
   private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
   @SuppressWarnings("unchecked") private static <E extends Throwable> void sneakyThrow(Throwable t) throws E { throw (E) t; }
+}
+"#;
+
+const WAV_TRACK_PROVIDER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.wav.WavFileInfo;
+import com.sedmelluq.discord.lavaplayer.container.wav.WavTrackProvider;
+import com.sedmelluq.discord.lavaplayer.filter.AudioPipeline;
+import com.sedmelluq.discord.lavaplayer.filter.AudioFilterChain;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import java.io.DataInput;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.ShortBuffer;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateWavTrackProvider {
+  public static void main(String[] args) throws Exception {
+    nullConstruction(); injectedOperations(); failures(); reflection();
+    System.out.println("contracts=constructor-failure,field-layout,seek-full-width,seek-order,seek-io-wrapping,close-dispatch,provide-empty,provide-io-wrapping,private-state,throws,reflection");
+  }
+  private static void nullConstruction() {
+    check(catchThrowable(() -> new WavTrackProvider(null, null, null)) instanceof NullPointerException,
+        "null constructor fails at info access");
+  }
+  private static void injectedOperations() throws Exception {
+    MemoryStream stream = new MemoryStream(); WavFileInfo info = new WavFileInfo(2, 8000, 16, 4, 2L, 44L);
+    RecordingPipeline downstream = allocate(RecordingPipeline.class); WavTrackProvider provider = allocate(WavTrackProvider.class);
+    set(provider, "inputStream", stream); set(provider, "dataInput", new DataInputStream(stream)); set(provider, "info", info);
+    set(provider, "bytesPerSample", 2); set(provider, "downstream", downstream); set(provider, "buffer", null);
+    ByteBuffer byteBuffer = ByteBuffer.allocate(8192).order(ByteOrder.LITTLE_ENDIAN); set(provider, "byteBuffer", byteBuffer); set(provider, "rawBuffer", byteBuffer.array());
+    provider.seekToTimecode(Long.MAX_VALUE / 2);
+    long expected = (Long.MAX_VALUE / 2) * 8000L / 1000L * 4L + 44L;
+    check(stream.seekPosition == expected && downstream.seekFrom == Long.MAX_VALUE / 2 && downstream.seekTo == Long.MAX_VALUE / 2,
+        "seek uses full-width arithmetic and downstream ordering");
+    provider.close(); check(downstream.closeCalls == 1, "close dispatch");
+    stream.position = 52; provider.provideFrames(); check(downstream.processCalls == 0, "empty/end provide is inert");
+  }
+  private static void failures() throws Exception {
+    MemoryStream stream = new MemoryStream(); WavFileInfo info = new WavFileInfo(1, 8000, 16, 2, 2L, 44L);
+    WavTrackProvider provider = prepared(stream, info); IOException failure = new IOException("seek-failure"); stream.seekFailure = failure;
+    Throwable wrapped = catchThrowable(() -> provider.seekToTimecode(10L));
+    check(wrapped instanceof RuntimeException && wrapped.getCause() == failure, "seek IOException is wrapped");
+    stream.seekFailure = null; stream.position = 44; stream.readFailure = new IOException("read-failure");
+    Throwable readWrapped = catchThrowable(provider::provideFrames);
+    check(readWrapped instanceof RuntimeException && readWrapped.getCause() instanceof IOException, "provide IOException is wrapped");
+  }
+  private static WavTrackProvider prepared(MemoryStream stream, WavFileInfo info) throws Exception {
+    WavTrackProvider provider = allocate(WavTrackProvider.class); RecordingPipeline downstream = allocate(RecordingPipeline.class);
+    set(provider, "inputStream", stream); set(provider, "dataInput", new DataInputStream(stream)); set(provider, "info", info);
+    set(provider, "bytesPerSample", info.bitsPerSample >> 3); set(provider, "downstream", downstream); set(provider, "buffer", null);
+    ByteBuffer byteBuffer = ByteBuffer.allocate(8192).order(ByteOrder.LITTLE_ENDIAN); set(provider, "byteBuffer", byteBuffer); set(provider, "rawBuffer", byteBuffer.array()); return provider;
+  }
+  private static void reflection() throws Exception {
+    Class<WavTrackProvider> type = WavTrackProvider.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class && type.getInterfaces().length == 0
+        && type.getDeclaredFields().length == 9 && type.getDeclaredMethods().length == 7 && type.getDeclaredConstructors().length == 1,
+        "exact provider shape");
+    checkField(type, "BLOCKS_IN_BUFFER", int.class, Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "inputStream", SeekableInputStream.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "dataInput", DataInput.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "info", WavFileInfo.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "bytesPerSample", int.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "downstream", AudioPipeline.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "buffer", short[].class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "rawBuffer", byte[].class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "byteBuffer", ByteBuffer.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkMethod(type, "seekToTimecode", void.class, new Class<?>[] {long.class}, new Class<?>[0]);
+    checkMethod(type, "provideFrames", void.class, new Class<?>[0], new Class<?>[] {InterruptedException.class});
+    checkMethod(type, "close", void.class, new Class<?>[0], new Class<?>[0]);
+  }
+  private static void checkField(Class<?> owner, String name, Class<?> fieldType, int modifiers) throws Exception { Field field = owner.getDeclaredField(name); check(field.getType() == fieldType && field.getModifiers() == modifiers && !field.isSynthetic(), name + " metadata"); }
+  private static void checkMethod(Class<?> owner, String name, Class<?> result, Class<?>[] params, Class<?>[] exceptions) throws Exception { Method method = owner.getDeclaredMethod(name, params); check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == result && Arrays.equals(method.getExceptionTypes(), exceptions) && !method.isSynthetic() && !method.isBridge(), name + " metadata"); }
+  private static void set(Object owner, String name, Object value) throws Exception { Field field = WavTrackProvider.class.getDeclaredField(name); field.setAccessible(true); field.set(owner, value); }
+  private static <T> T allocate(Class<T> type) throws Exception { Field field = Class.forName("sun.misc.Unsafe").getDeclaredField("theUnsafe"); field.setAccessible(true); Object unsafe = field.get(null); return type.cast(unsafe.getClass().getMethod("allocateInstance", Class.class).invoke(unsafe, type)); }
+  private static Throwable catchThrowable(Throwing action) { try { action.run(); return null; } catch (Throwable failure) { return failure; } }
+  private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean value, String message) { if (!value) throw new AssertionError(message); }
+  private static final class MemoryStream extends SeekableInputStream {
+    long position, seekPosition; IOException seekFailure, readFailure;
+    MemoryStream() { super(8192L, 0L); }
+    public int read() throws IOException { if (readFailure != null) throw readFailure; return -1; }
+    public long getPosition() { return position; }
+    protected void seekHard(long target) throws IOException { if (seekFailure != null) throw seekFailure; seekPosition = target; position = target; }
+    public boolean canSeekHard() { return true; }
+    public List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider> getTrackInfoProviders() { return Collections.emptyList(); }
+  }
+  private static final class RecordingPipeline extends AudioPipeline {
+    long seekFrom, seekTo; int closeCalls, processCalls;
+    RecordingPipeline() { super(null); }
+    public void seekPerformed(long from, long to) { seekFrom = from; seekTo = to; }
+    public void close() { closeCalls++; }
+    public void process(ShortBuffer buffer) { processCalls++; }
+  }
 }
 "#;
 
