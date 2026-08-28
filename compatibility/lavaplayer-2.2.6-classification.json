@@ -7047,45 +7047,50 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact InputStream subclass shape, greedy wrapper and buffer state, PES synchronization/header parsing, packet-bounded reads, malformed-input behavior, checked failure identity, and reflection metadata are reference-proven.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpegts.PesPacketInputStream",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Ljava/io/InputStream;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Wraps the exact nullable input identity in GreedyInputStream without eager reads and creates the linked two-byte/ByteBuffer length state with a zero payload counter.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpegts.PesPacketInputStream",
       "symbol_kind": "METHOD",
       "member_name": "read",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves PES sync scanning, signed length/header handling, single-byte packet accounting, packet transitions, truncated-header EOF, premature-payload EOF, and IOException identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpegts.PesPacketInputStream",
       "symbol_kind": "METHOD",
       "member_name": "read",
       "descriptor": "([BII)I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves packet-boundary-limited bulk reads, offset writes, multi-packet progression, zero-length behavior, EOF short-circuiting, payload accounting, and checked failure identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpegts.PesPacketInputStream",
       "symbol_kind": "METHOD",
       "member_name": "available",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Returns only the current parsed packet payload counter without probing or delegating to the underlying stream, including the premature-payload EOF quirk.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggAudioTrack",

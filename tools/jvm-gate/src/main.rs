@@ -176,6 +176,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mpeg-ts-elementary-input-stream-consumer" => {
             Some(MPEG_TS_ELEMENTARY_INPUT_STREAM_CONSUMER)
         }
+        "write-pes-packet-input-stream-consumer" => Some(PES_PACKET_INPUT_STREAM_CONSUMER),
         "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
         "write-mpeg-track-info-consumer" => Some(MPEG_TRACK_INFO_CONSUMER),
         "write-mpeg-track-info-builder-consumer" => Some(MPEG_TRACK_INFO_BUILDER_CONSUMER),
@@ -15282,6 +15283,296 @@ public final class GateMpegTsElementaryInputStream {
       position += count;
       return count;
     }
+  }
+}
+"#;
+
+const PES_PACKET_INPUT_STREAM_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mpegts.PesPacketInputStream;
+import com.sedmelluq.discord.lavaplayer.tools.io.GreedyInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.FilterInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+
+public final class GatePesPacketInputStream {
+  private static final Object UNSAFE = loadUnsafe();
+
+  public static void main(String[] args) throws Exception {
+    reflection();
+    construction();
+    payloadReads();
+    scanningAndMalformedPackets();
+    edgeBehavior();
+    failures();
+    subclassUse();
+    System.out.println("contracts=constructor,greedy-wrapper,no-eager-read,buffers,private-state,sync-scan,header-skip,single-read,bulk-read,packet-boundaries,multiple-packets,available,zero-length,signed-length,truncated-headers,premature-payload-eof,failure-identity,subclassable,throws,reflection");
+  }
+
+  private static void reflection() throws Exception {
+    Class<PesPacketInputStream> type = PesPacketInputStream.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == InputStream.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0 && type.getDeclaredFields().length == 5
+        && type.getDeclaredMethods().length == 5 && type.getDeclaredConstructors().length == 1,
+        "exact class shape and member counts");
+
+    Field sync = type.getDeclaredField("SYNC_BYTES");
+    sync.setAccessible(true);
+    check(sync.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && sync.getType() == byte[].class
+        && Arrays.equals((byte[]) sync.get(null), new byte[] {0, 0, 1}) && !sync.isSynthetic(),
+        "private sync marker metadata and value");
+    Field input = type.getDeclaredField("inputStream");
+    Field lengthBytes = type.getDeclaredField("lengthBufferBytes");
+    Field lengthBuffer = type.getDeclaredField("lengthBuffer");
+    check(input.getType() == InputStream.class && lengthBytes.getType() == byte[].class
+        && lengthBuffer.getType() == ByteBuffer.class, "private state types");
+    for (Field state : new Field[] {input, lengthBytes, lengthBuffer}) {
+      check(state.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL) && !state.isSynthetic(),
+          "private final state " + state.getName());
+    }
+    Field remaining = type.getDeclaredField("packetBytesLeft");
+    check(remaining.getModifiers() == Modifier.PRIVATE && remaining.getType() == int.class
+        && !remaining.isSynthetic(), "mutable packet counter metadata");
+
+    checkConstructor(type.getDeclaredConstructor(InputStream.class),
+        new Class<?>[] {InputStream.class}, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("read"), int.class, new Class<?>[0], IOException.class);
+    checkMethod(type.getDeclaredMethod("read", byte[].class, int.class, int.class), int.class,
+        new Class<?>[] {byte[].class, int.class, int.class}, IOException.class);
+    checkMethod(type.getDeclaredMethod("available"), int.class, new Class<?>[0], IOException.class);
+    checkPrivateMethod(type.getDeclaredMethod("makeBytesAvailable"), boolean.class,
+        IOException.class);
+    checkPrivateMethod(type.getDeclaredMethod("processPacketHeader"), boolean.class,
+        IOException.class);
+  }
+
+  private static void construction() throws Exception {
+    TrackingInputStream raw = stream();
+    PesPacketInputStream pes = new PesPacketInputStream(raw);
+    Object wrapper = field(pes, "inputStream");
+    check(wrapper.getClass() == GreedyInputStream.class
+        && field(wrapper, FilterInputStream.class, "in") == raw && raw.readCalls == 0,
+        "constructor installs a greedy wrapper without reading");
+    byte[] lengthBytes = (byte[]) field(pes, "lengthBufferBytes");
+    ByteBuffer lengthBuffer = (ByteBuffer) field(pes, "lengthBuffer");
+    check(lengthBytes.length == 2 && lengthBuffer.hasArray()
+        && lengthBuffer.array() == lengthBytes && lengthBuffer.position() == 0
+        && lengthBuffer.limit() == 2 && intField(pes, "packetBytesLeft") == 0,
+        "constructor allocates linked length buffers and zero counter");
+    PesPacketInputStream nullInput = new PesPacketInputStream(null);
+    check(field(field(nullInput, "inputStream"), FilterInputStream.class, "in") == null,
+        "null input is retained through the wrapper");
+  }
+
+  private static void payloadReads() throws Exception {
+    TrackingInputStream raw = stream(concat(new byte[] {9, 0, 9}, packet(
+        new byte[] {1, 2, 3}, new byte[] {44, 45})));
+    PesPacketInputStream pes = new PesPacketInputStream(raw);
+    check(pes.available() == 0 && raw.available() > 0, "available reports only parsed payload");
+    check(pes.read() == 1 && pes.available() == 2, "single read scans and decrements payload");
+    check(pes.read() == 2 && pes.available() == 1, "single read continues current packet");
+    check(pes.read() == 3 && pes.available() == 0, "single read exhausts packet");
+    check(pes.read() == -1 && pes.available() == 0, "single read reaches final EOF");
+
+    PesPacketInputStream multiple = new PesPacketInputStream(stream(concat(
+        packet(new byte[] {10, 11, 12}, new byte[] {7}),
+        packet(new byte[] {20, 21}, new byte[0]))));
+    byte[] target = new byte[] {-1, -1, -1, -1, -1, -1, -1};
+    check(multiple.read(target, 1, 6) == 3 && multiple.available() == 0
+        && Arrays.equals(target, new byte[] {-1, 10, 11, 12, -1, -1, -1}),
+        "bulk read stops at the first packet boundary");
+    check(multiple.read(target, 4, 3) == 2 && multiple.available() == 0
+        && Arrays.equals(target, new byte[] {-1, 10, 11, 12, 20, 21, -1}),
+        "next bulk read discovers the next packet");
+    check(multiple.read(target, 0, target.length) == -1, "bulk read reaches final EOF");
+  }
+
+  private static void scanningAndMalformedPackets() throws Exception {
+    byte[] overlapNoise = new byte[] {0, 0, 0, 1, 7, 0, 0, 2, 7};
+    PesPacketInputStream resync = new PesPacketInputStream(stream(concat(overlapNoise,
+        packet(new byte[] {33}, new byte[0]))));
+    check(resync.read() == 33 && resync.read() == -1,
+        "scanner resets partial sync matches and later resynchronizes");
+
+    byte[] zeroPayloadPacket = new byte[] {0, 0, 1, (byte) 0xe0, 0, 3, 0, 0, 0};
+    PesPacketInputStream rejected = new PesPacketInputStream(stream(concat(zeroPayloadPacket,
+        packet(new byte[] {34}, new byte[0]))));
+    check(rejected.read() == 34, "non-positive payload packet is skipped");
+
+    byte[] signedLength = new byte[] {0, 0, 1, (byte) 0xe0, (byte) 0x80, 4, 0, 0, 0};
+    PesPacketInputStream signed = new PesPacketInputStream(stream(concat(signedLength,
+        packet(new byte[] {35}, new byte[0]))));
+    check(signed.read() == 35, "packet length is interpreted as a signed short");
+
+    for (byte[] truncated : new byte[][] {
+        {0, 0, 1},
+        {0, 0, 1, (byte) 0xe0},
+        {0, 0, 1, (byte) 0xe0, 0},
+        {0, 0, 1, (byte) 0xe0, 0, 5, 0},
+        {0, 0, 1, (byte) 0xe0, 0, 5, 0, 0},
+        {0, 0, 1, (byte) 0xe0, 0, 5, 0, 0, 2, 9}}) {
+      PesPacketInputStream stream = new PesPacketInputStream(stream(truncated));
+      check(stream.read() == -1 && stream.available() == 0,
+          "truncated header terminates without exposing payload");
+    }
+  }
+
+  private static void edgeBehavior() throws Exception {
+    PesPacketInputStream empty = new PesPacketInputStream(stream());
+    check(empty.read(new byte[0], 0, 0) == -1,
+        "zero-length read on empty input still performs packet discovery");
+
+    PesPacketInputStream zero = new PesPacketInputStream(stream(packet(
+        new byte[] {41, 42}, new byte[0])));
+    check(zero.read(new byte[0], 0, 0) == 0 && zero.available() == 2
+        && zero.read() == 41, "zero-length read parses and retains a valid packet");
+
+    byte[] declaredThreeWithOne = packet(new byte[] {51}, new byte[0]);
+    declaredThreeWithOne[4] = 0;
+    declaredThreeWithOne[5] = 6;
+    PesPacketInputStream shortPayload = new PesPacketInputStream(stream(declaredThreeWithOne));
+    check(shortPayload.read() == 51 && shortPayload.available() == 2
+        && shortPayload.read() == -1 && shortPayload.available() == 2,
+        "premature payload EOF leaves the declared byte counter unchanged");
+
+    PesPacketInputStream nullBuffer = new PesPacketInputStream(stream());
+    check(nullBuffer.read(null, 0, 0) == -1, "empty input short-circuits a null buffer");
+  }
+
+  private static void failures() throws Exception {
+    IOException scanFailure = new IOException("scan-failure");
+    TrackingInputStream scan = stream();
+    scan.failure = scanFailure;
+    check(catchThrowable(new PesPacketInputStream(scan)::read) == scanFailure,
+        "sync scan preserves IOException identity");
+
+    IOException payloadFailure = new IOException("payload-failure");
+    byte[] bytes = packet(new byte[] {61}, new byte[] {8});
+    TrackingInputStream payload = stream(bytes);
+    payload.failurePosition = bytes.length - 1;
+    payload.failure = payloadFailure;
+    check(catchThrowable(new PesPacketInputStream(payload)::read) == payloadFailure,
+        "payload read preserves IOException identity");
+  }
+
+  private static void subclassUse() throws Exception {
+    Derived derived = new Derived(stream());
+    check(derived.available() == 37, "public concrete stream remains subclassable");
+  }
+
+  private static byte[] packet(byte[] payload, byte[] optionalHeader) {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    output.write(0); output.write(0); output.write(1); output.write(0xe0);
+    int packetLength = 3 + optionalHeader.length + payload.length;
+    output.write(packetLength >>> 8); output.write(packetLength);
+    output.write(0x80); output.write(0); output.write(optionalHeader.length);
+    output.write(optionalHeader, 0, optionalHeader.length);
+    output.write(payload, 0, payload.length);
+    return output.toByteArray();
+  }
+  private static byte[] concat(byte[]... arrays) {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    for (byte[] array : arrays) output.write(array, 0, array.length);
+    return output.toByteArray();
+  }
+  private static TrackingInputStream stream(byte... data) { return new TrackingInputStream(data); }
+  private static Object field(Object target, String name) throws Exception {
+    return field(target, PesPacketInputStream.class, name);
+  }
+  private static Object field(Object target, Class<?> owner, String name) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    long offset = (Long) UNSAFE.getClass().getMethod("objectFieldOffset", Field.class)
+        .invoke(UNSAFE, field);
+    return UNSAFE.getClass().getMethod("getObject", Object.class, long.class)
+        .invoke(UNSAFE, target, offset);
+  }
+  private static int intField(Object target, String name) throws Exception {
+    Field field = PesPacketInputStream.class.getDeclaredField(name);
+    long offset = (Long) UNSAFE.getClass().getMethod("objectFieldOffset", Field.class)
+        .invoke(UNSAFE, field);
+    return (Integer) UNSAFE.getClass().getMethod("getInt", Object.class, long.class)
+        .invoke(UNSAFE, target, offset);
+  }
+  private static Object loadUnsafe() {
+    try {
+      Field field = Class.forName("sun.misc.Unsafe").getDeclaredField("theUnsafe");
+      field.setAccessible(true);
+      return field.get(null);
+    } catch (ReflectiveOperationException error) {
+      throw new AssertionError(error);
+    }
+  }
+  private static void checkConstructor(Constructor<?> constructor, Class<?>[] parameters,
+      Class<?>[] exceptions) {
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && Arrays.equals(constructor.getParameterTypes(), parameters)
+        && Arrays.equals(constructor.getExceptionTypes(), exceptions)
+        && !constructor.isSynthetic(), "constructor metadata");
+  }
+  private static void checkMethod(Method method, Class<?> result, Class<?>[] parameters,
+      Class<?>... exceptions) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == result
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isSynthetic() && !method.isBridge(), method.getName() + " metadata");
+  }
+  private static void checkPrivateMethod(Method method, Class<?> result,
+      Class<?>... exceptions) {
+    check(method.getModifiers() == Modifier.PRIVATE && method.getReturnType() == result
+        && method.getParameterCount() == 0
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isSynthetic() && !method.isBridge(), method.getName() + " private metadata");
+  }
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private interface ThrowingRunnable { int run() throws Throwable; }
+  private static final class Derived extends PesPacketInputStream {
+    Derived(InputStream input) { super(input); }
+    @Override public int available() { return 37; }
+  }
+  private static final class TrackingInputStream extends InputStream {
+    final byte[] data;
+    int position;
+    int readCalls;
+    int failurePosition = -1;
+    IOException failure;
+    TrackingInputStream(byte[] data) { this.data = data; }
+    @Override public int read() throws IOException {
+      readCalls++;
+      failIfNeeded();
+      return position < data.length ? data[position++] & 0xff : -1;
+    }
+    @Override public int read(byte[] buffer, int offset, int length) throws IOException {
+      readCalls++;
+      failIfNeeded();
+      if (position == data.length) return -1;
+      int count = Math.min(length, data.length - position);
+      System.arraycopy(data, position, buffer, offset, count);
+      position += count;
+      return count;
+    }
+    @Override public long skip(long count) throws IOException {
+      failIfNeeded();
+      int skipped = (int) Math.min(count, data.length - position);
+      position += skipped;
+      return skipped;
+    }
+    @Override public int available() { return data.length - position; }
+    private void failIfNeeded() throws IOException {
+      if (failure != null && (failurePosition < 0 || position >= failurePosition)) throw failure;
+    }
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
   }
 }
 "#;

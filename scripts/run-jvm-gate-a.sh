@@ -269,6 +269,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-adts-container-probe-cons
   --output "$WORK/GateMpegAdtsContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-ts-elementary-input-stream-consumer \
   --output "$WORK/GateMpegTsElementaryInputStream.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-pes-packet-input-stream-consumer \
+  --output "$WORK/GatePesPacketInputStream.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-file-loader-consumer \
   --output "$WORK/GateMpegFileLoader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-info-consumer \
@@ -564,6 +566,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$MPEG_CLASSES" 
   "$WORK/GateMpegContainerProbe.java" \
   "$WORK/GateMpegAdtsContainerProbe.java" \
   "$WORK/GateMpegTsElementaryInputStream.java" \
+  "$WORK/GatePesPacketInputStream.java" \
   "$WORK/MpegGateSupport.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   -d "$MPEG_FILE_LOADER_CLASSES" "$WORK/GateMpegFileLoader.java"
@@ -1501,6 +1504,16 @@ cmp "$WORK/mpeg-ts-elementary-input-stream-reference.txt" "$WORK/mpeg-ts-element
 grep --fixed-strings \
   'contracts=constant,constructor,wrapper,no-eager-read,metadata-freshness,metadata-nulls,empty-eof,short-input,invalid-packet,null-buffer,failure-identity,public-shape,private-state,reflection' \
   "$WORK/mpeg-ts-elementary-input-stream-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$MPEG_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePesPacketInputStream \
+  >"$WORK/pes-packet-input-stream-reference.txt"
+java -Xverify:all \
+  -cp "$MPEG_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GatePesPacketInputStream >"$WORK/pes-packet-input-stream-candidate.txt"
+cmp "$WORK/pes-packet-input-stream-reference.txt" "$WORK/pes-packet-input-stream-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,greedy-wrapper,no-eager-read,buffers,private-state,sync-scan,header-skip,single-read,bulk-read,packet-boundaries,multiple-packets,available,zero-length,signed-length,truncated-headers,premature-payload-eof,failure-identity,subclassable,throws,reflection' \
+  "$WORK/pes-packet-input-stream-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mpeg_file_loader_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateMpegFileLoader "$ROOT/tests/media/fixtures/tone-aac-lc-metadata.m4a" \
