@@ -270,6 +270,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-flac-audio-track-support-consumer" => Some(FLAC_AUDIO_TRACK_SUPPORT_CONSUMER),
         "write-wav-audio-track-consumer" => Some(WAV_AUDIO_TRACK_CONSUMER),
         "write-wav-audio-track-support-consumer" => Some(WAV_AUDIO_TRACK_SUPPORT_CONSUMER),
+        "write-wav-container-probe-consumer" => Some(WAV_CONTAINER_PROBE_CONSUMER),
         "write-flac-container-probe-consumer" => Some(FLAC_CONTAINER_PROBE_CONSUMER),
         "write-flac-file-loader-consumer" => Some(FLAC_FILE_LOADER_CONSUMER),
         "write-flac-file-loader-support-consumer" => Some(FLAC_FILE_LOADER_SUPPORT_CONSUMER),
@@ -26262,6 +26263,133 @@ public final class GateWavAudioTrack {
   }
   private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
   @SuppressWarnings("unchecked") private static <E extends Throwable> void sneakyThrow(Throwable t) throws E { throw (E) t; }
+}
+"#;
+
+const WAV_CONTAINER_PROBE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerHints;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerProbe;
+import com.sedmelluq.discord.lavaplayer.container.wav.WavAudioTrack;
+import com.sedmelluq.discord.lavaplayer.container.wav.WavContainerProbe;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+
+public final class GateWavContainerProbe {
+  public static void main(String[] args) throws Exception {
+    namesAndHints(); misses(); success(); failures(); trackFactory(); subclassUse(); reflection();
+    System.out.println("contracts=name,ignored-hints,null-hints,riff-wildcard,case-sensitive,rewind-match,rewind-miss,initial-position,logging-order,loader-parse,metadata,duration,metadata-fallback,supported-result,self-probe,null-reference,read-failure,parse-failure,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,private-state,throws,reflection");
+  }
+  private static void namesAndHints() {
+    WavContainerProbe probe = new WavContainerProbe();
+    check(probe.getName().equals("wav") && probe.getName() == "wav", "stable name");
+    check(!probe.matchesHints(null) && !probe.matchesHints(MediaContainerHints.from(null, null))
+        && !probe.matchesHints(MediaContainerHints.from("audio/wav", "wav")), "hints ignored");
+  }
+  private static void misses() throws Exception {
+    WavContainerProbe probe = new WavContainerProbe();
+    MemoryStream wrong = new MemoryStream(wav(), 0); wrong.data[0] = 0;
+    check(probe.probe(null, wrong) == null && wrong.readCalls == 1 && wrong.seekCalls == 1
+        && wrong.position == 0, "header miss rewinds and stops early");
+    MemoryStream caseWrong = new MemoryStream(wav(), 0); caseWrong.data[8] = 'w';
+    check(probe.probe(null, caseWrong) == null && caseWrong.readCalls == 9
+        && caseWrong.seekCalls == 1 && caseWrong.position == 0, "WAVE is case-sensitive");
+  }
+  private static void success() throws Exception {
+    WavContainerProbe probe = new WavContainerProbe();
+    MemoryStream stream = new MemoryStream(wav(), 0);
+    AudioReference reference = new AudioReference("wav-id", "wav-title");
+    MediaContainerDetectionResult result = probe.probe(reference, stream);
+    check(result != null && result.isContainerDetected() && result.isSupportedFile()
+        && !result.isReference() && result.getContainerDescriptor().probe == probe
+        && result.getContainerDescriptor().parameters == null, "supported result identity");
+    AudioTrackInfo info = result.getTrackInfo();
+    check(info.title.equals("wav-title") && info.author.equals("Unknown artist")
+        && info.length == 100L && info.identifier.equals("wav-id") && !info.isStream
+        && info.uri.equals("wav-id") && info.artworkUrl == null && info.isrc == null,
+        "metadata and duration");
+    MemoryStream fallback = new MemoryStream(wav(), 0);
+    AudioTrackInfo fallbackInfo = probe.probe(new AudioReference("id", null), fallback).getTrackInfo();
+    check(fallbackInfo.title.equals("Unknown title") && fallbackInfo.length == 100L,
+        "null title fallback");
+  }
+  private static void failures() throws Exception {
+    WavContainerProbe probe = new WavContainerProbe();
+    MemoryStream read = new MemoryStream(wav(), 0); IOException readFailure = new IOException("read"); read.readFailure = readFailure;
+    check(catchThrowable(() -> probe.probe(new AudioReference("id", "t"), read)) == readFailure
+        && read.seekCalls == 0, "read failure identity");
+    check(catchThrowable(() -> probe.probe(null, new MemoryStream(wav(), 0))) instanceof NullPointerException,
+        "matched null reference fails after detection");
+    check(catchThrowable(() -> probe.probe(new AudioReference("id", "t"), null)) instanceof NullPointerException,
+        "null stream failure");
+  }
+  private static void trackFactory() throws Exception {
+    WavContainerProbe probe = new WavContainerProbe(); AudioTrackInfo info = new AudioTrackInfo("t", "a", 1L, "id", false, "u", null, null);
+    MemoryStream stream = new MemoryStream(wav(), 0); AudioTrack first = probe.createTrack("ignored", info, stream);
+    check(first instanceof WavAudioTrack && first.getInfo() == info && input((WavAudioTrack) first) == stream,
+        "track factory identities");
+    WavAudioTrack nulls = (WavAudioTrack) probe.createTrack(null, null, null);
+    check(nulls.getInfo() == null && input(nulls) == null, "null factory arguments");
+  }
+  private static void subclassUse() throws Exception {
+    Derived derived = new Derived(); MediaContainerProbe probe = derived;
+    check(probe.getName().equals("derived-wav") && probe.probe(new AudioReference("id", "t"), new MemoryStream(wav(), 0)).getContainerDescriptor().probe == derived,
+        "subclass dispatch and self identity");
+  }
+  private static void reflection() throws Exception {
+    Class<WavContainerProbe> type = WavContainerProbe.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {MediaContainerProbe.class})
+        && type.getDeclaredFields().length == 1 && type.getDeclaredMethods().length == 4
+        && type.getDeclaredConstructors().length == 1, "exact class shape");
+    Field log = type.getDeclaredField("log"); log.setAccessible(true);
+    Object expected = Class.forName("org.slf4j.LoggerFactory").getMethod("getLogger", Class.class).invoke(null, type);
+    check(log.getType().getName().equals("org.slf4j.Logger") && log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && log.get(null) == expected && !log.isSynthetic(), "logger metadata");
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    checkMethod(type, "getName", String.class, new Class<?>[0], new Class<?>[0]);
+    checkMethod(type, "matchesHints", boolean.class, new Class<?>[] {MediaContainerHints.class}, new Class<?>[0]);
+    checkMethod(type, "probe", MediaContainerDetectionResult.class, new Class<?>[] {AudioReference.class, SeekableInputStream.class}, new Class<?>[] {IOException.class});
+    checkMethod(type, "createTrack", AudioTrack.class, new Class<?>[] {String.class, AudioTrackInfo.class, SeekableInputStream.class}, new Class<?>[0]);
+  }
+  private static void checkMethod(Class<?> owner, String name, Class<?> result, Class<?>[] params, Class<?>[] exceptions) throws Exception {
+    Method method = owner.getDeclaredMethod(name, params);
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == result && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isSynthetic() && !method.isBridge(), name + " metadata");
+  }
+  private static Object input(WavAudioTrack track) throws Exception { Field field = WavAudioTrack.class.getDeclaredField("inputStream"); field.setAccessible(true); return field.get(track); }
+  private static Throwable catchThrowable(Throwing action) { try { action.run(); return null; } catch (Throwable failure) { return failure; } }
+  private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean value, String message) { if (!value) throw new AssertionError(message); }
+  private static byte[] wav() {
+    byte[] value = new byte[44]; putAscii(value, 0, "RIFF"); putLeInt(value, 4, 3236); putAscii(value, 8, "WAVE");
+    putAscii(value, 12, "fmt "); putLeInt(value, 16, 16); putLeShort(value, 20, 1); putLeShort(value, 22, 2);
+    putLeInt(value, 24, 8000); putLeInt(value, 28, 32000); putLeShort(value, 32, 4); putLeShort(value, 34, 16);
+    putAscii(value, 36, "data"); putLeInt(value, 40, 3200); return value;
+  }
+  private static void putAscii(byte[] value, int offset, String text) { for (int i = 0; i < text.length(); i++) value[offset + i] = (byte) text.charAt(i); }
+  private static void putLeInt(byte[] value, int offset, int number) { for (int i = 0; i < 4; i++) value[offset + i] = (byte) (number >>> (8 * i)); }
+  private static void putLeShort(byte[] value, int offset, int number) { value[offset] = (byte) number; value[offset + 1] = (byte) (number >>> 8); }
+  private static final class MemoryStream extends SeekableInputStream {
+    final byte[] data; int position, readCalls, seekCalls; IOException readFailure;
+    MemoryStream(byte[] data, int position) { super(data.length, 0L); this.data = data; this.position = position; }
+    public int read() throws IOException { readCalls++; if (readFailure != null) throw readFailure; return position < data.length ? data[position++] & 0xff : -1; }
+    public long getPosition() { return position; }
+    protected void seekHard(long target) { seekCalls++; position = (int) target; }
+    public boolean canSeekHard() { return true; }
+    public java.util.List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider> getTrackInfoProviders() { return Collections.emptyList(); }
+  }
+  private static final class Derived extends WavContainerProbe { public String getName() { return "derived-wav"; } }
 }
 "#;
 
