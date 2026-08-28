@@ -424,6 +424,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-wav-file-loader-consumer \
   --output "$WORK/GateWavFileLoader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-wav-track-provider-consumer \
   --output "$WORK/GateWavTrackProvider.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-wave-format-type-consumer \
+  --output "$WORK/GateWaveFormatType.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-container-probe-consumer \
   --output "$WORK/GateFlacContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-file-loader-consumer \
@@ -721,6 +723,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_VORBIS_CLA
   "$WORK/GateWavFileInfo.java" \
   "$WORK/GateWavFileLoader.java" \
   "$WORK/GateWavTrackProvider.java" \
+  "$WORK/GateWaveFormatType.java" \
   "$WORK/GateVorbisCommentParser.java" \
   "$WORK/OggVorbisTrackHandler.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_VORBIS_TRACK_CLASSES" \
@@ -1995,6 +1998,17 @@ cmp "$WORK/wav-track-provider-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor-failure,field-layout,seek-full-width,seek-order,seek-io-wrapping,close-dispatch,provide-empty,provide-io-wrapping,private-state,throws,reflection' \
   "$WORK/wav-track-provider-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$ogg_vorbis_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateWaveFormatType >"$WORK/wave-format-type-reference.txt"
+java -Xverify:all \
+  -cp "$ogg_vorbis_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateWaveFormatType >"$WORK/wave-format-type-candidate.txt"
+cmp "$WORK/wave-format-type-reference.txt" \
+  "$WORK/wave-format-type-candidate.txt"
+grep --fixed-strings \
+  'contracts=order,names,ordinals,codes,values-clone,value-of,value-of-failures,code-lookup,unknown-fallback,private-state,synthetic-state,throws,reflection' \
+  "$WORK/wave-format-type-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_vorbis_track_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggVorbisTrackHandler >"$WORK/ogg-vorbis-track-handler-reference.txt"

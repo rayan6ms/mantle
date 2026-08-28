@@ -238,6 +238,8 @@ const WAV_FILE_INFO_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/wa
 const WAV_FILE_LOADER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/wav/WavFileLoader";
 const WAV_TRACK_PROVIDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/wav/WavTrackProvider";
+const WAVE_FORMAT_TYPE_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/wav/WaveFormatType";
 const WAV_FILE_INFO_BUILDER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/wav/WavFileLoader$InfoBuilder";
 const FLAC_CONTAINER_PROBE_CLASS: &str =
@@ -755,6 +757,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     WAV_FILE_INFO_CLASS,
     WAV_FILE_LOADER_CLASS,
     WAV_TRACK_PROVIDER_CLASS,
+    WAVE_FORMAT_TYPE_CLASS,
     FLAC_CONTAINER_PROBE_CLASS,
     FLAC_FILE_LOADER_CLASS,
     FLAC_METADATA_HEADER_CLASS,
@@ -1049,6 +1052,7 @@ pub fn emit(
     let mut ogg_vorbis_codec_handler_blueprint_bytes = None;
     let mut ogg_vorbis_track_handler_bytes = None;
     let mut wav_track_provider_bytes = None;
+    let mut wave_format_type_bytes = None;
     let mut vorbis_comment_parser_bytes = None;
     let mut extended_m3u_parser_bytes = None;
     let mut extended_m3u_line_bytes = None;
@@ -1184,6 +1188,8 @@ pub fn emit(
             mpeg_standard_sample_chunking_iterator_bytes = Some(bytes);
         } else if *binary_name == WAV_TRACK_PROVIDER_CLASS {
             wav_track_provider_bytes = Some(bytes);
+        } else if *binary_name == WAVE_FORMAT_TYPE_CLASS {
+            wave_format_type_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -1241,6 +1247,12 @@ pub fn emit(
                 wav_track_provider_bytes
                     .as_ref()
                     .expect("WAV track provider source bytes are retained"),
+            );
+        } else if name == format!("{WAVE_FORMAT_TYPE_CLASS}.class") {
+            bytes.clone_from(
+                wave_format_type_bytes
+                    .as_ref()
+                    .expect("WAVE format type source bytes are retained"),
             );
         } else if name == format!("{MPEG_AUDIO_TRACK_CLASS}.class") {
             bytes.clone_from(

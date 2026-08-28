@@ -274,6 +274,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-wav-file-info-consumer" => Some(WAV_FILE_INFO_CONSUMER),
         "write-wav-file-loader-consumer" => Some(WAV_FILE_LOADER_CONSUMER),
         "write-wav-track-provider-consumer" => Some(WAV_TRACK_PROVIDER_CONSUMER),
+        "write-wave-format-type-consumer" => Some(WAVE_FORMAT_TYPE_CONSUMER),
         "write-flac-container-probe-consumer" => Some(FLAC_CONTAINER_PROBE_CONSUMER),
         "write-flac-file-loader-consumer" => Some(FLAC_FILE_LOADER_CONSUMER),
         "write-flac-file-loader-support-consumer" => Some(FLAC_FILE_LOADER_SUPPORT_CONSUMER),
@@ -26366,6 +26367,106 @@ public final class GateWavTrackProvider {
     public void seekPerformed(long from, long to) { seekFrom = from; seekTo = to; }
     public void close() { closeCalls++; }
     public void process(ShortBuffer buffer) { processCalls++; }
+  }
+}
+"#;
+
+const WAVE_FORMAT_TYPE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.wav.WaveFormatType;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateWaveFormatType {
+  public static void main(String[] args) throws Exception {
+    values(); lookup(); reflection();
+    System.out.println("contracts=order,names,ordinals,codes,values-clone,value-of,value-of-failures,code-lookup,unknown-fallback,private-state,synthetic-state,throws,reflection");
+  }
+
+  private static void values() throws Exception {
+    WaveFormatType[] first = WaveFormatType.values();
+    WaveFormatType[] second = WaveFormatType.values();
+    String[] names = {"WAVE_FORMAT_UNKNOWN", "WAVE_FORMAT_PCM", "WAVE_FORMAT_EXTENSIBLE"};
+    int[] codes = {0, 1, 0xFFFE};
+    check(first != second && first.length == names.length, "fresh values arrays");
+    Field code = WaveFormatType.class.getDeclaredField("code"); code.setAccessible(true);
+    for (int index = 0; index < names.length; index++) {
+      check(first[index] == second[index]
+          && first[index].name().equals(names[index])
+          && first[index].ordinal() == index
+          && first[index] == WaveFormatType.valueOf(names[index])
+          && code.getInt(first[index]) == codes[index], "enum value " + index);
+    }
+    first[0] = null;
+    check(WaveFormatType.values()[0] == WaveFormatType.WAVE_FORMAT_UNKNOWN,
+        "values mutation is isolated");
+  }
+
+  private static void lookup() throws Exception {
+    Method getByCode = WaveFormatType.class.getDeclaredMethod("getByCode", int.class);
+    getByCode.setAccessible(true);
+    check(getByCode.invoke(null, 0) == WaveFormatType.WAVE_FORMAT_UNKNOWN
+        && getByCode.invoke(null, 1) == WaveFormatType.WAVE_FORMAT_PCM
+        && getByCode.invoke(null, 0xFFFE) == WaveFormatType.WAVE_FORMAT_EXTENSIBLE
+        && getByCode.invoke(null, -1) == WaveFormatType.WAVE_FORMAT_UNKNOWN
+        && getByCode.invoke(null, Integer.MAX_VALUE) == WaveFormatType.WAVE_FORMAT_UNKNOWN,
+        "code lookup and fallback");
+    check(catchThrowable(() -> WaveFormatType.valueOf("wave_format_pcm"))
+            instanceof IllegalArgumentException
+        && catchThrowable(() -> WaveFormatType.valueOf("")) instanceof IllegalArgumentException
+        && catchThrowable(() -> WaveFormatType.valueOf(null)) instanceof NullPointerException,
+        "valueOf failures");
+  }
+
+  private static void reflection() throws Exception {
+    Class<WaveFormatType> type = WaveFormatType.class;
+    check((type.getModifiers() & ~0x4000) == (Modifier.PUBLIC | Modifier.FINAL)
+        && type.isEnum() && type.getSuperclass() == Enum.class && type.getInterfaces().length == 0
+        && type.getDeclaredFields().length == 5 && type.getDeclaredMethods().length == 4
+        && type.getDeclaredConstructors().length == 1, "exact enum shape");
+    String[] constants = {"WAVE_FORMAT_UNKNOWN", "WAVE_FORMAT_PCM", "WAVE_FORMAT_EXTENSIBLE"};
+    for (String name : constants) {
+      Field field = type.getDeclaredField(name);
+      check(field.getType() == type
+          && field.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL | 0x4000)
+          && field.isEnumConstant() && !field.isSynthetic(), name + " metadata");
+    }
+    Field code = type.getDeclaredField("code");
+    check(code.getType() == int.class && code.getModifiers() == Modifier.FINAL
+        && !code.isSynthetic(), "code metadata");
+    Field values = type.getDeclaredField("$VALUES");
+    check(values.getType() == WaveFormatType[].class
+        && values.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL | 0x1000)
+        && values.isSynthetic(), "$VALUES metadata");
+    checkMethod(type, "values", WaveFormatType[].class, new Class<?>[0], Modifier.PUBLIC | Modifier.STATIC, false);
+    checkMethod(type, "valueOf", type, new Class<?>[] {String.class}, Modifier.PUBLIC | Modifier.STATIC, false);
+    checkMethod(type, "getByCode", type, new Class<?>[] {int.class}, Modifier.STATIC, false);
+    checkMethod(type, "lambda$getByCode$0", boolean.class,
+        new Class<?>[] {int.class, type}, Modifier.PRIVATE | Modifier.STATIC | 0x1000, true);
+    Constructor<?> constructor = type.getDeclaredConstructors()[0];
+    check(constructor.getModifiers() == Modifier.PRIVATE
+        && Arrays.equals(constructor.getParameterTypes(),
+            new Class<?>[] {String.class, int.class, int.class})
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "constructor metadata");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> result,
+      Class<?>[] parameters, int modifiers, boolean synthetic) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == result && method.getModifiers() == modifiers
+        && method.isSynthetic() == synthetic && !method.isBridge()
+        && method.getExceptionTypes().length == 0, name + " metadata");
+  }
+
+  private static Throwable catchThrowable(Throwing action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+  private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean value, String message) {
+    if (!value) throw new AssertionError(message);
   }
 }
 "#;
