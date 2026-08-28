@@ -184,6 +184,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-ogg-metadata-consumer" => Some(OGG_METADATA_CONSUMER),
         "write-ogg-packet-input-stream-consumer" => Some(OGG_PACKET_INPUT_STREAM_CONSUMER),
         "write-ogg-page-header-consumer" => Some(OGG_PAGE_HEADER_CONSUMER),
+        "write-ogg-page-scanner-consumer" => Some(OGG_PAGE_SCANNER_CONSUMER),
         "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
         "write-mpeg-track-info-consumer" => Some(MPEG_TRACK_INFO_CONSUMER),
         "write-mpeg-track-info-builder-consumer" => Some(MPEG_TRACK_INFO_BUILDER_CONSUMER),
@@ -17372,6 +17373,286 @@ public final class GateOggPageHeader {
         int checksum, int segmentCount, long byteStreamPosition) {
       super(flags, absolutePosition, streamIdentifier, pageSequence, checksum, segmentCount,
           byteStreamPosition);
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const OGG_PAGE_SCANNER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggPageScanner;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggSeekPoint;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggStreamSizeInfo;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+public final class GateOggPageScanner {
+  public static void main(String[] args) throws Exception {
+    constructorAndLiveData();
+    sizeScanning();
+    seekTableScanning();
+    malformedAndBoundaryInputs();
+    objectBehavior();
+    reflection();
+    System.out.println("contracts=public-scanner,9-fields,1-constructor,3-methods,direct-state,live-data,data-length-window,signature-search,version-gate,lacing-capacity,payload-capacity,checksum-ignored,stream-fields-ignored,last-page,contiguous-pages,absolute-offset,end-index-size-arithmetic,granule-endianness,sample-rate,timecode-truncation,seek-order,persistent-page-sequence,fresh-mutable-list,strict-tail-boundary,short-input,null-input,invalid-length,identity-semantics,subclassable,generics,throws,reflection");
+  }
+
+  private static void constructorAndLiveData() throws Exception {
+    byte[] page = page(1, 4, 48000L, new int[] {2});
+    byte[] data = concat(new byte[] {9, 8}, page, new byte[] {0});
+    OggPageScanner scanner = new OggPageScanner(Long.MIN_VALUE, data, data.length);
+    check((Long) field(scanner, "absoluteOffset") == Long.MIN_VALUE
+        && field(scanner, "data") == data
+        && (Integer) field(scanner, "dataLength") == data.length,
+        "constructor retains exact state without copying");
+    check(scanner.scanForSizeInfo(Long.MIN_VALUE + 2L, 48000) == null,
+        "unsupported version is ignored");
+    data[2 + 4] = 0;
+    check(scanner.scanForSizeInfo(Long.MIN_VALUE + 2L, 48000) != null,
+        "later caller mutation remains visible");
+  }
+
+  private static void sizeScanning() {
+    byte[] first = page(0, 0, 48000L, new int[] {2});
+    byte[] last = page(0, 4, 96000L, new int[] {3, 4});
+    byte[] prefix = new byte[] {1, 2, 3};
+    byte[] data = concat(prefix, first, last, new byte[] {0});
+    long absoluteOffset = 1000L;
+    long firstPageOffset = absoluteOffset + prefix.length;
+    OggStreamSizeInfo info = new OggPageScanner(absoluteOffset, data, data.length)
+        .scanForSizeInfo(firstPageOffset, 48000);
+    long lastPageOffset = absoluteOffset + prefix.length + first.length;
+    long absoluteEndIndex = prefix.length + first.length + last.length;
+    check(info != null && info.totalBytes == (lastPageOffset - firstPageOffset) + absoluteEndIndex
+        && info.totalSamples == 96000L && info.firstPageOffset == firstPageOffset
+        && info.lastPageOffset == lastPageOffset && info.sampleRate == 48000
+        && info.getDuration() == 2000L, "contiguous last-page size arithmetic");
+
+    byte[] noLast = concat(prefix, first, new byte[] {0});
+    check(new OggPageScanner(absoluteOffset, noLast, noLast.length)
+        .scanForSizeInfo(firstPageOffset, 48000) == null, "non-terminal pages return null");
+    byte[] noisyLast = page(0, 4, Long.MAX_VALUE, new int[] {0});
+    noisyLast[14] = 11;
+    noisyLast[18] = 22;
+    noisyLast[22] = 33;
+    byte[] noisyData = concat(new byte[] {7}, noisyLast, new byte[] {0});
+    OggStreamSizeInfo noisy = new OggPageScanner(-50L, noisyData, noisyData.length)
+        .scanForSizeInfo(-49L, -48000);
+    check(noisy != null && noisy.totalSamples == Long.MAX_VALUE
+        && noisy.lastPageOffset == -49L && noisy.sampleRate == -48000,
+        "checksum and logical-stream fields are not validated");
+  }
+
+  private static void seekTableScanning() {
+    byte[] first = page(0, 0, 48000L, new int[] {1, 2});
+    byte[] second = page(0, 0, 96000L, new int[] {3});
+    byte[] prefix = new byte[] {6, 5};
+    byte[] gap = new byte[] {99};
+    byte[] data = concat(prefix, first, gap, second, new byte[] {0});
+    long absoluteOffset = 700L;
+    OggPageScanner scanner = new OggPageScanner(absoluteOffset, data, data.length);
+    List<OggSeekPoint> points = scanner.createSeekTable(48000);
+    check(points instanceof ArrayList && points.size() == 2, "fresh mutable ArrayList result");
+    checkPoint(points.get(0), absoluteOffset + prefix.length, 48000L, 1000L, 1L);
+    checkPoint(points.get(1), absoluteOffset + prefix.length + first.length + gap.length,
+        96000L, 2000L, 2L);
+    points.add(null);
+    check(points.size() == 3, "seek result remains caller mutable");
+
+    List<OggSeekPoint> repeated = scanner.createSeekTable(48000);
+    check(repeated != points && repeated.size() == 2, "each scan returns a fresh list");
+    checkPoint(repeated.get(0), absoluteOffset + prefix.length, 48000L, 1000L, 3L);
+    checkPoint(repeated.get(1), absoluteOffset + prefix.length + first.length + gap.length,
+        96000L, 2000L, 4L);
+    List<OggSeekPoint> reset = new OggPageScanner(absoluteOffset, data, data.length)
+        .createSeekTable(48000);
+    check(reset.get(0).getPageSequence() == 1L, "new scanner resets page numbering");
+
+    List<OggSeekPoint> negativeRate = new OggPageScanner(0L,
+        concat(first, new byte[] {0}), first.length + 1).createSeekTable(-48000);
+    check(negativeRate.get(0).getTimecode() == -1000L, "signed sample-rate divisor");
+    expect(ArithmeticException.class, () -> new OggPageScanner(0L,
+        concat(first, new byte[] {0}), first.length + 1).createSeekTable(999));
+  }
+
+  private static void malformedAndBoundaryInputs() {
+    byte[] page = page(0, 4, 1L, new int[] {2});
+    byte[] minimalPage = page(0, 4, 1L, new int[0]);
+    check(new OggPageScanner(0L, minimalPage, minimalPage.length)
+        .createSeekTable(1000).isEmpty(),
+        "header at strict final scan boundary is skipped");
+    byte[] wrongVersion = concat(page(1, 4, 1L, new int[] {2}), new byte[] {0});
+    check(new OggPageScanner(0L, wrongVersion, wrongVersion.length)
+        .createSeekTable(1000).isEmpty(), "nonzero stream version is rejected");
+    byte[] shortSegments = Arrays.copyOf(page(0, 4, 1L, new int[] {2, 3}), 28);
+    check(new OggPageScanner(0L, concat(shortSegments, new byte[] {0}), shortSegments.length + 1)
+        .createSeekTable(1000).isEmpty(), "truncated segment table is rejected");
+    byte[] shortPayload = Arrays.copyOf(page, page.length - 1);
+    check(new OggPageScanner(0L, shortPayload, shortPayload.length)
+        .createSeekTable(1000).isEmpty(), "truncated page payload is rejected");
+
+    OggPageScanner nullData = new OggPageScanner(0L, null, 0);
+    expect(NullPointerException.class, () -> nullData.createSeekTable(1000));
+    OggPageScanner shortData = new OggPageScanner(0L, new byte[3], 3);
+    expect(IndexOutOfBoundsException.class, () -> shortData.scanForSizeInfo(0L, 1000));
+    OggPageScanner oversized = new OggPageScanner(0L, new byte[4], 5);
+    expect(IndexOutOfBoundsException.class, () -> oversized.createSeekTable(1000));
+    OggPageScanner negative = new OggPageScanner(0L, new byte[4], -1);
+    expect(IndexOutOfBoundsException.class, () -> negative.createSeekTable(1000));
+
+    byte[] bounded = concat(new byte[] {0, 0, 0, 0, 0}, page, new byte[] {0});
+    check(new OggPageScanner(0L, bounded, 5).createSeekTable(1000).isEmpty(),
+        "declared data length excludes later valid pages");
+  }
+
+  private static void objectBehavior() {
+    OggPageScanner first = new OggPageScanner(0L, new byte[4], 4);
+    OggPageScanner second = new OggPageScanner(0L, new byte[4], 4);
+    check(first != second && !first.equals(second), "Object identity semantics");
+    Derived derived = new Derived();
+    OggPageScanner view = derived;
+    check(view.createSeekTable(1) == derived.result && derived.calls == 1,
+        "ordinary subclass dispatch");
+  }
+
+  private static void reflection() throws Exception {
+    Class<OggPageScanner> type = OggPageScanner.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0 && type.getDeclaredClasses().length == 0,
+        "class metadata");
+    check(type.getDeclaredFields().length == 9 && type.getDeclaredMethods().length == 3
+        && type.getDeclaredConstructors().length == 1, "exact declared member counts");
+    String[] names = Arrays.stream(type.getDeclaredFields()).map(Field::getName)
+        .toArray(String[]::new);
+    check(Arrays.equals(names, new String[] {"OGG_PAGE_HEADER_INT", "absoluteOffset", "data",
+        "dataLength", "flags", "reversedPosition", "pageSize", "byteStreamPosition",
+        "pageSequence"}), "declared field order");
+    Field constant = type.getDeclaredField("OGG_PAGE_HEADER_INT");
+    constant.setAccessible(true);
+    check(constant.getType() == int.class
+        && constant.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && constant.getInt(null) == 0x4f676753 && !constant.isSynthetic(),
+        "runtime-computed signature constant");
+    checkField(type, "absoluteOffset", long.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "data", byte[].class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "dataLength", int.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "flags", int.class, Modifier.PRIVATE);
+    checkField(type, "reversedPosition", long.class, Modifier.PRIVATE);
+    checkField(type, "pageSize", int.class, Modifier.PRIVATE);
+    checkField(type, "byteStreamPosition", long.class, Modifier.PRIVATE);
+    checkField(type, "pageSequence", int.class, Modifier.PRIVATE);
+
+    Constructor<OggPageScanner> constructor = type.getDeclaredConstructor(long.class,
+        byte[].class, int.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic()
+        && !constructor.isVarArgs(), "constructor metadata");
+    checkMethod(type.getDeclaredMethod("scanForSizeInfo", long.class, int.class), Modifier.PUBLIC,
+        OggStreamSizeInfo.class, new Class<?>[] {long.class, int.class});
+    Method seek = type.getDeclaredMethod("createSeekTable", int.class);
+    checkMethod(seek, Modifier.PUBLIC, List.class, new Class<?>[] {int.class});
+    check(seek.getGenericReturnType() instanceof ParameterizedType
+        && ((ParameterizedType) seek.getGenericReturnType()).getRawType() == List.class
+        && Arrays.equals(((ParameterizedType) seek.getGenericReturnType()).getActualTypeArguments(),
+            new Object[] {OggSeekPoint.class}), "generic seek-point list signature");
+    checkMethod(type.getDeclaredMethod("attemptReadHeader", ByteBuffer.class), Modifier.PRIVATE,
+        boolean.class, new Class<?>[] {ByteBuffer.class});
+  }
+
+  private static byte[] page(int version, int flags, long granule, int[] segmentSizes) {
+    int payload = Arrays.stream(segmentSizes).sum();
+    byte[] page = new byte[27 + segmentSizes.length + payload];
+    page[0] = 0x4f;
+    page[1] = 0x67;
+    page[2] = 0x67;
+    page[3] = 0x53;
+    page[4] = (byte) version;
+    page[5] = (byte) flags;
+    for (int i = 0; i < 8; i++) page[6 + i] = (byte) (granule >>> (i * 8));
+    page[14] = 0x12;
+    page[18] = 0x34;
+    page[22] = 0x56;
+    page[26] = (byte) segmentSizes.length;
+    int payloadIndex = 27 + segmentSizes.length;
+    for (int i = 0; i < segmentSizes.length; i++) {
+      page[27 + i] = (byte) segmentSizes[i];
+      Arrays.fill(page, payloadIndex, payloadIndex + segmentSizes[i], (byte) (i + 1));
+      payloadIndex += segmentSizes[i];
+    }
+    return page;
+  }
+
+  private static byte[] concat(byte[]... chunks) {
+    int length = Arrays.stream(chunks).mapToInt(chunk -> chunk.length).sum();
+    byte[] result = new byte[length];
+    int offset = 0;
+    for (byte[] chunk : chunks) {
+      System.arraycopy(chunk, 0, result, offset, chunk.length);
+      offset += chunk.length;
+    }
+    return result;
+  }
+
+  private static void checkPoint(OggSeekPoint point, long position, long granule,
+      long timecode, long sequence) {
+    check(point.getPosition() == position && point.getGranulePosition() == granule
+        && point.getTimecode() == timecode && point.getPageSequence() == sequence,
+        "seek point values");
+  }
+
+  private static Object field(Object target, String name) throws Exception {
+    Field field = OggPageScanner.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
+  }
+
+  private static void checkField(Class<OggPageScanner> type, String name, Class<?> fieldType,
+      int modifiers) throws Exception {
+    Field field = type.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getModifiers() == modifiers
+        && !field.isSynthetic() && field.getDeclaredAnnotations().length == 0,
+        name + " field metadata");
+  }
+
+  private static void checkMethod(Method method, int modifiers, Class<?> returnType,
+      Class<?>[] parameters) {
+    check(method.getModifiers() == modifiers && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && method.getDeclaredAnnotations().length == 0 && !method.isSynthetic()
+        && !method.isBridge() && !method.isDefault() && !method.isVarArgs(),
+        method.getName() + " method metadata");
+  }
+
+  private static <T extends Throwable> void expect(Class<T> type, ThrowingRunnable action) {
+    try {
+      action.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable throwable) {
+      check(type.isInstance(throwable), "failure type " + throwable);
+    }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class Derived extends OggPageScanner {
+    final List<OggSeekPoint> result = new ArrayList<>();
+    int calls;
+    Derived() { super(0L, new byte[4], 4); }
+    @Override public List<OggSeekPoint> createSeekTable(int sampleRate) {
+      calls++;
+      return result;
     }
   }
 
