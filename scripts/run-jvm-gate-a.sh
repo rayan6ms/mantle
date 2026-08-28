@@ -265,6 +265,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-audio-track-support-consu
   --output "$WORK/MpegGateSupport.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-container-probe-consumer \
   --output "$WORK/GateMpegContainerProbe.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-adts-container-probe-consumer \
+  --output "$WORK/GateMpegAdtsContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-file-loader-consumer \
   --output "$WORK/GateMpegFileLoader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-info-consumer \
@@ -558,6 +560,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$MP3_CLASSES" \
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$MPEG_CLASSES" \
   "$WORK/GateMpegAudioTrack.java" \
   "$WORK/GateMpegContainerProbe.java" \
+  "$WORK/GateMpegAdtsContainerProbe.java" \
   "$WORK/MpegGateSupport.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   -d "$MPEG_FILE_LOADER_CLASSES" "$WORK/GateMpegFileLoader.java"
@@ -1475,6 +1478,16 @@ cmp "$WORK/mpeg-container-probe-reference.txt" "$WORK/mpeg-container-probe-candi
 grep --fixed-strings \
   'contracts=name,constant-hints,always-no-hints,iso-tag,wildcard,rewind,scan-miss,short-input,unsupported-audio,unsupported-reader,metadata,duration,probe-identity,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,private-state,throws,reflection' \
   "$WORK/mpeg-container-probe-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$MPEG_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMpegAdtsContainerProbe \
+  >"$WORK/mpeg-adts-container-probe-reference.txt"
+java -Xverify:all \
+  -cp "$MPEG_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegAdtsContainerProbe >"$WORK/mpeg-adts-container-probe-candidate.txt"
+cmp "$WORK/mpeg-adts-container-probe-reference.txt" "$WORK/mpeg-adts-container-probe-candidate.txt"
+grep --fixed-strings \
+  'contracts=name,hint-extension,case-insensitive,wrong-hints,empty-miss,non-ts-miss,no-rewind,null-reference,null-input,io-identity,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,private-state,throws,reflection' \
+  "$WORK/mpeg-adts-container-probe-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mpeg_file_loader_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateMpegFileLoader "$ROOT/tests/media/fixtures/tone-aac-lc-metadata.m4a" \

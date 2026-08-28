@@ -173,6 +173,8 @@ const MPEG_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegAudioTrack";
 const MPEG_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegContainerProbe";
+const MPEG_ADTS_CONTAINER_PROBE_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/mpegts/MpegAdtsContainerProbe";
 const MPEG_FILE_LOADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegFileLoader";
 const MPEG_NOOP_TRACK_CONSUMER_CLASS: &str =
@@ -644,6 +646,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MP3_XING_SEEKER_CLASS,
     MPEG_AUDIO_TRACK_CLASS,
     MPEG_CONTAINER_PROBE_CLASS,
+    MPEG_ADTS_CONTAINER_PROBE_CLASS,
     MPEG_FILE_LOADER_CLASS,
     MPEG_NOOP_TRACK_CONSUMER_CLASS,
     MPEG_TRACK_CONSUMER_CLASS,
@@ -903,6 +906,7 @@ pub fn emit(
     let mut mpeg_aac_track_consumer_bytes = None;
     let mut mpeg_audio_track_bytes = None;
     let mut mpeg_container_probe_bytes = None;
+    let mut mpeg_adts_container_probe_bytes = None;
     let mut mpeg_file_loader_bytes = None;
     let mut mpeg_noop_track_consumer_bytes = None;
     let mut mpeg_fragmented_file_track_provider_bytes = None;
@@ -932,6 +936,8 @@ pub fn emit(
             mpeg_audio_track_bytes = Some(bytes);
         } else if *binary_name == MPEG_CONTAINER_PROBE_CLASS {
             mpeg_container_probe_bytes = Some(bytes);
+        } else if *binary_name == MPEG_ADTS_CONTAINER_PROBE_CLASS {
+            mpeg_adts_container_probe_bytes = Some(bytes);
         } else if *binary_name == MPEG_FILE_LOADER_CLASS {
             mpeg_file_loader_bytes = Some(bytes);
         } else if *binary_name == MPEG_NOOP_TRACK_CONSUMER_CLASS {
@@ -1019,6 +1025,12 @@ pub fn emit(
                 mpeg_container_probe_bytes
                     .as_ref()
                     .expect("MPEG container probe source bytes are retained"),
+            );
+        } else if name == format!("{MPEG_ADTS_CONTAINER_PROBE_CLASS}.class") {
+            bytes.clone_from(
+                mpeg_adts_container_probe_bytes
+                    .as_ref()
+                    .expect("MPEG ADTS container probe source bytes are retained"),
             );
         } else if name == format!("{MPEG_FILE_LOADER_CLASS}.class") {
             bytes.clone_from(
@@ -1582,6 +1594,7 @@ fn retain_private_methods(class_name: &str) -> bool {
     )
 }
 
+#[allow(clippy::too_many_lines)]
 fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<'static>> {
     let class_name = class.class_name()?.to_string();
     // The EBML reader, compiler-generated enum switch table, and Matroska element registries form
@@ -1609,6 +1622,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | MP3_XING_SEEKER_CLASS
             | MPEG_AUDIO_TRACK_CLASS
             | MPEG_CONTAINER_PROBE_CLASS
+            | MPEG_ADTS_CONTAINER_PROBE_CLASS
             | MPEG_FILE_LOADER_CLASS
             | MPEG_READER_CLASS
             | MPEG_READER_CHAIN_CLASS

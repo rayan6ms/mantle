@@ -171,6 +171,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mpeg-audio-track-consumer" => Some(MPEG_AUDIO_TRACK_CONSUMER),
         "write-mpeg-audio-track-support-consumer" => Some(MPEG_AUDIO_TRACK_SUPPORT_CONSUMER),
         "write-mpeg-container-probe-consumer" => Some(MPEG_CONTAINER_PROBE_CONSUMER),
+        "write-mpeg-adts-container-probe-consumer" => Some(MPEG_ADTS_CONTAINER_PROBE_CONSUMER),
         "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
         "write-mpeg-track-info-consumer" => Some(MPEG_TRACK_INFO_CONSUMER),
         "write-mpeg-track-info-builder-consumer" => Some(MPEG_TRACK_INFO_BUILDER_CONSUMER),
@@ -14967,6 +14968,151 @@ public final class GateMpegContainerProbe {
   private static final class MemoryStream extends SeekableInputStream { final byte[] data; long position; IOException ioFailure; MemoryStream(byte[] data) { super(data.length, 0L); this.data = data; } @Override public int read() throws IOException { if (ioFailure != null) throw ioFailure; return position < data.length ? data[(int) position++] & 0xff : -1; } @Override public long getPosition() { return position; } @Override protected void seekHard(long target) { position = target; } @Override public boolean canSeekHard() { return true; } @Override public List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider> getTrackInfoProviders() { return Collections.emptyList(); } }
   private static final class Derived extends MpegContainerProbe { @Override public String getName() { return "derived-mp4"; } }
   private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
+}
+"#;
+
+const MPEG_ADTS_CONTAINER_PROBE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerHints;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerProbe;
+import com.sedmelluq.discord.lavaplayer.container.mpegts.MpegAdtsAudioTrack;
+import com.sedmelluq.discord.lavaplayer.container.mpegts.MpegAdtsContainerProbe;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateMpegAdtsContainerProbe {
+  public static void main(String[] args) throws Exception {
+    nameAndHints();
+    probeMissesAndFailures();
+    trackFactory();
+    subclassUse();
+    reflection();
+    System.out.println("contracts=name,hint-extension,case-insensitive,wrong-hints,empty-miss,non-ts-miss,no-rewind,null-reference,null-input,io-identity,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,private-state,throws,reflection");
+  }
+
+  private static void nameAndHints() {
+    MpegAdtsContainerProbe probe = new MpegAdtsContainerProbe();
+    check(probe.getName().equals("mpegts-adts") && probe.getName() == "mpegts-adts",
+        "stable MPEG-TS ADTS probe name");
+    check(probe.matchesHints(MediaContainerHints.from("video/mp2t", "ts"))
+        && probe.matchesHints(MediaContainerHints.from(null, "TS"))
+        && !probe.matchesHints(MediaContainerHints.from("audio/aac", "aac"))
+        && !probe.matchesHints(MediaContainerHints.from(null, null)),
+        "only the case-insensitive ts extension is accepted");
+    expect(NullPointerException.class, () -> probe.matchesHints(null));
+  }
+
+  private static void probeMissesAndFailures() throws Exception {
+    MpegAdtsContainerProbe probe = new MpegAdtsContainerProbe();
+    MemoryStream empty = new MemoryStream(new byte[0]);
+    check(probe.probe(new AudioReference("id", "title"), empty) == null
+        && empty.position == 0L, "empty MPEG-TS input returns null without seeking");
+    MemoryStream nonTs = new MemoryStream(new byte[] {1, 2, 3, 4, 5, 6});
+    check(probe.probe(new AudioReference("id", "title"), nonTs) == null,
+        "non-TS input returns null");
+    check(probe.probe(null, new MemoryStream(new byte[0])) == null,
+        "null reference is tolerated on a miss");
+    expect(NullPointerException.class, () -> probe.probe(new AudioReference("id", "title"), null));
+    IOException failure = new IOException("read-failure");
+    MemoryStream failing = new MemoryStream(new byte[] {0});
+    failing.ioFailure = failure;
+    check(catchThrowable(() -> probe.probe(new AudioReference("id", "title"), failing)) == failure,
+        "checked stream failure preserves IOException identity");
+  }
+
+  private static void trackFactory() throws Exception {
+    MpegAdtsContainerProbe probe = new MpegAdtsContainerProbe();
+    AudioTrackInfo info = new AudioTrackInfo("title", "author", 2L, "id", false, "uri");
+    MemoryStream stream = new MemoryStream(new byte[0]);
+    AudioTrack first = probe.createTrack("one", info, stream);
+    AudioTrack second = probe.createTrack("two", info, stream);
+    check(first instanceof MpegAdtsAudioTrack && second instanceof MpegAdtsAudioTrack
+        && first != second && first.getInfo() == info
+        && input((MpegAdtsAudioTrack) first) == stream
+        && input((MpegAdtsAudioTrack) second) == stream,
+        "factory creates fresh tracks retaining info and input identity");
+    MpegAdtsAudioTrack nulls = (MpegAdtsAudioTrack) probe.createTrack(null, null, null);
+    check(nulls.getInfo() == null && input(nulls) == null,
+        "factory accepts null track arguments and ignores parameters");
+  }
+
+  private static void subclassUse() {
+    Derived derived = new Derived();
+    check(derived.getName().equals("derived-mpegts-adts"), "subclass dispatch remains available");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MpegAdtsContainerProbe> type = MpegAdtsContainerProbe.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {MediaContainerProbe.class})
+        && type.getDeclaredFields().length == 1 && type.getDeclaredMethods().length == 4
+        && type.getDeclaredConstructors().length == 1, "exact public shape and counts");
+    Field log = type.getDeclaredField("log");
+    check(log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && log.getType().getName().equals("org.slf4j.Logger"), "eager logger metadata");
+    checkMethod(type.getDeclaredConstructor(), new Class<?>[0], new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("getName"), String.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("matchesHints", MediaContainerHints.class), boolean.class,
+        new Class<?>[] {MediaContainerHints.class});
+    checkMethod(type.getDeclaredMethod("probe", AudioReference.class, SeekableInputStream.class),
+        MediaContainerDetectionResult.class,
+        new Class<?>[] {AudioReference.class, SeekableInputStream.class}, IOException.class);
+    checkMethod(type.getDeclaredMethod("createTrack", String.class, AudioTrackInfo.class,
+        SeekableInputStream.class), AudioTrack.class,
+        new Class<?>[] {String.class, AudioTrackInfo.class, SeekableInputStream.class});
+  }
+
+  private static java.io.InputStream input(MpegAdtsAudioTrack track) throws Exception {
+    Field field = MpegAdtsAudioTrack.class.getDeclaredField("inputStream");
+    field.setAccessible(true);
+    return (java.io.InputStream) field.get(track);
+  }
+  private static void checkMethod(Constructor<?> c, Class<?>[] p, Class<?>[] e) {
+    check(c.getModifiers() == Modifier.PUBLIC && Arrays.equals(c.getParameterTypes(), p)
+        && Arrays.equals(c.getExceptionTypes(), e), "constructor metadata");
+  }
+  private static void checkMethod(Method m, Class<?> r, Class<?>[] p, Class<?>... e) {
+    check(m.getModifiers() == Modifier.PUBLIC && m.getReturnType() == r
+        && Arrays.equals(m.getParameterTypes(), p) && Arrays.equals(m.getExceptionTypes(), e)
+        && !m.isSynthetic() && !m.isBridge(), m.getName() + " metadata");
+  }
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable t) { return t; }
+  }
+  private static void expect(Class<? extends Throwable> type, ThrowingRunnable action) {
+    Throwable t = catchThrowable(action);
+    check(type.isInstance(t), "expected " + type.getName() + ": " + t);
+  }
+  private interface ThrowingRunnable { void run() throws Throwable; }
+  private static final class MemoryStream extends SeekableInputStream {
+    final byte[] data; long position; IOException ioFailure;
+    MemoryStream(byte[] data) { super(data.length, 0L); this.data = data; }
+    @Override public int read() throws IOException {
+      if (ioFailure != null) throw ioFailure;
+      return position < data.length ? data[(int) position++] & 0xff : -1;
+    }
+    @Override public long getPosition() { return position; }
+    @Override protected void seekHard(long target) { position = target; }
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider>
+        getTrackInfoProviders() { return Collections.emptyList(); }
+  }
+  private static final class Derived extends MpegAdtsContainerProbe {
+    @Override public String getName() { return "derived-mpegts-adts"; }
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
 }
 "#;
 
