@@ -157,6 +157,9 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-decoded-exception-consumer" => Some(DECODED_EXCEPTION_CONSUMER),
         "write-exception-tools-consumer" => Some(EXCEPTION_TOOLS_CONSUMER),
+        "write-exception-tools-error-debug-info-consumer" => {
+            Some(EXCEPTION_TOOLS_ERROR_DEBUG_INFO_CONSUMER)
+        }
         "write-friendly-exception-consumer" => Some(FRIENDLY_EXCEPTION_CONSUMER),
         "write-friendly-exception-severity-consumer" => Some(FRIENDLY_EXCEPTION_SEVERITY_CONSUMER),
         _ => None,
@@ -27129,6 +27132,86 @@ public final class GateExceptionTools {
     try { action.run(); return null; } catch (Throwable failure) { return failure; }
   }
   private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const EXCEPTION_TOOLS_ERROR_DEBUG_INFO_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.ExceptionTools;
+import com.sedmelluq.discord.lavaplayer.tools.ExceptionTools.ErrorDebugInfo;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import org.slf4j.Logger;
+
+public final class GateExceptionToolsErrorDebugInfo {
+  public static void main(String[] args) throws Exception {
+    construction(); nullValues(); subclassability(); reflection();
+    System.out.println("contracts=constructor,field-identity,null-values,subclassable,nested-linkage,reflection");
+  }
+
+  private static void construction() {
+    Logger logger = (Logger) Proxy.newProxyInstance(Logger.class.getClassLoader(),
+        new Class<?>[] {Logger.class}, (proxy, method, args) -> null);
+    String errorId = new String("error-id");
+    IllegalStateException cause = new IllegalStateException("cause");
+    String message = new String("message");
+    String name = new String("name");
+    String value = new String("value");
+    ErrorDebugInfo info = new ErrorDebugInfo(logger, errorId, cause, message, name, value);
+    check(info.log == logger && info.errorId == errorId && info.cause == cause
+        && info.message == message && info.name == name && info.value == value,
+        "constructor field identity");
+  }
+
+  private static void nullValues() {
+    ErrorDebugInfo info = new ErrorDebugInfo(null, null, null, null, null, null);
+    check(info.log == null && info.errorId == null && info.cause == null
+        && info.message == null && info.name == null && info.value == null, "null values");
+  }
+
+  private static void subclassability() {
+    Derived derived = new Derived();
+    check(derived instanceof ErrorDebugInfo && "derived".equals(derived.errorId),
+        "subclassability");
+  }
+
+  private static void reflection() throws Exception {
+    Class<ErrorDebugInfo> type = ErrorDebugInfo.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && type.getSuperclass() == Object.class && type.getInterfaces().length == 0
+        && type.getDeclaringClass() == ExceptionTools.class
+        && type.getDeclaredFields().length == 6 && type.getDeclaredMethods().length == 0
+        && type.getDeclaredConstructors().length == 1, "class shape and nested linkage");
+    checkField(type, "log", Logger.class);
+    checkField(type, "errorId", String.class);
+    checkField(type, "cause", Throwable.class);
+    checkField(type, "message", String.class);
+    checkField(type, "name", String.class);
+    checkField(type, "value", String.class);
+    Constructor<?> constructor = type.getDeclaredConstructors()[0];
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && Arrays.equals(constructor.getParameterTypes(), new Class<?>[] {
+            Logger.class, String.class, Throwable.class, String.class, String.class, String.class})
+        && constructor.getExceptionTypes().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> fieldType) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == fieldType
+        && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && !field.isSynthetic(), name + " metadata");
+  }
+
+  private static final class Derived extends ErrorDebugInfo {
+    Derived() { super(null, "derived", null, null, null, null); }
+  }
+
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }

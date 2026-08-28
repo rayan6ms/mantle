@@ -436,6 +436,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-decoded-exception-consumer \
   --output "$WORK/GateDecodedException.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-exception-tools-consumer \
   --output "$WORK/GateExceptionTools.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-exception-tools-error-debug-info-consumer \
+  --output "$WORK/GateExceptionToolsErrorDebugInfo.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-friendly-exception-consumer \
   --output "$WORK/GateFriendlyException.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-friendly-exception-severity-consumer \
@@ -768,6 +770,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateDecodedException.java" \
   "$WORK/GateExceptionTools.java" \
+  "$WORK/GateExceptionToolsErrorDebugInfo.java" \
   "$WORK/GateFriendlyException.java" \
   "$WORK/GateFriendlyExceptionSeverity.java" \
   "$WORK/GateAdtsStreamProvider.java" \
@@ -2085,6 +2088,17 @@ cmp "$WORK/exception-tools-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,rethrow,wrap-friendly,wrap-runtime,to-runtime,find-deep,interrupt,log,debug-info,serialization,close-warnings,reflection' \
   "$WORK/exception-tools-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateExceptionToolsErrorDebugInfo >"$WORK/exception-tools-error-debug-info-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateExceptionToolsErrorDebugInfo >"$WORK/exception-tools-error-debug-info-candidate.txt"
+cmp "$WORK/exception-tools-error-debug-info-reference.txt" \
+  "$WORK/exception-tools-error-debug-info-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,field-identity,null-values,subclassable,nested-linkage,reflection' \
+  "$WORK/exception-tools-error-debug-info-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateFriendlyException >"$WORK/friendly-exception-reference.txt"
