@@ -495,6 +495,8 @@ const HLS_STREAM_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/playlists/HlsStreamTrack";
 const M3U_PLAYLIST_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/playlists/M3uPlaylistContainerProbe";
+const PLAIN_PLAYLIST_CONTAINER_PROBE_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/playlists/PlainPlaylistContainerProbe";
 const MAX_OGG_SEEK_SCAN_BYTES: i64 = 64 << 20;
 const TWITCH_CONSTANTS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/twitch/TwitchConstants";
@@ -843,6 +845,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     HLS_STREAM_SEGMENT_URL_PROVIDER_CLASS,
     HLS_STREAM_TRACK_CLASS,
     M3U_PLAYLIST_CONTAINER_PROBE_CLASS,
+    PLAIN_PLAYLIST_CONTAINER_PROBE_CLASS,
     TWITCH_CONSTANTS_CLASS,
     TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS,
     TWITCH_STREAM_AUDIO_TRACK_CLASS,
@@ -1035,6 +1038,7 @@ pub fn emit(
     let mut hls_stream_segment_url_provider_bytes = None;
     let mut hls_stream_track_bytes = None;
     let mut m3u_playlist_container_probe_bytes = None;
+    let mut plain_playlist_container_probe_bytes = None;
     let mut mpeg_file_loader_bytes = None;
     let mut mpeg_noop_track_consumer_bytes = None;
     let mut mpeg_fragmented_file_track_provider_bytes = None;
@@ -1130,6 +1134,8 @@ pub fn emit(
             hls_stream_track_bytes = Some(bytes);
         } else if *binary_name == M3U_PLAYLIST_CONTAINER_PROBE_CLASS {
             m3u_playlist_container_probe_bytes = Some(bytes);
+        } else if *binary_name == PLAIN_PLAYLIST_CONTAINER_PROBE_CLASS {
+            plain_playlist_container_probe_bytes = Some(bytes);
         } else if *binary_name == MPEG_FILE_LOADER_CLASS {
             mpeg_file_loader_bytes = Some(bytes);
         } else if *binary_name == MPEG_NOOP_TRACK_CONSUMER_CLASS {
@@ -1415,6 +1421,12 @@ pub fn emit(
                 m3u_playlist_container_probe_bytes
                     .as_ref()
                     .expect("M3U playlist container probe source bytes are retained"),
+            );
+        } else if name == format!("{PLAIN_PLAYLIST_CONTAINER_PROBE_CLASS}.class") {
+            bytes.clone_from(
+                plain_playlist_container_probe_bytes
+                    .as_ref()
+                    .expect("plain playlist container probe source bytes are retained"),
             );
         } else if name == format!("{MPEG_FILE_LOADER_CLASS}.class") {
             bytes.clone_from(
@@ -2132,6 +2144,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | HLS_STREAM_SEGMENT_URL_PROVIDER_CLASS
             | HLS_STREAM_TRACK_CLASS
             | M3U_PLAYLIST_CONTAINER_PROBE_CLASS
+            | PLAIN_PLAYLIST_CONTAINER_PROBE_CLASS
             | MPEG_FILE_LOADER_CLASS
             | MPEG_READER_CLASS
             | MPEG_READER_CHAIN_CLASS

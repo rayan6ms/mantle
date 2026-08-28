@@ -330,6 +330,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-hls-stream-track-consumer \
   --output "$WORK/GateHlsStreamTrack.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-m3u-playlist-container-probe-consumer \
   --output "$WORK/GateM3uPlaylistContainerProbe.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-plain-playlist-container-probe-consumer \
+  --output "$WORK/GatePlainPlaylistContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-vorbis-comment-parser-consumer \
   --output "$WORK/GateVorbisCommentParser.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ogg-vorbis-track-handler-support-consumer \
@@ -697,6 +699,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_VORBIS_CLA
   "$WORK/GateHlsStreamSegmentUrlProvider.java" \
   "$WORK/GateHlsStreamTrack.java" \
   "$WORK/GateM3uPlaylistContainerProbe.java" \
+  "$WORK/GatePlainPlaylistContainerProbe.java" \
   "$WORK/GateVorbisCommentParser.java" \
   "$WORK/OggVorbisTrackHandler.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_VORBIS_TRACK_CLASSES" \
@@ -1894,6 +1897,17 @@ cmp "$WORK/m3u-playlist-container-probe-reference.txt" \
 grep --fixed-strings \
   'contracts=public-construction,public-probe,name-identity,hints-false,non-m3u-null,unsupported-create-track,interface-implementation,private-constants,private-manager,checked-probe-throws,reflection' \
   "$WORK/m3u-playlist-container-probe-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$ogg_vorbis_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GatePlainPlaylistContainerProbe >"$WORK/plain-playlist-container-probe-reference.txt"
+java -Xverify:all \
+  -cp "$ogg_vorbis_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GatePlainPlaylistContainerProbe >"$WORK/plain-playlist-container-probe-candidate.txt"
+cmp "$WORK/plain-playlist-container-probe-reference.txt" \
+  "$WORK/plain-playlist-container-probe-candidate.txt"
+grep --fixed-strings \
+  'contracts=public-construction,public-probe,name-identity,hints-false,non-plain-null,plain-reference,reference-fields,unsupported-create-track,interface-implementation,private-pattern,checked-probe-throws,reflection' \
+  "$WORK/plain-playlist-container-probe-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_vorbis_track_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggVorbisTrackHandler >"$WORK/ogg-vorbis-track-handler-reference.txt"
