@@ -195,6 +195,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-ogg-opus-track-handler-consumer" => Some(OGG_OPUS_TRACK_HANDLER_CONSUMER),
         "write-ogg-opus-router-support-consumer" => Some(OGG_OPUS_ROUTER_SUPPORT_CONSUMER),
         "write-ogg-vorbis-codec-handler-consumer" => Some(OGG_VORBIS_CODEC_HANDLER_CONSUMER),
+        "write-extended-m3u-parser-consumer" => Some(EXTENDED_M3U_PARSER_CONSUMER),
         "write-vorbis-comment-parser-consumer" => Some(VORBIS_COMMENT_PARSER_CONSUMER),
         "write-ogg-vorbis-track-handler-support-consumer" => {
             Some(OGG_VORBIS_TRACK_HANDLER_SUPPORT_CONSUMER)
@@ -18911,6 +18912,182 @@ public class PcmFormat {
   }
 }
 ";
+
+const EXTENDED_M3U_PARSER_CONSUMER: &str = r##"
+import com.sedmelluq.discord.lavaplayer.container.playlists.ExtendedM3uParser;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.regex.Pattern;
+
+public final class GateExtendedM3uParser {
+  public static void main(String[] args) throws Exception {
+    emptyAndDataLines();
+    directiveLines();
+    argumentGrammar();
+    failuresAndConstruction();
+    reflection();
+    System.out.println("contracts=public-construction,subclassable,trim,shared-empty-line,null-empty-fields,empty-predicates,data-line,data-map-immutable,bare-directive,hash-directive,trailing-colon,first-colon,raw-extra-data,fresh-hash-map,mutable-arguments,quoted-comma,unquoted-value,empty-value,uppercase-hyphen-keys,case-sensitive-keys,duplicate-last,malformed-permissive,argument-map-identity,null-line,line-predicates,outer-reflection,line-reflection,generic-map");
+  }
+
+  private static void emptyAndDataLines() {
+    ExtendedM3uParser.Line empty = ExtendedM3uParser.parseLine("  \t\r\n  ");
+    ExtendedM3uParser.Line emptyAgain = ExtendedM3uParser.parseLine("");
+    check(empty == emptyAgain && empty.lineData == null && empty.directiveName == null
+        && empty.directiveArguments == null && empty.extraData == null
+        && !empty.isData() && !empty.isDirective(), "shared null-filled empty line");
+
+    ExtendedM3uParser.Line data = ExtendedM3uParser.parseLine("  https://media/one  ");
+    ExtendedM3uParser.Line dataAgain = ExtendedM3uParser.parseLine("https://media/two");
+    check(data != dataAgain && "https://media/one".equals(data.lineData)
+        && data.directiveName == null && data.extraData == null
+        && data.isData() && !data.isDirective(), "trimmed data line");
+    check(data.directiveArguments == dataAgain.directiveArguments
+        && data.directiveArguments.isEmpty(), "shared empty data map");
+    expect(UnsupportedOperationException.class,
+        () -> data.directiveArguments.put("X", "one"));
+  }
+
+  private static void directiveLines() {
+    ExtendedM3uParser.Line bare = ExtendedM3uParser.parseLine("  #EXTM3U  ");
+    check(bare.lineData == null && "EXTM3U".equals(bare.directiveName)
+        && bare.directiveArguments.isEmpty() && "".equals(bare.extraData)
+        && bare.isDirective() && !bare.isData(), "bare directive");
+    expect(UnsupportedOperationException.class,
+        () -> bare.directiveArguments.put("X", "one"));
+
+    ExtendedM3uParser.Line hash = ExtendedM3uParser.parseLine("#");
+    check("".equals(hash.directiveName) && hash.isDirective()
+        && "".equals(hash.extraData), "empty-name hash directive");
+
+    ExtendedM3uParser.Line trailing = ExtendedM3uParser.parseLine("#NAME:");
+    check("NAME".equals(trailing.directiveName) && "".equals(trailing.extraData)
+        && trailing.directiveArguments.isEmpty(), "trailing colon split quirk");
+
+    ExtendedM3uParser.Line colons = ExtendedM3uParser.parseLine("#TAG:VALUE=a:b:c");
+    check("TAG".equals(colons.directiveName) && "VALUE=a:b:c".equals(colons.extraData)
+        && "a:b:c".equals(colons.directiveArguments.get("VALUE")), "first colon only");
+  }
+
+  private static void argumentGrammar() {
+    String raw = "FOO=first,QUOTED=\"a,b\",EMPTY=\"\",DASH-KEY=value,FOO=last";
+    ExtendedM3uParser.Line parsed = ExtendedM3uParser.parseLine("  #EXT-X:" + raw + "  ");
+    check(parsed.directiveArguments.getClass() == HashMap.class
+        && parsed.directiveArguments.size() == 4
+        && "last".equals(parsed.directiveArguments.get("FOO"))
+        && "a,b".equals(parsed.directiveArguments.get("QUOTED"))
+        && "".equals(parsed.directiveArguments.get("EMPTY"))
+        && "value".equals(parsed.directiveArguments.get("DASH-KEY"))
+        && raw.equals(parsed.extraData), "argument grammar and raw extra data");
+    Map<String, String> identity = parsed.directiveArguments;
+    identity.put("MUTABLE", "yes");
+    check(parsed.directiveArguments == identity
+        && "yes".equals(parsed.directiveArguments.remove("MUTABLE")),
+        "public mutable argument-map identity");
+
+    ExtendedM3uParser.Line malformed = ExtendedM3uParser.parseLine(
+        "#TAG:lower=no,GOOD=yes,MIXED-Key=no,ALSO-GOOD=ok,UNFINISHED=\"bad");
+    check(malformed.directiveArguments.size() == 3
+        && "yes".equals(malformed.directiveArguments.get("GOOD"))
+        && "ok".equals(malformed.directiveArguments.get("ALSO-GOOD"))
+        && "\"bad".equals(malformed.directiveArguments.get("UNFINISHED"))
+        && !malformed.directiveArguments.containsKey("lower")
+        && !malformed.directiveArguments.containsKey("MIXED-Key"),
+        "case-sensitive keys and permissive malformed argument handling");
+
+    ExtendedM3uParser.Line noArguments = ExtendedM3uParser.parseLine("#TAG:not-an-argument");
+    ExtendedM3uParser.Line noArgumentsAgain = ExtendedM3uParser.parseLine("#TAG:still-none");
+    check(noArguments.directiveArguments.getClass() == HashMap.class
+        && noArguments.directiveArguments.isEmpty()
+        && noArguments.directiveArguments != noArgumentsAgain.directiveArguments,
+        "fresh mutable map for colon directives");
+  }
+
+  private static void failuresAndConstruction() {
+    expect(NullPointerException.class, () -> ExtendedM3uParser.parseLine(null));
+    check(new ExtendedM3uParser() != null && new Derived().marker() == 67,
+        "public construction and subclassability");
+  }
+
+  private static void reflection() throws Exception {
+    Class<ExtendedM3uParser> outer = ExtendedM3uParser.class;
+    check(outer.getModifiers() == Modifier.PUBLIC && outer.getSuperclass() == Object.class
+        && outer.getInterfaces().length == 0 && outer.getDeclaredFields().length == 1
+        && outer.getDeclaredMethods().length == 2 && outer.getDeclaredConstructors().length == 1
+        && outer.getDeclaredClasses().length == 1, "exact outer class shape");
+    Constructor<ExtendedM3uParser> constructor = outer.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0, "outer constructor metadata");
+    Method parse = outer.getDeclaredMethod("parseLine", String.class);
+    check(parse.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && parse.getReturnType() == ExtendedM3uParser.Line.class
+        && parse.getExceptionTypes().length == 0 && !parse.isSynthetic() && !parse.isBridge(),
+        "parseLine metadata");
+    Method helper = outer.getDeclaredMethod("parseDirectiveLine", String.class);
+    check(helper.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC)
+        && helper.getReturnType() == ExtendedM3uParser.Line.class
+        && helper.getExceptionTypes().length == 0 && !helper.isSynthetic() && !helper.isBridge(),
+        "private parser metadata");
+    Field pattern = outer.getDeclaredField("directiveArgumentPattern");
+    check(pattern.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && pattern.getType() == Pattern.class && !pattern.isSynthetic(), "pattern metadata");
+
+    Class<ExtendedM3uParser.Line> line = ExtendedM3uParser.Line.class;
+    check(line.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && line.getSuperclass() == Object.class && line.getInterfaces().length == 0
+        && line.getDeclaredFields().length == 5 && line.getDeclaredMethods().length == 2
+        && line.getDeclaredConstructors().length == 1 && line.getDeclaredClasses().length == 0
+        && line.getDeclaringClass() == outer, "exact nested line shape");
+    checkField(line, "lineData", String.class, "java.lang.String");
+    checkField(line, "directiveName", String.class, "java.lang.String");
+    checkField(line, "extraData", String.class, "java.lang.String");
+    checkField(line, "directiveArguments", Map.class,
+        "java.util.Map<java.lang.String, java.lang.String>");
+    Field empty = line.getDeclaredField("EMPTY_LINE");
+    check(empty.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && empty.getType() == line && !empty.isSynthetic(), "empty singleton metadata");
+    Constructor<?> lineConstructor = line.getDeclaredConstructor(
+        String.class, String.class, Map.class, String.class);
+    check(lineConstructor.getModifiers() == Modifier.PRIVATE
+        && lineConstructor.getExceptionTypes().length == 0 && !lineConstructor.isSynthetic()
+        && lineConstructor.toGenericString().contains(
+            "java.util.Map<java.lang.String, java.lang.String>"), "line constructor metadata");
+    checkBooleanMethod(line, "isDirective");
+    checkBooleanMethod(line, "isData");
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> type, String generic)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && field.getType() == type && field.getGenericType().getTypeName().equals(generic)
+        && !field.isSynthetic(), name + " field metadata");
+  }
+  private static void checkBooleanMethod(Class<?> owner, String name) throws Exception {
+    Method method = owner.getDeclaredMethod(name);
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == boolean.class
+        && method.getParameterCount() == 0 && method.getExceptionTypes().length == 0
+        && !method.isSynthetic() && !method.isBridge(), name + " metadata");
+  }
+  private static void expect(Class<? extends Throwable> type, Throwing action) {
+    Throwable failure = catchThrowable(action);
+    check(type.isInstance(failure), "expected " + type.getName());
+  }
+  private static Throwable catchThrowable(Throwing action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+  private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+  private static final class Derived extends ExtendedM3uParser {
+    int marker() { return 67; }
+  }
+}
+"##;
 
 const VORBIS_COMMENT_PARSER_CONSUMER: &str = r#"
 import com.sedmelluq.discord.lavaplayer.container.ogg.vorbis.VorbisCommentParser;

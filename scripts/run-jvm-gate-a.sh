@@ -318,6 +318,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-ogg-opus-router-support-consum
   --output "$WORK/OpusPacketRouter.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ogg-vorbis-codec-handler-consumer \
   --output "$WORK/GateOggVorbisCodecHandler.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-extended-m3u-parser-consumer \
+  --output "$WORK/GateExtendedM3uParser.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-vorbis-comment-parser-consumer \
   --output "$WORK/GateVorbisCommentParser.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ogg-vorbis-track-handler-support-consumer \
@@ -679,6 +681,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_OPUS_CLASS
   "$WORK/OpusPacketRouter.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_VORBIS_CLASSES" \
   "$WORK/GateOggVorbisCodecHandler.java" \
+  "$WORK/GateExtendedM3uParser.java" \
   "$WORK/GateVorbisCommentParser.java" \
   "$WORK/OggVorbisTrackHandler.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_VORBIS_TRACK_CLASSES" \
@@ -1810,6 +1813,17 @@ cmp "$WORK/vorbis-comment-parser-reference.txt" \
 grep --fixed-strings \
   'contracts=public-construction,subclassable,fresh-hash-map,mutable-result,little-endian,vendor-skip,item-count,buffer-position,trailing-bytes,utf8,locale-root,first-equals,empty-key,empty-value,no-equals,case-folded-duplicate,last-value,negative-item-count,truncated-size,truncated-payload,strict-size,strict-payload,negative-vendor,negative-item-length,short-header,oversized-vendor,null-buffer,reflection' \
   "$WORK/vorbis-comment-parser-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$ogg_vorbis_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateExtendedM3uParser >"$WORK/extended-m3u-parser-reference.txt"
+java -Xverify:all \
+  -cp "$ogg_vorbis_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateExtendedM3uParser >"$WORK/extended-m3u-parser-candidate.txt"
+cmp "$WORK/extended-m3u-parser-reference.txt" \
+  "$WORK/extended-m3u-parser-candidate.txt"
+grep --fixed-strings \
+  'contracts=public-construction,subclassable,trim,shared-empty-line,null-empty-fields,empty-predicates,data-line,data-map-immutable,bare-directive,hash-directive,trailing-colon,first-colon,raw-extra-data,fresh-hash-map,mutable-arguments,quoted-comma,unquoted-value,empty-value,uppercase-hyphen-keys,case-sensitive-keys,duplicate-last,malformed-permissive,argument-map-identity,null-line,line-predicates,outer-reflection,line-reflection,generic-map' \
+  "$WORK/extended-m3u-parser-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_vorbis_track_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggVorbisTrackHandler >"$WORK/ogg-vorbis-track-handler-reference.txt"
