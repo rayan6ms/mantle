@@ -438,6 +438,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-exception-tools-consumer \
   --output "$WORK/GateExceptionTools.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-exception-tools-error-debug-info-consumer \
   --output "$WORK/GateExceptionToolsErrorDebugInfo.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-exception-tools-error-debug-info-handler-consumer \
+  --output "$WORK/GateExceptionToolsErrorDebugInfoHandler.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-friendly-exception-consumer \
   --output "$WORK/GateFriendlyException.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-friendly-exception-severity-consumer \
@@ -771,6 +773,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateDecodedException.java" \
   "$WORK/GateExceptionTools.java" \
   "$WORK/GateExceptionToolsErrorDebugInfo.java" \
+  "$WORK/GateExceptionToolsErrorDebugInfoHandler.java" \
   "$WORK/GateFriendlyException.java" \
   "$WORK/GateFriendlyExceptionSeverity.java" \
   "$WORK/GateAdtsStreamProvider.java" \
@@ -2099,6 +2102,19 @@ cmp "$WORK/exception-tools-error-debug-info-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,field-identity,null-values,subclassable,nested-linkage,reflection' \
   "$WORK/exception-tools-error-debug-info-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateExceptionToolsErrorDebugInfoHandler \
+  >"$WORK/exception-tools-error-debug-info-handler-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateExceptionToolsErrorDebugInfoHandler \
+  >"$WORK/exception-tools-error-debug-info-handler-candidate.txt"
+cmp "$WORK/exception-tools-error-debug-info-handler-reference.txt" \
+  "$WORK/exception-tools-error-debug-info-handler-candidate.txt"
+grep --fixed-strings \
+  'contracts=caller-implementation,payload-identity,null-payload,proxy-dispatch,nested-linkage,reflection' \
+  "$WORK/exception-tools-error-debug-info-handler-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateFriendlyException >"$WORK/friendly-exception-reference.txt"

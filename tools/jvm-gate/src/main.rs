@@ -160,6 +160,9 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-exception-tools-error-debug-info-consumer" => {
             Some(EXCEPTION_TOOLS_ERROR_DEBUG_INFO_CONSUMER)
         }
+        "write-exception-tools-error-debug-info-handler-consumer" => {
+            Some(EXCEPTION_TOOLS_ERROR_DEBUG_INFO_HANDLER_CONSUMER)
+        }
         "write-friendly-exception-consumer" => Some(FRIENDLY_EXCEPTION_CONSUMER),
         "write-friendly-exception-severity-consumer" => Some(FRIENDLY_EXCEPTION_SEVERITY_CONSUMER),
         _ => None,
@@ -27210,6 +27213,68 @@ public final class GateExceptionToolsErrorDebugInfo {
 
   private static final class Derived extends ErrorDebugInfo {
     Derived() { super(null, "derived", null, null, null, null); }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const EXCEPTION_TOOLS_ERROR_DEBUG_INFO_HANDLER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.ExceptionTools;
+import com.sedmelluq.discord.lavaplayer.tools.ExceptionTools.ErrorDebugInfo;
+import com.sedmelluq.discord.lavaplayer.tools.ExceptionTools.ErrorDebugInfoHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.concurrent.atomic.AtomicReference;
+
+public final class GateExceptionToolsErrorDebugInfoHandler {
+  public static void main(String[] args) throws Exception {
+    dispatch(); proxyDispatch(); reflection();
+    System.out.println("contracts=caller-implementation,payload-identity,null-payload,proxy-dispatch,nested-linkage,reflection");
+  }
+
+  private static void dispatch() {
+    RecordingHandler handler = new RecordingHandler();
+    ErrorDebugInfo payload = new ErrorDebugInfo(null, "id", null, null, null, null);
+    handler.handle(payload);
+    check(handler.calls == 1 && handler.payload == payload, "caller implementation dispatch");
+    handler.handle(null);
+    check(handler.calls == 2 && handler.payload == null, "null payload dispatch");
+  }
+
+  private static void proxyDispatch() {
+    AtomicReference<Object> argument = new AtomicReference<>();
+    ErrorDebugInfoHandler handler = (ErrorDebugInfoHandler) Proxy.newProxyInstance(
+        ErrorDebugInfoHandler.class.getClassLoader(), new Class<?>[] {ErrorDebugInfoHandler.class},
+        (proxy, method, args) -> { argument.set(args[0]); return null; });
+    ErrorDebugInfo payload = new ErrorDebugInfo(null, "proxy", null, null, null, null);
+    handler.handle(payload);
+    check(argument.get() == payload, "proxy payload identity");
+  }
+
+  private static void reflection() throws Exception {
+    Class<ErrorDebugInfoHandler> type = ErrorDebugInfoHandler.class;
+    check(type.getModifiers() ==
+            (Modifier.PUBLIC | Modifier.STATIC | Modifier.ABSTRACT | Modifier.INTERFACE)
+        && type.isInterface() && type.getSuperclass() == null && type.getInterfaces().length == 0
+        && type.getDeclaringClass() == ExceptionTools.class
+        && type.getDeclaredFields().length == 0 && type.getDeclaredMethods().length == 1
+        && type.getDeclaredConstructors().length == 0, "interface shape and nested linkage");
+    Method handle = type.getDeclaredMethod("handle", ErrorDebugInfo.class);
+    check(handle.getReturnType() == void.class
+        && handle.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && handle.getExceptionTypes().length == 0 && !handle.isDefault()
+        && !handle.isBridge() && !handle.isSynthetic() && !handle.isVarArgs(),
+        "handle metadata");
+  }
+
+  private static final class RecordingHandler implements ErrorDebugInfoHandler {
+    int calls;
+    ErrorDebugInfo payload;
+    @Override public void handle(ErrorDebugInfo value) { calls++; payload = value; }
   }
 
   private static void check(boolean condition, String message) {
