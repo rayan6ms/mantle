@@ -183,6 +183,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mpeg-versioned-section-handler-consumer" => {
             Some(MPEG_VERSIONED_SECTION_HANDLER_CONSUMER)
         }
+        "write-mpeg-versioned-section-info-consumer" => Some(MPEG_VERSIONED_SECTION_INFO_CONSUMER),
         "write-mpeg-noop-track-consumer-consumer" => Some(MPEG_NOOP_TRACK_CONSUMER_CONSUMER),
         "write-mpeg-track-consumer-consumer" => Some(MPEG_TRACK_CONSUMER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
@@ -16782,6 +16783,109 @@ public final class GateMpegVersionedSectionHandler {
     @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
       return Collections.emptyList();
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MPEG_VERSIONED_SECTION_INFO_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegSectionInfo;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegVersionedSectionInfo;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateMpegVersionedSectionInfo {
+  public static void main(String[] args) throws Exception {
+    constructionAndIdentity();
+    nullsAndEdges();
+    objectSemanticsAndSubclassing();
+    reflection();
+    System.out.println("contracts=field-order,superclass-copy,offset-storage,length-storage,type-identity,version-storage,flags-storage,full-width-longs,full-width-ints,null-type,no-validation,identity-equality,object-hash,object-string,subclassable,public-final-fields,constructor-descriptor,no-throws,member-counts,reflection");
+  }
+
+  private static void constructionAndIdentity() {
+    String type = new String("wide");
+    MpegSectionInfo source = new MpegSectionInfo(Long.MIN_VALUE, Long.MAX_VALUE, type);
+    MpegVersionedSectionInfo info = new MpegVersionedSectionInfo(
+        source, Integer.MIN_VALUE, Integer.MAX_VALUE);
+    check(info.offset == Long.MIN_VALUE && info.length == Long.MAX_VALUE
+        && info.type == type && info.version == Integer.MIN_VALUE
+        && info.flags == Integer.MAX_VALUE,
+        "constructor copies superclass values and stores full-width version flags");
+  }
+
+  private static void nullsAndEdges() {
+    MpegSectionInfo source = new MpegSectionInfo(0L, 0L, null);
+    MpegVersionedSectionInfo nullable = new MpegVersionedSectionInfo(source, 0, 0);
+    check(nullable.offset == 0L && nullable.length == 0L && nullable.type == null
+        && nullable.version == 0 && nullable.flags == 0,
+        "constructor preserves null type and zero values");
+    MpegVersionedSectionInfo unusual = new MpegVersionedSectionInfo(
+        new MpegSectionInfo(Long.MAX_VALUE, -1L, new String("")),
+        Integer.MAX_VALUE, Integer.MIN_VALUE);
+    check(unusual.offset == Long.MAX_VALUE && unusual.length == -1L
+        && unusual.version == Integer.MAX_VALUE && unusual.flags == Integer.MIN_VALUE,
+        "constructor performs no scalar validation or normalization");
+    check(catchThrowable(() -> new MpegVersionedSectionInfo(null, 1, 2))
+        instanceof NullPointerException,
+        "null source fails naturally during superclass value copy");
+  }
+
+  private static void objectSemanticsAndSubclassing() {
+    MpegSectionInfo source = new MpegSectionInfo(1L, 2L, "box1");
+    MpegVersionedSectionInfo first = new MpegVersionedSectionInfo(source, 3, 4);
+    MpegVersionedSectionInfo second = new MpegVersionedSectionInfo(source, 3, 4);
+    check(first != second && first.equals(first) && !first.equals(second)
+        && first.hashCode() == System.identityHashCode(first)
+        && first.toString().startsWith(MpegVersionedSectionInfo.class.getName() + "@"),
+        "subclass retains Object identity equality, hash and string behavior");
+    Derived derived = new Derived(source, -5, -6);
+    check(derived.offset == 1L && derived.length == 2L && derived.type == source.type
+        && derived.version == -5 && derived.flags == -6,
+        "ordinary subclass inherits exact construction");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MpegVersionedSectionInfo> type = MpegVersionedSectionInfo.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == MpegSectionInfo.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public non-final subclass metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredMethods().length == 0
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredClasses().length == 0,
+        "exact declared member counts");
+    String[] names = Arrays.stream(type.getDeclaredFields()).map(Field::getName).toArray(String[]::new);
+    check(Arrays.equals(names, new String[] {"version", "flags"}),
+        "exact declared field order");
+    checkField(type.getDeclaredField("version"), int.class);
+    checkField(type.getDeclaredField("flags"), int.class);
+    Constructor<MpegVersionedSectionInfo> constructor = type.getDeclaredConstructor(
+        MpegSectionInfo.class, int.class, int.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && Arrays.equals(constructor.getParameterTypes(),
+            new Class<?>[] {MpegSectionInfo.class, int.class, int.class})
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic()
+        && !constructor.isVarArgs(), "exact public constructor descriptor and metadata");
+  }
+
+  private static void checkField(Field field, Class<?> fieldType) {
+    check(field.getType() == fieldType
+        && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL) && !field.isSynthetic(),
+        field.getName() + " field metadata");
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class Derived extends MpegVersionedSectionInfo {
+    Derived(MpegSectionInfo source, int version, int flags) { super(source, version, flags); }
   }
 
   private static void check(boolean condition, String message) {

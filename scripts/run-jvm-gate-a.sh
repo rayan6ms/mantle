@@ -285,6 +285,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-section-info-consumer \
   --output "$WORK/GateMpegSectionInfo.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-versioned-section-handler-consumer \
   --output "$WORK/GateMpegVersionedSectionHandler.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-versioned-section-info-consumer \
+  --output "$WORK/GateMpegVersionedSectionInfo.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-noop-track-consumer-consumer \
   --output "$WORK/GateMpegNoopTrackConsumer.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-consumer-consumer \
@@ -463,6 +465,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateMpegSectionHandler.java" \
   "$WORK/GateMpegSectionInfo.java" \
   "$WORK/GateMpegVersionedSectionHandler.java" \
+  "$WORK/GateMpegVersionedSectionInfo.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GateAdtsStreamReader.java" \
@@ -1575,6 +1578,16 @@ cmp "$WORK/mpeg-versioned-section-handler-reference.txt" \
 grep --fixed-strings \
   'contracts=public-abstract-interface,functional-interface,no-fields,no-constructors,one-method,section-identity,null-section,anonymous-implementation,lambda-compatibility,checked-failure-identity,unchecked-failure-identity,chain-dispatch,version-flags,section-copy,parent-identity,skip-after-handler,checked-throws,reflection' \
   "$WORK/mpeg-versioned-section-handler-candidate.txt" >/dev/null
+java -Xverify:all -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegVersionedSectionInfo >"$WORK/mpeg-versioned-section-info-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegVersionedSectionInfo >"$WORK/mpeg-versioned-section-info-candidate.txt"
+cmp "$WORK/mpeg-versioned-section-info-reference.txt" \
+  "$WORK/mpeg-versioned-section-info-candidate.txt"
+grep --fixed-strings \
+  'contracts=field-order,superclass-copy,offset-storage,length-storage,type-identity,version-storage,flags-storage,full-width-longs,full-width-ints,null-type,no-validation,identity-equality,object-hash,object-string,subclassable,public-final-fields,constructor-descriptor,no-throws,member-counts,reflection' \
+  "$WORK/mpeg-versioned-section-info-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mp3_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMp3ConstantRateSeeker \
   >"$WORK/mp3-constant-rate-seeker-reference.txt"
