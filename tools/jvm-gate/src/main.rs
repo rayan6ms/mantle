@@ -197,6 +197,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-ogg-vorbis-codec-handler-consumer" => Some(OGG_VORBIS_CODEC_HANDLER_CONSUMER),
         "write-extended-m3u-parser-consumer" => Some(EXTENDED_M3U_PARSER_CONSUMER),
         "write-hls-stream-segment-consumer" => Some(HLS_STREAM_SEGMENT_CONSUMER),
+        "write-hls-stream-segment-parser-consumer" => Some(HLS_STREAM_SEGMENT_PARSER_CONSUMER),
         "write-vorbis-comment-parser-consumer" => Some(VORBIS_COMMENT_PARSER_CONSUMER),
         "write-ogg-vorbis-track-handler-support-consumer" => {
             Some(OGG_VORBIS_TRACK_HANDLER_SUPPORT_CONSUMER)
@@ -19156,6 +19157,117 @@ public final class GateHlsStreamSegment {
   }
 }
 "#;
+
+const HLS_STREAM_SEGMENT_PARSER_CONSUMER: &str = r##"
+import com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamSegment;
+import com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamSegmentParser;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.List;
+
+public final class GateHlsStreamSegmentParser {
+  public static void main(String[] args) throws Exception {
+    parseLines();
+    emptyAndFailures();
+    reflection();
+    System.out.println("contracts=public-construction,subclassable,array-list-result,fresh-result,trimmed-data,extinf-order,metadata-name,decimal-milliseconds,invalid-duration-null,nan-zero,infinity-saturation,negative-infinity-saturation,stale-metadata,non-extinf-ignored,no-comma-null-metadata,empty-lines,mutable-result,null-array,null-url,reflection,generic-signatures,private-duration-helper");
+  }
+
+  private static void parseLines() {
+    String[] lines = {
+        "#EXTM3U", "  #EXTINF:1.25,First title  ", "  https://media/one.ts  ",
+        "#EXTINF:bad,Bad duration", "https://media/two.ts", "plain-data",
+        "#EXTINF:NaN,Not a number", "three.ts", "#EXTINF:Infinity,Infinite", "four.ts",
+        "#EXTINF:-Infinity,Negative infinite", "five.ts", "#X", "six.ts",
+        "#EXTINF:7", "seven.ts", "   "
+    };
+    List<HlsStreamSegment> segments = HlsStreamSegmentParser.parseFromLines(lines);
+    check(segments.getClass() == ArrayList.class && segments.size() == 8,
+        "fresh ArrayList with ordered data segments");
+    checkSegment(segments.get(0), "https://media/one.ts", 1250L, "First title");
+    checkSegment(segments.get(1), "https://media/two.ts", null, "Bad duration");
+    checkSegment(segments.get(2), "plain-data", null, "Bad duration");
+    checkSegment(segments.get(3), "three.ts", 0L, "Not a number");
+    checkSegment(segments.get(4), "four.ts", Long.MAX_VALUE, "Infinite");
+    checkSegment(segments.get(5), "five.ts", Long.MIN_VALUE, "Negative infinite");
+    checkSegment(segments.get(6), "six.ts", Long.MIN_VALUE, "Negative infinite");
+    checkSegment(segments.get(7), "seven.ts", null, null);
+
+    List<HlsStreamSegment> noMetadata = HlsStreamSegmentParser.parseFromLines(
+        new String[] {"#EXTINF:7", "seven.ts", "#NOT-EXTINF:3,Ignored", "eight.ts"});
+    check(noMetadata.size() == 2, "non-EXTINF directives do not create segments");
+    checkSegment(noMetadata.get(0), "seven.ts", null, null);
+    checkSegment(noMetadata.get(1), "eight.ts", null, null);
+    noMetadata.add(new HlsStreamSegment("added", 1L, "added"));
+    List<HlsStreamSegment> fresh = HlsStreamSegmentParser.parseFromLines(new String[] {"one"});
+    check(noMetadata.size() == 3 && fresh != noMetadata && fresh.size() == 1,
+        "mutable fresh result lists");
+  }
+
+  private static void emptyAndFailures() {
+    check(HlsStreamSegmentParser.parseFromLines(new String[0]).isEmpty(), "empty input");
+    expect(NullPointerException.class, () -> HlsStreamSegmentParser.parseFromLines(null));
+    expect(NullPointerException.class, () -> HlsStreamSegmentParser.parseFromLines(
+        new String[] {null}));
+    expect(NullPointerException.class, () -> HlsStreamSegmentParser.parseFromUrl(null, null));
+    check(new HlsStreamSegmentParser() != null && new Derived().marker() == 73,
+        "public construction and subclassability");
+  }
+
+  private static void reflection() throws Exception {
+    Class<HlsStreamSegmentParser> type = HlsStreamSegmentParser.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 0
+        && type.getDeclaredMethods().length == 3 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredClasses().length == 0, "exact class shape");
+    Constructor<HlsStreamSegmentParser> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0
+        && !constructor.isSynthetic(), "constructor metadata");
+    Method fromUrl = type.getDeclaredMethod("parseFromUrl",
+        com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface.class, String.class);
+    check(fromUrl.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && fromUrl.getReturnType() == List.class && fromUrl.getExceptionTypes().length == 1
+        && fromUrl.getExceptionTypes()[0] == IOException.class
+        && fromUrl.getGenericReturnType().getTypeName().equals(
+            "java.util.List<com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamSegment>")
+        && !fromUrl.isSynthetic() && !fromUrl.isBridge(), "parseFromUrl metadata");
+    Method fromLines = type.getDeclaredMethod("parseFromLines", String[].class);
+    check(fromLines.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && fromLines.getReturnType() == List.class && fromLines.getExceptionTypes().length == 0
+        && fromLines.getGenericReturnType().getTypeName().equals(
+            "java.util.List<com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamSegment>")
+        && !fromLines.isSynthetic() && !fromLines.isBridge(), "parseFromLines metadata");
+    Method duration = type.getDeclaredMethod("parseSecondDuration", String.class);
+    check(duration.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC)
+        && duration.getReturnType() == Long.class && duration.getExceptionTypes().length == 0
+        && !duration.isSynthetic() && !duration.isBridge(), "private duration helper metadata");
+  }
+
+  private static void checkSegment(HlsStreamSegment segment, String url, Long duration, String name) {
+    check(segment.url.equals(url) && (segment.duration == null ? duration == null
+        : segment.duration.equals(duration)) && (segment.name == null ? name == null
+        : segment.name.equals(name)), "segment values");
+  }
+  private static void expect(Class<? extends Throwable> type, Throwing action) {
+    Throwable failure = catchThrowable(action);
+    check(type.isInstance(failure), "expected " + type.getName());
+  }
+  private static Throwable catchThrowable(Throwing action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+  private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+  private static final class Derived extends HlsStreamSegmentParser {
+    int marker() { return 73; }
+  }
+}
+"##;
 
 const VORBIS_COMMENT_PARSER_CONSUMER: &str = r#"
 import com.sedmelluq.discord.lavaplayer.container.ogg.vorbis.VorbisCommentParser;
