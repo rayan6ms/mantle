@@ -191,6 +191,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-ogg-track-handler-consumer" => Some(OGG_TRACK_HANDLER_CONSUMER),
         "write-ogg-track-loader-consumer" => Some(OGG_TRACK_LOADER_CONSUMER),
         "write-ogg-flac-codec-handler-consumer" => Some(OGG_FLAC_CODEC_HANDLER_CONSUMER),
+        "write-ogg-opus-codec-handler-consumer" => Some(OGG_OPUS_CODEC_HANDLER_CONSUMER),
         "write-ogg-flac-track-handler-consumer" => Some(OGG_FLAC_TRACK_HANDLER_CONSUMER),
         "write-ogg-flac-track-handler-support-consumer" => {
             Some(OGG_FLAC_TRACK_HANDLER_SUPPORT_CONSUMER)
@@ -18431,6 +18432,349 @@ public final class FlacFrameReader {
   }
 }
 ";
+
+const OGG_OPUS_CODEC_HANDLER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggMetadata;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggSeekPoint;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggStreamSizeInfo;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackBlueprint;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackHandler;
+import com.sedmelluq.discord.lavaplayer.container.ogg.opus.OggOpusCodecHandler;
+import com.sedmelluq.discord.lavaplayer.tools.io.DirectBufferStreamBroker;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateOggOpusCodecHandler {
+  private static final int IDENTIFIER = 0x4F707573;
+  private static final int COMMENT_SAVE_LIMIT = 61_440;
+  private static final int COMMENT_READ_LIMIT = 125_829_120;
+
+  public static void main(String[] args) throws Exception {
+    matchingAndConstruction();
+    blueprint();
+    metadata();
+    boundariesAndFailures();
+    reflection();
+    System.out.println("contracts=identifier,maximum-length,public-construction,opus-head,little-endian-rate,unsigned-channels,comment-skip-bound,comment-save-bound,comment-read-bound,tag-parse,empty-tags,metadata-duration,unknown-duration,size-rate,seek-table,seek-point-identity,blueprint-state,blueprint-sample-rate,broker-clear,handler-stream-identity,handler-broker-identity,handler-channel-rate,missing-comments,oversized-comments,complete-long-comments,checked-failure-identity,runtime-failure-identity,subclassable,private-blueprint,private-methods,throws,reflection");
+  }
+
+  private static void matchingAndConstruction() {
+    OggOpusCodecHandler handler = new OggOpusCodecHandler();
+    check(handler.isMatchingIdentifier(IDENTIFIER), "Opus mapping identifier");
+    check(!handler.isMatchingIdentifier(IDENTIFIER - 1)
+        && !handler.isMatchingIdentifier(0x4F676753), "nearby identifiers rejected");
+    check(handler.getMaximumFirstPacketLength() == 276, "maximum first packet length");
+    check(new Derived().marker() == 41, "public class remains subclassable");
+  }
+
+  private static void blueprint() throws Exception {
+    OggOpusCodecHandler handler = new OggOpusCodecHandler();
+    int sampleRate = 44_100;
+    RecordingBroker broker = new RecordingBroker(firstPacket(sampleRate, 255), new byte[0]);
+    ScriptedStream stream = new ScriptedStream();
+    OggSeekPoint point = new OggSeekPoint(11L, 12L, 13L, 14L);
+    stream.seekTable = Collections.singletonList(point);
+    OggTrackBlueprint blueprint = handler.loadBlueprint(stream, broker);
+    check(blueprint.getSampleRate() == sampleRate
+        && ((Integer) field(blueprint, "channelCount")) == 255
+        && ((Integer) field(blueprint, "sampleRate")) == sampleRate
+        && field(blueprint, "broker") == broker,
+        "blueprint retains unsigned channels, little-endian rate, and broker identity");
+    check(stream.startCalls == 1 && broker.consumeCalls == 1
+        && broker.input == stream && broker.savedLength == 0
+        && broker.readLength == COMMENT_READ_LIMIT,
+        "blueprint skips comments within the exact read bound");
+    check(stream.createSeekTableCalls == 1 && stream.createSeekTableRate == sampleRate
+        && stream.seekPoints == stream.seekTable && stream.seekPoints.get(0) == point,
+        "blueprint forwards sample rate and exact seek table identity");
+
+    ScriptedStream trackStream = new ScriptedStream();
+    Object trackHandler = blueprint.loadTrackHandler(trackStream);
+    check(trackHandler.getClass().getName().equals(
+        "com.sedmelluq.discord.lavaplayer.container.ogg.opus.OggOpusTrackHandler")
+        && broker.clearCalls == 1, "blueprint clears the broker and creates an Opus handler");
+    check(field(trackHandler, "packetInputStream") == trackStream
+        && field(trackHandler, "broker") == broker
+        && ((Integer) field(trackHandler, "channelCount")) == 255
+        && ((Integer) field(trackHandler, "sampleRate")) == sampleRate,
+        "handler receives exact stream, broker, channel, and rate values");
+    Object nullHandler = blueprint.loadTrackHandler(null);
+    check(broker.clearCalls == 2 && field(nullHandler, "packetInputStream") == null,
+        "repeated handler loads clear the broker and retain nullable stream identity");
+  }
+
+  private static void metadata() throws Exception {
+    OggOpusCodecHandler handler = new OggOpusCodecHandler();
+    int sampleRate = 48_000;
+    RecordingBroker broker = new RecordingBroker(firstPacket(sampleRate, 2),
+        commentPacket("TITLE=Signal", "ARTIST=Voice", "ISRC=US-ABC-12-34567"));
+    ScriptedStream stream = new ScriptedStream();
+    stream.sizeInfo = new OggStreamSizeInfo(1L, 96_001L, 2L, 3L, sampleRate);
+    OggMetadata metadata = handler.loadMetadata(stream, broker);
+    check("Signal".equals(metadata.getTitle()) && "Voice".equals(metadata.getAuthor())
+        && "US-ABC-12-34567".equals(metadata.getISRC())
+        && metadata.getLength() == 2_000L, "OpusTags and truncated duration are preserved");
+    check(stream.startCalls == 1 && broker.consumeCalls == 1 && broker.input == stream
+        && broker.savedLength == COMMENT_SAVE_LIMIT && broker.readLength == COMMENT_READ_LIMIT
+        && broker.truncatedCalls == 1, "metadata uses exact comment save/read bounds");
+    check(stream.seekForSizeInfoCalls == 1 && stream.seekForSizeInfoRate == sampleRate,
+        "metadata size lookup receives the OpusHead sample rate");
+
+    RecordingBroker emptyBroker = new RecordingBroker(firstPacket(8_000, 1),
+        new byte[] {'N', 'o', 't', 'T', 'a', 'g', 's', '!'});
+    ScriptedStream emptyStream = new ScriptedStream();
+    OggMetadata empty = handler.loadMetadata(emptyStream, emptyBroker);
+    check(empty.getTitle() == null && empty.getLength() == null
+        && field(empty, "tags") == Collections.emptyMap(),
+        "unknown tag prefix returns the shared empty map and unknown duration");
+  }
+
+  private static void boundariesAndFailures() throws Exception {
+    OggOpusCodecHandler handler = new OggOpusCodecHandler();
+
+    byte[] wrongHead = firstPacket(44_100, 2); wrongHead[4] = 'X';
+    Throwable wrong = catchThrowable(() -> handler.loadMetadata(new ScriptedStream(),
+        new RecordingBroker(wrongHead, commentPacket("TITLE=Wrong"))));
+    check(wrong != null && wrong.getClass() == IllegalStateException.class
+        && wrong.getMessage().equals("First packet is not an OpusHead."),
+        "wrong OpusHead failure type and message");
+
+    ScriptedStream missingStream = new ScriptedStream(); missingStream.packetAvailable = false;
+    RecordingBroker missingBroker = new RecordingBroker(firstPacket(44_100, 2), new byte[0]);
+    Throwable missing = catchThrowable(() -> handler.loadMetadata(missingStream, missingBroker));
+    check(missing != null && missing.getClass() == IllegalStateException.class
+        && missing.getMessage().equals("No OpusTags packet in track.")
+        && missingBroker.consumeCalls == 0, "missing comments fail before broker consumption");
+
+    ScriptedStream longStream = new ScriptedStream(); longStream.packetComplete = false;
+    RecordingBroker longBroker = new RecordingBroker(firstPacket(44_100, 2), new byte[0]);
+    longBroker.consumeResult = false;
+    Throwable tooLong = catchThrowable(() -> handler.loadBlueprint(longStream, longBroker));
+    check(tooLong != null && tooLong.getClass() == IllegalStateException.class
+        && tooLong.getMessage().equals("Opus comments header packet longer than allowed.")
+        && longStream.packetCompleteCalls == 1,
+        "overlong incomplete comments retain the bounded failure");
+
+    ScriptedStream completeStream = new ScriptedStream(); completeStream.packetComplete = true;
+    RecordingBroker completeBroker = new RecordingBroker(firstPacket(44_100, 2),
+        commentPacket("TITLE=Complete"));
+    completeBroker.consumeResult = false;
+    OggMetadata complete = handler.loadMetadata(completeStream, completeBroker);
+    check("Complete".equals(complete.getTitle()) && completeStream.packetCompleteCalls == 1,
+        "a broker limit ending exactly with the packet remains accepted");
+
+    IOException startFailure = new IOException("start");
+    ScriptedStream startStream = new ScriptedStream(); startStream.startFailure = startFailure;
+    expectSame(startFailure, () -> handler.loadMetadata(startStream,
+        new RecordingBroker(firstPacket(44_100, 2), new byte[0])));
+
+    IOException consumeFailure = new IOException("consume");
+    RecordingBroker consumeBroker = new RecordingBroker(firstPacket(44_100, 2), new byte[0]);
+    consumeBroker.consumeFailure = consumeFailure;
+    expectSame(consumeFailure, () -> handler.loadBlueprint(new ScriptedStream(), consumeBroker));
+
+    IOException tableFailure = new IOException("table");
+    ScriptedStream tableStream = new ScriptedStream(); tableStream.createSeekTableFailure = tableFailure;
+    expectSame(tableFailure, () -> handler.loadBlueprint(tableStream,
+        new RecordingBroker(firstPacket(44_100, 2), new byte[0])));
+
+    IOException sizeFailure = new IOException("size");
+    ScriptedStream sizeStream = new ScriptedStream(); sizeStream.seekForSizeInfoFailure = sizeFailure;
+    expectSame(sizeFailure, () -> handler.loadMetadata(sizeStream,
+        new RecordingBroker(firstPacket(44_100, 2), commentPacket("TITLE=Size"))));
+
+    RuntimeException runtime = new RuntimeException("buffer");
+    RecordingBroker runtimeBroker = new RecordingBroker(firstPacket(44_100, 2), new byte[0]);
+    runtimeBroker.bufferFailure = runtime;
+    expectSame(runtime, () -> handler.loadBlueprint(new ScriptedStream(), runtimeBroker));
+  }
+
+  private static void reflection() throws Exception {
+    Class<OggOpusCodecHandler> type = OggOpusCodecHandler.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {
+            com.sedmelluq.discord.lavaplayer.container.ogg.OggCodecHandler.class})
+        && type.getDeclaredFields().length == 6 && type.getDeclaredMethods().length == 9
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredClasses().length == 1,
+        "exact public codec shape");
+    Constructor<OggOpusCodecHandler> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic(),
+        "public no-argument constructor metadata");
+    checkStaticInt(type, "OPUS_IDENTIFIER", IDENTIFIER);
+    checkStaticInt(type, "HEAD_TAG_HALF", 0x48656164);
+    checkStaticInt(type, "OPUS_TAG_HALF", IDENTIFIER);
+    checkStaticInt(type, "TAGS_TAG_HALF", 0x54616773);
+    checkStaticInt(type, "MAX_COMMENTS_SAVED_LENGTH", COMMENT_SAVE_LIMIT);
+    checkStaticInt(type, "MAX_COMMENTS_READ_LENGTH", COMMENT_READ_LIMIT);
+    checkMethod(type.getDeclaredMethod("isMatchingIdentifier", int.class), boolean.class,
+        new Class<?>[] {int.class});
+    checkMethod(type.getDeclaredMethod("getMaximumFirstPacketLength"), int.class,
+        new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("loadBlueprint", OggPacketInputStream.class,
+        DirectBufferStreamBroker.class), OggTrackBlueprint.class,
+        new Class<?>[] {OggPacketInputStream.class, DirectBufferStreamBroker.class}, IOException.class);
+    checkMethod(type.getDeclaredMethod("loadMetadata", OggPacketInputStream.class,
+        DirectBufferStreamBroker.class), OggMetadata.class,
+        new Class<?>[] {OggPacketInputStream.class, DirectBufferStreamBroker.class}, IOException.class);
+    checkPrivate(type.getDeclaredMethod("parseTags", ByteBuffer.class, boolean.class));
+    checkPrivate(type.getDeclaredMethod("detectLength", OggPacketInputStream.class, int.class),
+        IOException.class);
+    checkPrivate(type.getDeclaredMethod("verifyFirstPacket", ByteBuffer.class));
+    checkPrivate(type.getDeclaredMethod("getSampleRate", ByteBuffer.class));
+    checkPrivate(type.getDeclaredMethod("loadCommentsHeader", OggPacketInputStream.class,
+        DirectBufferStreamBroker.class, boolean.class), IOException.class);
+
+    Class<?> blueprint = type.getDeclaredClasses()[0];
+    check(blueprint.getName().equals(type.getName() + "$Blueprint")
+        && blueprint.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC)
+        && blueprint.getSuperclass() == Object.class
+        && Arrays.equals(blueprint.getInterfaces(), new Class<?>[] {OggTrackBlueprint.class})
+        && blueprint.getDeclaredFields().length == 3 && blueprint.getDeclaredMethods().length == 2
+        && blueprint.getDeclaredConstructors().length == 1 && blueprint.getDeclaredClasses().length == 0,
+        "exact private blueprint shape");
+    Constructor<?> blueprintConstructor = blueprint.getDeclaredConstructor(
+        DirectBufferStreamBroker.class, int.class, int.class);
+    check(blueprintConstructor.getModifiers() == Modifier.PRIVATE
+        && !blueprintConstructor.isSynthetic(), "private blueprint constructor metadata");
+    checkField(blueprint, "broker", DirectBufferStreamBroker.class);
+    checkField(blueprint, "channelCount", int.class);
+    checkField(blueprint, "sampleRate", int.class);
+    checkMethod(blueprint.getDeclaredMethod("loadTrackHandler", OggPacketInputStream.class),
+        OggTrackHandler.class, new Class<?>[] {OggPacketInputStream.class});
+    checkMethod(blueprint.getDeclaredMethod("getSampleRate"), int.class, new Class<?>[0]);
+  }
+
+  private static byte[] firstPacket(int sampleRate, int channels) {
+    byte[] packet = new byte[19];
+    byte[] head = "OpusHead".getBytes(StandardCharsets.US_ASCII);
+    System.arraycopy(head, 0, packet, 0, head.length);
+    packet[8] = 1; packet[9] = (byte) channels;
+    packet[12] = (byte) sampleRate; packet[13] = (byte) (sampleRate >>> 8);
+    packet[14] = (byte) (sampleRate >>> 16); packet[15] = (byte) (sampleRate >>> 24);
+    return packet;
+  }
+
+  private static byte[] commentPacket(String... comments) throws IOException {
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    DataOutputStream output = new DataOutputStream(bytes);
+    output.write("OpusTags".getBytes(StandardCharsets.US_ASCII));
+    output.writeInt(Integer.reverseBytes(0));
+    output.writeInt(Integer.reverseBytes(comments.length));
+    for (String comment : comments) {
+      byte[] value = comment.getBytes(StandardCharsets.UTF_8);
+      output.writeInt(Integer.reverseBytes(value.length)); output.write(value);
+    }
+    return bytes.toByteArray();
+  }
+
+  private static Object field(Object target, String name) throws Exception {
+    Field field = target.getClass().getDeclaredField(name); field.setAccessible(true); return field.get(target);
+  }
+  private static void checkStaticInt(Class<?> type, String name, int value) throws Exception {
+    Field field = type.getDeclaredField(name); field.setAccessible(true);
+    check(field.getType() == int.class
+        && field.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && field.getInt(null) == value && !field.isSynthetic(), name + " field metadata");
+  }
+  private static void checkField(Class<?> type, String name, Class<?> fieldType) throws Exception {
+    Field field = type.getDeclaredField(name);
+    check(field.getType() == fieldType
+        && field.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && !field.isSynthetic(), name + " blueprint field metadata");
+  }
+  private static void checkMethod(Method method, Class<?> result, Class<?>[] parameters,
+      Class<?>... exceptions) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == result
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isSynthetic() && !method.isBridge(), method.getName() + " method metadata");
+  }
+  private static void checkPrivate(Method method, Class<?>... exceptions) {
+    check(method.getModifiers() == Modifier.PRIVATE
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isSynthetic() && !method.isBridge(), method.getName() + " private metadata");
+  }
+  private static Throwable catchThrowable(Throwing action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+  private static void expectSame(Throwable expected, Throwing action) {
+    check(catchThrowable(action) == expected, "failure identity for " + expected.getMessage());
+  }
+  private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+  private static final class Derived extends OggOpusCodecHandler { int marker() { return 41; } }
+
+  private static final class RecordingBroker extends DirectBufferStreamBroker {
+    final ByteBuffer firstPacket; final ByteBuffer comments;
+    int bufferCalls; int consumeCalls; int clearCalls; int truncatedCalls;
+    int savedLength; int readLength; InputStream input;
+    boolean consumeResult = true; boolean truncated;
+    IOException consumeFailure; RuntimeException bufferFailure;
+    RecordingBroker(byte[] firstPacket, byte[] comments) {
+      super(1); this.firstPacket = ByteBuffer.wrap(firstPacket); this.comments = ByteBuffer.wrap(comments);
+    }
+    @Override public ByteBuffer getBuffer() {
+      if (bufferFailure != null) throw bufferFailure;
+      return (bufferCalls++ == 0 ? firstPacket : comments).duplicate();
+    }
+    @Override public boolean consumeNext(InputStream input, int savedLength, int readLength)
+        throws IOException {
+      consumeCalls++; this.input = input; this.savedLength = savedLength; this.readLength = readLength;
+      if (consumeFailure != null) throw consumeFailure; return consumeResult;
+    }
+    @Override public boolean isTruncated() { truncatedCalls++; return truncated; }
+    @Override public void clear() { clearCalls++; }
+  }
+
+  private static final class ScriptedStream extends OggPacketInputStream {
+    boolean packetAvailable = true; boolean packetComplete = true;
+    int startCalls; int packetCompleteCalls; int createSeekTableCalls; int createSeekTableRate;
+    int seekForSizeInfoCalls; int seekForSizeInfoRate;
+    List<OggSeekPoint> seekTable; List<OggSeekPoint> seekPoints; OggStreamSizeInfo sizeInfo;
+    IOException startFailure; IOException createSeekTableFailure; IOException seekForSizeInfoFailure;
+    ScriptedStream() { super(new EmptyStream(), false); }
+    @Override public boolean startNewPacket() throws IOException {
+      startCalls++; if (startFailure != null) throw startFailure; return packetAvailable;
+    }
+    @Override public boolean isPacketComplete() { packetCompleteCalls++; return packetComplete; }
+    @Override public List<OggSeekPoint> createSeekTable(int sampleRate) throws IOException {
+      createSeekTableCalls++; createSeekTableRate = sampleRate;
+      if (createSeekTableFailure != null) throw createSeekTableFailure; return seekTable;
+    }
+    @Override public void setSeekPoints(List<OggSeekPoint> points) { seekPoints = points; }
+    @Override public OggStreamSizeInfo seekForSizeInfo(int sampleRate) throws IOException {
+      seekForSizeInfoCalls++; seekForSizeInfoRate = sampleRate;
+      if (seekForSizeInfoFailure != null) throw seekForSizeInfoFailure; return sizeInfo;
+    }
+  }
+  private static final class EmptyStream extends SeekableInputStream {
+    EmptyStream() { super(0L, 0L); }
+    @Override public int read() { return -1; }
+    @Override public long getPosition() { return 0L; }
+    @Override protected void seekHard(long position) {}
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      return Collections.emptyList();
+    }
+  }
+}
+"#;
 
 const OGG_FLAC_CODEC_HANDLER_CONSUMER: &str = r#"
 import com.sedmelluq.discord.lavaplayer.container.flac.FlacStreamInfo;

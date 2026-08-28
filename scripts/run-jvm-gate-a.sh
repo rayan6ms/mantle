@@ -302,6 +302,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-ogg-track-loader-consumer \
   --output "$WORK/GateOggTrackLoader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ogg-flac-codec-handler-consumer \
   --output "$WORK/GateOggFlacCodecHandler.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-ogg-opus-codec-handler-consumer \
+  --output "$WORK/GateOggOpusCodecHandler.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ogg-flac-track-handler-consumer \
   --output "$WORK/GateOggFlacTrackHandler.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ogg-flac-track-handler-support-consumer \
@@ -629,7 +631,8 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_CODEC_CLAS
   "$WORK/GateOggTrackBlueprint.java" \
   "$WORK/GateOggTrackHandler.java" \
   "$WORK/GateOggTrackLoader.java" \
-  "$WORK/GateOggFlacCodecHandler.java"
+  "$WORK/GateOggFlacCodecHandler.java" \
+  "$WORK/GateOggOpusCodecHandler.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_FLAC_CLASSES" \
   "$WORK/GateOggFlacTrackHandler.java" \
   "$WORK/OggPacketInputStream.java" \
@@ -1718,6 +1721,16 @@ cmp "$WORK/ogg-flac-codec-handler-reference.txt" "$WORK/ogg-flac-codec-handler-c
 grep --fixed-strings \
   'contracts=identifier,maximum-length,public-construction,stream-info,metadata-blocks,tag-parse,metadata-duration,seek-table,seek-point-forwarding,blueprint-sample-rate,handler-info-identity,handler-stream-identity,empty-tags,unknown-identifier,short-native-header,wrong-native-header,missing-metadata,metadata-io-identity,blueprint-io-identity,metadata-size-lookup,subclassable,private-blueprint,private-methods,throws,reflection' \
   "$WORK/ogg-flac-codec-handler-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$OGG_CODEC_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOggOpusCodecHandler >"$WORK/ogg-opus-codec-handler-reference.txt"
+java -Xverify:all \
+  -cp "$OGG_CODEC_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOggOpusCodecHandler >"$WORK/ogg-opus-codec-handler-candidate.txt"
+cmp "$WORK/ogg-opus-codec-handler-reference.txt" "$WORK/ogg-opus-codec-handler-candidate.txt"
+grep --fixed-strings \
+  'contracts=identifier,maximum-length,public-construction,opus-head,little-endian-rate,unsigned-channels,comment-skip-bound,comment-save-bound,comment-read-bound,tag-parse,empty-tags,metadata-duration,unknown-duration,size-rate,seek-table,seek-point-identity,blueprint-state,blueprint-sample-rate,broker-clear,handler-stream-identity,handler-broker-identity,handler-channel-rate,missing-comments,oversized-comments,complete-long-comments,checked-failure-identity,runtime-failure-identity,subclassable,private-blueprint,private-methods,throws,reflection' \
+  "$WORK/ogg-opus-codec-handler-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_flac_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggFlacTrackHandler >"$WORK/ogg-flac-track-handler-reference.txt"
