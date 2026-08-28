@@ -187,6 +187,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mpeg-fragmented-file-track-provider-consumer" => {
             Some(MPEG_FRAGMENTED_FILE_TRACK_PROVIDER_CONSUMER)
         }
+        "write-mpeg-global-seek-info-consumer" => Some(MPEG_GLOBAL_SEEK_INFO_CONSUMER),
         "write-mpeg-noop-track-consumer-consumer" => Some(MPEG_NOOP_TRACK_CONSUMER_CONSUMER),
         "write-mpeg-track-consumer-consumer" => Some(MPEG_TRACK_CONSUMER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
@@ -17024,6 +17025,116 @@ public final class GateMpegFragmentedFileTrackProvider {
     @Override public boolean canSeekHard() { return true; }
     @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
       return Collections.emptyList();
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MPEG_GLOBAL_SEEK_INFO_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.fragmented.MpegGlobalSeekInfo;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.fragmented.MpegSegmentEntry;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateMpegGlobalSeekInfo {
+  public static void main(String[] args) throws Exception {
+    constructionAndOffsets();
+    edgeCases();
+    reflection();
+    System.out.println("contracts=constructor,timescale-storage,entries-identity,offset-allocation,cumulative-time-offsets,cumulative-file-offsets,full-width-base-offset,overflow,nullable-rejection,empty-rejection,identity-equality,subclassable,public-final-fields,field-order,constructor-descriptor,no-throws,member-counts,reflection");
+  }
+
+  private static void constructionAndOffsets() {
+    MpegSegmentEntry first = new MpegSegmentEntry(1, 100, 7);
+    MpegSegmentEntry second = new MpegSegmentEntry(0, 250, 11);
+    MpegSegmentEntry third = new MpegSegmentEntry(1, 30, 13);
+    MpegSegmentEntry[] entries = {first, second, third};
+    MpegGlobalSeekInfo info = new MpegGlobalSeekInfo(48_000, 1_000_000_000L, entries);
+    check(info.timescale == 48_000 && info.entries == entries,
+        "constructor stores timescale and entries exactly");
+    check(info.timeOffsets != null && info.fileOffsets != null
+        && info.timeOffsets != info.fileOffsets && info.timeOffsets.length == entries.length
+        && info.fileOffsets.length == entries.length, "constructor allocates independent offset arrays");
+    check(Arrays.equals(info.timeOffsets, new long[] {0L, 7L, 18L})
+        && Arrays.equals(info.fileOffsets, new long[] {1_000_000_000L, 1_000_000_100L,
+            1_000_000_350L}), "constructor computes cumulative offsets");
+    entries[1] = third;
+    check(info.entries[1] == third && info.timeOffsets[1] == 7L && info.fileOffsets[1] == 1_000_000_100L,
+        "entries array is retained while offsets are snapshots");
+    check(info.equals(info) && !info.equals(new MpegGlobalSeekInfo(48_000, 1_000_000_000L, entries)),
+        "value object retains Object identity equality");
+}
+
+  private static void edgeCases() {
+    MpegSegmentEntry[] entries = {
+        new MpegSegmentEntry(Integer.MIN_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE),
+        new MpegSegmentEntry(Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MAX_VALUE)
+    };
+    MpegGlobalSeekInfo info = new MpegGlobalSeekInfo(Integer.MIN_VALUE, Long.MAX_VALUE, entries);
+    check(info.timescale == Integer.MIN_VALUE && info.timeOffsets[1] == Integer.MIN_VALUE
+        && info.fileOffsets[1] == Long.MAX_VALUE + (long) Integer.MAX_VALUE,
+        "signed int values widen exactly into cumulative long offsets");
+    MpegGlobalSeekInfo overflow = new MpegGlobalSeekInfo(1, Long.MAX_VALUE,
+        new MpegSegmentEntry[] {new MpegSegmentEntry(0, 1, 1), new MpegSegmentEntry(0, 2, 2)});
+    check(overflow.timeOffsets[1] == 1L && overflow.fileOffsets[1] == Long.MIN_VALUE,
+        "long file offsets retain JVM wraparound");
+    check(catchThrowable(() -> new MpegGlobalSeekInfo(1, 0L, null)) instanceof NullPointerException,
+        "null entries fail through array length access");
+    check(catchThrowable(() -> new MpegGlobalSeekInfo(1, 0L, new MpegSegmentEntry[0]))
+        instanceof ArrayIndexOutOfBoundsException, "empty entries fail at first file offset");
+    MpegSegmentEntry[] withNull = {null, new MpegSegmentEntry(0, 1, 2)};
+    check(catchThrowable(() -> new MpegGlobalSeekInfo(1, 0L, withNull))
+        instanceof NullPointerException, "null entry fails during cumulative offset construction");
+    Derived derived = new Derived(90, 12L, new MpegSegmentEntry[] {
+        new MpegSegmentEntry(0, 4, 5)
+    });
+    check(derived.timescale == 90 && derived.fileOffsets[0] == 12L,
+        "ordinary subclass inherits construction");
+}
+
+  private static void reflection() throws Exception {
+    Class<MpegGlobalSeekInfo> type = MpegGlobalSeekInfo.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete non-final class metadata");
+    check(type.getDeclaredFields().length == 4 && type.getDeclaredMethods().length == 0
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredClasses().length == 0,
+        "exact declared member counts");
+    check(Arrays.equals(Arrays.stream(type.getDeclaredFields()).map(Field::getName).toArray(),
+        new String[] {"timescale", "entries", "timeOffsets", "fileOffsets"}),
+        "public field declaration order");
+    checkField(type.getDeclaredField("timescale"), int.class);
+    checkField(type.getDeclaredField("entries"), MpegSegmentEntry[].class);
+    checkField(type.getDeclaredField("timeOffsets"), long[].class);
+    checkField(type.getDeclaredField("fileOffsets"), long[].class);
+    Constructor<MpegGlobalSeekInfo> constructor = type.getDeclaredConstructor(
+        int.class, long.class, MpegSegmentEntry[].class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0
+        && Arrays.equals(constructor.getParameterTypes(), new Class<?>[] {
+            int.class, long.class, MpegSegmentEntry[].class}),
+        "constructor descriptor and no checked failures");
+  }
+
+  private static void checkField(Field field, Class<?> type) {
+    check(field.getType() == type && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && !field.isSynthetic(), field.getName() + " field metadata");
+  }
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class Derived extends MpegGlobalSeekInfo {
+    Derived(int timescale, long baseOffset, MpegSegmentEntry[] entries) {
+      super(timescale, baseOffset, entries);
     }
   }
 

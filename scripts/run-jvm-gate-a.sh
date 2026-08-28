@@ -289,6 +289,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-versioned-section-info-co
   --output "$WORK/GateMpegVersionedSectionInfo.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-fragmented-file-track-provider-consumer \
   --output "$WORK/GateMpegFragmentedFileTrackProvider.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-global-seek-info-consumer \
+  --output "$WORK/GateMpegGlobalSeekInfo.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-noop-track-consumer-consumer \
   --output "$WORK/GateMpegNoopTrackConsumer.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-consumer-consumer \
@@ -469,6 +471,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateMpegVersionedSectionHandler.java" \
   "$WORK/GateMpegVersionedSectionInfo.java" \
   "$WORK/GateMpegFragmentedFileTrackProvider.java" \
+  "$WORK/GateMpegGlobalSeekInfo.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GateAdtsStreamReader.java" \
@@ -1601,6 +1604,15 @@ cmp "$WORK/mpeg-fragmented-file-track-provider-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,reader-identity,root-identity,initial-fragment-state,nullable-consumer,pre-fragment-initialise,pre-fragment-duration,pre-fragment-seek,subclassable,private-state,field-order,method-descriptors,checked-throws,reflection' \
   "$WORK/mpeg-fragmented-file-track-provider-candidate.txt" >/dev/null
+java -Xverify:all -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegGlobalSeekInfo >"$WORK/mpeg-global-seek-info-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegGlobalSeekInfo >"$WORK/mpeg-global-seek-info-candidate.txt"
+cmp "$WORK/mpeg-global-seek-info-reference.txt" "$WORK/mpeg-global-seek-info-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,timescale-storage,entries-identity,offset-allocation,cumulative-time-offsets,cumulative-file-offsets,full-width-base-offset,overflow,nullable-rejection,empty-rejection,identity-equality,subclassable,public-final-fields,field-order,constructor-descriptor,no-throws,member-counts,reflection' \
+  "$WORK/mpeg-global-seek-info-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mp3_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMp3ConstantRateSeeker \
   >"$WORK/mp3-constant-rate-seeker-reference.txt"
