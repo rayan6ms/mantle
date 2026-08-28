@@ -320,6 +320,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-ogg-vorbis-codec-handler-consu
   --output "$WORK/GateOggVorbisCodecHandler.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-extended-m3u-parser-consumer \
   --output "$WORK/GateExtendedM3uParser.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-hls-stream-segment-consumer \
+  --output "$WORK/GateHlsStreamSegment.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-vorbis-comment-parser-consumer \
   --output "$WORK/GateVorbisCommentParser.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ogg-vorbis-track-handler-support-consumer \
@@ -682,6 +684,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_OPUS_CLASS
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_VORBIS_CLASSES" \
   "$WORK/GateOggVorbisCodecHandler.java" \
   "$WORK/GateExtendedM3uParser.java" \
+  "$WORK/GateHlsStreamSegment.java" \
   "$WORK/GateVorbisCommentParser.java" \
   "$WORK/OggVorbisTrackHandler.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_VORBIS_TRACK_CLASSES" \
@@ -1824,6 +1827,17 @@ cmp "$WORK/extended-m3u-parser-reference.txt" \
 grep --fixed-strings \
   'contracts=public-construction,subclassable,trim,shared-empty-line,null-empty-fields,empty-predicates,data-line,data-map-immutable,bare-directive,hash-directive,trailing-colon,first-colon,raw-extra-data,fresh-hash-map,mutable-arguments,quoted-comma,unquoted-value,empty-value,uppercase-hyphen-keys,case-sensitive-keys,duplicate-last,malformed-permissive,argument-map-identity,null-line,line-predicates,outer-reflection,line-reflection,generic-map' \
   "$WORK/extended-m3u-parser-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$ogg_vorbis_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateHlsStreamSegment >"$WORK/hls-stream-segment-reference.txt"
+java -Xverify:all \
+  -cp "$ogg_vorbis_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateHlsStreamSegment >"$WORK/hls-stream-segment-candidate.txt"
+cmp "$WORK/hls-stream-segment-reference.txt" \
+  "$WORK/hls-stream-segment-candidate.txt"
+grep --fixed-strings \
+  'contracts=public-construction,subclassable,reference-identity,nullable-duration,boxed-duration,extreme-duration,final-fields,field-order,constructor-order,no-validation,reflection' \
+  "$WORK/hls-stream-segment-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_vorbis_track_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggVorbisTrackHandler >"$WORK/ogg-vorbis-track-handler-reference.txt"

@@ -196,6 +196,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-ogg-opus-router-support-consumer" => Some(OGG_OPUS_ROUTER_SUPPORT_CONSUMER),
         "write-ogg-vorbis-codec-handler-consumer" => Some(OGG_VORBIS_CODEC_HANDLER_CONSUMER),
         "write-extended-m3u-parser-consumer" => Some(EXTENDED_M3U_PARSER_CONSUMER),
+        "write-hls-stream-segment-consumer" => Some(HLS_STREAM_SEGMENT_CONSUMER),
         "write-vorbis-comment-parser-consumer" => Some(VORBIS_COMMENT_PARSER_CONSUMER),
         "write-ogg-vorbis-track-handler-support-consumer" => {
             Some(OGG_VORBIS_TRACK_HANDLER_SUPPORT_CONSUMER)
@@ -2219,7 +2220,6 @@ import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
 import com.sedmelluq.discord.lavaplayer.track.playback.TerminatorAudioFrame;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
 
@@ -19088,6 +19088,74 @@ public final class GateExtendedM3uParser {
   }
 }
 "##;
+
+const HLS_STREAM_SEGMENT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamSegment;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+
+public final class GateHlsStreamSegment {
+  public static void main(String[] args) throws Exception {
+    valuesAndIdentity();
+    reflection();
+    System.out.println("contracts=public-construction,subclassable,reference-identity,nullable-duration,boxed-duration,extreme-duration,final-fields,field-order,constructor-order,no-validation,reflection");
+  }
+
+  private static void valuesAndIdentity() throws Exception {
+    String url = new String("https://media.example/segment.ts");
+    String name = new String("intro");
+    Long duration = Long.valueOf(9_223_372_036_854_775_000L);
+    HlsStreamSegment segment = new HlsStreamSegment(url, duration, name);
+    check(segment.url == url && segment.duration == duration && segment.name == name,
+        "constructor preserves reference identity and boxed duration");
+    HlsStreamSegment nulls = new HlsStreamSegment(null, null, null);
+    check(nulls.url == null && nulls.duration == null && nulls.name == null,
+        "nullable fields and no validation");
+    HlsStreamSegment empty = new HlsStreamSegment("", Long.valueOf(Long.MIN_VALUE), "");
+    check("".equals(empty.url) && empty.duration.longValue() == Long.MIN_VALUE
+        && "".equals(empty.name), "empty values and extreme duration");
+
+    Field urlField = HlsStreamSegment.class.getField("url");
+    boolean failed = false;
+    try { urlField.set(segment, "changed"); } catch (IllegalAccessException | IllegalArgumentException e) {
+      failed = true;
+    }
+    check(failed && segment.url == url, "public final fields reject ordinary mutation");
+    check(new Derived().marker() == 71, "subclassability");
+  }
+
+  private static void reflection() throws Exception {
+    Class<HlsStreamSegment> type = HlsStreamSegment.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 3
+        && type.getDeclaredMethods().length == 0 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredClasses().length == 0, "exact class shape");
+    checkField(type, "url", String.class);
+    checkField(type, "duration", Long.class);
+    checkField(type, "name", String.class);
+    Constructor<HlsStreamSegment> constructor = type.getDeclaredConstructor(
+        String.class, Long.class, String.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0
+        && !constructor.isSynthetic(), "constructor metadata");
+  }
+
+  private static void checkField(Class<?> owner, String name, Class<?> expectedType)
+      throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && field.getType() == expectedType && !field.isSynthetic(), name + " field metadata");
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+  private static final class Derived extends HlsStreamSegment {
+    Derived() { super(null, null, null); }
+    int marker() { return 71; }
+  }
+}
+"#;
 
 const VORBIS_COMMENT_PARSER_CONSUMER: &str = r#"
 import com.sedmelluq.discord.lavaplayer.container.ogg.vorbis.VorbisCommentParser;

@@ -8387,45 +8387,50 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Differential oracle covers public construction, subclassability, reference identity, nullable values, and exact reflection.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamSegment",
       "symbol_kind": "FIELD",
       "member_name": "url",
       "descriptor": "Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public final URL field assignment and reflection metadata match the frozen reference.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamSegment",
       "symbol_kind": "FIELD",
       "member_name": "duration",
       "descriptor": "Ljava/lang/Long;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public final nullable boxed-duration field assignment and reflection metadata match the frozen reference.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamSegment",
       "symbol_kind": "FIELD",
       "member_name": "name",
       "descriptor": "Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public final nullable name field assignment and reflection metadata match the frozen reference.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamSegment",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public constructor parameter order, no-validation behavior, and reflected metadata match the frozen reference.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamSegmentParser",
