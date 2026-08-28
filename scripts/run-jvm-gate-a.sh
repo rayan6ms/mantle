@@ -267,6 +267,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-container-probe-consumer 
   --output "$WORK/GateMpegContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-adts-container-probe-consumer \
   --output "$WORK/GateMpegAdtsContainerProbe.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-ts-elementary-input-stream-consumer \
+  --output "$WORK/GateMpegTsElementaryInputStream.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-file-loader-consumer \
   --output "$WORK/GateMpegFileLoader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-info-consumer \
@@ -561,6 +563,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$MPEG_CLASSES" 
   "$WORK/GateMpegAudioTrack.java" \
   "$WORK/GateMpegContainerProbe.java" \
   "$WORK/GateMpegAdtsContainerProbe.java" \
+  "$WORK/GateMpegTsElementaryInputStream.java" \
   "$WORK/MpegGateSupport.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   -d "$MPEG_FILE_LOADER_CLASSES" "$WORK/GateMpegFileLoader.java"
@@ -1488,6 +1491,16 @@ cmp "$WORK/mpeg-adts-container-probe-reference.txt" "$WORK/mpeg-adts-container-p
 grep --fixed-strings \
   'contracts=name,hint-extension,case-insensitive,wrong-hints,empty-miss,non-ts-miss,no-rewind,null-reference,null-input,io-identity,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,private-state,throws,reflection' \
   "$WORK/mpeg-adts-container-probe-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$MPEG_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMpegTsElementaryInputStream \
+  >"$WORK/mpeg-ts-elementary-input-stream-reference.txt"
+java -Xverify:all \
+  -cp "$MPEG_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegTsElementaryInputStream >"$WORK/mpeg-ts-elementary-input-stream-candidate.txt"
+cmp "$WORK/mpeg-ts-elementary-input-stream-reference.txt" "$WORK/mpeg-ts-elementary-input-stream-candidate.txt"
+grep --fixed-strings \
+  'contracts=constant,constructor,wrapper,no-eager-read,metadata-freshness,metadata-nulls,empty-eof,short-input,invalid-packet,null-buffer,failure-identity,public-shape,private-state,reflection' \
+  "$WORK/mpeg-ts-elementary-input-stream-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mpeg_file_loader_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateMpegFileLoader "$ROOT/tests/media/fixtures/tone-aac-lc-metadata.m4a" \

@@ -433,6 +433,8 @@ const M3U_SEGMENT_TOOLS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/stream/MantleM3uSegmentTools";
 const MPEG_TS_M3U_STREAM_AUDIO_TRACK_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/stream/MpegTsM3uStreamAudioTrack";
+const MPEG_TS_ELEMENTARY_INPUT_STREAM_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/mpegts/MpegTsElementaryInputStream";
 const TWITCH_CONSTANTS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/twitch/TwitchConstants";
 const TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS: &str =
@@ -752,6 +754,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     M3U_CHANNEL_STREAM_INFO_CLASS,
     M3U_SEGMENT_INFO_CLASS,
     MPEG_TS_M3U_STREAM_AUDIO_TRACK_CLASS,
+    MPEG_TS_ELEMENTARY_INPUT_STREAM_CLASS,
     TWITCH_CONSTANTS_CLASS,
     TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS,
     TWITCH_STREAM_AUDIO_TRACK_CLASS,
@@ -907,6 +910,7 @@ pub fn emit(
     let mut mpeg_audio_track_bytes = None;
     let mut mpeg_container_probe_bytes = None;
     let mut mpeg_adts_container_probe_bytes = None;
+    let mut mpeg_ts_elementary_input_stream_bytes = None;
     let mut mpeg_file_loader_bytes = None;
     let mut mpeg_noop_track_consumer_bytes = None;
     let mut mpeg_fragmented_file_track_provider_bytes = None;
@@ -938,6 +942,8 @@ pub fn emit(
             mpeg_container_probe_bytes = Some(bytes);
         } else if *binary_name == MPEG_ADTS_CONTAINER_PROBE_CLASS {
             mpeg_adts_container_probe_bytes = Some(bytes);
+        } else if *binary_name == MPEG_TS_ELEMENTARY_INPUT_STREAM_CLASS {
+            mpeg_ts_elementary_input_stream_bytes = Some(bytes);
         } else if *binary_name == MPEG_FILE_LOADER_CLASS {
             mpeg_file_loader_bytes = Some(bytes);
         } else if *binary_name == MPEG_NOOP_TRACK_CONSUMER_CLASS {
@@ -1031,6 +1037,12 @@ pub fn emit(
                 mpeg_adts_container_probe_bytes
                     .as_ref()
                     .expect("MPEG ADTS container probe source bytes are retained"),
+            );
+        } else if name == format!("{MPEG_TS_ELEMENTARY_INPUT_STREAM_CLASS}.class") {
+            bytes.clone_from(
+                mpeg_ts_elementary_input_stream_bytes
+                    .as_ref()
+                    .expect("MPEG TS elementary input stream source bytes are retained"),
             );
         } else if name == format!("{MPEG_FILE_LOADER_CLASS}.class") {
             bytes.clone_from(
@@ -1623,6 +1635,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | MPEG_AUDIO_TRACK_CLASS
             | MPEG_CONTAINER_PROBE_CLASS
             | MPEG_ADTS_CONTAINER_PROBE_CLASS
+            | MPEG_TS_ELEMENTARY_INPUT_STREAM_CLASS
             | MPEG_FILE_LOADER_CLASS
             | MPEG_READER_CLASS
             | MPEG_READER_CHAIN_CLASS

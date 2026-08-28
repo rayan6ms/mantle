@@ -145,6 +145,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn container_consumer_source(command: &str) -> Option<&'static str> {
     match command {
         "write-formats-consumer" => Some(FORMATS_CONSUMER),
@@ -172,6 +173,9 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mpeg-audio-track-support-consumer" => Some(MPEG_AUDIO_TRACK_SUPPORT_CONSUMER),
         "write-mpeg-container-probe-consumer" => Some(MPEG_CONTAINER_PROBE_CONSUMER),
         "write-mpeg-adts-container-probe-consumer" => Some(MPEG_ADTS_CONTAINER_PROBE_CONSUMER),
+        "write-mpeg-ts-elementary-input-stream-consumer" => {
+            Some(MPEG_TS_ELEMENTARY_INPUT_STREAM_CONSUMER)
+        }
         "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
         "write-mpeg-track-info-consumer" => Some(MPEG_TRACK_INFO_CONSUMER),
         "write-mpeg-track-info-builder-consumer" => Some(MPEG_TRACK_INFO_BUILDER_CONSUMER),
@@ -15112,6 +15116,172 @@ public final class GateMpegAdtsContainerProbe {
   }
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MPEG_TS_ELEMENTARY_INPUT_STREAM_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mpegts.MpegTsElementaryInputStream;
+import com.sedmelluq.discord.lavaplayer.tools.io.GreedyInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.FilterInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateMpegTsElementaryInputStream {
+  private static final Object UNSAFE = loadUnsafe();
+
+  public static void main(String[] args) throws Exception {
+    reflection();
+    construction();
+    metadata();
+    missesAndFailures();
+    System.out.println("contracts=constant,constructor,wrapper,no-eager-read,metadata-freshness,metadata-nulls,empty-eof,short-input,invalid-packet,null-buffer,failure-identity,public-shape,private-state,reflection");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MpegTsElementaryInputStream> type = MpegTsElementaryInputStream.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == InputStream.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 17
+        && type.getDeclaredMethods().length == 17 && type.getDeclaredConstructors().length == 1,
+        "exact public shape and counts");
+    Field constant = type.getDeclaredField("ADTS_ELEMENTARY_STREAM");
+    check(constant.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL)
+        && constant.getType() == int.class && constant.getInt(null) == 15,
+        "ADTS elementary stream constant");
+    checkMethod(type.getDeclaredConstructor(InputStream.class, int.class),
+        new Class<?>[] {InputStream.class, int.class}, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("getLoadedMetadata"), AudioTrackInfoProvider.class,
+        new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("read"), int.class, new Class<?>[0], IOException.class);
+    checkMethod(type.getDeclaredMethod("read", byte[].class, int.class, int.class), int.class,
+        new Class<?>[] {byte[].class, int.class, int.class}, IOException.class);
+  }
+
+  private static void construction() throws Exception {
+    CountingInputStream raw = new CountingInputStream(new byte[0]);
+    MpegTsElementaryInputStream stream = new MpegTsElementaryInputStream(raw, 15);
+    check(field(stream, "inputStream").getClass() == GreedyInputStream.class,
+        "constructor installs greedy wrapper");
+    check(field(field(stream, "inputStream"), FilterInputStream.class, "in") == raw,
+        "constructor retains raw input identity");
+    check(intField(stream, "elementaryDataType") == 15 && raw.reads == 0,
+        "constructor retains type without reading");
+    MpegTsElementaryInputStream nullStream = new MpegTsElementaryInputStream(null, 0);
+    check(field(field(nullStream, "inputStream"), FilterInputStream.class, "in") == null,
+        "null input is retained through wrapper");
+  }
+
+  private static void metadata() {
+    MpegTsElementaryInputStream stream = new MpegTsElementaryInputStream(byteStream(), 15);
+    AudioTrackInfoProvider first = stream.getLoadedMetadata();
+    AudioTrackInfoProvider second = stream.getLoadedMetadata();
+    check(first != second, "metadata provider is fresh");
+    check(first.getTitle() == null && first.getAuthor() == null && first.getLength() == null
+        && first.getIdentifier() == null && first.getUri() == null && first.getArtworkUrl() == null
+        && first.getISRC() == null, "metadata provider starts empty");
+  }
+
+  private static void missesAndFailures() throws Exception {
+    MpegTsElementaryInputStream empty = new MpegTsElementaryInputStream(byteStream(), 15);
+    check(empty.read() == -1, "empty input reaches EOF");
+    check(empty.read(new byte[8], 0, 8) == -1, "empty bulk input reaches EOF");
+
+    byte[] shortData = new byte[] {0x47, 0x00, 0x00};
+    MpegTsElementaryInputStream shortInput =
+        new MpegTsElementaryInputStream(byteStream(shortData), 15);
+    check(shortInput.read() == -1, "short packet is rejected");
+
+    byte[] invalidData = new byte[188];
+    invalidData[0] = 0x46;
+    MpegTsElementaryInputStream invalid =
+        new MpegTsElementaryInputStream(byteStream(invalidData), 15);
+    check(invalid.read(new byte[4], 0, 4) == -1, "invalid sync byte is rejected");
+
+    MpegTsElementaryInputStream nullBuffer = new MpegTsElementaryInputStream(byteStream(), 15);
+    check(nullBuffer.read(null, 0, 0) == -1, "empty input short-circuits null buffer");
+
+    IOException failure = new IOException("read-failure");
+    CountingInputStream failingRaw = new CountingInputStream(new byte[0]);
+    failingRaw.failure = failure;
+    MpegTsElementaryInputStream failing = new MpegTsElementaryInputStream(failingRaw, 15);
+    check(catchThrowable(failing::read) == failure, "read preserves IOException identity");
+  }
+
+  private static CountingInputStream byteStream() { return new CountingInputStream(new byte[0]); }
+  private static CountingInputStream byteStream(byte[] data) { return new CountingInputStream(data); }
+  private static Object field(Object target, String name) throws Exception {
+    return field(target, MpegTsElementaryInputStream.class, name);
+  }
+  private static Object field(Object target, Class<?> owner, String name) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    long offset = (Long) UNSAFE.getClass().getMethod("objectFieldOffset", Field.class)
+        .invoke(UNSAFE, field);
+    return UNSAFE.getClass().getMethod("getObject", Object.class, long.class)
+        .invoke(UNSAFE, target, offset);
+  }
+  private static int intField(Object target, String name) throws Exception {
+    Field field = MpegTsElementaryInputStream.class.getDeclaredField(name);
+    long offset = (Long) UNSAFE.getClass().getMethod("objectFieldOffset", Field.class)
+        .invoke(UNSAFE, field);
+    return (Integer) UNSAFE.getClass().getMethod("getInt", Object.class, long.class)
+        .invoke(UNSAFE, target, offset);
+  }
+  private static Object loadUnsafe() {
+    try {
+      Field field = Class.forName("sun.misc.Unsafe").getDeclaredField("theUnsafe");
+      field.setAccessible(true);
+      return field.get(null);
+    } catch (ReflectiveOperationException error) {
+      throw new AssertionError(error);
+    }
+  }
+  private static void checkMethod(Constructor<?> constructor, Class<?>[] parameters,
+      Class<?>[] exceptions) {
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && Arrays.equals(constructor.getParameterTypes(), parameters)
+        && Arrays.equals(constructor.getExceptionTypes(), exceptions)
+        && !constructor.isSynthetic(), "constructor metadata");
+  }
+  private static void checkMethod(Method method, Class<?> result, Class<?>[] parameters,
+      Class<?>... exceptions) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == result
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isSynthetic() && !method.isBridge(), method.getName() + " metadata");
+  }
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private interface ThrowingRunnable { int run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+  private static final class CountingInputStream extends InputStream {
+    final byte[] data;
+    int position;
+    int reads;
+    IOException failure;
+    CountingInputStream(byte[] data) { this.data = data; }
+    @Override public int read() throws IOException {
+      reads++;
+      if (failure != null) throw failure;
+      return position < data.length ? data[position++] & 0xff : -1;
+    }
+    @Override public int read(byte[] buffer, int offset, int length) throws IOException {
+      reads++;
+      if (failure != null) throw failure;
+      if (position == data.length) return -1;
+      int count = Math.min(length, data.length - position);
+      System.arraycopy(data, position, buffer, offset, count);
+      position += count;
+      return count;
+    }
   }
 }
 "#;
