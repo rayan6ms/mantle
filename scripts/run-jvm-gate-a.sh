@@ -285,6 +285,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-ogg-metadata-consumer \
   --output "$WORK/GateOggMetadata.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ogg-packet-input-stream-consumer \
   --output "$WORK/GateOggPacketInputStream.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-ogg-page-header-consumer \
+  --output "$WORK/GateOggPageHeader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-file-loader-consumer \
   --output "$WORK/GateMpegFileLoader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-info-consumer \
@@ -590,7 +592,8 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_PROBE_CLAS
   "$WORK/GateOggContainerProbe.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_CODEC_CLASSES" \
   "$WORK/GateOggMetadata.java" \
-  "$WORK/GateOggPacketInputStream.java"
+  "$WORK/GateOggPacketInputStream.java" \
+  "$WORK/GateOggPageHeader.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   -d "$MPEG_FILE_LOADER_CLASSES" "$WORK/GateMpegFileLoader.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
@@ -1592,6 +1595,16 @@ grep --fixed-strings \
 grep --fixed-strings \
   'common=public-input-stream,13-fields,1-constructor,17-methods,private-state-enum,constructor-capture,track-boundaries,packet-boundaries,single-read,bulk-read,zero-length-read,available,multiple-packets,page-continuation,empty-pages,chained-tracks,last-page,physical-eof,invalid-header,invalid-version,truncated-header,premature-packet-eof,checked-failure-identity,seek-point-identity,ceiling-selection,track-seeking,seek-table,position-restore,size-info,hard-seek-gates,delegated-close,subclassable,generics,throws,reflection;scan=bounded-64-mib' \
   "$WORK/ogg-packet-input-stream-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$OGG_CODEC_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOggPageHeader >"$WORK/ogg-page-header-reference.txt"
+java -Xverify:all \
+  -cp "$OGG_CODEC_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOggPageHeader >"$WORK/ogg-page-header-candidate.txt"
+cmp "$WORK/ogg-page-header-reference.txt" "$WORK/ogg-page-header-candidate.txt"
+grep --fixed-strings \
+  'contracts=constants,individual-flags,combined-flags,unrelated-flags,negative-flags,full-width-fields,negative-segment-count,no-validation,immutable-public-state,identity-semantics,subclassable,field-order,constructor,throws,reflection' \
+  "$WORK/ogg-page-header-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mpeg_file_loader_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateMpegFileLoader "$ROOT/tests/media/fixtures/tone-aac-lc-metadata.m4a" \

@@ -183,6 +183,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-ogg-container-probe-consumer" => Some(OGG_CONTAINER_PROBE_CONSUMER),
         "write-ogg-metadata-consumer" => Some(OGG_METADATA_CONSUMER),
         "write-ogg-packet-input-stream-consumer" => Some(OGG_PACKET_INPUT_STREAM_CONSUMER),
+        "write-ogg-page-header-consumer" => Some(OGG_PAGE_HEADER_CONSUMER),
         "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
         "write-mpeg-track-info-consumer" => Some(MPEG_TRACK_INFO_CONSUMER),
         "write-mpeg-track-info-builder-consumer" => Some(MPEG_TRACK_INFO_BUILDER_CONSUMER),
@@ -17249,6 +17250,131 @@ public final class GateOggPacketInputStream {
     Derived(SeekableInputStream input) { super(input, false); }
     @Override public int read() { return 123; }
   }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const OGG_PAGE_HEADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggPageHeader;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateOggPageHeader {
+  public static void main(String[] args) throws Exception {
+    constantsAndFlags();
+    fieldValues();
+    objectBehavior();
+    reflection();
+    System.out.println("contracts=constants,individual-flags,combined-flags,unrelated-flags,negative-flags,full-width-fields,negative-segment-count,no-validation,immutable-public-state,identity-semantics,subclassable,field-order,constructor,throws,reflection");
+  }
+
+  private static void constantsAndFlags() {
+    check(OggPageHeader.FLAG_CONTINUATION == 1 && OggPageHeader.FLAG_FIRST_PAGE == 2
+        && OggPageHeader.FLAG_LAST_PAGE == 4, "flag constants");
+    checkFlags(new OggPageHeader(0, 0L, 0, 0, 0, 0, 0L), false, false, false);
+    checkFlags(new OggPageHeader(1, 0L, 0, 0, 0, 0, 0L), true, false, false);
+    checkFlags(new OggPageHeader(2, 0L, 0, 0, 0, 0, 0L), false, true, false);
+    checkFlags(new OggPageHeader(4, 0L, 0, 0, 0, 0, 0L), false, false, true);
+    checkFlags(new OggPageHeader(7, 0L, 0, 0, 0, 0, 0L), true, true, true);
+    checkFlags(new OggPageHeader(0x78, 0L, 0, 0, 0, 0, 0L), false, false, false);
+    checkFlags(new OggPageHeader(Integer.MIN_VALUE, 0L, 0, 0, 0, 0, 0L), false, false, false);
+    checkFlags(new OggPageHeader(-1, 0L, 0, 0, 0, 0, 0L), true, true, true);
+  }
+
+  private static void fieldValues() {
+    OggPageHeader header = new OggPageHeader(7, Long.MIN_VALUE, Integer.MIN_VALUE,
+        Integer.MAX_VALUE, 0x89abcdef, -1, Long.MAX_VALUE);
+    check(header.absolutePosition == Long.MIN_VALUE
+        && header.streamIdentifier == Integer.MIN_VALUE
+        && header.pageSequence == Integer.MAX_VALUE
+        && header.pageChecksum == 0x89abcdef
+        && header.segmentCount == -1
+        && header.byteStreamPosition == Long.MAX_VALUE,
+        "constructor preserves all full-width values without validation");
+  }
+
+  private static void objectBehavior() {
+    OggPageHeader first = new OggPageHeader(3, 1L, 2, 3, 4, 5, 6L);
+    OggPageHeader second = new OggPageHeader(3, 1L, 2, 3, 4, 5, 6L);
+    check(first != second && !first.equals(second), "Object identity semantics");
+    Derived derived = new Derived(4, 9L, 8, 7, 6, 5, 4L);
+    check(derived.isLastPage && derived.absolutePosition == 9L
+        && derived.byteStreamPosition == 4L, "ordinary subclass inherits immutable state");
+  }
+
+  private static void reflection() throws Exception {
+    Class<OggPageHeader> type = OggPageHeader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0 && type.getDeclaredClasses().length == 0,
+        "class metadata");
+    check(type.getDeclaredFields().length == 12 && type.getDeclaredMethods().length == 0
+        && type.getDeclaredConstructors().length == 1, "declared member counts");
+
+    String[] names = Arrays.stream(type.getDeclaredFields()).map(Field::getName)
+        .toArray(String[]::new);
+    check(Arrays.equals(names, new String[] {"FLAG_CONTINUATION", "FLAG_FIRST_PAGE",
+        "FLAG_LAST_PAGE", "isContinuation", "isFirstPage", "isLastPage",
+        "absolutePosition", "streamIdentifier", "pageSequence", "pageChecksum",
+        "segmentCount", "byteStreamPosition"}), "declared field order");
+    checkConstant(type, "FLAG_CONTINUATION", 1);
+    checkConstant(type, "FLAG_FIRST_PAGE", 2);
+    checkConstant(type, "FLAG_LAST_PAGE", 4);
+    checkField(type, "isContinuation", boolean.class);
+    checkField(type, "isFirstPage", boolean.class);
+    checkField(type, "isLastPage", boolean.class);
+    checkField(type, "absolutePosition", long.class);
+    checkField(type, "streamIdentifier", int.class);
+    checkField(type, "pageSequence", int.class);
+    checkField(type, "pageChecksum", int.class);
+    checkField(type, "segmentCount", int.class);
+    checkField(type, "byteStreamPosition", long.class);
+
+    Constructor<OggPageHeader> constructor = type.getDeclaredConstructor(int.class, long.class,
+        int.class, int.class, int.class, int.class, long.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0
+        && constructor.getTypeParameters().length == 0
+        && constructor.getDeclaredAnnotations().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
+  }
+
+  private static void checkConstant(Class<OggPageHeader> type, String name, int value)
+      throws Exception {
+    Field field = type.getDeclaredField(name);
+    check(field.getType() == int.class
+        && field.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL)
+        && field.getInt(null) == value && !field.isSynthetic()
+        && field.getDeclaredAnnotations().length == 0, name + " constant metadata");
+  }
+
+  private static void checkField(Class<OggPageHeader> type, String name, Class<?> fieldType)
+      throws Exception {
+    Field field = type.getDeclaredField(name);
+    check(field.getType() == fieldType
+        && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && !field.isSynthetic() && field.getDeclaredAnnotations().length == 0,
+        name + " field metadata");
+  }
+
+  private static void checkFlags(OggPageHeader header, boolean continuation, boolean first,
+      boolean last) {
+    check(header.isContinuation == continuation && header.isFirstPage == first
+        && header.isLastPage == last, "flag projection");
+  }
+
+  private static final class Derived extends OggPageHeader {
+    Derived(int flags, long absolutePosition, int streamIdentifier, int pageSequence,
+        int checksum, int segmentCount, long byteStreamPosition) {
+      super(flags, absolutePosition, streamIdentifier, pageSequence, checksum, segmentCount,
+          byteStreamPosition);
+    }
+  }
+
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }

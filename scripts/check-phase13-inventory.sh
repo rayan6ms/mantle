@@ -2527,9 +2527,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[2].completed_slices[].symbols] | add) == .cohorts[2].classified_symbols and
   (.cohorts[2].classified_symbols + .cohorts[2].remaining_symbols) == .cohorts[2].symbols and
   .cohorts[3].status == "IN_PROGRESS" and
-  .cohorts[3].classified_symbols == 660 and
-  .cohorts[3].remaining_symbols == 164 and
-  (.cohorts[3].completed_slices | length) == 82 and
+  .cohorts[3].classified_symbols == 674 and
+  .cohorts[3].remaining_symbols == 150 and
+  (.cohorts[3].completed_slices | length) == 83 and
   .cohorts[3].completed_slices[0] == {
     id: "formats-contracts",
     classes: 1,
@@ -3285,6 +3285,19 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "tools/jvm-gate/src/main.rs"
     ]
   } and
+  .cohorts[3].completed_slices[82] == {
+    id: "ogg-page-header-contracts",
+    classes: 1,
+    fields: 12,
+    methods: 1,
+    symbols: 14,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
   .cohorts[3].completed_slices[1] == {
     id: "media-container-contracts",
     classes: 1,
@@ -3599,9 +3612,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   } and
   ([.cohorts[3].completed_slices[].symbols] | add) == .cohorts[3].classified_symbols and
   (.cohorts[3].classified_symbols + .cohorts[3].remaining_symbols) == .cohorts[3].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 2112 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 2126 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1963 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1977 and
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegReader" and
@@ -3749,6 +3762,13 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
       (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
       (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 2 and
+  ([$classifications.symbols[] |
+    select(.binary_name ==
+      "com.sedmelluq.discord.lavaplayer.container.ogg.OggPageHeader" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 14 and
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegVersionedSectionInfo" and
@@ -4712,6 +4732,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.container.ogg.OggContainerProbe",
         "com.sedmelluq.discord.lavaplayer.container.ogg.OggMetadata",
         "com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream",
+        "com.sedmelluq.discord.lavaplayer.container.ogg.OggPageHeader",
         "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegFileLoader",
         "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegNoopTrackConsumer",
         "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackConsumer",
@@ -5209,11 +5230,15 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       then .classification == "C_SEMANTIC" and
         (.tests | index("crates/mantle-media/tests/phase12_soundcloud.rs")) != null and
         (.tests | index("docs/architecture/ADR-0015-bounded-soundcloud-source.md")) != null
+      elif $symbol.binary_name ==
+          "com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream" and
+          ($symbol.symbol_kind == "CLASS" or $symbol.member_name == "createSeekTable")
+      then .classification == "C_SEMANTIC"
       else .classification == "A_EXACT"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "ogg-page-header-contracts" and
+  .phase_entry.next_slice == "ogg-page-scanner-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 JQ
@@ -5221,7 +5246,7 @@ JQ
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '300 reference classes / 2,114 symbols' \
+  '301 reference classes / 2,128 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -5231,4 +5256,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 2,112 classified symbols and 650 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 2,126 classified symbols and 636 unassessed symbols.\n'
