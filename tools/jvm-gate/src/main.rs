@@ -208,6 +208,9 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-plain-playlist-container-probe-consumer" => {
             Some(PLAIN_PLAYLIST_CONTAINER_PROBE_CONSUMER)
         }
+        "write-pls-playlist-container-probe-consumer" => {
+            Some(PLS_PLAYLIST_CONTAINER_PROBE_CONSUMER)
+        }
         "write-vorbis-comment-parser-consumer" => Some(VORBIS_COMMENT_PARSER_CONSUMER),
         "write-ogg-vorbis-track-handler-support-consumer" => {
             Some(OGG_VORBIS_TRACK_HANDLER_SUPPORT_CONSUMER)
@@ -19808,6 +19811,160 @@ public final class GatePlainPlaylistContainerProbe {
   }
   private static AudioTrackInfo info() { return new AudioTrackInfo("title", "author", 1L, "id", true, null, null, null); }
   private static SeekableInputStream stream(String value) { return new MemoryStream(value.getBytes(StandardCharsets.UTF_8)); }
+  private static void expect(Class<? extends Throwable> type, Throwing action) {
+    try { action.run(); throw new AssertionError("expected " + type.getName()); }
+    catch (Throwable failure) { check(type.isInstance(failure), "wrong exception: " + failure); }
+  }
+  private interface Throwing { void run() throws Throwable; }
+  private static final class MemoryStream extends SeekableInputStream {
+    private final byte[] data; private int position;
+    MemoryStream(byte[] data) { super(data.length, 0); this.data = data; }
+    public long getPosition() { return position; }
+    protected void seekHard(long target) { position = (int) target; }
+    public boolean canSeekHard() { return true; }
+    public List<AudioTrackInfoProvider> getTrackInfoProviders() { return Collections.emptyList(); }
+    public int read() { return position < data.length ? data[position++] & 0xff : -1; }
+    public int read(byte[] target, int offset, int length) {
+      if (position >= data.length) return -1; int count = Math.min(length, data.length - position);
+      System.arraycopy(data, position, target, offset, count); position += count; return count;
+    }
+  }
+  private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
+}
+"#;
+
+const PLS_PLAYLIST_CONTAINER_PROBE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerHints;
+import com.sedmelluq.discord.lavaplayer.container.playlists.PlsPlaylistContainerProbe;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.regex.Pattern;
+
+public final class GatePlsPlaylistContainerProbe {
+  public static void main(String[] args) throws Exception {
+    PlsPlaylistContainerProbe probe = new PlsPlaylistContainerProbe();
+    check(probe.getName().equals("pls"), "probe name");
+    check(!probe.matchesHints(null), "hints are never preferred");
+    check(probe.probe(reference(), stream("not a playlist\n")) == null,
+        "non-PLS input is not detected");
+    unsupported(probe);
+    references(probe);
+    headersAndPatterns(probe);
+    expect(UnsupportedOperationException.class, () -> probe.createTrack(null, null, null));
+    reflection();
+    System.out.println("contracts=public-construction,public-probe,name-identity,hints-false,non-pls-null,wildcard-header,case-sensitive-header,unsupported-empty,unsupported-reason,indexed-file-title-pairing,unknown-title,http-https-icy-links,scheme-filtering,duplicate-last-value,whitespace-patterns,unsupported-create-track,interface-implementation,private-header,mutable-private-patterns,checked-probe-throws,map-entry-inner-metadata,reflection");
+  }
+
+  private static void unsupported(PlsPlaylistContainerProbe probe) throws Exception {
+    MediaContainerDetectionResult empty = probe.probe(reference(), stream("[playlist]\nNumberOfEntries=0\n"));
+    check(empty != null && empty.isContainerDetected() && !empty.isSupportedFile()
+        && !empty.isReference() && empty.getReference() == null && empty.getTrackInfo() == null
+        && empty.getUnsupportedReason().equals("The playlist file contains no links.")
+        && empty.getContainerDescriptor().probe == probe,
+        "recognized empty playlist is unsupported");
+    MediaContainerDetectionResult titleOnly = probe.probe(reference(), stream("[playlist]\nTitle1=orphan\n"));
+    check(titleOnly != null && !titleOnly.isSupportedFile()
+        && titleOnly.getUnsupportedReason().equals("The playlist file contains no links."),
+        "title without a file is unsupported");
+  }
+
+  private static void references(PlsPlaylistContainerProbe probe) throws Exception {
+    checkReference(probe, "[playlist]\nTitle7=Named title\nFile7=https://media.example/seven\n",
+        "https://media.example/seven", "Named title");
+    checkReference(probe, "[playlist]\nFile2=http://media.example/two\nTitle9=wrong index\n",
+        "http://media.example/two", "Unknown title");
+    checkReference(probe, "[playlist]\nFile3=icy://radio.example/live\nTitle3=Radio\n",
+        "icy://radio.example/live", "Radio");
+    checkReference(probe,
+        "[playlist]\nFile4=https://old.example/audio\nTitle4=Old\nFile4=https://new.example/audio\nTitle4=New\n",
+        "https://new.example/audio", "New");
+  }
+
+  private static void headersAndPatterns(PlsPlaylistContainerProbe probe) throws Exception {
+    checkReference(probe, "[Xlaylist]\n  File12=https://media.example/spaced\n  Title12=Spaced title\n",
+        "https://media.example/spaced", "Spaced title");
+    check(probe.probe(reference(), stream("[pLAYLIST]\nFile1=https://media.example/case\n")) == null,
+        "header matching is case-sensitive outside the wildcard");
+    MediaContainerDetectionResult rejected = probe.probe(reference(),
+        stream("[playlist]\nFile1=ftp://media.example/audio\nFile2=HTTPS://media.example/audio\n"));
+    check(rejected != null && !rejected.isSupportedFile()
+        && rejected.getUnsupportedReason().equals("The playlist file contains no links."),
+        "only lower-case HTTP, HTTPS, and ICY schemes are accepted");
+  }
+
+  private static void checkReference(PlsPlaylistContainerProbe probe, String body,
+      String identifier, String title) throws Exception {
+    MediaContainerDetectionResult result = probe.probe(reference(), stream(body));
+    check(result != null && result.isContainerDetected() && result.isSupportedFile()
+        && result.isReference() && result.getContainerDescriptor().probe == probe
+        && result.getReference().identifier.equals(identifier)
+        && result.getReference().title.equals(title), "PLS reference fields");
+  }
+
+  private static void reflection() throws Exception {
+    Class<PlsPlaylistContainerProbe> type = PlsPlaylistContainerProbe.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {
+            com.sedmelluq.discord.lavaplayer.container.MediaContainerProbe.class})
+        && type.getDeclaredFields().length == 4 && type.getDeclaredMethods().length == 5
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredClasses().length == 0,
+        "exact class shape");
+    checkField(type, "log", Class.forName("org.slf4j.Logger"), Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "PLS_HEADER", int[].class, Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "filePattern", Pattern.class, Modifier.PRIVATE | Modifier.STATIC);
+    checkField(type, "titlePattern", Pattern.class, Modifier.PRIVATE | Modifier.STATIC);
+    check(Arrays.equals((int[]) field(type, "PLS_HEADER").get(null),
+        new int[] {'[', -1, 'l', 'a', 'y', 'l', 'i', 's', 't', ']'})
+        && ((Pattern) field(type, "filePattern").get(null)).pattern().equals(
+            "\\s*File([0-9]+)=((?:https?|icy)://.*)\\s*")
+        && ((Pattern) field(type, "titlePattern").get(null)).pattern().equals(
+            "\\s*Title([0-9]+)=(.*)\\s*"), "header and pattern values");
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0
+        && !constructor.isSynthetic(), "constructor metadata");
+    checkMethod(type, "getName", String.class, new Class<?>[0], new Class<?>[0], Modifier.PUBLIC);
+    checkMethod(type, "matchesHints", boolean.class, new Class<?>[] {MediaContainerHints.class}, new Class<?>[0], Modifier.PUBLIC);
+    checkMethod(type, "probe", MediaContainerDetectionResult.class,
+        new Class<?>[] {AudioReference.class, SeekableInputStream.class}, new Class<?>[] {IOException.class}, Modifier.PUBLIC);
+    checkMethod(type, "createTrack", com.sedmelluq.discord.lavaplayer.track.AudioTrack.class,
+        new Class<?>[] {String.class, AudioTrackInfo.class, SeekableInputStream.class}, new Class<?>[0], Modifier.PUBLIC);
+    checkMethod(type, "loadFromLines", MediaContainerDetectionResult.class,
+        new Class<?>[] {String[].class}, new Class<?>[0], Modifier.PRIVATE);
+    check(Arrays.stream(type.getDeclaredMethods()).noneMatch(Method::isSynthetic),
+        "no synthetic methods");
+  }
+
+  private static Field field(Class<?> type, String name) throws Exception {
+    Field field = type.getDeclaredField(name); field.setAccessible(true); return field;
+  }
+  private static void checkField(Class<?> owner, String name, Class<?> type, int modifiers) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == type && field.getGenericType() == type && field.getModifiers() == modifiers
+        && !field.isSynthetic(), name + " metadata");
+  }
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+      Class<?>[] parameters, Class<?>[] exceptions, int modifiers) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && Arrays.equals(method.getParameterTypes(), parameters) && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.getTypeParameters().length == 0 && !method.isSynthetic() && !method.isBridge(), name + " metadata");
+  }
+  private static AudioReference reference() { return new AudioReference("fixture", "title"); }
+  private static SeekableInputStream stream(String value) {
+    return new MemoryStream(value.getBytes(StandardCharsets.UTF_8));
+  }
   private static void expect(Class<? extends Throwable> type, Throwing action) {
     try { action.run(); throw new AssertionError("expected " + type.getName()); }
     catch (Throwable failure) { check(type.isInstance(failure), "wrong exception: " + failure); }
