@@ -473,6 +473,10 @@ const OGG_OPUS_CODEC_HANDLER_BLUEPRINT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/ogg/opus/OggOpusCodecHandler$Blueprint";
 const OGG_OPUS_TRACK_HANDLER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/ogg/opus/OggOpusTrackHandler";
+const OGG_VORBIS_CODEC_HANDLER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/ogg/vorbis/OggVorbisCodecHandler";
+const OGG_VORBIS_CODEC_HANDLER_BLUEPRINT_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/ogg/vorbis/OggVorbisCodecHandler$Blueprint";
 const MAX_OGG_SEEK_SCAN_BYTES: i64 = 64 << 20;
 const TWITCH_CONSTANTS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/twitch/TwitchConstants";
@@ -811,6 +815,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     OGG_FLAC_TRACK_HANDLER_CLASS,
     OGG_OPUS_CODEC_HANDLER_CLASS,
     OGG_OPUS_TRACK_HANDLER_CLASS,
+    OGG_VORBIS_CODEC_HANDLER_CLASS,
     TWITCH_CONSTANTS_CLASS,
     TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS,
     TWITCH_STREAM_AUDIO_TRACK_CLASS,
@@ -936,6 +941,7 @@ const PRIVATE_SUPPORT_CLASSES: &[&str] = &[
     OGG_TRACK_LOADER_CODEC_DETECTION_CLASS,
     OGG_FLAC_CODEC_HANDLER_BLUEPRINT_CLASS,
     OGG_OPUS_CODEC_HANDLER_BLUEPRINT_CLASS,
+    OGG_VORBIS_CODEC_HANDLER_BLUEPRINT_CLASS,
 ];
 
 #[derive(Serialize)]
@@ -991,6 +997,8 @@ pub fn emit(
     let mut ogg_opus_codec_handler_bytes = None;
     let mut ogg_opus_codec_handler_blueprint_bytes = None;
     let mut ogg_opus_track_handler_bytes = None;
+    let mut ogg_vorbis_codec_handler_bytes = None;
+    let mut ogg_vorbis_codec_handler_blueprint_bytes = None;
     let mut mpeg_file_loader_bytes = None;
     let mut mpeg_noop_track_consumer_bytes = None;
     let mut mpeg_fragmented_file_track_provider_bytes = None;
@@ -1064,6 +1072,10 @@ pub fn emit(
             ogg_opus_codec_handler_blueprint_bytes = Some(bytes);
         } else if *binary_name == OGG_OPUS_TRACK_HANDLER_CLASS {
             ogg_opus_track_handler_bytes = Some(bytes);
+        } else if *binary_name == OGG_VORBIS_CODEC_HANDLER_CLASS {
+            ogg_vorbis_codec_handler_bytes = Some(bytes);
+        } else if *binary_name == OGG_VORBIS_CODEC_HANDLER_BLUEPRINT_CLASS {
+            ogg_vorbis_codec_handler_blueprint_bytes = Some(bytes);
         } else if *binary_name == MPEG_FILE_LOADER_CLASS {
             mpeg_file_loader_bytes = Some(bytes);
         } else if *binary_name == MPEG_NOOP_TRACK_CONSUMER_CLASS {
@@ -1283,6 +1295,18 @@ pub fn emit(
                 ogg_opus_track_handler_bytes
                     .as_ref()
                     .expect("OGG Opus track handler source bytes are retained"),
+            );
+        } else if name == format!("{OGG_VORBIS_CODEC_HANDLER_CLASS}.class") {
+            bytes.clone_from(
+                ogg_vorbis_codec_handler_bytes
+                    .as_ref()
+                    .expect("OGG Vorbis codec handler source bytes are retained"),
+            );
+        } else if name == format!("{OGG_VORBIS_CODEC_HANDLER_BLUEPRINT_CLASS}.class") {
+            bytes.clone_from(
+                ogg_vorbis_codec_handler_blueprint_bytes
+                    .as_ref()
+                    .expect("OGG Vorbis blueprint source bytes are retained"),
             );
         } else if name == format!("{MPEG_FILE_LOADER_CLASS}.class") {
             bytes.clone_from(
@@ -1989,6 +2013,8 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | OGG_OPUS_CODEC_HANDLER_CLASS
             | OGG_OPUS_CODEC_HANDLER_BLUEPRINT_CLASS
             | OGG_OPUS_TRACK_HANDLER_CLASS
+            | OGG_VORBIS_CODEC_HANDLER_CLASS
+            | OGG_VORBIS_CODEC_HANDLER_BLUEPRINT_CLASS
             | MPEG_FILE_LOADER_CLASS
             | MPEG_READER_CLASS
             | MPEG_READER_CHAIN_CLASS

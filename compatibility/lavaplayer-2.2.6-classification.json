@@ -8137,54 +8137,60 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public Ogg Vorbis codec-handler class shape, constants, interface, and private blueprint are covered by the focused oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.vorbis.OggVorbisCodecHandler",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public no-argument construction and ordinary subclassability match the reference.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.vorbis.OggVorbisCodecHandler",
       "symbol_kind": "METHOD",
       "member_name": "isMatchingIdentifier",
       "descriptor": "(I)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact Vorbis mapping identifier recognition and nearby-identifier rejection match the reference.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.vorbis.OggVorbisCodecHandler",
       "symbol_kind": "METHOD",
       "member_name": "getMaximumFirstPacketLength",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The exact 64-byte first-packet bound matches the reference.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.vorbis.OggVorbisCodecHandler",
       "symbol_kind": "METHOD",
       "member_name": "loadBlueprint",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/ogg/OggPacketInputStream;Lcom/sedmelluq/discord/lavaplayer/tools/io/DirectBufferStreamBroker;)Lcom/sedmelluq/discord/lavaplayer/container/ogg/OggTrackBlueprint;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Info extraction, bounded comment skipping, little-endian rate, nullable seek-table forwarding, blueprint state, handler construction, and failures match.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.vorbis.OggVorbisCodecHandler",
       "symbol_kind": "METHOD",
       "member_name": "loadMetadata",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/ogg/OggPacketInputStream;Lcom/sedmelluq/discord/lavaplayer/tools/io/DirectBufferStreamBroker;)Lcom/sedmelluq/discord/lavaplayer/container/ogg/OggMetadata;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Bounded comment parsing, empty singleton, duration sentinel/lookup, deferred info validation, and checked failure identity match the reference.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.vorbis.OggVorbisTrackHandler",

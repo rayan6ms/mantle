@@ -194,6 +194,10 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-ogg-opus-codec-handler-consumer" => Some(OGG_OPUS_CODEC_HANDLER_CONSUMER),
         "write-ogg-opus-track-handler-consumer" => Some(OGG_OPUS_TRACK_HANDLER_CONSUMER),
         "write-ogg-opus-router-support-consumer" => Some(OGG_OPUS_ROUTER_SUPPORT_CONSUMER),
+        "write-ogg-vorbis-codec-handler-consumer" => Some(OGG_VORBIS_CODEC_HANDLER_CONSUMER),
+        "write-ogg-vorbis-track-handler-support-consumer" => {
+            Some(OGG_VORBIS_TRACK_HANDLER_SUPPORT_CONSUMER)
+        }
         "write-ogg-flac-track-handler-consumer" => Some(OGG_FLAC_TRACK_HANDLER_CONSUMER),
         "write-ogg-flac-track-handler-support-consumer" => {
             Some(OGG_FLAC_TRACK_HANDLER_SUPPORT_CONSUMER)
@@ -18432,6 +18436,392 @@ public final class FlacFrameReader {
     calls++; lastInput = input; lastBits = bits; lastInfo = info; lastRaw = raw; lastSamples = samples; lastDecoding = decoding;
     if (ioFailure != null) throw ioFailure; if (runtimeFailure != null) throw runtimeFailure; return sampleCount;
   }
+}
+";
+
+const OGG_VORBIS_CODEC_HANDLER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggMetadata;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggSeekPoint;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggStreamSizeInfo;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackBlueprint;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackHandler;
+import com.sedmelluq.discord.lavaplayer.container.ogg.vorbis.OggVorbisCodecHandler;
+import com.sedmelluq.discord.lavaplayer.container.ogg.vorbis.OggVorbisTrackHandler;
+import com.sedmelluq.discord.lavaplayer.tools.io.DirectBufferStreamBroker;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateOggVorbisCodecHandler {
+  private static final int IDENTIFIER = 0x01766F72;
+  private static final int COMMENT_SAVE_LIMIT = 131_072;
+  private static final int COMMENT_READ_LIMIT = 125_829_120;
+
+  public static void main(String[] args) throws Exception {
+    matchingAndConstruction();
+    blueprint();
+    metadata();
+    boundariesAndFailures();
+    reflection();
+    System.out.println("contracts=identifier,maximum-length,public-construction,unvalidated-info-prefix,little-endian-rate,info-array-identity,comment-skip-bound,comment-save-bound,comment-read-bound,tag-parse,empty-singleton,unknown-duration,metadata-duration,size-rate,seek-table,nullable-seek-table,blueprint-state,blueprint-sample-rate,handler-info-identity,handler-stream-identity,handler-broker-identity,missing-comments,oversized-comments,complete-long-comments,short-comment-prefix,short-info-order,checked-failure-identity,runtime-failure-identity,subclassable,private-blueprint,private-methods,throws,reflection");
+  }
+
+  private static void matchingAndConstruction() {
+    OggVorbisCodecHandler handler = new OggVorbisCodecHandler();
+    check(handler.isMatchingIdentifier(IDENTIFIER), "Vorbis mapping identifier");
+    check(!handler.isMatchingIdentifier(IDENTIFIER - 1)
+        && !handler.isMatchingIdentifier(0x766F7262), "nearby identifiers rejected");
+    check(handler.getMaximumFirstPacketLength() == 64, "maximum first packet length");
+    check(new Derived().marker() == 47, "public class remains subclassable");
+  }
+
+  private static void blueprint() throws Exception {
+    OggVorbisCodecHandler handler = new OggVorbisCodecHandler();
+    int sampleRate = 0x76543210;
+    byte[] info = infoPacket(sampleRate);
+    RecordingBroker broker = new RecordingBroker(info, ByteBuffer.allocate(0));
+    ScriptedStream stream = new ScriptedStream();
+    OggSeekPoint point = new OggSeekPoint(21L, 22L, 23L, 24L);
+    stream.seekTable = Collections.singletonList(point);
+    OggTrackBlueprint blueprint = handler.loadBlueprint(stream, broker);
+    check(blueprint.getSampleRate() == sampleRate
+        && ((Integer) field(blueprint, "sampleRate")) == sampleRate
+        && field(blueprint, "infoPacket") == info && field(blueprint, "broker") == broker,
+        "blueprint retains little-endian rate, exact info array, and broker identity");
+    check(broker.extractCalls == 1 && stream.startCalls == 1 && broker.consumeCalls == 1
+        && broker.input == stream && broker.savedLength == 0
+        && broker.readLength == COMMENT_READ_LIMIT,
+        "blueprint extracts info before skipping comments within the exact read bound");
+    check(stream.createSeekTableCalls == 1 && stream.createSeekTableRate == sampleRate
+        && stream.seekPoints == stream.seekTable && stream.seekPoints.get(0) == point,
+        "blueprint forwards the sample rate and exact non-null seek table");
+
+    OggVorbisTrackHandler.reset();
+    ScriptedStream trackStream = new ScriptedStream();
+    OggTrackHandler trackHandler = blueprint.loadTrackHandler(trackStream);
+    check(trackHandler == OggVorbisTrackHandler.last
+        && OggVorbisTrackHandler.last.infoPacket == info
+        && OggVorbisTrackHandler.last.packetInputStream == trackStream
+        && OggVorbisTrackHandler.last.broker == broker,
+        "blueprint constructs a handler with exact info, stream, and broker identities");
+    OggTrackHandler nullable = blueprint.loadTrackHandler(null);
+    check(nullable == OggVorbisTrackHandler.last
+        && OggVorbisTrackHandler.last.packetInputStream == null,
+        "blueprint preserves nullable track-stream identity");
+
+    RecordingBroker nullBroker = new RecordingBroker(infoPacket(8_000), ByteBuffer.allocate(0));
+    ScriptedStream nullStream = new ScriptedStream(); nullStream.seekTable = null;
+    OggTrackBlueprint nullBlueprint = handler.loadBlueprint(nullStream, nullBroker);
+    check(nullBlueprint.getSampleRate() == 8_000 && nullStream.createSeekTableCalls == 1
+        && nullStream.setSeekPointsCalls == 0 && nullStream.seekPoints == null,
+        "null seek tables are not forwarded");
+  }
+
+  private static void metadata() throws Exception {
+    OggVorbisCodecHandler handler = new OggVorbisCodecHandler();
+    int sampleRate = 48_000;
+    RecordingBroker broker = new RecordingBroker(infoPacket(sampleRate),
+        ByteBuffer.wrap(commentPacket("TITLE=Signal", "ARTIST=Voice", "ISRC=US-ABC-12-34567")));
+    ScriptedStream stream = new ScriptedStream();
+    stream.sizeInfo = new OggStreamSizeInfo(1L, 96_001L, 2L, 3L, sampleRate);
+    OggMetadata metadata = handler.loadMetadata(stream, broker);
+    check("Signal".equals(metadata.getTitle()) && "Voice".equals(metadata.getAuthor())
+        && "US-ABC-12-34567".equals(metadata.getISRC())
+        && metadata.getLength() == 2_000L, "Vorbis comments and duration are preserved");
+    check(broker.extractCalls == 1 && broker.consumeCalls == 1 && broker.input == stream
+        && broker.savedLength == COMMENT_SAVE_LIMIT && broker.readLength == COMMENT_READ_LIMIT
+        && broker.bufferCalls == 1 && broker.truncatedCalls == 1,
+        "metadata uses exact extract, comment save/read, buffer, and truncation paths");
+    check(stream.seekForSizeInfoCalls == 1 && stream.seekForSizeInfoRate == sampleRate,
+        "metadata size lookup receives the info-packet sample rate");
+
+    RecordingBroker unknownBroker = new RecordingBroker(infoPacket(8_000),
+        ByteBuffer.wrap(commentPacket()));
+    ScriptedStream unknownStream = new ScriptedStream();
+    OggMetadata unknown = handler.loadMetadata(unknownStream, unknownBroker);
+    check(unknown.getTitle() == null && unknown.getLength() == Long.MAX_VALUE,
+        "missing size information uses the exact unknown-duration sentinel");
+
+    RecordingBroker wrongBroker = new RecordingBroker(new byte[] {1, 2, 3},
+        ByteBuffer.wrap(new byte[] {3, 'v', 'o', 'r', 'b', 'i', 'X'}));
+    ScriptedStream wrongStream = new ScriptedStream();
+    OggMetadata wrong = handler.loadMetadata(wrongStream, wrongBroker);
+    check(wrong == OggMetadata.EMPTY && wrongStream.seekForSizeInfoCalls == 0
+        && wrongBroker.truncatedCalls == 0,
+        "wrong comment prefix returns the shared empty singleton before info or size parsing");
+  }
+
+  private static void boundariesAndFailures() throws Exception {
+    OggVorbisCodecHandler handler = new OggVorbisCodecHandler();
+
+    ScriptedStream missingStream = new ScriptedStream(); missingStream.packetAvailable = false;
+    RecordingBroker missingBroker = new RecordingBroker(infoPacket(44_100), ByteBuffer.allocate(0));
+    Throwable missing = catchThrowable(() -> handler.loadMetadata(missingStream, missingBroker));
+    check(missing != null && missing.getClass() == IllegalStateException.class
+        && missing.getMessage().equals("No comments packet in track.")
+        && missingBroker.extractCalls == 1 && missingBroker.consumeCalls == 0,
+        "info extraction precedes the exact missing-comments failure");
+
+    ScriptedStream longStream = new ScriptedStream(); longStream.packetComplete = false;
+    RecordingBroker longBroker = new RecordingBroker(infoPacket(44_100), ByteBuffer.allocate(0));
+    longBroker.consumeResult = false;
+    Throwable tooLong = catchThrowable(() -> handler.loadBlueprint(longStream, longBroker));
+    check(tooLong != null && tooLong.getClass() == IllegalStateException.class
+        && tooLong.getMessage().equals("Vorbis comments header packet longer than allowed.")
+        && longStream.packetCompleteCalls == 1,
+        "overlong incomplete comments retain the bounded failure");
+
+    ScriptedStream completeStream = new ScriptedStream(); completeStream.packetComplete = true;
+    RecordingBroker completeBroker = new RecordingBroker(infoPacket(44_100),
+        ByteBuffer.wrap(commentPacket("TITLE=Complete")));
+    completeBroker.consumeResult = false;
+    OggMetadata complete = handler.loadMetadata(completeStream, completeBroker);
+    check("Complete".equals(complete.getTitle()) && completeStream.packetCompleteCalls == 1,
+        "a broker limit ending exactly with the packet remains accepted");
+
+    RecordingBroker shortCommentBroker = new RecordingBroker(infoPacket(44_100),
+        ByteBuffer.wrap(new byte[] {3, 'v'}));
+    Throwable shortComment = catchThrowable(() -> handler.loadMetadata(
+        new ScriptedStream(), shortCommentBroker));
+    check(shortComment != null && shortComment.getClass() == BufferUnderflowException.class,
+        "short comment prefix fails before comparison");
+
+    RecordingBroker shortInfoBroker = new RecordingBroker(new byte[] {1, 2, 3},
+        ByteBuffer.wrap(commentPacket()));
+    Throwable shortInfo = catchThrowable(() -> handler.loadMetadata(
+        new ScriptedStream(), shortInfoBroker));
+    check(shortInfo != null && shortInfo.getClass() == IndexOutOfBoundsException.class,
+        "valid comments expose deferred short-info failure");
+
+    IOException startFailure = new IOException("start");
+    ScriptedStream startStream = new ScriptedStream(); startStream.startFailure = startFailure;
+    expectSame(startFailure, () -> handler.loadMetadata(startStream,
+        new RecordingBroker(infoPacket(44_100), ByteBuffer.allocate(0))));
+
+    IOException consumeFailure = new IOException("consume");
+    RecordingBroker consumeBroker = new RecordingBroker(infoPacket(44_100), ByteBuffer.allocate(0));
+    consumeBroker.consumeFailure = consumeFailure;
+    expectSame(consumeFailure, () -> handler.loadBlueprint(new ScriptedStream(), consumeBroker));
+
+    IOException tableFailure = new IOException("table");
+    ScriptedStream tableStream = new ScriptedStream(); tableStream.createSeekTableFailure = tableFailure;
+    expectSame(tableFailure, () -> handler.loadBlueprint(tableStream,
+        new RecordingBroker(infoPacket(44_100), ByteBuffer.allocate(0))));
+
+    IOException sizeFailure = new IOException("size");
+    ScriptedStream sizeStream = new ScriptedStream(); sizeStream.seekForSizeInfoFailure = sizeFailure;
+    expectSame(sizeFailure, () -> handler.loadMetadata(sizeStream,
+        new RecordingBroker(infoPacket(44_100), ByteBuffer.wrap(commentPacket()))));
+
+    RuntimeException extractFailure = new RuntimeException("extract");
+    RecordingBroker extractBroker = new RecordingBroker(infoPacket(44_100), ByteBuffer.allocate(0));
+    extractBroker.extractFailure = extractFailure;
+    ScriptedStream extractStream = new ScriptedStream();
+    expectSame(extractFailure, () -> handler.loadBlueprint(extractStream, extractBroker));
+    check(extractStream.startCalls == 0, "extract failure occurs before comment packet access");
+  }
+
+  private static void reflection() throws Exception {
+    Class<OggVorbisCodecHandler> type = OggVorbisCodecHandler.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {
+            com.sedmelluq.discord.lavaplayer.container.ogg.OggCodecHandler.class})
+        && type.getDeclaredFields().length == 4 && type.getDeclaredMethods().length == 5
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredClasses().length == 1,
+        "exact public codec shape");
+    Constructor<OggVorbisCodecHandler> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic(),
+        "public no-argument constructor metadata");
+    checkStaticInt(type, "VORBIS_IDENTIFIER", IDENTIFIER);
+    checkStaticInt(type, "MAX_COMMENTS_SAVED_LENGTH", COMMENT_SAVE_LIMIT);
+    checkStaticInt(type, "MAX_COMMENTS_READ_LENGTH", COMMENT_READ_LIMIT);
+    Field commentStart = type.getDeclaredField("COMMENT_PACKET_START"); commentStart.setAccessible(true);
+    check(commentStart.getType() == byte[].class
+        && commentStart.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && Arrays.equals((byte[]) commentStart.get(null),
+            new byte[] {3, 'v', 'o', 'r', 'b', 'i', 's'}) && !commentStart.isSynthetic(),
+        "comment-prefix field metadata and contents");
+    checkMethod(type.getDeclaredMethod("isMatchingIdentifier", int.class), boolean.class,
+        new Class<?>[] {int.class});
+    checkMethod(type.getDeclaredMethod("getMaximumFirstPacketLength"), int.class,
+        new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("loadBlueprint", OggPacketInputStream.class,
+        DirectBufferStreamBroker.class), OggTrackBlueprint.class,
+        new Class<?>[] {OggPacketInputStream.class, DirectBufferStreamBroker.class}, IOException.class);
+    checkMethod(type.getDeclaredMethod("loadMetadata", OggPacketInputStream.class,
+        DirectBufferStreamBroker.class), OggMetadata.class,
+        new Class<?>[] {OggPacketInputStream.class, DirectBufferStreamBroker.class}, IOException.class);
+    checkPrivate(type.getDeclaredMethod("loadCommentsHeader", OggPacketInputStream.class,
+        DirectBufferStreamBroker.class, boolean.class), IOException.class);
+
+    Class<?> blueprint = type.getDeclaredClasses()[0];
+    check(blueprint.getName().equals(type.getName() + "$Blueprint")
+        && blueprint.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC)
+        && blueprint.getSuperclass() == Object.class
+        && Arrays.equals(blueprint.getInterfaces(), new Class<?>[] {OggTrackBlueprint.class})
+        && blueprint.getDeclaredFields().length == 3 && blueprint.getDeclaredMethods().length == 2
+        && blueprint.getDeclaredConstructors().length == 1 && blueprint.getDeclaredClasses().length == 0,
+        "exact private blueprint shape");
+    Constructor<?> blueprintConstructor = blueprint.getDeclaredConstructor(
+        int.class, byte[].class, DirectBufferStreamBroker.class);
+    check(blueprintConstructor.getModifiers() == Modifier.PRIVATE
+        && !blueprintConstructor.isSynthetic(), "private blueprint constructor metadata");
+    checkField(blueprint, "sampleRate", int.class);
+    checkField(blueprint, "infoPacket", byte[].class);
+    checkField(blueprint, "broker", DirectBufferStreamBroker.class);
+    checkMethod(blueprint.getDeclaredMethod("loadTrackHandler", OggPacketInputStream.class),
+        OggTrackHandler.class, new Class<?>[] {OggPacketInputStream.class});
+    checkMethod(blueprint.getDeclaredMethod("getSampleRate"), int.class, new Class<?>[0]);
+  }
+
+  private static byte[] infoPacket(int sampleRate) {
+    byte[] packet = new byte[20]; Arrays.fill(packet, (byte) 0x55);
+    packet[12] = (byte) sampleRate; packet[13] = (byte) (sampleRate >>> 8);
+    packet[14] = (byte) (sampleRate >>> 16); packet[15] = (byte) (sampleRate >>> 24);
+    return packet;
+  }
+  private static byte[] commentPacket(String... comments) throws IOException {
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    DataOutputStream output = new DataOutputStream(bytes);
+    output.write(new byte[] {3, 'v', 'o', 'r', 'b', 'i', 's'});
+    output.writeInt(Integer.reverseBytes(0));
+    output.writeInt(Integer.reverseBytes(comments.length));
+    for (String comment : comments) {
+      byte[] value = comment.getBytes(StandardCharsets.UTF_8);
+      output.writeInt(Integer.reverseBytes(value.length)); output.write(value);
+    }
+    return bytes.toByteArray();
+  }
+  private static Object field(Object target, String name) throws Exception {
+    Field field = target.getClass().getDeclaredField(name); field.setAccessible(true); return field.get(target);
+  }
+  private static void checkStaticInt(Class<?> type, String name, int value) throws Exception {
+    Field field = type.getDeclaredField(name); field.setAccessible(true);
+    check(field.getType() == int.class
+        && field.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && field.getInt(null) == value && !field.isSynthetic(), name + " field metadata");
+  }
+  private static void checkField(Class<?> type, String name, Class<?> fieldType) throws Exception {
+    Field field = type.getDeclaredField(name);
+    check(field.getType() == fieldType
+        && field.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && !field.isSynthetic(), name + " blueprint field metadata");
+  }
+  private static void checkMethod(Method method, Class<?> result, Class<?>[] parameters,
+      Class<?>... exceptions) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == result
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isSynthetic() && !method.isBridge(), method.getName() + " method metadata");
+  }
+  private static void checkPrivate(Method method, Class<?>... exceptions) {
+    check(method.getModifiers() == Modifier.PRIVATE
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isSynthetic() && !method.isBridge(), method.getName() + " private metadata");
+  }
+  private static Throwable catchThrowable(Throwing action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+  private static void expectSame(Throwable expected, Throwing action) {
+    check(catchThrowable(action) == expected, "failure identity for " + expected.getMessage());
+  }
+  private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+  private static final class Derived extends OggVorbisCodecHandler { int marker() { return 47; } }
+
+  private static final class RecordingBroker extends DirectBufferStreamBroker {
+    final byte[] extracted; final ByteBuffer comments;
+    int extractCalls; int consumeCalls; int bufferCalls; int truncatedCalls;
+    InputStream input; int savedLength; int readLength;
+    boolean consumeResult = true; boolean truncated;
+    IOException consumeFailure; RuntimeException extractFailure;
+    RecordingBroker(byte[] extracted, ByteBuffer comments) {
+      super(1); this.extracted = extracted; this.comments = comments;
+    }
+    @Override public byte[] extractBytes() {
+      extractCalls++; if (extractFailure != null) throw extractFailure; return extracted;
+    }
+    @Override public boolean consumeNext(InputStream input, int savedLength, int readLength)
+        throws IOException {
+      consumeCalls++; this.input = input; this.savedLength = savedLength; this.readLength = readLength;
+      if (consumeFailure != null) throw consumeFailure; return consumeResult;
+    }
+    @Override public ByteBuffer getBuffer() { bufferCalls++; return comments; }
+    @Override public boolean isTruncated() { truncatedCalls++; return truncated; }
+  }
+  private static final class ScriptedStream extends OggPacketInputStream {
+    boolean packetAvailable = true; boolean packetComplete = true;
+    int startCalls; int packetCompleteCalls; int createSeekTableCalls; int createSeekTableRate;
+    int setSeekPointsCalls; int seekForSizeInfoCalls; int seekForSizeInfoRate;
+    List<OggSeekPoint> seekTable; List<OggSeekPoint> seekPoints; OggStreamSizeInfo sizeInfo;
+    IOException startFailure; IOException createSeekTableFailure; IOException seekForSizeInfoFailure;
+    ScriptedStream() { super(new EmptyStream(), false); }
+    @Override public boolean startNewPacket() throws IOException {
+      startCalls++; if (startFailure != null) throw startFailure; return packetAvailable;
+    }
+    @Override public boolean isPacketComplete() { packetCompleteCalls++; return packetComplete; }
+    @Override public List<OggSeekPoint> createSeekTable(int sampleRate) throws IOException {
+      createSeekTableCalls++; createSeekTableRate = sampleRate;
+      if (createSeekTableFailure != null) throw createSeekTableFailure; return seekTable;
+    }
+    @Override public void setSeekPoints(List<OggSeekPoint> points) {
+      setSeekPointsCalls++; seekPoints = points;
+    }
+    @Override public OggStreamSizeInfo seekForSizeInfo(int sampleRate) throws IOException {
+      seekForSizeInfoCalls++; seekForSizeInfoRate = sampleRate;
+      if (seekForSizeInfoFailure != null) throw seekForSizeInfoFailure; return sizeInfo;
+    }
+  }
+  private static final class EmptyStream extends SeekableInputStream {
+    EmptyStream() { super(0L, 0L); }
+    @Override public int read() { return -1; }
+    @Override public long getPosition() { return 0L; }
+    @Override protected void seekHard(long position) {}
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      return Collections.emptyList();
+    }
+  }
+}
+"#;
+
+const OGG_VORBIS_TRACK_HANDLER_SUPPORT_CONSUMER: &str = r"
+package com.sedmelluq.discord.lavaplayer.container.ogg.vorbis;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackHandler;
+import com.sedmelluq.discord.lavaplayer.tools.io.DirectBufferStreamBroker;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.io.IOException;
+public class OggVorbisTrackHandler implements OggTrackHandler {
+  public static OggVorbisTrackHandler last;
+  public final byte[] infoPacket; public final OggPacketInputStream packetInputStream;
+  public final DirectBufferStreamBroker broker;
+  public OggVorbisTrackHandler(byte[] infoPacket, OggPacketInputStream packetInputStream,
+      DirectBufferStreamBroker broker) {
+    last = this; this.infoPacket = infoPacket; this.packetInputStream = packetInputStream; this.broker = broker;
+  }
+  public static void reset() { last = null; }
+  @Override public void initialise(AudioProcessingContext context, long timecode,
+      long desiredTimecode) throws IOException {}
+  @Override public void provideFrames() throws InterruptedException {}
+  @Override public void seekToTimecode(long timecode) {}
+  @Override public void close() {}
 }
 ";
 
