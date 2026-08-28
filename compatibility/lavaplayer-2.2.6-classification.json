@@ -7127,45 +7127,50 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact public abstract interface shape, four-method dispatch contract, primitive/object/null identity behavior, checked/runtime failure identity, and reflection metadata are reference-proven.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggCodecHandler",
       "symbol_kind": "METHOD",
       "member_name": "isMatchingIdentifier",
       "descriptor": "(I)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves full-width signed identifier input, boolean implementation results, runtime failure identity, and exact public-abstract metadata.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggCodecHandler",
       "symbol_kind": "METHOD",
       "member_name": "getMaximumFirstPacketLength",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves full-width signed implementation results, runtime failure identity, and exact public-abstract metadata.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggCodecHandler",
       "symbol_kind": "METHOD",
       "member_name": "loadBlueprint",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/ogg/OggPacketInputStream;Lcom/sedmelluq/discord/lavaplayer/tools/io/DirectBufferStreamBroker;)Lcom/sedmelluq/discord/lavaplayer/container/ogg/OggTrackBlueprint;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves exact nullable packet/broker argument identities, nullable blueprint result identity, IOException/runtime failure identity, and checked signature metadata.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggCodecHandler",
       "symbol_kind": "METHOD",
       "member_name": "loadMetadata",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/ogg/OggPacketInputStream;Lcom/sedmelluq/discord/lavaplayer/tools/io/DirectBufferStreamBroker;)Lcom/sedmelluq/discord/lavaplayer/container/ogg/OggMetadata;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves exact nullable packet/broker argument identities, nullable metadata result identity, IOException/runtime failure identity, and checked signature metadata.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggContainerProbe",

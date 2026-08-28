@@ -179,6 +179,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-pes-packet-input-stream-consumer" => Some(PES_PACKET_INPUT_STREAM_CONSUMER),
         "write-ogg-audio-track-consumer" => Some(OGG_AUDIO_TRACK_CONSUMER),
         "write-ogg-audio-track-support-consumer" => Some(OGG_AUDIO_TRACK_SUPPORT_CONSUMER),
+        "write-ogg-codec-handler-consumer" => Some(OGG_CODEC_HANDLER_CONSUMER),
         "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
         "write-mpeg-track-info-consumer" => Some(MPEG_TRACK_INFO_CONSUMER),
         "write-mpeg-track-info-builder-consumer" => Some(MPEG_TRACK_INFO_BUILDER_CONSUMER),
@@ -16084,6 +16085,209 @@ final class GateHandler implements OggTrackHandler {
   @Override public void close() {
     OggGateSupport.handlerCloseCalls++;
     OggGateSupport.event("close");
+  }
+}
+"#;
+
+const OGG_CODEC_HANDLER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggCodecHandler;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggMetadata;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackBlueprint;
+import com.sedmelluq.discord.lavaplayer.tools.io.DirectBufferStreamBroker;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateOggCodecHandler {
+  private static final Object UNSAFE = loadUnsafe();
+
+  public static void main(String[] args) throws Exception {
+    dispatch();
+    failures();
+    reflection();
+    System.out.println("contracts=public-interface,no-fields,no-constructors,four-abstract-methods,identifier-int,maximum-length-int,packet-identity,broker-identity,blueprint-identity,metadata-identity,null-arguments,null-returns,checked-failure-identity,runtime-failure-identity,implementation-dispatch,throws,reflection");
+  }
+
+  private static void dispatch() throws Exception {
+    RecordingHandler implementation = new RecordingHandler();
+    OggCodecHandler handler = implementation;
+    implementation.matchResult = true;
+    check(handler.isMatchingIdentifier(Integer.MIN_VALUE)
+        && implementation.identifier == Integer.MIN_VALUE,
+        "identifier preserves full-width signed int and implementation result");
+    implementation.matchResult = false;
+    check(!handler.isMatchingIdentifier(Integer.MAX_VALUE)
+        && implementation.identifier == Integer.MAX_VALUE,
+        "identifier dispatch preserves alternate primitive result");
+
+    implementation.maximumLength = Integer.MIN_VALUE;
+    check(handler.getMaximumFirstPacketLength() == Integer.MIN_VALUE,
+        "maximum packet length preserves full-width signed result");
+
+    OggPacketInputStream packet = allocate(OggPacketInputStream.class);
+    DirectBufferStreamBroker broker = allocate(DirectBufferStreamBroker.class);
+    OggTrackBlueprint blueprint = new OggTrackBlueprint() {
+      @Override public com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackHandler
+          loadTrackHandler(OggPacketInputStream stream) { return null; }
+      @Override public int getSampleRate() { return 48000; }
+    };
+    OggMetadata metadata = allocate(OggMetadata.class);
+    implementation.blueprintResult = blueprint;
+    implementation.metadataResult = metadata;
+    check(handler.loadBlueprint(packet, broker) == blueprint
+        && implementation.blueprintPacket == packet
+        && implementation.blueprintBroker == broker,
+        "blueprint load forwards exact arguments and result identity");
+    check(handler.loadMetadata(packet, broker) == metadata
+        && implementation.metadataPacket == packet
+        && implementation.metadataBroker == broker,
+        "metadata load forwards exact arguments and result identity");
+
+    implementation.blueprintResult = null;
+    implementation.metadataResult = null;
+    check(handler.loadBlueprint(null, null) == null
+        && implementation.blueprintPacket == null && implementation.blueprintBroker == null,
+        "blueprint load preserves null arguments and result");
+    check(handler.loadMetadata(null, null) == null
+        && implementation.metadataPacket == null && implementation.metadataBroker == null,
+        "metadata load preserves null arguments and result");
+  }
+
+  private static void failures() throws Exception {
+    RecordingHandler implementation = new RecordingHandler();
+    OggCodecHandler handler = implementation;
+    IOException blueprintIo = new IOException("blueprint-io");
+    implementation.blueprintFailure = blueprintIo;
+    check(catchThrowable(() -> handler.loadBlueprint(null, null)) == blueprintIo,
+        "blueprint checked failure keeps exact identity");
+    implementation.blueprintFailure = null;
+    RuntimeException blueprintRuntime = new RuntimeException("blueprint-runtime");
+    implementation.blueprintRuntimeFailure = blueprintRuntime;
+    check(catchThrowable(() -> handler.loadBlueprint(null, null)) == blueprintRuntime,
+        "blueprint runtime failure keeps exact identity");
+
+    IOException metadataIo = new IOException("metadata-io");
+    implementation.metadataFailure = metadataIo;
+    check(catchThrowable(() -> handler.loadMetadata(null, null)) == metadataIo,
+        "metadata checked failure keeps exact identity");
+    implementation.metadataFailure = null;
+    RuntimeException metadataRuntime = new RuntimeException("metadata-runtime");
+    implementation.metadataRuntimeFailure = metadataRuntime;
+    check(catchThrowable(() -> handler.loadMetadata(null, null)) == metadataRuntime,
+        "metadata runtime failure keeps exact identity");
+
+    RuntimeException identifierRuntime = new RuntimeException("identifier-runtime");
+    implementation.identifierFailure = identifierRuntime;
+    check(catchThrowable(() -> handler.isMatchingIdentifier(7)) == identifierRuntime,
+        "identifier runtime failure keeps exact identity");
+
+    RuntimeException maximumRuntime = new RuntimeException("maximum-runtime");
+    implementation.maximumFailure = maximumRuntime;
+    check(catchThrowable(handler::getMaximumFirstPacketLength) == maximumRuntime,
+        "maximum-length runtime failure keeps exact identity");
+  }
+
+  private static void reflection() throws Exception {
+    Class<OggCodecHandler> type = OggCodecHandler.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT | Modifier.INTERFACE)
+        && type.isInterface() && type.getSuperclass() == null && type.getInterfaces().length == 0
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0
+        && type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 4,
+        "exact public abstract interface shape");
+    checkMethod(type.getDeclaredMethod("isMatchingIdentifier", int.class), boolean.class,
+        new Class<?>[] {int.class});
+    checkMethod(type.getDeclaredMethod("getMaximumFirstPacketLength"), int.class,
+        new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("loadBlueprint", OggPacketInputStream.class,
+        DirectBufferStreamBroker.class), OggTrackBlueprint.class,
+        new Class<?>[] {OggPacketInputStream.class, DirectBufferStreamBroker.class},
+        IOException.class);
+    checkMethod(type.getDeclaredMethod("loadMetadata", OggPacketInputStream.class,
+        DirectBufferStreamBroker.class), OggMetadata.class,
+        new Class<?>[] {OggPacketInputStream.class, DirectBufferStreamBroker.class},
+        IOException.class);
+    check(type.isAssignableFrom(RecordingHandler.class),
+        "ordinary caller implementation satisfies the interface");
+  }
+
+  private static void checkMethod(Method method, Class<?> result, Class<?>[] parameters,
+      Class<?>... exceptions) {
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == result
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.getTypeParameters().length == 0 && method.getDeclaredAnnotations().length == 0
+        && !method.isDefault() && !method.isSynthetic() && !method.isBridge()
+        && !method.isVarArgs(), method.getName() + " exact abstract metadata");
+  }
+  private static <T> T allocate(Class<T> type) throws Exception {
+    return type.cast(UNSAFE.getClass().getMethod("allocateInstance", Class.class)
+        .invoke(UNSAFE, type));
+  }
+  private static Object loadUnsafe() {
+    try {
+      Class<?> type = Class.forName("sun.misc.Unsafe");
+      Field field = type.getDeclaredField("theUnsafe");
+      field.setAccessible(true);
+      return field.get(null);
+    } catch (ReflectiveOperationException error) {
+      throw new ExceptionInInitializerError(error);
+    }
+  }
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+  private interface ThrowingRunnable { Object run() throws Throwable; }
+
+  private static final class RecordingHandler implements OggCodecHandler {
+    int identifier;
+    boolean matchResult;
+    int maximumLength;
+    RuntimeException identifierFailure;
+    RuntimeException maximumFailure;
+    OggPacketInputStream blueprintPacket;
+    DirectBufferStreamBroker blueprintBroker;
+    OggTrackBlueprint blueprintResult;
+    IOException blueprintFailure;
+    RuntimeException blueprintRuntimeFailure;
+    OggPacketInputStream metadataPacket;
+    DirectBufferStreamBroker metadataBroker;
+    OggMetadata metadataResult;
+    IOException metadataFailure;
+    RuntimeException metadataRuntimeFailure;
+
+    @Override public boolean isMatchingIdentifier(int value) {
+      if (identifierFailure != null) throw identifierFailure;
+      identifier = value;
+      return matchResult;
+    }
+    @Override public int getMaximumFirstPacketLength() {
+      if (maximumFailure != null) throw maximumFailure;
+      return maximumLength;
+    }
+    @Override public OggTrackBlueprint loadBlueprint(
+        OggPacketInputStream packet, DirectBufferStreamBroker broker) throws IOException {
+      blueprintPacket = packet;
+      blueprintBroker = broker;
+      if (blueprintFailure != null) throw blueprintFailure;
+      if (blueprintRuntimeFailure != null) throw blueprintRuntimeFailure;
+      return blueprintResult;
+    }
+    @Override public OggMetadata loadMetadata(
+        OggPacketInputStream packet, DirectBufferStreamBroker broker) throws IOException {
+      metadataPacket = packet;
+      metadataBroker = broker;
+      if (metadataFailure != null) throw metadataFailure;
+      if (metadataRuntimeFailure != null) throw metadataRuntimeFailure;
+      return metadataResult;
+    }
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
   }
 }
 "#;

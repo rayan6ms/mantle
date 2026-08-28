@@ -438,6 +438,8 @@ const MPEG_TS_ELEMENTARY_INPUT_STREAM_CLASS: &str =
 const PES_PACKET_INPUT_STREAM_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpegts/PesPacketInputStream";
 const OGG_AUDIO_TRACK_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/ogg/OggAudioTrack";
+const OGG_CODEC_HANDLER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/ogg/OggCodecHandler";
 const TWITCH_CONSTANTS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/twitch/TwitchConstants";
 const TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS: &str =
@@ -760,6 +762,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MPEG_TS_ELEMENTARY_INPUT_STREAM_CLASS,
     PES_PACKET_INPUT_STREAM_CLASS,
     OGG_AUDIO_TRACK_CLASS,
+    OGG_CODEC_HANDLER_CLASS,
     TWITCH_CONSTANTS_CLASS,
     TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS,
     TWITCH_STREAM_AUDIO_TRACK_CLASS,
