@@ -13,6 +13,7 @@ readonly FLAC_METADATA_READER_CLASSES="$WORK/flac-metadata-reader-consumer-class
 readonly MATROSKA_CLASSES="$WORK/matroska-consumer-classes"
 readonly MPEG_CLASSES="$WORK/mpeg-consumer-classes"
 readonly OGG_CODEC_CLASSES="$WORK/ogg-codec-consumer-classes"
+readonly OGG_FLAC_CLASSES="$WORK/ogg-flac-consumer-classes"
 readonly OGG_PROBE_CLASSES="$WORK/ogg-probe-consumer-classes"
 readonly MPEG_FILE_LOADER_CLASSES="$WORK/mpeg-file-loader-consumer-classes"
 readonly JAR="$WORK/mantle-gate-a.jar"
@@ -25,10 +26,10 @@ fi
 
 rm -rf -- "$CLASSES" "$FLAC_CLASSES" "$MP3_CLASSES" "$FLAC_LOADER_CLASSES" \
   "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES" "$MPEG_CLASSES" \
-  "$MPEG_FILE_LOADER_CLASSES" "$OGG_CODEC_CLASSES" "$OGG_PROBE_CLASSES"
+  "$MPEG_FILE_LOADER_CLASSES" "$OGG_CODEC_CLASSES" "$OGG_FLAC_CLASSES" "$OGG_PROBE_CLASSES"
 mkdir -p "$CLASSES" "$FLAC_CLASSES" "$MP3_CLASSES" "$FLAC_LOADER_CLASSES" \
   "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES" "$MPEG_CLASSES" \
-  "$MPEG_FILE_LOADER_CLASSES" "$OGG_CODEC_CLASSES" "$OGG_PROBE_CLASSES"
+  "$MPEG_FILE_LOADER_CLASSES" "$OGG_CODEC_CLASSES" "$OGG_FLAC_CLASSES" "$OGG_PROBE_CLASSES"
 cargo build --locked -p mantle-jvm --features gate-a-direct-attachment
 cargo run --locked -q -p mantle-jvm-gate -- emit \
   --reference-jar "$REFERENCE_JAR" --output "$JAR" --expected-abi 1 \
@@ -301,6 +302,18 @@ cargo run --locked -q -p mantle-jvm-gate -- write-ogg-track-loader-consumer \
   --output "$WORK/GateOggTrackLoader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ogg-flac-codec-handler-consumer \
   --output "$WORK/GateOggFlacCodecHandler.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-ogg-flac-track-handler-consumer \
+  --output "$WORK/GateOggFlacTrackHandler.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-ogg-flac-track-handler-support-consumer \
+  --output "$WORK/OggPacketInputStream.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-ogg-flac-pipeline-support-consumer \
+  --output "$WORK/AudioPipeline.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-ogg-flac-pipeline-factory-support-consumer \
+  --output "$WORK/AudioPipelineFactory.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-ogg-flac-pcm-format-support-consumer \
+  --output "$WORK/PcmFormat.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-ogg-flac-frame-reader-support-consumer \
+  --output "$WORK/FlacFrameReader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-file-loader-consumer \
   --output "$WORK/GateMpegFileLoader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-info-consumer \
@@ -556,6 +569,7 @@ if command -v cygpath >/dev/null 2>&1; then
   flac_metadata_reader_classes_argument="$(cygpath -w "$FLAC_METADATA_READER_CLASSES")"
   matroska_classes_argument="$(cygpath -w "$MATROSKA_CLASSES")"
   mpeg_file_loader_classes_argument="$(cygpath -w "$MPEG_FILE_LOADER_CLASSES")"
+  ogg_flac_classes_argument="$(cygpath -w "$OGG_FLAC_CLASSES")"
   jar_argument="$(cygpath -w "$JAR")"
   reference_argument="$(cygpath -w "$REFERENCE_JAR")"
 else
@@ -567,6 +581,7 @@ else
   flac_metadata_reader_classes_argument="$FLAC_METADATA_READER_CLASSES"
   matroska_classes_argument="$MATROSKA_CLASSES"
   mpeg_file_loader_classes_argument="$MPEG_FILE_LOADER_CLASSES"
+  ogg_flac_classes_argument="$OGG_FLAC_CLASSES"
   jar_argument="$JAR"
   reference_argument="$REFERENCE_JAR"
 fi
@@ -615,6 +630,13 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_CODEC_CLAS
   "$WORK/GateOggTrackHandler.java" \
   "$WORK/GateOggTrackLoader.java" \
   "$WORK/GateOggFlacCodecHandler.java"
+javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_FLAC_CLASSES" \
+  "$WORK/GateOggFlacTrackHandler.java" \
+  "$WORK/OggPacketInputStream.java" \
+  "$WORK/AudioPipeline.java" \
+  "$WORK/AudioPipelineFactory.java" \
+  "$WORK/PcmFormat.java" \
+  "$WORK/FlacFrameReader.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   -d "$MPEG_FILE_LOADER_CLASSES" "$WORK/GateMpegFileLoader.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
@@ -1696,6 +1718,16 @@ cmp "$WORK/ogg-flac-codec-handler-reference.txt" "$WORK/ogg-flac-codec-handler-c
 grep --fixed-strings \
   'contracts=identifier,maximum-length,public-construction,stream-info,metadata-blocks,tag-parse,metadata-duration,seek-table,seek-point-forwarding,blueprint-sample-rate,handler-info-identity,handler-stream-identity,empty-tags,unknown-identifier,short-native-header,wrong-native-header,missing-metadata,metadata-io-identity,blueprint-io-identity,metadata-size-lookup,subclassable,private-blueprint,private-methods,throws,reflection' \
   "$WORK/ogg-flac-codec-handler-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$ogg_flac_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOggFlacTrackHandler >"$WORK/ogg-flac-track-handler-reference.txt"
+java -Xverify:all \
+  -cp "$ogg_flac_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOggFlacTrackHandler >"$WORK/ogg-flac-track-handler-candidate.txt"
+cmp "$WORK/ogg-flac-track-handler-reference.txt" "$WORK/ogg-flac-track-handler-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,info-identity,stream-identity,buffer-shapes,nullable-input,initialise-context,pcm-format,full-width-timecodes,pipeline-seek,packet-loop,frame-reader-identity,buffer-identity,frame-count,zero-frame-failure,io-wrapping,runtime-identity,seek-order,seek-result,seek-io-wrapping,close-before-init,close-dispatch,close-repeat,public-shape,private-state,throws,reflection' \
+  "$WORK/ogg-flac-track-handler-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mpeg_file_loader_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateMpegFileLoader "$ROOT/tests/media/fixtures/tone-aac-lc-metadata.m4a" \

@@ -191,6 +191,18 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-ogg-track-handler-consumer" => Some(OGG_TRACK_HANDLER_CONSUMER),
         "write-ogg-track-loader-consumer" => Some(OGG_TRACK_LOADER_CONSUMER),
         "write-ogg-flac-codec-handler-consumer" => Some(OGG_FLAC_CODEC_HANDLER_CONSUMER),
+        "write-ogg-flac-track-handler-consumer" => Some(OGG_FLAC_TRACK_HANDLER_CONSUMER),
+        "write-ogg-flac-track-handler-support-consumer" => {
+            Some(OGG_FLAC_TRACK_HANDLER_SUPPORT_CONSUMER)
+        }
+        "write-ogg-flac-pipeline-support-consumer" => Some(OGG_FLAC_PIPELINE_SUPPORT_CONSUMER),
+        "write-ogg-flac-pipeline-factory-support-consumer" => {
+            Some(OGG_FLAC_PIPELINE_FACTORY_SUPPORT_CONSUMER)
+        }
+        "write-ogg-flac-pcm-format-support-consumer" => Some(OGG_FLAC_PCM_FORMAT_SUPPORT_CONSUMER),
+        "write-ogg-flac-frame-reader-support-consumer" => {
+            Some(OGG_FLAC_FRAME_READER_SUPPORT_CONSUMER)
+        }
         "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
         "write-mpeg-track-info-consumer" => Some(MPEG_TRACK_INFO_CONSUMER),
         "write-mpeg-track-info-builder-consumer" => Some(MPEG_TRACK_INFO_BUILDER_CONSUMER),
@@ -18156,6 +18168,269 @@ public final class GateOggTrackHandler {
   }
 }
 "#;
+
+const OGG_FLAC_TRACK_HANDLER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacStreamInfo;
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacTrackInfo;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream;
+import com.sedmelluq.discord.lavaplayer.container.ogg.flac.OggFlacTrackHandler;
+import com.sedmelluq.discord.lavaplayer.filter.AudioPipelineFactory;
+import com.sedmelluq.discord.lavaplayer.tools.io.BitStreamReader;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.container.flac.frame.FlacFrameReader;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+
+public final class GateOggFlacTrackHandler {
+  public static void main(String[] args) throws Exception {
+    construction();
+    initialiseAndFrames();
+    failuresAndSeek();
+    closeAndReflection();
+    System.out.println("contracts=constructor,info-identity,stream-identity,buffer-shapes,nullable-input,initialise-context,pcm-format,full-width-timecodes,pipeline-seek,packet-loop,frame-reader-identity,buffer-identity,frame-count,zero-frame-failure,io-wrapping,runtime-identity,seek-order,seek-result,seek-io-wrapping,close-before-init,close-dispatch,close-repeat,public-shape,private-state,throws,reflection");
+  }
+
+  private static void construction() throws Exception {
+    FlacStreamInfo stream = stream(4, 2, 48_000);
+    FlacTrackInfo info = new FlacTrackInfo(stream, null, 0, null, 0L);
+    OggPacketInputStream packet = new OggPacketInputStream();
+    OggFlacTrackHandler handler = new OggFlacTrackHandler(info, packet);
+    check(field(handler, "info") == info && field(handler, "packetInputStream") == packet,
+        "constructor retains exact identities");
+    check(field(handler, "bitStreamReader") != null
+        && ((int[]) field(handler, "decodingBuffer")).length == FlacFrameReader.TEMPORARY_BUFFER_SIZE,
+        "constructor creates bit and decoding buffers");
+    int[][] raw = (int[][]) field(handler, "rawSampleBuffers");
+    short[][] samples = (short[][]) field(handler, "sampleBuffers");
+    check(raw.length == 2 && samples.length == 2 && raw[0].length == 4 && samples[1].length == 4,
+        "constructor sizes per-channel sample buffers");
+    OggFlacTrackHandler nullPacket = new OggFlacTrackHandler(info, null);
+    check(field(nullPacket, "packetInputStream") == null, "constructor accepts nullable packet stream");
+  }
+
+  private static void initialiseAndFrames() throws Exception {
+    AudioPipelineFactory.reset();
+    FlacFrameReader.reset();
+    OggPacketInputStream packet = new OggPacketInputStream();
+    packet.packetCount = 2;
+    OggFlacTrackHandler handler = new OggFlacTrackHandler(
+        new FlacTrackInfo(stream(8, 2, 44_100), null, 0, null, 0L), packet);
+    AudioProcessingContext context = allocate(AudioProcessingContext.class);
+    long initial = Long.MIN_VALUE + 31L;
+    long desired = Long.MAX_VALUE - 17L;
+    handler.initialise(context, initial, desired);
+    check(AudioPipelineFactory.createCalls == 1 && AudioPipelineFactory.context == context,
+        "initialise forwards exact processing context");
+    check(AudioPipelineFactory.format.channelCount == 2
+        && AudioPipelineFactory.format.sampleRate == 44_100,
+        "initialise creates exact PCM format");
+    check(AudioPipelineFactory.pipeline.seekCalls == 1
+        && AudioPipelineFactory.pipeline.seekTimes[0] == desired
+        && AudioPipelineFactory.pipeline.seekActual[0] == initial,
+        "initialise forwards full-width seek values in reference order");
+    FlacFrameReader.sampleCount = 3;
+    handler.provideFrames();
+    check(FlacFrameReader.lastInput == packet
+        && FlacFrameReader.lastBits == field(handler, "bitStreamReader")
+        && FlacFrameReader.lastInfo == ((FlacTrackInfo) field(handler, "info")).stream
+        && FlacFrameReader.lastRaw == field(handler, "rawSampleBuffers")
+        && FlacFrameReader.lastSamples == field(handler, "sampleBuffers")
+        && FlacFrameReader.lastDecoding == field(handler, "decodingBuffer"),
+        "readFlacFrame receives exact handler identities");
+    check(packet.startCalls == 3 && FlacFrameReader.calls == 2
+        && AudioPipelineFactory.pipeline.processCalls == 2
+        && AudioPipelineFactory.pipeline.processSamples[0] == field(handler, "sampleBuffers")
+        && AudioPipelineFactory.pipeline.processLengths[0] == 3,
+        "provideFrames loops packets and forwards decoded sample buffers");
+  }
+
+  private static void failuresAndSeek() throws Exception {
+    AudioPipelineFactory.reset();
+    FlacFrameReader.reset();
+    OggPacketInputStream zeroPacket = new OggPacketInputStream();
+    zeroPacket.packetCount = 1;
+    FlacFrameReader.sampleCount = 0;
+    OggFlacTrackHandler zero = new OggFlacTrackHandler(
+        new FlacTrackInfo(stream(4, 1, 8_000), null, 0, null, 0L), zeroPacket);
+    zero.initialise(allocate(AudioProcessingContext.class), 1L, 2L);
+    Throwable zeroFailure = catchThrowable(zero::provideFrames);
+    check(zeroFailure.getClass() == IllegalStateException.class
+        && zeroFailure.getMessage().equals("Not enough bytes in packet."),
+        "zero decoded samples retain exact failure");
+
+    IOException io = new IOException("decode");
+    FlacFrameReader.ioFailure = io;
+    OggPacketInputStream ioPacket = new OggPacketInputStream(); ioPacket.packetCount = 1;
+    OggFlacTrackHandler ioHandler = new OggFlacTrackHandler(
+        new FlacTrackInfo(stream(4, 1, 8_000), null, 0, null, 0L), ioPacket);
+    ioHandler.initialise(allocate(AudioProcessingContext.class), 0L, 0L);
+    Throwable wrapped = catchThrowable(ioHandler::provideFrames);
+    check(wrapped.getClass() == RuntimeException.class && wrapped.getCause() == io,
+        "decode IOException is wrapped with exact cause");
+
+    AudioPipelineFactory.reset();
+    OggPacketInputStream seekPacket = new OggPacketInputStream();
+    seekPacket.seekResult = Long.MIN_VALUE + 9L;
+    OggFlacTrackHandler seek = new OggFlacTrackHandler(
+        new FlacTrackInfo(stream(4, 1, 8_000), null, 0, null, 0L), seekPacket);
+    seek.initialise(allocate(AudioProcessingContext.class), 0L, 0L);
+    long target = Long.MAX_VALUE - 5L;
+    seek.seekToTimecode(target);
+    check(seekPacket.seekCalls == 1 && seekPacket.seekTimecode == target
+        && AudioPipelineFactory.pipeline.seekCalls == 2
+        && AudioPipelineFactory.pipeline.seekTimes[1] == target
+        && AudioPipelineFactory.pipeline.seekActual[1] == seekPacket.seekResult,
+        "seek forwards full-width target and actual timecode");
+
+    IOException seekIo = new IOException("seek"); seekPacket.seekFailure = seekIo;
+    Throwable seekWrapped = catchThrowable(() -> seek.seekToTimecode(12L));
+    check(seekWrapped.getClass() == RuntimeException.class && seekWrapped.getCause() == seekIo,
+        "seek IOException is wrapped with exact cause");
+    RuntimeException runtime = new RuntimeException("frame-runtime");
+    FlacFrameReader.reset(); FlacFrameReader.runtimeFailure = runtime;
+    OggPacketInputStream runtimePacket = new OggPacketInputStream(); runtimePacket.packetCount = 1;
+    OggFlacTrackHandler runtimeHandler = new OggFlacTrackHandler(
+        new FlacTrackInfo(stream(4, 1, 8_000), null, 0, null, 0L), runtimePacket);
+    runtimeHandler.initialise(allocate(AudioProcessingContext.class), 0L, 0L);
+    check(catchThrowable(runtimeHandler::provideFrames) == runtime,
+        "decoder runtime failure retains identity");
+  }
+
+  private static void closeAndReflection() throws Exception {
+    AudioPipelineFactory.reset();
+    OggFlacTrackHandler before = new OggFlacTrackHandler(
+        new FlacTrackInfo(stream(4, 1, 8_000), null, 0, null, 0L), new OggPacketInputStream());
+    before.close();
+    check(AudioPipelineFactory.pipeline == null, "close before initialise is a no-op");
+    before.initialise(allocate(AudioProcessingContext.class), 0L, 0L);
+    before.close(); before.close();
+    check(AudioPipelineFactory.pipeline.closeCalls == 2, "close dispatches repeatedly without clearing state");
+
+    Class<OggFlacTrackHandler> type = OggFlacTrackHandler.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {
+            com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackHandler.class})
+        && type.getDeclaredFields().length == 7 && type.getDeclaredMethods().length == 5
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredClasses().length == 0,
+        "exact public handler shape");
+    checkMethod(type.getDeclaredMethod("initialise", AudioProcessingContext.class, long.class, long.class), void.class,
+        new Class<?>[] {AudioProcessingContext.class, long.class, long.class});
+    checkMethod(type.getDeclaredMethod("provideFrames"), void.class, new Class<?>[0], InterruptedException.class);
+    checkMethod(type.getDeclaredMethod("seekToTimecode", long.class), void.class,
+        new Class<?>[] {long.class});
+    checkMethod(type.getDeclaredMethod("close"), void.class, new Class<?>[0]);
+    Field info = type.getDeclaredField("info");
+    check(info.getType() == FlacTrackInfo.class && info.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL),
+        "private final info field");
+    check(type.getDeclaredMethod("readFlacFrame").getModifiers() == Modifier.PRIVATE,
+        "private frame helper");
+  }
+
+  private static FlacStreamInfo stream(int block, int channels, int rate) {
+    byte[] data = new byte[FlacStreamInfo.LENGTH];
+    data[0] = (byte) (block >>> 8); data[1] = (byte) block;
+    data[2] = (byte) (block >>> 8); data[3] = (byte) block;
+    long packed = ((long) rate << 44) | ((long) (channels - 1) << 41) | (16L << 36);
+    for (int index = 17; index >= 10; index--) { data[index] = (byte) packed; packed >>>= 8; }
+    return new FlacStreamInfo(data, false);
+  }
+  private static Object field(Object target, String name) throws Exception {
+    Field field = target.getClass().getDeclaredField(name); field.setAccessible(true); return field.get(target);
+  }
+  private static <T> T allocate(Class<T> type) throws Exception {
+    Field unsafeField = Class.forName("sun.misc.Unsafe").getDeclaredField("theUnsafe");
+    unsafeField.setAccessible(true); Object unsafe = unsafeField.get(null);
+    return type.cast(unsafe.getClass().getMethod("allocateInstance", Class.class).invoke(unsafe, type));
+  }
+  private static Throwable catchThrowable(Throwing action) { try { action.run(); return null; } catch (Throwable e) { return e; } }
+  private static void checkMethod(Method method, Class<?> result, Class<?>[] parameters, Class<?>... exceptions) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == result
+        && Arrays.equals(method.getParameterTypes(), parameters) && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isSynthetic() && !method.isBridge(), method.getName() + " metadata");
+  }
+  private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
+}
+"#;
+
+const OGG_FLAC_TRACK_HANDLER_SUPPORT_CONSUMER: &str = r"
+package com.sedmelluq.discord.lavaplayer.container.ogg;
+import java.io.IOException;
+import java.io.InputStream;
+public class OggPacketInputStream extends InputStream {
+  public int packetCount; public int startCalls; public int seekCalls; public long seekTimecode;
+  public long seekResult; public IOException seekFailure;
+  public OggPacketInputStream() {}
+  @Override public int read() { return -1; }
+  @Override public boolean equals(Object other) { return this == other; }
+  public boolean startNewPacket() { startCalls++; return startCalls <= packetCount; }
+  public long seek(long timecode) throws IOException { seekCalls++; seekTimecode = timecode; if (seekFailure != null) throw seekFailure; return seekResult; }
+}
+";
+
+const OGG_FLAC_PIPELINE_SUPPORT_CONSUMER: &str = r"
+package com.sedmelluq.discord.lavaplayer.filter;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+public class AudioPipeline {
+  public int seekCalls; public long[] seekTimes = new long[8]; public long[] seekActual = new long[8];
+  public int processCalls; public short[][][] processSamples = new short[8][][]; public int[] processLengths = new int[8]; public int closeCalls;
+  public void seekPerformed(long timecode, long actual) { seekTimes[seekCalls] = timecode; seekActual[seekCalls++] = actual; }
+  public void process(short[][] samples, int offset, int length) { processSamples[processCalls] = samples; processLengths[processCalls++] = length; }
+  public void close() { closeCalls++; }
+}
+";
+
+const OGG_FLAC_PIPELINE_FACTORY_SUPPORT_CONSUMER: &str = r"
+package com.sedmelluq.discord.lavaplayer.filter;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+public final class AudioPipelineFactory {
+  public static int createCalls; public static AudioProcessingContext context; public static PcmFormat format; public static AudioPipeline pipeline;
+  public static void reset() { createCalls = 0; context = null; format = null; pipeline = null; }
+  public static AudioPipeline create(AudioProcessingContext context, PcmFormat format) {
+    createCalls++; AudioPipelineFactory.context = context; AudioPipelineFactory.format = format;
+    pipeline = new AudioPipeline(); return pipeline;
+  }
+}
+";
+
+const OGG_FLAC_PCM_FORMAT_SUPPORT_CONSUMER: &str = r"
+package com.sedmelluq.discord.lavaplayer.filter;
+public class PcmFormat {
+  public final int channelCount; public final int sampleRate;
+  public PcmFormat(int channelCount, int sampleRate) { this.channelCount = channelCount; this.sampleRate = sampleRate; }
+}
+";
+
+const OGG_FLAC_FRAME_READER_SUPPORT_CONSUMER: &str = r"
+package com.sedmelluq.discord.lavaplayer.container.flac.frame;
+import java.io.IOException;
+import java.io.InputStream;
+import com.sedmelluq.discord.lavaplayer.container.flac.FlacStreamInfo;
+import com.sedmelluq.discord.lavaplayer.tools.io.BitStreamReader;
+public final class FlacFrameReader {
+  public static final int TEMPORARY_BUFFER_SIZE = 32;
+  public static int calls; public static int sampleCount; public static IOException ioFailure; public static RuntimeException runtimeFailure;
+  public static InputStream lastInput; public static BitStreamReader lastBits; public static FlacStreamInfo lastInfo;
+  public static int[][] lastRaw; public static short[][] lastSamples; public static int[] lastDecoding;
+  public static void reset() {
+    calls = 0; sampleCount = 1; ioFailure = null; runtimeFailure = null;
+    lastInput = null; lastBits = null; lastInfo = null; lastRaw = null; lastSamples = null; lastDecoding = null;
+  }
+  public static int readFlacFrame(InputStream input, BitStreamReader bits, FlacStreamInfo info,
+      int[][] raw, short[][] samples, int[] decoding) throws IOException {
+    calls++; lastInput = input; lastBits = bits; lastInfo = info; lastRaw = raw; lastSamples = samples; lastDecoding = decoding;
+    if (ioFailure != null) throw ioFailure; if (runtimeFailure != null) throw runtimeFailure; return sampleCount;
+  }
+}
+";
 
 const OGG_FLAC_CODEC_HANDLER_CONSUMER: &str = r#"
 import com.sedmelluq.discord.lavaplayer.container.flac.FlacStreamInfo;

@@ -2527,9 +2527,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[2].completed_slices[].symbols] | add) == .cohorts[2].classified_symbols and
   (.cohorts[2].classified_symbols + .cohorts[2].remaining_symbols) == .cohorts[2].symbols and
   .cohorts[3].status == "IN_PROGRESS" and
-  .cohorts[3].classified_symbols == 703 and
-  .cohorts[3].remaining_symbols == 121 and
-  (.cohorts[3].completed_slices | length) == 89 and
+  .cohorts[3].classified_symbols == 715 and
+  .cohorts[3].remaining_symbols == 109 and
+  (.cohorts[3].completed_slices | length) == 91 and
   .cohorts[3].completed_slices[0] == {
     id: "formats-contracts",
     classes: 1,
@@ -3272,6 +3272,19 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "tools/jvm-gate/src/main.rs"
     ]
   } and
+  .cohorts[3].completed_slices[90] == {
+    id: "ogg-flac-track-handler-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 5,
+    symbols: 6,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
   .cohorts[3].completed_slices[80] == {
     id: "ogg-metadata-contracts",
     classes: 1,
@@ -3703,9 +3716,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   } and
   ([.cohorts[3].completed_slices[].symbols] | add) == .cohorts[3].classified_symbols and
   (.cohorts[3].classified_symbols + .cohorts[3].remaining_symbols) == .cohorts[3].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 2161 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 2167 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 2012 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 2018 and
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegReader" and
@@ -3877,6 +3890,13 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.container.ogg.flac.OggFlacCodecHandler" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 6 and
+  ([$classifications.symbols[] |
+    select(.binary_name ==
+      "com.sedmelluq.discord.lavaplayer.container.ogg.flac.OggFlacTrackHandler" and
       .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
       (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
       (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
@@ -4879,6 +4899,8 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackBlueprint",
         "com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackHandler",
         "com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackLoader",
+        "com.sedmelluq.discord.lavaplayer.container.ogg.flac.OggFlacCodecHandler",
+        "com.sedmelluq.discord.lavaplayer.container.ogg.flac.OggFlacTrackHandler",
         "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegFileLoader",
         "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegNoopTrackConsumer",
         "com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackConsumer",
@@ -5384,7 +5406,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "ogg-flac-track-handler-contracts" and
+  .phase_entry.next_slice == "ogg-opus-codec-handler-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 JQ
@@ -5392,7 +5414,7 @@ JQ
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '308 reference classes / 2,163 symbols' \
+  '309 reference classes / 2,169 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -5402,4 +5424,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 2,161 classified symbols and 601 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 2,167 classified symbols and 595 unassessed symbols.\n'
