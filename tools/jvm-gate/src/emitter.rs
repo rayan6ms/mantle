@@ -234,6 +234,7 @@ const FLAC_AUDIO_TRACK_CLASS: &str =
 const WAV_AUDIO_TRACK_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/wav/WavAudioTrack";
 const WAV_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/wav/WavContainerProbe";
+const WAV_FILE_INFO_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/wav/WavFileInfo";
 const FLAC_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/flac/FlacContainerProbe";
 const FLAC_FILE_LOADER_CLASS: &str =
@@ -746,6 +747,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     FLAC_AUDIO_TRACK_CLASS,
     WAV_AUDIO_TRACK_CLASS,
     WAV_CONTAINER_PROBE_CLASS,
+    WAV_FILE_INFO_CLASS,
     FLAC_CONTAINER_PROBE_CLASS,
     FLAC_FILE_LOADER_CLASS,
     FLAC_METADATA_HEADER_CLASS,
@@ -2426,6 +2428,9 @@ fn replacement_body(
     }
     if class_name == WAV_CONTAINER_PROBE_CLASS {
         return wav_container_probe_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == WAV_FILE_INFO_CLASS {
+        return wav_file_info_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == FLAC_CONTAINER_PROBE_CLASS {
         return flac_container_probe_replacement(pool, name, descriptor, required_locals);
@@ -6798,6 +6803,112 @@ fn wav_container_probe_clinit(pool: &mut ConstantPool<'static>) -> Result<Attrib
             Instruction::Invokestatic(get_logger),
             Instruction::Putstatic(log),
             Instruction::Return,
+        ],
+    )
+}
+
+fn wav_file_info_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "(IIIIJJ)V") => wav_file_info_constructor(pool),
+        ("getDuration", "()J") => wav_file_info_duration(pool),
+        ("getPadding", "()I") => wav_file_info_padding(pool),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {WAV_FILE_INFO_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn wav_file_info_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(WAV_FILE_INFO_CLASS)?;
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let channel_count = pool.add_field_ref(owner, "channelCount", "I")?;
+    let sample_rate = pool.add_field_ref(owner, "sampleRate", "I")?;
+    let bits_per_sample = pool.add_field_ref(owner, "bitsPerSample", "I")?;
+    let block_align = pool.add_field_ref(owner, "blockAlign", "I")?;
+    let block_count = pool.add_field_ref(owner, "blockCount", "J")?;
+    let start_offset = pool.add_field_ref(owner, "startOffset", "J")?;
+    code(
+        pool,
+        3,
+        9,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Iload_1,
+            Instruction::Putfield(channel_count),
+            Instruction::Aload_0,
+            Instruction::Iload_2,
+            Instruction::Putfield(sample_rate),
+            Instruction::Aload_0,
+            Instruction::Iload_3,
+            Instruction::Putfield(bits_per_sample),
+            Instruction::Aload_0,
+            Instruction::Iload(4),
+            Instruction::Putfield(block_align),
+            Instruction::Aload_0,
+            Instruction::Lload(5),
+            Instruction::Putfield(block_count),
+            Instruction::Aload_0,
+            Instruction::Lload(7),
+            Instruction::Putfield(start_offset),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn wav_file_info_duration(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(WAV_FILE_INFO_CLASS)?;
+    let block_count = pool.add_field_ref(owner, "blockCount", "J")?;
+    let sample_rate = pool.add_field_ref(owner, "sampleRate", "I")?;
+    let thousand = pool.add_long(1_000)?;
+    code(
+        pool,
+        4,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(block_count),
+            Instruction::Ldc2_w(thousand),
+            Instruction::Lmul,
+            Instruction::Aload_0,
+            Instruction::Getfield(sample_rate),
+            Instruction::I2l,
+            Instruction::Ldiv,
+            Instruction::Lreturn,
+        ],
+    )
+}
+
+fn wav_file_info_padding(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let owner = pool.add_class(WAV_FILE_INFO_CLASS)?;
+    let block_align = pool.add_field_ref(owner, "blockAlign", "I")?;
+    let channel_count = pool.add_field_ref(owner, "channelCount", "I")?;
+    let bits_per_sample = pool.add_field_ref(owner, "bitsPerSample", "I")?;
+    code(
+        pool,
+        4,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(block_align),
+            Instruction::Aload_0,
+            Instruction::Getfield(channel_count),
+            Instruction::Aload_0,
+            Instruction::Getfield(bits_per_sample),
+            Instruction::Bipush(3),
+            Instruction::Ishr,
+            Instruction::Imul,
+            Instruction::Isub,
+            Instruction::Ireturn,
         ],
     )
 }

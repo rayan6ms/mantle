@@ -418,6 +418,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-wav-audio-track-support-consum
   --output "$WORK/WavGateSupport.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-wav-container-probe-consumer \
   --output "$WORK/GateWavContainerProbe.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-wav-file-info-consumer \
+  --output "$WORK/GateWavFileInfo.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-container-probe-consumer \
   --output "$WORK/GateFlacContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-file-loader-consumer \
@@ -712,6 +714,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_VORBIS_CLA
   "$WORK/GateWavAudioTrack.java" \
   "$WORK/WavGateSupport.java" \
   "$WORK/GateWavContainerProbe.java" \
+  "$WORK/GateWavFileInfo.java" \
   "$WORK/GateVorbisCommentParser.java" \
   "$WORK/OggVorbisTrackHandler.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_VORBIS_TRACK_CLASSES" \
@@ -1953,6 +1956,17 @@ cmp "$WORK/wav-container-probe-reference.txt" \
 grep --fixed-strings \
   'contracts=name,ignored-hints,null-hints,riff-wildcard,case-sensitive,rewind-match,rewind-miss,initial-position,logging-order,loader-parse,metadata,duration,metadata-fallback,supported-result,self-probe,null-reference,read-failure,parse-failure,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,private-state,throws,reflection' \
   "$WORK/wav-container-probe-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$ogg_vorbis_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateWavFileInfo >"$WORK/wav-file-info-reference.txt"
+java -Xverify:all \
+  -cp "$ogg_vorbis_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateWavFileInfo >"$WORK/wav-file-info-candidate.txt"
+cmp "$WORK/wav-file-info-reference.txt" \
+  "$WORK/wav-file-info-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,field-identity,negative-values,duration,duration-overflow,negative-duration,zero-rate-failure,padding,odd-bit-padding,public-shape,final-fields,throws,reflection' \
+  "$WORK/wav-file-info-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_vorbis_track_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggVorbisTrackHandler >"$WORK/ogg-vorbis-track-handler-reference.txt"

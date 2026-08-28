@@ -271,6 +271,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-wav-audio-track-consumer" => Some(WAV_AUDIO_TRACK_CONSUMER),
         "write-wav-audio-track-support-consumer" => Some(WAV_AUDIO_TRACK_SUPPORT_CONSUMER),
         "write-wav-container-probe-consumer" => Some(WAV_CONTAINER_PROBE_CONSUMER),
+        "write-wav-file-info-consumer" => Some(WAV_FILE_INFO_CONSUMER),
         "write-flac-container-probe-consumer" => Some(FLAC_CONTAINER_PROBE_CONSUMER),
         "write-flac-file-loader-consumer" => Some(FLAC_FILE_LOADER_CONSUMER),
         "write-flac-file-loader-support-consumer" => Some(FLAC_FILE_LOADER_SUPPORT_CONSUMER),
@@ -26263,6 +26264,68 @@ public final class GateWavAudioTrack {
   }
   private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
   @SuppressWarnings("unchecked") private static <E extends Throwable> void sneakyThrow(Throwable t) throws E { throw (E) t; }
+}
+"#;
+
+const WAV_FILE_INFO_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.wav.WavFileInfo;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+
+public final class GateWavFileInfo {
+  public static void main(String[] args) throws Exception {
+    construction(); duration(); padding(); reflection();
+    System.out.println("contracts=constructor,field-identity,negative-values,duration,duration-overflow,negative-duration,zero-rate-failure,padding,odd-bit-padding,public-shape,final-fields,throws,reflection");
+  }
+  private static void construction() throws Exception {
+    WavFileInfo info = new WavFileInfo(-2, 48000, 24, 8, -9L, Long.MAX_VALUE);
+    check(info.channelCount == -2 && info.sampleRate == 48000 && info.bitsPerSample == 24
+        && info.blockAlign == 8 && info.blockCount == -9L && info.startOffset == Long.MAX_VALUE,
+        "constructor stores every argument exactly");
+  }
+  private static void duration() {
+    WavFileInfo info = new WavFileInfo(2, 48000, 16, 4, 9600L, 0L);
+    check(info.getDuration() == 200L, "millisecond duration");
+    WavFileInfo negative = new WavFileInfo(1, 1000, 16, 2, -7L, 0L);
+    check(negative.getDuration() == -7L, "negative duration follows Java arithmetic");
+    WavFileInfo overflow = new WavFileInfo(1, 1, 16, 2, Long.MAX_VALUE, 0L);
+    check(overflow.getDuration() == (Long.MAX_VALUE * 1000L), "long multiplication overflow is preserved");
+    check(catchThrowable(() -> new WavFileInfo(1, 0, 16, 2, 1L, 0L).getDuration()) instanceof ArithmeticException,
+        "zero sample rate fails at accessor time");
+  }
+  private static void padding() {
+    check(new WavFileInfo(2, 48000, 16, 6, 0L, 0L).getPadding() == 2, "padding subtracts packed sample width");
+    check(new WavFileInfo(2, 48000, 24, 8, 0L, 0L).getPadding() == 2, "24-bit padding");
+    check(new WavFileInfo(1, 48000, 15, 3, 0L, 0L).getPadding() == 2, "integer bit-width shift");
+  }
+  private static void reflection() throws Exception {
+    Class<WavFileInfo> type = WavFileInfo.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 6
+        && type.getDeclaredMethods().length == 2 && type.getDeclaredConstructors().length == 1,
+        "exact public data-class shape");
+    checkField(type, "channelCount", int.class); checkField(type, "sampleRate", int.class);
+    checkField(type, "bitsPerSample", int.class); checkField(type, "blockAlign", int.class);
+    checkField(type, "blockCount", long.class); checkField(type, "startOffset", long.class);
+    Constructor<?> constructor = type.getDeclaredConstructor(int.class, int.class, int.class, int.class, long.class, long.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(), "constructor metadata");
+    checkMethod(type, "getDuration", long.class, new Class<?>[0]);
+    checkMethod(type, "getPadding", int.class, new Class<?>[0]);
+  }
+  private static void checkField(Class<?> owner, String name, Class<?> fieldType) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL) && !field.isSynthetic(), name + " metadata");
+  }
+  private static void checkMethod(Class<?> owner, String name, Class<?> result, Class<?>[] params) throws Exception {
+    Method method = owner.getDeclaredMethod(name, params);
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == result && method.getExceptionTypes().length == 0
+        && !method.isSynthetic() && !method.isBridge() && !method.isVarArgs(), name + " metadata");
+  }
+  private static Throwable catchThrowable(Throwing action) { try { action.run(); return null; } catch (Throwable failure) { return failure; } }
+  private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean value, String message) { if (!value) throw new AssertionError(message); }
 }
 "#;
 
