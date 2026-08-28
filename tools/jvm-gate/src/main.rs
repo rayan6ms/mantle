@@ -142,6 +142,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-copy-on-update-identity-list-consumer" => {
             Some(COPY_ON_UPDATE_IDENTITY_LIST_CONSUMER)
         }
+        "write-data-format-tools-consumer" => Some(DATA_FORMAT_TOOLS_CONSUMER),
         _ => container_consumer_source(command)
             .or_else(|| filter_format_consumer_source(command))
             .or_else(|| sound_cloud_consumer_source(command)),
@@ -26617,6 +26618,182 @@ public final class GateCopyOnUpdateIdentityList {
   private static final class Derived extends CopyOnUpdateIdentityList<IdentityValue> {}
   private static void check(boolean value, String message) {
     if (!value) throw new AssertionError(message);
+  }
+}
+"#;
+
+const DATA_FORMAT_TOOLS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.DataFormatTools;
+import com.sedmelluq.discord.lavaplayer.tools.DataFormatTools.TextRange;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+
+public final class GateDataFormatTools {
+  public static void main(String[] args) throws Exception {
+    extraction(); maps(); encoding(); streamAndDuration(); nullableText(); arrays(); reflection();
+    System.out.println("contracts=extract-between,extract-ranges,extract-after,extract-candidates,null-empty,map-string,map-pairs,url-decode,default-null,stream-lines,duration,nullable-text,array-range,reflection");
+  }
+
+  private static void extraction() {
+    check("value".equals(DataFormatTools.extractBetween("prefix<value>suffix", "<", ">")), "between");
+    check("".equals(DataFormatTools.extractBetween("a[]b", "[", "]"))
+        && DataFormatTools.extractBetween("abc", "x", "y") == null
+        && "tail".equals(DataFormatTools.extractAfter("head:tail", ":"))
+        && DataFormatTools.extractAfter("abc", "x") == null, "basic extraction");
+    TextRange[] ranges = {new TextRange("missing", ";"), new TextRange("<", ">")};
+    check("value".equals(DataFormatTools.extractBetween("prefix<value>suffix", ranges))
+        && DataFormatTools.extractBetween("abc", new TextRange[0]) == null,
+        "range candidates");
+    check("tail".equals(DataFormatTools.extractAfter("head:tail", new String[] {"?", ":"}))
+        && DataFormatTools.extractAfter("abc", new String[] {"?"}) == null,
+        "after candidates");
+    check(catchThrowable(() -> DataFormatTools.extractBetween(null, "a", "b")) instanceof NullPointerException
+        && catchThrowable(() -> DataFormatTools.extractBetween("a", null, "b")) instanceof NullPointerException
+        && catchThrowable(() -> DataFormatTools.extractBetween("a", (TextRange[]) null)) instanceof NullPointerException,
+        "extraction null failures");
+    check(DataFormatTools.isNullOrEmpty(null) && DataFormatTools.isNullOrEmpty("")
+        && !DataFormatTools.isNullOrEmpty(" ") && !DataFormatTools.isNullOrEmpty("x"), "null empty");
+  }
+
+  private static void maps() throws Exception {
+    Map<String, String> text = DataFormatTools.convertToMapLayout("a=1\n\r b=2=extra\nmalformed\n=empty");
+    check(text.size() == 3 && "1".equals(text.get("a")) && "2=extra".equals(text.get(" b"))
+        && "empty".equals(text.get("")), "string map parsing");
+    Map<String, String> duplicates = DataFormatTools.convertToMapLayout("a=first\na=last\na");
+    check(duplicates.size() == 1 && "last".equals(duplicates.get("a")), "map duplicate last");
+    Class<?> pairType = Class.forName("org.apache.http.NameValuePair");
+    Collection pairs = Arrays.asList(pair(pairType, "first", "1"), pair(pairType, "second", null),
+        pair(pairType, "first", "last"));
+    Map<String, String> pairMap = DataFormatTools.convertToMapLayout(pairs);
+    check(pairMap.size() == 2 && "last".equals(pairMap.get("first")) && pairMap.containsKey("second")
+        && pairMap.get("second") == null, "pair map layout");
+    Map<String, String> encoded = DataFormatTools.decodeUrlEncodedItems("a=hello+world&b=%2B&b=last", false);
+    check(encoded.size() == 2 && "hello world".equals(encoded.get("a")) && "last".equals(encoded.get("b")),
+        "url decoding");
+    Map<String, String> escaped = DataFormatTools.decodeUrlEncodedItems("a=1\\\\u0026b=2", true);
+    check(escaped.size() == 2 && "1".equals(escaped.get("a")) && "2".equals(escaped.get("b")),
+        "escaped separator");
+    check(DataFormatTools.<String>defaultOnNull(null, "fallback") == "fallback"
+        && DataFormatTools.<String>defaultOnNull("value", "fallback") == "value", "default null");
+    check(catchThrowable(() -> DataFormatTools.convertToMapLayout((String) null)) instanceof NullPointerException,
+        "map null failure");
+  }
+
+  private static Object pair(Class<?> pairType, String name, String value) {
+    InvocationHandler handler = (proxy, method, args) -> {
+      if (method.getName().equals("getName")) return name;
+      if (method.getName().equals("getValue")) return value;
+      if (method.getName().equals("toString")) return name + "=" + value;
+      return method.invoke(proxy, args);
+    };
+    return Proxy.newProxyInstance(pairType.getClassLoader(), new Class<?>[] {pairType}, handler);
+  }
+
+  private static void encoding() {
+    check(DataFormatTools.durationTextToMillis("1:02.003") == 3723000L
+        && DataFormatTools.durationTextToMillis("2") == 2000L
+        && DataFormatTools.durationTextToMillis("1:2:3") == 3723000L,
+        "duration parsing");
+    check(DataFormatTools.durationTextToMillis("-1:02") == -58000L,
+        "duration signed parsing");
+    check(catchThrowable(() -> DataFormatTools.durationTextToMillis("bad")) instanceof NumberFormatException,
+        "duration failure");
+  }
+
+  private static void streamAndDuration() throws Exception {
+    String[] lines = DataFormatTools.streamToLines(
+        new ByteArrayInputStream(" first \n  second\r\nthird \n".getBytes(StandardCharsets.UTF_8)),
+        StandardCharsets.UTF_8);
+    check(Arrays.equals(lines, new String[] {" first", "second", "third"}), "stream lines");
+    IOException failure = new IOException("read-failure");
+    check(catchThrowable(() -> DataFormatTools.streamToLines(new FailingInput(failure), StandardCharsets.UTF_8)) == failure,
+        "stream failure identity");
+  }
+
+  private static void nullableText() throws Exception {
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    DataOutputStream output = new DataOutputStream(bytes);
+    DataFormatTools.writeNullableText(output, null);
+    DataFormatTools.writeNullableText(output, "héllo");
+    output.flush();
+    DataInputStream input = new DataInputStream(new ByteArrayInputStream(bytes.toByteArray()));
+    check(DataFormatTools.readNullableText(input) == null && "héllo".equals(DataFormatTools.readNullableText(input)),
+        "nullable text round trip");
+  }
+
+  private static void arrays() {
+    check(DataFormatTools.arrayRangeEquals(new byte[] {1, 2, 3, 4}, 1, new byte[] {2, 3})
+        && !DataFormatTools.arrayRangeEquals(new byte[] {1, 2, 9, 4}, 1, new byte[] {2, 3})
+        && DataFormatTools.arrayRangeEquals(new byte[] {1, 2}, 0, new byte[] {1, 2})
+        && !DataFormatTools.arrayRangeEquals(new byte[] {1, 2}, 1, new byte[] {2, 3}),
+        "array range matching");
+    check(catchThrowable(() -> DataFormatTools.arrayRangeEquals(new byte[] {1}, -1, new byte[] {1}))
+        instanceof ArrayIndexOutOfBoundsException, "array negative offset");
+  }
+
+  private static void reflection() throws Exception {
+    Class<DataFormatTools> type = DataFormatTools.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 1
+        && type.getDeclaredMethods().length == 14 && type.getDeclaredConstructors().length == 1,
+        "exact class shape");
+    Field pattern = type.getDeclaredField("lineSplitPattern");
+    check(pattern.getType() == java.util.regex.Pattern.class
+        && pattern.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && !pattern.isSynthetic(), "private pattern metadata");
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    for (Method method : type.getDeclaredMethods()) {
+      check(method.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+          && !method.isSynthetic() && !method.isBridge() && !method.isVarArgs(), method.getName() + " metadata");
+    }
+    Method collection = type.getDeclaredMethod("convertToMapLayout", Collection.class);
+    ParameterizedType collectionType = (ParameterizedType) collection.getGenericParameterTypes()[0];
+    check(collectionType.getRawType() == Collection.class
+        && collectionType.getActualTypeArguments()[0].getTypeName().contains("NameValuePair")
+        && ((ParameterizedType) collection.getGenericReturnType()).getRawType() == Map.class,
+        "collection generic signature");
+    Method generic = type.getDeclaredMethod("defaultOnNull", Object.class, Object.class);
+    TypeVariable<Method> variable = generic.getTypeParameters()[0];
+    check(variable.getName().equals("T") && Arrays.equals(generic.getGenericParameterTypes(), new Type[] {variable, variable})
+        && generic.getGenericReturnType() == variable, "method generic signature");
+    check(type.getDeclaredMethod("streamToLines", java.io.InputStream.class, java.nio.charset.Charset.class)
+        .getExceptionTypes()[0] == IOException.class
+        && type.getDeclaredMethod("writeNullableText", java.io.DataOutput.class, String.class)
+            .getExceptionTypes()[0] == IOException.class
+        && type.getDeclaredMethod("readNullableText", java.io.DataInput.class).getExceptionTypes()[0] == IOException.class,
+        "checked signatures");
+  }
+
+  private static Throwable catchThrowable(Throwing operation) {
+    try { operation.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+  private interface Throwing { void run() throws Throwable; }
+  private static final class FailingInput extends java.io.InputStream {
+    private final IOException failure;
+    FailingInput(IOException failure) { this.failure = failure; }
+    @Override public int read() throws IOException { throw failure; }
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
   }
 }
 "#;
