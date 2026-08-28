@@ -202,6 +202,8 @@ const MPEG_VERSIONED_SECTION_INFO_CLASS: &str =
 const MPEG_FRAGMENTED_FILE_TRACK_PROVIDER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/fragmented/MpegFragmentedFileTrackProvider";
 const MPEG_GLOBAL_SEEK_INFO_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/fragmented/MpegGlobalSeekInfo";
+const MPEG_SEGMENT_ENTRY_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/fragmented/MpegSegmentEntry";
 const MPEG_AAC_TRACK_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegAacTrackConsumer";
 const ADTS_CONTAINER_PROBE_CLASS: &str =
@@ -648,6 +650,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MPEG_VERSIONED_SECTION_INFO_CLASS,
     MPEG_FRAGMENTED_FILE_TRACK_PROVIDER_CLASS,
     MPEG_GLOBAL_SEEK_INFO_CLASS,
+    MPEG_SEGMENT_ENTRY_CLASS,
     MPEG_AAC_TRACK_CONSUMER_CLASS,
     ADTS_CONTAINER_PROBE_CLASS,
     ADTS_PACKET_HEADER_CLASS,
@@ -888,6 +891,7 @@ pub fn emit(
     let mut mpeg_noop_track_consumer_bytes = None;
     let mut mpeg_fragmented_file_track_provider_bytes = None;
     let mut mpeg_global_seek_info_bytes = None;
+    let mut mpeg_segment_entry_bytes = None;
     for binary_name in REFERENCE_CLASSES.iter().chain(PRIVATE_SUPPORT_CLASSES) {
         let mut entry = source.by_name(&format!("{binary_name}.class"))?;
         let mut bytes = Vec::new();
@@ -913,6 +917,8 @@ pub fn emit(
             mpeg_fragmented_file_track_provider_bytes = Some(bytes);
         } else if *binary_name == MPEG_GLOBAL_SEEK_INFO_CLASS {
             mpeg_global_seek_info_bytes = Some(bytes);
+        } else if *binary_name == MPEG_SEGMENT_ENTRY_CLASS {
+            mpeg_segment_entry_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -1000,6 +1006,12 @@ pub fn emit(
                 mpeg_global_seek_info_bytes
                     .as_ref()
                     .expect("MPEG global seek info source bytes are retained"),
+            );
+        } else if name == format!("{MPEG_SEGMENT_ENTRY_CLASS}.class") {
+            bytes.clone_from(
+                mpeg_segment_entry_bytes
+                    .as_ref()
+                    .expect("MPEG segment entry source bytes are retained"),
             );
         } else {
             class.to_bytes(&mut bytes)?;
@@ -1526,6 +1538,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | MPEG_AAC_TRACK_CONSUMER_CLASS
             | MPEG_FRAGMENTED_FILE_TRACK_PROVIDER_CLASS
             | MPEG_GLOBAL_SEEK_INFO_CLASS
+            | MPEG_SEGMENT_ENTRY_CLASS
     ) {
         return Ok(class);
     }

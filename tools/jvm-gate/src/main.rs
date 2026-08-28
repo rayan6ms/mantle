@@ -188,6 +188,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
             Some(MPEG_FRAGMENTED_FILE_TRACK_PROVIDER_CONSUMER)
         }
         "write-mpeg-global-seek-info-consumer" => Some(MPEG_GLOBAL_SEEK_INFO_CONSUMER),
+        "write-mpeg-segment-entry-consumer" => Some(MPEG_SEGMENT_ENTRY_CONSUMER),
         "write-mpeg-noop-track-consumer-consumer" => Some(MPEG_NOOP_TRACK_CONSUMER_CONSUMER),
         "write-mpeg-track-consumer-consumer" => Some(MPEG_TRACK_CONSUMER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
@@ -17136,6 +17137,76 @@ public final class GateMpegGlobalSeekInfo {
     Derived(int timescale, long baseOffset, MpegSegmentEntry[] entries) {
       super(timescale, baseOffset, entries);
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MPEG_SEGMENT_ENTRY_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.fragmented.MpegSegmentEntry;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateMpegSegmentEntry {
+  public static void main(String[] args) throws Exception {
+    values();
+    reflection();
+    System.out.println("contracts=constructor,type-storage,size-storage,duration-storage,signed-extrema,no-validation,identity-equality,subclassable,public-final-fields,field-order,constructor-descriptor,no-throws,member-counts,reflection");
+  }
+
+  private static void values() {
+    MpegSegmentEntry ordinary = new MpegSegmentEntry(1, 250, 11);
+    check(ordinary.type == 1 && ordinary.size == 250 && ordinary.duration == 11,
+        "constructor stores ordinary values exactly");
+    MpegSegmentEntry extrema = new MpegSegmentEntry(
+        Integer.MIN_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE);
+    check(extrema.type == Integer.MIN_VALUE && extrema.size == Integer.MAX_VALUE
+        && extrema.duration == Integer.MIN_VALUE, "constructor preserves signed extrema");
+    MpegSegmentEntry negative = new MpegSegmentEntry(-1, -2, -3);
+    check(negative.type == -1 && negative.size == -2 && negative.duration == -3,
+        "constructor applies no validation or normalization");
+    check(ordinary.equals(ordinary) && !ordinary.equals(new MpegSegmentEntry(1, 250, 11)),
+        "value shell retains Object identity equality");
+    Derived derived = new Derived(7, 8, 9);
+    check(derived.type == 7 && derived.size == 8 && derived.duration == 9,
+        "ordinary subclass inherits construction");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MpegSegmentEntry> type = MpegSegmentEntry.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete non-final class metadata");
+    check(type.getDeclaredFields().length == 3 && type.getDeclaredMethods().length == 0
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredClasses().length == 0,
+        "exact declared member counts");
+    check(Arrays.equals(Arrays.stream(type.getDeclaredFields()).map(Field::getName).toArray(),
+        new String[] {"type", "size", "duration"}), "public field declaration order");
+    checkField(type.getDeclaredField("type"));
+    checkField(type.getDeclaredField("size"));
+    checkField(type.getDeclaredField("duration"));
+    Constructor<MpegSegmentEntry> constructor = type.getDeclaredConstructor(
+        int.class, int.class, int.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0
+        && Arrays.equals(constructor.getParameterTypes(), new Class<?>[] {
+            int.class, int.class, int.class}), "constructor descriptor and no checked failures");
+  }
+
+  private static void checkField(Field field) {
+    check(field.getType() == int.class
+        && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL) && !field.isSynthetic(),
+        field.getName() + " field metadata");
+  }
+
+  private static final class Derived extends MpegSegmentEntry {
+    Derived(int type, int size, int duration) { super(type, size, duration); }
   }
 
   private static void check(boolean condition, String message) {

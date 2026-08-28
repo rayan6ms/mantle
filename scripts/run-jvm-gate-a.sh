@@ -291,6 +291,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-fragmented-file-track-pro
   --output "$WORK/GateMpegFragmentedFileTrackProvider.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-global-seek-info-consumer \
   --output "$WORK/GateMpegGlobalSeekInfo.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-segment-entry-consumer \
+  --output "$WORK/GateMpegSegmentEntry.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-noop-track-consumer-consumer \
   --output "$WORK/GateMpegNoopTrackConsumer.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-consumer-consumer \
@@ -472,6 +474,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateMpegVersionedSectionInfo.java" \
   "$WORK/GateMpegFragmentedFileTrackProvider.java" \
   "$WORK/GateMpegGlobalSeekInfo.java" \
+  "$WORK/GateMpegSegmentEntry.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GateAdtsStreamReader.java" \
@@ -1613,6 +1616,15 @@ cmp "$WORK/mpeg-global-seek-info-reference.txt" "$WORK/mpeg-global-seek-info-can
 grep --fixed-strings \
   'contracts=constructor,timescale-storage,entries-identity,offset-allocation,cumulative-time-offsets,cumulative-file-offsets,full-width-base-offset,overflow,nullable-rejection,empty-rejection,identity-equality,subclassable,public-final-fields,field-order,constructor-descriptor,no-throws,member-counts,reflection' \
   "$WORK/mpeg-global-seek-info-candidate.txt" >/dev/null
+java -Xverify:all -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegSegmentEntry >"$WORK/mpeg-segment-entry-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegSegmentEntry >"$WORK/mpeg-segment-entry-candidate.txt"
+cmp "$WORK/mpeg-segment-entry-reference.txt" "$WORK/mpeg-segment-entry-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,type-storage,size-storage,duration-storage,signed-extrema,no-validation,identity-equality,subclassable,public-final-fields,field-order,constructor-descriptor,no-throws,member-counts,reflection' \
+  "$WORK/mpeg-segment-entry-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mp3_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMp3ConstantRateSeeker \
   >"$WORK/mp3-constant-rate-seeker-reference.txt"
