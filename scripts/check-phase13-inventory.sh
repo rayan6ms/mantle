@@ -3964,9 +3964,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[3].completed_slices[].symbols] | add) == .cohorts[3].classified_symbols and
   (.cohorts[3].classified_symbols + .cohorts[3].remaining_symbols) == .cohorts[3].symbols and
   .cohorts[4].status == "IN_PROGRESS" and
-  .cohorts[4].classified_symbols == 62 and
-  .cohorts[4].remaining_symbols == 329 and
-  (.cohorts[4].completed_slices | length) == 9 and
+  .cohorts[4].classified_symbols == 65 and
+  .cohorts[4].remaining_symbols == 326 and
+  (.cohorts[4].completed_slices | length) == 10 and
   .cohorts[4].completed_slices[0] == {
     id: "copy-on-update-identity-list-contracts",
     classes: 1,
@@ -4084,11 +4084,24 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "tools/jvm-gate/src/main.rs"
     ]
   } and
+  .cohorts[4].completed_slices[9] == {
+    id: "exception-tools-default-error-debug-info-handler-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 2,
+    symbols: 3,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
   ([.cohorts[4].completed_slices[].symbols] | add) == .cohorts[4].classified_symbols and
   (.cohorts[4].classified_symbols + .cohorts[4].remaining_symbols) == .cohorts[4].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 2338 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 2341 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 2189 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 2192 and
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegReader" and
@@ -5379,6 +5392,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.tools.DataFormatTools$TextRange",
         "com.sedmelluq.discord.lavaplayer.tools.DecodedException",
         "com.sedmelluq.discord.lavaplayer.tools.ExceptionTools",
+        "com.sedmelluq.discord.lavaplayer.tools.ExceptionTools$DefaultErrorDebugInfoHandler",
         "com.sedmelluq.discord.lavaplayer.tools.ExceptionTools$ErrorDebugInfo",
         "com.sedmelluq.discord.lavaplayer.tools.ExceptionTools$ErrorDebugInfoHandler",
         "com.sedmelluq.discord.lavaplayer.tools.FriendlyException",
@@ -5830,7 +5844,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "exception-tools-default-error-debug-info-handler-contracts" and
+  .phase_entry.next_slice == "future-tools-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 JQ
@@ -5838,7 +5852,7 @@ JQ
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '336 reference classes / 2,331 symbols' \
+  '337 reference classes / 2,334 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -5848,4 +5862,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 2,338 classified symbols and 424 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 2,341 classified symbols and 421 unassessed symbols.\n'

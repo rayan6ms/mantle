@@ -157,6 +157,9 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-decoded-exception-consumer" => Some(DECODED_EXCEPTION_CONSUMER),
         "write-exception-tools-consumer" => Some(EXCEPTION_TOOLS_CONSUMER),
+        "write-exception-tools-default-error-debug-info-handler-consumer" => {
+            Some(EXCEPTION_TOOLS_DEFAULT_ERROR_DEBUG_INFO_HANDLER_CONSUMER)
+        }
         "write-exception-tools-error-debug-info-consumer" => {
             Some(EXCEPTION_TOOLS_ERROR_DEBUG_INFO_CONSUMER)
         }
@@ -27130,6 +27133,80 @@ public final class GateExceptionTools {
         && type.getDeclaredMethod("decodeException", java.io.DataInput.class)
             .getExceptionTypes()[0] == java.io.IOException.class, "checked metadata");
   }
+
+  private static Throwable catchThrowable(Throwing action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+  private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const EXCEPTION_TOOLS_DEFAULT_ERROR_DEBUG_INFO_HANDLER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.ExceptionTools;
+import com.sedmelluq.discord.lavaplayer.tools.ExceptionTools.DefaultErrorDebugInfoHandler;
+import com.sedmelluq.discord.lavaplayer.tools.ExceptionTools.ErrorDebugInfo;
+import com.sedmelluq.discord.lavaplayer.tools.ExceptionTools.ErrorDebugInfoHandler;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import org.slf4j.Logger;
+
+public final class GateExceptionToolsDefaultErrorDebugInfoHandler {
+  public static void main(String[] args) throws Exception {
+    construction(); handling(); subclassability(); reflection();
+    System.out.println("contracts=constructor,interface,warning-dispatch,payload-logger-ignored,null-payload,subclassable,nested-linkage,reflection");
+  }
+
+  private static void construction() {
+    DefaultErrorDebugInfoHandler handler = new DefaultErrorDebugInfoHandler();
+    check(handler instanceof ErrorDebugInfoHandler, "interface implementation");
+  }
+
+  private static void handling() {
+    Logger throwingLogger = (Logger) Proxy.newProxyInstance(Logger.class.getClassLoader(),
+        new Class<?>[] {Logger.class}, (proxy, method, args) -> {
+          throw new AssertionError("payload logger must not be used");
+        });
+    ErrorDebugInfo payload = new ErrorDebugInfo(
+        throwingLogger, "error-id", new IllegalStateException("cause"),
+        "message", "name", "secret-value");
+    DefaultErrorDebugInfoHandler handler = new DefaultErrorDebugInfoHandler();
+    handler.handle(payload);
+    check(catchThrowable(() -> handler.handle(null)) instanceof NullPointerException,
+        "null payload failure");
+  }
+
+  private static void subclassability() {
+    Derived derived = new Derived();
+    ErrorDebugInfo payload = new ErrorDebugInfo(null, "derived", null, null, null, null);
+    derived.handle(payload);
+    check(derived instanceof DefaultErrorDebugInfoHandler, "subclassability");
+  }
+
+  private static void reflection() throws Exception {
+    Class<DefaultErrorDebugInfoHandler> type = DefaultErrorDebugInfoHandler.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 1
+        && type.getInterfaces()[0] == ErrorDebugInfoHandler.class
+        && type.getDeclaringClass() == ExceptionTools.class
+        && type.getDeclaredFields().length == 0 && type.getDeclaredMethods().length == 1
+        && type.getDeclaredConstructors().length == 1, "class shape and nested linkage");
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
+    Method handle = type.getDeclaredMethod("handle", ErrorDebugInfo.class);
+    check(handle.getReturnType() == void.class && handle.getModifiers() == Modifier.PUBLIC
+        && handle.getExceptionTypes().length == 0 && !handle.isBridge()
+        && !handle.isSynthetic() && !handle.isVarArgs(), "handle metadata");
+  }
+
+  private static final class Derived extends DefaultErrorDebugInfoHandler {}
 
   private static Throwable catchThrowable(Throwing action) {
     try { action.run(); return null; } catch (Throwable failure) { return failure; }

@@ -436,6 +436,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-decoded-exception-consumer \
   --output "$WORK/GateDecodedException.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-exception-tools-consumer \
   --output "$WORK/GateExceptionTools.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-exception-tools-default-error-debug-info-handler-consumer \
+  --output "$WORK/GateExceptionToolsDefaultErrorDebugInfoHandler.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-exception-tools-error-debug-info-consumer \
   --output "$WORK/GateExceptionToolsErrorDebugInfo.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-exception-tools-error-debug-info-handler-consumer \
@@ -772,6 +774,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateDecodedException.java" \
   "$WORK/GateExceptionTools.java" \
+  "$WORK/GateExceptionToolsDefaultErrorDebugInfoHandler.java" \
   "$WORK/GateExceptionToolsErrorDebugInfo.java" \
   "$WORK/GateExceptionToolsErrorDebugInfoHandler.java" \
   "$WORK/GateFriendlyException.java" \
@@ -2091,6 +2094,19 @@ cmp "$WORK/exception-tools-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,rethrow,wrap-friendly,wrap-runtime,to-runtime,find-deep,interrupt,log,debug-info,serialization,close-warnings,reflection' \
   "$WORK/exception-tools-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateExceptionToolsDefaultErrorDebugInfoHandler \
+  >"$WORK/exception-tools-default-error-debug-info-handler-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateExceptionToolsDefaultErrorDebugInfoHandler \
+  >"$WORK/exception-tools-default-error-debug-info-handler-candidate.txt"
+cmp "$WORK/exception-tools-default-error-debug-info-handler-reference.txt" \
+  "$WORK/exception-tools-default-error-debug-info-handler-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,interface,warning-dispatch,payload-logger-ignored,null-payload,subclassable,nested-linkage,reflection' \
+  "$WORK/exception-tools-default-error-debug-info-handler-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateExceptionToolsErrorDebugInfo >"$WORK/exception-tools-error-debug-info-reference.txt"

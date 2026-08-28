@@ -343,6 +343,8 @@ const DATA_FORMAT_TOOLS_TEXT_RANGE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/DataFormatTools$TextRange";
 const DECODED_EXCEPTION_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/DecodedException";
 const EXCEPTION_TOOLS_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/ExceptionTools";
+const EXCEPTION_TOOLS_DEFAULT_ERROR_DEBUG_INFO_HANDLER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/ExceptionTools$DefaultErrorDebugInfoHandler";
 const EXCEPTION_TOOLS_ERROR_DEBUG_INFO_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/ExceptionTools$ErrorDebugInfo";
 const EXCEPTION_TOOLS_ERROR_DEBUG_INFO_HANDLER_CLASS: &str =
@@ -947,6 +949,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     DATA_FORMAT_TOOLS_TEXT_RANGE_CLASS,
     DECODED_EXCEPTION_CLASS,
     EXCEPTION_TOOLS_CLASS,
+    EXCEPTION_TOOLS_DEFAULT_ERROR_DEBUG_INFO_HANDLER_CLASS,
     EXCEPTION_TOOLS_ERROR_DEBUG_INFO_CLASS,
     EXCEPTION_TOOLS_ERROR_DEBUG_INFO_HANDLER_CLASS,
     FRIENDLY_EXCEPTION_CLASS,
@@ -1076,6 +1079,7 @@ pub fn emit(
     let mut data_format_tools_text_range_bytes = None;
     let mut decoded_exception_bytes = None;
     let mut exception_tools_bytes = None;
+    let mut exception_tools_default_error_debug_info_handler_bytes = None;
     let mut exception_tools_error_debug_info_bytes = None;
     let mut exception_tools_error_debug_info_handler_bytes = None;
     let mut friendly_exception_bytes = None;
@@ -1227,6 +1231,8 @@ pub fn emit(
             decoded_exception_bytes = Some(bytes);
         } else if *binary_name == EXCEPTION_TOOLS_CLASS {
             exception_tools_bytes = Some(bytes);
+        } else if *binary_name == EXCEPTION_TOOLS_DEFAULT_ERROR_DEBUG_INFO_HANDLER_CLASS {
+            exception_tools_default_error_debug_info_handler_bytes = Some(bytes);
         } else if *binary_name == EXCEPTION_TOOLS_ERROR_DEBUG_INFO_CLASS {
             exception_tools_error_debug_info_bytes = Some(bytes);
         } else if *binary_name == EXCEPTION_TOOLS_ERROR_DEBUG_INFO_HANDLER_CLASS {
@@ -1328,6 +1334,13 @@ pub fn emit(
                 exception_tools_bytes
                     .as_ref()
                     .expect("exception tools source bytes are retained"),
+            );
+        } else if name == format!("{EXCEPTION_TOOLS_DEFAULT_ERROR_DEBUG_INFO_HANDLER_CLASS}.class")
+        {
+            bytes.clone_from(
+                exception_tools_default_error_debug_info_handler_bytes
+                    .as_ref()
+                    .expect("exception tools default error debug info handler bytes are retained"),
             );
         } else if name == format!("{EXCEPTION_TOOLS_ERROR_DEBUG_INFO_CLASS}.class") {
             bytes.clone_from(
@@ -2287,6 +2300,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | DATA_FORMAT_TOOLS_TEXT_RANGE_CLASS
             | DECODED_EXCEPTION_CLASS
             | EXCEPTION_TOOLS_CLASS
+            | EXCEPTION_TOOLS_DEFAULT_ERROR_DEBUG_INFO_HANDLER_CLASS
             | EXCEPTION_TOOLS_ERROR_DEBUG_INFO_CLASS
             | EXCEPTION_TOOLS_ERROR_DEBUG_INFO_HANDLER_CLASS
             | FRIENDLY_EXCEPTION_CLASS
