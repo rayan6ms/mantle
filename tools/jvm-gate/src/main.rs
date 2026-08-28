@@ -198,6 +198,9 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-extended-m3u-parser-consumer" => Some(EXTENDED_M3U_PARSER_CONSUMER),
         "write-hls-stream-segment-consumer" => Some(HLS_STREAM_SEGMENT_CONSUMER),
         "write-hls-stream-segment-parser-consumer" => Some(HLS_STREAM_SEGMENT_PARSER_CONSUMER),
+        "write-hls-stream-segment-url-provider-consumer" => {
+            Some(HLS_STREAM_SEGMENT_URL_PROVIDER_CONSUMER)
+        }
         "write-vorbis-comment-parser-consumer" => Some(VORBIS_COMMENT_PARSER_CONSUMER),
         "write-ogg-vorbis-track-handler-support-consumer" => {
             Some(OGG_VORBIS_TRACK_HANDLER_SUPPORT_CONSUMER)
@@ -19265,6 +19268,143 @@ public final class GateHlsStreamSegmentParser {
   }
   private static final class Derived extends HlsStreamSegmentParser {
     int marker() { return 73; }
+  }
+}
+"##;
+
+const HLS_STREAM_SEGMENT_URL_PROVIDER_CONSUMER: &str = r##"
+import com.sedmelluq.discord.lavaplayer.container.playlists.ExtendedM3uParser;
+import com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamSegmentUrlProvider;
+import com.sedmelluq.discord.lavaplayer.source.stream.M3uStreamSegmentUrlProvider;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.net.URI;
+import java.util.Arrays;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpUriRequest;
+
+public final class GateHlsStreamSegmentUrlProvider {
+  public static void main(String[] args) throws Exception {
+    Exposed provider = new Exposed("https://media.example/root/index.m3u8", "cached.m3u8");
+    constructorAndProtectedMethods(provider);
+    playlistDetection(provider);
+    entrySelection();
+    cachedFetch(provider);
+    reflection();
+    System.out.println("contracts=public-construction,subclassable,superclass-state,constructor-identities,quality-default,segment-playlist-detection,case-sensitive-detection,leading-space-detection,entry-selection,relative-entry,empty-entry,null-lines,cached-fetch-identity,request-type,request-method,request-uri,uncached-null-failure,reflection,volatile-cache,synthetic-lambda");
+  }
+
+  private static void constructorAndProtectedMethods(Exposed provider) {
+    check(provider.quality(null).equals("default"), "quality always defaults");
+    HttpUriRequest request = provider.request("https://media.example/segment.ts");
+    check(request instanceof HttpGet && "GET".equals(request.getMethod())
+        && URI.create("https://media.example/segment.ts").equals(request.getURI()),
+        "segment request type, method, and URI");
+    check(new Exposed(null, null).quality(ExtendedM3uParser.parseLine("#EXTINF:1,Name"))
+        .equals("default"), "null constructor values remain usable");
+  }
+
+  private static void playlistDetection(Exposed provider) {
+    check(provider.segment(new String[] {"#EXTM3U", "#EXTINF:1,Name", "segment.ts"}),
+        "segment playlist without stream directives");
+    check(!provider.segment(new String[] {"#EXT-X-STREAM-INF:BANDWIDTH=1", "stream.m3u8"}),
+        "stream playlist directive detection");
+    check(provider.segment(new String[] {" #EXT-X-STREAM-INF:BANDWIDTH=1"}),
+        "leading spaces do not match stream directive");
+    check(provider.segment(new String[] {"#ext-x-stream-inf:BANDWIDTH=1"}),
+        "directive matching is case sensitive");
+    expect(NullPointerException.class, () -> provider.segment(null));
+    expect(NullPointerException.class, () -> provider.segment(new String[] {null}));
+  }
+
+  private static void entrySelection() {
+    String[] entries = {
+        "#EXTM3U", "#EXT-X-STREAM-INF:BANDWIDTH=1", "relative.m3u8",
+        "#EXT-X-STREAM-INF:BANDWIDTH=2", "https://cdn.example/absolute.m3u8"
+    };
+    check("relative.m3u8".equals(HlsStreamSegmentUrlProvider.findHlsEntryUrl(entries)),
+        "first stream entry is selected");
+    check(HlsStreamSegmentUrlProvider.findHlsEntryUrl(new String[] {"#EXTM3U"}) == null,
+        "empty stream list returns null");
+    expect(NullPointerException.class, () -> HlsStreamSegmentUrlProvider.findHlsEntryUrl(null));
+  }
+
+  private static void cachedFetch(Exposed provider) throws Exception {
+    check(provider.fetch(null) == provider.cachedValue(), "cached playlist identity and bypass");
+    Exposed uncached = new Exposed("https://media.example/root/index.m3u8", null);
+    expect(NullPointerException.class, () -> uncached.fetch(null));
+  }
+
+  private static void reflection() throws Exception {
+    Class<HlsStreamSegmentUrlProvider> type = HlsStreamSegmentUrlProvider.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == M3uStreamSegmentUrlProvider.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 3
+        && type.getDeclaredMethods().length == 6 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredClasses().length == 0, "exact class shape");
+    Field log = type.getDeclaredField("log");
+    check(log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && log.getType().getName().equals("org.slf4j.Logger") && !log.isSynthetic(),
+        "logger metadata");
+    Field streamList = type.getDeclaredField("streamListUrl");
+    check(streamList.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && streamList.getType() == String.class && !streamList.isSynthetic(),
+        "stream list field metadata");
+    Field segment = type.getDeclaredField("segmentPlaylistUrl");
+    check(segment.getModifiers() == (Modifier.PRIVATE | Modifier.VOLATILE)
+        && segment.getType() == String.class && !segment.isSynthetic(),
+        "volatile segment field metadata");
+    Method quality = type.getDeclaredMethod("getQualityFromM3uDirective", ExtendedM3uParser.Line.class);
+    checkProtected(quality, String.class, new Class<?>[] {ExtendedM3uParser.Line.class}, new Class<?>[0]);
+    Method playlist = type.getDeclaredMethod("isSegmentPlaylist", String[].class);
+    checkProtected(playlist, boolean.class, new Class<?>[] {String[].class}, new Class<?>[0]);
+    Method fetch = type.getDeclaredMethod("fetchSegmentPlaylistUrl", HttpInterface.class);
+    checkProtected(fetch, String.class, new Class<?>[] {HttpInterface.class}, new Class<?>[] {IOException.class});
+    Method request = type.getDeclaredMethod("createSegmentGetRequest", String.class);
+    checkProtected(request, HttpUriRequest.class, new Class<?>[] {String.class}, new Class<?>[0]);
+    Method find = type.getDeclaredMethod("findHlsEntryUrl", String[].class);
+    check(find.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC) && find.getReturnType() == String.class
+        && find.getExceptionTypes().length == 0 && !find.isSynthetic() && !find.isBridge(),
+        "findHlsEntryUrl metadata");
+    Method lambda = Arrays.stream(type.getDeclaredMethods())
+        .filter(method -> method.isSynthetic() && method.getName().startsWith("lambda$")).findFirst().orElse(null);
+    check(lambda != null && lambda.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | 0x1000),
+        "synthetic lambda metadata");
+  }
+
+  private static void checkProtected(Method method, Class<?> returnType, Class<?>[] parameters,
+      Class<?>[] exceptions) {
+    check(method.getModifiers() == Modifier.PROTECTED && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isSynthetic() && !method.isBridge(), method.getName() + " metadata");
+  }
+  private static void expect(Class<? extends Throwable> type, Throwing action) {
+    Throwable failure = catchThrowable(action);
+    check(type.isInstance(failure), "expected " + type.getName());
+  }
+  private static Throwable catchThrowable(Throwing action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+  private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+  private static final class Exposed extends HlsStreamSegmentUrlProvider {
+    Exposed(String streamListUrl, String segmentPlaylistUrl) {
+      super(streamListUrl, segmentPlaylistUrl);
+    }
+    String quality(ExtendedM3uParser.Line line) { return getQualityFromM3uDirective(line); }
+    boolean segment(String[] lines) { return isSegmentPlaylist(lines); }
+    String fetch(HttpInterface http) throws IOException { return fetchSegmentPlaylistUrl(http); }
+    HttpUriRequest request(String url) { return createSegmentGetRequest(url); }
+    String cachedValue() throws Exception {
+      Field field = HlsStreamSegmentUrlProvider.class.getDeclaredField("segmentPlaylistUrl");
+      field.setAccessible(true);
+      return (String) field.get(this);
+    }
   }
 }
 "##;

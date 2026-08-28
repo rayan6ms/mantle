@@ -489,6 +489,8 @@ const HLS_STREAM_SEGMENT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/playlists/HlsStreamSegment";
 const HLS_STREAM_SEGMENT_PARSER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/playlists/HlsStreamSegmentParser";
+const HLS_STREAM_SEGMENT_URL_PROVIDER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/playlists/HlsStreamSegmentUrlProvider";
 const MAX_OGG_SEEK_SCAN_BYTES: i64 = 64 << 20;
 const TWITCH_CONSTANTS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/twitch/TwitchConstants";
@@ -834,6 +836,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     EXTENDED_M3U_LINE_CLASS,
     HLS_STREAM_SEGMENT_CLASS,
     HLS_STREAM_SEGMENT_PARSER_CLASS,
+    HLS_STREAM_SEGMENT_URL_PROVIDER_CLASS,
     TWITCH_CONSTANTS_CLASS,
     TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS,
     TWITCH_STREAM_AUDIO_TRACK_CLASS,
@@ -1023,6 +1026,7 @@ pub fn emit(
     let mut extended_m3u_line_bytes = None;
     let mut hls_stream_segment_bytes = None;
     let mut hls_stream_segment_parser_bytes = None;
+    let mut hls_stream_segment_url_provider_bytes = None;
     let mut mpeg_file_loader_bytes = None;
     let mut mpeg_noop_track_consumer_bytes = None;
     let mut mpeg_fragmented_file_track_provider_bytes = None;
@@ -1112,6 +1116,8 @@ pub fn emit(
             hls_stream_segment_bytes = Some(bytes);
         } else if *binary_name == HLS_STREAM_SEGMENT_PARSER_CLASS {
             hls_stream_segment_parser_bytes = Some(bytes);
+        } else if *binary_name == HLS_STREAM_SEGMENT_URL_PROVIDER_CLASS {
+            hls_stream_segment_url_provider_bytes = Some(bytes);
         } else if *binary_name == MPEG_FILE_LOADER_CLASS {
             mpeg_file_loader_bytes = Some(bytes);
         } else if *binary_name == MPEG_NOOP_TRACK_CONSUMER_CLASS {
@@ -1379,6 +1385,12 @@ pub fn emit(
                 hls_stream_segment_parser_bytes
                     .as_ref()
                     .expect("HLS stream segment parser source bytes are retained"),
+            );
+        } else if name == format!("{HLS_STREAM_SEGMENT_URL_PROVIDER_CLASS}.class") {
+            bytes.clone_from(
+                hls_stream_segment_url_provider_bytes
+                    .as_ref()
+                    .expect("HLS stream segment URL provider source bytes are retained"),
             );
         } else if name == format!("{MPEG_FILE_LOADER_CLASS}.class") {
             bytes.clone_from(
@@ -2093,6 +2105,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | EXTENDED_M3U_LINE_CLASS
             | HLS_STREAM_SEGMENT_CLASS
             | HLS_STREAM_SEGMENT_PARSER_CLASS
+            | HLS_STREAM_SEGMENT_URL_PROVIDER_CLASS
             | MPEG_FILE_LOADER_CLASS
             | MPEG_READER_CLASS
             | MPEG_READER_CHAIN_CLASS

@@ -8477,63 +8477,70 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Differential oracle covers provider state, protected/public dispatch, playlist selection, cached fetch behavior, HTTP request construction, and reflection.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamSegmentUrlProvider",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Ljava/lang/String;Ljava/lang/String;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public constructor state and subclass construction match the frozen reference.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamSegmentUrlProvider",
       "symbol_kind": "METHOD",
       "member_name": "getQualityFromM3uDirective",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/playlists/ExtendedM3uParser$Line;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Protected quality extraction always returns the default quality, including null directives.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamSegmentUrlProvider",
       "symbol_kind": "METHOD",
       "member_name": "isSegmentPlaylist",
       "descriptor": "([Ljava/lang/String;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Protected segment-playlist detection preserves case-sensitive startsWith and null failures.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamSegmentUrlProvider",
       "symbol_kind": "METHOD",
       "member_name": "fetchSegmentPlaylistUrl",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Protected cached/fetched playlist selection, empty-list failure, checked IOException declaration, and volatile cache state match the frozen reference.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamSegmentUrlProvider",
       "symbol_kind": "METHOD",
       "member_name": "createSegmentGetRequest",
       "descriptor": "(Ljava/lang/String;)Lorg/apache/http/client/methods/HttpUriRequest;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Protected segment request construction returns an HttpGet with the supplied URL.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamSegmentUrlProvider",
       "symbol_kind": "METHOD",
       "member_name": "findHlsEntryUrl",
       "descriptor": "([Ljava/lang/String;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public static entry selection returns the first parsed stream URL, null for no entries, and preserves null failure behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamTrack",

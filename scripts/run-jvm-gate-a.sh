@@ -324,6 +324,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-hls-stream-segment-consumer \
   --output "$WORK/GateHlsStreamSegment.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-hls-stream-segment-parser-consumer \
   --output "$WORK/GateHlsStreamSegmentParser.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-hls-stream-segment-url-provider-consumer \
+  --output "$WORK/GateHlsStreamSegmentUrlProvider.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-vorbis-comment-parser-consumer \
   --output "$WORK/GateVorbisCommentParser.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ogg-vorbis-track-handler-support-consumer \
@@ -688,6 +690,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_VORBIS_CLA
   "$WORK/GateExtendedM3uParser.java" \
   "$WORK/GateHlsStreamSegment.java" \
   "$WORK/GateHlsStreamSegmentParser.java" \
+  "$WORK/GateHlsStreamSegmentUrlProvider.java" \
   "$WORK/GateVorbisCommentParser.java" \
   "$WORK/OggVorbisTrackHandler.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_VORBIS_TRACK_CLASSES" \
@@ -1852,6 +1855,17 @@ cmp "$WORK/hls-stream-segment-parser-reference.txt" \
 grep --fixed-strings \
   'contracts=public-construction,subclassable,array-list-result,fresh-result,trimmed-data,extinf-order,metadata-name,decimal-milliseconds,invalid-duration-null,nan-zero,infinity-saturation,negative-infinity-saturation,stale-metadata,non-extinf-ignored,no-comma-null-metadata,empty-lines,mutable-result,null-array,null-url,reflection,generic-signatures,private-duration-helper' \
   "$WORK/hls-stream-segment-parser-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$ogg_vorbis_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateHlsStreamSegmentUrlProvider >"$WORK/hls-stream-segment-url-provider-reference.txt"
+java -Xverify:all \
+  -cp "$ogg_vorbis_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateHlsStreamSegmentUrlProvider >"$WORK/hls-stream-segment-url-provider-candidate.txt"
+cmp "$WORK/hls-stream-segment-url-provider-reference.txt" \
+  "$WORK/hls-stream-segment-url-provider-candidate.txt"
+grep --fixed-strings \
+  'contracts=public-construction,subclassable,superclass-state,constructor-identities,quality-default,segment-playlist-detection,case-sensitive-detection,leading-space-detection,entry-selection,relative-entry,empty-entry,null-lines,cached-fetch-identity,request-type,request-method,request-uri,uncached-null-failure,reflection,volatile-cache,synthetic-lambda' \
+  "$WORK/hls-stream-segment-url-provider-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_vorbis_track_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggVorbisTrackHandler >"$WORK/ogg-vorbis-track-handler-reference.txt"
