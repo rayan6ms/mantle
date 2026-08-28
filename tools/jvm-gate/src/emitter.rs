@@ -207,6 +207,12 @@ const MPEG_SEGMENT_ENTRY_CLASS: &str =
 const MPEG_TRACK_FRAGMENT_HEADER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/fragmented/MpegTrackFragmentHeader";
 const MPEG_TRACK_FRAGMENT_HEADER_BUILDER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/fragmented/MpegTrackFragmentHeader$Builder";
+const MPEG_STANDARD_FILE_TRACK_PROVIDER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/standard/MpegStandardFileTrackProvider";
+const MPEG_STANDARD_TRACK_SEEK_INFO_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/standard/MpegStandardFileTrackProvider$TrackSeekInfo";
+const MPEG_STANDARD_TRACK_SEEK_INFO_BUILDER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/standard/MpegStandardFileTrackProvider$TrackSeekInfoBuilder";
+const MPEG_STANDARD_SAMPLE_DURATION_ITERATOR_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/standard/MpegStandardFileTrackProvider$SampleDurationIterator";
+const MPEG_STANDARD_SAMPLE_CHUNKING_ITERATOR_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/standard/MpegStandardFileTrackProvider$SampleChunkingIterator";
 const MPEG_AAC_TRACK_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegAacTrackConsumer";
 const ADTS_CONTAINER_PROBE_CLASS: &str =
@@ -656,6 +662,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MPEG_SEGMENT_ENTRY_CLASS,
     MPEG_TRACK_FRAGMENT_HEADER_CLASS,
     MPEG_TRACK_FRAGMENT_HEADER_BUILDER_CLASS,
+    MPEG_STANDARD_FILE_TRACK_PROVIDER_CLASS,
     MPEG_AAC_TRACK_CONSUMER_CLASS,
     ADTS_CONTAINER_PROBE_CLASS,
     ADTS_PACKET_HEADER_CLASS,
@@ -859,6 +866,10 @@ const PRIVATE_SUPPORT_CLASSES: &[&str] = &[
     MATROSKA_FILE_TRACK_BUILDER_CLASS,
     MATROSKA_FILE_TRACK_AUDIO_BUILDER_CLASS,
     MPEG_READER_HANDLER_CLASS,
+    MPEG_STANDARD_TRACK_SEEK_INFO_CLASS,
+    MPEG_STANDARD_TRACK_SEEK_INFO_BUILDER_CLASS,
+    MPEG_STANDARD_SAMPLE_DURATION_ITERATOR_CLASS,
+    MPEG_STANDARD_SAMPLE_CHUNKING_ITERATOR_CLASS,
 ];
 
 #[derive(Serialize)]
@@ -899,6 +910,11 @@ pub fn emit(
     let mut mpeg_segment_entry_bytes = None;
     let mut mpeg_track_fragment_header_bytes = None;
     let mut mpeg_track_fragment_header_builder_bytes = None;
+    let mut mpeg_standard_file_track_provider_bytes = None;
+    let mut mpeg_standard_track_seek_info_bytes = None;
+    let mut mpeg_standard_track_seek_info_builder_bytes = None;
+    let mut mpeg_standard_sample_duration_iterator_bytes = None;
+    let mut mpeg_standard_sample_chunking_iterator_bytes = None;
     for binary_name in REFERENCE_CLASSES.iter().chain(PRIVATE_SUPPORT_CLASSES) {
         let mut entry = source.by_name(&format!("{binary_name}.class"))?;
         let mut bytes = Vec::new();
@@ -930,6 +946,16 @@ pub fn emit(
             mpeg_track_fragment_header_bytes = Some(bytes);
         } else if *binary_name == MPEG_TRACK_FRAGMENT_HEADER_BUILDER_CLASS {
             mpeg_track_fragment_header_builder_bytes = Some(bytes);
+        } else if *binary_name == MPEG_STANDARD_FILE_TRACK_PROVIDER_CLASS {
+            mpeg_standard_file_track_provider_bytes = Some(bytes);
+        } else if *binary_name == MPEG_STANDARD_TRACK_SEEK_INFO_CLASS {
+            mpeg_standard_track_seek_info_bytes = Some(bytes);
+        } else if *binary_name == MPEG_STANDARD_TRACK_SEEK_INFO_BUILDER_CLASS {
+            mpeg_standard_track_seek_info_builder_bytes = Some(bytes);
+        } else if *binary_name == MPEG_STANDARD_SAMPLE_DURATION_ITERATOR_CLASS {
+            mpeg_standard_sample_duration_iterator_bytes = Some(bytes);
+        } else if *binary_name == MPEG_STANDARD_SAMPLE_CHUNKING_ITERATOR_CLASS {
+            mpeg_standard_sample_chunking_iterator_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -1035,6 +1061,36 @@ pub fn emit(
                 mpeg_track_fragment_header_builder_bytes
                     .as_ref()
                     .expect("MPEG track fragment header builder source bytes are retained"),
+            );
+        } else if name == format!("{MPEG_STANDARD_FILE_TRACK_PROVIDER_CLASS}.class") {
+            bytes.clone_from(
+                mpeg_standard_file_track_provider_bytes
+                    .as_ref()
+                    .expect("MPEG standard provider source bytes are retained"),
+            );
+        } else if name == format!("{MPEG_STANDARD_TRACK_SEEK_INFO_CLASS}.class") {
+            bytes.clone_from(
+                mpeg_standard_track_seek_info_bytes
+                    .as_ref()
+                    .expect("MPEG standard seek info source bytes are retained"),
+            );
+        } else if name == format!("{MPEG_STANDARD_TRACK_SEEK_INFO_BUILDER_CLASS}.class") {
+            bytes.clone_from(
+                mpeg_standard_track_seek_info_builder_bytes
+                    .as_ref()
+                    .expect("MPEG standard seek info builder source bytes are retained"),
+            );
+        } else if name == format!("{MPEG_STANDARD_SAMPLE_DURATION_ITERATOR_CLASS}.class") {
+            bytes.clone_from(
+                mpeg_standard_sample_duration_iterator_bytes
+                    .as_ref()
+                    .expect("MPEG standard duration iterator source bytes are retained"),
+            );
+        } else if name == format!("{MPEG_STANDARD_SAMPLE_CHUNKING_ITERATOR_CLASS}.class") {
+            bytes.clone_from(
+                mpeg_standard_sample_chunking_iterator_bytes
+                    .as_ref()
+                    .expect("MPEG standard chunking iterator source bytes are retained"),
             );
         } else {
             class.to_bytes(&mut bytes)?;
@@ -1564,6 +1620,11 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | MPEG_SEGMENT_ENTRY_CLASS
             | MPEG_TRACK_FRAGMENT_HEADER_CLASS
             | MPEG_TRACK_FRAGMENT_HEADER_BUILDER_CLASS
+            | MPEG_STANDARD_FILE_TRACK_PROVIDER_CLASS
+            | MPEG_STANDARD_TRACK_SEEK_INFO_CLASS
+            | MPEG_STANDARD_TRACK_SEEK_INFO_BUILDER_CLASS
+            | MPEG_STANDARD_SAMPLE_DURATION_ITERATOR_CLASS
+            | MPEG_STANDARD_SAMPLE_CHUNKING_ITERATOR_CLASS
     ) {
         return Ok(class);
     }

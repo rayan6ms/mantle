@@ -190,6 +190,9 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-mpeg-global-seek-info-consumer" => Some(MPEG_GLOBAL_SEEK_INFO_CONSUMER),
         "write-mpeg-segment-entry-consumer" => Some(MPEG_SEGMENT_ENTRY_CONSUMER),
         "write-mpeg-track-fragment-header-consumer" => Some(MPEG_TRACK_FRAGMENT_HEADER_CONSUMER),
+        "write-mpeg-standard-file-track-provider-consumer" => {
+            Some(MPEG_STANDARD_FILE_TRACK_PROVIDER_CONSUMER)
+        }
         "write-mpeg-noop-track-consumer-consumer" => Some(MPEG_NOOP_TRACK_CONSUMER_CONSUMER),
         "write-mpeg-track-consumer-consumer" => Some(MPEG_TRACK_CONSUMER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
@@ -17402,6 +17405,187 @@ public final class GateMpegTrackFragmentHeader {
     }
   }
 
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MPEG_STANDARD_FILE_TRACK_PROVIDER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegNoopTrackConsumer;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackConsumer;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackInfo;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegReader;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegSectionInfo;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegVersionedSectionInfo;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.standard.MpegStandardFileTrackProvider;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
+public final class GateMpegStandardFileTrackProvider {
+  public static void main(String[] args) throws Exception {
+    constructionAndDefaults();
+    mediaHeadersAndLifecycle();
+    parserAttachmentAndFailures();
+    reflection();
+    System.out.println("contracts=constructor,reader-identity,collection-defaults,scalar-defaults,nullable-reader,consumer-identity,initialise-miss,initialise-cleanup,media-header-v0,media-header-v1,full-width-timescale,parser-attachment,pre-init-duration,pre-init-seek,pre-init-frames,public-interface,private-state,field-order,method-descriptors,checked-throws,inner-metadata,reflection");
+  }
+
+  private static void constructionAndDefaults() throws Exception {
+    EmptyStream stream = new EmptyStream();
+    MpegReader reader = new MpegReader(stream);
+    MpegStandardFileTrackProvider provider = new MpegStandardFileTrackProvider(reader);
+    check(field(provider, "reader") == reader, "constructor retains exact reader identity");
+    check(field(provider, "builders") instanceof List && ((List<?>) field(provider, "builders")).isEmpty()
+        && field(provider, "trackTimescales") instanceof Map
+        && ((Map<?, ?>) field(provider, "trackTimescales")).isEmpty(),
+        "constructor creates empty builder and timescale collections");
+    check(((Integer) field(provider, "timescale")) == 0
+        && ((Integer) field(provider, "currentChunk")) == 0
+        && field(provider, "consumer") == null && field(provider, "seekInfo") == null,
+        "constructor establishes exact scalar and nullable state defaults");
+    MpegStandardFileTrackProvider nullable = new MpegStandardFileTrackProvider(null);
+    check(field(nullable, "reader") == null, "constructor accepts nullable reader without eager access");
+  }
+
+  private static void mediaHeadersAndLifecycle() throws Exception {
+    MemoryStream stream = new MemoryStream(v0Bytes(Integer.MIN_VALUE));
+    MpegReader reader = new MpegReader(stream);
+    MpegStandardFileTrackProvider provider = new MpegStandardFileTrackProvider(reader);
+    MpegVersionedSectionInfo v0 = versioned(0, 0);
+    provider.readMediaHeaders(v0, 7);
+    Map<?, ?> scales = (Map<?, ?>) field(provider, "trackTimescales");
+    check(scales.get(7).equals(Integer.MIN_VALUE), "version-zero media header stores signed timescale");
+    MemoryStream v1Stream = new MemoryStream(v1Bytes(Long.MIN_VALUE, Long.MAX_VALUE, Integer.MAX_VALUE));
+    MpegStandardFileTrackProvider v1Provider = new MpegStandardFileTrackProvider(new MpegReader(v1Stream));
+    v1Provider.readMediaHeaders(versioned(1, 0), Integer.MAX_VALUE);
+    check(((Map<?, ?>) field(v1Provider, "trackTimescales")).get(Integer.MAX_VALUE).equals(Integer.MAX_VALUE),
+        "version-one media header consumes full-width fields and stores timescale");
+
+    MpegTrackConsumer consumer = new MpegNoopTrackConsumer(new MpegTrackInfo(7, null, null, 0, 0, null));
+    check(!provider.initialise(consumer) && field(provider, "consumer") == consumer
+        && ((List<?>) field(provider, "builders")).isEmpty(),
+        "initialise retains consumer identity, misses without builder, and clears builders");
+    check(catchThrowable(provider::getDuration) instanceof NullPointerException,
+        "duration fails naturally before seek metadata");
+    check(catchThrowable(() -> provider.seekToTimecode(Long.MIN_VALUE)) instanceof NullPointerException,
+        "seek fails naturally before seek metadata");
+    check(catchThrowable(provider::provideFrames) instanceof NullPointerException,
+        "frame delivery fails naturally before seek metadata");
+  }
+
+  private static void parserAttachmentAndFailures() throws Exception {
+    EmptyStream stream = new EmptyStream();
+    MpegReader reader = new MpegReader(stream);
+    MpegStandardFileTrackProvider provider = new MpegStandardFileTrackProvider(reader);
+    provider.attachSampleTableParsers(reader.in(new MpegSectionInfo(0L, 0L, "stbl")), 12);
+    check(((List<?>) field(provider, "builders")).size() == 1,
+        "sample-table parser attachment records one track builder");
+    check(catchThrowable(() -> provider.readMediaHeaders(null, 1)) instanceof NullPointerException,
+        "null media header fails naturally");
+    check(catchThrowable(() -> provider.attachSampleTableParsers(null, 1)) instanceof NullPointerException,
+        "null parser chain fails naturally");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MpegStandardFileTrackProvider> type = MpegStandardFileTrackProvider.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {
+            com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegFileTrackProvider.class})
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0
+        && type.getDeclaredFields().length == 7 && type.getDeclaredMethods().length == 16
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredClasses().length == 4,
+        "exact provider metadata and member counts");
+    check(Arrays.equals(Arrays.stream(type.getDeclaredFields()).map(Field::getName).toArray(),
+        new String[] {"reader", "builders", "trackTimescales", "timescale", "currentChunk",
+            "consumer", "seekInfo"}), "exact private field order");
+    checkField(type.getDeclaredField("reader"), MpegReader.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type.getDeclaredField("builders"), List.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type.getDeclaredField("trackTimescales"), Map.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type.getDeclaredField("timescale"), int.class, Modifier.PRIVATE);
+    checkField(type.getDeclaredField("currentChunk"), int.class, Modifier.PRIVATE);
+    checkField(type.getDeclaredField("consumer"), MpegTrackConsumer.class, Modifier.PRIVATE);
+    checkField(type.getDeclaredField("seekInfo"), Class.forName(type.getName() + "$TrackSeekInfo"), Modifier.PRIVATE);
+    Constructor<MpegStandardFileTrackProvider> constructor = type.getDeclaredConstructor(MpegReader.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0
+        && !constructor.isSynthetic(), "exact public constructor metadata");
+    checkMethod(type.getDeclaredMethod("initialise", MpegTrackConsumer.class), boolean.class,
+        new Class<?>[] {MpegTrackConsumer.class}, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("getDuration"), long.class, new Class<?>[0], new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("provideFrames"), void.class, new Class<?>[0],
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("seekToTimecode", long.class), void.class,
+        new Class<?>[] {long.class}, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("readMediaHeaders", MpegVersionedSectionInfo.class, int.class),
+        void.class, new Class<?>[] {MpegVersionedSectionInfo.class, int.class}, new Class<?>[] {IOException.class});
+    checkMethod(type.getDeclaredMethod("attachSampleTableParsers", MpegReader.Chain.class, int.class),
+        void.class, new Class<?>[] {MpegReader.Chain.class, int.class}, new Class<?>[0]);
+  }
+
+  private static void checkField(Field field, Class<?> fieldType, int modifiers) {
+    check(field.getType() == fieldType && field.getModifiers() == modifiers && !field.isSynthetic(),
+        field.getName() + " field metadata");
+  }
+  private static void checkMethod(Method method, Class<?> returnType, Class<?>[] parameters,
+      Class<?>[] failures) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isVarArgs(), method.getName() + " method metadata");
+  }
+  private static Object field(Object owner, String name) throws Exception {
+    Field field = owner.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(owner);
+  }
+  private static MpegVersionedSectionInfo versioned(int version, int flags) {
+    return new MpegVersionedSectionInfo(new MpegSectionInfo(0L, 0L, "mdhd"), version, flags);
+  }
+  private static byte[] v0Bytes(int timescale) throws IOException {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    DataOutputStream data = new DataOutputStream(output);
+    data.writeInt(0); data.writeInt(0); data.writeInt(timescale); data.writeInt(0);
+    return output.toByteArray();
+  }
+  private static byte[] v1Bytes(long creation, long modification, int timescale) throws IOException {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    DataOutputStream data = new DataOutputStream(output);
+    data.writeLong(creation); data.writeLong(modification); data.writeInt(timescale); data.writeLong(0);
+    return output.toByteArray();
+  }
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+  private interface ThrowingRunnable { void run() throws Throwable; }
+  private static final class EmptyStream extends SeekableInputStream {
+    EmptyStream() { super(0L, 0L); }
+    @Override public int read() { return -1; }
+    @Override public long getPosition() { return 0L; }
+    @Override protected void seekHard(long position) {}
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() { return Collections.emptyList(); }
+  }
+  private static final class MemoryStream extends SeekableInputStream {
+    private final byte[] data;
+    private int position;
+    MemoryStream(byte[] data) { super(data.length, 0L); this.data = data; }
+    @Override public int read() { return position < data.length ? data[position++] & 0xff : -1; }
+    @Override public long getPosition() { return position; }
+    @Override protected void seekHard(long target) { position = (int) target; }
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() { return Collections.emptyList(); }
+  }
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }

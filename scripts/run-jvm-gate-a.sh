@@ -295,6 +295,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-segment-entry-consumer \
   --output "$WORK/GateMpegSegmentEntry.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-fragment-header-consumer \
   --output "$WORK/GateMpegTrackFragmentHeader.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-standard-file-track-provider-consumer \
+  --output "$WORK/GateMpegStandardFileTrackProvider.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-noop-track-consumer-consumer \
   --output "$WORK/GateMpegNoopTrackConsumer.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-consumer-consumer \
@@ -478,6 +480,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateMpegGlobalSeekInfo.java" \
   "$WORK/GateMpegSegmentEntry.java" \
   "$WORK/GateMpegTrackFragmentHeader.java" \
+  "$WORK/GateMpegStandardFileTrackProvider.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GateAdtsStreamReader.java" \
@@ -1638,6 +1641,16 @@ cmp "$WORK/mpeg-track-fragment-header-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,scalar-storage,array-identity,signed-extrema,identity-equality,subclassable,builder-default,builder-setters,array-allocation,array-identity-through-build,default-size-fill,zero-default-null,flag-retention,unchecked-failures,negative-size-failure,public-final-fields,private-builder-state,field-order,method-descriptors,constructor-descriptors,no-throws,member-counts,reflection' \
   "$WORK/mpeg-track-fragment-header-candidate.txt" >/dev/null
+java -Xverify:all -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegStandardFileTrackProvider >"$WORK/mpeg-standard-file-track-provider-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegStandardFileTrackProvider >"$WORK/mpeg-standard-file-track-provider-candidate.txt"
+cmp "$WORK/mpeg-standard-file-track-provider-reference.txt" \
+  "$WORK/mpeg-standard-file-track-provider-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,reader-identity,collection-defaults,scalar-defaults,nullable-reader,consumer-identity,initialise-miss,initialise-cleanup,media-header-v0,media-header-v1,full-width-timescale,parser-attachment,pre-init-duration,pre-init-seek,pre-init-frames,public-interface,private-state,field-order,method-descriptors,checked-throws,inner-metadata,reflection' \
+  "$WORK/mpeg-standard-file-track-provider-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mp3_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMp3ConstantRateSeeker \
   >"$WORK/mp3-constant-rate-seeker-reference.txt"

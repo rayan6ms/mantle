@@ -6817,72 +6817,80 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public standard-file provider preserves exact Java 11 metadata, private state layout, and reference lifecycle behavior through the verified reference implementation shell and retained support classes.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.standard.MpegStandardFileTrackProvider",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegReader;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public constructor preserves nullable reader acceptance, exact collection/scalar defaults, descriptor, and reflection metadata.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.standard.MpegStandardFileTrackProvider",
       "symbol_kind": "METHOD",
       "member_name": "initialise",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/mpeg/MpegTrackConsumer;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public initializer preserves consumer identity, track-timescale miss behavior, builder cleanup, and boolean result semantics.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.standard.MpegStandardFileTrackProvider",
       "symbol_kind": "METHOD",
       "member_name": "getDuration",
       "descriptor": "()J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public duration method preserves full-width return behavior and natural pre-initialization failure identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.standard.MpegStandardFileTrackProvider",
       "symbol_kind": "METHOD",
       "member_name": "provideFrames",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public frame-delivery method preserves its InterruptedException declaration and natural pre-initialization failure behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.standard.MpegStandardFileTrackProvider",
       "symbol_kind": "METHOD",
       "member_name": "seekToTimecode",
       "descriptor": "(J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public seek method preserves full-width timecode input and natural pre-initialization failure behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.standard.MpegStandardFileTrackProvider",
       "symbol_kind": "METHOD",
       "member_name": "readMediaHeaders",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegVersionedSectionInfo;I)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public media-header parser preserves version-specific field consumption, signed full-width timescale storage, and checked IOException metadata.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.standard.MpegStandardFileTrackProvider",
       "symbol_kind": "METHOD",
       "member_name": "attachSampleTableParsers",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegReader$Chain;I)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public parser-attachment method preserves chain registration, builder recording, nullable failure behavior, and exact descriptor metadata.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpegts.MpegAdtsAudioTrack",
