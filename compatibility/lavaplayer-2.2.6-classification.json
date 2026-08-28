@@ -23964,126 +23964,140 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public utility shell preserves exact static state, superclass identity, and reflection shape.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.ExceptionTools",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public no-throws constructor retains exact identity and constructor metadata.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.ExceptionTools",
       "symbol_kind": "METHOD",
       "member_name": "rethrowErrors",
       "descriptor": "(Ljava/lang/Throwable;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Error instances are rethrown by identity while ordinary throwables return normally.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.ExceptionTools",
       "symbol_kind": "METHOD",
       "member_name": "wrapUnfriendlyExceptions",
       "descriptor": "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity;Ljava/lang/Throwable;)Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Existing FriendlyException identity and wrapping message, severity, and cause propagation are preserved.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.ExceptionTools",
       "symbol_kind": "METHOD",
       "member_name": "wrapUnfriendlyExceptions",
       "descriptor": "(Ljava/lang/Throwable;)Ljava/lang/RuntimeException;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Friendly exceptions retain identity and other throwables are wrapped with their cause unchanged.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.ExceptionTools",
       "symbol_kind": "METHOD",
       "member_name": "toRuntimeException",
       "descriptor": "(Ljava/lang/Exception;)Ljava/lang/RuntimeException;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "RuntimeException identity and checked-exception cause wrapping retain reference behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.ExceptionTools",
       "symbol_kind": "METHOD",
       "member_name": "findDeepException",
       "descriptor": "(Ljava/lang/Throwable;Ljava/lang/Class;)Ljava/lang/Throwable;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Cause-chain traversal preserves assignable-type matching, first-match identity, and null termination.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.ExceptionTools",
       "symbol_kind": "METHOD",
       "member_name": "keepInterrupted",
       "descriptor": "(Ljava/lang/Throwable;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "InterruptedException restores the current thread flag while unrelated throwables leave it unchanged.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.ExceptionTools",
       "symbol_kind": "METHOD",
       "member_name": "log",
       "descriptor": "(Lorg/slf4j/Logger;Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException;Ljava/lang/Object;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Severity-directed logger dispatch preserves debug, warning, and error method selection and argument identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.ExceptionTools",
       "symbol_kind": "METHOD",
       "member_name": "setDebugInfoHandler",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/ExceptionTools$ErrorDebugInfoHandler;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Debug-handler replacement preserves nullable volatile global state and callback configuration behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.ExceptionTools",
       "symbol_kind": "METHOD",
       "member_name": "throwWithDebugInfo",
       "descriptor": "(Lorg/slf4j/Logger;Ljava/lang/Throwable;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/RuntimeException;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Debug error IDs and redacted diagnostic messages preserve returned RuntimeException cause and message behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.ExceptionTools",
       "symbol_kind": "METHOD",
       "member_name": "encodeException",
       "descriptor": "(Ljava/io/DataOutput;Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exception-chain and stack serialization preserve ordering, nullable messages, severity ordinals, and checked I/O failures.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.ExceptionTools",
       "symbol_kind": "METHOD",
       "member_name": "closeWithWarnings",
       "descriptor": "(Ljava/lang/AutoCloseable;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "AutoCloseable close dispatch preserves successful completion and warning-only checked failure handling.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.ExceptionTools",
       "symbol_kind": "METHOD",
       "member_name": "decodeException",
       "descriptor": "(Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exception-chain and stack deserialization preserve decoded exception types, messages, severity, ordering, and checked I/O failures.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.ExceptionTools$DefaultErrorDebugInfoHandler",

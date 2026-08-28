@@ -139,6 +139,15 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
         }
+        _ => tools_consumer_source(command)
+            .or_else(|| container_consumer_source(command))
+            .or_else(|| filter_format_consumer_source(command))
+            .or_else(|| sound_cloud_consumer_source(command)),
+    }
+}
+
+fn tools_consumer_source(command: &str) -> Option<&'static str> {
+    match command {
         "write-copy-on-update-identity-list-consumer" => {
             Some(COPY_ON_UPDATE_IDENTITY_LIST_CONSUMER)
         }
@@ -147,9 +156,8 @@ fn consumer_source(command: &str) -> Option<&'static str> {
             Some(DATA_FORMAT_TOOLS_TEXT_RANGE_CONSUMER)
         }
         "write-decoded-exception-consumer" => Some(DECODED_EXCEPTION_CONSUMER),
-        _ => container_consumer_source(command)
-            .or_else(|| filter_format_consumer_source(command))
-            .or_else(|| sound_cloud_consumer_source(command)),
+        "write-exception-tools-consumer" => Some(EXCEPTION_TOOLS_CONSUMER),
+        _ => None,
     }
 }
 
@@ -26916,6 +26924,209 @@ public final class GateDecodedException {
         && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
   }
 
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const EXCEPTION_TOOLS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.DecodedException;
+import com.sedmelluq.discord.lavaplayer.tools.ExceptionTools;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException.Severity;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.TypeVariable;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.slf4j.Logger;
+
+public final class GateExceptionTools {
+  public static void main(String[] args) throws Exception {
+    construction(); wrapping(); deepAndInterrupt(); logging(); debugInfo(); serialization(); closing(); reflection();
+    System.out.println("contracts=constructor,rethrow,wrap-friendly,wrap-runtime,to-runtime,find-deep,interrupt,log,debug-info,serialization,close-warnings,reflection");
+  }
+
+  private static void construction() {
+    check(new ExceptionTools().getClass() == ExceptionTools.class, "constructor");
+    AssertionError error = new AssertionError("fatal");
+    check(catchThrowable(() -> ExceptionTools.rethrowErrors(error)) == error, "rethrow error identity");
+    ExceptionTools.rethrowErrors(new RuntimeException("ordinary"));
+    check(true, "ordinary no throw");
+  }
+
+  private static void wrapping() {
+    FriendlyException friendly = new FriendlyException("friendly", Severity.COMMON, null);
+    check(ExceptionTools.wrapUnfriendlyExceptions("ignored", Severity.FAULT, friendly) == friendly,
+        "friendly identity");
+    IllegalArgumentException cause = new IllegalArgumentException("bad");
+    FriendlyException wrapped = ExceptionTools.wrapUnfriendlyExceptions("wrapped", Severity.SUSPICIOUS, cause);
+    check(wrapped != null && wrapped != friendly && "wrapped".equals(wrapped.getMessage())
+        && wrapped.severity == Severity.SUSPICIOUS && wrapped.getCause() == cause,
+        "friendly wrapping");
+    check(ExceptionTools.wrapUnfriendlyExceptions(friendly) == friendly, "runtime friendly identity");
+    RuntimeException runtime = ExceptionTools.wrapUnfriendlyExceptions(cause);
+    check(runtime != cause && runtime.getCause() == cause, "runtime wrapping");
+    RuntimeException existing = new RuntimeException("existing");
+    check(ExceptionTools.toRuntimeException(existing) == existing, "runtime identity");
+    Exception checked = new Exception("checked");
+    RuntimeException converted = ExceptionTools.toRuntimeException(checked);
+    check(converted != checked && converted.getCause() == checked, "checked conversion");
+  }
+
+  private static void deepAndInterrupt() {
+    IllegalStateException target = new IllegalStateException("target");
+    RuntimeException middle = new RuntimeException(target);
+    check(ExceptionTools.<IllegalStateException>findDeepException(middle, IllegalStateException.class) == target
+        && ExceptionTools.findDeepException(null, IllegalStateException.class) == null
+        && ExceptionTools.findDeepException(middle, NullPointerException.class) == null,
+        "deep search");
+    Thread.interrupted();
+    ExceptionTools.keepInterrupted(new RuntimeException());
+    check(!Thread.currentThread().isInterrupted(), "ordinary interrupt unchanged");
+    ExceptionTools.keepInterrupted(new InterruptedException());
+    check(Thread.currentThread().isInterrupted(), "interrupted restored");
+    Thread.interrupted();
+  }
+
+  private static void logging() {
+    AtomicReference<String> called = new AtomicReference<>();
+    Logger logger = logger(called);
+    FriendlyException common = new FriendlyException("common", Severity.COMMON, null);
+    FriendlyException suspicious = new FriendlyException("suspicious", Severity.SUSPICIOUS, null);
+    FriendlyException fault = new FriendlyException("fault", Severity.FAULT, null);
+    ExceptionTools.log(logger, common, "one");
+    check("debug".equals(called.get()), "common log");
+    ExceptionTools.log(logger, suspicious, "two");
+    check("warn".equals(called.get()), "suspicious log");
+    ExceptionTools.log(logger, fault, "three");
+    check("error".equals(called.get()), "fault log");
+  }
+
+  private static void debugInfo() {
+    AtomicReference<ExceptionTools.ErrorDebugInfo> info = new AtomicReference<>();
+    ExceptionTools.setDebugInfoHandler(info::set);
+    Logger logger = logger(new AtomicReference<>());
+    IllegalStateException cause = new IllegalStateException("cause");
+    RuntimeException result = ExceptionTools.throwWithDebugInfo(
+        logger, cause, "message", "name", "secret-value");
+    ExceptionTools.ErrorDebugInfo payload = info.get();
+    check(payload != null && payload.log == logger && payload.cause == cause
+        && "message".equals(payload.message) && "name".equals(payload.name)
+        && "secret-value".equals(payload.value) && payload.errorId.length() == 36,
+        "debug handler payload");
+    check(result.getCause() == cause && result.getMessage().startsWith("message EID: ")
+        && result.getMessage().contains(payload.errorId)
+        && result.getMessage().endsWith("name<redacted>")
+        && !result.getMessage().contains("secret-value"), "debug info redaction");
+    ExceptionTools.setDebugInfoHandler(info::set);
+  }
+
+  private static void serialization() throws Exception {
+    DecodedException inner = new DecodedException("InnerType", "inner message", null);
+    DecodedException outer = new DecodedException("OuterType", null, inner);
+    FriendlyException original = new FriendlyException("serialized", Severity.FAULT,
+        outer);
+    StackTraceElement marker = new StackTraceElement("Gate", "run", "Gate.java", 12);
+    original.setStackTrace(new StackTraceElement[] {marker});
+    outer.setStackTrace(new StackTraceElement[] {marker});
+    inner.setStackTrace(new StackTraceElement[] {marker});
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    ExceptionTools.encodeException(new DataOutputStream(bytes), original);
+    FriendlyException decoded = ExceptionTools.decodeException(
+        new DataInputStream(new ByteArrayInputStream(bytes.toByteArray())));
+    check("serialized".equals(decoded.getMessage()) && decoded.severity == Severity.FAULT
+        && decoded.getCause() instanceof DecodedException
+        && "OuterType".equals(((DecodedException) decoded.getCause()).className)
+        && ((DecodedException) decoded.getCause()).originalMessage == null
+        && decoded.getCause().getCause() instanceof DecodedException
+        && "InnerType".equals(((DecodedException) decoded.getCause().getCause()).className)
+        && "inner message".equals(
+            ((DecodedException) decoded.getCause().getCause()).originalMessage)
+        && decoded.getStackTrace().length == 1 && decoded.getStackTrace()[0].equals(marker),
+        "exception serialization");
+    check(catchThrowable(() -> ExceptionTools.decodeException(
+        new DataInputStream(new ByteArrayInputStream(new byte[0])))) instanceof IOException,
+        "decode I/O failure");
+    DataOutputStream failing = new DataOutputStream(new OutputStream() {
+      @Override public void write(int value) throws IOException { throw new IOException("write"); }
+    });
+    check(catchThrowable(() -> ExceptionTools.encodeException(failing, original)) instanceof IOException,
+        "encode I/O failure");
+  }
+
+  private static void closing() {
+    AtomicInteger closes = new AtomicInteger();
+    ExceptionTools.closeWithWarnings(closes::incrementAndGet);
+    ExceptionTools.closeWithWarnings(() -> {
+      closes.incrementAndGet();
+      throw new Exception("close failure");
+    });
+    check(closes.get() == 2, "close success and warning-only failure");
+  }
+
+  private static Logger logger(AtomicReference<String> called) {
+    return (Logger) Proxy.newProxyInstance(Logger.class.getClassLoader(), new Class<?>[] {Logger.class},
+        (proxy, method, args) -> {
+          if (method.getName().equals("debug") || method.getName().equals("warn")
+              || method.getName().equals("error")) called.set(method.getName());
+          if (method.getReturnType() == boolean.class) return false;
+          if (method.getReturnType() == byte.class) return (byte) 0;
+          if (method.getReturnType() == short.class) return (short) 0;
+          if (method.getReturnType() == int.class) return 0;
+          if (method.getReturnType() == long.class) return 0L;
+          if (method.getReturnType() == float.class) return 0f;
+          if (method.getReturnType() == double.class) return 0d;
+          if (method.getReturnType() == char.class) return (char) 0;
+          return null;
+        });
+  }
+
+  private static void reflection() throws Exception {
+    Class<ExceptionTools> type = ExceptionTools.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 2
+        && type.getDeclaredMethods().length == 14 && type.getDeclaredConstructors().length == 1,
+        "class shape");
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    for (Method method : type.getDeclaredMethods()) {
+      if (Modifier.isPublic(method.getModifiers())) {
+        check(method.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+            && !method.isSynthetic() && !method.isBridge() && !method.isVarArgs(),
+            method.getName() + " metadata");
+      } else {
+        check(method.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC)
+            && !method.isSynthetic() && !method.isBridge() && !method.isVarArgs(),
+            method.getName() + " private metadata");
+      }
+    }
+    Method deep = type.getDeclaredMethod("findDeepException", Throwable.class, Class.class);
+    check(deep.getTypeParameters().length == 1
+        && deep.getTypeParameters()[0].getName().equals("T")
+        && ((ParameterizedType) deep.getGenericParameterTypes()[1]).getRawType() == Class.class
+        && deep.getGenericReturnType() instanceof TypeVariable, "generic deep metadata");
+    check(type.getDeclaredMethod("encodeException", java.io.DataOutput.class, FriendlyException.class)
+        .getExceptionTypes()[0] == java.io.IOException.class
+        && type.getDeclaredMethod("decodeException", java.io.DataInput.class)
+            .getExceptionTypes()[0] == java.io.IOException.class, "checked metadata");
+  }
+
+  private static Throwable catchThrowable(Throwing action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+  private interface Throwing { void run() throws Throwable; }
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }

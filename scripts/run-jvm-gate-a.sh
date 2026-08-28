@@ -434,6 +434,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-data-format-tools-text-range-c
   --output "$WORK/GateDataFormatToolsTextRange.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-decoded-exception-consumer \
   --output "$WORK/GateDecodedException.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-exception-tools-consumer \
+  --output "$WORK/GateExceptionTools.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-container-probe-consumer \
   --output "$WORK/GateFlacContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-file-loader-consumer \
@@ -536,7 +538,6 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateCopyOnUpdateIdentityList.java" \
   "$WORK/GateDataFormatTools.java" \
   "$WORK/GateDataFormatToolsTextRange.java" \
-  "$WORK/GateDecodedException.java" \
   "$WORK/GateAudioFilterInterface.java" \
   "$WORK/GateFloatPcmAudioFilter.java" \
   "$WORK/GateShortPcmAudioFilter.java" \
@@ -761,6 +762,8 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   "$WORK/MatroskaGateSupport.java"
 
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
+  "$WORK/GateDecodedException.java" \
+  "$WORK/GateExceptionTools.java" \
   "$WORK/GateAdtsStreamProvider.java" \
   "$WORK/GateAacPacketRouter.java" \
   "$WORK/GateMpegAacTrackConsumer.java" \
@@ -2065,6 +2068,17 @@ cmp "$WORK/decoded-exception-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,fields,message,cause,null-values,stack,suppression,reflection' \
   "$WORK/decoded-exception-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateExceptionTools >"$WORK/exception-tools-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateExceptionTools >"$WORK/exception-tools-candidate.txt"
+cmp "$WORK/exception-tools-reference.txt" \
+  "$WORK/exception-tools-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,rethrow,wrap-friendly,wrap-runtime,to-runtime,find-deep,interrupt,log,debug-info,serialization,close-warnings,reflection' \
+  "$WORK/exception-tools-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_vorbis_track_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggVorbisTrackHandler >"$WORK/ogg-vorbis-track-handler-reference.txt"
