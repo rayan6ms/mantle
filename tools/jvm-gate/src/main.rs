@@ -177,6 +177,8 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
             Some(MPEG_TS_ELEMENTARY_INPUT_STREAM_CONSUMER)
         }
         "write-pes-packet-input-stream-consumer" => Some(PES_PACKET_INPUT_STREAM_CONSUMER),
+        "write-ogg-audio-track-consumer" => Some(OGG_AUDIO_TRACK_CONSUMER),
+        "write-ogg-audio-track-support-consumer" => Some(OGG_AUDIO_TRACK_SUPPORT_CONSUMER),
         "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
         "write-mpeg-track-info-consumer" => Some(MPEG_TRACK_INFO_CONSUMER),
         "write-mpeg-track-info-builder-consumer" => Some(MPEG_TRACK_INFO_BUILDER_CONSUMER),
@@ -15573,6 +15575,515 @@ public final class GatePesPacketInputStream {
   }
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const OGG_AUDIO_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggAudioTrack;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggGateSupport;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateOggAudioTrack {
+  private static final Object UNSAFE = loadUnsafe();
+
+  public static void main(String[] args) throws Exception {
+    construction();
+    processing();
+    failures();
+    subclassUse();
+    reflection();
+    System.out.println("contracts=track-info,input-identity,null-construction,packet-wrapper,non-closing,blueprint-load,handler-load,processing-context,initialise-zeroes,read-callback,seek-callback,full-width-timecode,chained-blueprints,handler-reuse,wait-on-end,executor-control,empty-stream,io-identity,io-wrapping,interruption-identity,runtime-identity,null-handler,null-executor,identifier-dispatch,input-ownership,subclassable,eager-logger,private-state,synthetic-callback,throws,reflection");
+  }
+
+  private static void construction() throws Exception {
+    AudioTrackInfo info = info("constructor-id");
+    MemoryStream input = new MemoryStream();
+    OggAudioTrack track = new OggAudioTrack(info, input);
+    check(track.getInfo() == info && track.getIdentifier() == info.identifier,
+        "base constructor retains exact track info identity");
+    check(field(track, "inputStream") == input, "constructor retains exact input identity");
+    OggAudioTrack nullInput = new OggAudioTrack(info, null);
+    OggAudioTrack nullInfo = new OggAudioTrack(null, input);
+    check(field(nullInput, "inputStream") == null && nullInfo.getInfo() == null,
+        "constructor accepts null input and track info");
+  }
+
+  private static void processing() throws Exception {
+    OggGateSupport.reset();
+    OggGateSupport.blueprints = 2;
+    MemoryStream input = new MemoryStream();
+    RecordingExecutor executor = executor();
+    executor.context = allocate(AudioProcessingContext.class);
+    executor.invokeRead = true;
+    executor.invokeSeek = true;
+    executor.seekTimecode = Long.MIN_VALUE + 41L;
+    Derived track = new Derived(info("process-id"), input, null);
+    track.process(executor);
+    check(OggGateSupport.packetInput == input && !OggGateSupport.closeDelegated
+        && OggGateSupport.packetConstructions == 1,
+        "process creates one non-closing packet wrapper around the exact input");
+    check(OggGateSupport.loaderCalls == 3 && OggGateSupport.handlerLoadCalls == 1
+        && OggGateSupport.initialiseCalls == 2 && OggGateSupport.provideCalls == 2,
+        "chained blueprints reuse the initially selected handler until EOF");
+    check(OggGateSupport.context == executor.context && OggGateSupport.firstTimecode == 0L
+        && OggGateSupport.desiredTimecode == 0L && executor.contextCalls == 1,
+        "read callback forwards one context and zero initial timecodes");
+    check(executor.loopCalls == 1 && executor.readExecutor != null
+        && executor.seekExecutor != null && executor.waitOnEnd
+        && OggGateSupport.seekCalls == 1
+        && OggGateSupport.seekTimecode == Long.MIN_VALUE + 41L,
+        "executor receives read/seek callbacks, wait-on-end, and full-width seek values");
+    check(track.identifierCalls == 1 && OggGateSupport.handlerCloseCalls == 0
+        && input.closeCalls == 0,
+        "logging uses virtual identifier dispatch without taking handler or input ownership");
+    check(OggGateSupport.events.toString().equals(
+        "packet,load1,identifier,handler,loop,context,initialise,provide,load2,initialise,provide,load3,seek"),
+        "packet, loader, callback, and seek lifecycle order");
+
+    OggGateSupport.reset();
+    MemoryStream untouched = new MemoryStream();
+    RecordingExecutor passive = executor();
+    new OggAudioTrack(info("passive-id"), untouched).process(passive);
+    check(passive.loopCalls == 1 && passive.readExecutor != null && passive.seekExecutor != null
+        && passive.waitOnEnd && passive.contextCalls == 0
+        && OggGateSupport.loaderCalls == 1 && OggGateSupport.initialiseCalls == 0
+        && OggGateSupport.provideCalls == 0 && untouched.closeCalls == 0,
+        "executor exclusively controls callback invocation");
+
+    OggGateSupport.reset();
+    OggAudioTrack nullInput = new OggAudioTrack(info("null-input"), null);
+    nullInput.process(executor());
+    check(OggGateSupport.packetInput == null && OggGateSupport.packetConstructions == 1,
+        "nullable input identity reaches packet-wrapper construction unchanged");
+  }
+
+  private static void failures() throws Exception {
+    IOException loadFailure = new IOException("load-failure");
+    OggGateSupport.reset();
+    OggGateSupport.loaderIoFailure = loadFailure;
+    Derived beforeLog = new Derived(info("load"), new MemoryStream(), null);
+    check(catchThrowable(() -> beforeLog.process(executor())) == loadFailure
+        && beforeLog.identifierCalls == 0 && OggGateSupport.handlerLoadCalls == 0,
+        "initial blueprint IOException keeps identity and precedes logging");
+
+    OggGateSupport.reset();
+    OggGateSupport.blueprints = 0;
+    Derived empty = new Derived(info("empty"), new MemoryStream(), null);
+    Throwable terminated = catchThrowable(() -> empty.process(executor()));
+    check(terminated instanceof IOException && terminated.getClass() == IOException.class
+        && terminated.getMessage().equals("Stream terminated before the first packet.")
+        && empty.identifierCalls == 1 && OggGateSupport.handlerLoadCalls == 0,
+        "empty stream logs before producing the exact checked failure");
+
+    RuntimeException identifierFailure = new RuntimeException("identifier-failure");
+    OggGateSupport.reset();
+    Derived identifier = new Derived(info("identifier"), new MemoryStream(), identifierFailure);
+    check(catchThrowable(() -> identifier.process(executor())) == identifierFailure
+        && OggGateSupport.loaderCalls == 1 && OggGateSupport.handlerLoadCalls == 0,
+        "virtual identifier failure keeps identity before handler construction");
+
+    RuntimeException handlerFailure = new RuntimeException("handler-failure");
+    OggGateSupport.reset();
+    OggGateSupport.handlerLoadFailure = handlerFailure;
+    check(catchThrowable(() -> new OggAudioTrack(info("handler"), new MemoryStream())
+        .process(executor())) == handlerFailure && OggGateSupport.handlerLoadCalls == 1,
+        "handler construction runtime failure keeps identity");
+
+    OggGateSupport.reset();
+    OggGateSupport.nullHandler = true;
+    RecordingExecutor nullHandlerExecutor = executor();
+    check(catchThrowable(() -> new OggAudioTrack(info("null-handler"), new MemoryStream())
+        .process(nullHandlerExecutor)) instanceof NullPointerException
+        && nullHandlerExecutor.loopCalls == 0,
+        "null handler fails before processing-loop dispatch");
+
+    RuntimeException loopFailure = new RuntimeException("loop-failure");
+    OggGateSupport.reset();
+    RecordingExecutor loop = executor();
+    loop.loopFailure = loopFailure;
+    check(catchThrowable(() -> new OggAudioTrack(info("loop"), new MemoryStream())
+        .process(loop)) == loopFailure && OggGateSupport.handlerCloseCalls == 0,
+        "processing-loop runtime failure keeps identity without handler ownership");
+
+    IOException initialiseFailure = new IOException("initialise-failure");
+    OggGateSupport.reset();
+    OggGateSupport.initialiseFailure = initialiseFailure;
+    RecordingExecutor initialise = executor();
+    initialise.context = allocate(AudioProcessingContext.class);
+    initialise.invokeRead = true;
+    Throwable wrappedInitialise = catchThrowable(() ->
+        new OggAudioTrack(info("initialise"), new MemoryStream()).process(initialise));
+    checkFriendly(wrappedInitialise, initialiseFailure);
+    check(OggGateSupport.provideCalls == 0 && OggGateSupport.handlerCloseCalls == 0,
+        "initialise IOException is wrapped before frame delivery without cleanup");
+
+    IOException chainedFailure = new IOException("chained-load-failure");
+    OggGateSupport.reset();
+    OggGateSupport.loaderFailureCall = 2;
+    OggGateSupport.loaderIoFailure = chainedFailure;
+    RecordingExecutor chained = executor();
+    chained.context = allocate(AudioProcessingContext.class);
+    chained.invokeRead = true;
+    Throwable wrappedLoad = catchThrowable(() ->
+        new OggAudioTrack(info("chained"), new MemoryStream()).process(chained));
+    checkFriendly(wrappedLoad, chainedFailure);
+    check(OggGateSupport.initialiseCalls == 1 && OggGateSupport.provideCalls == 1,
+        "later blueprint IOException is wrapped after completed frame delivery");
+
+    InterruptedException provideFailure = new InterruptedException("provide-failure");
+    OggGateSupport.reset();
+    OggGateSupport.provideFailure = provideFailure;
+    RecordingExecutor provide = executor();
+    provide.context = allocate(AudioProcessingContext.class);
+    provide.invokeRead = true;
+    check(catchThrowable(() -> new OggAudioTrack(info("provide"), new MemoryStream())
+        .process(provide)) == provideFailure,
+        "frame-delivery interruption bypasses IOException wrapping with exact identity");
+
+    RuntimeException contextFailure = new RuntimeException("context-failure");
+    OggGateSupport.reset();
+    RecordingExecutor context = executor();
+    context.contextFailure = contextFailure;
+    context.invokeRead = true;
+    check(catchThrowable(() -> new OggAudioTrack(info("context"), new MemoryStream())
+        .process(context)) == contextFailure && OggGateSupport.initialiseCalls == 0,
+        "processing-context runtime failure keeps identity before initialisation");
+
+    OggGateSupport.reset();
+    check(catchThrowable(() -> new OggAudioTrack(info("null-executor"), new MemoryStream())
+        .process(null)) instanceof NullPointerException
+        && OggGateSupport.handlerLoadCalls == 1,
+        "null executor fails after handler construction");
+  }
+
+  private static void subclassUse() throws Exception {
+    OggGateSupport.reset();
+    Derived derived = new Derived(info("derived"), new MemoryStream(), null);
+    BaseAudioTrack dynamic = derived;
+    dynamic.process(executor());
+    check(derived.processCalls == 1 && derived.identifierCalls == 1,
+        "ordinary subclass participates in process and identifier dispatch");
+  }
+
+  private static void reflection() throws Exception {
+    Class<OggAudioTrack> type = OggAudioTrack.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == BaseAudioTrack.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0,
+        "public concrete non-final class metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredMethods().length == 3
+        && type.getDeclaredConstructors().length == 1, "exact declared member counts");
+    Field log = type.getDeclaredField("log");
+    log.setAccessible(true);
+    Object expectedLogger = Class.forName("org.slf4j.LoggerFactory")
+        .getMethod("getLogger", Class.class).invoke(null, type);
+    check(log.getType().getName().equals("org.slf4j.Logger")
+        && log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && !log.isSynthetic() && log.get(null) != null && log.get(null) == expectedLogger,
+        "eager logger identity and metadata");
+    Field input = type.getDeclaredField("inputStream");
+    check(input.getType() == SeekableInputStream.class
+        && input.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && !input.isSynthetic(), "private input metadata");
+    Constructor<OggAudioTrack> constructor =
+        type.getDeclaredConstructor(AudioTrackInfo.class, SeekableInputStream.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    Method process = type.getDeclaredMethod("process", LocalAudioTrackExecutor.class);
+    check(process.getModifiers() == Modifier.PUBLIC && process.getReturnType() == void.class
+        && Arrays.equals(process.getParameterTypes(), new Class<?>[] {LocalAudioTrackExecutor.class})
+        && Arrays.equals(process.getExceptionTypes(), new Class<?>[] {IOException.class})
+        && !process.isSynthetic() && !process.isBridge() && !process.isVarArgs(),
+        "process descriptor and checked exception metadata");
+    Class<?> packet = Class.forName(
+        "com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream");
+    Class<?> handler = Class.forName(
+        "com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackHandler");
+    Class<?> blueprint = Class.forName(
+        "com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackBlueprint");
+    Method loop = type.getDeclaredMethod("processTrackLoop", packet,
+        AudioProcessingContext.class, handler, blueprint);
+    check(loop.getModifiers() == Modifier.PRIVATE && loop.getReturnType() == void.class
+        && Arrays.equals(loop.getExceptionTypes(),
+            new Class<?>[] {IOException.class, InterruptedException.class})
+        && !loop.isSynthetic(), "private processing-loop metadata");
+    Method callback = type.getDeclaredMethod("lambda$process$0", packet,
+        LocalAudioTrackExecutor.class, handler, blueprint);
+    check(callback.getModifiers() == (Modifier.PRIVATE | 0x1000)
+        && callback.getReturnType() == void.class && callback.isSynthetic()
+        && Arrays.equals(callback.getExceptionTypes(), new Class<?>[] {Exception.class}),
+        "private synthetic read-callback metadata");
+  }
+
+  private static void checkFriendly(Throwable actual, IOException cause) {
+    check(actual instanceof FriendlyException && actual.getCause() == cause
+        && actual.getMessage().equals("Stream broke when playing OGG track.")
+        && ((FriendlyException) actual).severity == FriendlyException.Severity.SUSPICIOUS,
+        "IOException callback failure has exact FriendlyException mapping");
+  }
+  private static AudioTrackInfo info(String identifier) {
+    return new AudioTrackInfo("title", "author", 123L, identifier, true,
+        "uri", "artwork", "isrc");
+  }
+  private static Object field(Object owner, String name) throws Exception {
+    Field field = OggAudioTrack.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(owner);
+  }
+  private static RecordingExecutor executor() throws Exception {
+    return allocate(RecordingExecutor.class);
+  }
+  private static <T> T allocate(Class<T> type) throws Exception {
+    return type.cast(UNSAFE.getClass().getMethod("allocateInstance", Class.class)
+        .invoke(UNSAFE, type));
+  }
+  private static Object loadUnsafe() {
+    try {
+      Class<?> type = Class.forName("sun.misc.Unsafe");
+      Field field = type.getDeclaredField("theUnsafe");
+      field.setAccessible(true);
+      return field.get(null);
+    } catch (ReflectiveOperationException error) {
+      throw new ExceptionInInitializerError(error);
+    }
+  }
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+  @SuppressWarnings("unchecked")
+  private static <E extends Throwable> void sneakyThrow(Throwable failure) throws E {
+    throw (E) failure;
+  }
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    long position;
+    int closeCalls;
+    MemoryStream() { super(0L, 0L); }
+    @Override public int read() { return -1; }
+    @Override public long getPosition() { return position; }
+    @Override protected void seekHard(long target) { position = target; }
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      return Collections.emptyList();
+    }
+    @Override public void close() { closeCalls++; }
+  }
+
+  private static final class RecordingExecutor extends LocalAudioTrackExecutor {
+    AudioProcessingContext context;
+    int contextCalls;
+    int loopCalls;
+    boolean invokeRead;
+    boolean invokeSeek;
+    boolean waitOnEnd;
+    long seekTimecode;
+    RuntimeException contextFailure;
+    RuntimeException loopFailure;
+    ReadExecutor readExecutor;
+    SeekExecutor seekExecutor;
+    private RecordingExecutor() { super(null, null, null, false, 0); }
+    @Override public AudioProcessingContext getProcessingContext() {
+      contextCalls++;
+      OggGateSupport.event("context");
+      if (contextFailure != null) throw contextFailure;
+      return context;
+    }
+    @Override public void executeProcessingLoop(
+        ReadExecutor read, SeekExecutor seek, boolean wait) {
+      loopCalls++;
+      readExecutor = read;
+      seekExecutor = seek;
+      waitOnEnd = wait;
+      OggGateSupport.event("loop");
+      if (loopFailure != null) throw loopFailure;
+      try {
+        if (invokeRead) read.performRead();
+        if (invokeSeek) seek.performSeek(seekTimecode);
+      } catch (Throwable failure) {
+        GateOggAudioTrack.<RuntimeException>sneakyThrow(failure);
+      }
+    }
+  }
+
+  private static final class Derived extends OggAudioTrack {
+    final RuntimeException identifierFailure;
+    int processCalls;
+    int identifierCalls;
+    Derived(AudioTrackInfo info, SeekableInputStream input, RuntimeException identifierFailure) {
+      super(info, input);
+      this.identifierFailure = identifierFailure;
+    }
+    @Override public void process(LocalAudioTrackExecutor executor) throws IOException {
+      processCalls++;
+      super.process(executor);
+    }
+    @Override public String getIdentifier() {
+      identifierCalls++;
+      OggGateSupport.event("identifier");
+      if (identifierFailure != null) throw identifierFailure;
+      return super.getIdentifier();
+    }
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const OGG_AUDIO_TRACK_SUPPORT_CONSUMER: &str = r#"
+package com.sedmelluq.discord.lavaplayer.container.ogg;
+
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.InputStream;
+
+public final class OggGateSupport {
+  public static SeekableInputStream packetInput;
+  public static boolean closeDelegated;
+  public static int packetConstructions;
+  public static int blueprints;
+  public static int loaderCalls;
+  public static int loaderFailureCall;
+  public static IOException loaderIoFailure;
+  public static RuntimeException loaderRuntimeFailure;
+  public static RuntimeException handlerLoadFailure;
+  public static boolean nullHandler;
+  public static int handlerLoadCalls;
+  public static int initialiseCalls;
+  public static int provideCalls;
+  public static int seekCalls;
+  public static int handlerCloseCalls;
+  public static AudioProcessingContext context;
+  public static long firstTimecode;
+  public static long desiredTimecode;
+  public static long seekTimecode;
+  public static IOException initialiseFailure;
+  public static InterruptedException provideFailure;
+  public static final StringBuilder events = new StringBuilder();
+
+  private OggGateSupport() {}
+
+  public static void reset() {
+    packetInput = null;
+    closeDelegated = false;
+    packetConstructions = 0;
+    blueprints = 1;
+    loaderCalls = 0;
+    loaderFailureCall = 1;
+    loaderIoFailure = null;
+    loaderRuntimeFailure = null;
+    handlerLoadFailure = null;
+    nullHandler = false;
+    handlerLoadCalls = 0;
+    initialiseCalls = 0;
+    provideCalls = 0;
+    seekCalls = 0;
+    handlerCloseCalls = 0;
+    context = null;
+    firstTimecode = 0L;
+    desiredTimecode = 0L;
+    seekTimecode = 0L;
+    initialiseFailure = null;
+    provideFailure = null;
+    events.setLength(0);
+  }
+
+  public static void event(String value) {
+    if (events.length() > 0) events.append(',');
+    events.append(value);
+  }
+}
+
+class OggPacketInputStream extends InputStream {
+  OggPacketInputStream(SeekableInputStream input, boolean closeDelegated) {
+    OggGateSupport.packetInput = input;
+    OggGateSupport.closeDelegated = closeDelegated;
+    OggGateSupport.packetConstructions++;
+    OggGateSupport.event("packet");
+  }
+
+  @Override public int read() { return -1; }
+}
+
+class OggTrackLoader {
+  static OggTrackBlueprint loadTrackBlueprint(OggPacketInputStream input) throws IOException {
+    int call = ++OggGateSupport.loaderCalls;
+    OggGateSupport.event("load" + call);
+    if (call == OggGateSupport.loaderFailureCall) {
+      if (OggGateSupport.loaderIoFailure != null) throw OggGateSupport.loaderIoFailure;
+      if (OggGateSupport.loaderRuntimeFailure != null) throw OggGateSupport.loaderRuntimeFailure;
+    }
+    return call <= OggGateSupport.blueprints ? new GateBlueprint() : null;
+  }
+}
+
+interface OggTrackBlueprint {
+  OggTrackHandler loadTrackHandler(OggPacketInputStream input);
+  int getSampleRate();
+}
+
+interface OggTrackHandler extends Closeable {
+  void initialise(AudioProcessingContext context, long timecode, long desiredTimecode)
+      throws IOException;
+  void provideFrames() throws InterruptedException;
+  void seekToTimecode(long timecode);
+}
+
+final class GateBlueprint implements OggTrackBlueprint {
+  @Override public OggTrackHandler loadTrackHandler(OggPacketInputStream input) {
+    OggGateSupport.handlerLoadCalls++;
+    OggGateSupport.event("handler");
+    if (OggGateSupport.handlerLoadFailure != null) throw OggGateSupport.handlerLoadFailure;
+    return OggGateSupport.nullHandler ? null : new GateHandler();
+  }
+
+  @Override public int getSampleRate() { return 48000; }
+}
+
+final class GateHandler implements OggTrackHandler {
+  @Override public void initialise(
+      AudioProcessingContext context, long timecode, long desiredTimecode) throws IOException {
+    OggGateSupport.initialiseCalls++;
+    OggGateSupport.context = context;
+    OggGateSupport.firstTimecode = timecode;
+    OggGateSupport.desiredTimecode = desiredTimecode;
+    OggGateSupport.event("initialise");
+    if (OggGateSupport.initialiseFailure != null) throw OggGateSupport.initialiseFailure;
+  }
+
+  @Override public void provideFrames() throws InterruptedException {
+    OggGateSupport.provideCalls++;
+    OggGateSupport.event("provide");
+    if (OggGateSupport.provideFailure != null) throw OggGateSupport.provideFailure;
+  }
+
+  @Override public void seekToTimecode(long timecode) {
+    OggGateSupport.seekCalls++;
+    OggGateSupport.seekTimecode = timecode;
+    OggGateSupport.event("seek");
+  }
+
+  @Override public void close() {
+    OggGateSupport.handlerCloseCalls++;
+    OggGateSupport.event("close");
   }
 }
 "#;

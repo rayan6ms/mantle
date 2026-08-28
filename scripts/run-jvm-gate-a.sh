@@ -271,6 +271,10 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-ts-elementary-input-strea
   --output "$WORK/GateMpegTsElementaryInputStream.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-pes-packet-input-stream-consumer \
   --output "$WORK/GatePesPacketInputStream.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-ogg-audio-track-consumer \
+  --output "$WORK/GateOggAudioTrack.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-ogg-audio-track-support-consumer \
+  --output "$WORK/OggGateSupport.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-file-loader-consumer \
   --output "$WORK/GateMpegFileLoader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-info-consumer \
@@ -567,6 +571,8 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$MPEG_CLASSES" 
   "$WORK/GateMpegAdtsContainerProbe.java" \
   "$WORK/GateMpegTsElementaryInputStream.java" \
   "$WORK/GatePesPacketInputStream.java" \
+  "$WORK/GateOggAudioTrack.java" \
+  "$WORK/OggGateSupport.java" \
   "$WORK/MpegGateSupport.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   -d "$MPEG_FILE_LOADER_CLASSES" "$WORK/GateMpegFileLoader.java"
@@ -1514,6 +1520,16 @@ cmp "$WORK/pes-packet-input-stream-reference.txt" "$WORK/pes-packet-input-stream
 grep --fixed-strings \
   'contracts=constructor,greedy-wrapper,no-eager-read,buffers,private-state,sync-scan,header-skip,single-read,bulk-read,packet-boundaries,multiple-packets,available,zero-length,signed-length,truncated-headers,premature-payload-eof,failure-identity,subclassable,throws,reflection' \
   "$WORK/pes-packet-input-stream-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$MPEG_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateOggAudioTrack \
+  >"$WORK/ogg-audio-track-reference.txt"
+java -Xverify:all \
+  -cp "$MPEG_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOggAudioTrack >"$WORK/ogg-audio-track-candidate.txt"
+cmp "$WORK/ogg-audio-track-reference.txt" "$WORK/ogg-audio-track-candidate.txt"
+grep --fixed-strings \
+  'contracts=track-info,input-identity,null-construction,packet-wrapper,non-closing,blueprint-load,handler-load,processing-context,initialise-zeroes,read-callback,seek-callback,full-width-timecode,chained-blueprints,handler-reuse,wait-on-end,executor-control,empty-stream,io-identity,io-wrapping,interruption-identity,runtime-identity,null-handler,null-executor,identifier-dispatch,input-ownership,subclassable,eager-logger,private-state,synthetic-callback,throws,reflection' \
+  "$WORK/ogg-audio-track-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mpeg_file_loader_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateMpegFileLoader "$ROOT/tests/media/fixtures/tone-aac-lc-metadata.m4a" \
