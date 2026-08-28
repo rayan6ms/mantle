@@ -7787,27 +7787,30 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves the public abstract interface with no parents, fields, constructors, defaults, type parameters, or annotations, plus exact implementation dispatch and reflection metadata.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackBlueprint",
       "symbol_kind": "METHOD",
       "member_name": "loadTrackHandler",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/ogg/OggPacketInputStream;)Lcom/sedmelluq/discord/lavaplayer/container/ogg/OggTrackHandler;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves the public abstract erased descriptor, nullable packet-stream identity, handler identity and null returns, implementation dispatch, unchecked failure identity, and empty checked-throws contract.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackBlueprint",
       "symbol_kind": "METHOD",
       "member_name": "getSampleRate",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves public abstract full-width signed int return dispatch, unchecked failure identity, absence of defaults and generics, and exact empty checked-throws metadata.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackHandler",

@@ -187,6 +187,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-ogg-page-scanner-consumer" => Some(OGG_PAGE_SCANNER_CONSUMER),
         "write-ogg-seek-point-consumer" => Some(OGG_SEEK_POINT_CONSUMER),
         "write-ogg-stream-size-info-consumer" => Some(OGG_STREAM_SIZE_INFO_CONSUMER),
+        "write-ogg-track-blueprint-consumer" => Some(OGG_TRACK_BLUEPRINT_CONSUMER),
         "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
         "write-mpeg-track-info-consumer" => Some(MPEG_TRACK_INFO_CONSUMER),
         "write-mpeg-track-info-builder-consumer" => Some(MPEG_TRACK_INFO_BUILDER_CONSUMER),
@@ -17886,6 +17887,130 @@ public final class GateOggStreamSizeInfo {
     int calls;
     Derived() { super(10L, 20L, 30L, 40L, 50); }
     @Override public long getDuration() { calls++; return 77L; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const OGG_TRACK_BLUEPRINT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackBlueprint;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackHandler;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateOggTrackBlueprint {
+  public static void main(String[] args) throws Exception {
+    dispatchAndIdentity();
+    failures();
+    reflection();
+    System.out.println("contracts=public-interface,no-fields,no-constructors,2-abstract-methods,stream-identity,null-stream,handler-identity,null-return,full-width-sample-rate,implementation-dispatch,runtime-failure-identity,no-defaults,no-generics,throws,reflection");
+  }
+
+  private static void dispatchAndIdentity() {
+    Handler handler = new Handler();
+    RecordingBlueprint blueprint = new RecordingBlueprint(handler, Integer.MIN_VALUE);
+    OggTrackBlueprint view = blueprint;
+    check(view.loadTrackHandler(null) == handler && blueprint.stream == null
+        && blueprint.loadCalls == 1, "nullable stream and handler identity");
+    check(view.getSampleRate() == Integer.MIN_VALUE && blueprint.rateCalls == 1,
+        "full-width sample rate dispatch");
+    blueprint.handler = null;
+    check(view.loadTrackHandler(null) == null && blueprint.loadCalls == 2,
+        "null handler return");
+    RecordingBlueprint maximum = new RecordingBlueprint(handler, Integer.MAX_VALUE);
+    check(maximum.getSampleRate() == Integer.MAX_VALUE, "maximum sample rate");
+  }
+
+  private static void failures() {
+    RuntimeException loadFailure = new RuntimeException("load");
+    RuntimeException rateFailure = new RuntimeException("rate");
+    FailingBlueprint failing = new FailingBlueprint(loadFailure, rateFailure);
+    expectSame(loadFailure, () -> failing.loadTrackHandler(null));
+    expectSame(rateFailure, failing::getSampleRate);
+  }
+
+  private static void reflection() throws Exception {
+    Class<OggTrackBlueprint> type = OggTrackBlueprint.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.INTERFACE | Modifier.ABSTRACT)
+        && type.getSuperclass() == null && type.getInterfaces().length == 0
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0
+        && type.getDeclaredClasses().length == 0, "interface metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 2, "exact member counts");
+    String[] names = Arrays.stream(type.getDeclaredMethods()).map(Method::getName)
+        .toArray(String[]::new);
+    check(Arrays.equals(names, new String[] {"getSampleRate", "loadTrackHandler"})
+        || Arrays.equals(names, new String[] {"loadTrackHandler", "getSampleRate"}),
+        "declared methods are exact");
+    checkMethod(type.getDeclaredMethod("loadTrackHandler", OggPacketInputStream.class),
+        OggTrackHandler.class, new Class<?>[] {OggPacketInputStream.class});
+    checkMethod(type.getDeclaredMethod("getSampleRate"), int.class, new Class<?>[0]);
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, Class<?>[] parameters) {
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && method.getExceptionTypes().length == 0 && method.getTypeParameters().length == 0
+        && method.getDeclaredAnnotations().length == 0 && !method.isSynthetic()
+        && !method.isBridge() && !method.isDefault() && !method.isVarArgs(),
+        method.getName() + " abstract method metadata");
+  }
+
+  private static void expectSame(Throwable expected, ThrowingRunnable action) {
+    try {
+      action.run();
+      throw new AssertionError("expected failure");
+    } catch (Throwable throwable) {
+      check(throwable == expected, "failure identity");
+    }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class RecordingBlueprint implements OggTrackBlueprint {
+    OggTrackHandler handler;
+    final int sampleRate;
+    OggPacketInputStream stream;
+    int loadCalls;
+    int rateCalls;
+    RecordingBlueprint(OggTrackHandler handler, int sampleRate) {
+      this.handler = handler;
+      this.sampleRate = sampleRate;
+    }
+    @Override public OggTrackHandler loadTrackHandler(OggPacketInputStream stream) {
+      loadCalls++;
+      this.stream = stream;
+      return handler;
+    }
+    @Override public int getSampleRate() { rateCalls++; return sampleRate; }
+  }
+
+  private static final class FailingBlueprint implements OggTrackBlueprint {
+    final RuntimeException loadFailure;
+    final RuntimeException rateFailure;
+    FailingBlueprint(RuntimeException loadFailure, RuntimeException rateFailure) {
+      this.loadFailure = loadFailure;
+      this.rateFailure = rateFailure;
+    }
+    @Override public OggTrackHandler loadTrackHandler(OggPacketInputStream stream) {
+      throw loadFailure;
+    }
+    @Override public int getSampleRate() { throw rateFailure; }
+  }
+
+  private static final class Handler implements OggTrackHandler {
+    @Override public void initialise(AudioProcessingContext context, long timecode,
+        long desiredTimecode) {}
+    @Override public void provideFrames() {}
+    @Override public void seekToTimecode(long timecode) {}
+    @Override public void close() {}
   }
 
   private static void check(boolean condition, String message) {
