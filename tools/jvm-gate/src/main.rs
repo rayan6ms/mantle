@@ -189,6 +189,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-ogg-stream-size-info-consumer" => Some(OGG_STREAM_SIZE_INFO_CONSUMER),
         "write-ogg-track-blueprint-consumer" => Some(OGG_TRACK_BLUEPRINT_CONSUMER),
         "write-ogg-track-handler-consumer" => Some(OGG_TRACK_HANDLER_CONSUMER),
+        "write-ogg-track-loader-consumer" => Some(OGG_TRACK_LOADER_CONSUMER),
         "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
         "write-mpeg-track-info-consumer" => Some(MPEG_TRACK_INFO_CONSUMER),
         "write-mpeg-track-info-builder-consumer" => Some(MPEG_TRACK_INFO_BUILDER_CONSUMER),
@@ -2488,7 +2489,6 @@ import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
 import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayerOptions;
 import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer;
-import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -18148,6 +18148,410 @@ public final class GateOggTrackHandler {
     @Override public void provideFrames() throws InterruptedException { throw provideFailure; }
     @Override public void seekToTimecode(long timecode) { throw seekFailure; }
     @Override public void close() throws IOException { throw closeFailure; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const OGG_TRACK_LOADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggCodecHandler;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggMetadata;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackBlueprint;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackHandler;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackLoader;
+import com.sedmelluq.discord.lavaplayer.tools.io.DirectBufferStreamBroker;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateOggTrackLoader {
+  private static final int IDENTIFIER = 0x4f676753;
+
+  public static void main(String[] args) throws Exception {
+    staticConfiguration();
+    dispatchAndBoundaries();
+    failures();
+    constructionAndSubclassing();
+    reflection();
+    System.out.println("contracts=public-loader,2-fields,1-constructor,2-public-static-methods,private-detection,provider-order,maximum-first-packet,track-boundary,packet-boundary,identifier-read,selection-order,stream-identity,broker-identity,blueprint-identity,metadata-identity,null-provider-returns,long-first-packet,unknown-codec,short-header,null-stream,checked-failure-identity,runtime-failure-identity,subclassable,private-nested-detection,throws,reflection");
+  }
+
+  private static void staticConfiguration() throws Exception {
+    Field providersField = OggTrackLoader.class.getDeclaredField("TRACK_PROVIDERS");
+    providersField.setAccessible(true);
+    OggCodecHandler[] providers = (OggCodecHandler[]) providersField.get(null);
+    check(providers.length == 3
+        && providers[0].getClass().getName().equals(
+            "com.sedmelluq.discord.lavaplayer.container.ogg.opus.OggOpusCodecHandler")
+        && providers[1].getClass().getName().equals(
+            "com.sedmelluq.discord.lavaplayer.container.ogg.flac.OggFlacCodecHandler")
+        && providers[2].getClass().getName().equals(
+            "com.sedmelluq.discord.lavaplayer.container.ogg.vorbis.OggVorbisCodecHandler"),
+        "codec providers retain Opus, FLAC, Vorbis order");
+    Field maximumField = OggTrackLoader.class.getDeclaredField("MAXIMUM_FIRST_PACKET_LENGTH");
+    maximumField.setAccessible(true);
+    check(maximumField.getInt(null) == 276, "maximum first packet length");
+  }
+
+  private static void dispatchAndBoundaries() throws Exception {
+    OggCodecHandler[] providers = mutableProviders();
+    OggCodecHandler[] originals = providers.clone();
+    try {
+      Blueprint blueprint = new Blueprint();
+      RecordingCodec first = new RecordingCodec(-1, null, null);
+      RecordingCodec second = new RecordingCodec(IDENTIFIER, blueprint, OggMetadata.EMPTY);
+      RecordingCodec third = new RecordingCodec(IDENTIFIER, null, null);
+      install(providers, first, second, third);
+
+      ScriptedPacketStream blueprintStream = new ScriptedPacketStream(packet(IDENTIFIER, 3));
+      check(OggTrackLoader.loadTrackBlueprint(blueprintStream) == blueprint,
+          "blueprint identity is returned");
+      check(first.matchCalls == 1 && second.matchCalls == 1 && third.matchCalls == 0
+          && second.blueprintCalls == 1 && second.metadataCalls == 0,
+          "blueprint uses first matching provider in order");
+      check(second.stream == blueprintStream && second.broker != null
+          && second.broker.getBuffer().getInt() == IDENTIFIER
+          && second.broker.getBuffer().remaining() == 7,
+          "blueprint provider receives exact stream and populated broker");
+      DirectBufferStreamBroker blueprintBroker = second.broker;
+
+      reset(first, second, third);
+      ScriptedPacketStream metadataStream = new ScriptedPacketStream(packet(IDENTIFIER, 5));
+      check(OggTrackLoader.loadMetadata(metadataStream) == OggMetadata.EMPTY,
+          "metadata identity is returned");
+      check(first.matchCalls == 1 && second.matchCalls == 1 && third.matchCalls == 0
+          && second.metadataCalls == 1 && second.blueprintCalls == 0
+          && second.stream == metadataStream && second.broker != null
+          && second.broker != blueprintBroker
+          && second.broker.getBuffer().getInt() == IDENTIFIER
+          && second.broker.getBuffer().remaining() == 9,
+          "metadata uses first matching provider with exact arguments");
+
+      second.blueprint = null;
+      second.metadata = null;
+      check(OggTrackLoader.loadTrackBlueprint(new ScriptedPacketStream(packet(IDENTIFIER, 0)))
+          == null, "provider null blueprint is preserved");
+      check(OggTrackLoader.loadMetadata(new ScriptedPacketStream(packet(IDENTIFIER, 0))) == null,
+          "provider null metadata is preserved");
+
+      ScriptedPacketStream noTrack = new ScriptedPacketStream(packet(IDENTIFIER, 0));
+      noTrack.trackAvailable = false;
+      check(OggTrackLoader.loadTrackBlueprint(noTrack) == null && noTrack.trackCalls == 1
+          && noTrack.packetCalls == 0, "track boundary returns null without reading a packet");
+      ScriptedPacketStream noPacket = new ScriptedPacketStream(packet(IDENTIFIER, 0));
+      noPacket.packetAvailable = false;
+      check(OggTrackLoader.loadMetadata(noPacket) == null && noPacket.trackCalls == 1
+          && noPacket.packetCalls == 1 && noPacket.readCalls == 0,
+          "packet boundary returns null without reading bytes");
+
+      ScriptedPacketStream longPacket = new ScriptedPacketStream(packet(IDENTIFIER, 296));
+      check(OggTrackLoader.loadTrackBlueprint(longPacket) == null && longPacket.readCalls >= 2,
+          "the broker consumes a first packet beyond the configured maximum before dispatch");
+
+      install(providers, new RecordingCodec(-1, null, null),
+          new RecordingCodec(-2, null, null), new RecordingCodec(-3, null, null));
+      Throwable unknown = catchThrowable(() ->
+          OggTrackLoader.loadTrackBlueprint(new ScriptedPacketStream(packet(IDENTIFIER, 0))));
+      check(unknown instanceof IllegalStateException
+          && unknown.getMessage().equals("Unsupported track in OGG stream."),
+          "unknown codec failure type and message");
+      check(catchThrowable(() -> OggTrackLoader.loadMetadata(
+          new ScriptedPacketStream(new byte[] {1, 2, 3}))) instanceof BufferUnderflowException,
+          "short codec header fails while reading the identifier");
+      check(catchThrowable(() -> OggTrackLoader.loadTrackBlueprint(null))
+          instanceof NullPointerException, "null stream fails before dispatch");
+    } finally {
+      System.arraycopy(originals, 0, providers, 0, originals.length);
+    }
+  }
+
+  private static void failures() throws Exception {
+    OggCodecHandler[] providers = mutableProviders();
+    OggCodecHandler[] originals = providers.clone();
+    try {
+      RecordingCodec matching = new RecordingCodec(IDENTIFIER, new Blueprint(), OggMetadata.EMPTY);
+      install(providers, matching, new RecordingCodec(-1, null, null),
+          new RecordingCodec(-2, null, null));
+
+      RuntimeException trackFailure = new RuntimeException("track");
+      ScriptedPacketStream trackStream = new ScriptedPacketStream(packet(IDENTIFIER, 0));
+      trackStream.trackFailure = trackFailure;
+      expectSame(trackFailure, () -> OggTrackLoader.loadTrackBlueprint(trackStream));
+
+      IOException packetFailure = new IOException("packet");
+      ScriptedPacketStream packetStream = new ScriptedPacketStream(packet(IDENTIFIER, 0));
+      packetStream.packetFailure = packetFailure;
+      expectSame(packetFailure, () -> OggTrackLoader.loadMetadata(packetStream));
+
+      IOException readFailure = new IOException("read");
+      ScriptedPacketStream readStream = new ScriptedPacketStream(packet(IDENTIFIER, 0));
+      readStream.readFailure = readFailure;
+      expectSame(readFailure, () -> OggTrackLoader.loadTrackBlueprint(readStream));
+
+      RuntimeException matchFailure = new RuntimeException("match");
+      matching.matchFailure = matchFailure;
+      expectSame(matchFailure, () -> OggTrackLoader.loadMetadata(
+          new ScriptedPacketStream(packet(IDENTIFIER, 0))));
+      matching.matchFailure = null;
+
+      IOException blueprintFailure = new IOException("blueprint");
+      matching.blueprintFailure = blueprintFailure;
+      expectSame(blueprintFailure, () -> OggTrackLoader.loadTrackBlueprint(
+          new ScriptedPacketStream(packet(IDENTIFIER, 0))));
+      matching.blueprintFailure = null;
+
+      IOException metadataFailure = new IOException("metadata");
+      matching.metadataFailure = metadataFailure;
+      expectSame(metadataFailure, () -> OggTrackLoader.loadMetadata(
+          new ScriptedPacketStream(packet(IDENTIFIER, 0))));
+    } finally {
+      System.arraycopy(originals, 0, providers, 0, originals.length);
+    }
+  }
+
+  private static void constructionAndSubclassing() {
+    OggTrackLoader loader = new OggTrackLoader();
+    Derived derived = new Derived();
+    check(loader.getClass() == OggTrackLoader.class && derived instanceof OggTrackLoader
+        && derived.marker() == 37, "public construction and ordinary subclassing");
+  }
+
+  private static void reflection() throws Exception {
+    Class<OggTrackLoader> type = OggTrackLoader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0, "public concrete loader metadata");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredMethods().length == 3
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredClasses().length == 1,
+        "exact loader member counts");
+
+    Field providers = type.getDeclaredField("TRACK_PROVIDERS");
+    Field maximum = type.getDeclaredField("MAXIMUM_FIRST_PACKET_LENGTH");
+    check(providers.getType() == OggCodecHandler[].class
+        && providers.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && maximum.getType() == int.class
+        && maximum.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && !providers.isSynthetic() && !maximum.isSynthetic(), "exact private static fields");
+
+    Constructor<OggTrackLoader> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0
+        && constructor.getTypeParameters().length == 0
+        && constructor.getDeclaredAnnotations().length == 0 && !constructor.isSynthetic(),
+        "public no-argument constructor metadata");
+    checkLoaderMethod(type.getDeclaredMethod("loadTrackBlueprint", OggPacketInputStream.class),
+        OggTrackBlueprint.class, Modifier.PUBLIC | Modifier.STATIC);
+    checkLoaderMethod(type.getDeclaredMethod("loadMetadata", OggPacketInputStream.class),
+        OggMetadata.class, Modifier.PUBLIC | Modifier.STATIC);
+
+    Class<?> detection = type.getDeclaredClasses()[0];
+    Method detect = type.getDeclaredMethod("detectCodec", OggPacketInputStream.class);
+    checkLoaderMethod(detect, detection, Modifier.PRIVATE | Modifier.STATIC);
+    check(detection.getName().equals(OggTrackLoader.class.getName() + "$CodecDetection")
+        && detection.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC)
+        && detection.getSuperclass() == Object.class && detection.getInterfaces().length == 0
+        && detection.getTypeParameters().length == 0
+        && detection.getDeclaredAnnotations().length == 0
+        && detection.getDeclaredClasses().length == 0 && detection.getDeclaredMethods().length == 0
+        && detection.getDeclaredFields().length == 2
+        && detection.getDeclaredConstructors().length == 1,
+        "private static codec detection class metadata");
+    Field provider = detection.getDeclaredField("provider");
+    Field broker = detection.getDeclaredField("broker");
+    check(provider.getType() == OggCodecHandler.class
+        && broker.getType() == DirectBufferStreamBroker.class
+        && provider.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && broker.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && !provider.isSynthetic() && !broker.isSynthetic(), "detection state fields");
+    Constructor<?> detectionConstructor = detection.getDeclaredConstructor(
+        OggCodecHandler.class, DirectBufferStreamBroker.class);
+    check(detectionConstructor.getModifiers() == Modifier.PRIVATE
+        && detectionConstructor.getExceptionTypes().length == 0
+        && detectionConstructor.getTypeParameters().length == 0
+        && detectionConstructor.getDeclaredAnnotations().length == 0
+        && !detectionConstructor.isSynthetic(), "detection constructor metadata");
+  }
+
+  private static void checkLoaderMethod(Method method, Class<?> returnType, int modifiers) {
+    check(method.getModifiers() == modifiers && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), new Class<?>[] {OggPacketInputStream.class})
+        && Arrays.equals(method.getExceptionTypes(), new Class<?>[] {IOException.class})
+        && method.getTypeParameters().length == 0 && method.getDeclaredAnnotations().length == 0
+        && !method.isSynthetic() && !method.isBridge() && !method.isVarArgs(),
+        method.getName() + " method metadata");
+  }
+
+  private static OggCodecHandler[] mutableProviders() throws Exception {
+    Field field = OggTrackLoader.class.getDeclaredField("TRACK_PROVIDERS");
+    field.setAccessible(true);
+    return (OggCodecHandler[]) field.get(null);
+  }
+
+  private static void install(OggCodecHandler[] target, OggCodecHandler first,
+      OggCodecHandler second, OggCodecHandler third) {
+    target[0] = first;
+    target[1] = second;
+    target[2] = third;
+  }
+
+  private static void reset(RecordingCodec... codecs) {
+    for (RecordingCodec codec : codecs) {
+      codec.matchCalls = 0;
+      codec.blueprintCalls = 0;
+      codec.metadataCalls = 0;
+      codec.stream = null;
+      codec.broker = null;
+    }
+  }
+
+  private static byte[] packet(int identifier, int tailLength) {
+    byte[] packet = new byte[4 + tailLength];
+    ByteBuffer.wrap(packet).putInt(identifier);
+    for (int index = 4; index < packet.length; index++) packet[index] = (byte) index;
+    return packet;
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try {
+      action.run();
+      return null;
+    } catch (Throwable throwable) {
+      return throwable;
+    }
+  }
+
+  private static void expectSame(Throwable expected, ThrowingRunnable action) {
+    check(catchThrowable(action) == expected, "failure identity for " + expected.getMessage());
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class RecordingCodec implements OggCodecHandler {
+    final int identifier;
+    OggTrackBlueprint blueprint;
+    OggMetadata metadata;
+    RuntimeException matchFailure;
+    IOException blueprintFailure;
+    IOException metadataFailure;
+    int matchCalls;
+    int blueprintCalls;
+    int metadataCalls;
+    OggPacketInputStream stream;
+    DirectBufferStreamBroker broker;
+
+    RecordingCodec(int identifier, OggTrackBlueprint blueprint, OggMetadata metadata) {
+      this.identifier = identifier;
+      this.blueprint = blueprint;
+      this.metadata = metadata;
+    }
+
+    @Override public boolean isMatchingIdentifier(int identifier) {
+      matchCalls++;
+      if (matchFailure != null) throw matchFailure;
+      return this.identifier == identifier;
+    }
+
+    @Override public int getMaximumFirstPacketLength() { return 0; }
+
+    @Override public OggTrackBlueprint loadBlueprint(OggPacketInputStream stream,
+        DirectBufferStreamBroker broker) throws IOException {
+      blueprintCalls++;
+      this.stream = stream;
+      this.broker = broker;
+      if (blueprintFailure != null) throw blueprintFailure;
+      return blueprint;
+    }
+
+    @Override public OggMetadata loadMetadata(OggPacketInputStream stream,
+        DirectBufferStreamBroker broker) throws IOException {
+      metadataCalls++;
+      this.stream = stream;
+      this.broker = broker;
+      if (metadataFailure != null) throw metadataFailure;
+      return metadata;
+    }
+  }
+
+  private static final class ScriptedPacketStream extends OggPacketInputStream {
+    final byte[] packet;
+    int position;
+    boolean trackAvailable = true;
+    boolean packetAvailable = true;
+    RuntimeException trackFailure;
+    IOException packetFailure;
+    IOException readFailure;
+    int trackCalls;
+    int packetCalls;
+    int readCalls;
+
+    ScriptedPacketStream(byte[] packet) {
+      super(new EmptyStream(), false);
+      this.packet = packet;
+    }
+
+    @Override public boolean startNewTrack() {
+      trackCalls++;
+      if (trackFailure != null) throw trackFailure;
+      return trackAvailable;
+    }
+
+    @Override public boolean startNewPacket() throws IOException {
+      packetCalls++;
+      if (packetFailure != null) throw packetFailure;
+      position = 0;
+      return packetAvailable;
+    }
+
+    @Override public int read() throws IOException {
+      byte[] one = new byte[1];
+      return read(one, 0, 1) == -1 ? -1 : one[0] & 0xff;
+    }
+
+    @Override public int read(byte[] target, int offset, int length) throws IOException {
+      readCalls++;
+      if (readFailure != null) throw readFailure;
+      if (position == packet.length) return -1;
+      int count = Math.min(length, packet.length - position);
+      System.arraycopy(packet, position, target, offset, count);
+      position += count;
+      return count;
+    }
+
+    @Override public int available() throws IOException { return packet.length - position; }
+  }
+
+  private static final class EmptyStream extends SeekableInputStream {
+    EmptyStream() { super(0L, 0L); }
+    @Override public int read() { return -1; }
+    @Override public long getPosition() { return 0L; }
+    @Override protected void seekHard(long position) {}
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      return Collections.emptyList();
+    }
+  }
+
+  private static final class Blueprint implements OggTrackBlueprint {
+    @Override public OggTrackHandler loadTrackHandler(OggPacketInputStream stream) { return null; }
+    @Override public int getSampleRate() { return 48000; }
+  }
+
+  private static class Derived extends OggTrackLoader {
+    int marker() { return 37; }
   }
 
   private static void check(boolean condition, String message) {

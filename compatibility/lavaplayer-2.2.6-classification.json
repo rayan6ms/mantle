@@ -7857,36 +7857,40 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves the public subclassable loader, ordered private codec-provider state, computed maximum, private nested detection state, and exact class/reflection metadata.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackLoader",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves public no-argument construction, Object identity semantics, ordinary subclassing, and the exact empty checked-throws contract.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackLoader",
       "symbol_kind": "METHOD",
       "member_name": "loadTrackBlueprint",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/ogg/OggPacketInputStream;)Lcom/sedmelluq/discord/lavaplayer/container/ogg/OggTrackBlueprint;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves track/packet boundary nulls, ordered codec selection, exact stream/broker and blueprint identity, long-packet reference behavior, failure identity, and IOException metadata.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackLoader",
       "symbol_kind": "METHOD",
       "member_name": "loadMetadata",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/ogg/OggPacketInputStream;)Lcom/sedmelluq/discord/lavaplayer/container/ogg/OggMetadata;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves track/packet boundary nulls, first-header dispatch, exact stream/broker and metadata identity including null returns, failure identity, and IOException metadata.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.flac.OggFlacCodecHandler",

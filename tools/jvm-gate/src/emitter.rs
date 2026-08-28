@@ -457,6 +457,10 @@ const OGG_TRACK_BLUEPRINT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/ogg/OggTrackBlueprint";
 const OGG_TRACK_HANDLER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/ogg/OggTrackHandler";
+const OGG_TRACK_LOADER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/ogg/OggTrackLoader";
+const OGG_TRACK_LOADER_CODEC_DETECTION_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/ogg/OggTrackLoader$CodecDetection";
 const MAX_OGG_SEEK_SCAN_BYTES: i64 = 64 << 20;
 const TWITCH_CONSTANTS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/twitch/TwitchConstants";
@@ -790,6 +794,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     OGG_STREAM_SIZE_INFO_CLASS,
     OGG_TRACK_BLUEPRINT_CLASS,
     OGG_TRACK_HANDLER_CLASS,
+    OGG_TRACK_LOADER_CLASS,
     TWITCH_CONSTANTS_CLASS,
     TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS,
     TWITCH_STREAM_AUDIO_TRACK_CLASS,
@@ -912,6 +917,7 @@ const PRIVATE_SUPPORT_CLASSES: &[&str] = &[
     MPEG_STANDARD_SAMPLE_DURATION_ITERATOR_CLASS,
     MPEG_STANDARD_SAMPLE_CHUNKING_ITERATOR_CLASS,
     OGG_PACKET_INPUT_STREAM_STATE_CLASS,
+    OGG_TRACK_LOADER_CODEC_DETECTION_CLASS,
 ];
 
 #[derive(Serialize)]
@@ -959,6 +965,8 @@ pub fn emit(
     let mut ogg_stream_size_info_bytes = None;
     let mut ogg_track_blueprint_bytes = None;
     let mut ogg_track_handler_bytes = None;
+    let mut ogg_track_loader_bytes = None;
+    let mut ogg_track_loader_codec_detection_bytes = None;
     let mut mpeg_file_loader_bytes = None;
     let mut mpeg_noop_track_consumer_bytes = None;
     let mut mpeg_fragmented_file_track_provider_bytes = None;
@@ -1016,6 +1024,10 @@ pub fn emit(
             ogg_track_blueprint_bytes = Some(bytes);
         } else if *binary_name == OGG_TRACK_HANDLER_CLASS {
             ogg_track_handler_bytes = Some(bytes);
+        } else if *binary_name == OGG_TRACK_LOADER_CLASS {
+            ogg_track_loader_bytes = Some(bytes);
+        } else if *binary_name == OGG_TRACK_LOADER_CODEC_DETECTION_CLASS {
+            ogg_track_loader_codec_detection_bytes = Some(bytes);
         } else if *binary_name == MPEG_FILE_LOADER_CLASS {
             mpeg_file_loader_bytes = Some(bytes);
         } else if *binary_name == MPEG_NOOP_TRACK_CONSUMER_CLASS {
@@ -1187,6 +1199,18 @@ pub fn emit(
                 ogg_track_handler_bytes
                     .as_ref()
                     .expect("OGG track handler source bytes are retained"),
+            );
+        } else if name == format!("{OGG_TRACK_LOADER_CLASS}.class") {
+            bytes.clone_from(
+                ogg_track_loader_bytes
+                    .as_ref()
+                    .expect("OGG track loader source bytes are retained"),
+            );
+        } else if name == format!("{OGG_TRACK_LOADER_CODEC_DETECTION_CLASS}.class") {
+            bytes.clone_from(
+                ogg_track_loader_codec_detection_bytes
+                    .as_ref()
+                    .expect("OGG track loader detection source bytes are retained"),
             );
         } else if name == format!("{MPEG_FILE_LOADER_CLASS}.class") {
             bytes.clone_from(
@@ -1885,6 +1909,8 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | OGG_STREAM_SIZE_INFO_CLASS
             | OGG_TRACK_BLUEPRINT_CLASS
             | OGG_TRACK_HANDLER_CLASS
+            | OGG_TRACK_LOADER_CLASS
+            | OGG_TRACK_LOADER_CODEC_DETECTION_CLASS
             | MPEG_FILE_LOADER_CLASS
             | MPEG_READER_CLASS
             | MPEG_READER_CHAIN_CLASS
