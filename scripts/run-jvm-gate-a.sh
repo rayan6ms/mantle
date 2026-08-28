@@ -412,6 +412,10 @@ cargo run --locked -q -p mantle-jvm-gate -- write-flac-audio-track-consumer \
   --output "$WORK/GateFlacAudioTrack.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-audio-track-support-consumer \
   --output "$WORK/FlacGateSupport.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-wav-audio-track-consumer \
+  --output "$WORK/GateWavAudioTrack.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-wav-audio-track-support-consumer \
+  --output "$WORK/WavGateSupport.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-container-probe-consumer \
   --output "$WORK/GateFlacContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-file-loader-consumer \
@@ -703,6 +707,8 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_VORBIS_CLA
   "$WORK/GateM3uPlaylistContainerProbe.java" \
   "$WORK/GatePlainPlaylistContainerProbe.java" \
   "$WORK/GatePlsPlaylistContainerProbe.java" \
+  "$WORK/GateWavAudioTrack.java" \
+  "$WORK/WavGateSupport.java" \
   "$WORK/GateVorbisCommentParser.java" \
   "$WORK/OggVorbisTrackHandler.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_VORBIS_TRACK_CLASSES" \
@@ -1922,6 +1928,17 @@ cmp "$WORK/pls-playlist-container-probe-reference.txt" \
 grep --fixed-strings \
   'contracts=public-construction,public-probe,name-identity,hints-false,non-pls-null,wildcard-header,case-sensitive-header,unsupported-empty,unsupported-reason,indexed-file-title-pairing,unknown-title,http-https-icy-links,scheme-filtering,duplicate-last-value,whitespace-patterns,unsupported-create-track,interface-implementation,private-header,mutable-private-patterns,checked-probe-throws,map-entry-inner-metadata,reflection' \
   "$WORK/pls-playlist-container-probe-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$ogg_vorbis_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateWavAudioTrack >"$WORK/wav-audio-track-reference.txt"
+java -Xverify:all \
+  -cp "$ogg_vorbis_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateWavAudioTrack >"$WORK/wav-audio-track-candidate.txt"
+cmp "$WORK/wav-audio-track-reference.txt" \
+  "$WORK/wav-audio-track-candidate.txt"
+grep --fixed-strings \
+  'contracts=track-info,input-identity,null-construction,loader-order,processing-context,read-callback,seek-callback,full-timecode,executor-control,input-ownership,context-failure,load-failure,null-executor,identifier-dispatch,loop-failure,callback-failure,close-finally,close-replacement,null-provider,subclassable,eager-logger,private-state,throws,reflection' \
+  "$WORK/wav-audio-track-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_vorbis_track_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggVorbisTrackHandler >"$WORK/ogg-vorbis-track-handler-reference.txt"
