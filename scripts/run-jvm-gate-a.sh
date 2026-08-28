@@ -318,6 +318,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-ogg-opus-router-support-consum
   --output "$WORK/OpusPacketRouter.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ogg-vorbis-codec-handler-consumer \
   --output "$WORK/GateOggVorbisCodecHandler.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-vorbis-comment-parser-consumer \
+  --output "$WORK/GateVorbisCommentParser.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ogg-vorbis-track-handler-support-consumer \
   --output "$WORK/OggVorbisTrackHandler.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ogg-vorbis-track-consumer \
@@ -677,6 +679,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_OPUS_CLASS
   "$WORK/OpusPacketRouter.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_VORBIS_CLASSES" \
   "$WORK/GateOggVorbisCodecHandler.java" \
+  "$WORK/GateVorbisCommentParser.java" \
   "$WORK/OggVorbisTrackHandler.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_VORBIS_TRACK_CLASSES" \
   "$OGG_VORBIS_TRACK_SOURCES/GateOggVorbisTrackHandler.java" \
@@ -1796,6 +1799,17 @@ cmp "$WORK/ogg-vorbis-codec-handler-reference.txt" \
 grep --fixed-strings \
   'contracts=identifier,maximum-length,public-construction,unvalidated-info-prefix,little-endian-rate,info-array-identity,comment-skip-bound,comment-save-bound,comment-read-bound,tag-parse,empty-singleton,unknown-duration,metadata-duration,size-rate,seek-table,nullable-seek-table,blueprint-state,blueprint-sample-rate,handler-info-identity,handler-stream-identity,handler-broker-identity,missing-comments,oversized-comments,complete-long-comments,short-comment-prefix,short-info-order,checked-failure-identity,runtime-failure-identity,subclassable,private-blueprint,private-methods,throws,reflection' \
   "$WORK/ogg-vorbis-codec-handler-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$ogg_vorbis_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateVorbisCommentParser >"$WORK/vorbis-comment-parser-reference.txt"
+java -Xverify:all \
+  -cp "$ogg_vorbis_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateVorbisCommentParser >"$WORK/vorbis-comment-parser-candidate.txt"
+cmp "$WORK/vorbis-comment-parser-reference.txt" \
+  "$WORK/vorbis-comment-parser-candidate.txt"
+grep --fixed-strings \
+  'contracts=public-construction,subclassable,fresh-hash-map,mutable-result,little-endian,vendor-skip,item-count,buffer-position,trailing-bytes,utf8,locale-root,first-equals,empty-key,empty-value,no-equals,case-folded-duplicate,last-value,negative-item-count,truncated-size,truncated-payload,strict-size,strict-payload,negative-vendor,negative-item-length,short-header,oversized-vendor,null-buffer,reflection' \
+  "$WORK/vorbis-comment-parser-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_vorbis_track_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggVorbisTrackHandler >"$WORK/ogg-vorbis-track-handler-reference.txt"

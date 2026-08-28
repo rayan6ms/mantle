@@ -195,6 +195,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-ogg-opus-track-handler-consumer" => Some(OGG_OPUS_TRACK_HANDLER_CONSUMER),
         "write-ogg-opus-router-support-consumer" => Some(OGG_OPUS_ROUTER_SUPPORT_CONSUMER),
         "write-ogg-vorbis-codec-handler-consumer" => Some(OGG_VORBIS_CODEC_HANDLER_CONSUMER),
+        "write-vorbis-comment-parser-consumer" => Some(VORBIS_COMMENT_PARSER_CONSUMER),
         "write-ogg-vorbis-track-handler-support-consumer" => {
             Some(OGG_VORBIS_TRACK_HANDLER_SUPPORT_CONSUMER)
         }
@@ -18910,6 +18911,167 @@ public class PcmFormat {
   }
 }
 ";
+
+const VORBIS_COMMENT_PARSER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.ogg.vorbis.VorbisCommentParser;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+
+public final class GateVorbisCommentParser {
+  private static final String BOUNDS =
+      "Invalid tag buffer - tag size field out of bounds.";
+
+  public static void main(String[] args) throws Exception {
+    parsingAndMutation();
+    countsAndTruncation();
+    failures();
+    reflection();
+    System.out.println("contracts=public-construction,subclassable,fresh-hash-map,mutable-result,little-endian,vendor-skip,item-count,buffer-position,trailing-bytes,utf8,locale-root,first-equals,empty-key,empty-value,no-equals,case-folded-duplicate,last-value,negative-item-count,truncated-size,truncated-payload,strict-size,strict-payload,negative-vendor,negative-item-length,short-header,oversized-vendor,null-buffer,reflection");
+  }
+
+  private static void parsingAndMutation() throws Exception {
+    Locale previous = Locale.getDefault();
+    try {
+      Locale.setDefault(new Locale("tr", "TR"));
+      byte[] encoded = comments(7, "vendor-data", "title=First", "ARTIST=Voice",
+          "TiTlE=Last=Part", "IGNORED", "=empty-key", "EMPTY=", "mötley=Grüße");
+      byte[] input = Arrays.copyOf(encoded, encoded.length + 3);
+      input[encoded.length] = 91; input[encoded.length + 1] = 92; input[encoded.length + 2] = 93;
+      ByteBuffer buffer = ByteBuffer.wrap(input);
+      Map<String, String> tags = VorbisCommentParser.parse(buffer, false);
+      check(tags.getClass() == HashMap.class && tags.size() == 5,
+          "fresh concrete hash map with parsed tags");
+      check("Last=Part".equals(tags.get("TITLE")) && "Voice".equals(tags.get("ARTIST"))
+          && "empty-key".equals(tags.get("")) && "".equals(tags.get("EMPTY"))
+          && "Grüße".equals(tags.get("MÖTLEY")) && !tags.containsKey("IGNORED"),
+          "UTF-8, ROOT case folding, first equals, empty values, and duplicate replacement");
+      check(buffer.position() == encoded.length && buffer.remaining() == 3
+          && buffer.get() == 91, "exact input position and trailing bytes");
+      tags.put("MUTABLE", "yes"); tags.remove("ARTIST");
+      check("yes".equals(tags.get("MUTABLE")) && !tags.containsKey("ARTIST"),
+          "mutable result");
+      Map<String, String> fresh = VorbisCommentParser.parse(
+          ByteBuffer.wrap(comments(0, "another-vendor")), false);
+      check(fresh.getClass() == HashMap.class && fresh.isEmpty() && fresh != tags,
+          "fresh empty result");
+      check(new Derived().marker() == 59, "public construction and subclassability");
+    } finally {
+      Locale.setDefault(previous);
+    }
+  }
+
+  private static void countsAndTruncation() throws Exception {
+    byte[] oneOfTwo = comments(2, "", "A=one");
+    ByteBuffer missingSize = ByteBuffer.wrap(oneOfTwo);
+    Map<String, String> partial = VorbisCommentParser.parse(missingSize, true);
+    check(partial.size() == 1 && "one".equals(partial.get("A"))
+        && !missingSize.hasRemaining(), "truncated missing size returns accumulated tags");
+    expect(IllegalArgumentException.class, BOUNDS,
+        () -> VorbisCommentParser.parse(ByteBuffer.wrap(oneOfTwo), false));
+
+    byte[] shortPayload = append(littleEndian(0, 1, 5), new byte[] {'B', '='});
+    ByteBuffer missingPayload = ByteBuffer.wrap(shortPayload);
+    check(VorbisCommentParser.parse(missingPayload, true).isEmpty()
+        && missingPayload.position() == 12 && missingPayload.remaining() == 2,
+        "truncated payload leaves unread bytes and returns accumulated tags");
+    expect(IllegalArgumentException.class, BOUNDS,
+        () -> VorbisCommentParser.parse(ByteBuffer.wrap(shortPayload), false));
+
+    ByteBuffer negativeCount = ByteBuffer.wrap(append(littleEndian(0, -1), new byte[] {7}));
+    Map<String, String> negative = VorbisCommentParser.parse(negativeCount, false);
+    check(negative.isEmpty() && negativeCount.position() == 8 && negativeCount.get() == 7,
+        "negative item count behaves as zero and preserves trailing input");
+
+    byte[] twoEntries = comments(1, "", "ONLY=yes", "EXTRA=no");
+    ByteBuffer bounded = ByteBuffer.wrap(twoEntries);
+    check("yes".equals(VorbisCommentParser.parse(bounded, false).get("ONLY"))
+        && bounded.hasRemaining(), "declared item count bounds consumption");
+  }
+
+  private static void failures() {
+    expect(IllegalStateException.class, "Ogg comments vendor length is negative.",
+        () -> VorbisCommentParser.parse(ByteBuffer.wrap(littleEndian(-1)), false));
+    byte[] negativeItem = littleEndian(0, 1, -2);
+    expect(IllegalStateException.class, "Ogg comments tag item length is negative.",
+        () -> VorbisCommentParser.parse(ByteBuffer.wrap(negativeItem), false));
+    expect(IllegalStateException.class, "Ogg comments tag item length is negative.",
+        () -> VorbisCommentParser.parse(ByteBuffer.wrap(negativeItem), true));
+    expect(BufferUnderflowException.class, null,
+        () -> VorbisCommentParser.parse(ByteBuffer.allocate(3), false));
+    expect(IllegalArgumentException.class, null,
+        () -> VorbisCommentParser.parse(ByteBuffer.wrap(append(littleEndian(3), new byte[] {1, 2})), false));
+    expect(NullPointerException.class, null, () -> VorbisCommentParser.parse(null, false));
+  }
+
+  private static void reflection() throws Exception {
+    Class<VorbisCommentParser> type = VorbisCommentParser.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 0
+        && type.getDeclaredMethods().length == 2 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredClasses().length == 0, "exact public class shape");
+    Constructor<VorbisCommentParser> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    Method parse = type.getDeclaredMethod("parse", ByteBuffer.class, boolean.class);
+    check(parse.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && parse.getReturnType() == Map.class && parse.getExceptionTypes().length == 0
+        && parse.getGenericReturnType().getTypeName().equals(
+            "java.util.Map<java.lang.String, java.lang.String>")
+        && !parse.isSynthetic() && !parse.isBridge(), "parse metadata");
+    Method store = type.getDeclaredMethod("storeTagToMap", Map.class, byte[].class);
+    check(store.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC)
+        && store.getReturnType() == void.class && store.getExceptionTypes().length == 0
+        && !store.isSynthetic() && !store.isBridge(), "private helper metadata");
+  }
+
+  private static byte[] comments(int count, String vendor, String... entries) throws Exception {
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    DataOutputStream output = new DataOutputStream(bytes);
+    byte[] vendorBytes = vendor.getBytes(StandardCharsets.UTF_8);
+    output.writeInt(Integer.reverseBytes(vendorBytes.length)); output.write(vendorBytes);
+    output.writeInt(Integer.reverseBytes(count));
+    for (String entry : entries) {
+      byte[] item = entry.getBytes(StandardCharsets.UTF_8);
+      output.writeInt(Integer.reverseBytes(item.length)); output.write(item);
+    }
+    return bytes.toByteArray();
+  }
+  private static byte[] littleEndian(int... values) {
+    ByteBuffer buffer = ByteBuffer.allocate(values.length * 4);
+    for (int value : values) buffer.putInt(Integer.reverseBytes(value));
+    return buffer.array();
+  }
+  private static byte[] append(byte[] first, byte[] second) {
+    byte[] result = Arrays.copyOf(first, first.length + second.length);
+    System.arraycopy(second, 0, result, first.length, second.length); return result;
+  }
+  private static void expect(Class<? extends Throwable> type, String message, Throwing action) {
+    Throwable failure = catchThrowable(action);
+    check(type.isInstance(failure) && (message == null || message.equals(failure.getMessage())),
+        "expected " + type.getName() + (message == null ? "" : ": " + message));
+  }
+  private static Throwable catchThrowable(Throwing action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+  private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+  private static final class Derived extends VorbisCommentParser {
+    int marker() { return 59; }
+  }
+}
+"#;
 
 const OGG_VORBIS_CODEC_HANDLER_CONSUMER: &str = r#"
 import com.sedmelluq.discord.lavaplayer.container.ogg.OggMetadata;
