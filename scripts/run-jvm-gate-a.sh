@@ -287,6 +287,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-versioned-section-handler
   --output "$WORK/GateMpegVersionedSectionHandler.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-versioned-section-info-consumer \
   --output "$WORK/GateMpegVersionedSectionInfo.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-fragmented-file-track-provider-consumer \
+  --output "$WORK/GateMpegFragmentedFileTrackProvider.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-noop-track-consumer-consumer \
   --output "$WORK/GateMpegNoopTrackConsumer.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-consumer-consumer \
@@ -466,6 +468,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateMpegSectionInfo.java" \
   "$WORK/GateMpegVersionedSectionHandler.java" \
   "$WORK/GateMpegVersionedSectionInfo.java" \
+  "$WORK/GateMpegFragmentedFileTrackProvider.java" \
   "$WORK/GateAdtsContainerProbe.java" \
   "$WORK/GateAdtsPacketHeader.java" \
   "$WORK/GateAdtsStreamReader.java" \
@@ -1588,6 +1591,16 @@ cmp "$WORK/mpeg-versioned-section-info-reference.txt" \
 grep --fixed-strings \
   'contracts=field-order,superclass-copy,offset-storage,length-storage,type-identity,version-storage,flags-storage,full-width-longs,full-width-ints,null-type,no-validation,identity-equality,object-hash,object-string,subclassable,public-final-fields,constructor-descriptor,no-throws,member-counts,reflection' \
   "$WORK/mpeg-versioned-section-info-candidate.txt" >/dev/null
+java -Xverify:all -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegFragmentedFileTrackProvider >"$WORK/mpeg-fragmented-file-track-provider-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMpegFragmentedFileTrackProvider >"$WORK/mpeg-fragmented-file-track-provider-candidate.txt"
+cmp "$WORK/mpeg-fragmented-file-track-provider-reference.txt" \
+  "$WORK/mpeg-fragmented-file-track-provider-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,reader-identity,root-identity,initial-fragment-state,nullable-consumer,pre-fragment-initialise,pre-fragment-duration,pre-fragment-seek,subclassable,private-state,field-order,method-descriptors,checked-throws,reflection' \
+  "$WORK/mpeg-fragmented-file-track-provider-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mp3_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMp3ConstantRateSeeker \
   >"$WORK/mp3-constant-rate-seeker-reference.txt"

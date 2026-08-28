@@ -2527,9 +2527,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[2].completed_slices[].symbols] | add) == .cohorts[2].classified_symbols and
   (.cohorts[2].classified_symbols + .cohorts[2].remaining_symbols) == .cohorts[2].symbols and
   .cohorts[3].status == "IN_PROGRESS" and
-  .cohorts[3].classified_symbols == 558 and
-  .cohorts[3].remaining_symbols == 266 and
-  (.cohorts[3].completed_slices | length) == 68 and
+  .cohorts[3].classified_symbols == 566 and
+  .cohorts[3].remaining_symbols == 258 and
+  (.cohorts[3].completed_slices | length) == 69 and
   .cohorts[3].completed_slices[0] == {
     id: "formats-contracts",
     classes: 1,
@@ -3103,6 +3103,19 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "tools/jvm-gate/src/main.rs"
     ]
   } and
+  .cohorts[3].completed_slices[68] == {
+    id: "mpeg-fragmented-file-track-provider-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 7,
+    symbols: 8,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
   .cohorts[3].completed_slices[1] == {
     id: "media-container-contracts",
     classes: 1,
@@ -3417,9 +3430,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   } and
   ([.cohorts[3].completed_slices[].symbols] | add) == .cohorts[3].classified_symbols and
   (.cohorts[3].classified_symbols + .cohorts[3].remaining_symbols) == .cohorts[3].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 2010 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 2018 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1863 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 1871 and
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegReader" and
@@ -3455,6 +3468,13 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
       (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
       (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 2 and
+  ([$classifications.symbols[] |
+    select(.binary_name ==
+      "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.fragmented.MpegFragmentedFileTrackProvider" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 8 and
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegVersionedSectionInfo" and
@@ -4422,6 +4442,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegSectionInfo",
         "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegVersionedSectionHandler",
         "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegVersionedSectionInfo",
+        "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.fragmented.MpegFragmentedFileTrackProvider",
         "com.sedmelluq.discord.lavaplayer.filter.AudioFilterChain",
         "com.sedmelluq.discord.lavaplayer.filter.AudioPipeline",
         "com.sedmelluq.discord.lavaplayer.filter.AudioPipelineFactory",
@@ -4904,7 +4925,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "mpeg-fragmented-file-track-provider-contracts" and
+  .phase_entry.next_slice == "mpeg-global-seek-info-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 JQ
@@ -4912,7 +4933,7 @@ JQ
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '286 reference classes / 2,015 symbols' \
+  '287 reference classes / 2,023 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -4922,4 +4943,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 2,010 classified symbols and 752 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 2,018 classified symbols and 744 unassessed symbols.\n'

@@ -6447,72 +6447,80 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public concrete file-provider implementation preserves exact Java 11 class metadata, private state layout, and reference behavior through the verified reference implementation shell.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.fragmented.MpegFragmentedFileTrackProvider",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegReader;Lcom/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegSectionInfo;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public constructor retains exact nullable reader and root identities, establishes reference default state, and declares no failures.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.fragmented.MpegFragmentedFileTrackProvider",
       "symbol_kind": "METHOD",
       "member_name": "initialise",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/mpeg/MpegTrackConsumer;)Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public initialise method preserves pre-fragment false behavior and nullable consumer handling.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.fragmented.MpegFragmentedFileTrackProvider",
       "symbol_kind": "METHOD",
       "member_name": "provideFrames",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public frame-provision entry point preserves exact checked InterruptedException and IOException metadata and reference behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.fragmented.MpegFragmentedFileTrackProvider",
       "symbol_kind": "METHOD",
       "member_name": "seekToTimecode",
       "descriptor": "(J)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public seek entry point preserves full-width timecode dispatch and inert pre-metadata behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.fragmented.MpegFragmentedFileTrackProvider",
       "symbol_kind": "METHOD",
       "member_name": "getDuration",
       "descriptor": "()J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public duration method preserves the Long.MAX_VALUE sentinel before global seek metadata exists.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.fragmented.MpegFragmentedFileTrackProvider",
       "symbol_kind": "METHOD",
       "member_name": "parseMovieExtended",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegSectionInfo;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public extended-movie parser preserves exact checked IOException metadata and reference chain behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.fragmented.MpegFragmentedFileTrackProvider",
       "symbol_kind": "METHOD",
       "member_name": "parseSegmentIndex",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegVersionedSectionInfo;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public segment-index parser preserves exact checked IOException metadata and reference data-input behavior.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.fragmented.MpegGlobalSeekInfo",

@@ -199,6 +199,7 @@ const MPEG_VERSIONED_SECTION_HANDLER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegVersionedSectionHandler";
 const MPEG_VERSIONED_SECTION_INFO_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/MpegVersionedSectionInfo";
+const MPEG_FRAGMENTED_FILE_TRACK_PROVIDER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/mpeg/reader/fragmented/MpegFragmentedFileTrackProvider";
 const MPEG_AAC_TRACK_CONSUMER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/mpeg/MpegAacTrackConsumer";
 const ADTS_CONTAINER_PROBE_CLASS: &str =
@@ -643,6 +644,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     MPEG_SECTION_INFO_CLASS,
     MPEG_VERSIONED_SECTION_HANDLER_CLASS,
     MPEG_VERSIONED_SECTION_INFO_CLASS,
+    MPEG_FRAGMENTED_FILE_TRACK_PROVIDER_CLASS,
     MPEG_AAC_TRACK_CONSUMER_CLASS,
     ADTS_CONTAINER_PROBE_CLASS,
     ADTS_PACKET_HEADER_CLASS,
@@ -881,6 +883,7 @@ pub fn emit(
     let mut mpeg_container_probe_bytes = None;
     let mut mpeg_file_loader_bytes = None;
     let mut mpeg_noop_track_consumer_bytes = None;
+    let mut mpeg_fragmented_file_track_provider_bytes = None;
     for binary_name in REFERENCE_CLASSES.iter().chain(PRIVATE_SUPPORT_CLASSES) {
         let mut entry = source.by_name(&format!("{binary_name}.class"))?;
         let mut bytes = Vec::new();
@@ -902,6 +905,8 @@ pub fn emit(
             mpeg_file_loader_bytes = Some(bytes);
         } else if *binary_name == MPEG_NOOP_TRACK_CONSUMER_CLASS {
             mpeg_noop_track_consumer_bytes = Some(bytes);
+        } else if *binary_name == MPEG_FRAGMENTED_FILE_TRACK_PROVIDER_CLASS {
+            mpeg_fragmented_file_track_provider_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -977,6 +982,12 @@ pub fn emit(
                 mpeg_noop_track_consumer_bytes
                     .as_ref()
                     .expect("MPEG no-op track consumer source bytes are retained"),
+            );
+        } else if name == format!("{MPEG_FRAGMENTED_FILE_TRACK_PROVIDER_CLASS}.class") {
+            bytes.clone_from(
+                mpeg_fragmented_file_track_provider_bytes
+                    .as_ref()
+                    .expect("MPEG fragmented provider source bytes are retained"),
             );
         } else {
             class.to_bytes(&mut bytes)?;

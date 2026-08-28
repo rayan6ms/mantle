@@ -184,6 +184,9 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
             Some(MPEG_VERSIONED_SECTION_HANDLER_CONSUMER)
         }
         "write-mpeg-versioned-section-info-consumer" => Some(MPEG_VERSIONED_SECTION_INFO_CONSUMER),
+        "write-mpeg-fragmented-file-track-provider-consumer" => {
+            Some(MPEG_FRAGMENTED_FILE_TRACK_PROVIDER_CONSUMER)
+        }
         "write-mpeg-noop-track-consumer-consumer" => Some(MPEG_NOOP_TRACK_CONSUMER_CONSUMER),
         "write-mpeg-track-consumer-consumer" => Some(MPEG_TRACK_CONSUMER_CONSUMER),
         "write-adts-container-probe-consumer" => Some(ADTS_CONTAINER_PROBE_CONSUMER),
@@ -16886,6 +16889,142 @@ public final class GateMpegVersionedSectionInfo {
 
   private static final class Derived extends MpegVersionedSectionInfo {
     Derived(MpegSectionInfo source, int version, int flags) { super(source, version, flags); }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MPEG_FRAGMENTED_FILE_TRACK_PROVIDER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.mpeg.MpegTrackConsumer;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegReader;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegSectionInfo;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegVersionedSectionInfo;
+import com.sedmelluq.discord.lavaplayer.container.mpeg.reader.fragmented.MpegFragmentedFileTrackProvider;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateMpegFragmentedFileTrackProvider {
+  public static void main(String[] args) throws Exception {
+    constructionAndDefaults();
+    lifecycleDefaults();
+    reflection();
+    System.out.println("contracts=constructor,reader-identity,root-identity,initial-fragment-state,nullable-consumer,pre-fragment-initialise,pre-fragment-duration,pre-fragment-seek,subclassable,private-state,field-order,method-descriptors,checked-throws,reflection");
+  }
+
+  private static void constructionAndDefaults() throws Exception {
+    EmptyStream stream = new EmptyStream();
+    MpegReader reader = new MpegReader(stream);
+    MpegSectionInfo root = new MpegSectionInfo(Long.MIN_VALUE, Long.MAX_VALUE, new String("root"));
+    MpegFragmentedFileTrackProvider provider = new MpegFragmentedFileTrackProvider(reader, root);
+    check(field(provider, "reader") == reader && field(provider, "root") == root,
+        "constructor retains exact reader and root identities");
+    check(!((Boolean) field(provider, "isFragmented"))
+        && field(provider, "consumer") == null && field(provider, "globalSeekInfo") == null
+        && !((Boolean) field(provider, "seeking"))
+        && ((Long) field(provider, "totalDuration")) == 0L
+        && ((Long) field(provider, "minimumTimecode")) == 0L,
+        "constructor establishes exact default private state");
+    check(catchThrowable(() -> new MpegFragmentedFileTrackProvider(null, root)) == null
+        && catchThrowable(() -> new MpegFragmentedFileTrackProvider(reader, null)) == null,
+        "constructor accepts nullable references without eager validation");
+  }
+
+  private static void lifecycleDefaults() throws Exception {
+    MpegFragmentedFileTrackProvider provider = new MpegFragmentedFileTrackProvider(
+        new MpegReader(new EmptyStream()), new MpegSectionInfo(0L, 0L, "root"));
+    check(!provider.initialise(null),
+        "initialise returns false before fragmented state is discovered");
+    check(provider.getDuration() == Long.MAX_VALUE,
+        "duration reports Long.MAX_VALUE before global seek metadata");
+    provider.seekToTimecode(Long.MIN_VALUE);
+    provider.seekToTimecode(Long.MAX_VALUE);
+    check(!((Boolean) field(provider, "seeking")) && field(provider, "consumer") == null,
+        "seek is inert before global seek metadata and does not retain consumer");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MpegFragmentedFileTrackProvider> type = MpegFragmentedFileTrackProvider.class;
+    check(type.getModifiers() == Modifier.PUBLIC
+        && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {
+            com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegFileTrackProvider.class})
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0,
+        "exact public concrete implementation metadata");
+    check(type.getDeclaredFields().length == 8 && type.getDeclaredMethods().length == 15
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredClasses().length == 0,
+        "exact declared member counts");
+    String[] fields = Arrays.stream(type.getDeclaredFields()).map(Field::getName).toArray(String[]::new);
+    check(Arrays.equals(fields, new String[] {"reader", "root", "consumer", "isFragmented",
+        "totalDuration", "globalSeekInfo", "seeking", "minimumTimecode"}),
+        "exact private field order");
+    checkField(type.getDeclaredField("reader"), MpegReader.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type.getDeclaredField("root"), MpegSectionInfo.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type.getDeclaredField("consumer"), MpegTrackConsumer.class, Modifier.PRIVATE);
+    checkField(type.getDeclaredField("isFragmented"), boolean.class, Modifier.PRIVATE);
+    checkField(type.getDeclaredField("totalDuration"), long.class, Modifier.PRIVATE);
+    checkField(type.getDeclaredField("globalSeekInfo"),
+        Class.forName("com.sedmelluq.discord.lavaplayer.container.mpeg.reader.fragmented.MpegGlobalSeekInfo"), Modifier.PRIVATE);
+    checkField(type.getDeclaredField("seeking"), boolean.class, Modifier.PRIVATE);
+    checkField(type.getDeclaredField("minimumTimecode"), long.class, Modifier.PRIVATE);
+    Constructor<MpegFragmentedFileTrackProvider> constructor = type.getDeclaredConstructor(
+        MpegReader.class, MpegSectionInfo.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "exact public constructor metadata");
+    checkMethod(type.getDeclaredMethod("initialise", MpegTrackConsumer.class), boolean.class,
+        new Class<?>[] {MpegTrackConsumer.class}, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("provideFrames"), void.class, new Class<?>[0],
+        new Class<?>[] {InterruptedException.class, IOException.class});
+    checkMethod(type.getDeclaredMethod("seekToTimecode", long.class), void.class,
+        new Class<?>[] {long.class}, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("getDuration"), long.class, new Class<?>[0], new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("parseMovieExtended", MpegSectionInfo.class), void.class,
+        new Class<?>[] {MpegSectionInfo.class}, new Class<?>[] {IOException.class});
+    checkMethod(type.getDeclaredMethod("parseSegmentIndex", MpegVersionedSectionInfo.class),
+        void.class, new Class<?>[] {MpegVersionedSectionInfo.class}, new Class<?>[] {IOException.class});
+  }
+
+  private static void checkField(Field field, Class<?> fieldType, int modifiers) {
+    check(field.getType() == fieldType && field.getModifiers() == modifiers && !field.isSynthetic(),
+        field.getName() + " field metadata");
+  }
+  private static void checkMethod(Method method, Class<?> returnType, Class<?>[] parameters,
+      Class<?>[] failures) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == returnType
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), failures) && !method.isSynthetic()
+        && !method.isBridge() && !method.isVarArgs(), method.getName() + " method metadata");
+  }
+  private static Object field(Object owner, String name) throws Exception {
+    Field field = owner.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(owner);
+  }
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class EmptyStream extends SeekableInputStream {
+    EmptyStream() { super(0L, 0L); }
+    @Override public int read() { return -1; }
+    @Override public long getPosition() { return 0L; }
+    @Override protected void seekHard(long position) {}
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      return Collections.emptyList();
+    }
   }
 
   private static void check(boolean condition, String message) {
