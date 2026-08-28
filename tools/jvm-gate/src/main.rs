@@ -202,6 +202,9 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
             Some(HLS_STREAM_SEGMENT_URL_PROVIDER_CONSUMER)
         }
         "write-hls-stream-track-consumer" => Some(HLS_STREAM_TRACK_CONSUMER),
+        "write-m3u-playlist-container-probe-consumer" => {
+            Some(M3U_PLAYLIST_CONTAINER_PROBE_CONSUMER)
+        }
         "write-vorbis-comment-parser-consumer" => Some(VORBIS_COMMENT_PARSER_CONSUMER),
         "write-ogg-vorbis-track-handler-support-consumer" => {
             Some(OGG_VORBIS_TRACK_HANDLER_SUPPORT_CONSUMER)
@@ -19612,6 +19615,116 @@ public final class GateHlsStreamTrack {
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }
+}
+"#;
+
+const M3U_PLAYLIST_CONTAINER_PROBE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerHints;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult;
+import com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamTrack;
+import com.sedmelluq.discord.lavaplayer.container.playlists.M3uPlaylistContainerProbe;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateM3uPlaylistContainerProbe {
+  public static void main(String[] args) throws Exception {
+    M3uPlaylistContainerProbe probe = new M3uPlaylistContainerProbe();
+    check(probe.getName().equals("m3u"), "probe name");
+    check(!probe.matchesHints(null), "hints are never preferred");
+    check(probe.probe(new AudioReference("fixture", "title"), new MemoryStream(new byte[] {1, 2, 3})) == null,
+        "non-M3U input is not detected");
+    expect(IllegalArgumentException.class, () -> probe.createTrack("unknown", info(), null));
+    reflection(probe);
+    System.out.println("contracts=public-construction,public-probe,name-identity,hints-false,non-m3u-null,unsupported-create-track,interface-implementation,private-constants,private-manager,checked-probe-throws,reflection");
+  }
+
+  private static void reflection(M3uPlaylistContainerProbe probe) throws Exception {
+    Class<M3uPlaylistContainerProbe> type = M3uPlaylistContainerProbe.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {
+            com.sedmelluq.discord.lavaplayer.container.MediaContainerProbe.class})
+        && type.getDeclaredFields().length == 6 && type.getDeclaredMethods().length == 6
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredClasses().length == 0,
+        "exact class shape");
+    checkField(type, "log", Class.forName("org.slf4j.Logger"), Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "TYPE_HLS_OUTER", String.class, Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "TYPE_HLS_INNER", String.class, Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "M3U_HEADER_TAG", int[].class, Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "M3U_ENTRY_TAG", int[].class, Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField(type, "httpInterfaceManager",
+        Class.forName("com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager"),
+        Modifier.PRIVATE | Modifier.FINAL);
+    check(((String) field(type, "TYPE_HLS_OUTER").get(null)).equals("hls-outer")
+        && ((String) field(type, "TYPE_HLS_INNER").get(null)).equals("hls-inner")
+        && Arrays.equals((int[]) field(type, "M3U_HEADER_TAG").get(null), new int[] {'#','E','X','T','M','3','U'})
+        && Arrays.equals((int[]) field(type, "M3U_ENTRY_TAG").get(null), new int[] {'#','E','X','T','I','N','F'}),
+        "constant values");
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0
+        && !constructor.isSynthetic(), "constructor metadata");
+    checkMethod(type, "getName", String.class, new Class<?>[0], new Class<?>[0]);
+    checkMethod(type, "matchesHints", boolean.class, new Class<?>[] {MediaContainerHints.class}, new Class<?>[0]);
+    checkMethod(type, "probe", MediaContainerDetectionResult.class,
+        new Class<?>[] {AudioReference.class, SeekableInputStream.class}, new Class<?>[] {IOException.class});
+    checkMethod(type, "createTrack", com.sedmelluq.discord.lavaplayer.track.AudioTrack.class,
+        new Class<?>[] {String.class, AudioTrackInfo.class, SeekableInputStream.class}, new Class<?>[0]);
+    checkMethod(type, "loadSingleItemPlaylist", MediaContainerDetectionResult.class,
+        new Class<?>[] {String[].class}, new Class<?>[0], Modifier.PRIVATE);
+    checkMethod(type, "extractTitleFromInfo", String.class,
+        new Class<?>[] {String.class}, new Class<?>[0], Modifier.PRIVATE);
+  }
+
+  private static Field field(Class<?> type, String name) throws Exception {
+    Field field = type.getDeclaredField(name); field.setAccessible(true); return field;
+  }
+  private static void checkField(Class<?> owner, String name, Class<?> type, int modifiers) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    check(field.getType() == type && field.getGenericType() == type && field.getModifiers() == modifiers
+        && !field.isSynthetic(), name + " metadata");
+  }
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+      Class<?>[] parameters, Class<?>[] exceptions) throws Exception {
+    checkMethod(owner, name, returnType, parameters, exceptions, Modifier.PUBLIC);
+  }
+  private static void checkMethod(Class<?> owner, String name, Class<?> returnType,
+      Class<?>[] parameters, Class<?>[] exceptions, int modifiers) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == returnType && method.getModifiers() == modifiers
+        && Arrays.equals(method.getParameterTypes(), parameters) && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.getTypeParameters().length == 0 && !method.isSynthetic() && !method.isBridge(), name + " metadata");
+  }
+  private static AudioTrackInfo info() {
+    return new AudioTrackInfo("title", "author", 1L, "id", true, null, null, null);
+  }
+  private static void expect(Class<? extends Throwable> type, Throwing action) {
+    try { action.run(); throw new AssertionError("expected " + type.getName()); }
+    catch (Throwable failure) { check(type.isInstance(failure), "wrong exception: " + failure); }
+  }
+  private interface Throwing { void run() throws Throwable; }
+  private static final class MemoryStream extends SeekableInputStream {
+    private final byte[] data; private int position;
+    MemoryStream(byte[] data) { super(data.length, 0); this.data = data; }
+    public long getPosition() { return position; }
+    protected void seekHard(long target) { position = (int) target; }
+    public boolean canSeekHard() { return true; }
+    public List<AudioTrackInfoProvider> getTrackInfoProviders() { return Collections.emptyList(); }
+    public int read() { return position < data.length ? data[position++] & 0xff : -1; }
+    public int read(byte[] target, int offset, int length) {
+      if (position >= data.length) return -1; int count = Math.min(length, data.length - position);
+      System.arraycopy(data, position, target, offset, count); position += count; return count;
+    }
+  }
+  private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
 }
 "#;
 
