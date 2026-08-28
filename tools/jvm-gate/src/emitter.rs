@@ -442,6 +442,7 @@ const OGG_CODEC_HANDLER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/ogg/OggCodecHandler";
 const OGG_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/ogg/OggContainerProbe";
+const OGG_METADATA_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/ogg/OggMetadata";
 const TWITCH_CONSTANTS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/twitch/TwitchConstants";
 const TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS: &str =
@@ -766,6 +767,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     OGG_AUDIO_TRACK_CLASS,
     OGG_CODEC_HANDLER_CLASS,
     OGG_CONTAINER_PROBE_CLASS,
+    OGG_METADATA_CLASS,
     TWITCH_CONSTANTS_CLASS,
     TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS,
     TWITCH_STREAM_AUDIO_TRACK_CLASS,
@@ -925,6 +927,7 @@ pub fn emit(
     let mut pes_packet_input_stream_bytes = None;
     let mut ogg_audio_track_bytes = None;
     let mut ogg_container_probe_bytes = None;
+    let mut ogg_metadata_bytes = None;
     let mut mpeg_file_loader_bytes = None;
     let mut mpeg_noop_track_consumer_bytes = None;
     let mut mpeg_fragmented_file_track_provider_bytes = None;
@@ -964,6 +967,8 @@ pub fn emit(
             ogg_audio_track_bytes = Some(bytes);
         } else if *binary_name == OGG_CONTAINER_PROBE_CLASS {
             ogg_container_probe_bytes = Some(bytes);
+        } else if *binary_name == OGG_METADATA_CLASS {
+            ogg_metadata_bytes = Some(bytes);
         } else if *binary_name == MPEG_FILE_LOADER_CLASS {
             mpeg_file_loader_bytes = Some(bytes);
         } else if *binary_name == MPEG_NOOP_TRACK_CONSUMER_CLASS {
@@ -1081,6 +1086,12 @@ pub fn emit(
                 ogg_container_probe_bytes
                     .as_ref()
                     .expect("OGG container probe source bytes are retained"),
+            );
+        } else if name == format!("{OGG_METADATA_CLASS}.class") {
+            bytes.clone_from(
+                ogg_metadata_bytes
+                    .as_ref()
+                    .expect("OGG metadata source bytes are retained"),
             );
         } else if name == format!("{MPEG_FILE_LOADER_CLASS}.class") {
             bytes.clone_from(
@@ -1677,6 +1688,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | PES_PACKET_INPUT_STREAM_CLASS
             | OGG_AUDIO_TRACK_CLASS
             | OGG_CONTAINER_PROBE_CLASS
+            | OGG_METADATA_CLASS
             | MPEG_FILE_LOADER_CLASS
             | MPEG_READER_CLASS
             | MPEG_READER_CHAIN_CLASS

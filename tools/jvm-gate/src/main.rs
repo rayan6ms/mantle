@@ -181,6 +181,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-ogg-audio-track-support-consumer" => Some(OGG_AUDIO_TRACK_SUPPORT_CONSUMER),
         "write-ogg-codec-handler-consumer" => Some(OGG_CODEC_HANDLER_CONSUMER),
         "write-ogg-container-probe-consumer" => Some(OGG_CONTAINER_PROBE_CONSUMER),
+        "write-ogg-metadata-consumer" => Some(OGG_METADATA_CONSUMER),
         "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
         "write-mpeg-track-info-consumer" => Some(MPEG_TRACK_INFO_CONSUMER),
         "write-mpeg-track-info-builder-consumer" => Some(MPEG_TRACK_INFO_BUILDER_CONSUMER),
@@ -16575,6 +16576,224 @@ public final class GateOggContainerProbe {
 
   private static final class Derived extends OggContainerProbe {
     @Override public String getName() { return "derived-ogg"; }
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const OGG_METADATA_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggMetadata;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.AbstractMap;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+
+public final class GateOggMetadata {
+  public static void main(String[] args) throws Exception {
+    emptySingleton();
+    directValuesAndMutation();
+    keyDispatchAndFailures();
+    nullableValues();
+    subclassUse();
+    reflection();
+    System.out.println("contracts=empty-singleton,empty-values,empty-map-immutable,direct-map-identity,direct-length-identity,uppercase-title,uppercase-artist,uppercase-isrc,case-sensitive,live-map-mutation,nullable-tags,nullable-length,wrong-value-cast,failure-identity,identifier-null,uri-null,artwork-null,provider-interface,identity-semantics,subclassable,public-static-field,private-constants,private-final-state,generic-map-signature,throws,reflection");
+  }
+
+  private static void emptySingleton() throws Exception {
+    OggMetadata empty = OggMetadata.EMPTY;
+    check(empty != null && empty == OggMetadata.EMPTY
+        && empty.getTitle() == null && empty.getAuthor() == null && empty.getISRC() == null
+        && empty.getIdentifier() == null && empty.getUri() == null
+        && empty.getArtworkUrl() == null && empty.getLength().longValue() == Long.MAX_VALUE,
+        "EMPTY is stable with empty tags, unknown duration, and null auxiliary metadata");
+    @SuppressWarnings("unchecked")
+    Map<String, String> tags = (Map<String, String>) field(empty, "tags");
+    check(tags == Collections.<String, String>emptyMap() && tags.isEmpty(),
+        "EMPTY retains the JDK empty-map singleton");
+    check(catchThrowable(() -> tags.put("TITLE", "changed"))
+        instanceof UnsupportedOperationException, "EMPTY tag storage is immutable");
+    check(field(empty, "length") == empty.getLength(),
+        "EMPTY getter retains its exact boxed duration identity");
+  }
+
+  private static void directValuesAndMutation() throws Exception {
+    Map<String, String> tags = new LinkedHashMap<>();
+    String title = new String("title-value");
+    String author = new String("author-value");
+    String isrc = new String("isrc-value");
+    tags.put("TITLE", title);
+    tags.put("ARTIST", author);
+    tags.put("ISRC", isrc);
+    tags.put("title", "wrong-case-title");
+    tags.put("artist", "wrong-case-author");
+    Long length = Long.valueOf(1_234_567_890_123L);
+    OggMetadata metadata = new OggMetadata(tags, length);
+    check(field(metadata, "tags") == tags && field(metadata, "length") == length,
+        "constructor retains exact map and boxed duration identities");
+    check(metadata.getTitle() == title && metadata.getAuthor() == author
+        && metadata.getISRC() == isrc && metadata.getLength() == length,
+        "getters return exact uppercase-tag and duration object identities");
+    check(metadata.getIdentifier() == null && metadata.getUri() == null
+        && metadata.getArtworkUrl() == null,
+        "identifier, URI, and artwork remain unconditionally null");
+
+    String changed = new String("changed-title");
+    tags.put("TITLE", changed);
+    tags.remove("ARTIST");
+    check(metadata.getTitle() == changed && metadata.getAuthor() == null
+        && metadata.getISRC() == isrc,
+        "later caller map mutations are observed without copying or caching");
+    check(metadata != new OggMetadata(tags, length)
+        && !metadata.equals(new OggMetadata(tags, length)),
+        "metadata retains Object identity semantics");
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private static void keyDispatchAndFailures() {
+    RecordingMap tags = new RecordingMap();
+    OggMetadata metadata = new OggMetadata(tags, Long.valueOf(7L));
+    tags.value = "title";
+    check(metadata.getTitle().equals("title") && tags.lastKey == "TITLE",
+        "title getter performs exact uppercase TITLE lookup");
+    tags.value = "author";
+    check(metadata.getAuthor().equals("author") && tags.lastKey == "ARTIST",
+        "author getter performs exact uppercase ARTIST lookup");
+    tags.value = "isrc";
+    check(metadata.getISRC().equals("isrc") && tags.lastKey == "ISRC",
+        "ISRC getter performs exact uppercase ISRC lookup");
+
+    RuntimeException failure = new RuntimeException("map-get-failure");
+    tags.failure = failure;
+    check(catchThrowable(metadata::getTitle) == failure
+        && catchThrowable(metadata::getAuthor) == failure
+        && catchThrowable(metadata::getISRC) == failure,
+        "all tag getters preserve exact map failure identity");
+
+    Map raw = new LinkedHashMap();
+    raw.put("TITLE", Integer.valueOf(42));
+    OggMetadata wrongValue = new OggMetadata(raw, null);
+    check(catchThrowable(wrongValue::getTitle) instanceof ClassCastException,
+        "erased map values are cast to String at getter time");
+  }
+
+  private static void nullableValues() {
+    OggMetadata nullTags = new OggMetadata(null, null);
+    check(nullTags.getLength() == null && nullTags.getIdentifier() == null
+        && nullTags.getUri() == null && nullTags.getArtworkUrl() == null,
+        "nullable constructor values are retained and auxiliary getters avoid tag access");
+    check(catchThrowable(nullTags::getTitle) instanceof NullPointerException
+        && catchThrowable(nullTags::getAuthor) instanceof NullPointerException
+        && catchThrowable(nullTags::getISRC) instanceof NullPointerException,
+        "tag getters naturally dereference a null map");
+    OggMetadata nullEntries = new OggMetadata(Collections.singletonMap("TITLE", null), null);
+    check(nullEntries.getTitle() == null && nullEntries.getLength() == null,
+        "null tag values and duration pass through unchanged");
+  }
+
+  private static void subclassUse() {
+    Derived derived = new Derived(Collections.singletonMap("TITLE", "base"), 3L);
+    AudioTrackInfoProvider provider = derived;
+    check(provider.getTitle().equals("derived") && provider.getLength().equals(3L),
+        "ordinary subclass and provider-interface dispatch remain virtual");
+  }
+
+  private static void reflection() throws Exception {
+    Class<OggMetadata> type = OggMetadata.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {AudioTrackInfoProvider.class})
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0
+        && type.getDeclaredFields().length == 6 && type.getDeclaredMethods().length == 7
+        && type.getDeclaredConstructors().length == 1,
+        "exact public concrete non-final provider shape and member counts");
+
+    Field[] fields = type.getDeclaredFields();
+    check(Arrays.equals(Arrays.stream(fields).map(Field::getName).toArray(String[]::new),
+        new String[] {"EMPTY", "TITLE_FIELD", "ARTIST_FIELD", "ISRC_FIELD", "tags", "length"}),
+        "exact declared field order");
+    Field empty = type.getDeclaredField("EMPTY");
+    check(empty.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL)
+        && empty.getType() == OggMetadata.class && empty.get(null) == OggMetadata.EMPTY
+        && !empty.isSynthetic(), "public EMPTY field metadata and identity");
+    checkConstant(type.getDeclaredField("TITLE_FIELD"), "TITLE");
+    checkConstant(type.getDeclaredField("ARTIST_FIELD"), "ARTIST");
+    checkConstant(type.getDeclaredField("ISRC_FIELD"), "ISRC");
+    Field tags = type.getDeclaredField("tags");
+    Field length = type.getDeclaredField("length");
+    check(tags.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && tags.getType() == Map.class && !tags.isSynthetic()
+        && tags.getGenericType().getTypeName()
+            .equals("java.util.Map<java.lang.String, java.lang.String>"),
+        "private final generic tag-map metadata");
+    check(length.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && length.getType() == Long.class && !length.isSynthetic(),
+        "private final boxed duration metadata");
+
+    Constructor<OggMetadata> constructor = type.getDeclaredConstructor(Map.class, Long.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0,
+        "public constructor metadata");
+    Type genericMap = constructor.getGenericParameterTypes()[0];
+    check(genericMap instanceof ParameterizedType
+        && genericMap.getTypeName().equals("java.util.Map<java.lang.String, java.lang.String>")
+        && constructor.getGenericParameterTypes()[1] == Long.class,
+        "constructor preserves Map<String,String> generic signature");
+    checkMethod(type.getDeclaredMethod("getTitle"), String.class);
+    checkMethod(type.getDeclaredMethod("getAuthor"), String.class);
+    checkMethod(type.getDeclaredMethod("getLength"), Long.class);
+    checkMethod(type.getDeclaredMethod("getIdentifier"), String.class);
+    checkMethod(type.getDeclaredMethod("getUri"), String.class);
+    checkMethod(type.getDeclaredMethod("getArtworkUrl"), String.class);
+    checkMethod(type.getDeclaredMethod("getISRC"), String.class);
+  }
+
+  private static void checkConstant(Field field, String value) throws Exception {
+    field.setAccessible(true);
+    check(field.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && field.getType() == String.class && field.get(null) == value && !field.isSynthetic(),
+        field.getName() + " exact private constant");
+  }
+  private static void checkMethod(Method method, Class<?> result) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == result
+        && method.getParameterTypes().length == 0 && method.getExceptionTypes().length == 0
+        && method.getTypeParameters().length == 0 && method.getDeclaredAnnotations().length == 0
+        && !method.isDefault() && !method.isSynthetic() && !method.isBridge()
+        && !method.isVarArgs(), method.getName() + " exact getter metadata");
+  }
+  private static Object field(Object target, String name) throws Exception {
+    Field field = OggMetadata.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
+  }
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class RecordingMap extends AbstractMap<String, String> {
+    Object lastKey;
+    String value;
+    RuntimeException failure;
+    @Override public String get(Object key) {
+      lastKey = key;
+      if (failure != null) throw failure;
+      return value;
+    }
+    @Override public Set<Entry<String, String>> entrySet() { return Collections.emptySet(); }
+  }
+  private static final class Derived extends OggMetadata {
+    Derived(Map<String, String> tags, Long length) { super(tags, length); }
+    @Override public String getTitle() { return "derived"; }
   }
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
