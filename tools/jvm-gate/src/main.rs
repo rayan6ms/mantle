@@ -182,6 +182,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-ogg-codec-handler-consumer" => Some(OGG_CODEC_HANDLER_CONSUMER),
         "write-ogg-container-probe-consumer" => Some(OGG_CONTAINER_PROBE_CONSUMER),
         "write-ogg-metadata-consumer" => Some(OGG_METADATA_CONSUMER),
+        "write-ogg-packet-input-stream-consumer" => Some(OGG_PACKET_INPUT_STREAM_CONSUMER),
         "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
         "write-mpeg-track-info-consumer" => Some(MPEG_TRACK_INFO_CONSUMER),
         "write-mpeg-track-info-builder-consumer" => Some(MPEG_TRACK_INFO_BUILDER_CONSUMER),
@@ -16794,6 +16795,459 @@ public final class GateOggMetadata {
   private static final class Derived extends OggMetadata {
     Derived(Map<String, String> tags, Long length) { super(tags, length); }
     @Override public String getTitle() { return "derived"; }
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const OGG_PACKET_INPUT_STREAM_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggSeekPoint;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggStreamSizeInfo;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInput;
+import java.io.DataInputStream;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateOggPacketInputStream {
+  public static void main(String[] args) throws Exception {
+    boolean reference = args.length == 1 && args[0].equals("reference");
+    constructionAndBoundaries();
+    packetReads();
+    continuationAndTracks();
+    malformedAndFailurePaths();
+    seekBehavior();
+    scanners(reference);
+    closeBehavior();
+    subclassUse();
+    reflection();
+    System.out.println("common=public-input-stream,13-fields,1-constructor,17-methods,private-state-enum,constructor-capture,track-boundaries,packet-boundaries,single-read,bulk-read,zero-length-read,available,multiple-packets,page-continuation,empty-pages,chained-tracks,last-page,physical-eof,invalid-header,invalid-version,truncated-header,premature-packet-eof,checked-failure-identity,seek-point-identity,ceiling-selection,track-seeking,seek-table,position-restore,size-info,hard-seek-gates,delegated-close,subclassable,generics,throws,reflection;scan="
+        + (reference ? "legacy-content-length-allocation" : "bounded-64-mib"));
+  }
+
+  private static void constructionAndBoundaries() throws Exception {
+    MemoryStream input = new MemoryStream(new byte[0]);
+    OggPacketInputStream packet = new OggPacketInputStream(input, false);
+    check(field(packet, "inputStream") == input && !(Boolean) field(packet, "closeDelegated")
+        && field(packet, "dataInput") instanceof DataInputStream
+        && ((int[]) field(packet, "segmentSizes")).length == 256
+        && state(packet).equals("TRACK_BOUNDARY"), "constructor captures exact eager state");
+    check(!packet.startNewPacket() && !packet.isPacketComplete()
+        && packet.read() == -1 && packet.available() == 0,
+        "initial track boundary exposes no packet bytes");
+    check(packet.startNewTrack() && state(packet).equals("PACKET_BOUNDARY"),
+        "first track starts from the initial boundary");
+    Throwable duplicate = catchThrowable(packet::startNewTrack);
+    check(duplicate instanceof IllegalStateException
+        && duplicate.getMessage().equals(
+            "Cannot load the next track while the previous one has not been consumed."),
+        "track cannot restart before reaching its boundary");
+    OggPacketInputStream nullInput = new OggPacketInputStream(null, false);
+    check(nullInput.startNewTrack(), "null-input track enters packet boundary");
+    Throwable nullFailure = catchThrowable(nullInput::startNewPacket);
+    check(field(nullInput, "inputStream") == null && nullFailure instanceof NullPointerException,
+        "null input is retained until the first page access: " + nullFailure);
+  }
+
+  private static void packetReads() throws Exception {
+    byte[] stream = page(2, 10L, 7, 0, new int[] {3, 2},
+        new byte[] {1, 2, 3, 4, 5});
+    MemoryStream input = new MemoryStream(stream);
+    input.availableLimit = 2;
+    OggPacketInputStream packet = opened(input, false);
+    check(packet.startNewPacket() && packet.isPacketComplete() && packet.available() == 2,
+        "first packet is active and available is bounded by delegate and known packet bytes");
+    check(packet.read() == 1 && packet.available() == 2, "single read advances within packet");
+    byte[] output = new byte[8];
+    check(packet.read(output, 2, 6) == 2
+        && Arrays.equals(Arrays.copyOfRange(output, 2, 4), new byte[] {2, 3})
+        && !packet.isPacketComplete() && packet.read() == -1 && packet.available() == 0,
+        "bulk read stops at the first packet boundary");
+    check(packet.startNewPacket() && packet.read(output, 0, output.length) == 2
+        && output[0] == 4 && output[1] == 5 && !packet.isPacketComplete(),
+        "next same-page lacing segment becomes a separate packet");
+    check(packet.read(null, 0, 0) == 0 && packet.read(null, 4, -2) == 0,
+        "zero and negative bulk lengths are no-ops even at packet EOF");
+
+    OggPacketInputStream nullBuffer = opened(new MemoryStream(
+        page(2, 0L, 1, 0, new int[] {1}, new byte[] {9})), false);
+    check(nullBuffer.startNewPacket()
+        && catchThrowable(() -> nullBuffer.read(null, 0, 1)) instanceof NullPointerException,
+        "positive bulk reads naturally dereference a null buffer");
+  }
+
+  private static void continuationAndTracks() throws Exception {
+    byte[] firstPayload = new byte[255];
+    for (int i = 0; i < firstPayload.length; i++) firstPayload[i] = (byte) i;
+    byte[] data = concat(
+        page(2, 0L, 3, 0, new int[] {255}, firstPayload),
+        page(1, 960L, 3, 1, new int[] {2, 3}, new byte[] {41, 42, 51, 52, 53}));
+    OggPacketInputStream packet = opened(new MemoryStream(data), false);
+    byte[] joined = new byte[300];
+    check(packet.startNewPacket() && packet.read(joined, 0, joined.length) == 257
+        && joined[255] == 41 && joined[256] == 42 && !packet.isPacketComplete(),
+        "packet continuation joins lacing across pages and stops at its end");
+    check(packet.startNewPacket() && packet.read(joined, 0, joined.length) == 3
+        && joined[0] == 51 && joined[2] == 53,
+        "remaining continuation-page segments form the next packet");
+
+    byte[] withEmptyPage = concat(page(2, 0L, 4, 0, new int[0], new byte[0]),
+        page(4, 10L, 4, 1, new int[] {1}, new byte[] {77}));
+    OggPacketInputStream empty = opened(new MemoryStream(withEmptyPage), false);
+    check(empty.startNewPacket() && empty.read() == 77 && empty.read() == -1
+        && !empty.startNewPacket() && state(empty).equals("TRACK_BOUNDARY"),
+        "empty pages are skipped and a last page ends the track");
+
+    byte[] chained = concat(
+        page(6, 100L, 5, 0, new int[] {1}, new byte[] {11}),
+        page(6, 200L, 6, 0, new int[] {1}, new byte[] {22}));
+    OggPacketInputStream tracks = opened(new MemoryStream(chained), false);
+    check(tracks.startNewPacket() && tracks.read() == 11 && !tracks.startNewPacket()
+        && tracks.startNewTrack() && tracks.startNewPacket() && tracks.read() == 22
+        && !tracks.startNewPacket(), "last-page boundaries permit chained logical tracks");
+
+    OggPacketInputStream physicalEnd = opened(new MemoryStream(
+        page(2, 0L, 1, 0, new int[] {1}, new byte[] {3})), false);
+    check(physicalEnd.startNewPacket() && physicalEnd.read() == 3
+        && !physicalEnd.startNewPacket() && state(physicalEnd).equals("PACKET_BOUNDARY")
+        && catchThrowable(physicalEnd::startNewTrack) instanceof IllegalStateException,
+        "physical EOF without a last-page flag preserves the packet-boundary quirk");
+  }
+
+  private static void malformedAndFailurePaths() throws Exception {
+    OggPacketInputStream wrongHeader = opened(new MemoryStream(new byte[] {1, 2, 3, 4}), false);
+    Throwable header = catchThrowable(wrongHeader::startNewPacket);
+    check(header instanceof IllegalStateException
+        && header.getMessage().equals("Stream is not positioned at a page header."),
+        "non-OGG bytes fail with the exact header diagnostic");
+
+    byte[] version = page(2, 0L, 1, 0, new int[] {1}, new byte[] {1});
+    version[4] = 1;
+    Throwable unknown = catchThrowable(opened(new MemoryStream(version), false)::startNewPacket);
+    check(unknown instanceof IllegalStateException
+        && unknown.getMessage().equals("Unknown OGG stream version."),
+        "unknown stream versions fail after matching the signature");
+    Throwable truncated = catchThrowable(opened(new MemoryStream(
+        Arrays.copyOf(page(2, 0L, 1, 0, new int[] {1}, new byte[] {1}), 10)), false)
+        ::startNewPacket);
+    check(truncated instanceof EOFException, "truncated page headers preserve checked EOF");
+
+    byte[] shortPayload = page(2, 0L, 1, 0, new int[] {3}, new byte[] {8});
+    OggPacketInputStream bulk = opened(new MemoryStream(shortPayload), false);
+    check(bulk.startNewPacket(), "premature payload fixture starts a packet");
+    check(bulk.read(new byte[4], 0, 4) == 1,
+        "a short delegate read returns its partial progress before physical EOF");
+    Throwable premature = catchThrowable(() -> bulk.read(new byte[4], 0, 4));
+    check(premature instanceof EOFException
+        && premature.getMessage().equals("Underlying stream ended before the end of a packet."),
+        "bulk reads reject partial packets with exact checked failure");
+    OggPacketInputStream single = opened(new MemoryStream(shortPayload), false);
+    check(single.startNewPacket() && single.read() == 8 && single.read() == -1
+        && (Integer) field(single, "bytesLeftInPacket") == 2,
+        "single-byte reads retain the reference's soft underlying-EOF behavior");
+
+    IOException readFailure = new IOException("packet-read-failure");
+    MemoryStream failing = new MemoryStream(
+        page(2, 0L, 1, 0, new int[] {1}, new byte[] {1}));
+    OggPacketInputStream failurePacket = opened(failing, false);
+    check(failurePacket.startNewPacket(), "failure fixture starts a packet");
+    failing.readFailure = readFailure;
+    check(catchThrowable(failurePacket::read) == readFailure
+        && catchThrowable(failurePacket::available) == readFailure,
+        "read and available preserve exact checked delegate failure identity");
+
+    byte[] unfinished = page(6, 0L, 1, 0, new int[] {255}, new byte[255]);
+    OggPacketInputStream middle = opened(new MemoryStream(unfinished), false);
+    check(middle.startNewPacket(), "unfinished last-page packet starts");
+    Throwable midTrack = catchThrowable(() -> middle.read(new byte[300], 0, 300));
+    check(midTrack instanceof IllegalStateException
+        && midTrack.getMessage().equals("Track finished in the middle of a packet."),
+        "last-page continuation fails with the exact mid-packet diagnostic");
+  }
+
+  private static void seekBehavior() throws Exception {
+    byte[] first = page(2, 0L, 8, 0, new int[] {1}, new byte[] {10});
+    byte[] second = page(4, 4800L, 8, 1, new int[] {1}, new byte[] {20});
+    MemoryStream input = new MemoryStream(concat(first, second));
+    OggPacketInputStream packet = opened(input, false);
+    List<OggSeekPoint> points = new ArrayList<>();
+    points.add(new OggSeekPoint(0L, 0L, 0L, 0L));
+    points.add(new OggSeekPoint(first.length, 4800L, 100L, 1L));
+    packet.setSeekPoints(points);
+    check(field(packet, "seekPoints") == points, "seek-point list identity is retained directly");
+    check(packet.seek(0L) == 100L && input.position == first.length
+        && state(packet).equals("TRACK_SEEKING")
+        && packet.startNewPacket() && packet.read() == 20,
+        "binary search preserves the first-point skip and ceiling selection quirks");
+
+    OggPacketInputStream unset = new OggPacketInputStream(new MemoryStream(first), false);
+    Throwable missing = catchThrowable(() -> unset.seek(0L));
+    check(missing instanceof IllegalStateException
+        && missing.getMessage().equals("Seek points have not been set."),
+        "seek requires an explicitly supplied list");
+    unset.setSeekPoints(Collections.singletonList(new OggSeekPoint(0L, 0L, 0L, 0L)));
+    check(catchThrowable(() -> unset.seek(0L)) instanceof IndexOutOfBoundsException,
+        "single-point tables preserve the reference index failure");
+  }
+
+  private static void scanners(boolean reference) throws Exception {
+    byte[] data = concat(
+        page(2, 0L, 9, 0, new int[] {1}, new byte[] {1}),
+        page(4, 96000L, 9, 1, new int[] {1}, new byte[] {2}));
+    MemoryStream input = new MemoryStream(data);
+    OggPacketInputStream packet = opened(input, false);
+    check(packet.startNewPacket(), "scanner fixture loads its first page");
+    long saved = input.position;
+    List<OggSeekPoint> table = packet.createSeekTable(48000);
+    check(table.size() == 2 && table.get(0).getPosition() == 0L
+        && table.get(1).getPosition() > 0L && table.get(1).getGranulePosition() == 96000L
+        && table.get(1).getTimecode() == 2000L && input.position == saved,
+        "seek-table scanning preserves page values and restores position");
+    OggStreamSizeInfo size = packet.seekForSizeInfo(48000);
+    check(size != null && size.totalBytes == data.length + table.get(1).getPosition()
+        && size.totalSamples == 96000L
+        && size.firstPageOffset == 0L && size.lastPageOffset == table.get(1).getPosition()
+        && size.sampleRate == 48000 && size.getDuration() == 2000L
+        && input.position == saved,
+        "tail scanning preserves size arithmetic quirks and restores position");
+
+    MemoryStream forwardOnly = new MemoryStream(data);
+    forwardOnly.hardSeek = false;
+    OggPacketInputStream noSeek = new OggPacketInputStream(forwardOnly, false);
+    check(noSeek.createSeekTable(48000) == null && noSeek.seekForSizeInfo(48000) == null,
+        "both scanners short-circuit when hard seeking is unavailable");
+
+    if (!reference) {
+      MemoryStream oversized = new MemoryStream(data);
+      oversized.reportedLength = (64L << 20) + 1L;
+      OggPacketInputStream bounded = opened(oversized, false);
+      check(bounded.startNewPacket(), "bounded scan fixture loads a page header");
+      Throwable limit = catchThrowable(() -> bounded.createSeekTable(48000));
+      check(limit instanceof IllegalArgumentException
+          && limit.getMessage().equals("OGG seek-table scan exceeds the 64 MiB limit."),
+          "candidate rejects an oversized scan before allocation");
+      MemoryStream negativeLength = new MemoryStream(data);
+      negativeLength.reportedLength = -1L;
+      OggPacketInputStream negative = opened(negativeLength, false);
+      check(negative.startNewPacket(), "negative-length scan fixture loads a page header");
+      Throwable negativeLimit = catchThrowable(() -> negative.createSeekTable(48000));
+      check(negativeLimit instanceof IllegalArgumentException
+          && negativeLimit.getMessage().equals("OGG seek-table scan exceeds the 64 MiB limit."),
+          "candidate rejects a negative reported length before allocation");
+    }
+  }
+
+  private static void closeBehavior() throws Exception {
+    MemoryStream retained = new MemoryStream(new byte[0]);
+    new OggPacketInputStream(retained, false).close();
+    check(retained.closeCalls == 0, "nondelegated close retains caller ownership");
+    MemoryStream delegated = new MemoryStream(new byte[0]);
+    new OggPacketInputStream(delegated, true).close();
+    check(delegated.closeCalls == 1, "delegated close calls the input exactly once");
+    IOException failure = new IOException("close-failure");
+    delegated.closeFailure = failure;
+    check(catchThrowable(() -> new OggPacketInputStream(delegated, true).close()) == failure,
+        "delegated close preserves checked failure identity");
+  }
+
+  private static void subclassUse() throws Exception {
+    Derived derived = new Derived(new MemoryStream(new byte[0]));
+    check(derived.startNewTrack() && derived.read() == 123,
+        "ordinary subclass construction and virtual read dispatch remain available");
+  }
+
+  private static void reflection() throws Exception {
+    Class<OggPacketInputStream> type = OggPacketInputStream.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == InputStream.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0 && type.getDeclaredFields().length == 13
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredMethods().length == 17
+        && type.getDeclaredClasses().length == 1,
+        "exact public non-final input-stream shape and member counts");
+    String[] names = Arrays.stream(type.getDeclaredFields()).map(Field::getName)
+        .toArray(String[]::new);
+    check(Arrays.equals(names, new String[] {"OGG_PAGE_HEADER", "SHORT_SCAN", "LONG_SCAN",
+        "inputStream", "closeDelegated", "dataInput", "segmentSizes", "seekPoints",
+        "pageHeader", "bytesLeftInPacket", "packetContinues", "nextPacketSegmentIndex", "state"}),
+        "exact private/package state order");
+    Field signature = type.getDeclaredField("OGG_PAGE_HEADER");
+    signature.setAccessible(true);
+    check(signature.getModifiers() == (Modifier.STATIC | Modifier.FINAL)
+        && signature.getType() == int[].class
+        && Arrays.equals((int[]) signature.get(null), new int[] {79, 103, 103, 83}),
+        "package-private OggS signature state");
+    checkConstant(type.getDeclaredField("SHORT_SCAN"), 10240);
+    checkConstant(type.getDeclaredField("LONG_SCAN"), 65307);
+    for (String name : new String[] {"inputStream", "closeDelegated", "dataInput", "segmentSizes"}) {
+      Field field = type.getDeclaredField(name);
+      check(field.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL) && !field.isSynthetic(),
+          "private final constructor state " + name);
+    }
+    Field seekPoints = type.getDeclaredField("seekPoints");
+    check(seekPoints.getModifiers() == Modifier.PRIVATE
+        && seekPoints.getGenericType().getTypeName()
+            .equals("java.util.List<com.sedmelluq.discord.lavaplayer.container.ogg.OggSeekPoint>"),
+        "private generic seek-point state");
+
+    Constructor<OggPacketInputStream> constructor =
+        type.getDeclaredConstructor(SeekableInputStream.class, boolean.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
+    checkMethod(type.getDeclaredMethod("setSeekPoints", List.class), void.class,
+        new Class<?>[] {List.class});
+    ParameterizedType generic = (ParameterizedType) type.getDeclaredMethod(
+        "setSeekPoints", List.class).getGenericParameterTypes()[0];
+    check(Arrays.equals(generic.getActualTypeArguments(), new Object[] {OggSeekPoint.class}),
+        "seek setter preserves its generic element signature");
+    checkMethod(type.getDeclaredMethod("startNewTrack"), boolean.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("startNewPacket"), boolean.class, new Class<?>[0], IOException.class);
+    checkMethod(type.getDeclaredMethod("isPacketComplete"), boolean.class, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("read"), int.class, new Class<?>[0], IOException.class);
+    checkMethod(type.getDeclaredMethod("read", byte[].class, int.class, int.class), int.class,
+        new Class<?>[] {byte[].class, int.class, int.class}, IOException.class);
+    checkMethod(type.getDeclaredMethod("available"), int.class, new Class<?>[0], IOException.class);
+    checkMethod(type.getDeclaredMethod("close"), void.class, new Class<?>[0], IOException.class);
+    checkMethod(type.getDeclaredMethod("seek", long.class), long.class,
+        new Class<?>[] {long.class}, IOException.class);
+    Method create = checkMethod(type.getDeclaredMethod("createSeekTable", int.class), List.class,
+        new Class<?>[] {int.class}, IOException.class);
+    check(create.getGenericReturnType().getTypeName().equals(
+        "java.util.List<com.sedmelluq.discord.lavaplayer.container.ogg.OggSeekPoint>"),
+        "seek-table return preserves its generic element signature");
+    checkMethod(type.getDeclaredMethod("seekForSizeInfo", int.class), OggStreamSizeInfo.class,
+        new Class<?>[] {int.class}, IOException.class);
+
+    Class<?> state = type.getDeclaredClasses()[0];
+    check(state.getSimpleName().equals("State") && state.isEnum()
+        && state.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL | 0x4000)
+        && state.getEnclosingClass() == type && state.getEnumConstants().length == 5
+        && Arrays.equals(Arrays.stream(state.getEnumConstants()).map(Object::toString)
+            .toArray(String[]::new), new String[] {"TRACK_SEEKING", "TRACK_BOUNDARY",
+                "PACKET_BOUNDARY", "PACKET_READ", "TERMINATED"}),
+        "private nested enum preserves names, order, ownership, and modifiers: "
+            + state + "," + state.getModifiers() + "," + state.getEnclosingClass());
+  }
+
+  private static OggPacketInputStream opened(MemoryStream input, boolean delegated) {
+    OggPacketInputStream packet = new OggPacketInputStream(input, delegated);
+    check(packet.startNewTrack(), "fixture track starts");
+    return packet;
+  }
+
+  private static byte[] page(int flags, long granule, int serial, int sequence,
+      int[] lacing, byte[] payload) {
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    out.write(79); out.write(103); out.write(103); out.write(83);
+    out.write(0); out.write(flags);
+    writeLongLe(out, granule); writeIntLe(out, serial); writeIntLe(out, sequence);
+    writeIntLe(out, 0); out.write(lacing.length);
+    for (int value : lacing) out.write(value);
+    out.write(payload, 0, payload.length);
+    return out.toByteArray();
+  }
+  private static void writeIntLe(ByteArrayOutputStream out, int value) {
+    for (int i = 0; i < 4; i++) out.write(value >>> (i * 8));
+  }
+  private static void writeLongLe(ByteArrayOutputStream out, long value) {
+    for (int i = 0; i < 8; i++) out.write((int) (value >>> (i * 8)));
+  }
+  private static byte[] concat(byte[] first, byte[] second) {
+    byte[] result = Arrays.copyOf(first, first.length + second.length);
+    System.arraycopy(second, 0, result, first.length, second.length);
+    return result;
+  }
+  private static Object field(Object owner, String name) throws Exception {
+    Field field = OggPacketInputStream.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(owner);
+  }
+  private static String state(OggPacketInputStream packet) throws Exception {
+    return field(packet, "state").toString();
+  }
+  private static void checkConstant(Field field, int value) throws Exception {
+    field.setAccessible(true);
+    check(field.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && field.getType() == int.class && field.getInt(null) == value && !field.isSynthetic(),
+        field.getName() + " exact constant metadata");
+  }
+  private static Method checkMethod(Method method, Class<?> result, Class<?>[] parameters,
+      Class<?>... exceptions) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == result
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.getTypeParameters().length == 0 && method.getDeclaredAnnotations().length == 0
+        && !method.isDefault() && !method.isSynthetic() && !method.isBridge() && !method.isVarArgs(),
+        method.getName() + " exact public metadata");
+    return method;
+  }
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static class MemoryStream extends SeekableInputStream {
+    final byte[] data;
+    long position;
+    long reportedLength;
+    boolean hardSeek = true;
+    int availableLimit = Integer.MAX_VALUE;
+    int closeCalls;
+    IOException readFailure;
+    IOException closeFailure;
+    MemoryStream(byte[] data) {
+      super(data.length, 0L);
+      this.data = data;
+      this.reportedLength = data.length;
+    }
+    @Override public long getContentLength() { return reportedLength; }
+    @Override public int read() throws IOException {
+      if (readFailure != null) throw readFailure;
+      return position < data.length ? data[(int) position++] & 0xff : -1;
+    }
+    @Override public int read(byte[] buffer, int offset, int length) throws IOException {
+      if (readFailure != null) throw readFailure;
+      if (position >= data.length) return -1;
+      int count = Math.min(length, data.length - (int) position);
+      System.arraycopy(data, (int) position, buffer, offset, count);
+      position += count;
+      return count;
+    }
+    @Override public int available() throws IOException {
+      if (readFailure != null) throw readFailure;
+      return Math.min(availableLimit, data.length - (int) position);
+    }
+    @Override public long getPosition() { return position; }
+    @Override protected void seekHard(long target) throws IOException {
+      if (target < 0L || target > data.length) throw new EOFException("seek out of range");
+      position = target;
+    }
+    @Override public boolean canSeekHard() { return hardSeek; }
+    @Override public void close() throws IOException {
+      closeCalls++;
+      if (closeFailure != null) throw closeFailure;
+    }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      return Collections.emptyList();
+    }
+  }
+  private static final class Derived extends OggPacketInputStream {
+    Derived(SeekableInputStream input) { super(input, false); }
+    @Override public int read() { return 123; }
   }
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

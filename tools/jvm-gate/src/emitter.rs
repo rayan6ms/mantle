@@ -443,6 +443,11 @@ const OGG_CODEC_HANDLER_CLASS: &str =
 const OGG_CONTAINER_PROBE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/container/ogg/OggContainerProbe";
 const OGG_METADATA_CLASS: &str = "com/sedmelluq/discord/lavaplayer/container/ogg/OggMetadata";
+const OGG_PACKET_INPUT_STREAM_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/ogg/OggPacketInputStream";
+const OGG_PACKET_INPUT_STREAM_STATE_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/container/ogg/OggPacketInputStream$State";
+const MAX_OGG_SEEK_SCAN_BYTES: i64 = 64 << 20;
 const TWITCH_CONSTANTS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/source/twitch/TwitchConstants";
 const TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS: &str =
@@ -768,6 +773,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     OGG_CODEC_HANDLER_CLASS,
     OGG_CONTAINER_PROBE_CLASS,
     OGG_METADATA_CLASS,
+    OGG_PACKET_INPUT_STREAM_CLASS,
     TWITCH_CONSTANTS_CLASS,
     TWITCH_STREAM_AUDIO_SOURCE_MANAGER_CLASS,
     TWITCH_STREAM_AUDIO_TRACK_CLASS,
@@ -889,6 +895,7 @@ const PRIVATE_SUPPORT_CLASSES: &[&str] = &[
     MPEG_STANDARD_TRACK_SEEK_INFO_BUILDER_CLASS,
     MPEG_STANDARD_SAMPLE_DURATION_ITERATOR_CLASS,
     MPEG_STANDARD_SAMPLE_CHUNKING_ITERATOR_CLASS,
+    OGG_PACKET_INPUT_STREAM_STATE_CLASS,
 ];
 
 #[derive(Serialize)]
@@ -928,6 +935,8 @@ pub fn emit(
     let mut ogg_audio_track_bytes = None;
     let mut ogg_container_probe_bytes = None;
     let mut ogg_metadata_bytes = None;
+    let mut ogg_packet_input_stream_bytes = None;
+    let mut ogg_packet_input_stream_state_bytes = None;
     let mut mpeg_file_loader_bytes = None;
     let mut mpeg_noop_track_consumer_bytes = None;
     let mut mpeg_fragmented_file_track_provider_bytes = None;
@@ -969,6 +978,10 @@ pub fn emit(
             ogg_container_probe_bytes = Some(bytes);
         } else if *binary_name == OGG_METADATA_CLASS {
             ogg_metadata_bytes = Some(bytes);
+        } else if *binary_name == OGG_PACKET_INPUT_STREAM_CLASS {
+            ogg_packet_input_stream_bytes = Some(patch_ogg_packet_input_stream(&bytes)?);
+        } else if *binary_name == OGG_PACKET_INPUT_STREAM_STATE_CLASS {
+            ogg_packet_input_stream_state_bytes = Some(bytes);
         } else if *binary_name == MPEG_FILE_LOADER_CLASS {
             mpeg_file_loader_bytes = Some(bytes);
         } else if *binary_name == MPEG_NOOP_TRACK_CONSUMER_CLASS {
@@ -1092,6 +1105,18 @@ pub fn emit(
                 ogg_metadata_bytes
                     .as_ref()
                     .expect("OGG metadata source bytes are retained"),
+            );
+        } else if name == format!("{OGG_PACKET_INPUT_STREAM_CLASS}.class") {
+            bytes.clone_from(
+                ogg_packet_input_stream_bytes
+                    .as_ref()
+                    .expect("OGG packet input stream source bytes are retained"),
+            );
+        } else if name == format!("{OGG_PACKET_INPUT_STREAM_STATE_CLASS}.class") {
+            bytes.clone_from(
+                ogg_packet_input_stream_state_bytes
+                    .as_ref()
+                    .expect("OGG packet input stream state source bytes are retained"),
             );
         } else if name == format!("{MPEG_FILE_LOADER_CLASS}.class") {
             bytes.clone_from(
@@ -1365,6 +1390,99 @@ fn read_class(archive: &mut ZipArchive<File>, entry_name: &str) -> Result<ClassF
     let mut bytes = Vec::new();
     entry.read_to_end(&mut bytes)?;
     Ok(ClassFile::from_bytes(&bytes)?)
+}
+
+fn patch_ogg_packet_input_stream(source: &[u8]) -> Result<Vec<u8>> {
+    let mut bytes = source.to_vec();
+    let constant_count = u16::from_be_bytes(
+        bytes
+            .get(8..10)
+            .ok_or("truncated OggPacketInputStream constant pool")?
+            .try_into()?,
+    );
+    let mut offset = 10usize;
+    let mut index = 1u16;
+    while index < constant_count {
+        let tag = *bytes
+            .get(offset)
+            .ok_or("truncated OggPacketInputStream constant entry")?;
+        offset += 1;
+        let width = match tag {
+            1 => {
+                let length = u16::from_be_bytes(
+                    bytes
+                        .get(offset..offset + 2)
+                        .ok_or("truncated OggPacketInputStream UTF-8 length")?
+                        .try_into()?,
+                );
+                2 + usize::from(length)
+            }
+            3 | 4 | 9 | 10 | 11 | 12 | 17 | 18 => 4,
+            5 | 6 => {
+                index += 1;
+                8
+            }
+            7 | 8 | 16 | 19 | 20 => 2,
+            15 => 3,
+            _ => return Err(format!("unsupported OggPacketInputStream constant tag {tag}").into()),
+        };
+        offset = offset
+            .checked_add(width)
+            .filter(|end| *end <= bytes.len())
+            .ok_or("truncated OggPacketInputStream constant value")?;
+        index += 1;
+    }
+
+    let class_name = b"dev/mantle/internal/MantleNative";
+    let method_name = b"boundedOggScanArray";
+    let descriptor = b"(J)[B";
+    let class_name_index = constant_count;
+    let class_index = constant_count + 1;
+    let method_name_index = constant_count + 2;
+    let descriptor_index = constant_count + 3;
+    let name_and_type_index = constant_count + 4;
+    let method_ref_index = constant_count + 5;
+    let mut ordered = Vec::new();
+    ordered.push(1);
+    ordered.extend_from_slice(&u16::try_from(class_name.len())?.to_be_bytes());
+    ordered.extend_from_slice(class_name);
+    ordered.extend_from_slice(&[7]);
+    ordered.extend_from_slice(&class_name_index.to_be_bytes());
+    ordered.push(1);
+    ordered.extend_from_slice(&u16::try_from(method_name.len())?.to_be_bytes());
+    ordered.extend_from_slice(method_name);
+    ordered.push(1);
+    ordered.extend_from_slice(&u16::try_from(descriptor.len())?.to_be_bytes());
+    ordered.extend_from_slice(descriptor);
+    ordered.push(12);
+    ordered.extend_from_slice(&method_name_index.to_be_bytes());
+    ordered.extend_from_slice(&descriptor_index.to_be_bytes());
+    ordered.push(10);
+    ordered.extend_from_slice(&class_index.to_be_bytes());
+    ordered.extend_from_slice(&name_and_type_index.to_be_bytes());
+
+    bytes[8..10].copy_from_slice(&(constant_count + 6).to_be_bytes());
+    bytes.splice(offset..offset, ordered);
+    // The frozen 2.2.6 call site is `getContentLength(); l2i; newarray byte`. Replace only the
+    // latter three bytes with an equal-width static call so every branch, frame, and debug offset
+    // in the otherwise exact reference method remains valid.
+    let pattern = [0xb6, 0x00, 0x3f, 0x88, 0xbc, 0x08];
+    let matches = bytes
+        .windows(pattern.len())
+        .enumerate()
+        .filter_map(|(index, window)| (window == pattern).then_some(index))
+        .collect::<Vec<_>>();
+    if matches.len() != 1 {
+        return Err(format!(
+            "expected one OggPacketInputStream seek-table allocation, found {}",
+            matches.len()
+        )
+        .into());
+    }
+    let allocation = matches[0] + 3;
+    bytes[allocation] = 0xb8;
+    bytes[allocation + 1..allocation + 3].copy_from_slice(&method_ref_index.to_be_bytes());
+    Ok(bytes)
 }
 
 fn interface_names(class: &ClassFile<'_>) -> Result<Vec<String>> {
@@ -1689,6 +1807,8 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | OGG_AUDIO_TRACK_CLASS
             | OGG_CONTAINER_PROBE_CLASS
             | OGG_METADATA_CLASS
+            | OGG_PACKET_INPUT_STREAM_CLASS
+            | OGG_PACKET_INPUT_STREAM_STATE_CLASS
             | MPEG_FILE_LOADER_CLASS
             | MPEG_READER_CLASS
             | MPEG_READER_CHAIN_CLASS
@@ -53895,7 +54015,52 @@ fn native_class(expected_abi: u8) -> Result<ClassFile<'static>> {
         "()V",
         Some(body),
     )?;
+    let body = bounded_ogg_scan_array(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+        "boundedOggScanArray",
+        "(J)[B",
+        Some(body),
+    )?;
     Ok(class)
+}
+
+fn bounded_ogg_scan_array(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let maximum = pool.add_long(MAX_OGG_SEEK_SCAN_BYTES)?;
+    let error = pool.add_class("java/lang/IllegalArgumentException")?;
+    let error_init = pool.add_method_ref(error, "<init>", "(Ljava/lang/String;)V")?;
+    let message = pool.add_string("OGG seek-table scan exceeds the 64 MiB limit.")?;
+    let mut body = code(
+        pool,
+        4,
+        2,
+        vec![
+            Instruction::Lload_0,
+            Instruction::Lconst_0,
+            Instruction::Lcmp,
+            Instruction::Iflt(8),
+            Instruction::Lload_0,
+            Instruction::Ldc2_w(maximum),
+            Instruction::Lcmp,
+            Instruction::Ifle(13),
+            Instruction::New(error),
+            Instruction::Dup,
+            Instruction::Ldc_w(message),
+            Instruction::Invokespecial(error_init),
+            Instruction::Athrow,
+            Instruction::Lload_0,
+            Instruction::L2i,
+            Instruction::Newarray(ArrayType::Byte),
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![same_stack_frame(8), same_stack_frame(4)],
+    )?;
+    Ok(body)
 }
 
 fn native_youtube_client_config_class() -> Result<ClassFile<'static>> {

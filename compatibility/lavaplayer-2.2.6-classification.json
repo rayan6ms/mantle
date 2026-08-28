@@ -7337,117 +7337,130 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Preserves the exact public/private InputStream shell, nested state enum, Ogg page/packet/track state machine, seeking, scanning, failures, and ownership behavior while bounding whole-content seek-table allocation to 64 MiB.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream;Z)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves superclass construction, nullable input capture, delegated-close policy, eager DataInputStream wrapping, fixed 256-entry lacing storage, and initial track-boundary state.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream",
       "symbol_kind": "METHOD",
       "member_name": "setSeekPoints",
       "descriptor": "(Ljava/util/List;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Retains the caller's exact nullable generic seek-point list identity without copying, validation, or reordering.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream",
       "symbol_kind": "METHOD",
       "member_name": "startNewTrack",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves track-boundary validation, page-header reset, packet-boundary transition, duplicate-start diagnostic, and terminal-state result.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream",
       "symbol_kind": "METHOD",
       "member_name": "startNewPacket",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves packet-boundary validation, seek resumption, empty-page and lacing traversal, chained-track/physical-EOF distinctions, exact state transitions, and checked failures.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream",
       "symbol_kind": "METHOD",
       "member_name": "isPacketComplete",
       "descriptor": "()Z",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Returns the exact PACKET_READ state predicate, including its active-packet naming quirk.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream",
       "symbol_kind": "METHOD",
       "member_name": "read",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves packet-bounded single-byte reads, cross-page continuation, boundary transition, soft physical-EOF behavior, and exact delegate failure identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream",
       "symbol_kind": "METHOD",
       "member_name": "read",
       "descriptor": "([BII)I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves bounded bulk reads across continuation pages, partial delegate progress, zero/negative-length quirks, packet EOF, and premature underlying-EOF diagnostics.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream",
       "symbol_kind": "METHOD",
       "member_name": "available",
       "descriptor": "()I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Returns zero outside PACKET_READ and otherwise the exact minimum of delegate availability and known packet bytes, preserving checked failure identity.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream",
       "symbol_kind": "METHOD",
       "member_name": "close",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves caller ownership for nondelegated streams and exact single-call close/failure behavior when delegation is enabled.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream",
       "symbol_kind": "METHOD",
       "member_name": "seek",
       "descriptor": "(J)J",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves missing-table failure, reference binary-search ceiling and first-point quirks, full-width delegate positioning, chosen timecode, and TRACK_SEEKING transition.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream",
       "symbol_kind": "METHOD",
       "member_name": "createSeekTable",
       "descriptor": "(I)Ljava/util/List;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "C_SEMANTIC",
+      "notes": "Preserves the hard-seek gate, page-offset scan, OggPageScanner results, generic return type, position restoration, and failures for ordinary inputs, but rejects negative or greater-than-64-MiB reported content lengths before allocating the reference's whole-content byte array.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream",
       "symbol_kind": "METHOD",
       "member_name": "seekForSizeInfo",
       "descriptor": "(I)Lcom/sedmelluq/discord/lavaplayer/container/ogg/OggStreamSizeInfo;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Preserves the hard-seek gate, null pre-page result, short/long tail scans, reference size arithmetic, sample-rate conversion, position restoration, and checked failures.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.container.ogg.OggPageHeader",

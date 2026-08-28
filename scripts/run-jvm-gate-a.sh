@@ -283,6 +283,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-ogg-container-probe-consumer \
   --output "$WORK/GateOggContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ogg-metadata-consumer \
   --output "$WORK/GateOggMetadata.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-ogg-packet-input-stream-consumer \
+  --output "$WORK/GateOggPacketInputStream.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-file-loader-consumer \
   --output "$WORK/GateMpegFileLoader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-info-consumer \
@@ -587,7 +589,8 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_CODEC_CLAS
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_PROBE_CLASSES" \
   "$WORK/GateOggContainerProbe.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_CODEC_CLASSES" \
-  "$WORK/GateOggMetadata.java"
+  "$WORK/GateOggMetadata.java" \
+  "$WORK/GateOggPacketInputStream.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   -d "$MPEG_FILE_LOADER_CLASSES" "$WORK/GateMpegFileLoader.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
@@ -1576,6 +1579,19 @@ cmp "$WORK/ogg-metadata-reference.txt" "$WORK/ogg-metadata-candidate.txt"
 grep --fixed-strings \
   'contracts=empty-singleton,empty-values,empty-map-immutable,direct-map-identity,direct-length-identity,uppercase-title,uppercase-artist,uppercase-isrc,case-sensitive,live-map-mutation,nullable-tags,nullable-length,wrong-value-cast,failure-identity,identifier-null,uri-null,artwork-null,provider-interface,identity-semantics,subclassable,public-static-field,private-constants,private-final-state,generic-map-signature,throws,reflection' \
   "$WORK/ogg-metadata-candidate.txt" >/dev/null
+# Preserve Ogg packet/page semantics while bounding the reference's whole-content seek-table allocation.
+java -Xverify:all \
+  -cp "$OGG_CODEC_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOggPacketInputStream reference >"$WORK/ogg-packet-input-stream-reference.txt"
+java -Xverify:all \
+  -cp "$OGG_CODEC_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOggPacketInputStream candidate >"$WORK/ogg-packet-input-stream-candidate.txt"
+grep --fixed-strings \
+  'common=public-input-stream,13-fields,1-constructor,17-methods,private-state-enum,constructor-capture,track-boundaries,packet-boundaries,single-read,bulk-read,zero-length-read,available,multiple-packets,page-continuation,empty-pages,chained-tracks,last-page,physical-eof,invalid-header,invalid-version,truncated-header,premature-packet-eof,checked-failure-identity,seek-point-identity,ceiling-selection,track-seeking,seek-table,position-restore,size-info,hard-seek-gates,delegated-close,subclassable,generics,throws,reflection;scan=legacy-content-length-allocation' \
+  "$WORK/ogg-packet-input-stream-reference.txt" >/dev/null
+grep --fixed-strings \
+  'common=public-input-stream,13-fields,1-constructor,17-methods,private-state-enum,constructor-capture,track-boundaries,packet-boundaries,single-read,bulk-read,zero-length-read,available,multiple-packets,page-continuation,empty-pages,chained-tracks,last-page,physical-eof,invalid-header,invalid-version,truncated-header,premature-packet-eof,checked-failure-identity,seek-point-identity,ceiling-selection,track-seeking,seek-table,position-restore,size-info,hard-seek-gates,delegated-close,subclassable,generics,throws,reflection;scan=bounded-64-mib' \
+  "$WORK/ogg-packet-input-stream-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mpeg_file_loader_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateMpegFileLoader "$ROOT/tests/media/fixtures/tone-aac-lc-metadata.m4a" \
