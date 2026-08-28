@@ -186,6 +186,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-ogg-page-header-consumer" => Some(OGG_PAGE_HEADER_CONSUMER),
         "write-ogg-page-scanner-consumer" => Some(OGG_PAGE_SCANNER_CONSUMER),
         "write-ogg-seek-point-consumer" => Some(OGG_SEEK_POINT_CONSUMER),
+        "write-ogg-stream-size-info-consumer" => Some(OGG_STREAM_SIZE_INFO_CONSUMER),
         "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
         "write-mpeg-track-info-consumer" => Some(MPEG_TRACK_INFO_CONSUMER),
         "write-mpeg-track-info-builder-consumer" => Some(MPEG_TRACK_INFO_BUILDER_CONSUMER),
@@ -17758,6 +17759,133 @@ public final class GateOggSeekPoint {
       super(position, granulePosition, timecode, pageSequence);
     }
     @Override public long getPosition() { calls++; return 99L; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const OGG_STREAM_SIZE_INFO_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggStreamSizeInfo;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateOggStreamSizeInfo {
+  public static void main(String[] args) throws Exception {
+    constructorAndFields();
+    durationArithmetic();
+    objectBehavior();
+    reflection();
+    System.out.println("contracts=public-value,5-fields,1-constructor,1-method,direct-assignment,full-width-values,negative-values,no-validation,duration-multiply-first,integer-truncation,signed-division,long-overflow,zero-rate-failure,unrelated-fields,immutable-public-state,identity-semantics,subclassable,override-dispatch,field-order,throws,reflection");
+  }
+
+  private static void constructorAndFields() {
+    OggStreamSizeInfo info = new OggStreamSizeInfo(Long.MIN_VALUE, Long.MAX_VALUE, -1L,
+        0L, Integer.MIN_VALUE);
+    check(info.totalBytes == Long.MIN_VALUE && info.totalSamples == Long.MAX_VALUE
+        && info.firstPageOffset == -1L && info.lastPageOffset == 0L
+        && info.sampleRate == Integer.MIN_VALUE,
+        "constructor preserves independent full-width signed values");
+    OggStreamSizeInfo ordered = new OggStreamSizeInfo(11L, 22L, 33L, 44L, 55);
+    check(ordered.totalBytes == 11L && ordered.totalSamples == 22L
+        && ordered.firstPageOffset == 33L && ordered.lastPageOffset == 44L
+        && ordered.sampleRate == 55, "constructor field order");
+  }
+
+  private static void durationArithmetic() {
+    check(new OggStreamSizeInfo(1L, 96000L, 2L, 3L, 48000).getDuration() == 2000L,
+        "ordinary sample duration");
+    check(new OggStreamSizeInfo(0L, 1L, 0L, 0L, 3).getDuration() == 333L,
+        "positive integer truncation");
+    check(new OggStreamSizeInfo(0L, -1L, 0L, 0L, 3).getDuration() == -333L,
+        "negative truncation toward zero");
+    check(new OggStreamSizeInfo(0L, 1L, 0L, 0L, -3).getDuration() == -333L,
+        "signed sample-rate division");
+    check(new OggStreamSizeInfo(Long.MIN_VALUE, Long.MAX_VALUE, Long.MAX_VALUE,
+        Long.MIN_VALUE, 1000).getDuration() == -1L,
+        "long multiplication overflows before division");
+    check(new OggStreamSizeInfo(Long.MAX_VALUE, Long.MIN_VALUE, -8L, 9L, 7)
+        .getDuration() == 0L, "wrapped Long.MIN multiplication");
+    OggStreamSizeInfo zeroRate = new OggStreamSizeInfo(1L, 2L, 3L, 4L, 0);
+    expect(ArithmeticException.class, zeroRate::getDuration);
+    check(new OggStreamSizeInfo(-9L, 0L, Long.MIN_VALUE, Long.MAX_VALUE, 1)
+        .getDuration() == 0L, "unrelated byte and offset fields do not affect duration");
+  }
+
+  private static void objectBehavior() {
+    OggStreamSizeInfo first = new OggStreamSizeInfo(1L, 2L, 3L, 4L, 5);
+    OggStreamSizeInfo second = new OggStreamSizeInfo(1L, 2L, 3L, 4L, 5);
+    check(first != second && !first.equals(second), "Object identity semantics");
+    Derived derived = new Derived();
+    OggStreamSizeInfo view = derived;
+    check(view.getDuration() == 77L && derived.calls == 1
+        && view.totalBytes == 10L && view.totalSamples == 20L,
+        "ordinary subclass override dispatch and inherited state");
+  }
+
+  private static void reflection() throws Exception {
+    Class<OggStreamSizeInfo> type = OggStreamSizeInfo.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getTypeParameters().length == 0
+        && type.getDeclaredAnnotations().length == 0 && type.getDeclaredClasses().length == 0,
+        "class metadata");
+    check(type.getDeclaredFields().length == 5 && type.getDeclaredMethods().length == 1
+        && type.getDeclaredConstructors().length == 1, "declared member counts");
+    String[] fields = Arrays.stream(type.getDeclaredFields()).map(Field::getName)
+        .toArray(String[]::new);
+    check(Arrays.equals(fields, new String[] {"totalBytes", "totalSamples", "firstPageOffset",
+        "lastPageOffset", "sampleRate"}), "declared field order");
+    checkField(type, "totalBytes", long.class);
+    checkField(type, "totalSamples", long.class);
+    checkField(type, "firstPageOffset", long.class);
+    checkField(type, "lastPageOffset", long.class);
+    checkField(type, "sampleRate", int.class);
+
+    Constructor<OggStreamSizeInfo> constructor = type.getDeclaredConstructor(long.class,
+        long.class, long.class, long.class, int.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0
+        && constructor.getTypeParameters().length == 0
+        && constructor.getDeclaredAnnotations().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
+    Method duration = type.getDeclaredMethod("getDuration");
+    check(duration.getModifiers() == Modifier.PUBLIC && duration.getReturnType() == long.class
+        && duration.getParameterTypes().length == 0 && duration.getExceptionTypes().length == 0
+        && duration.getTypeParameters().length == 0
+        && duration.getDeclaredAnnotations().length == 0 && !duration.isSynthetic()
+        && !duration.isBridge() && !duration.isDefault() && !duration.isVarArgs(),
+        "duration method metadata");
+  }
+
+  private static void checkField(Class<OggStreamSizeInfo> type, String name, Class<?> fieldType)
+      throws Exception {
+    Field field = type.getDeclaredField(name);
+    check(field.getType() == fieldType
+        && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && !field.isSynthetic() && field.getDeclaredAnnotations().length == 0,
+        name + " field metadata");
+  }
+
+  private static <T extends Throwable> void expect(Class<T> type, ThrowingRunnable action) {
+    try {
+      action.run();
+      throw new AssertionError("expected " + type.getName());
+    } catch (Throwable throwable) {
+      check(type.isInstance(throwable), "failure type " + throwable);
+    }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class Derived extends OggStreamSizeInfo {
+    int calls;
+    Derived() { super(10L, 20L, 30L, 40L, 50); }
+    @Override public long getDuration() { calls++; return 77L; }
   }
 
   private static void check(boolean condition, String message) {
