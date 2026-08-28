@@ -143,6 +143,9 @@ fn consumer_source(command: &str) -> Option<&'static str> {
             Some(COPY_ON_UPDATE_IDENTITY_LIST_CONSUMER)
         }
         "write-data-format-tools-consumer" => Some(DATA_FORMAT_TOOLS_CONSUMER),
+        "write-data-format-tools-text-range-consumer" => {
+            Some(DATA_FORMAT_TOOLS_TEXT_RANGE_CONSUMER)
+        }
         _ => container_consumer_source(command)
             .or_else(|| filter_format_consumer_source(command))
             .or_else(|| sound_cloud_consumer_source(command)),
@@ -26792,6 +26795,61 @@ public final class GateDataFormatTools {
     FailingInput(IOException failure) { this.failure = failure; }
     @Override public int read() throws IOException { throw failure; }
   }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const DATA_FORMAT_TOOLS_TEXT_RANGE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.DataFormatTools;
+import com.sedmelluq.discord.lavaplayer.tools.DataFormatTools.TextRange;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+
+public final class GateDataFormatToolsTextRange {
+  public static void main(String[] args) throws Exception {
+    values(); reflection();
+    System.out.println("contracts=constructor,field-identity,null-values,subclassable,identity,reflection");
+  }
+
+  private static void values() {
+    String start = new String("<");
+    String end = new String(">");
+    TextRange range = new TextRange(start, end);
+    check(range.start == start && range.end == end, "field identity");
+    TextRange nulls = new TextRange(null, null);
+    check(nulls.start == null && nulls.end == null, "null values");
+    check(range.equals(range) && !range.equals(new TextRange(start, end)), "identity equality");
+    Derived derived = new Derived("[", "]");
+    check("[".equals(derived.start) && "]".equals(derived.end), "subclass construction");
+  }
+
+  private static void reflection() throws Exception {
+    Class<TextRange> type = TextRange.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && type.getSuperclass() == Object.class && type.getInterfaces().length == 0
+        && type.getEnclosingClass() == DataFormatTools.class
+        && type.getDeclaringClass() == DataFormatTools.class
+        && type.getDeclaredFields().length == 2 && type.getDeclaredMethods().length == 0
+        && type.getDeclaredConstructors().length == 1, "class shape");
+    Field start = type.getDeclaredField("start");
+    Field end = type.getDeclaredField("end");
+    check(start.getType() == String.class && end.getType() == String.class
+        && start.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && end.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && !start.isSynthetic() && !end.isSynthetic(), "field metadata");
+    Constructor<?> constructor = type.getDeclaredConstructor(String.class, String.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
+    check(type.getNestHost() == DataFormatTools.class, "nest host");
+  }
+
+  private static final class Derived extends TextRange {
+    Derived(String start, String end) { super(start, end); }
+  }
+
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }
