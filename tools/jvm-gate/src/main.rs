@@ -146,6 +146,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-data-format-tools-text-range-consumer" => {
             Some(DATA_FORMAT_TOOLS_TEXT_RANGE_CONSUMER)
         }
+        "write-decoded-exception-consumer" => Some(DECODED_EXCEPTION_CONSUMER),
         _ => container_consumer_source(command)
             .or_else(|| filter_format_consumer_source(command))
             .or_else(|| sound_cloud_consumer_source(command)),
@@ -26848,6 +26849,71 @@ public final class GateDataFormatToolsTextRange {
 
   private static final class Derived extends TextRange {
     Derived(String start, String end) { super(start, end); }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const DECODED_EXCEPTION_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.DecodedException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+
+public final class GateDecodedException {
+  public static void main(String[] args) throws Exception {
+    construction(); nullValues(); inheritedExceptionState(); reflection();
+    System.out.println("contracts=constructor,fields,message,cause,null-values,stack,suppression,reflection");
+  }
+
+  private static void construction() {
+    String className = new String("ExampleType");
+    String original = new String("decoded failure");
+    DecodedException cause = new DecodedException("CauseType", "cause message", null);
+    DecodedException error = new DecodedException(className, original, cause);
+    check(error.className == className && error.originalMessage == original, "field identity");
+    check("ExampleType: decoded failure".equals(error.getMessage())
+        && error.getCause() == cause && error.getLocalizedMessage().equals(error.getMessage()),
+        "message and cause");
+  }
+
+  private static void nullValues() {
+    DecodedException error = new DecodedException(null, null, null);
+    check(error.className == null && error.originalMessage == null
+        && "null: null".equals(error.getMessage()) && error.getCause() == null,
+        "null values");
+  }
+
+  private static void inheritedExceptionState() {
+    DecodedException error = new DecodedException("Type", "message", null);
+    StackTraceElement marker = new StackTraceElement("Gate", "method", "Gate.java", 7);
+    error.setStackTrace(new StackTraceElement[] {marker});
+    check(error.getStackTrace().length == 1 && error.getStackTrace()[0].equals(marker),
+        "writable stack trace");
+    IllegalStateException suppressed = new IllegalStateException("suppressed");
+    error.addSuppressed(suppressed);
+    check(error.getSuppressed().length == 1 && error.getSuppressed()[0] == suppressed,
+        "suppression");
+  }
+
+  private static void reflection() throws Exception {
+    Class<DecodedException> type = DecodedException.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Exception.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 2
+        && type.getDeclaredMethods().length == 0 && type.getDeclaredConstructors().length == 1,
+        "class shape");
+    Field className = type.getDeclaredField("className");
+    Field originalMessage = type.getDeclaredField("originalMessage");
+    check(className.getType() == String.class && originalMessage.getType() == String.class
+        && className.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && originalMessage.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && !className.isSynthetic() && !originalMessage.isSynthetic(), "field metadata");
+    Constructor<?> constructor = type.getDeclaredConstructor(String.class, String.class, type);
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
   }
 
   private static void check(boolean condition, String message) {

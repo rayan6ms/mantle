@@ -432,6 +432,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-data-format-tools-consumer \
   --output "$WORK/GateDataFormatTools.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-data-format-tools-text-range-consumer \
   --output "$WORK/GateDataFormatToolsTextRange.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-decoded-exception-consumer \
+  --output "$WORK/GateDecodedException.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-container-probe-consumer \
   --output "$WORK/GateFlacContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-file-loader-consumer \
@@ -534,6 +536,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateCopyOnUpdateIdentityList.java" \
   "$WORK/GateDataFormatTools.java" \
   "$WORK/GateDataFormatToolsTextRange.java" \
+  "$WORK/GateDecodedException.java" \
   "$WORK/GateAudioFilterInterface.java" \
   "$WORK/GateFloatPcmAudioFilter.java" \
   "$WORK/GateShortPcmAudioFilter.java" \
@@ -2051,6 +2054,17 @@ cmp "$WORK/data-format-tools-text-range-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,field-identity,null-values,subclassable,identity,reflection' \
   "$WORK/data-format-tools-text-range-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateDecodedException >"$WORK/decoded-exception-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateDecodedException >"$WORK/decoded-exception-candidate.txt"
+cmp "$WORK/decoded-exception-reference.txt" \
+  "$WORK/decoded-exception-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,fields,message,cause,null-values,stack,suppression,reflection' \
+  "$WORK/decoded-exception-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_vorbis_track_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggVorbisTrackHandler >"$WORK/ogg-vorbis-track-handler-reference.txt"
