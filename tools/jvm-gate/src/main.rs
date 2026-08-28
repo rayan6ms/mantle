@@ -139,6 +139,9 @@ fn consumer_source(command: &str) -> Option<&'static str> {
         "write-reference-mutable-audio-frame-consumer" => {
             Some(REFERENCE_MUTABLE_AUDIO_FRAME_CONSUMER)
         }
+        "write-copy-on-update-identity-list-consumer" => {
+            Some(COPY_ON_UPDATE_IDENTITY_LIST_CONSUMER)
+        }
         _ => container_consumer_source(command)
             .or_else(|| filter_format_consumer_source(command))
             .or_else(|| sound_cloud_consumer_source(command)),
@@ -26465,6 +26468,153 @@ public final class GateWaveFormatType {
     try { action.run(); return null; } catch (Throwable failure) { return failure; }
   }
   private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean value, String message) {
+    if (!value) throw new AssertionError(message);
+  }
+}
+"#;
+
+const COPY_ON_UPDATE_IDENTITY_LIST_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.CopyOnUpdateIdentityList;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.TypeVariable;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateCopyOnUpdateIdentityList {
+  public static void main(String[] args) throws Exception {
+    construction(); identityUpdates(); externalState(); failures(); reflection();
+    System.out.println("contracts=constructor-empty,public-items,identity-add,equals-distinct,duplicate-no-publish,null-add,copy-publication,snapshot-stability,remove-identity,remove-all,remove-missing-publishes,external-state,null-state-failures,subclassable,generics,throws,reflection");
+  }
+
+  private static void construction() {
+    CopyOnUpdateIdentityList<IdentityValue> list = new CopyOnUpdateIdentityList<>();
+    check(list.items == Collections.<IdentityValue>emptyList() && list.items.isEmpty(),
+        "constructor uses shared empty list");
+    check(catchThrowable(() -> list.items.add(new IdentityValue(0)))
+        instanceof UnsupportedOperationException, "initial list is immutable");
+    Derived derived = new Derived();
+    check(derived.items.isEmpty(), "class remains subclassable");
+  }
+
+  private static void identityUpdates() {
+    CopyOnUpdateIdentityList<IdentityValue> list = new CopyOnUpdateIdentityList<>();
+    List<IdentityValue> initial = list.items;
+    IdentityValue first = new IdentityValue(1);
+    IdentityValue equal = new IdentityValue(1);
+    list.add(first);
+    List<IdentityValue> afterFirst = list.items;
+    check(afterFirst != initial && afterFirst.size() == 1 && afterFirst.get(0) == first
+        && initial.isEmpty(), "first add publishes copy");
+    list.add(first);
+    check(list.items == afterFirst, "duplicate identity does not publish");
+    list.add(equal);
+    List<IdentityValue> afterEqual = list.items;
+    check(afterEqual != afterFirst && afterEqual.size() == 2
+        && afterEqual.get(0) == first && afterEqual.get(1) == equal
+        && first.equals(equal), "equals-equal identities remain distinct");
+    list.add(null);
+    List<IdentityValue> afterNull = list.items;
+    list.add(null);
+    check(list.items == afterNull && afterNull.size() == 3 && afterNull.get(2) == null,
+        "null uses identity duplicate handling");
+    List<IdentityValue> beforeMissing = list.items;
+    list.remove(new IdentityValue(1));
+    check(list.items != beforeMissing && sameIdentities(list.items, first, equal, null)
+        && sameIdentities(beforeMissing, first, equal, null), "missing remove still publishes copy");
+    List<IdentityValue> beforeEqualRemove = list.items;
+    list.remove(equal);
+    check(sameIdentities(list.items, first, null)
+        && sameIdentities(beforeEqualRemove, first, equal, null),
+        "remove uses identity and preserves snapshot");
+  }
+
+  private static void externalState() {
+    CopyOnUpdateIdentityList<IdentityValue> list = new CopyOnUpdateIdentityList<>();
+    IdentityValue first = new IdentityValue(1);
+    IdentityValue equal = new IdentityValue(1);
+    List<IdentityValue> injected = new ArrayList<>(Arrays.asList(first, first, equal, null, null));
+    list.items = injected;
+    list.remove(first);
+    check(list.items != injected && sameIdentities(list.items, equal, null, null)
+        && injected.size() == 5, "remove drops every matching identity from a copy");
+    list.remove(null);
+    check(sameIdentities(list.items, equal), "remove drops every null identity");
+    List<IdentityValue> singleton = Collections.singletonList(first);
+    list.items = singleton;
+    list.add(equal);
+    check(list.items instanceof ArrayList && sameIdentities(list.items, first, equal)
+        && singleton.size() == 1, "add copies caller-supplied list");
+  }
+
+  private static void failures() {
+    CopyOnUpdateIdentityList<Object> list = new CopyOnUpdateIdentityList<>();
+    list.items = null;
+    check(catchThrowable(() -> list.add(new Object())) instanceof NullPointerException
+        && catchThrowable(() -> list.remove(new Object())) instanceof NullPointerException,
+        "null public state fails naturally");
+  }
+
+  private static void reflection() throws Exception {
+    Class<CopyOnUpdateIdentityList> type = CopyOnUpdateIdentityList.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getGenericSuperclass() == Object.class && type.getInterfaces().length == 0
+        && type.getDeclaredFields().length == 1 && type.getDeclaredMethods().length == 2
+        && type.getDeclaredConstructors().length == 1, "exact class shape");
+    TypeVariable<?>[] variables = type.getTypeParameters();
+    check(variables.length == 1 && variables[0].getName().equals("T")
+        && Arrays.equals(variables[0].getBounds(), new java.lang.reflect.Type[] {Object.class}),
+        "class generic parameter");
+    Field items = type.getDeclaredField("items");
+    check(items.getModifiers() == Modifier.PUBLIC && items.getType() == List.class
+        && !items.isSynthetic(), "items metadata");
+    ParameterizedType itemsType = (ParameterizedType) items.getGenericType();
+    check(itemsType.getRawType() == List.class
+        && Arrays.equals(itemsType.getActualTypeArguments(), variables), "items generic signature");
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
+    checkMethod(type, variables[0], "add");
+    checkMethod(type, variables[0], "remove");
+  }
+
+  private static void checkMethod(Class<?> type, TypeVariable<?> variable, String name)
+      throws Exception {
+    Method method = type.getDeclaredMethod(name, Object.class);
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == void.class
+        && Arrays.equals(method.getParameterTypes(), new Class<?>[] {Object.class})
+        && Arrays.equals(method.getGenericParameterTypes(), new java.lang.reflect.Type[] {variable})
+        && method.getExceptionTypes().length == 0 && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), name + " metadata");
+  }
+
+  private static boolean sameIdentities(List<?> actual, Object... expected) {
+    if (actual.size() != expected.length) return false;
+    for (int index = 0; index < expected.length; index++) {
+      if (actual.get(index) != expected[index]) return false;
+    }
+    return true;
+  }
+
+  private static Throwable catchThrowable(Throwing action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+  private interface Throwing { void run() throws Throwable; }
+  private static final class IdentityValue {
+    final int value;
+    IdentityValue(int value) { this.value = value; }
+    @Override public boolean equals(Object other) {
+      return other instanceof IdentityValue && ((IdentityValue) other).value == value;
+    }
+    @Override public int hashCode() { return value; }
+  }
+  private static final class Derived extends CopyOnUpdateIdentityList<IdentityValue> {}
   private static void check(boolean value, String message) {
     if (!value) throw new AssertionError(message);
   }

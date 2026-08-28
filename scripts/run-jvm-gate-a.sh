@@ -426,6 +426,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-wav-track-provider-consumer \
   --output "$WORK/GateWavTrackProvider.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-wave-format-type-consumer \
   --output "$WORK/GateWaveFormatType.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-copy-on-update-identity-list-consumer \
+  --output "$WORK/GateCopyOnUpdateIdentityList.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-container-probe-consumer \
   --output "$WORK/GateFlacContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-file-loader-consumer \
@@ -525,6 +527,7 @@ javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateDelegatedAudioTrack.java" "$WORK/GateAudioTrackInfoBuilder.java" \
   "$WORK/GateAbstractAudioFrameBuffer.java" "$WORK/GateAllocatingAudioFrameBuffer.java" \
   "$WORK/GateNonAllocatingAudioFrameBuffer.java" \
+  "$WORK/GateCopyOnUpdateIdentityList.java" \
   "$WORK/GateAudioFilterInterface.java" \
   "$WORK/GateFloatPcmAudioFilter.java" \
   "$WORK/GateShortPcmAudioFilter.java" \
@@ -2009,6 +2012,17 @@ cmp "$WORK/wave-format-type-reference.txt" \
 grep --fixed-strings \
   'contracts=order,names,ordinals,codes,values-clone,value-of,value-of-failures,code-lookup,unknown-fallback,private-state,synthetic-state,throws,reflection' \
   "$WORK/wave-format-type-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateCopyOnUpdateIdentityList >"$WORK/copy-on-update-identity-list-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateCopyOnUpdateIdentityList >"$WORK/copy-on-update-identity-list-candidate.txt"
+cmp "$WORK/copy-on-update-identity-list-reference.txt" \
+  "$WORK/copy-on-update-identity-list-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor-empty,public-items,identity-add,equals-distinct,duplicate-no-publish,null-add,copy-publication,snapshot-stability,remove-identity,remove-all,remove-missing-publishes,external-state,null-state-failures,subclassable,generics,throws,reflection' \
+  "$WORK/copy-on-update-identity-list-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_vorbis_track_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggVorbisTrackHandler >"$WORK/ogg-vorbis-track-handler-reference.txt"

@@ -336,6 +336,8 @@ const ALLOCATING_AUDIO_FRAME_BUFFER_CLASS: &str =
 const NON_ALLOCATING_AUDIO_FRAME_BUFFER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/NonAllocatingAudioFrameBuffer";
 const FRIENDLY_EXCEPTION_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/FriendlyException";
+const COPY_ON_UPDATE_IDENTITY_LIST_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/CopyOnUpdateIdentityList";
 const FRIENDLY_EXCEPTION_SEVERITY_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity";
 const ABSTRACT_MUTABLE_FRAME_CLASS: &str =
@@ -931,6 +933,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     STREAMING_DATA_FORMATS_EXTRACTOR_CLASS,
     YOUTUBE_TRACK_FORMAT_EXTRACTOR_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
+    COPY_ON_UPDATE_IDENTITY_LIST_CLASS,
     FRIENDLY_EXCEPTION_CLASS,
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/AudioItem",
@@ -1053,6 +1056,7 @@ pub fn emit(
     let mut ogg_vorbis_track_handler_bytes = None;
     let mut wav_track_provider_bytes = None;
     let mut wave_format_type_bytes = None;
+    let mut copy_on_update_identity_list_bytes = None;
     let mut vorbis_comment_parser_bytes = None;
     let mut extended_m3u_parser_bytes = None;
     let mut extended_m3u_line_bytes = None;
@@ -1190,6 +1194,8 @@ pub fn emit(
             wav_track_provider_bytes = Some(bytes);
         } else if *binary_name == WAVE_FORMAT_TYPE_CLASS {
             wave_format_type_bytes = Some(bytes);
+        } else if *binary_name == COPY_ON_UPDATE_IDENTITY_LIST_CLASS {
+            copy_on_update_identity_list_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -1253,6 +1259,12 @@ pub fn emit(
                 wave_format_type_bytes
                     .as_ref()
                     .expect("WAVE format type source bytes are retained"),
+            );
+        } else if name == format!("{COPY_ON_UPDATE_IDENTITY_LIST_CLASS}.class") {
+            bytes.clone_from(
+                copy_on_update_identity_list_bytes
+                    .as_ref()
+                    .expect("copy-on-update identity list source bytes are retained"),
             );
         } else if name == format!("{MPEG_AUDIO_TRACK_CLASS}.class") {
             bytes.clone_from(
