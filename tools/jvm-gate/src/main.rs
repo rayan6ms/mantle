@@ -158,6 +158,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-decoded-exception-consumer" => Some(DECODED_EXCEPTION_CONSUMER),
         "write-exception-tools-consumer" => Some(EXCEPTION_TOOLS_CONSUMER),
         "write-friendly-exception-consumer" => Some(FRIENDLY_EXCEPTION_CONSUMER),
+        "write-friendly-exception-severity-consumer" => Some(FRIENDLY_EXCEPTION_SEVERITY_CONSUMER),
         _ => None,
     }
 }
@@ -27205,6 +27206,92 @@ public final class GateFriendlyException {
     Derived(String message, Severity severity) { super(message, severity, null); }
   }
 
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const FRIENDLY_EXCEPTION_SEVERITY_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException.Severity;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateFriendlyExceptionSeverity {
+  public static void main(String[] args) throws Exception {
+    values(); lookupFailures(); reflection();
+    System.out.println("contracts=order,names,ordinals,to-string,values-clone,value-of,value-of-failures,nested-linkage,synthetic-state,reflection");
+  }
+
+  private static void values() {
+    Severity[] first = Severity.values();
+    Severity[] second = Severity.values();
+    Severity[] expected = {Severity.COMMON, Severity.SUSPICIOUS, Severity.FAULT};
+    String[] names = {"COMMON", "SUSPICIOUS", "FAULT"};
+    check(first != second && first.length == expected.length, "fresh values arrays");
+    for (int index = 0; index < expected.length; index++) {
+      check(first[index] == expected[index] && second[index] == expected[index]
+          && first[index].name().equals(names[index])
+          && first[index].toString().equals(names[index])
+          && first[index].ordinal() == index
+          && Severity.valueOf(names[index]) == expected[index], "enum value " + index);
+    }
+    first[0] = null;
+    check(Severity.values()[0] == Severity.COMMON, "values mutation is isolated");
+  }
+
+  private static void lookupFailures() {
+    check(catchThrowable(() -> Severity.valueOf("common")) instanceof IllegalArgumentException
+        && catchThrowable(() -> Severity.valueOf("")) instanceof IllegalArgumentException
+        && catchThrowable(() -> Severity.valueOf("UNKNOWN")) instanceof IllegalArgumentException
+        && catchThrowable(() -> Severity.valueOf(null)) instanceof NullPointerException,
+        "valueOf failures");
+  }
+
+  private static void reflection() throws Exception {
+    Class<Severity> type = Severity.class;
+    check((type.getModifiers() & ~0x4000) ==
+            (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL)
+        && type.isEnum() && type.getSuperclass() == Enum.class && type.getInterfaces().length == 0
+        && type.getDeclaringClass() == FriendlyException.class
+        && type.getDeclaredFields().length == 4 && type.getDeclaredMethods().length == 2
+        && type.getDeclaredConstructors().length == 1, "exact enum shape");
+    for (String name : new String[] {"COMMON", "SUSPICIOUS", "FAULT"}) {
+      Field field = type.getDeclaredField(name);
+      check(field.getType() == type
+          && field.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL | 0x4000)
+          && field.isEnumConstant() && !field.isSynthetic(), name + " metadata");
+    }
+    Field values = type.getDeclaredField("$VALUES");
+    check(values.getType() == Severity[].class
+        && values.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL | 0x1000)
+        && values.isSynthetic(), "$VALUES metadata");
+    checkMethod(type, "values", Severity[].class, new Class<?>[0]);
+    checkMethod(type, "valueOf", type, new Class<?>[] {String.class});
+    Constructor<?> constructor = type.getDeclaredConstructors()[0];
+    check(constructor.getModifiers() == Modifier.PRIVATE
+        && Arrays.equals(constructor.getParameterTypes(), new Class<?>[] {String.class, int.class})
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic(),
+        "constructor metadata");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> result,
+      Class<?>[] parameters) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == result
+        && method.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && !method.isSynthetic() && !method.isBridge() && !method.isVarArgs()
+        && method.getExceptionTypes().length == 0, name + " metadata");
+  }
+
+  private static Throwable catchThrowable(Throwing action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+  private interface Throwing { void run() throws Throwable; }
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }

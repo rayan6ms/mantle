@@ -438,6 +438,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-exception-tools-consumer \
   --output "$WORK/GateExceptionTools.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-friendly-exception-consumer \
   --output "$WORK/GateFriendlyException.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-friendly-exception-severity-consumer \
+  --output "$WORK/GateFriendlyExceptionSeverity.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-container-probe-consumer \
   --output "$WORK/GateFlacContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-file-loader-consumer \
@@ -767,6 +769,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateDecodedException.java" \
   "$WORK/GateExceptionTools.java" \
   "$WORK/GateFriendlyException.java" \
+  "$WORK/GateFriendlyExceptionSeverity.java" \
   "$WORK/GateAdtsStreamProvider.java" \
   "$WORK/GateAacPacketRouter.java" \
   "$WORK/GateMpegAacTrackConsumer.java" \
@@ -2093,6 +2096,17 @@ cmp "$WORK/friendly-exception-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,message,severity,cause,null-values,stack,suppression,subclassable,nested-linkage,reflection' \
   "$WORK/friendly-exception-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateFriendlyExceptionSeverity >"$WORK/friendly-exception-severity-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateFriendlyExceptionSeverity >"$WORK/friendly-exception-severity-candidate.txt"
+cmp "$WORK/friendly-exception-severity-reference.txt" \
+  "$WORK/friendly-exception-severity-candidate.txt"
+grep --fixed-strings \
+  'contracts=order,names,ordinals,to-string,values-clone,value-of,value-of-failures,nested-linkage,synthetic-state,reflection' \
+  "$WORK/friendly-exception-severity-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_vorbis_track_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggVorbisTrackHandler >"$WORK/ogg-vorbis-track-handler-reference.txt"

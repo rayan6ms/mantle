@@ -1071,6 +1071,7 @@ pub fn emit(
     let mut decoded_exception_bytes = None;
     let mut exception_tools_bytes = None;
     let mut friendly_exception_bytes = None;
+    let mut friendly_exception_severity_bytes = None;
     let mut vorbis_comment_parser_bytes = None;
     let mut extended_m3u_parser_bytes = None;
     let mut extended_m3u_line_bytes = None;
@@ -1220,6 +1221,8 @@ pub fn emit(
             exception_tools_bytes = Some(bytes);
         } else if *binary_name == FRIENDLY_EXCEPTION_CLASS {
             friendly_exception_bytes = Some(bytes);
+        } else if *binary_name == FRIENDLY_EXCEPTION_SEVERITY_CLASS {
+            friendly_exception_severity_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -1319,6 +1322,12 @@ pub fn emit(
                 friendly_exception_bytes
                     .as_ref()
                     .expect("friendly exception source bytes are retained"),
+            );
+        } else if name == format!("{FRIENDLY_EXCEPTION_SEVERITY_CLASS}.class") {
+            bytes.clone_from(
+                friendly_exception_severity_bytes
+                    .as_ref()
+                    .expect("friendly exception severity source bytes are retained"),
             );
         } else if name == format!("{MPEG_AUDIO_TRACK_CLASS}.class") {
             bytes.clone_from(
@@ -2255,6 +2264,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | DECODED_EXCEPTION_CLASS
             | EXCEPTION_TOOLS_CLASS
             | FRIENDLY_EXCEPTION_CLASS
+            | FRIENDLY_EXCEPTION_SEVERITY_CLASS
             | OGG_FLAC_CODEC_HANDLER_CLASS
             | OGG_FLAC_CODEC_HANDLER_BLUEPRINT_CLASS
             | OGG_FLAC_TRACK_HANDLER_CLASS
@@ -40475,7 +40485,6 @@ fn track_enum_constants(class_name: &str) -> Option<&'static [&'static str]> {
             "LATE",
             "ENDED",
         ]),
-        FRIENDLY_EXCEPTION_SEVERITY_CLASS => Some(&["COMMON", "SUSPICIOUS", "FAULT"]),
         RESAMPLING_CLASS => Some(&["HIGH", "MEDIUM", "LOW"]),
         YOUTUBE_INFO_STATUS_CLASS => Some(&[
             "INFO_PRESENT",
