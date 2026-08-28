@@ -157,6 +157,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-decoded-exception-consumer" => Some(DECODED_EXCEPTION_CONSUMER),
         "write-exception-tools-consumer" => Some(EXCEPTION_TOOLS_CONSUMER),
+        "write-friendly-exception-consumer" => Some(FRIENDLY_EXCEPTION_CONSUMER),
         _ => None,
     }
 }
@@ -27127,6 +27128,83 @@ public final class GateExceptionTools {
     try { action.run(); return null; } catch (Throwable failure) { return failure; }
   }
   private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const FRIENDLY_EXCEPTION_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException.Severity;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+
+public final class GateFriendlyException {
+  public static void main(String[] args) throws Exception {
+    construction(); nullValues(); inheritedBehavior(); subclassability(); reflection();
+    System.out.println("contracts=constructor,message,severity,cause,null-values,stack,suppression,subclassable,nested-linkage,reflection");
+  }
+
+  private static void construction() {
+    Severity[] severities = {Severity.COMMON, Severity.SUSPICIOUS, Severity.FAULT};
+    for (Severity severity : severities) {
+      IllegalStateException cause = new IllegalStateException("technical");
+      FriendlyException exception = new FriendlyException("friendly", severity, cause);
+      check("friendly".equals(exception.getMessage())
+          && "friendly".equals(exception.getLocalizedMessage())
+          && exception.severity == severity && exception.getCause() == cause,
+          "constructor identity " + severity.name());
+    }
+  }
+
+  private static void nullValues() {
+    FriendlyException exception = new FriendlyException(null, null, null);
+    check(exception.getMessage() == null && exception.getLocalizedMessage() == null
+        && exception.severity == null && exception.getCause() == null, "null values");
+  }
+
+  private static void inheritedBehavior() {
+    FriendlyException exception = new FriendlyException("friendly", Severity.FAULT, null);
+    StackTraceElement marker = new StackTraceElement("Gate", "run", "Gate.java", 42);
+    exception.setStackTrace(new StackTraceElement[] {marker});
+    IllegalArgumentException suppressed = new IllegalArgumentException("suppressed");
+    exception.addSuppressed(suppressed);
+    check(exception.getStackTrace().length == 1 && exception.getStackTrace()[0].equals(marker)
+        && exception.getSuppressed().length == 1 && exception.getSuppressed()[0] == suppressed,
+        "inherited exception state");
+  }
+
+  private static void subclassability() {
+    Derived derived = new Derived("derived", Severity.COMMON);
+    check(derived instanceof FriendlyException && "derived".equals(derived.getMessage())
+        && derived.severity == Severity.COMMON, "subclassability");
+  }
+
+  private static void reflection() throws Exception {
+    Class<FriendlyException> type = FriendlyException.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == RuntimeException.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 1
+        && type.getDeclaredMethods().length == 0 && type.getDeclaredConstructors().length == 1,
+        "class shape");
+    check(type.getDeclaredClasses().length == 1 && type.getDeclaredClasses()[0] == Severity.class,
+        "nested linkage");
+    Field severity = type.getDeclaredField("severity");
+    check(severity.getType() == Severity.class
+        && severity.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL)
+        && !severity.isSynthetic(), "field metadata");
+    Constructor<?> constructor = type.getDeclaredConstructor(
+        String.class, Severity.class, Throwable.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0
+        && !constructor.isSynthetic() && !constructor.isVarArgs(), "constructor metadata");
+  }
+
+  private static final class Derived extends FriendlyException {
+    Derived(String message, Severity severity) { super(message, severity, null); }
+  }
+
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }

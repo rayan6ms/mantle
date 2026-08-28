@@ -1070,6 +1070,7 @@ pub fn emit(
     let mut data_format_tools_text_range_bytes = None;
     let mut decoded_exception_bytes = None;
     let mut exception_tools_bytes = None;
+    let mut friendly_exception_bytes = None;
     let mut vorbis_comment_parser_bytes = None;
     let mut extended_m3u_parser_bytes = None;
     let mut extended_m3u_line_bytes = None;
@@ -1217,6 +1218,8 @@ pub fn emit(
             decoded_exception_bytes = Some(bytes);
         } else if *binary_name == EXCEPTION_TOOLS_CLASS {
             exception_tools_bytes = Some(bytes);
+        } else if *binary_name == FRIENDLY_EXCEPTION_CLASS {
+            friendly_exception_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -1310,6 +1313,12 @@ pub fn emit(
                 exception_tools_bytes
                     .as_ref()
                     .expect("exception tools source bytes are retained"),
+            );
+        } else if name == format!("{FRIENDLY_EXCEPTION_CLASS}.class") {
+            bytes.clone_from(
+                friendly_exception_bytes
+                    .as_ref()
+                    .expect("friendly exception source bytes are retained"),
             );
         } else if name == format!("{MPEG_AUDIO_TRACK_CLASS}.class") {
             bytes.clone_from(
@@ -2245,6 +2254,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | DATA_FORMAT_TOOLS_TEXT_RANGE_CLASS
             | DECODED_EXCEPTION_CLASS
             | EXCEPTION_TOOLS_CLASS
+            | FRIENDLY_EXCEPTION_CLASS
             | OGG_FLAC_CODEC_HANDLER_CLASS
             | OGG_FLAC_CODEC_HANDLER_BLUEPRINT_CLASS
             | OGG_FLAC_TRACK_HANDLER_CLASS
@@ -3003,9 +3013,6 @@ fn replacement_body(
     }
     if class_name == FUNCTIONAL_RESULT_HANDLER_CLASS {
         return functional_result_handler_replacement(pool, name, descriptor, required_locals);
-    }
-    if class_name == FRIENDLY_EXCEPTION_CLASS {
-        return friendly_exception_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == LOCAL_TRACK_EXECUTOR_CLASS {
         return local_audio_track_executor_replacement(pool, name, descriptor, required_locals);
@@ -36241,25 +36248,6 @@ fn audio_processing_context_replacement(
     }
 }
 
-fn friendly_exception_replacement(
-    pool: &mut ConstantPool<'static>,
-    name: &str,
-    descriptor: &str,
-    required_locals: u16,
-) -> Result<Attribute> {
-    match (name, descriptor) {
-        (
-            "<init>",
-            "(Ljava/lang/String;Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity;Ljava/lang/Throwable;)V",
-        ) => friendly_exception_constructor(pool),
-        _ => unsupported_body(
-            pool,
-            &format!("Phase 13 does not implement {FRIENDLY_EXCEPTION_CLASS}.{name}{descriptor}"),
-            required_locals,
-        ),
-    }
-}
-
 fn local_audio_track_executor_replacement(
     pool: &mut ConstantPool<'static>,
     name: &str,
@@ -57408,36 +57396,6 @@ fn local_audio_track_executor_delegate(
     instructions.extend(loads);
     instructions.extend([Instruction::Invokevirtual(method), result]);
     code(pool, 6, required_locals, instructions)
-}
-
-fn friendly_exception_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
-    let runtime = pool.add_class("java/lang/RuntimeException")?;
-    let init = pool.add_method_ref(
-        runtime,
-        "<init>",
-        "(Ljava/lang/String;Ljava/lang/Throwable;)V",
-    )?;
-    let owner = pool.add_class(FRIENDLY_EXCEPTION_CLASS)?;
-    let severity = pool.add_field_ref(
-        owner,
-        "severity",
-        "Lcom/sedmelluq/discord/lavaplayer/tools/FriendlyException$Severity;",
-    )?;
-    code(
-        pool,
-        3,
-        4,
-        vec![
-            Instruction::Aload_0,
-            Instruction::Aload_1,
-            Instruction::Aload_3,
-            Instruction::Invokespecial(init),
-            Instruction::Aload_0,
-            Instruction::Aload_2,
-            Instruction::Putfield(severity),
-            Instruction::Return,
-        ],
-    )
 }
 
 #[allow(clippy::too_many_lines)]
