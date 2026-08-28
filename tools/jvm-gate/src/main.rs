@@ -198,6 +198,15 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-ogg-vorbis-track-handler-support-consumer" => {
             Some(OGG_VORBIS_TRACK_HANDLER_SUPPORT_CONSUMER)
         }
+        "write-ogg-vorbis-track-consumer" => Some(OGG_VORBIS_TRACK_CONSUMER),
+        "write-ogg-vorbis-decoder-support-consumer" => Some(OGG_VORBIS_DECODER_SUPPORT_CONSUMER),
+        "write-ogg-vorbis-pipeline-support-consumer" => Some(OGG_VORBIS_PIPELINE_SUPPORT_CONSUMER),
+        "write-ogg-vorbis-pipeline-factory-support-consumer" => {
+            Some(OGG_VORBIS_PIPELINE_FACTORY_SUPPORT_CONSUMER)
+        }
+        "write-ogg-vorbis-pcm-format-support-consumer" => {
+            Some(OGG_VORBIS_PCM_FORMAT_SUPPORT_CONSUMER)
+        }
         "write-ogg-flac-track-handler-consumer" => Some(OGG_FLAC_TRACK_HANDLER_CONSUMER),
         "write-ogg-flac-track-handler-support-consumer" => {
             Some(OGG_FLAC_TRACK_HANDLER_SUPPORT_CONSUMER)
@@ -18435,6 +18444,469 @@ public final class FlacFrameReader {
       int[][] raw, short[][] samples, int[] decoding) throws IOException {
     calls++; lastInput = input; lastBits = bits; lastInfo = info; lastRaw = raw; lastSamples = samples; lastDecoding = decoding;
     if (ioFailure != null) throw ioFailure; if (runtimeFailure != null) throw runtimeFailure; return sampleCount;
+  }
+}
+";
+
+const OGG_VORBIS_TRACK_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream;
+import com.sedmelluq.discord.lavaplayer.container.ogg.vorbis.OggVorbisTrackHandler;
+import com.sedmelluq.discord.lavaplayer.filter.AudioPipeline;
+import com.sedmelluq.discord.lavaplayer.filter.AudioPipelineFactory;
+import com.sedmelluq.discord.lavaplayer.natives.vorbis.VorbisDecoder;
+import com.sedmelluq.discord.lavaplayer.tools.io.DirectBufferStreamBroker;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateOggVorbisTrackHandler {
+  public static void main(String[] args) throws Exception {
+    construction();
+    initialise();
+    frames();
+    failuresAndSeek();
+    closeAndReflection();
+    System.out.println("contracts=constructor,info-identity,nullable-stream-broker,little-endian-rate,unsigned-channels,pcm-buffer-shapes,decoder-construction,deferred-short-info,setup-packet,direct-info-copy,setup-buffer-identity,integer-max-bounds,consume-result-ignored,decoder-initialise,broker-reset,pipeline-context,pcm-format,full-width-timecodes,reinitialise,packet-loop,decoder-input-identity,output-buffer-identity,full-buffer-drain,partial-output,zero-output-skip,interruption-identity,io-wrapping,runtime-identity,seek-order,seek-result,preinit-seek-order,close-before-init,close-order,close-repeat,public-shape,private-state,throws,reflection");
+  }
+
+  private static void construction() throws Exception {
+    resetSupports();
+    byte[] info = infoPacket(44_100, 255);
+    ScriptedStream stream = new ScriptedStream();
+    RecordingBroker broker = new RecordingBroker();
+    OggVorbisTrackHandler handler = new OggVorbisTrackHandler(info, stream, broker);
+    check(field(handler, "infoPacket") == info && field(handler, "packetInputStream") == stream
+        && field(handler, "broker") == broker && field(handler, "decoder") == VorbisDecoder.last
+        && ((Integer) field(handler, "sampleRate")) == 44_100
+        && field(handler, "downstream") == null,
+        "constructor retains identities, decoder, little-endian rate, and null pipeline default");
+    float[][] channels = (float[][]) field(handler, "channelPcmBuffers");
+    check(channels.length == 255 && channels[0].length == 4096
+        && channels[254].length == 4096 && channels[0] != channels[1],
+        "constructor allocates exact unsigned per-channel PCM buffers");
+
+    OggVorbisTrackHandler nullable = new OggVorbisTrackHandler(infoPacket(8_000, 0), null, null);
+    check(field(nullable, "packetInputStream") == null && field(nullable, "broker") == null
+        && ((float[][]) field(nullable, "channelPcmBuffers")).length == 0,
+        "constructor accepts nullable stream/broker and zero channels");
+
+    int before = VorbisDecoder.constructionCalls;
+    Throwable shortInfo = catchThrowable(() ->
+        new OggVorbisTrackHandler(new byte[12], stream, broker));
+    check(shortInfo != null && shortInfo.getClass() == IndexOutOfBoundsException.class
+        && VorbisDecoder.constructionCalls == before + 1,
+        "decoder construction precedes deferred short-info failure");
+    check(new Derived(infoPacket(8_000, 1), stream, broker).marker() == 53,
+        "public handler remains subclassable");
+  }
+
+  private static void initialise() throws Exception {
+    resetSupports();
+    byte[] info = infoPacket(48_000, 2);
+    ByteBuffer setup = ByteBuffer.wrap(new byte[] {7, 8, 9});
+    ScriptedStream stream = new ScriptedStream(true, true);
+    RecordingBroker broker = new RecordingBroker(setup, ByteBuffer.wrap(new byte[] {10}));
+    broker.consumeResult = false;
+    OggVorbisTrackHandler handler = new OggVorbisTrackHandler(info, stream, broker);
+    VorbisDecoder decoder = VorbisDecoder.last; decoder.channelCount = 3;
+    AudioProcessingContext context = allocate(AudioProcessingContext.class);
+    long initial = Long.MIN_VALUE + 37L;
+    long desired = Long.MAX_VALUE - 29L;
+    handler.initialise(context, initial, desired);
+    AudioPipeline first = AudioPipelineFactory.pipeline;
+    check(stream.startCalls == 1 && broker.consumeCalls == 1 && broker.inputs[0] == stream
+        && broker.savedLengths[0] == Integer.MAX_VALUE
+        && broker.readLengths[0] == Integer.MAX_VALUE,
+        "initialise requests setup packet with exact broker bounds and ignores consume result");
+    check(decoder.initialiseCalls == 1 && decoder.infoBuffer.isDirect()
+        && bufferEquals(decoder.infoBuffer, info) && decoder.setupBuffer == setup,
+        "decoder receives a direct info copy and exact setup-buffer identity");
+    check(broker.resetCalls == 1 && AudioPipelineFactory.createCalls == 1
+        && AudioPipelineFactory.context == context
+        && AudioPipelineFactory.format.channelCount == 3
+        && AudioPipelineFactory.format.sampleRate == 48_000
+        && field(handler, "downstream") == first,
+        "broker reset and pipeline creation preserve context and decoder format");
+    check(first.seekCalls == 1 && first.seekTimes[0] == desired
+        && first.seekActual[0] == initial,
+        "initialise forwards desired then actual full-width timecodes");
+
+    AudioProcessingContext replacementContext = allocate(AudioProcessingContext.class);
+    handler.initialise(replacementContext, 11L, 13L);
+    AudioPipeline replacement = AudioPipelineFactory.pipeline;
+    check(decoder.initialiseCalls == 2 && broker.resetCalls == 2
+        && replacement != first && AudioPipelineFactory.createCalls == 2
+        && replacement.seekTimes[0] == 13L && replacement.seekActual[0] == 11L
+        && first.closeCalls == 0 && field(handler, "downstream") == replacement,
+        "reinitialise reuses the decoder and replaces without closing the old pipeline");
+  }
+
+  private static void frames() throws Exception {
+    resetSupports();
+    ByteBuffer setup = ByteBuffer.wrap(new byte[] {1});
+    ByteBuffer firstPacket = ByteBuffer.wrap(new byte[] {2, 3});
+    ByteBuffer secondPacket = ByteBuffer.allocateDirect(1); secondPacket.put((byte) 4).flip();
+    ScriptedStream stream = new ScriptedStream(true, true, true, false);
+    RecordingBroker broker = new RecordingBroker(setup, firstPacket, secondPacket);
+    broker.consumeResult = false;
+    OggVorbisTrackHandler handler = new OggVorbisTrackHandler(
+        infoPacket(44_100, 2), stream, broker);
+    VorbisDecoder decoder = VorbisDecoder.last; decoder.channelCount = 2;
+    handler.initialise(allocate(AudioProcessingContext.class), 0L, 0L);
+    AudioPipeline pipeline = AudioPipelineFactory.pipeline;
+    decoder.outputs = new int[] {4096, 3, 0};
+    handler.provideFrames();
+    check(stream.startCalls == 4 && broker.consumeCalls == 3 && broker.bufferCalls == 3,
+        "provideFrames iterates the post-setup packets through the broker");
+    check(decoder.inputCalls == 2 && decoder.inputs[0] == firstPacket
+        && decoder.inputs[1] == secondPacket && decoder.outputCalls == 3,
+        "decoder receives exact packet identities and drains a full output buffer");
+    float[][] pcm = (float[][]) field(handler, "channelPcmBuffers");
+    check(decoder.outputBuffers[0] == pcm && decoder.outputBuffers[1] == pcm
+        && decoder.outputBuffers[2] == pcm
+        && pipeline.processCalls == 2 && pipeline.processBuffers[0] == pcm
+        && pipeline.processBuffers[1] == pcm && pipeline.processOffsets[0] == 0
+        && pipeline.processLengths[0] == 4096 && pipeline.processLengths[1] == 3,
+        "shared PCM buffers route full and partial output while zero output is suppressed");
+  }
+
+  private static void failuresAndSeek() throws Exception {
+    resetSupports();
+    ScriptedStream missingStream = new ScriptedStream(false);
+    RecordingBroker missingBroker = new RecordingBroker();
+    OggVorbisTrackHandler missingHandler = new OggVorbisTrackHandler(
+        infoPacket(8_000, 1), missingStream, missingBroker);
+    Throwable missing = catchThrowable(() -> missingHandler.initialise(
+        allocate(AudioProcessingContext.class), 0L, 0L));
+    check(missing != null && missing.getClass() == IllegalStateException.class
+        && missing.getMessage().equals("End of track before header setup header.")
+        && missingBroker.consumeCalls == 0 && VorbisDecoder.last.initialiseCalls == 0,
+        "missing setup packet retains exact failure before broker and decoder");
+
+    IOException initialiseIo = new IOException("initialise-start");
+    ScriptedStream initialiseIoStream = new ScriptedStream();
+    initialiseIoStream.startFailure = initialiseIo;
+    expectSame(initialiseIo, () -> new OggVorbisTrackHandler(infoPacket(8_000, 1),
+        initialiseIoStream, new RecordingBroker()).initialise(
+        allocate(AudioProcessingContext.class), 0L, 0L));
+
+    resetSupports();
+    ScriptedStream interruptedStream = new ScriptedStream(true, true, false);
+    RecordingBroker interruptedBroker = new RecordingBroker(
+        ByteBuffer.wrap(new byte[] {1}), ByteBuffer.wrap(new byte[] {2}));
+    OggVorbisTrackHandler interruptedHandler = new OggVorbisTrackHandler(
+        infoPacket(8_000, 1), interruptedStream, interruptedBroker);
+    interruptedHandler.initialise(allocate(AudioProcessingContext.class), 0L, 0L);
+    VorbisDecoder.last.outputs = new int[] {1};
+    InterruptedException interrupted = new InterruptedException("process");
+    AudioPipelineFactory.pipeline.processInterruptedFailure = interrupted;
+    expectSame(interrupted, interruptedHandler::provideFrames);
+
+    resetSupports();
+    ScriptedStream startStream = new ScriptedStream(true);
+    RecordingBroker startBroker = new RecordingBroker(ByteBuffer.wrap(new byte[] {1}));
+    OggVorbisTrackHandler startHandler = initialised(startStream, startBroker);
+    IOException startIo = new IOException("frames-start"); startStream.startFailure = startIo;
+    Throwable wrappedStart = catchThrowable(startHandler::provideFrames);
+    check(wrappedStart != null && wrappedStart.getClass() == RuntimeException.class
+        && wrappedStart.getCause() == startIo, "frame-start IOException is wrapped exactly");
+
+    resetSupports();
+    ScriptedStream consumeStream = new ScriptedStream(true, true);
+    RecordingBroker consumeBroker = new RecordingBroker(
+        ByteBuffer.wrap(new byte[] {1}), ByteBuffer.wrap(new byte[] {2}));
+    OggVorbisTrackHandler consumeHandler = initialised(consumeStream, consumeBroker);
+    IOException consumeIo = new IOException("frames-consume"); consumeBroker.consumeFailure = consumeIo;
+    Throwable wrappedConsume = catchThrowable(consumeHandler::provideFrames);
+    check(wrappedConsume != null && wrappedConsume.getClass() == RuntimeException.class
+        && wrappedConsume.getCause() == consumeIo, "frame-broker IOException is wrapped exactly");
+
+    resetSupports();
+    ScriptedStream runtimeStream = new ScriptedStream(true, true);
+    RecordingBroker runtimeBroker = new RecordingBroker(
+        ByteBuffer.wrap(new byte[] {1}), ByteBuffer.wrap(new byte[] {2}));
+    OggVorbisTrackHandler runtimeHandler = initialised(runtimeStream, runtimeBroker);
+    RuntimeException inputFailure = new RuntimeException("decoder-input");
+    VorbisDecoder.last.inputFailure = inputFailure;
+    expectSame(inputFailure, runtimeHandler::provideFrames);
+
+    resetSupports();
+    ScriptedStream seekStream = new ScriptedStream(true); seekStream.seekResult = Long.MIN_VALUE + 15L;
+    RecordingBroker seekBroker = new RecordingBroker(ByteBuffer.wrap(new byte[] {1}));
+    OggVorbisTrackHandler seekHandler = initialised(seekStream, seekBroker);
+    long target = Long.MAX_VALUE - 7L;
+    seekHandler.seekToTimecode(target);
+    AudioPipeline seekPipeline = AudioPipelineFactory.pipeline;
+    check(seekStream.seekCalls == 1 && seekStream.seekTimecode == target
+        && seekPipeline.seekCalls == 2 && seekPipeline.seekTimes[1] == target
+        && seekPipeline.seekActual[1] == seekStream.seekResult,
+        "seek forwards full-width target and actual result in order");
+    IOException seekIo = new IOException("seek"); seekStream.seekFailure = seekIo;
+    Throwable wrappedSeek = catchThrowable(() -> seekHandler.seekToTimecode(17L));
+    check(wrappedSeek != null && wrappedSeek.getClass() == RuntimeException.class
+        && wrappedSeek.getCause() == seekIo, "seek IOException is wrapped exactly");
+
+    ScriptedStream preinitStream = new ScriptedStream(); preinitStream.seekResult = 73L;
+    OggVorbisTrackHandler preinit = new OggVorbisTrackHandler(
+        infoPacket(8_000, 1), preinitStream, new RecordingBroker());
+    Throwable preinitFailure = catchThrowable(() -> preinit.seekToTimecode(19L));
+    check(preinitFailure != null && preinitFailure.getClass() == NullPointerException.class
+        && preinitStream.seekCalls == 1 && preinitStream.seekTimecode == 19L,
+        "preinitialisation seek performs stream seek before null-pipeline failure");
+  }
+
+  private static void closeAndReflection() throws Exception {
+    resetSupports();
+    OggVorbisTrackHandler before = new OggVorbisTrackHandler(
+        infoPacket(8_000, 1), new ScriptedStream(), new RecordingBroker());
+    VorbisDecoder beforeDecoder = VorbisDecoder.last;
+    VorbisDecoder.events = ""; before.close();
+    check(beforeDecoder.closeCalls == 1 && VorbisDecoder.events.equals("decoder-close"),
+        "close before initialise still closes only the decoder");
+
+    resetSupports();
+    ScriptedStream stream = new ScriptedStream(true);
+    OggVorbisTrackHandler handler = initialised(stream,
+        new RecordingBroker(ByteBuffer.wrap(new byte[] {1})));
+    AudioPipeline pipeline = AudioPipelineFactory.pipeline;
+    VorbisDecoder decoder = VorbisDecoder.last;
+    VorbisDecoder.events = ""; handler.close(); handler.close();
+    check(pipeline.closeCalls == 2 && decoder.closeCalls == 2
+        && VorbisDecoder.events.equals(
+            "pipeline-close,decoder-close,pipeline-close,decoder-close"),
+        "close dispatches pipeline before decoder on every call");
+    RuntimeException closeFailure = new RuntimeException("pipeline-close");
+    pipeline.closeFailure = closeFailure; int decoderCloses = decoder.closeCalls;
+    expectSame(closeFailure, handler::close);
+    check(decoder.closeCalls == decoderCloses, "pipeline close failure prevents decoder close");
+
+    Class<OggVorbisTrackHandler> type = OggVorbisTrackHandler.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {
+            com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackHandler.class})
+        && type.getDeclaredFields().length == 8 && type.getDeclaredMethods().length == 5
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredClasses().length == 0,
+        "exact public handler shape");
+    Constructor<OggVorbisTrackHandler> constructor = type.getDeclaredConstructor(
+        byte[].class, OggPacketInputStream.class, DirectBufferStreamBroker.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0, "exact public constructor metadata");
+    checkStaticInt(type, "PCM_BUFFER_SIZE", 4096);
+    checkField(type, "infoPacket", byte[].class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "packetInputStream", OggPacketInputStream.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "broker", DirectBufferStreamBroker.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "decoder", VorbisDecoder.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "sampleRate", int.class, Modifier.PRIVATE | Modifier.FINAL);
+    checkField(type, "channelPcmBuffers", float[][].class, Modifier.PRIVATE);
+    checkField(type, "downstream", AudioPipeline.class, Modifier.PRIVATE);
+    checkMethod(type.getDeclaredMethod("initialise", AudioProcessingContext.class,
+        long.class, long.class), new Class<?>[] {AudioProcessingContext.class, long.class, long.class},
+        IOException.class);
+    checkMethod(type.getDeclaredMethod("provideFrames"), new Class<?>[0], InterruptedException.class);
+    checkPrivate(type.getDeclaredMethod("provideFromBuffer", ByteBuffer.class),
+        InterruptedException.class);
+    checkMethod(type.getDeclaredMethod("seekToTimecode", long.class), new Class<?>[] {long.class});
+    checkMethod(type.getDeclaredMethod("close"), new Class<?>[0]);
+  }
+
+  private static OggVorbisTrackHandler initialised(ScriptedStream stream, RecordingBroker broker)
+      throws Exception {
+    OggVorbisTrackHandler handler = new OggVorbisTrackHandler(
+        infoPacket(8_000, 1), stream, broker);
+    handler.initialise(allocate(AudioProcessingContext.class), 0L, 0L);
+    return handler;
+  }
+  private static byte[] infoPacket(int sampleRate, int channels) {
+    byte[] packet = new byte[20]; packet[11] = (byte) channels;
+    packet[12] = (byte) sampleRate; packet[13] = (byte) (sampleRate >>> 8);
+    packet[14] = (byte) (sampleRate >>> 16); packet[15] = (byte) (sampleRate >>> 24);
+    return packet;
+  }
+  private static boolean bufferEquals(ByteBuffer buffer, byte[] expected) {
+    ByteBuffer copy = buffer.duplicate(); byte[] actual = new byte[copy.remaining()]; copy.get(actual);
+    return Arrays.equals(actual, expected);
+  }
+  private static void resetSupports() {
+    VorbisDecoder.reset(); AudioPipelineFactory.reset();
+  }
+  private static Object field(Object target, String name) throws Exception {
+    Field field = target.getClass().getDeclaredField(name); field.setAccessible(true); return field.get(target);
+  }
+  private static <T> T allocate(Class<T> type) throws Exception {
+    Field unsafeField = Class.forName("sun.misc.Unsafe").getDeclaredField("theUnsafe");
+    unsafeField.setAccessible(true); Object unsafe = unsafeField.get(null);
+    return type.cast(unsafe.getClass().getMethod("allocateInstance", Class.class).invoke(unsafe, type));
+  }
+  private static void checkStaticInt(Class<?> type, String name, int value) throws Exception {
+    Field field = type.getDeclaredField(name); field.setAccessible(true);
+    check(field.getType() == int.class
+        && field.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && field.getInt(null) == value && !field.isSynthetic(), name + " field metadata");
+  }
+  private static void checkField(Class<?> type, String name, Class<?> fieldType, int modifiers)
+      throws Exception {
+    Field field = type.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getModifiers() == modifiers
+        && !field.isSynthetic(), name + " field metadata");
+  }
+  private static void checkMethod(Method method, Class<?>[] parameters,
+      Class<?>... exceptions) {
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == void.class
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isSynthetic() && !method.isBridge(), method.getName() + " method metadata");
+  }
+  private static void checkPrivate(Method method, Class<?>... exceptions) {
+    check(method.getModifiers() == Modifier.PRIVATE && method.getReturnType() == void.class
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && !method.isSynthetic() && !method.isBridge(), method.getName() + " private metadata");
+  }
+  private static Throwable catchThrowable(Throwing action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+  private static void expectSame(Throwable expected, Throwing action) {
+    check(catchThrowable(action) == expected, "failure identity for " + expected.getMessage());
+  }
+  private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+
+  private static final class Derived extends OggVorbisTrackHandler {
+    Derived(byte[] info, OggPacketInputStream stream, DirectBufferStreamBroker broker) {
+      super(info, stream, broker);
+    }
+    int marker() { return 53; }
+  }
+  private static final class RecordingBroker extends DirectBufferStreamBroker {
+    final ByteBuffer[] buffers; int consumeCalls; int bufferCalls; int resetCalls;
+    final InputStream[] inputs = new InputStream[8];
+    final int[] savedLengths = new int[8]; final int[] readLengths = new int[8];
+    boolean consumeResult = true; IOException consumeFailure;
+    RecordingBroker(ByteBuffer... buffers) { super(1); this.buffers = buffers; }
+    @Override public boolean consumeNext(InputStream input, int savedLength, int readLength)
+        throws IOException {
+      inputs[consumeCalls] = input; savedLengths[consumeCalls] = savedLength;
+      readLengths[consumeCalls++] = readLength;
+      if (consumeFailure != null) throw consumeFailure; return consumeResult;
+    }
+    @Override public ByteBuffer getBuffer() { return buffers[bufferCalls++]; }
+    @Override public void resetAndCompact() { resetCalls++; }
+  }
+  private static final class ScriptedStream extends OggPacketInputStream {
+    final boolean[] packets; int packetIndex; int startCalls; int seekCalls;
+    long seekTimecode; long seekResult; IOException startFailure; IOException seekFailure;
+    ScriptedStream(boolean... packets) { super(new EmptyStream(), false); this.packets = packets; }
+    @Override public boolean startNewPacket() throws IOException {
+      startCalls++; if (startFailure != null) throw startFailure;
+      return packetIndex < packets.length && packets[packetIndex++];
+    }
+    @Override public long seek(long timecode) throws IOException {
+      seekCalls++; seekTimecode = timecode; if (seekFailure != null) throw seekFailure; return seekResult;
+    }
+  }
+  private static final class EmptyStream extends SeekableInputStream {
+    EmptyStream() { super(0L, 0L); }
+    @Override public int read() { return -1; }
+    @Override public long getPosition() { return 0L; }
+    @Override protected void seekHard(long position) {}
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      return Collections.emptyList();
+    }
+  }
+}
+"#;
+
+const OGG_VORBIS_DECODER_SUPPORT_CONSUMER: &str = r#"
+package com.sedmelluq.discord.lavaplayer.natives.vorbis;
+import java.nio.ByteBuffer;
+public class VorbisDecoder {
+  public static int constructionCalls; public static VorbisDecoder last; public static String events = "";
+  public int channelCount = 1; public int initialiseCalls; public ByteBuffer infoBuffer; public ByteBuffer setupBuffer;
+  public int inputCalls; public ByteBuffer[] inputs = new ByteBuffer[8]; public int outputCalls;
+  public float[][][] outputBuffers = new float[16][][]; public int[] outputs = new int[0]; public int outputIndex;
+  public int closeCalls; public RuntimeException initialiseFailure; public RuntimeException inputFailure;
+  public RuntimeException outputFailure; public RuntimeException closeFailure;
+  public VorbisDecoder() { constructionCalls++; last = this; }
+  public static void reset() { constructionCalls = 0; last = null; events = ""; }
+  public static void record(String event) { events = events.isEmpty() ? event : events + "," + event; }
+  public void initialise(ByteBuffer info, ByteBuffer setup) {
+    if (initialiseFailure != null) throw initialiseFailure;
+    initialiseCalls++; infoBuffer = info; setupBuffer = setup;
+  }
+  public int getChannelCount() { return channelCount; }
+  public void input(ByteBuffer input) {
+    if (inputFailure != null) throw inputFailure; inputs[inputCalls++] = input;
+  }
+  public int output(float[][] buffers) {
+    if (outputFailure != null) throw outputFailure; outputBuffers[outputCalls++] = buffers;
+    return outputIndex < outputs.length ? outputs[outputIndex++] : 0;
+  }
+  public void close() {
+    if (closeFailure != null) throw closeFailure; closeCalls++; record("decoder-close");
+  }
+}
+"#;
+
+const OGG_VORBIS_PIPELINE_SUPPORT_CONSUMER: &str = r#"
+package com.sedmelluq.discord.lavaplayer.filter;
+import com.sedmelluq.discord.lavaplayer.natives.vorbis.VorbisDecoder;
+public class AudioPipeline {
+  public int seekCalls; public long[] seekTimes = new long[8]; public long[] seekActual = new long[8];
+  public int processCalls; public float[][][] processBuffers = new float[16][][];
+  public int[] processOffsets = new int[16]; public int[] processLengths = new int[16];
+  public int closeCalls; public InterruptedException processInterruptedFailure;
+  public RuntimeException processRuntimeFailure; public RuntimeException seekFailure; public RuntimeException closeFailure;
+  public void seekPerformed(long timecode, long actual) {
+    if (seekFailure != null) throw seekFailure;
+    seekTimes[seekCalls] = timecode; seekActual[seekCalls++] = actual;
+  }
+  public void process(float[][] buffers, int offset, int length) throws InterruptedException {
+    if (processInterruptedFailure != null) throw processInterruptedFailure;
+    if (processRuntimeFailure != null) throw processRuntimeFailure;
+    processBuffers[processCalls] = buffers; processOffsets[processCalls] = offset;
+    processLengths[processCalls++] = length;
+  }
+  public void close() {
+    if (closeFailure != null) throw closeFailure; closeCalls++; VorbisDecoder.record("pipeline-close");
+  }
+}
+"#;
+
+const OGG_VORBIS_PIPELINE_FACTORY_SUPPORT_CONSUMER: &str = r"
+package com.sedmelluq.discord.lavaplayer.filter;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+public final class AudioPipelineFactory {
+  public static int createCalls; public static AudioProcessingContext context;
+  public static PcmFormat format; public static AudioPipeline pipeline; public static RuntimeException createFailure;
+  public static void reset() { createCalls = 0; context = null; format = null; pipeline = null; createFailure = null; }
+  public static AudioPipeline create(AudioProcessingContext context, PcmFormat format) {
+    if (createFailure != null) throw createFailure; createCalls++;
+    AudioPipelineFactory.context = context; AudioPipelineFactory.format = format;
+    pipeline = new AudioPipeline(); return pipeline;
+  }
+}
+";
+
+const OGG_VORBIS_PCM_FORMAT_SUPPORT_CONSUMER: &str = r"
+package com.sedmelluq.discord.lavaplayer.filter;
+public class PcmFormat {
+  public final int channelCount; public final int sampleRate;
+  public PcmFormat(int channelCount, int sampleRate) {
+    this.channelCount = channelCount; this.sampleRate = sampleRate;
   }
 }
 ";

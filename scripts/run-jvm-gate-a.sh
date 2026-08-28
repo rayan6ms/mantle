@@ -16,6 +16,8 @@ readonly OGG_CODEC_CLASSES="$WORK/ogg-codec-consumer-classes"
 readonly OGG_FLAC_CLASSES="$WORK/ogg-flac-consumer-classes"
 readonly OGG_OPUS_CLASSES="$WORK/ogg-opus-consumer-classes"
 readonly OGG_VORBIS_CLASSES="$WORK/ogg-vorbis-consumer-classes"
+readonly OGG_VORBIS_TRACK_CLASSES="$WORK/ogg-vorbis-track-consumer-classes"
+readonly OGG_VORBIS_TRACK_SOURCES="$WORK/ogg-vorbis-track-sources"
 readonly OGG_PROBE_CLASSES="$WORK/ogg-probe-consumer-classes"
 readonly MPEG_FILE_LOADER_CLASSES="$WORK/mpeg-file-loader-consumer-classes"
 readonly JAR="$WORK/mantle-gate-a.jar"
@@ -29,11 +31,13 @@ fi
 rm -rf -- "$CLASSES" "$FLAC_CLASSES" "$MP3_CLASSES" "$FLAC_LOADER_CLASSES" \
   "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES" "$MPEG_CLASSES" \
   "$MPEG_FILE_LOADER_CLASSES" "$OGG_CODEC_CLASSES" "$OGG_FLAC_CLASSES" \
-  "$OGG_OPUS_CLASSES" "$OGG_VORBIS_CLASSES" "$OGG_PROBE_CLASSES"
+  "$OGG_OPUS_CLASSES" "$OGG_VORBIS_CLASSES" "$OGG_VORBIS_TRACK_CLASSES" \
+  "$OGG_VORBIS_TRACK_SOURCES" "$OGG_PROBE_CLASSES"
 mkdir -p "$CLASSES" "$FLAC_CLASSES" "$MP3_CLASSES" "$FLAC_LOADER_CLASSES" \
   "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES" "$MPEG_CLASSES" \
   "$MPEG_FILE_LOADER_CLASSES" "$OGG_CODEC_CLASSES" "$OGG_FLAC_CLASSES" \
-  "$OGG_OPUS_CLASSES" "$OGG_VORBIS_CLASSES" "$OGG_PROBE_CLASSES"
+  "$OGG_OPUS_CLASSES" "$OGG_VORBIS_CLASSES" "$OGG_VORBIS_TRACK_CLASSES" \
+  "$OGG_VORBIS_TRACK_SOURCES" "$OGG_PROBE_CLASSES"
 cargo build --locked -p mantle-jvm --features gate-a-direct-attachment
 cargo run --locked -q -p mantle-jvm-gate -- emit \
   --reference-jar "$REFERENCE_JAR" --output "$JAR" --expected-abi 1 \
@@ -316,6 +320,16 @@ cargo run --locked -q -p mantle-jvm-gate -- write-ogg-vorbis-codec-handler-consu
   --output "$WORK/GateOggVorbisCodecHandler.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ogg-vorbis-track-handler-support-consumer \
   --output "$WORK/OggVorbisTrackHandler.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-ogg-vorbis-track-consumer \
+  --output "$OGG_VORBIS_TRACK_SOURCES/GateOggVorbisTrackHandler.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-ogg-vorbis-decoder-support-consumer \
+  --output "$OGG_VORBIS_TRACK_SOURCES/VorbisDecoder.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-ogg-vorbis-pipeline-support-consumer \
+  --output "$OGG_VORBIS_TRACK_SOURCES/AudioPipeline.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-ogg-vorbis-pipeline-factory-support-consumer \
+  --output "$OGG_VORBIS_TRACK_SOURCES/AudioPipelineFactory.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-ogg-vorbis-pcm-format-support-consumer \
+  --output "$OGG_VORBIS_TRACK_SOURCES/PcmFormat.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ogg-flac-track-handler-consumer \
   --output "$WORK/GateOggFlacTrackHandler.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ogg-flac-track-handler-support-consumer \
@@ -586,6 +600,7 @@ if command -v cygpath >/dev/null 2>&1; then
   ogg_flac_classes_argument="$(cygpath -w "$OGG_FLAC_CLASSES")"
   ogg_opus_classes_argument="$(cygpath -w "$OGG_OPUS_CLASSES")"
   ogg_vorbis_classes_argument="$(cygpath -w "$OGG_VORBIS_CLASSES")"
+  ogg_vorbis_track_classes_argument="$(cygpath -w "$OGG_VORBIS_TRACK_CLASSES")"
   jar_argument="$(cygpath -w "$JAR")"
   reference_argument="$(cygpath -w "$REFERENCE_JAR")"
 else
@@ -600,6 +615,7 @@ else
   ogg_flac_classes_argument="$OGG_FLAC_CLASSES"
   ogg_opus_classes_argument="$OGG_OPUS_CLASSES"
   ogg_vorbis_classes_argument="$OGG_VORBIS_CLASSES"
+  ogg_vorbis_track_classes_argument="$OGG_VORBIS_TRACK_CLASSES"
   jar_argument="$JAR"
   reference_argument="$REFERENCE_JAR"
 fi
@@ -662,6 +678,12 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_OPUS_CLASS
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_VORBIS_CLASSES" \
   "$WORK/GateOggVorbisCodecHandler.java" \
   "$WORK/OggVorbisTrackHandler.java"
+javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_VORBIS_TRACK_CLASSES" \
+  "$OGG_VORBIS_TRACK_SOURCES/GateOggVorbisTrackHandler.java" \
+  "$OGG_VORBIS_TRACK_SOURCES/VorbisDecoder.java" \
+  "$OGG_VORBIS_TRACK_SOURCES/AudioPipeline.java" \
+  "$OGG_VORBIS_TRACK_SOURCES/AudioPipelineFactory.java" \
+  "$OGG_VORBIS_TRACK_SOURCES/PcmFormat.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   -d "$MPEG_FILE_LOADER_CLASSES" "$WORK/GateMpegFileLoader.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
@@ -1774,6 +1796,17 @@ cmp "$WORK/ogg-vorbis-codec-handler-reference.txt" \
 grep --fixed-strings \
   'contracts=identifier,maximum-length,public-construction,unvalidated-info-prefix,little-endian-rate,info-array-identity,comment-skip-bound,comment-save-bound,comment-read-bound,tag-parse,empty-singleton,unknown-duration,metadata-duration,size-rate,seek-table,nullable-seek-table,blueprint-state,blueprint-sample-rate,handler-info-identity,handler-stream-identity,handler-broker-identity,missing-comments,oversized-comments,complete-long-comments,short-comment-prefix,short-info-order,checked-failure-identity,runtime-failure-identity,subclassable,private-blueprint,private-methods,throws,reflection' \
   "$WORK/ogg-vorbis-codec-handler-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$ogg_vorbis_track_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOggVorbisTrackHandler >"$WORK/ogg-vorbis-track-handler-reference.txt"
+java -Xverify:all \
+  -cp "$ogg_vorbis_track_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOggVorbisTrackHandler >"$WORK/ogg-vorbis-track-handler-candidate.txt"
+cmp "$WORK/ogg-vorbis-track-handler-reference.txt" \
+  "$WORK/ogg-vorbis-track-handler-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,info-identity,nullable-stream-broker,little-endian-rate,unsigned-channels,pcm-buffer-shapes,decoder-construction,deferred-short-info,setup-packet,direct-info-copy,setup-buffer-identity,integer-max-bounds,consume-result-ignored,decoder-initialise,broker-reset,pipeline-context,pcm-format,full-width-timecodes,reinitialise,packet-loop,decoder-input-identity,output-buffer-identity,full-buffer-drain,partial-output,zero-output-skip,interruption-identity,io-wrapping,runtime-identity,seek-order,seek-result,preinit-seek-order,close-before-init,close-order,close-repeat,public-shape,private-state,throws,reflection' \
+  "$WORK/ogg-vorbis-track-handler-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_flac_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggFlacTrackHandler >"$WORK/ogg-flac-track-handler-reference.txt"
