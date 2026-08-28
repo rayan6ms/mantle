@@ -180,6 +180,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-ogg-audio-track-consumer" => Some(OGG_AUDIO_TRACK_CONSUMER),
         "write-ogg-audio-track-support-consumer" => Some(OGG_AUDIO_TRACK_SUPPORT_CONSUMER),
         "write-ogg-codec-handler-consumer" => Some(OGG_CODEC_HANDLER_CONSUMER),
+        "write-ogg-container-probe-consumer" => Some(OGG_CONTAINER_PROBE_CONSUMER),
         "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
         "write-mpeg-track-info-consumer" => Some(MPEG_TRACK_INFO_CONSUMER),
         "write-mpeg-track-info-builder-consumer" => Some(MPEG_TRACK_INFO_BUILDER_CONSUMER),
@@ -16285,6 +16286,295 @@ public final class GateOggCodecHandler {
       if (metadataRuntimeFailure != null) throw metadataRuntimeFailure;
       return metadataResult;
     }
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const OGG_CONTAINER_PROBE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerDetectionResult;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerHints;
+import com.sedmelluq.discord.lavaplayer.container.MediaContainerProbe;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggAudioTrack;
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggContainerProbe;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoBuilder;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateOggContainerProbe {
+  private static final byte[] OGG_HEADER = new byte[] {'O', 'g', 'g', 'S'};
+
+  public static void main(String[] args) throws Exception {
+    nameAndHints();
+    missesAndFailures();
+    truncatedMetadata();
+    taggedMetadata(Path.of(args[0]));
+    trackFactory();
+    subclassUse();
+    reflection();
+    System.out.println("contracts=name,no-hints,null-hints,empty-miss,non-ogg-miss,current-position,rewind,null-reference-miss,matched-null-reference,null-input,read-failure-identity,seek-failure-identity,runtime-failure-identity,provider-failure-identity,truncated-supported,metadata-failure-swallowed,provider-overlay,tagged-opus,title,artist,isrc,duration,descriptor-identity,stream-ownership,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,private-helper,private-state,throws,reflection");
+  }
+
+  private static void nameAndHints() {
+    OggContainerProbe probe = new OggContainerProbe();
+    check(probe.getName().equals("ogg") && probe.getName() == "ogg",
+        "stable OGG probe name");
+    check(!probe.matchesHints(MediaContainerHints.from("audio/ogg", "ogg"))
+        && !probe.matchesHints(MediaContainerHints.from("application/ogg", "oga"))
+        && !probe.matchesHints(MediaContainerHints.from(null, null))
+        && !probe.matchesHints(null), "all hints, including null, are rejected");
+  }
+
+  private static void missesAndFailures() throws Exception {
+    OggContainerProbe probe = new OggContainerProbe();
+    MemoryStream empty = stream(new byte[0]);
+    check(probe.probe(new AudioReference("empty-id", "empty-title"), empty) == null
+        && empty.position == 0L && empty.providerCalls == 0,
+        "empty input is a rewound miss before metadata construction");
+
+    MemoryStream nonOgg = stream(new byte[] {1, 2, 3, 4, 5});
+    check(probe.probe(new AudioReference("miss-id", "miss-title"), nonOgg) == null
+        && nonOgg.position == 0L && nonOgg.providerCalls == 0,
+        "non-OGG input is rewound and returns null");
+    MemoryStream offset = stream(new byte[] {9, 8, 1, 2, 3, 4, 5});
+    offset.position = 2L;
+    check(probe.probe(null, offset) == null && offset.position == 2L,
+        "header matching starts at and restores the current position");
+    check(probe.probe(null, stream(new byte[] {0, 1, 2, 3})) == null,
+        "null reference is tolerated on a miss");
+    check(catchThrowable(() -> probe.probe(null, stream(OGG_HEADER)))
+        instanceof NullPointerException, "matched input dereferences the reference for logging");
+    check(catchThrowable(() -> probe.probe(new AudioReference("id", null), null))
+        instanceof NullPointerException, "null stream fails during header detection");
+
+    IOException readFailure = new IOException("ogg-read-failure");
+    MemoryStream failingRead = stream(OGG_HEADER);
+    failingRead.ioFailure = readFailure;
+    check(catchThrowable(() -> probe.probe(null, failingRead)) == readFailure,
+        "header read preserves checked failure identity");
+    RuntimeException runtimeFailure = new RuntimeException("ogg-runtime-failure");
+    MemoryStream failingRuntime = stream(OGG_HEADER);
+    failingRuntime.runtimeFailure = runtimeFailure;
+    check(catchThrowable(() -> probe.probe(null, failingRuntime)) == runtimeFailure,
+        "header read preserves runtime failure identity");
+    IOException seekFailure = new IOException("ogg-seek-failure");
+    MemoryStream failingSeek = stream(OGG_HEADER);
+    failingSeek.seekFailure = seekFailure;
+    check(catchThrowable(() -> probe.probe(null, failingSeek)) == seekFailure,
+        "header rewind preserves checked seek failure identity");
+
+    RuntimeException providersFailure = new RuntimeException("ogg-providers-failure");
+    MemoryStream providerStream = stream(OGG_HEADER);
+    providerStream.providersFailure = providersFailure;
+    check(catchThrowable(() -> probe.probe(
+        new AudioReference("provider-id", null), providerStream)) == providersFailure
+        && providerStream.providerCalls == 1 && providerStream.providerPosition == 0L,
+        "provider failure precedes metadata catch and preserves identity");
+  }
+
+  private static void truncatedMetadata() throws Exception {
+    OggContainerProbe probe = new OggContainerProbe();
+    Metadata provider = new Metadata();
+    MemoryStream input = new MemoryStream(OGG_HEADER, Collections.singletonList(provider));
+    MediaContainerDetectionResult result = probe.probe(
+        new AudioReference("reference-id", "reference-title"), input);
+    AudioTrackInfo info = result.getTrackInfo();
+    check(result.isContainerDetected() && result.isSupportedFile()
+        && !result.isReference() && result.getUnsupportedReason() == null
+        && result.getReference() == null && result.getContainerDescriptor().probe == probe
+        && result.getContainerDescriptor().parameters == null,
+        "truncated matched input remains a supported OGG result");
+    check(info.title.equals("stream-title") && info.author.equals("stream-author")
+        && info.length == 42L && info.identifier.equals("stream-id")
+        && info.uri.equals("stream-uri") && info.artworkUrl.equals("stream-artwork")
+        && info.isrc.equals("stream-isrc") && !info.isStream,
+        "metadata failure is swallowed after reference and stream-provider overlay");
+    check(input.providerCalls == 1 && input.providerPosition == 0L && input.closeCalls == 0,
+        "probe does not close caller input while collecting metadata");
+  }
+
+  private static void taggedMetadata(Path fixture) throws Exception {
+    OggContainerProbe probe = new OggContainerProbe();
+    MemoryStream input = stream(Files.readAllBytes(fixture));
+    MediaContainerDetectionResult result = probe.probe(
+        new AudioReference("fixture-id", "fallback-title"), input);
+    AudioTrackInfo info = result.getTrackInfo();
+    check(result.isSupportedFile() && result.getContainerDescriptor().probe == probe
+        && result.getContainerDescriptor().parameters == null,
+        "tagged Opus fixture produces a supported descriptor for this probe");
+    check(info.title.equals("Mantle Ogg Opus Title")
+        && info.author.equals("Mantle Ogg Opus Artist")
+        && info.isrc.equals("BRMNT2600003") && info.identifier.equals("fixture-id")
+        && info.uri.equals("fixture-id") && info.length >= 1900L && info.length <= 2100L
+        && !info.isStream, "real Opus comments and bounded duration override fallbacks");
+    check(input.providerCalls == 1 && input.providerPosition == 0L
+        && input.position > 0L && input.closeCalls == 0,
+        "real metadata scan advances but does not close caller input");
+  }
+
+  private static void trackFactory() throws Exception {
+    OggContainerProbe probe = new OggContainerProbe();
+    AudioTrackInfo info = new AudioTrackInfo(
+        "title", "author", 1L, "track-id", false, "uri", "art", "isrc");
+    MemoryStream input = stream(new byte[0]);
+    AudioTrack first = probe.createTrack("ignored-one", info, input);
+    AudioTrack second = probe.createTrack("ignored-two", info, input);
+    check(first.getClass() == OggAudioTrack.class && second.getClass() == OggAudioTrack.class
+        && first != second && first.getInfo() == info && second.getInfo() == info
+        && trackInput((OggAudioTrack) first) == input
+        && trackInput((OggAudioTrack) second) == input,
+        "factory creates fresh OGG tracks retaining exact argument identities");
+    OggAudioTrack nulls = (OggAudioTrack) probe.createTrack(null, null, null);
+    check(nulls.getInfo() == null && trackInput(nulls) == null,
+        "factory ignores parameters and accepts null track arguments");
+  }
+
+  private static void subclassUse() throws Exception {
+    Derived derived = new Derived();
+    MediaContainerDetectionResult result = derived.probe(
+        new AudioReference("derived-id", null), stream(OGG_HEADER));
+    check(derived.getName().equals("derived-ogg") && result.isSupportedFile()
+        && result.getContainerDescriptor().probe == derived,
+        "ordinary subclass dispatch and supported-result self identity");
+  }
+
+  private static void reflection() throws Exception {
+    Class<OggContainerProbe> type = OggContainerProbe.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {MediaContainerProbe.class})
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0
+        && type.getDeclaredFields().length == 1 && type.getDeclaredMethods().length == 5
+        && type.getDeclaredConstructors().length == 1,
+        "exact public concrete non-final probe shape and member counts");
+
+    Field log = type.getDeclaredField("log");
+    log.setAccessible(true);
+    Object expectedLogger = Class.forName("org.slf4j.LoggerFactory")
+        .getMethod("getLogger", Class.class).invoke(null, type);
+    check(log.getType().getName().equals("org.slf4j.Logger")
+        && log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && !log.isSynthetic() && log.get(null) != null && log.get(null) == expectedLogger,
+        "eager logger identity and private static final metadata");
+
+    Constructor<OggContainerProbe> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && !constructor.isVarArgs() && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    checkMethod(type.getDeclaredMethod("getName"), Modifier.PUBLIC, String.class,
+        new Class<?>[0], new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("matchesHints", MediaContainerHints.class),
+        Modifier.PUBLIC, boolean.class, new Class<?>[] {MediaContainerHints.class}, new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("probe", AudioReference.class, SeekableInputStream.class),
+        Modifier.PUBLIC, MediaContainerDetectionResult.class,
+        new Class<?>[] {AudioReference.class, SeekableInputStream.class},
+        new Class<?>[] {IOException.class});
+    checkMethod(type.getDeclaredMethod("createTrack", String.class, AudioTrackInfo.class,
+        SeekableInputStream.class), Modifier.PUBLIC, AudioTrack.class,
+        new Class<?>[] {String.class, AudioTrackInfo.class, SeekableInputStream.class},
+        new Class<?>[0]);
+    checkMethod(type.getDeclaredMethod("collectStreamInformation", SeekableInputStream.class,
+        AudioTrackInfoBuilder.class), Modifier.PRIVATE, void.class,
+        new Class<?>[] {SeekableInputStream.class, AudioTrackInfoBuilder.class},
+        new Class<?>[] {IOException.class});
+  }
+
+  private static void checkMethod(Method method, int modifiers, Class<?> result,
+      Class<?>[] parameters, Class<?>[] exceptions) {
+    check(method.getModifiers() == modifiers && method.getReturnType() == result
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), exceptions)
+        && method.getTypeParameters().length == 0 && method.getDeclaredAnnotations().length == 0
+        && !method.isDefault() && !method.isSynthetic() && !method.isBridge()
+        && !method.isVarArgs(), method.getName() + " exact method metadata");
+  }
+
+  private static SeekableInputStream trackInput(OggAudioTrack track) throws Exception {
+    Field field = OggAudioTrack.class.getDeclaredField("inputStream");
+    field.setAccessible(true);
+    return (SeekableInputStream) field.get(track);
+  }
+  private static MemoryStream stream(byte[] data) {
+    return new MemoryStream(data, Collections.emptyList());
+  }
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class Metadata implements AudioTrackInfoProvider {
+    @Override public String getTitle() { return "stream-title"; }
+    @Override public String getAuthor() { return "stream-author"; }
+    @Override public Long getLength() { return 42L; }
+    @Override public String getIdentifier() { return "stream-id"; }
+    @Override public String getUri() { return "stream-uri"; }
+    @Override public String getArtworkUrl() { return "stream-artwork"; }
+    @Override public String getISRC() { return "stream-isrc"; }
+  }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    final byte[] data;
+    final List<AudioTrackInfoProvider> providers;
+    long position;
+    long providerPosition = -1L;
+    int providerCalls;
+    int closeCalls;
+    IOException ioFailure;
+    IOException seekFailure;
+    RuntimeException runtimeFailure;
+    RuntimeException providersFailure;
+
+    MemoryStream(byte[] data, List<AudioTrackInfoProvider> providers) {
+      super(data.length, 0L);
+      this.data = data;
+      this.providers = providers;
+    }
+    @Override public int read() throws IOException {
+      if (ioFailure != null) throw ioFailure;
+      if (runtimeFailure != null) throw runtimeFailure;
+      return position < data.length ? data[(int) position++] & 0xFF : -1;
+    }
+    @Override public int read(byte[] buffer, int offset, int length) throws IOException {
+      if (ioFailure != null) throw ioFailure;
+      if (runtimeFailure != null) throw runtimeFailure;
+      if (length == 0) return 0;
+      if (position >= data.length) return -1;
+      int count = (int) Math.min(length, data.length - position);
+      System.arraycopy(data, (int) position, buffer, offset, count);
+      position += count;
+      return count;
+    }
+    @Override public long getPosition() { return position; }
+    @Override protected void seekHard(long target) throws IOException {
+      if (seekFailure != null) throw seekFailure;
+      position = target;
+    }
+    @Override public boolean canSeekHard() { return true; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() {
+      providerCalls++;
+      providerPosition = position;
+      if (providersFailure != null) throw providersFailure;
+      return providers;
+    }
+    @Override public void close() { closeCalls++; }
+  }
+
+  private static final class Derived extends OggContainerProbe {
+    @Override public String getName() { return "derived-ogg"; }
   }
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

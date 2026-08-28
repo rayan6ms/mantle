@@ -13,6 +13,7 @@ readonly FLAC_METADATA_READER_CLASSES="$WORK/flac-metadata-reader-consumer-class
 readonly MATROSKA_CLASSES="$WORK/matroska-consumer-classes"
 readonly MPEG_CLASSES="$WORK/mpeg-consumer-classes"
 readonly OGG_CODEC_CLASSES="$WORK/ogg-codec-consumer-classes"
+readonly OGG_PROBE_CLASSES="$WORK/ogg-probe-consumer-classes"
 readonly MPEG_FILE_LOADER_CLASSES="$WORK/mpeg-file-loader-consumer-classes"
 readonly JAR="$WORK/mantle-gate-a.jar"
 readonly MISMATCH_JAR="$WORK/mantle-gate-a-mismatch.jar"
@@ -24,10 +25,10 @@ fi
 
 rm -rf -- "$CLASSES" "$FLAC_CLASSES" "$MP3_CLASSES" "$FLAC_LOADER_CLASSES" \
   "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES" "$MPEG_CLASSES" \
-  "$MPEG_FILE_LOADER_CLASSES" "$OGG_CODEC_CLASSES"
+  "$MPEG_FILE_LOADER_CLASSES" "$OGG_CODEC_CLASSES" "$OGG_PROBE_CLASSES"
 mkdir -p "$CLASSES" "$FLAC_CLASSES" "$MP3_CLASSES" "$FLAC_LOADER_CLASSES" \
   "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES" "$MPEG_CLASSES" \
-  "$MPEG_FILE_LOADER_CLASSES" "$OGG_CODEC_CLASSES"
+  "$MPEG_FILE_LOADER_CLASSES" "$OGG_CODEC_CLASSES" "$OGG_PROBE_CLASSES"
 cargo build --locked -p mantle-jvm --features gate-a-direct-attachment
 cargo run --locked -q -p mantle-jvm-gate -- emit \
   --reference-jar "$REFERENCE_JAR" --output "$JAR" --expected-abi 1 \
@@ -278,6 +279,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-ogg-audio-track-support-consum
   --output "$WORK/OggGateSupport.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ogg-codec-handler-consumer \
   --output "$WORK/GateOggCodecHandler.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-ogg-container-probe-consumer \
+  --output "$WORK/GateOggContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-file-loader-consumer \
   --output "$WORK/GateMpegFileLoader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-info-consumer \
@@ -579,6 +582,8 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$MPEG_CLASSES" 
   "$WORK/MpegGateSupport.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_CODEC_CLASSES" \
   "$WORK/GateOggCodecHandler.java"
+javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_PROBE_CLASSES" \
+  "$WORK/GateOggContainerProbe.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   -d "$MPEG_FILE_LOADER_CLASSES" "$WORK/GateMpegFileLoader.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
@@ -1545,6 +1550,18 @@ cmp "$WORK/ogg-codec-handler-reference.txt" "$WORK/ogg-codec-handler-candidate.t
 grep --fixed-strings \
   'contracts=public-interface,no-fields,no-constructors,four-abstract-methods,identifier-int,maximum-length-int,packet-identity,broker-identity,blueprint-identity,metadata-identity,null-arguments,null-returns,checked-failure-identity,runtime-failure-identity,implementation-dispatch,throws,reflection' \
   "$WORK/ogg-codec-handler-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$OGG_PROBE_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOggContainerProbe "$ROOT/tests/media/fixtures/tone-opus-tags.ogg" \
+  >"$WORK/ogg-container-probe-reference.txt"
+java -Xverify:all \
+  -cp "$OGG_PROBE_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOggContainerProbe "$ROOT/tests/media/fixtures/tone-opus-tags.ogg" \
+  >"$WORK/ogg-container-probe-candidate.txt"
+cmp "$WORK/ogg-container-probe-reference.txt" "$WORK/ogg-container-probe-candidate.txt"
+grep --fixed-strings \
+  'contracts=name,no-hints,null-hints,empty-miss,non-ogg-miss,current-position,rewind,null-reference-miss,matched-null-reference,null-input,read-failure-identity,seek-failure-identity,runtime-failure-identity,provider-failure-identity,truncated-supported,metadata-failure-swallowed,provider-overlay,tagged-opus,title,artist,isrc,duration,descriptor-identity,stream-ownership,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,private-helper,private-state,throws,reflection' \
+  "$WORK/ogg-container-probe-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mpeg_file_loader_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateMpegFileLoader "$ROOT/tests/media/fixtures/tone-aac-lc-metadata.m4a" \
