@@ -295,6 +295,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-ogg-stream-size-info-consumer 
   --output "$WORK/GateOggStreamSizeInfo.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ogg-track-blueprint-consumer \
   --output "$WORK/GateOggTrackBlueprint.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-ogg-track-handler-consumer \
+  --output "$WORK/GateOggTrackHandler.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-file-loader-consumer \
   --output "$WORK/GateMpegFileLoader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-mpeg-track-info-consumer \
@@ -605,7 +607,8 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_CODEC_CLAS
   "$WORK/GateOggPageScanner.java" \
   "$WORK/GateOggSeekPoint.java" \
   "$WORK/GateOggStreamSizeInfo.java" \
-  "$WORK/GateOggTrackBlueprint.java"
+  "$WORK/GateOggTrackBlueprint.java" \
+  "$WORK/GateOggTrackHandler.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   -d "$MPEG_FILE_LOADER_CLASSES" "$WORK/GateMpegFileLoader.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
@@ -1657,6 +1660,16 @@ cmp "$WORK/ogg-track-blueprint-reference.txt" "$WORK/ogg-track-blueprint-candida
 grep --fixed-strings \
   'contracts=public-interface,no-fields,no-constructors,2-abstract-methods,stream-identity,null-stream,handler-identity,null-return,full-width-sample-rate,implementation-dispatch,runtime-failure-identity,no-defaults,no-generics,throws,reflection' \
   "$WORK/ogg-track-blueprint-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$OGG_CODEC_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOggTrackHandler >"$WORK/ogg-track-handler-reference.txt"
+java -Xverify:all \
+  -cp "$OGG_CODEC_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOggTrackHandler >"$WORK/ogg-track-handler-candidate.txt"
+cmp "$WORK/ogg-track-handler-reference.txt" "$WORK/ogg-track-handler-candidate.txt"
+grep --fixed-strings \
+  'contracts=public-interface,closeable-parent,no-fields,no-constructors,3-declared-methods,context-identity,null-context,full-width-initial-timecodes,provide-dispatch,full-width-seek,inherited-close,ordered-dispatch,checked-failure-identity,runtime-failure-identity,no-defaults,no-generics,throws,reflection' \
+  "$WORK/ogg-track-handler-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$mpeg_file_loader_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateMpegFileLoader "$ROOT/tests/media/fixtures/tone-aac-lc-metadata.m4a" \

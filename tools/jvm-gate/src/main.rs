@@ -188,6 +188,7 @@ fn container_consumer_source(command: &str) -> Option<&'static str> {
         "write-ogg-seek-point-consumer" => Some(OGG_SEEK_POINT_CONSUMER),
         "write-ogg-stream-size-info-consumer" => Some(OGG_STREAM_SIZE_INFO_CONSUMER),
         "write-ogg-track-blueprint-consumer" => Some(OGG_TRACK_BLUEPRINT_CONSUMER),
+        "write-ogg-track-handler-consumer" => Some(OGG_TRACK_HANDLER_CONSUMER),
         "write-mpeg-file-loader-consumer" => Some(MPEG_FILE_LOADER_CONSUMER),
         "write-mpeg-track-info-consumer" => Some(MPEG_TRACK_INFO_CONSUMER),
         "write-mpeg-track-info-builder-consumer" => Some(MPEG_TRACK_INFO_BUILDER_CONSUMER),
@@ -18011,6 +18012,142 @@ public final class GateOggTrackBlueprint {
     @Override public void provideFrames() {}
     @Override public void seekToTimecode(long timecode) {}
     @Override public void close() {}
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const OGG_TRACK_HANDLER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.container.ogg.OggTrackHandler;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
+import java.io.Closeable;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+public final class GateOggTrackHandler {
+  public static void main(String[] args) throws Exception {
+    dispatchAndIdentity();
+    failures();
+    reflection();
+    System.out.println("contracts=public-interface,closeable-parent,no-fields,no-constructors,3-declared-methods,context-identity,null-context,full-width-initial-timecodes,provide-dispatch,full-width-seek,inherited-close,ordered-dispatch,checked-failure-identity,runtime-failure-identity,no-defaults,no-generics,throws,reflection");
+  }
+
+  private static void dispatchAndIdentity() throws Exception {
+    RecordingHandler handler = new RecordingHandler();
+    OggTrackHandler view = handler;
+    view.initialise(null, Long.MIN_VALUE, Long.MAX_VALUE);
+    view.provideFrames();
+    view.seekToTimecode(-1L);
+    Closeable closeable = view;
+    closeable.close();
+    check(handler.context == null && handler.timecode == Long.MIN_VALUE
+        && handler.desiredTimecode == Long.MAX_VALUE && handler.seekTimecode == -1L,
+        "nullable context and full-width timecodes");
+    check(handler.events.equals(Arrays.asList("initialise", "provide", "seek", "close")),
+        "all interface and inherited dispatch remains ordered");
+  }
+
+  private static void failures() {
+    IOException initialiseFailure = new IOException("initialise");
+    InterruptedException provideFailure = new InterruptedException("provide");
+    RuntimeException seekFailure = new RuntimeException("seek");
+    IOException closeFailure = new IOException("close");
+    FailingHandler handler = new FailingHandler(initialiseFailure, provideFailure, seekFailure,
+        closeFailure);
+    expectSame(initialiseFailure, () -> handler.initialise(null, 1L, 2L));
+    expectSame(provideFailure, handler::provideFrames);
+    expectSame(seekFailure, () -> handler.seekToTimecode(3L));
+    expectSame(closeFailure, handler::close);
+  }
+
+  private static void reflection() throws Exception {
+    Class<OggTrackHandler> type = OggTrackHandler.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.INTERFACE | Modifier.ABSTRACT)
+        && type.getSuperclass() == null
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {Closeable.class})
+        && type.getTypeParameters().length == 0 && type.getDeclaredAnnotations().length == 0
+        && type.getDeclaredClasses().length == 0, "interface and Closeable metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 3, "exact declared member counts");
+    checkMethod(type.getDeclaredMethod("initialise", AudioProcessingContext.class, long.class,
+        long.class), new Class<?>[] {AudioProcessingContext.class, long.class, long.class},
+        new Class<?>[] {IOException.class});
+    checkMethod(type.getDeclaredMethod("provideFrames"), new Class<?>[0],
+        new Class<?>[] {InterruptedException.class});
+    checkMethod(type.getDeclaredMethod("seekToTimecode", long.class),
+        new Class<?>[] {long.class}, new Class<?>[0]);
+    Method close = type.getMethod("close");
+    check(close.getDeclaringClass() == Closeable.class
+        && Arrays.equals(close.getExceptionTypes(), new Class<?>[] {IOException.class}),
+        "inherited Closeable method metadata");
+  }
+
+  private static void checkMethod(Method method, Class<?>[] parameters, Class<?>[] failures) {
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == void.class
+        && Arrays.equals(method.getParameterTypes(), parameters)
+        && Arrays.equals(method.getExceptionTypes(), failures)
+        && method.getTypeParameters().length == 0 && method.getDeclaredAnnotations().length == 0
+        && !method.isSynthetic() && !method.isBridge() && !method.isDefault()
+        && !method.isVarArgs(), method.getName() + " abstract method metadata");
+  }
+
+  private static void expectSame(Throwable expected, ThrowingRunnable action) {
+    try {
+      action.run();
+      throw new AssertionError("expected failure");
+    } catch (Throwable throwable) {
+      check(throwable == expected, "failure identity");
+    }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class RecordingHandler implements OggTrackHandler {
+    final List<String> events = new ArrayList<>();
+    AudioProcessingContext context;
+    long timecode;
+    long desiredTimecode;
+    long seekTimecode;
+    @Override public void initialise(AudioProcessingContext context, long timecode,
+        long desiredTimecode) {
+      events.add("initialise");
+      this.context = context;
+      this.timecode = timecode;
+      this.desiredTimecode = desiredTimecode;
+    }
+    @Override public void provideFrames() { events.add("provide"); }
+    @Override public void seekToTimecode(long timecode) {
+      events.add("seek");
+      seekTimecode = timecode;
+    }
+    @Override public void close() { events.add("close"); }
+  }
+
+  private static final class FailingHandler implements OggTrackHandler {
+    final IOException initialiseFailure;
+    final InterruptedException provideFailure;
+    final RuntimeException seekFailure;
+    final IOException closeFailure;
+    FailingHandler(IOException initialiseFailure, InterruptedException provideFailure,
+        RuntimeException seekFailure, IOException closeFailure) {
+      this.initialiseFailure = initialiseFailure;
+      this.provideFailure = provideFailure;
+      this.seekFailure = seekFailure;
+      this.closeFailure = closeFailure;
+    }
+    @Override public void initialise(AudioProcessingContext context, long timecode,
+        long desiredTimecode) throws IOException { throw initialiseFailure; }
+    @Override public void provideFrames() throws InterruptedException { throw provideFailure; }
+    @Override public void seekToTimecode(long timecode) { throw seekFailure; }
+    @Override public void close() throws IOException { throw closeFailure; }
   }
 
   private static void check(boolean condition, String message) {

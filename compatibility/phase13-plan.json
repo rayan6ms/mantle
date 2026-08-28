@@ -2559,8 +2559,8 @@
       "objective": "Cover public container, probe, seek, and media-facing extension contracts.",
       "exit_evidence": "Container fixtures, protected-extension tests, per-symbol ledger entries, and Revapi diff.",
       "status": "IN_PROGRESS",
-      "classified_symbols": 695,
-      "remaining_symbols": 129,
+      "classified_symbols": 699,
+      "remaining_symbols": 125,
       "completed_slices": [
         {
           "id": "formats-contracts",
@@ -3693,6 +3693,19 @@
             "tools/jvm-gate/src/emitter.rs",
             "tools/jvm-gate/src/main.rs"
           ]
+        },
+        {
+          "id": "ogg-track-handler-contracts",
+          "classes": 1,
+          "fields": 0,
+          "methods": 3,
+          "symbols": 4,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
         }
       ]
     },
@@ -3787,7 +3800,7 @@
   "phase_entry": {
     "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
     "first_execution_cohort": "core-player-track",
-    "next_slice": "ogg-track-handler-contracts",
+    "next_slice": "ogg-track-loader-contracts",
     "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
   }
 }
