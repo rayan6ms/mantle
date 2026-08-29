@@ -170,6 +170,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-friendly-exception-severity-consumer" => Some(FRIENDLY_EXCEPTION_SEVERITY_CONSUMER),
         "write-future-tools-consumer" => Some(FUTURE_TOOLS_CONSUMER),
         "write-garbage-collection-monitor-consumer" => Some(GARBAGE_COLLECTION_MONITOR_CONSUMER),
+        "write-json-browser-consumer" => Some(JSON_BROWSER_CONSUMER),
         _ => None,
     }
 }
@@ -28020,6 +28021,371 @@ public final class GateGarbageCollectionMonitor {
   private static final class Derived extends GarbageCollectionMonitor {
     Derived(ScheduledExecutorService executor) { super(executor); }
   }
+  private static Throwable catchThrowable(Throwing action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+  private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const JSON_BROWSER_CONSUMER: &str = r#"
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
+public final class GateJsonBrowser {
+  public static void main(String[] args) throws Exception {
+    singletonAndParsing(); navigation(); mapMutation(); listMutation(); scalarConversions();
+    objectConversions(); reflection();
+    System.out.println("contracts=null-singleton,mapper-flags,string-parse,stream-parse,stream-ownership,comments,unquoted-fields,parse-failures,new-map,new-list,map-list-detection,index-bounds,key-missing,wrapper-freshness,ordered-values,ordered-keys,mutable-snapshots,map-put-browser,map-put-object,map-remove,node-sharing,list-add,list-insert,list-index-clamping,list-remove,wrong-container-failures,text-shapes,defaults,boolean-coercion,long-coercion,int-coercion,safe-text,format,null-detection,class-conversion,type-reference-conversion,conversion-wrapping,generics,private-state,synthetic-lambda,reflection");
+  }
+
+  private static void singletonAndParsing() throws Exception {
+    JsonBrowser missing = JsonBrowser.NULL_BROWSER;
+    check(missing == JsonBrowser.NULL_BROWSER && missing.isNull() && !missing.isMap()
+        && !missing.isList() && missing.text() == null && missing.format() == null
+        && missing.safeText().equals("") && missing.textOrDefault("fallback").equals("fallback"),
+        "null singleton values");
+    check(missing.get("anything") == missing && missing.get(null) == missing
+        && missing.index(0) == missing && missing.index(-1) == missing,
+        "null singleton navigation");
+    List<JsonBrowser> firstValues = missing.values();
+    List<JsonBrowser> secondValues = missing.values();
+    firstValues.add(missing);
+    check(firstValues != secondValues && firstValues.size() == 1 && secondValues.isEmpty(),
+        "null values are fresh mutable lists");
+    check(missing.keys() == Collections.<String>emptyList()
+        && catchThrowable(() -> missing.keys().add("x")) instanceof UnsupportedOperationException,
+        "non-map keys use immutable empty list");
+
+    Field node = field("node");
+    check(node.get(missing) == null, "null singleton node");
+    ObjectMapper mapper = (ObjectMapper) field("mapper").get(null);
+    check(mapper != null
+        && mapper.getFactory().isEnabled(JsonParser.Feature.ALLOW_COMMENTS)
+        && mapper.getFactory().isEnabled(JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES),
+        "permissive mapper features");
+
+    JsonBrowser parsed = JsonBrowser.parse(
+        "{/* comment */ unquoted:[1,true,null], text:\"value\"}");
+    check(parsed.isMap() && parsed.get("unquoted").isList()
+        && parsed.get("unquoted").index(0).asInt(-1) == 1
+        && parsed.get("text").text().equals("value"), "string parser features");
+    TrackStream stream = new TrackStream("{streamed:2}");
+    JsonBrowser streamed = JsonBrowser.parse(stream);
+    check(streamed.get("streamed").asInt(-1) == 2 && stream.closed,
+        "stream parser closes caller stream");
+    check(catchThrowable(() -> JsonBrowser.parse("{")) instanceof IOException,
+        "invalid string parse failure");
+    check(catchThrowable(() -> JsonBrowser.parse((String) null))
+        instanceof IllegalArgumentException, "null string parse failure");
+    check(catchThrowable(() -> JsonBrowser.parse((InputStream) null))
+        instanceof IllegalArgumentException, "null stream parse failure");
+
+    JsonBrowser explicitNull = JsonBrowser.parse("null");
+    check(explicitNull != missing && explicitNull.isNull() && explicitNull.text() == null
+        && explicitNull.format().equals("null"), "explicit null node differs from missing");
+    JsonBrowser map = JsonBrowser.newMap();
+    JsonBrowser list = JsonBrowser.newList();
+    check(map.isMap() && !map.isList() && list.isList() && !list.isMap()
+        && map != JsonBrowser.newMap() && list != JsonBrowser.newList(),
+        "fresh map and list factories");
+  }
+
+  private static void navigation() throws Exception {
+    JsonBrowser root = JsonBrowser.parse("{\"first\":1,\"second\":[\"a\",null],\"third\":true}");
+    check(root.get("missing") == JsonBrowser.NULL_BROWSER
+        && root.get(null) == JsonBrowser.NULL_BROWSER
+        && root.index(0) == JsonBrowser.NULL_BROWSER, "map miss and wrong index");
+    JsonBrowser list = root.get("second");
+    check(list.index(-1) == JsonBrowser.NULL_BROWSER
+        && list.index(2) == JsonBrowser.NULL_BROWSER
+        && list.index(Integer.MAX_VALUE) == JsonBrowser.NULL_BROWSER,
+        "list index bounds");
+    JsonBrowser first = list.index(0);
+    JsonBrowser again = list.index(0);
+    check(first != again && first.text().equals("a") && again.text().equals("a"),
+        "navigation wrappers are fresh");
+    check(list.index(1) != JsonBrowser.NULL_BROWSER && list.index(1).isNull(),
+        "explicit list null wrapper");
+
+    List<JsonBrowser> values = root.values();
+    List<JsonBrowser> valuesAgain = root.values();
+    check(values != valuesAgain && values.size() == 3
+        && values.get(0).asInt(-1) == 1 && values.get(1).isList()
+        && values.get(2).asBoolean(false), "ordered map values");
+    values.clear();
+    check(root.values().size() == 3, "value snapshot mutation is isolated");
+    List<String> keys = root.keys();
+    check(keys.equals(Arrays.asList("first", "second", "third")), "ordered keys");
+    keys.add("detached");
+    check(root.keys().equals(Arrays.asList("first", "second", "third")),
+        "key snapshot is mutable and isolated");
+    check(JsonBrowser.parse("1").values().isEmpty(), "scalar values empty");
+  }
+
+  private static void mapMutation() throws Exception {
+    JsonBrowser map = JsonBrowser.newMap();
+    map.put("text", "value");
+    map.put("number", 7);
+    map.put("array", Arrays.asList(1, 2));
+    map.put("nullObject", null);
+    map.put("nullBrowser", JsonBrowser.NULL_BROWSER);
+    JsonBrowser child = JsonBrowser.newMap();
+    child.put("before", true);
+    map.put("child", child);
+    child.put("after", 9);
+    check(map.get("text").text().equals("value") && map.get("number").asInt(-1) == 7
+        && map.get("array").values().size() == 2 && map.get("nullObject").isNull()
+        && map.get("nullBrowser").isNull() && map.get("child").get("after").asInt(-1) == 9,
+        "map object conversion and browser node sharing");
+    map.put("number", 8);
+    check(map.get("number").asInt(-1) == 8, "map replacement");
+    map.remove("text");
+    map.remove("missing");
+    map.remove(null);
+    check(map.get("text") == JsonBrowser.NULL_BROWSER, "map removal");
+
+    JsonBrowser list = JsonBrowser.newList();
+    IllegalStateException put = (IllegalStateException) catchThrowable(() -> list.put("x", 1));
+    IllegalStateException remove =
+        (IllegalStateException) catchThrowable(() -> list.remove("x"));
+    check(put.getMessage().equals("Put only works on a map")
+        && remove.getMessage().equals("Remove only works on a map"),
+        "map mutation wrong-container messages");
+  }
+
+  private static void listMutation() throws Exception {
+    JsonBrowser list = JsonBrowser.newList();
+    list.add(1);
+    list.add(Arrays.asList("a", "b"));
+    list.add(null);
+    JsonBrowser child = JsonBrowser.newMap();
+    child.put("before", 1);
+    list.add(child);
+    child.put("after", 2);
+    check(list.values().size() == 4 && list.index(0).asInt(-1) == 1
+        && list.index(1).isList() && list.index(2).isNull()
+        && list.index(3).get("after").asInt(-1) == 2,
+        "list add conversion and browser node sharing");
+
+    list.set(1, "inserted");
+    check(list.values().size() == 5 && list.index(1).text().equals("inserted")
+        && list.index(2).isList(), "set inserts instead of replacing");
+    list.set(-100, "front");
+    list.set(100, "tail");
+    check(list.index(0).text().equals("front")
+        && list.index(list.values().size() - 1).text().equals("tail"),
+        "insert index clamping");
+    int size = list.values().size();
+    list.remove(-1);
+    list.remove(999);
+    check(list.values().size() == size, "invalid list removal is ignored");
+    list.remove(0);
+    check(list.values().size() == size - 1 && !list.index(0).text().equals("front"),
+        "valid list removal");
+
+    JsonBrowser map = JsonBrowser.newMap();
+    IllegalStateException add = (IllegalStateException) catchThrowable(() -> map.add(1));
+    IllegalStateException set = (IllegalStateException) catchThrowable(() -> map.set(0, 1));
+    IllegalStateException remove = (IllegalStateException) catchThrowable(() -> map.remove(0));
+    check(add.getMessage().equals("Add only works on a list")
+        && set.getMessage().equals("Add only works on a list")
+        && remove.getMessage().equals("Remove only works on a list"),
+        "list mutation wrong-container messages");
+  }
+
+  private static void scalarConversions() throws Exception {
+    check(JsonBrowser.parse("\"hello\"").text().equals("hello")
+        && JsonBrowser.parse("-9223372036854775808").text().equals("-9223372036854775808")
+        && JsonBrowser.parse("1.50").text().equals("1.5")
+        && JsonBrowser.parse("true").text().equals("true")
+        && JsonBrowser.parse("[1,2]").text().equals("[1,2]")
+        && JsonBrowser.parse("{\"a\":1}").text().equals("{\"a\":1}"),
+        "text conversion shapes");
+    check(JsonBrowser.parse("null").textOrDefault("d").equals("d")
+        && JsonBrowser.parse("\"x\"").textOrDefault("d").equals("x")
+        && JsonBrowser.parse("null").textOrDefault(null) == null,
+        "text defaults");
+
+    check(JsonBrowser.parse("true").asBoolean(false)
+        && !JsonBrowser.parse("false").asBoolean(true)
+        && JsonBrowser.parse("\"true\"").asBoolean(false)
+        && !JsonBrowser.parse("\"false\"").asBoolean(true)
+        && JsonBrowser.parse("\"TRUE\"").asBoolean(true)
+        && JsonBrowser.parse("1").asBoolean(true)
+        && !JsonBrowser.parse("null").asBoolean(false), "boolean coercion and defaults");
+
+    check(JsonBrowser.parse("5.9").asLong(-1L) == 5L
+        && JsonBrowser.parse("\"9223372036854775807\"").asLong(-1L) == Long.MAX_VALUE
+        && JsonBrowser.parse("\"9223372036854775808\"").asLong(7L) == 7L
+        && JsonBrowser.parse("\" 1\"").asLong(8L) == 8L
+        && JsonBrowser.parse("true").asLong(9L) == 9L, "long coercion and defaults");
+    check(JsonBrowser.parse("5.9").asInt(-1) == 5
+        && JsonBrowser.parse("2147483648").asInt(9) == Integer.MIN_VALUE
+        && JsonBrowser.parse("\"2147483647\"").asInt(-1) == Integer.MAX_VALUE
+        && JsonBrowser.parse("\"2147483648\"").asInt(10) == 10
+        && JsonBrowser.parse("false").asInt(11) == 11, "int coercion and defaults");
+
+    check(JsonBrowser.parse("null").safeText().equals("")
+        && JsonBrowser.parse("\"safe\"").safeText().equals("safe"), "safe text");
+    check(JsonBrowser.parse("{ unquoted : [1, true] }").format()
+        .equals("{\"unquoted\":[1,true]}")
+        && JsonBrowser.parse("null").format().equals("null"), "compact format");
+  }
+
+  private static void objectConversions() throws Exception {
+    JsonBrowser personJson = JsonBrowser.parse("{\"name\":\"Ada\",\"age\":37}");
+    Person person = personJson.as(Person.class);
+    check(person.name.equals("Ada") && person.age == 37, "class conversion");
+    Map<?, ?> map = personJson.as(Map.class);
+    check(map.get("name").equals("Ada") && map.get("age").equals(37), "map conversion");
+    List<Integer> values = JsonBrowser.parse("[1,2,3]")
+        .as(new TypeReference<List<Integer>>() {});
+    check(values.equals(Arrays.asList(1, 2, 3)), "type reference conversion");
+
+    Throwable classFailure = catchThrowable(() -> personJson.as(Integer.class));
+    Throwable typeFailure = catchThrowable(() -> personJson.as(
+        new TypeReference<List<Integer>>() {}));
+    check(classFailure instanceof RuntimeException && classFailure.getCause() != null
+        && typeFailure instanceof RuntimeException && typeFailure.getCause() != null,
+        "conversion failures are wrapped");
+  }
+
+  private static void reflection() throws Exception {
+    Class<JsonBrowser> type = JsonBrowser.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredFields().length == 3
+        && type.getDeclaredMethods().length == 28 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredClasses().length == 0, "exact class shape");
+    checkField("NULL_BROWSER", JsonBrowser.class,
+        Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
+    checkField("mapper", ObjectMapper.class, Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField("node", JsonNode.class, Modifier.PRIVATE | Modifier.FINAL);
+    Constructor<?> constructor = type.getDeclaredConstructor(JsonNode.class);
+    check(constructor.getModifiers() == Modifier.PRIVATE
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic()
+        && !constructor.isVarArgs(), "private constructor metadata");
+
+    checkMethod("isList", boolean.class, Modifier.PUBLIC);
+    checkMethod("isMap", boolean.class, Modifier.PUBLIC);
+    checkMethod("index", JsonBrowser.class, Modifier.PUBLIC, int.class);
+    checkMethod("get", JsonBrowser.class, Modifier.PUBLIC, String.class);
+    checkMethod("put", void.class, Modifier.PUBLIC, String.class, Object.class);
+    checkMethod("remove", void.class, Modifier.PUBLIC, String.class);
+    checkMethod("add", void.class, Modifier.PUBLIC, Object.class);
+    checkMethod("set", void.class, Modifier.PUBLIC, int.class, Object.class);
+    checkMethod("remove", void.class, Modifier.PUBLIC, int.class);
+    Method values = checkMethod("values", List.class, Modifier.PUBLIC);
+    Method keys = checkMethod("keys", List.class, Modifier.PUBLIC);
+    Method asClass = checkMethod("as", Object.class, Modifier.PUBLIC, Class.class);
+    Method asType = checkMethod("as", Object.class, Modifier.PUBLIC, TypeReference.class);
+    checkMethod("text", String.class, Modifier.PUBLIC);
+    checkMethod("textOrDefault", String.class, Modifier.PUBLIC, String.class);
+    checkMethod("asBoolean", boolean.class, Modifier.PUBLIC, boolean.class);
+    checkMethod("asLong", long.class, Modifier.PUBLIC, long.class);
+    checkMethod("asInt", int.class, Modifier.PUBLIC, int.class);
+    checkMethod("safeText", String.class, Modifier.PUBLIC);
+    checkMethod("format", String.class, Modifier.PUBLIC);
+    checkMethod("isNull", boolean.class, Modifier.PUBLIC);
+    checkThrows("parse", new Class<?>[] {String.class});
+    checkThrows("parse", new Class<?>[] {InputStream.class});
+    checkThrows("newMap", new Class<?>[0]);
+    checkThrows("newList", new Class<?>[0]);
+    checkMethod("setupMapper", ObjectMapper.class, Modifier.PRIVATE | Modifier.STATIC);
+    checkMethod("create", JsonBrowser.class, Modifier.PRIVATE | Modifier.STATIC, JsonNode.class);
+    Method lambda = checkMethod("lambda$values$0", void.class,
+        Modifier.PRIVATE | Modifier.STATIC | 0x1000, List.class, JsonNode.class);
+    check(lambda.isSynthetic(), "synthetic values lambda");
+
+    check(parameter(values.getGenericReturnType(), List.class) == JsonBrowser.class,
+        "values generic result");
+    check(parameter(keys.getGenericReturnType(), List.class) == String.class,
+        "keys generic result");
+    checkGenericConversion(asClass, Class.class);
+    checkGenericConversion(asType, TypeReference.class);
+  }
+
+  private static void checkGenericConversion(Method method, Class<?> parameterRaw) {
+    TypeVariable<Method>[] variables = method.getTypeParameters();
+    check(variables.length == 1 && variables[0].getName().equals("T")
+        && Arrays.equals(variables[0].getBounds(), new Type[] {Object.class})
+        && method.getGenericReturnType() == variables[0], method + " type variable");
+    ParameterizedType parameter = (ParameterizedType) method.getGenericParameterTypes()[0];
+    check(parameter.getRawType() == parameterRaw
+        && parameter.getActualTypeArguments()[0] == variables[0], method + " generic parameter");
+  }
+
+  private static Type parameter(Type type, Class<?> raw) {
+    ParameterizedType parameterized = (ParameterizedType) type;
+    check(parameterized.getRawType() == raw, "generic raw type");
+    return parameterized.getActualTypeArguments()[0];
+  }
+
+  private static void checkThrows(String name, Class<?>[] parameters) throws Exception {
+    Method method = checkMethod(name, JsonBrowser.class, Modifier.PUBLIC | Modifier.STATIC,
+        parameters);
+    check(Arrays.equals(method.getExceptionTypes(), new Class<?>[] {IOException.class}),
+        name + " checked exception");
+  }
+
+  private static Field checkField(String name, Class<?> fieldType, int modifiers) throws Exception {
+    Field field = JsonBrowser.class.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getModifiers() == modifiers
+        && !field.isSynthetic(), name + " field metadata");
+    return field;
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = JsonBrowser.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static Method checkMethod(String name, Class<?> result, int modifiers,
+      Class<?>... parameters) throws Exception {
+    Method method = JsonBrowser.class.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == result && method.getModifiers() == modifiers
+        && !method.isBridge() && !method.isVarArgs()
+        && (name.equals("lambda$values$0") || !method.isSynthetic()), name + " metadata");
+    if (!name.startsWith("parse") && !name.startsWith("new")) {
+      check(method.getExceptionTypes().length == 0, name + " unexpected checked exception");
+    }
+    return method;
+  }
+
+  public static final class Person {
+    public String name;
+    public int age;
+    public Person() {}
+  }
+
+  private static final class TrackStream extends ByteArrayInputStream {
+    boolean closed;
+    TrackStream(String value) { super(value.getBytes(StandardCharsets.UTF_8)); }
+    @Override public void close() throws IOException { closed = true; super.close(); }
+  }
+
   private static Throwable catchThrowable(Throwing action) {
     try { action.run(); return null; } catch (Throwable failure) { return failure; }
   }

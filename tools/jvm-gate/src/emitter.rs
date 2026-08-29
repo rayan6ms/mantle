@@ -354,6 +354,7 @@ const FRIENDLY_EXCEPTION_SEVERITY_CLASS: &str =
 const FUTURE_TOOLS_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/FutureTools";
 const GARBAGE_COLLECTION_MONITOR_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/GarbageCollectionMonitor";
+const JSON_BROWSER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/JsonBrowser";
 const ABSTRACT_MUTABLE_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AbstractMutableAudioFrame";
 const IMMUTABLE_FRAME_CLASS: &str =
@@ -959,6 +960,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     FRIENDLY_EXCEPTION_SEVERITY_CLASS,
     FUTURE_TOOLS_CLASS,
     GARBAGE_COLLECTION_MONITOR_CLASS,
+    JSON_BROWSER_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/AudioItem",
     AUDIO_REFERENCE_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/AudioPlaylist",
@@ -1091,6 +1093,7 @@ pub fn emit(
     let mut friendly_exception_severity_bytes = None;
     let mut future_tools_bytes = None;
     let mut garbage_collection_monitor_bytes = None;
+    let mut json_browser_bytes = None;
     let mut vorbis_comment_parser_bytes = None;
     let mut extended_m3u_parser_bytes = None;
     let mut extended_m3u_line_bytes = None;
@@ -1252,6 +1255,8 @@ pub fn emit(
             future_tools_bytes = Some(bytes);
         } else if *binary_name == GARBAGE_COLLECTION_MONITOR_CLASS {
             garbage_collection_monitor_bytes = Some(bytes);
+        } else if *binary_name == JSON_BROWSER_CLASS {
+            json_browser_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -1388,6 +1393,12 @@ pub fn emit(
                 garbage_collection_monitor_bytes
                     .as_ref()
                     .expect("garbage collection monitor source bytes are retained"),
+            );
+        } else if name == format!("{JSON_BROWSER_CLASS}.class") {
+            bytes.clone_from(
+                json_browser_bytes
+                    .as_ref()
+                    .expect("JSON browser source bytes are retained"),
             );
         } else if name == format!("{MPEG_AUDIO_TRACK_CLASS}.class") {
             bytes.clone_from(
@@ -2330,6 +2341,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | FRIENDLY_EXCEPTION_SEVERITY_CLASS
             | FUTURE_TOOLS_CLASS
             | GARBAGE_COLLECTION_MONITOR_CLASS
+            | JSON_BROWSER_CLASS
             | OGG_FLAC_CODEC_HANDLER_CLASS
             | OGG_FLAC_CODEC_HANDLER_BLUEPRINT_CLASS
             | OGG_FLAC_TRACK_HANDLER_CLASS
