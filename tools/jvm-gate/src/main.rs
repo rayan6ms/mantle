@@ -195,6 +195,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-bit-stream-reader-consumer" => Some(BIT_STREAM_READER_CONSUMER),
         "write-bit-stream-writer-consumer" => Some(BIT_STREAM_WRITER_CONSUMER),
         "write-byte-buffer-input-stream-consumer" => Some(BYTE_BUFFER_INPUT_STREAM_CONSUMER),
+        "write-byte-buffer-output-stream-consumer" => Some(BYTE_BUFFER_OUTPUT_STREAM_CONSUMER),
         "write-extended-http-configurable-consumer" => Some(EXTENDED_HTTP_CONFIGURABLE_CONSUMER),
         "write-http-configurable-consumer" => Some(HTTP_CONFIGURABLE_CONSUMER),
         "write-http-context-filter-consumer" => Some(HTTP_CONTEXT_FILTER_CONSUMER),
@@ -64374,6 +64375,134 @@ public final class GateByteBufferInputStream {
   }
 
   private static final class Derived extends ByteBufferInputStream {
+    Derived(ByteBuffer buffer) { super(buffer); }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const BYTE_BUFFER_OUTPUT_STREAM_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.io.ByteBufferOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.BufferOverflowException;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+
+public final class GateByteBufferOutputStream {
+  public static void main(String[] args) throws Exception {
+    constructionAndSingleWrites();
+    bulkWritesAndCapacity();
+    failuresAndInheritedBehavior();
+    reflection();
+    System.out.println("contracts=constructor,buffer-identity,live-state,single-write,truncation,position,bulk-offset,bulk-bytes,zero-length,capacity-overflow,overflow-position,invalid-range,null-buffer,read-only-buffer,inherited-close,inherited-flush,subclassable,private-state,reflection");
+  }
+
+  private static void constructionAndSingleWrites() throws Exception {
+    ByteBuffer buffer = ByteBuffer.allocate(4);
+    ByteBufferOutputStream stream = new ByteBufferOutputStream(buffer);
+    check(field(stream, "buffer") == buffer, "buffer identity");
+    check(buffer.position() == 0 && buffer.limit() == 4, "initial state");
+    buffer.position(1);
+    stream.write(0x1FF);
+    check(buffer.position() == 2 && buffer.get(1) == (byte) 0xFF, "single write truncation");
+    buffer.limit(3);
+    check(buffer.remaining() == 1, "external buffer state is live");
+    stream.write(0x80);
+    check(buffer.position() == 3 && buffer.get(2) == (byte) 0x80, "single write position");
+  }
+
+  private static void bulkWritesAndCapacity() throws Exception {
+    ByteBuffer buffer = ByteBuffer.allocate(6);
+    ByteBufferOutputStream stream = new ByteBufferOutputStream(buffer);
+    byte[] source = new byte[] {9, 10, 11, 12, 13};
+    stream.write(source, 1, 3);
+    check(buffer.position() == 3, "bulk position");
+    check(Arrays.equals(Arrays.copyOf(buffer.array(), 3), new byte[] {10, 11, 12}),
+        "bulk offset bytes");
+    stream.write(source, 0, 0);
+    check(buffer.position() == 3, "zero-length write");
+
+    buffer.limit(4);
+    Throwable overflow = catchThrowable(() -> stream.write(source, 0, 2));
+    check(overflow instanceof BufferOverflowException, "capacity overflow");
+    check(buffer.position() == 3, "overflow position");
+
+    ByteBuffer invalidBuffer = ByteBuffer.allocate(2);
+    ByteBufferOutputStream invalid = new ByteBufferOutputStream(invalidBuffer);
+    check(catchThrowable(() -> invalid.write(new byte[1], 1, 1))
+        instanceof IndexOutOfBoundsException, "invalid source range");
+    check(invalidBuffer.position() == 0, "invalid range position");
+  }
+
+  private static void failuresAndInheritedBehavior() throws Exception {
+    ByteBufferInputStreamSentinel sentinel = new ByteBufferInputStreamSentinel();
+    ByteBufferOutputStream stream = new ByteBufferOutputStream(sentinel.buffer);
+    stream.close();
+    stream.flush();
+    stream.write(7);
+    check(sentinel.buffer.position() == 1, "inherited close and flush are no-op");
+
+    ByteBufferOutputStream nullBuffer = new ByteBufferOutputStream(null);
+    check(field(nullBuffer, "buffer") == null, "null buffer identity");
+    check(catchThrowable(() -> nullBuffer.write(1)) instanceof NullPointerException,
+        "null single write");
+    check(catchThrowable(() -> nullBuffer.write(new byte[1], 0, 1)) instanceof NullPointerException,
+        "null bulk write");
+
+    ByteBufferOutputStream readOnly = new ByteBufferOutputStream(
+        ByteBuffer.allocate(1).asReadOnlyBuffer());
+    check(catchThrowable(() -> readOnly.write(1)) instanceof UnsupportedOperationException,
+        "read-only single write");
+    check(catchThrowable(() -> readOnly.write(new byte[] {1}, 0, 1))
+        instanceof UnsupportedOperationException, "read-only bulk write");
+  }
+
+  private static void reflection() throws Exception {
+    Class<ByteBufferOutputStream> type = ByteBufferOutputStream.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers()),
+        "class modifiers");
+    check(type.getSuperclass() == OutputStream.class && type.getInterfaces().length == 0,
+        "superclass");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredMethods().length == 2,
+        "member counts");
+    Field buffer = type.getDeclaredField("buffer");
+    check(buffer.getType() == ByteBuffer.class
+        && (buffer.getModifiers() & (Modifier.PRIVATE | Modifier.FINAL))
+            == (Modifier.PRIVATE | Modifier.FINAL), "buffer field shape");
+    check(type.getDeclaredConstructor(ByteBuffer.class).getExceptionTypes().length == 0,
+        "constructor exceptions");
+    Method single = type.getDeclaredMethod("write", int.class);
+    Method bulk = type.getDeclaredMethod("write", byte[].class, int.class, int.class);
+    check(Modifier.isPublic(single.getModifiers()) && single.getExceptionTypes().length == 1
+        && single.getExceptionTypes()[0] == IOException.class, "single write shape");
+    check(Modifier.isPublic(bulk.getModifiers()) && bulk.getExceptionTypes().length == 1
+        && bulk.getExceptionTypes()[0] == IOException.class, "bulk write shape");
+    new Derived(ByteBuffer.allocate(0));
+  }
+
+  private static Object field(Object instance, String name) throws Exception {
+    Field field = instance.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(instance);
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+
+  private static final class ByteBufferInputStreamSentinel {
+    final ByteBuffer buffer = ByteBuffer.allocate(2);
+  }
+
+  private static final class Derived extends ByteBufferOutputStream {
     Derived(ByteBuffer buffer) { super(buffer); }
   }
 

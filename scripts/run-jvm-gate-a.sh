@@ -480,6 +480,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-bit-stream-writer-consumer \
   --output "$WORK/GateBitStreamWriter.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-byte-buffer-input-stream-consumer \
   --output "$WORK/GateByteBufferInputStream.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-byte-buffer-output-stream-consumer \
+  --output "$WORK/GateByteBufferOutputStream.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-extended-http-configurable-consumer \
   --output "$WORK/GateExtendedHttpConfigurable.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-http-configurable-consumer \
@@ -844,6 +846,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateBitStreamReader.java" \
   "$WORK/GateBitStreamWriter.java" \
   "$WORK/GateByteBufferInputStream.java" \
+  "$WORK/GateByteBufferOutputStream.java" \
   "$WORK/GateExtendedHttpConfigurable.java" \
   "$WORK/GateHttpConfigurable.java" \
   "$WORK/GateHttpContextFilter.java" \
@@ -2398,6 +2401,17 @@ cmp "$WORK/byte-buffer-input-stream-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,buffer-identity,live-state,available,unsigned-single,position,single-eof,bulk-offset,bulk-position,zero-length,over-read-underflow,underflow-position,bulk-eof,eof-validation-order,null-buffer,read-only-buffer,inherited-close,inherited-mark,subclassable,private-state,reflection' \
   "$WORK/byte-buffer-input-stream-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateByteBufferOutputStream \
+  >"$WORK/byte-buffer-output-stream-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateByteBufferOutputStream >"$WORK/byte-buffer-output-stream-candidate.txt"
+cmp "$WORK/byte-buffer-output-stream-reference.txt" \
+  "$WORK/byte-buffer-output-stream-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,buffer-identity,live-state,single-write,truncation,position,bulk-offset,bulk-bytes,zero-length,capacity-overflow,overflow-position,invalid-range,null-buffer,read-only-buffer,inherited-close,inherited-flush,subclassable,private-state,reflection' \
+  "$WORK/byte-buffer-output-stream-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateExtendedHttpConfigurable \
   >"$WORK/extended-http-configurable-reference.txt"
