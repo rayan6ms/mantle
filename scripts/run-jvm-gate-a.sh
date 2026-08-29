@@ -482,6 +482,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-byte-buffer-input-stream-consu
   --output "$WORK/GateByteBufferInputStream.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-byte-buffer-output-stream-consumer \
   --output "$WORK/GateByteBufferOutputStream.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-chained-input-stream-consumer \
+  --output "$WORK/GateChainedInputStream.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-extended-http-configurable-consumer \
   --output "$WORK/GateExtendedHttpConfigurable.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-http-configurable-consumer \
@@ -847,6 +849,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateBitStreamWriter.java" \
   "$WORK/GateByteBufferInputStream.java" \
   "$WORK/GateByteBufferOutputStream.java" \
+  "$WORK/GateChainedInputStream.java" \
   "$WORK/GateExtendedHttpConfigurable.java" \
   "$WORK/GateHttpConfigurable.java" \
   "$WORK/GateHttpContextFilter.java" \
@@ -2412,6 +2415,16 @@ cmp "$WORK/byte-buffer-output-stream-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,buffer-identity,live-state,single-write,truncation,position,bulk-offset,bulk-bytes,zero-length,capacity-overflow,overflow-position,invalid-range,null-buffer,read-only-buffer,inherited-close,inherited-flush,subclassable,private-state,reflection' \
   "$WORK/byte-buffer-output-stream-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateChainedInputStream \
+  >"$WORK/chained-input-stream-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateChainedInputStream >"$WORK/chained-input-stream-candidate.txt"
+cmp "$WORK/chained-input-stream-reference.txt" "$WORK/chained-input-stream-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,provider-identity,lazy-provider,initial-state,single-read,unsigned-read,ordered-rotation,close-before-next,terminal-null,terminal-latch,bulk-delegation,bulk-zero,bulk-terminal,skip-delegation,skip-zero-terminal,skip-terminal,empty-stream-cap,cap-resume,provider-io-identity,read-io-identity,close-io-identity,close-retry,manual-close-resume,null-provider,mark-unsupported,subclassable,private-state,provider-interface,reflection' \
+  "$WORK/chained-input-stream-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateExtendedHttpConfigurable \
   >"$WORK/extended-http-configurable-reference.txt"

@@ -196,6 +196,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-bit-stream-writer-consumer" => Some(BIT_STREAM_WRITER_CONSUMER),
         "write-byte-buffer-input-stream-consumer" => Some(BYTE_BUFFER_INPUT_STREAM_CONSUMER),
         "write-byte-buffer-output-stream-consumer" => Some(BYTE_BUFFER_OUTPUT_STREAM_CONSUMER),
+        "write-chained-input-stream-consumer" => Some(CHAINED_INPUT_STREAM_CONSUMER),
         "write-extended-http-configurable-consumer" => Some(EXTENDED_HTTP_CONFIGURABLE_CONSUMER),
         "write-http-configurable-consumer" => Some(HTTP_CONFIGURABLE_CONSUMER),
         "write-http-context-filter-consumer" => Some(HTTP_CONTEXT_FILTER_CONSUMER),
@@ -64504,6 +64505,291 @@ public final class GateByteBufferOutputStream {
 
   private static final class Derived extends ByteBufferOutputStream {
     Derived(ByteBuffer buffer) { super(buffer); }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const CHAINED_INPUT_STREAM_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.io.ChainedInputStream;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+public final class GateChainedInputStream {
+  public static void main(String[] args) throws Exception {
+    constructionAndSingleRotation();
+    bulkAndSkipDelegation();
+    emptyStreamCap();
+    failuresAndManualClose();
+    reflection();
+    System.out.println("contracts=constructor,provider-identity,lazy-provider,initial-state,single-read,unsigned-read,ordered-rotation,close-before-next,terminal-null,terminal-latch,bulk-delegation,bulk-zero,bulk-terminal,skip-delegation,skip-zero-terminal,skip-terminal,empty-stream-cap,cap-resume,provider-io-identity,read-io-identity,close-io-identity,close-retry,manual-close-resume,null-provider,mark-unsupported,subclassable,private-state,provider-interface,reflection");
+  }
+
+  private static void constructionAndSingleRotation() throws Exception {
+    TrackingInput empty = new TrackingInput(new byte[0]);
+    TrackingInput first = new TrackingInput(new byte[] {(byte) 0x80, 1});
+    TrackingInput second = new TrackingInput(new byte[] {(byte) 0xFF});
+    QueueProvider provider = new QueueProvider(empty, first, second, null);
+    ChainedInputStream stream = new ChainedInputStream(provider);
+    check(field(stream, "provider") == provider, "provider identity");
+    check(field(stream, "currentStream") == null && !(Boolean) field(stream, "streamEnded"),
+        "initial state");
+    check(provider.calls == 0, "provider is lazy");
+    check(stream.read() == 128, "rotated unsigned read");
+    check(provider.calls == 2 && empty.closes == 1, "empty rotation close");
+    check(stream.read() == 1 && provider.calls == 2, "current stream reuse");
+    check(stream.read() == 255 && first.closes == 1 && provider.calls == 3,
+        "ordered stream rotation");
+    check(stream.read() == -1 && second.closes == 1 && provider.calls == 4,
+        "terminal null");
+    check((Boolean) field(stream, "streamEnded") && field(stream, "currentStream") == null,
+        "terminal state");
+    check(stream.read() == -1 && stream.skip(1) == -1 && provider.calls == 4,
+        "terminal latch");
+    stream.close();
+    check(provider.calls == 4, "terminal close no-op");
+  }
+
+  private static void bulkAndSkipDelegation() throws Exception {
+    ScriptedBulkInput bulk = new ScriptedBulkInput();
+    QueueProvider bulkProvider = new QueueProvider(bulk, null);
+    ChainedInputStream bulkStream = new ChainedInputStream(bulkProvider);
+    byte[] target = new byte[6];
+    check(bulkStream.read(target, 2, 3) == 3, "bulk result");
+    check(bulk.lastArray == target && bulk.lastOffset == 2 && bulk.lastLength == 3,
+        "bulk arguments");
+    check(Arrays.equals(target, new byte[] {0, 0, 4, 5, 6, 0}), "bulk bytes");
+    check(bulkStream.read(target, 0, 0) == 0 && bulkProvider.calls == 1,
+        "bulk zero does not rotate");
+    check(bulkStream.read(target, 0, 1) == -1 && bulk.closes == 1
+        && bulkProvider.calls == 2, "bulk terminal null");
+    check(bulkStream.read(null, -1, -1) == -1, "terminal bulk skips validation");
+
+    SkipInput zero = new SkipInput(0);
+    SkipInput positive = new SkipInput(3);
+    QueueProvider skipProvider = new QueueProvider(zero, positive, null);
+    ChainedInputStream skipStream = new ChainedInputStream(skipProvider);
+    check(skipStream.skip(9) == 3, "skip rotation result");
+    check(zero.distance == 9 && positive.distance == 9, "skip arguments");
+    check(zero.closes == 1 && skipProvider.calls == 2, "skip close before next");
+    check(skipStream.skip(5) == 3 && skipProvider.calls == 2, "positive skip retains stream");
+
+    SkipInput terminalZero = new SkipInput(0);
+    QueueProvider terminalProvider = new QueueProvider(terminalZero, null);
+    ChainedInputStream terminal = new ChainedInputStream(terminalProvider);
+    check(terminal.skip(1) == 0 && terminalZero.closes == 1, "skip null result");
+    check(terminal.skip(1) == -1, "skip after terminal null");
+  }
+
+  private static void emptyStreamCap() throws Exception {
+    TrackingInput[] empty = new TrackingInput[5];
+    Object[] streams = new Object[6];
+    for (int i = 0; i < empty.length; i++) {
+      empty[i] = new TrackingInput(new byte[0]);
+      streams[i] = empty[i];
+    }
+    streams[5] = new TrackingInput(new byte[] {42});
+    QueueProvider provider = new QueueProvider(streams);
+    ChainedInputStream stream = new ChainedInputStream(provider);
+    check(stream.read() == -1 && provider.calls == 5, "five-empty cap");
+    check(empty[4].closes == 0 && field(stream, "currentStream") == empty[4],
+        "fifth stream retained");
+    check(stream.read() == 42 && provider.calls == 6 && empty[4].closes == 1,
+        "next call resumes rotation");
+  }
+
+  private static void failuresAndManualClose() throws Exception {
+    IOException providerFailure = new IOException("provider");
+    FailingOnceProvider provider = new FailingOnceProvider(providerFailure,
+        new TrackingInput(new byte[] {7}));
+    ChainedInputStream providerStream = new ChainedInputStream(provider);
+    check(catchThrowable(providerStream::read) == providerFailure, "provider IO identity");
+    check(field(providerStream, "currentStream") == null
+        && !(Boolean) field(providerStream, "streamEnded"), "provider failure state");
+    check(providerStream.read() == 7 && provider.calls == 2, "provider retry");
+
+    IOException readFailure = new IOException("read");
+    FailingReadInput failingRead = new FailingReadInput(readFailure);
+    QueueProvider readProvider = new QueueProvider(failingRead, new TrackingInput(new byte[] {8}));
+    ChainedInputStream readStream = new ChainedInputStream(readProvider);
+    check(catchThrowable(readStream::read) == readFailure, "read IO identity");
+    check(readProvider.calls == 1 && failingRead.closes == 0
+        && field(readStream, "currentStream") == failingRead, "read failure state");
+
+    IOException closeFailure = new IOException("close");
+    FailOnceCloseInput failingClose = new FailOnceCloseInput(closeFailure, new byte[] {9});
+    QueueProvider closeProvider = new QueueProvider(failingClose, new TrackingInput(new byte[] {10}));
+    ChainedInputStream closeStream = new ChainedInputStream(closeProvider);
+    check(closeStream.read() == 9, "close setup read");
+    check(catchThrowable(closeStream::close) == closeFailure, "close IO identity");
+    check(field(closeStream, "currentStream") == failingClose, "failed close retains stream");
+    closeStream.close();
+    check(field(closeStream, "currentStream") == null && failingClose.closeAttempts == 2,
+        "close retry clears stream");
+    check(closeStream.read() == 10 && closeProvider.calls == 2, "manual close resumes provider");
+
+    ChainedInputStream nullProvider = new ChainedInputStream(null);
+    check(field(nullProvider, "provider") == null, "null provider identity");
+    check(catchThrowable(nullProvider::read) instanceof NullPointerException,
+        "null provider failure");
+    check(!nullProvider.markSupported(), "mark unsupported");
+  }
+
+  private static void reflection() throws Exception {
+    Class<ChainedInputStream> type = ChainedInputStream.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers()),
+        "class modifiers");
+    check(type.getSuperclass() == InputStream.class && type.getInterfaces().length == 0,
+        "superclass");
+    check(type.getDeclaredFields().length == 3 && type.getDeclaredMethods().length == 6,
+        "outer member counts");
+    Field provider = type.getDeclaredField("provider");
+    check(provider.getType() == ChainedInputStream.Provider.class
+        && (provider.getModifiers() & (Modifier.PRIVATE | Modifier.FINAL))
+            == (Modifier.PRIVATE | Modifier.FINAL), "provider field");
+    check(type.getDeclaredField("currentStream").getType() == InputStream.class
+        && Modifier.isPrivate(type.getDeclaredField("currentStream").getModifiers()),
+        "current stream field");
+    check(type.getDeclaredField("streamEnded").getType() == boolean.class
+        && Modifier.isPrivate(type.getDeclaredField("streamEnded").getModifiers()),
+        "ended field");
+    check(type.getDeclaredConstructor(ChainedInputStream.Provider.class).getExceptionTypes().length == 0,
+        "constructor shape");
+    for (Method method : new Method[] {
+        type.getDeclaredMethod("read"),
+        type.getDeclaredMethod("read", byte[].class, int.class, int.class),
+        type.getDeclaredMethod("skip", long.class),
+        type.getDeclaredMethod("close")}) {
+      check(method.getExceptionTypes().length == 1
+          && method.getExceptionTypes()[0] == IOException.class, method.getName() + " exceptions");
+    }
+    Method load = type.getDeclaredMethod("loadNextStream");
+    check(Modifier.isPrivate(load.getModifiers()) && load.getReturnType() == boolean.class
+        && load.getExceptionTypes().length == 1 && load.getExceptionTypes()[0] == IOException.class,
+        "private loader shape");
+    check(type.getDeclaredMethod("markSupported").getExceptionTypes().length == 0,
+        "mark signature");
+
+    Class<ChainedInputStream.Provider> providerType = ChainedInputStream.Provider.class;
+    check(Modifier.isPublic(providerType.getModifiers())
+        && Modifier.isStatic(providerType.getModifiers())
+        && Modifier.isInterface(providerType.getModifiers())
+        && Modifier.isAbstract(providerType.getModifiers()), "provider modifiers");
+    check(providerType.getDeclaringClass() == type && providerType.getDeclaredFields().length == 0
+        && providerType.getDeclaredMethods().length == 1, "provider nesting");
+    Method next = providerType.getDeclaredMethod("next");
+    check(Modifier.isPublic(next.getModifiers()) && Modifier.isAbstract(next.getModifiers())
+        && !next.isDefault() && next.getReturnType() == InputStream.class
+        && next.getExceptionTypes().length == 1 && next.getExceptionTypes()[0] == IOException.class,
+        "provider method");
+    new Derived(() -> null);
+  }
+
+  private static Object field(Object instance, String name) throws Exception {
+    Field field = instance.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(instance);
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+
+  private static class TrackingInput extends ByteArrayInputStream {
+    int closes;
+    TrackingInput(byte[] bytes) { super(bytes); }
+    public void close() { closes++; }
+  }
+
+  private static final class ScriptedBulkInput extends InputStream {
+    byte[] lastArray;
+    int lastOffset;
+    int lastLength;
+    int calls;
+    int closes;
+    public int read() { return -1; }
+    public int read(byte[] array, int offset, int length) {
+      lastArray = array;
+      lastOffset = offset;
+      lastLength = length;
+      calls++;
+      if (calls == 1) {
+        array[offset] = 4; array[offset + 1] = 5; array[offset + 2] = 6;
+        return 3;
+      }
+      return calls == 2 ? 0 : -1;
+    }
+    public void close() { closes++; }
+  }
+
+  private static final class SkipInput extends InputStream {
+    final long result;
+    long distance;
+    int closes;
+    SkipInput(long result) { this.result = result; }
+    public int read() { return -1; }
+    public long skip(long distance) { this.distance = distance; return result; }
+    public void close() { closes++; }
+  }
+
+  private static final class QueueProvider implements ChainedInputStream.Provider {
+    final Object[] values;
+    int calls;
+    final List<String> events = new ArrayList<>();
+    QueueProvider(Object... values) { this.values = values; }
+    public InputStream next() throws IOException {
+      events.add("next");
+      Object value = calls < values.length ? values[calls++] : null;
+      if (value instanceof IOException) throw (IOException) value;
+      return (InputStream) value;
+    }
+  }
+
+  private static final class FailingOnceProvider implements ChainedInputStream.Provider {
+    final IOException failure;
+    final InputStream stream;
+    int calls;
+    FailingOnceProvider(IOException failure, InputStream stream) {
+      this.failure = failure; this.stream = stream;
+    }
+    public InputStream next() throws IOException {
+      calls++;
+      if (calls == 1) throw failure;
+      return stream;
+    }
+  }
+
+  private static final class FailingReadInput extends InputStream {
+    final IOException failure;
+    int closes;
+    FailingReadInput(IOException failure) { this.failure = failure; }
+    public int read() throws IOException { throw failure; }
+    public void close() { closes++; }
+  }
+
+  private static final class FailOnceCloseInput extends ByteArrayInputStream {
+    final IOException failure;
+    int closeAttempts;
+    FailOnceCloseInput(IOException failure, byte[] bytes) { super(bytes); this.failure = failure; }
+    public void close() throws IOException {
+      closeAttempts++;
+      if (closeAttempts == 1) throw failure;
+    }
+  }
+
+  private static final class Derived extends ChainedInputStream {
+    Derived(Provider provider) { super(provider); }
   }
 
   private interface ThrowingRunnable { void run() throws Throwable; }

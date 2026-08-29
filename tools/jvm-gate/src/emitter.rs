@@ -404,6 +404,10 @@ const BYTE_BUFFER_INPUT_STREAM_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/io/ByteBufferInputStream";
 const BYTE_BUFFER_OUTPUT_STREAM_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/io/ByteBufferOutputStream";
+const CHAINED_INPUT_STREAM_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/io/ChainedInputStream";
+const CHAINED_INPUT_STREAM_PROVIDER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/io/ChainedInputStream$Provider";
 const ABSTRACT_MUTABLE_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AbstractMutableAudioFrame";
 const IMMUTABLE_FRAME_CLASS: &str =
@@ -1019,6 +1023,8 @@ const REFERENCE_CLASSES: &[&str] = &[
     BIT_STREAM_WRITER_CLASS,
     BYTE_BUFFER_INPUT_STREAM_CLASS,
     BYTE_BUFFER_OUTPUT_STREAM_CLASS,
+    CHAINED_INPUT_STREAM_CLASS,
+    CHAINED_INPUT_STREAM_PROVIDER_CLASS,
     COPY_ON_UPDATE_IDENTITY_LIST_CLASS,
     DATA_FORMAT_TOOLS_CLASS,
     DATA_FORMAT_TOOLS_TEXT_RANGE_CLASS,
@@ -1199,6 +1205,8 @@ pub fn emit(
     let mut bit_stream_writer_bytes = None;
     let mut byte_buffer_input_stream_bytes = None;
     let mut byte_buffer_output_stream_bytes = None;
+    let mut chained_input_stream_bytes = None;
+    let mut chained_input_stream_provider_bytes = None;
     let mut vorbis_comment_parser_bytes = None;
     let mut extended_m3u_parser_bytes = None;
     let mut extended_m3u_line_bytes = None;
@@ -1416,6 +1424,10 @@ pub fn emit(
             byte_buffer_input_stream_bytes = Some(bytes);
         } else if *binary_name == BYTE_BUFFER_OUTPUT_STREAM_CLASS {
             byte_buffer_output_stream_bytes = Some(bytes);
+        } else if *binary_name == CHAINED_INPUT_STREAM_CLASS {
+            chained_input_stream_bytes = Some(bytes);
+        } else if *binary_name == CHAINED_INPUT_STREAM_PROVIDER_CLASS {
+            chained_input_stream_provider_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -1724,6 +1736,18 @@ pub fn emit(
                 byte_buffer_output_stream_bytes
                     .as_ref()
                     .expect("byte buffer output stream source bytes are retained"),
+            );
+        } else if name == format!("{CHAINED_INPUT_STREAM_CLASS}.class") {
+            bytes.clone_from(
+                chained_input_stream_bytes
+                    .as_ref()
+                    .expect("chained input stream source bytes are retained"),
+            );
+        } else if name == format!("{CHAINED_INPUT_STREAM_PROVIDER_CLASS}.class") {
+            bytes.clone_from(
+                chained_input_stream_provider_bytes
+                    .as_ref()
+                    .expect("chained input stream provider source bytes are retained"),
             );
         } else if name == format!("{MPEG_AUDIO_TRACK_CLASS}.class") {
             bytes.clone_from(
