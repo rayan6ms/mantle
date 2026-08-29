@@ -474,6 +474,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-abstract-http-interface-manage
   --output "$WORK/GateAbstractHttpInterfaceManager.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-bit-buffer-reader-consumer \
   --output "$WORK/GateBitBufferReader.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-bit-stream-reader-consumer \
+  --output "$WORK/GateBitStreamReader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-extended-http-configurable-consumer \
   --output "$WORK/GateExtendedHttpConfigurable.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-http-configurable-consumer \
@@ -835,6 +837,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateExtendedHttpClientBuilder.java" \
   "$WORK/GateAbstractHttpInterfaceManager.java" \
   "$WORK/GateBitBufferReader.java" \
+  "$WORK/GateBitStreamReader.java" \
   "$WORK/GateExtendedHttpConfigurable.java" \
   "$WORK/GateHttpConfigurable.java" \
   "$WORK/GateHttpContextFilter.java" \
@@ -2358,6 +2361,16 @@ cmp "$WORK/bit-buffer-reader-reference.txt" "$WORK/bit-buffer-reader-candidate.t
 grep --fixed-strings \
   'contracts=constructor,buffer-identity,unsigned-long,unsigned-integer,cross-byte,position,signed-long,signed-integer,remaining-bits,all-zeroes,byte-unsigned,eof-failure,null-failure,subclassable,private-state,reflection' \
   "$WORK/bit-buffer-reader-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateBitStreamReader \
+  >"$WORK/bit-stream-reader-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateBitStreamReader >"$WORK/bit-stream-reader-candidate.txt"
+cmp "$WORK/bit-stream-reader-reference.txt" "$WORK/bit-stream-reader-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,stream-identity,unsigned-long,unsigned-integer,cross-byte,state-position,signed-long,signed-integer,remaining-bits,all-zeroes,checked-eof,eof-state,io-identity,non-positive-widths,null-stream,subclassable,private-state,reflection' \
+  "$WORK/bit-stream-reader-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateExtendedHttpConfigurable \
   >"$WORK/extended-http-configurable-reference.txt"

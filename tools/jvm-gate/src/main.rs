@@ -192,6 +192,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
             Some(ABSTRACT_HTTP_INTERFACE_MANAGER_CONSUMER)
         }
         "write-bit-buffer-reader-consumer" => Some(BIT_BUFFER_READER_CONSUMER),
+        "write-bit-stream-reader-consumer" => Some(BIT_STREAM_READER_CONSUMER),
         "write-extended-http-configurable-consumer" => Some(EXTENDED_HTTP_CONFIGURABLE_CONSUMER),
         "write-http-configurable-consumer" => Some(HTTP_CONFIGURABLE_CONSUMER),
         "write-http-context-filter-consumer" => Some(HTTP_CONTEXT_FILTER_CONSUMER),
@@ -63921,6 +63922,140 @@ public final class GateBitBufferReader {
   private static final class Derived extends BitBufferReader {
     Derived(ByteBuffer buffer) { super(buffer); }
     int readBytePublic() throws java.io.IOException { return readByte(); }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const BIT_STREAM_READER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.io.BitStreamReader;
+import java.io.ByteArrayInputStream;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateBitStreamReader {
+  public static void main(String[] args) throws Exception {
+    constructionAndUnsignedReads();
+    signedAndAlignmentReads();
+    failuresAndCheckedErrors();
+    reflection();
+    System.out.println("contracts=constructor,stream-identity,unsigned-long,unsigned-integer,cross-byte,state-position,signed-long,signed-integer,remaining-bits,all-zeroes,checked-eof,eof-state,io-identity,non-positive-widths,null-stream,subclassable,private-state,reflection");
+  }
+
+  private static void constructionAndUnsignedReads() throws Exception {
+    TrackingStream stream = new TrackingStream(new byte[] {(byte) 0xB2, (byte) 0x5A, (byte) 0xFF});
+    BitStreamReader reader = new BitStreamReader(stream);
+    check(field(reader, "stream") == stream, "stream identity");
+    check(reader.asLong(3) == 5L, "first unsigned bits");
+    check(reader.asInteger(5) == 18, "second unsigned bits");
+    check(stream.reads == 1, "single source byte");
+    check(reader.asLong(12) == 0x5AFL && stream.reads == 3, "cross-byte unsigned long");
+
+    BitStreamReader integerReader = new BitStreamReader(
+        new ByteArrayInputStream(new byte[] {(byte) 0xAB, (byte) 0xCD, (byte) 0xEF}));
+    check(integerReader.asInteger(20) == 0xABCDE, "unsigned integer width");
+    check(integerReader.readRemainingBits() == 0xF, "remaining integer bits");
+  }
+
+  private static void signedAndAlignmentReads() throws Exception {
+    BitStreamReader signed = new BitStreamReader(
+        new ByteArrayInputStream(new byte[] {(byte) 0xF0, 0x70}));
+    check(signed.asSignedLong(4) == -1L, "negative signed long");
+    check(signed.asSignedLong(4) == 0L, "zero signed long");
+    BitStreamReader signedInteger = new BitStreamReader(
+        new ByteArrayInputStream(new byte[] {(byte) 0x80}));
+    check(signedInteger.asSignedInteger(8) == -128, "negative signed integer");
+
+    BitStreamReader remaining = new BitStreamReader(
+        new ByteArrayInputStream(new byte[] {(byte) 0xB5}));
+    check(remaining.asLong(3) == 5L && remaining.readRemainingBits() == 0x15,
+        "remaining bits value");
+    check(remaining.readRemainingBits() == 0, "remaining bits consumed");
+
+    BitStreamReader zeroes = new BitStreamReader(
+        new ByteArrayInputStream(new byte[] {0, 0x10}));
+    check(zeroes.readAllZeroes() == 11, "all zeroes count");
+  }
+
+  private static void failuresAndCheckedErrors() throws Exception {
+    BitStreamReader empty = new BitStreamReader(new ByteArrayInputStream(new byte[0]));
+    Throwable eof = catchThrowable(() -> empty.asLong(1));
+    check(eof instanceof EOFException && eof.getMessage().equals("Bit stream needs more bytes"),
+        "checked EOF");
+    check((Integer) field(empty, "bitsLeft") == 8 && (Integer) field(empty, "currentByte") == -1,
+        "EOF leaves refill state");
+    check(empty.readRemainingBits() == 255, "EOF remaining state");
+
+    IOException io = new IOException("read");
+    BitStreamReader failing = new BitStreamReader(new FailingStream(io));
+    check(catchThrowable(() -> failing.asSignedInteger(1)) == io, "IO identity");
+    BitStreamReader zeroWidth = new BitStreamReader(new ByteArrayInputStream(new byte[] {1}));
+    check(zeroWidth.asLong(0) == 0L && zeroWidth.asInteger(-3) == 0,
+        "non-positive widths are no-op");
+    BitStreamReader nullStream = new BitStreamReader(null);
+    check(catchThrowable(() -> nullStream.asLong(1)) instanceof NullPointerException,
+        "null stream failure");
+  }
+
+  private static void reflection() throws Exception {
+    Class<BitStreamReader> type = BitStreamReader.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers()),
+        "class modifiers");
+    check(type.getSuperclass() == Object.class && type.getInterfaces().length == 0, "superclass");
+    check(type.getDeclaredFields().length == 3 && type.getDeclaredMethods().length == 8,
+        "member counts");
+    check(type.getDeclaredConstructor(InputStream.class).getExceptionTypes().length == 0,
+        "constructor shape");
+    check(type.getDeclaredField("stream").getType() == InputStream.class, "stream field type");
+    for (String name : new String[] {"asLong", "asSignedLong", "asInteger", "asSignedInteger", "readAllZeroes", "readByte"}) {
+      Method method = (name.equals("readByte") || name.equals("readAllZeroes"))
+          ? type.getDeclaredMethod(name) : type.getDeclaredMethod(name, int.class);
+      check(method.getExceptionTypes().length == 1 && method.getExceptionTypes()[0] == IOException.class,
+          name + " checked exception");
+    }
+    check(type.getDeclaredMethod("readRemainingBits").getExceptionTypes().length == 0,
+        "remaining bits exceptions");
+    check((type.getDeclaredField("stream").getModifiers() & (Modifier.PRIVATE | Modifier.FINAL))
+        == (Modifier.PRIVATE | Modifier.FINAL), "stream field shape");
+    new Derived(new ByteArrayInputStream(new byte[] {1}));
+  }
+
+  private static Object field(Object instance, String name) throws Exception {
+    Field field = instance instanceof Class ? ((Class<?>) instance).getDeclaredField(name)
+        : instance.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(instance instanceof Class ? null : instance);
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+
+  private static final class TrackingStream extends InputStream {
+    final byte[] bytes;
+    int index;
+    int reads;
+    TrackingStream(byte[] bytes) { this.bytes = bytes; }
+    public int read() { reads++; return index < bytes.length ? bytes[index++] & 0xFF : -1; }
+  }
+
+  private static final class FailingStream extends InputStream {
+    final IOException failure;
+    FailingStream(IOException failure) { this.failure = failure; }
+    public int read() throws IOException { throw failure; }
+  }
+
+  private static final class Derived extends BitStreamReader {
+    Derived(InputStream stream) { super(stream); }
   }
 
   private interface ThrowingRunnable { void run() throws Throwable; }
