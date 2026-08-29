@@ -448,6 +448,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-friendly-exception-severity-co
   --output "$WORK/GateFriendlyExceptionSeverity.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-future-tools-consumer \
   --output "$WORK/GateFutureTools.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-garbage-collection-monitor-consumer \
+  --output "$WORK/GateGarbageCollectionMonitor.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-container-probe-consumer \
   --output "$WORK/GateFlacContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-file-loader-consumer \
@@ -782,6 +784,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateFriendlyException.java" \
   "$WORK/GateFriendlyExceptionSeverity.java" \
   "$WORK/GateFutureTools.java" \
+  "$WORK/GateGarbageCollectionMonitor.java" \
   "$WORK/GateAdtsStreamProvider.java" \
   "$WORK/GateAacPacketRouter.java" \
   "$WORK/GateMpegAacTrackConsumer.java" \
@@ -2166,6 +2169,17 @@ cmp "$WORK/future-tools-reference.txt" "$WORK/future-tools-candidate.txt"
 grep --fixed-strings \
   'contracts=constructor,subclassable,take-count,input-order,done-filter,null-filter,get-failure,interruption-stop,runtime-stop,null-service,stream-fallback,null-futures,mutable-result,generics,private-state,synthetic-lambda,reflection' \
   "$WORK/future-tools-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateGarbageCollectionMonitor >"$WORK/garbage-collection-monitor-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateGarbageCollectionMonitor >"$WORK/garbage-collection-monitor-candidate.txt"
+cmp "$WORK/garbage-collection-monitor-reference.txt" \
+  "$WORK/garbage-collection-monitor-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,subclassable,state,enable-disable-idempotence,scheduling,frequency,cancel-mode,reschedule,schedule-failure-state,bucket-thresholds,negative-duration,warning-reset,debug-reset,type-filter,null-notification,invalid-payload,no-gc-filter,gc-duration,interfaces,private-state,generics,reflection' \
+  "$WORK/garbage-collection-monitor-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_vorbis_track_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggVorbisTrackHandler >"$WORK/ogg-vorbis-track-handler-reference.txt"

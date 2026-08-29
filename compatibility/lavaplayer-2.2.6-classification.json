@@ -24366,54 +24366,84 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Mantle retains the byte-identical public NotificationListener/Runnable class, subclassability, constants, private scheduler/counter/atomic state, generic future metadata, and complete reflection shape.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.GarbageCollectionMonitor",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Ljava/util/concurrent/ScheduledExecutorService;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The byte-identical public constructor preserves executor identity including null, six zeroed counters, disabled atomic state, an empty scheduled-future reference, and subclass construction.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.GarbageCollectionMonitor",
       "symbol_kind": "METHOD",
       "member_name": "enable",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The byte-identical method preserves one-time listener registration, fixed-rate 120000-millisecond scheduling, future retention, idempotence, re-enable behavior, and the enabled state left by scheduling failure.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.GarbageCollectionMonitor",
       "symbol_kind": "METHOD",
       "member_name": "disable",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The byte-identical method preserves one-time listener removal, atomic future clearing, non-interrupting cancellation, idempotence, and cleanup after scheduling failure.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.GarbageCollectionMonitor",
       "symbol_kind": "METHOD",
       "member_name": "handleNotification",
       "descriptor": "(Ljavax/management/Notification;Ljava/lang/Object;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The byte-identical listener preserves notification-type filtering, ignored handback values, real JDK composite-data parsing, No GC suppression, duration registration, and null/invalid payload failures.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.GarbageCollectionMonitor",
       "symbol_kind": "METHOD",
       "member_name": "run",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The byte-identical reporting task preserves descending duration thresholds, negative-duration exclusion, suspicious-latency selection, normal reporting, and atomic counter reset after each report.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.JsonBrowser",

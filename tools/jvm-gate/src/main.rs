@@ -169,6 +169,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-friendly-exception-consumer" => Some(FRIENDLY_EXCEPTION_CONSUMER),
         "write-friendly-exception-severity-consumer" => Some(FRIENDLY_EXCEPTION_SEVERITY_CONSUMER),
         "write-future-tools-consumer" => Some(FUTURE_TOOLS_CONSUMER),
+        "write-garbage-collection-monitor-consumer" => Some(GARBAGE_COLLECTION_MONITOR_CONSUMER),
         _ => None,
     }
 }
@@ -27722,6 +27723,303 @@ public final class GateFutureTools {
   }
 
   private static final class Derived extends FutureTools {}
+  private static Throwable catchThrowable(Throwing action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+  private interface Throwing { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const GARBAGE_COLLECTION_MONITOR_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.GarbageCollectionMonitor;
+import com.sun.management.GarbageCollectionNotificationInfo;
+import com.sun.management.GcInfo;
+import java.lang.management.GarbageCollectorMXBean;
+import java.lang.management.ManagementFactory;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.Type;
+import java.lang.reflect.WildcardType;
+import java.util.Arrays;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import javax.management.Notification;
+import javax.management.NotificationListener;
+
+public final class GateGarbageCollectionMonitor {
+  public static void main(String[] args) throws Exception {
+    constructionAndState(); lifecycle(); schedulingFailure(); bucketingAndReset();
+    notifications(); reflection();
+    System.out.println("contracts=constructor,subclassable,state,enable-disable-idempotence,scheduling,frequency,cancel-mode,reschedule,schedule-failure-state,bucket-thresholds,negative-duration,warning-reset,debug-reset,type-filter,null-notification,invalid-payload,no-gc-filter,gc-duration,interfaces,private-state,generics,reflection");
+  }
+
+  private static void constructionAndState() throws Exception {
+    SchedulingProbe probe = new SchedulingProbe();
+    ScheduledExecutorService executor = probe.executor();
+    GarbageCollectionMonitor monitor = new GarbageCollectionMonitor(executor);
+    GarbageCollectionMonitor nullable = new GarbageCollectionMonitor(null);
+    check(nullable.getClass() == GarbageCollectionMonitor.class
+        && field("reportingExecutor").get(nullable) == null, "nullable executor construction");
+    check(new Derived(probe.executor()) instanceof GarbageCollectionMonitor, "subclassability");
+    check(field("reportingExecutor").get(monitor) == executor, "executor identity retained");
+    check(Arrays.equals((long[]) field("BUCKETS").get(null),
+        new long[] {2000L, 500L, 200L, 50L, 20L, 0L}), "bucket constants");
+    check(field("REPORTING_FREQUENCY").getLong(null) == 120_000L, "reporting frequency");
+    check(Arrays.equals((int[]) field("bucketCounters").get(monitor), new int[6]),
+        "counter defaults");
+    check(!((AtomicBoolean) field("enabled").get(monitor)).get(), "disabled default");
+    check(((AtomicReference<?>) field("executorFuture").get(monitor)).get() == null,
+        "future default");
+  }
+
+  private static void lifecycle() throws Exception {
+    SchedulingProbe probe = new SchedulingProbe();
+    GarbageCollectionMonitor monitor = new GarbageCollectionMonitor(probe.executor());
+    monitor.enable();
+    check(probe.schedules == 1 && probe.command == monitor
+        && probe.initialDelay == 120_000L && probe.period == 120_000L
+        && probe.unit == TimeUnit.MILLISECONDS, "fixed-rate scheduling");
+    check(((AtomicBoolean) field("enabled").get(monitor)).get(), "enabled state");
+    check(((AtomicReference<?>) field("executorFuture").get(monitor)).get() == probe.future,
+        "scheduled future retained");
+    monitor.enable();
+    check(probe.schedules == 1, "enable idempotence");
+
+    monitor.disable();
+    check(probe.cancels == 1 && !probe.mayInterrupt && !((AtomicBoolean)
+        field("enabled").get(monitor)).get(), "disable cancellation");
+    check(((AtomicReference<?>) field("executorFuture").get(monitor)).get() == null,
+        "future cleared");
+    monitor.disable();
+    check(probe.cancels == 1, "disable idempotence");
+
+    monitor.enable();
+    monitor.disable();
+    check(probe.schedules == 2 && probe.cancels == 2, "re-enable reschedules");
+  }
+
+  private static void schedulingFailure() throws Exception {
+    GarbageCollectionMonitor monitor = new GarbageCollectionMonitor(null);
+    check(catchThrowable(monitor::enable) instanceof NullPointerException,
+        "null executor schedule failure");
+    check(((AtomicBoolean) field("enabled").get(monitor)).get(),
+        "schedule failure retains enabled transition");
+    check(catchThrowable(monitor::enable) == null, "failed enable is idempotent");
+    monitor.disable();
+    check(!((AtomicBoolean) field("enabled").get(monitor)).get(),
+        "failed enable can be disabled");
+  }
+
+  private static void bucketingAndReset() throws Exception {
+    GarbageCollectionMonitor monitor = new GarbageCollectionMonitor(null);
+    Method register = GarbageCollectionMonitor.class.getDeclaredMethod("registerPause", long.class);
+    register.setAccessible(true);
+    for (long duration : new long[] {2000L, 500L, 200L, 50L, 20L, 0L, -1L}) {
+      register.invoke(monitor, duration);
+    }
+    check(Arrays.equals(counters(monitor), new int[] {1, 1, 1, 1, 1, 1}),
+        "descending bucket thresholds and negative exclusion");
+    monitor.run();
+    check(Arrays.equals(counters(monitor), new int[6]), "warning report resets counters");
+    register.invoke(monitor, 19L);
+    register.invoke(monitor, 0L);
+    check(Arrays.equals(counters(monitor), new int[] {0, 0, 0, 0, 0, 2}),
+        "short pauses share the final bucket");
+    monitor.run();
+    check(Arrays.equals(counters(monitor), new int[6]), "debug report resets counters");
+  }
+
+  private static void notifications() throws Exception {
+    GarbageCollectionMonitor monitor = new GarbageCollectionMonitor(null);
+    Notification ignored = new Notification("other", monitor, 1L);
+    ignored.setUserData(new Object());
+    monitor.handleNotification(ignored, new Object());
+    check(Arrays.equals(counters(monitor), new int[6]), "notification type filter");
+    check(catchThrowable(() -> monitor.handleNotification(null, null))
+        instanceof NullPointerException, "null notification failure");
+
+    Notification missing = notification(null);
+    check(catchThrowable(() -> monitor.handleNotification(missing, null))
+        instanceof NullPointerException, "null payload failure");
+    Notification invalid = notification(new Object());
+    check(catchThrowable(() -> monitor.handleNotification(invalid, null))
+        instanceof ClassCastException, "invalid payload failure");
+
+    GcInfo info = lastGcInfo();
+    Notification noGc = notification(new GarbageCollectionNotificationInfo(
+        "gate", "collection", "No GC", info).toCompositeData(null));
+    monitor.handleNotification(noGc, new Object());
+    check(Arrays.equals(counters(monitor), new int[6]), "No GC cause is ignored");
+
+    Notification collected = notification(new GarbageCollectionNotificationInfo(
+        "gate", "collection", "gate cause", info).toCompositeData(null));
+    monitor.handleNotification(collected, null);
+    int expectedBucket = bucket(info.getDuration());
+    int[] expected = new int[6];
+    expected[expectedBucket] = 1;
+    check(Arrays.equals(counters(monitor), expected), "GC duration registration");
+  }
+
+  private static void reflection() throws Exception {
+    Class<GarbageCollectionMonitor> type = GarbageCollectionMonitor.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(),
+            new Class<?>[] {NotificationListener.class, Runnable.class})
+        && type.getDeclaredFields().length == 7 && type.getDeclaredMethods().length == 7
+        && type.getDeclaredConstructors().length == 1 && type.getDeclaredClasses().length == 0,
+        "exact class shape");
+
+    checkField("log", "org.slf4j.Logger", Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField("REPORTING_FREQUENCY", "long",
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField("BUCKETS", "[J", Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    checkField("reportingExecutor", ScheduledExecutorService.class.getName(),
+        Modifier.PRIVATE | Modifier.FINAL);
+    checkField("bucketCounters", "[I", Modifier.PRIVATE | Modifier.FINAL);
+    checkField("enabled", AtomicBoolean.class.getName(), Modifier.PRIVATE | Modifier.FINAL);
+    Field future = checkField("executorFuture", AtomicReference.class.getName(),
+        Modifier.PRIVATE | Modifier.FINAL);
+    ParameterizedType reference = (ParameterizedType) future.getGenericType();
+    ParameterizedType scheduled = (ParameterizedType) reference.getActualTypeArguments()[0];
+    WildcardType wildcard = (WildcardType) scheduled.getActualTypeArguments()[0];
+    check(reference.getRawType() == AtomicReference.class
+        && scheduled.getRawType() == ScheduledFuture.class
+        && Arrays.equals(wildcard.getUpperBounds(), new Type[] {Object.class})
+        && wildcard.getLowerBounds().length == 0, "future generic signature");
+
+    Constructor<?> constructor = type.getDeclaredConstructor(ScheduledExecutorService.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0 && !constructor.isSynthetic()
+        && !constructor.isVarArgs(), "constructor metadata");
+    checkMethod("enable", void.class, Modifier.PUBLIC);
+    checkMethod("disable", void.class, Modifier.PUBLIC);
+    checkMethod("registerBeanListener", void.class, Modifier.PRIVATE);
+    checkMethod("unregisterBeanListener", void.class, Modifier.PRIVATE);
+    checkMethod("registerPause", void.class, Modifier.PRIVATE, long.class);
+    checkMethod("handleNotification", void.class, Modifier.PUBLIC,
+        Notification.class, Object.class);
+    checkMethod("run", void.class, Modifier.PUBLIC);
+  }
+
+  private static GcInfo lastGcInfo() {
+    GcInfo info = findGcInfo();
+    if (info == null) {
+      System.gc();
+      info = findGcInfo();
+    }
+    check(info != null && info.getDuration() >= 0L, "GC info available");
+    return info;
+  }
+
+  private static GcInfo findGcInfo() {
+    for (GarbageCollectorMXBean bean : ManagementFactory.getGarbageCollectorMXBeans()) {
+      if (bean instanceof com.sun.management.GarbageCollectorMXBean) {
+        GcInfo info = ((com.sun.management.GarbageCollectorMXBean) bean).getLastGcInfo();
+        if (info != null) return info;
+      }
+    }
+    return null;
+  }
+
+  private static Notification notification(Object payload) {
+    Notification notification = new Notification(
+        GarbageCollectionNotificationInfo.GARBAGE_COLLECTION_NOTIFICATION,
+        GateGarbageCollectionMonitor.class, 2L);
+    notification.setUserData(payload);
+    return notification;
+  }
+
+  private static int bucket(long duration) {
+    long[] thresholds = {2000L, 500L, 200L, 50L, 20L, 0L};
+    for (int index = 0; index < thresholds.length; index++) {
+      if (duration >= thresholds[index]) return index;
+    }
+    throw new AssertionError("negative GC duration");
+  }
+
+  private static Field field(String name) throws Exception {
+    Field field = GarbageCollectionMonitor.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  private static int[] counters(GarbageCollectionMonitor monitor) throws Exception {
+    return (int[]) field("bucketCounters").get(monitor);
+  }
+
+  private static Field checkField(String name, String typeName, int modifiers) throws Exception {
+    Field field = GarbageCollectionMonitor.class.getDeclaredField(name);
+    check(field.getType().getName().equals(typeName) && field.getModifiers() == modifiers
+        && !field.isSynthetic(), name + " field metadata");
+    return field;
+  }
+
+  private static void checkMethod(String name, Class<?> result, int modifiers,
+      Class<?>... parameters) throws Exception {
+    Method method = GarbageCollectionMonitor.class.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == result && method.getModifiers() == modifiers
+        && method.getExceptionTypes().length == 0 && !method.isSynthetic()
+        && !method.isBridge() && !method.isVarArgs(), name + " metadata");
+  }
+
+  private static final class SchedulingProbe implements InvocationHandler {
+    final ScheduledFuture<?> future;
+    int schedules;
+    int cancels;
+    Runnable command;
+    long initialDelay;
+    long period;
+    TimeUnit unit;
+    boolean mayInterrupt;
+
+    SchedulingProbe() {
+      future = (ScheduledFuture<?>) Proxy.newProxyInstance(
+          ScheduledFuture.class.getClassLoader(), new Class<?>[] {ScheduledFuture.class},
+          (proxy, method, args) -> {
+            if (method.getName().equals("cancel")) {
+              cancels++;
+              mayInterrupt = (Boolean) args[0];
+              return true;
+            }
+            if (method.getName().equals("toString")) return "future";
+            throw new AssertionError("unexpected future call " + method);
+          });
+    }
+
+    ScheduledExecutorService executor() {
+      return (ScheduledExecutorService) Proxy.newProxyInstance(
+          ScheduledExecutorService.class.getClassLoader(),
+          new Class<?>[] {ScheduledExecutorService.class}, this);
+    }
+
+    @Override public Object invoke(Object proxy, Method method, Object[] args) {
+      if (method.getName().equals("scheduleAtFixedRate")) {
+        schedules++;
+        command = (Runnable) args[0];
+        initialDelay = (Long) args[1];
+        period = (Long) args[2];
+        unit = (TimeUnit) args[3];
+        return future;
+      }
+      if (method.getName().equals("toString")) return "executor";
+      throw new AssertionError("unexpected executor call " + method);
+    }
+  }
+
+  private static final class Derived extends GarbageCollectionMonitor {
+    Derived(ScheduledExecutorService executor) { super(executor); }
+  }
   private static Throwable catchThrowable(Throwing action) {
     try { action.run(); return null; } catch (Throwable failure) { return failure; }
   }
