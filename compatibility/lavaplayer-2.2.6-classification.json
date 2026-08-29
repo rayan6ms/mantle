@@ -25318,45 +25318,50 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The outer and private nested holder class bytes are retained byte-identically; retry state, failure behavior, nest metadata, and reflection match the differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.http.HttpContextRetryCounter",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Ljava/lang/String;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public construction preserves the caller-supplied attribute-name identity, including deferred failure for null names.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.http.HttpContextRetryCounter",
       "symbol_kind": "METHOD",
       "member_name": "handleUpdate",
       "descriptor": "(Lorg/apache/http/client/protocol/HttpClientContext;Z)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Non-repetition reset, repetition increment, fresh-state creation, signed overflow, virtual dispatch, and failure identity match the differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.http.HttpContextRetryCounter",
       "symbol_kind": "METHOD",
       "member_name": "setRetryCount",
       "descriptor": "(Lorg/apache/http/client/protocol/HttpClientContext;I)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Lazy holder creation, holder reuse, exact signed values, key/context isolation, equal-key sharing, null failures, and wrong-type retention match the differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.http.HttpContextRetryCounter",
       "symbol_kind": "METHOD",
       "member_name": "getRetryCount",
       "descriptor": "(Lorg/apache/http/client/protocol/HttpClientContext;)I",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Missing-state zero without allocation, exact holder values, key/context isolation, equal-key sharing, null failures, and wrong-type failures match the differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.http.HttpStreamTools",

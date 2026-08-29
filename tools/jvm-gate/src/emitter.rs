@@ -367,6 +367,10 @@ const ABSTRACT_HTTP_CONTEXT_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/http/AbstractHttpContextFilter";
 const HTTP_CONTEXT_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/http/HttpContextFilter";
+const HTTP_CONTEXT_RETRY_COUNTER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/http/HttpContextRetryCounter";
+const HTTP_CONTEXT_RETRY_COUNTER_RETRY_COUNT_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/http/HttpContextRetryCounter$RetryCount";
 const ABSTRACT_MUTABLE_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AbstractMutableAudioFrame";
 const IMMUTABLE_FRAME_CLASS: &str =
@@ -962,6 +966,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     ABSTRACT_HTTP_CONTEXT_FILTER_CLASS,
     HTTP_CONTEXT_FILTER_CLASS,
+    HTTP_CONTEXT_RETRY_COUNTER_CLASS,
     COPY_ON_UPDATE_IDENTITY_LIST_CLASS,
     DATA_FORMAT_TOOLS_CLASS,
     DATA_FORMAT_TOOLS_TEXT_RANGE_CLASS,
@@ -1041,6 +1046,7 @@ const PRIVATE_SUPPORT_CLASSES: &[&str] = &[
     OGG_VORBIS_CODEC_HANDLER_BLUEPRINT_CLASS,
     WAV_FILE_INFO_BUILDER_CLASS,
     ORDERED_EXECUTOR_CHANNEL_RUNNABLE_CLASS,
+    HTTP_CONTEXT_RETRY_COUNTER_RETRY_COUNT_CLASS,
 ];
 
 #[derive(Serialize)]
@@ -1121,6 +1127,8 @@ pub fn emit(
     let mut thumbnail_tools_bytes = None;
     let mut units_bytes = None;
     let mut abstract_http_context_filter_bytes = None;
+    let mut http_context_retry_counter_bytes = None;
+    let mut http_context_retry_counter_retry_count_bytes = None;
     let mut vorbis_comment_parser_bytes = None;
     let mut extended_m3u_parser_bytes = None;
     let mut extended_m3u_line_bytes = None;
@@ -1298,6 +1306,10 @@ pub fn emit(
             units_bytes = Some(bytes);
         } else if *binary_name == ABSTRACT_HTTP_CONTEXT_FILTER_CLASS {
             abstract_http_context_filter_bytes = Some(bytes);
+        } else if *binary_name == HTTP_CONTEXT_RETRY_COUNTER_CLASS {
+            http_context_retry_counter_bytes = Some(bytes);
+        } else if *binary_name == HTTP_CONTEXT_RETRY_COUNTER_RETRY_COUNT_CLASS {
+            http_context_retry_counter_retry_count_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -1482,6 +1494,18 @@ pub fn emit(
                 abstract_http_context_filter_bytes
                     .as_ref()
                     .expect("abstract HTTP context filter source bytes are retained"),
+            );
+        } else if name == format!("{HTTP_CONTEXT_RETRY_COUNTER_CLASS}.class") {
+            bytes.clone_from(
+                http_context_retry_counter_bytes
+                    .as_ref()
+                    .expect("HTTP context retry counter source bytes are retained"),
+            );
+        } else if name == format!("{HTTP_CONTEXT_RETRY_COUNTER_RETRY_COUNT_CLASS}.class") {
+            bytes.clone_from(
+                http_context_retry_counter_retry_count_bytes
+                    .as_ref()
+                    .expect("HTTP context retry count source bytes are retained"),
             );
         } else if name == format!("{MPEG_AUDIO_TRACK_CLASS}.class") {
             bytes.clone_from(
@@ -2437,6 +2461,8 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | THUMBNAIL_TOOLS_CLASS
             | UNITS_CLASS
             | ABSTRACT_HTTP_CONTEXT_FILTER_CLASS
+            | HTTP_CONTEXT_RETRY_COUNTER_CLASS
+            | HTTP_CONTEXT_RETRY_COUNTER_RETRY_COUNT_CLASS
             | OGG_FLAC_CODEC_HANDLER_CLASS
             | OGG_FLAC_CODEC_HANDLER_BLUEPRINT_CLASS
             | OGG_FLAC_TRACK_HANDLER_CLASS

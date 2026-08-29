@@ -180,6 +180,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
             Some(ABSTRACT_HTTP_CONTEXT_FILTER_CONSUMER)
         }
         "write-http-context-filter-consumer" => Some(HTTP_CONTEXT_FILTER_CONSUMER),
+        "write-http-context-retry-counter-consumer" => Some(HTTP_CONTEXT_RETRY_COUNTER_CONSUMER),
         _ => None,
     }
 }
@@ -61513,6 +61514,234 @@ public final class GateHttpContextFilter {
       check(value == context && item == request && error == failure, "exception arguments");
       events.append("exception,");
       return false;
+    }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const HTTP_CONTEXT_RETRY_COUNTER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextRetryCounter;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import org.apache.http.client.protocol.HttpClientContext;
+
+public final class GateHttpContextRetryCounter {
+  public static void main(String[] args) throws Exception {
+    stateAndIdentity();
+    updateRules();
+    subclassDispatchAndFailures();
+    malformedInputs();
+    reflection();
+    System.out.println(
+        "contracts=constructor,attribute-key,missing-zero,lazy-holder,holder-reuse,context-isolation,"
+        + "key-sharing,key-isolation,explicit-values,repetition-reset,repetition-increment,"
+        + "integer-overflow,subclass-dispatch,failure-identity,nulls,wrong-type,private-state,"
+        + "nested-holder,reflection");
+  }
+
+  private static void stateAndIdentity() throws Exception {
+    String key = new String("retry-key");
+    HttpContextRetryCounter counter = new HttpContextRetryCounter(key);
+    HttpClientContext first = HttpClientContext.create();
+    HttpClientContext second = HttpClientContext.create();
+
+    check(counter.getRetryCount(first) == 0 && first.getAttribute(key) == null,
+        "missing count must not allocate");
+    counter.setRetryCount(first, 7);
+    Object holder = first.getAttribute(key);
+    check(holder != null && holder.getClass().getName().equals(
+        "com.sedmelluq.discord.lavaplayer.tools.http.HttpContextRetryCounter$RetryCount"),
+        "private holder type");
+    check(holderValue(holder) == 7 && counter.getRetryCount(first) == 7,
+        "explicit positive value");
+
+    counter.setRetryCount(first, -9);
+    check(first.getAttribute(key) == holder && holderValue(holder) == -9
+        && counter.getRetryCount(first) == -9, "holder reuse and negative value");
+    check(counter.getRetryCount(second) == 0 && second.getAttribute(key) == null,
+        "context isolation");
+
+    HttpContextRetryCounter shared = new HttpContextRetryCounter(new String("retry-key"));
+    check(shared.getRetryCount(first) == -9, "equal key sharing");
+    shared.setRetryCount(first, 23);
+    check(first.getAttribute(key) == holder && counter.getRetryCount(first) == 23,
+        "shared holder mutation");
+
+    HttpContextRetryCounter isolated = new HttpContextRetryCounter("other-key");
+    check(isolated.getRetryCount(first) == 0 && first.getAttribute("other-key") == null,
+        "key isolation");
+    isolated.setRetryCount(first, Integer.MIN_VALUE);
+    check(isolated.getRetryCount(first) == Integer.MIN_VALUE && counter.getRetryCount(first) == 23,
+        "independent key state");
+
+    Field keyField = HttpContextRetryCounter.class.getDeclaredField("attributeName");
+    keyField.setAccessible(true);
+    check(keyField.get(counter) == key, "constructor key identity");
+  }
+
+  private static void updateRules() throws Exception {
+    String key = "updates";
+    HttpContextRetryCounter counter = new HttpContextRetryCounter(key);
+    HttpClientContext context = HttpClientContext.create();
+
+    counter.handleUpdate(context, false);
+    Object holder = context.getAttribute(key);
+    check(holder != null && holderValue(holder) == 0, "fresh reset installs zero holder");
+    counter.handleUpdate(context, true);
+    counter.handleUpdate(context, true);
+    check(counter.getRetryCount(context) == 2 && context.getAttribute(key) == holder,
+        "repetition increment and holder retention");
+    counter.handleUpdate(context, false);
+    check(counter.getRetryCount(context) == 0 && context.getAttribute(key) == holder,
+        "non-repetition reset");
+
+    counter.setRetryCount(context, Integer.MAX_VALUE);
+    counter.handleUpdate(context, true);
+    check(counter.getRetryCount(context) == Integer.MIN_VALUE, "signed overflow");
+    counter.handleUpdate(context, true);
+    check(counter.getRetryCount(context) == Integer.MIN_VALUE + 1, "post-overflow increment");
+
+    HttpClientContext fresh = HttpClientContext.create();
+    counter.handleUpdate(fresh, true);
+    check(counter.getRetryCount(fresh) == 1 && fresh.getAttribute(key) != null,
+        "fresh repetition starts at one");
+  }
+
+  private static void subclassDispatchAndFailures() {
+    HttpClientContext context = HttpClientContext.create();
+    Derived counter = new Derived();
+    counter.readValue = 41;
+    counter.handleUpdate(context, true);
+    check(counter.reads == 1 && counter.writes == 1 && counter.writtenValue == 42,
+        "repetition virtual dispatch");
+    counter.handleUpdate(context, false);
+    check(counter.reads == 1 && counter.writes == 2 && counter.writtenValue == 0,
+        "reset virtual dispatch");
+
+    RuntimeException readFailure = new RuntimeException("read");
+    counter.readFailure = readFailure;
+    check(catchThrowable(() -> counter.handleUpdate(context, true)) == readFailure,
+        "read failure identity");
+    check(counter.writes == 2, "read failure prefix");
+    counter.readFailure = null;
+
+    RuntimeException writeFailure = new RuntimeException("write");
+    counter.writeFailure = writeFailure;
+    check(catchThrowable(() -> counter.handleUpdate(context, false)) == writeFailure,
+        "write failure identity");
+  }
+
+  private static void malformedInputs() throws Exception {
+    HttpContextRetryCounter nullKey = new HttpContextRetryCounter(null);
+    Field keyField = HttpContextRetryCounter.class.getDeclaredField("attributeName");
+    keyField.setAccessible(true);
+    check(keyField.get(nullKey) == null, "null key construction");
+    check(catchThrowable(() -> nullKey.getRetryCount(HttpClientContext.create()))
+        instanceof IllegalArgumentException, "null key use");
+
+    HttpContextRetryCounter counter = new HttpContextRetryCounter("bad");
+    check(catchThrowable(() -> counter.getRetryCount(null)) instanceof NullPointerException,
+        "null context get");
+    check(catchThrowable(() -> counter.setRetryCount(null, 1)) instanceof NullPointerException,
+        "null context set");
+
+    HttpClientContext context = HttpClientContext.create();
+    Object wrong = new Object();
+    context.setAttribute("bad", wrong);
+    check(catchThrowable(() -> counter.getRetryCount(context)) instanceof ClassCastException,
+        "wrong-type get");
+    check(catchThrowable(() -> counter.setRetryCount(context, 4)) instanceof ClassCastException,
+        "wrong-type set");
+    check(context.getAttribute("bad") == wrong, "wrong-type retention");
+  }
+
+  private static void reflection() throws Exception {
+    Class<HttpContextRetryCounter> type = HttpContextRetryCounter.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers()) && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0, "class metadata");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 3, "outer member counts");
+
+    Field key = type.getDeclaredField("attributeName");
+    check(key.getType() == String.class
+        && key.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL) && !key.isSynthetic(),
+        "key field metadata");
+    Constructor<HttpContextRetryCounter> constructor = type.getDeclaredConstructor(String.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    method(type, "handleUpdate", void.class, HttpClientContext.class, boolean.class);
+    method(type, "setRetryCount", void.class, HttpClientContext.class, int.class);
+    method(type, "getRetryCount", int.class, HttpClientContext.class);
+
+    Class<?>[] nestedTypes = type.getDeclaredClasses();
+    check(nestedTypes.length == 1, "nested type count");
+    Class<?> nested = nestedTypes[0];
+    check(nested.getSimpleName().equals("RetryCount")
+        && nested.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC)
+        && nested.getSuperclass() == Object.class && nested.getInterfaces().length == 0
+        && nested.getDeclaringClass() == type && nested.getEnclosingClass() == type
+        && nested.getNestHost() == type, "nested type metadata");
+    check(nested.getDeclaredFields().length == 1 && nested.getDeclaredConstructors().length == 1
+        && nested.getDeclaredMethods().length == 0, "nested member counts");
+    Field value = nested.getDeclaredField("value");
+    check(value.getType() == int.class && value.getModifiers() == Modifier.PRIVATE
+        && !value.isSynthetic(), "nested value metadata");
+    Constructor<?> nestedConstructor = nested.getDeclaredConstructor();
+    check(nestedConstructor.getModifiers() == Modifier.PRIVATE
+        && !nestedConstructor.isSynthetic(), "nested constructor metadata");
+    Class<?>[] nestMembers = type.getNestMembers();
+    check(nestMembers.length == 2 && Arrays.asList(nestMembers).contains(type)
+        && Arrays.asList(nestMembers).contains(nested), "nest membership");
+  }
+
+  private static int holderValue(Object holder) throws Exception {
+    Field value = holder.getClass().getDeclaredField("value");
+    value.setAccessible(true);
+    return value.getInt(holder);
+  }
+
+  private static void method(Class<?> type, String name, Class<?> returnType,
+                             Class<?>... parameters) throws Exception {
+    Method method = type.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == returnType
+        && method.getExceptionTypes().length == 0 && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), name + " metadata");
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class Derived extends HttpContextRetryCounter {
+    int readValue;
+    int writtenValue;
+    int reads;
+    int writes;
+    RuntimeException readFailure;
+    RuntimeException writeFailure;
+
+    Derived() { super("derived"); }
+
+    public int getRetryCount(HttpClientContext context) {
+      if (readFailure != null) throw readFailure;
+      reads++;
+      return readValue;
+    }
+
+    public void setRetryCount(HttpClientContext context, int value) {
+      if (writeFailure != null) throw writeFailure;
+      writes++;
+      writtenValue = value;
     }
   }
 
