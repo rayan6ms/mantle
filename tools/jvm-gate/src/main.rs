@@ -185,6 +185,9 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-simple-http-client-connection-manager-consumer" => {
             Some(SIMPLE_HTTP_CLIENT_CONNECTION_MANAGER_CONSUMER)
         }
+        "write-extended-http-client-builder-consumer" => {
+            Some(EXTENDED_HTTP_CLIENT_BUILDER_CONSUMER)
+        }
         "write-extended-http-configurable-consumer" => Some(EXTENDED_HTTP_CONFIGURABLE_CONSUMER),
         "write-http-configurable-consumer" => Some(HTTP_CONFIGURABLE_CONSUMER),
         "write-http-context-filter-consumer" => Some(HTTP_CONTEXT_FILTER_CONSUMER),
@@ -63303,6 +63306,285 @@ public final class GateSettableHttpRequestFilter {
 
   private static final class Derived extends SettableHttpRequestFilter {}
 
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const EXTENDED_HTTP_CLIENT_BUILDER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.tools.http.ExtendedConnectionOperator;
+import com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpClientBuilder;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
+import javax.net.ssl.SSLContext;
+import org.apache.http.HttpResponseFactory;
+import org.apache.http.ProtocolVersion;
+import org.apache.http.config.MessageConstraints;
+import org.apache.http.config.Registry;
+import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.http.conn.HttpClientConnectionOperator;
+import org.apache.http.conn.HttpConnectionFactory;
+import org.apache.http.conn.ManagedHttpClientConnection;
+import org.apache.http.conn.socket.ConnectionSocketFactory;
+import org.apache.http.conn.socket.PlainConnectionSocketFactory;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.conn.DefaultHttpResponseParser;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.impl.execchain.ClientExecChain;
+import org.apache.http.io.SessionInputBuffer;
+import org.apache.http.message.BasicLineParser;
+import org.apache.http.message.ParserCursor;
+import org.apache.http.protocol.HttpContext;
+import org.apache.http.util.CharArrayBuffer;
+
+public final class GateExtendedHttpClientBuilder {
+  public static void main(String[] args) throws Exception {
+    constructorAndSetters();
+    buildLifecycle();
+    buildFailuresAndCleanup();
+    parserBehavior();
+    reflection();
+    System.out.println("contracts=constructor,default-state,setter-identity,null-retention,decorator-identity,manager-factory,operator-factory,custom-sockets,ssl-protocols,build-reset,repeated-build,factory-failure,build-failure-cleanup,icy-parser,garbage-parser,parser-delegation,default-manager,manager-limits,subclassable,private-state,nested-types,generics,reflection");
+  }
+
+  private static void constructorAndSetters() throws Exception {
+    ExtendedHttpClientBuilder builder = new ExtendedHttpClientBuilder();
+    check(field(builder, "sslContextOverride") == null, "default SSL override");
+    check(field(builder, "sslSupportedProtocols") == null, "default protocols");
+    check(field(builder, "plainSocketFactory") == null, "default plain factory");
+    check(field(builder, "sslSocketFactory") == null, "default SSL factory");
+    check(field(builder, "connectionManagerFactory") != null, "default manager factory");
+
+    SSLContext context = SSLContext.getDefault();
+    String[] protocols = new String[] {"TLSv1.2", "TLSv1.3"};
+    PlainConnectionSocketFactory plain = PlainConnectionSocketFactory.getSocketFactory();
+    SSLConnectionSocketFactory ssl = new SSLConnectionSocketFactory(context);
+    builder.setSslContextOverride(context);
+    builder.setSslSupportedProtocols(protocols);
+    builder.setPlainConnectionSocketFactory(plain);
+    builder.setSslConnectionSocketFactory(ssl);
+    check(field(builder, "sslContextOverride") == context, "SSL override identity");
+    check(field(builder, "sslSupportedProtocols") == protocols, "protocol identity");
+    check(field(builder, "plainSocketFactory") == plain, "plain factory identity");
+    check(field(builder, "sslSocketFactory") == ssl, "SSL factory identity");
+    builder.setSslContextOverride(null);
+    builder.setSslSupportedProtocols(null);
+    builder.setPlainConnectionSocketFactory(null);
+    builder.setSslConnectionSocketFactory(null);
+    check(field(builder, "sslContextOverride") == null && field(builder, "sslSupportedProtocols") == null,
+        "nullable setters retained");
+    Exposed exposed = new Exposed();
+    ClientExecChain chain = proxy(ClientExecChain.class, (p, m, a) -> defaultValue(m));
+    check(exposed.decorate(chain) == chain && exposed.decorate(null) == null, "decorator identity");
+  }
+
+  private static void buildLifecycle() throws Exception {
+    final Captured captured = new Captured();
+    ExtendedHttpClientBuilder builder = new ExtendedHttpClientBuilder();
+    builder.setPlainConnectionSocketFactory(PlainConnectionSocketFactory.getSocketFactory());
+    builder.setSslConnectionSocketFactory(new SSLConnectionSocketFactory(SSLContext.getDefault()));
+    String[] protocols = new String[] {"TLSv1.2"};
+    builder.setSslSupportedProtocols(protocols);
+    builder.setConnectionManagerFactory((operator, factory) -> {
+      captured.operator = operator;
+      captured.factory = factory;
+      captured.calls++;
+      captured.manager = managerProxy();
+      return captured.manager;
+    });
+    CloseableHttpClient first = builder.build();
+    check(first != null && captured.calls == 1, "build and factory call");
+    check(captured.operator instanceof ExtendedConnectionOperator, "operator type");
+    check(captured.factory instanceof HttpConnectionFactory, "connection factory type");
+    Registry<?> registry = (Registry<?>) field(captured.operator, "socketFactoryRegistry");
+    check(registry.lookup("http") == field(builder, "plainSocketFactory"), "custom plain socket");
+    check(registry.lookup("https") == field(builder, "sslSocketFactory"), "custom SSL socket");
+    check(field(builder, "sslSupportedProtocols") == protocols, "protocols remain configured");
+    check(inheritedField(builder, "connManager") == null, "manager cleared after build");
+    first.close();
+
+    CloseableHttpClient second = builder.build();
+    check(second != null && captured.calls == 2 && captured.manager != null, "repeated build");
+    check(inheritedField(builder, "connManager") == null, "manager cleared after repeat");
+    second.close();
+
+    ExtendedHttpClientBuilder defaults = new ExtendedHttpClientBuilder();
+    defaults.setConnectionManagerFactory((operator, factory) -> {
+      captured.operator = operator;
+      captured.factory = factory;
+      captured.manager = managerProxy();
+      return captured.manager;
+    });
+    defaults.build().close();
+    Registry<?> defaultRegistry = (Registry<?>) field(captured.operator, "socketFactoryRegistry");
+    check(defaultRegistry.lookup("http") != null && defaultRegistry.lookup("https") != null,
+        "default socket registry");
+    Method create = ExtendedHttpClientBuilder.class.getDeclaredMethod(
+        "createDefaultConnectionManager", HttpClientConnectionOperator.class, HttpConnectionFactory.class);
+    create.setAccessible(true);
+    PoolingHttpClientConnectionManager manager = (PoolingHttpClientConnectionManager) create.invoke(
+        null, proxy(HttpClientConnectionOperator.class, (p, m, a) -> defaultValue(m)),
+        proxy(HttpConnectionFactory.class, (p, m, a) -> null));
+    check(manager.getMaxTotal() == 3000 && manager.getDefaultMaxPerRoute() == 1500,
+        "default manager limits");
+    manager.shutdown();
+  }
+
+  private static void buildFailuresAndCleanup() throws Exception {
+    RuntimeException factoryFailure = new RuntimeException("factory");
+    ExtendedHttpClientBuilder failedFactory = new ExtendedHttpClientBuilder();
+    failedFactory.setConnectionManagerFactory((operator, factory) -> { throw factoryFailure; });
+    check(catchThrowable(failedFactory::build) == factoryFailure, "factory failure identity");
+
+    RuntimeException buildFailure = new RuntimeException("decorate");
+    Exposed failing = new Exposed(buildFailure);
+    Captured captured = new Captured();
+    failing.setConnectionManagerFactory((operator, factory) -> {
+      captured.manager = managerProxy();
+      return captured.manager;
+    });
+    check(catchThrowable(failing::build) == buildFailure, "build failure identity");
+    check(inheritedField(failing, "connManager") == captured.manager, "failure leaves manager installed");
+  }
+
+  private static void parserBehavior() throws Exception {
+    Class<?> icy = Class.forName(ExtendedHttpClientBuilder.class.getName() + "$IcyHttpLineParser");
+    Object parser = field(null, icy, "ICY_INSTANCE");
+    CharArrayBuffer buffer = new CharArrayBuffer(16);
+    buffer.append("ICY 200 OK");
+    ParserCursor cursor = new ParserCursor(0, buffer.length());
+    Method parse = icy.getDeclaredMethod("parseProtocolVersion", CharArrayBuffer.class, ParserCursor.class);
+    parse.setAccessible(true);
+    ProtocolVersion version = (ProtocolVersion) parse.invoke(parser, buffer, cursor);
+    check(version.equals(new ProtocolVersion("HTTP", 1, 0)) && cursor.getPos() == 4, "ICY protocol parse");
+    Method has = icy.getDeclaredMethod("hasProtocolVersion", CharArrayBuffer.class, ParserCursor.class);
+    has.setAccessible(true);
+    check((Boolean) has.invoke(parser, buffer, new ParserCursor(0, buffer.length())), "ICY protocol detection");
+    CharArrayBuffer http = new CharArrayBuffer(16);
+    http.append("HTTP/1.1 200");
+    boolean delegated = (Boolean) has.invoke(parser, http, new ParserCursor(0, http.length()));
+    check(delegated == new BasicLineParser().hasProtocolVersion(http, new ParserCursor(0, http.length())),
+        "normal protocol delegation");
+
+    Class<?> garbage = Class.forName(ExtendedHttpClientBuilder.class.getName() + "$GarbageAllergicHttpResponseParser");
+    java.lang.reflect.Constructor<?> constructor = garbage.getDeclaredConstructor(
+        SessionInputBuffer.class, org.apache.http.message.LineParser.class,
+        HttpResponseFactory.class, MessageConstraints.class);
+    constructor.setAccessible(true);
+    Object rejector = constructor.newInstance(proxy(SessionInputBuffer.class, (p, m, a) -> defaultValue(m)), new BasicLineParser(),
+        org.apache.http.impl.DefaultHttpResponseFactory.INSTANCE, MessageConstraints.DEFAULT);
+    Method reject = garbage.getDeclaredMethod("reject", CharArrayBuffer.class, int.class);
+    reject.setAccessible(true);
+    CharArrayBuffer icyLine = new CharArrayBuffer(8);
+    icyLine.append("ICY 200");
+    Throwable icyFailure = unwrap(catchThrowable(() -> reject.invoke(rejector, icyLine, 1)));
+    check(icyFailure instanceof FriendlyException && ((FriendlyException) icyFailure).getMessage().equals("ICY protocol is not supported."),
+        "ICY rejection");
+    CharArrayBuffer garbageLine = new CharArrayBuffer(8);
+    garbageLine.append("noise");
+    Throwable garbageFailure = unwrap(catchThrowable(() -> reject.invoke(rejector, garbageLine, 11)));
+    check(garbageFailure instanceof FriendlyException && ((FriendlyException) garbageFailure).getMessage().equals("The server is giving us garbage."),
+        "garbage rejection");
+    check(!(Boolean) reject.invoke(rejector, garbageLine, 10), "garbage threshold");
+  }
+
+  private static void reflection() throws Exception {
+    Class<ExtendedHttpClientBuilder> type = ExtendedHttpClientBuilder.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers()), "class modifiers");
+    check(type.getSuperclass() == org.apache.http.impl.client.HttpClientBuilder.class, "superclass");
+    check(type.getDeclaredFields().length == 7 && type.getDeclaredMethods().length == 13, "member counts");
+    check(type.getDeclaredClasses().length == 3, "nested count");
+    check(type.getDeclaredMethod("build").getReturnType() == CloseableHttpClient.class,
+        "build signature");
+    check(Modifier.isSynchronized(type.getDeclaredMethod("build").getModifiers()), "build synchronized");
+    check(type.getDeclaredField("connectionManagerFactory").getType().getName().contains("ConnectionManagerFactory"),
+        "factory field type");
+    Class<?> factory = Class.forName(type.getName() + "$ConnectionManagerFactory");
+    Method createMethod = factory.getDeclaredMethod("create", HttpClientConnectionOperator.class, HttpConnectionFactory.class);
+    check(Modifier.isPublic(factory.getModifiers()) && Modifier.isStatic(factory.getModifiers())
+        && Modifier.isInterface(factory.getModifiers()), "factory interface shape");
+    check(createMethod.getGenericParameterTypes()[1].getTypeName().contains("HttpRoute")
+        && createMethod.getGenericParameterTypes()[1].getTypeName().contains("ManagedHttpClientConnection"),
+        "factory generic signature");
+    new Exposed();
+  }
+
+  private static HttpClientConnectionManager managerProxy() {
+    return proxy(HttpClientConnectionManager.class, (p, m, a) -> defaultValue(m));
+  }
+
+  private static Object field(Object instance, String name) throws Exception {
+    return field(instance, instance.getClass(), name);
+  }
+
+  private static Object field(Object instance, Class<?> type, String name) throws Exception {
+    Field field = type.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(instance);
+  }
+
+  private static Object inheritedField(Object instance, String name) throws Exception {
+    Class<?> type = instance.getClass();
+    while (type != null) {
+      try { return field(instance, type, name); } catch (NoSuchFieldException ignored) { type = type.getSuperclass(); }
+    }
+    throw new NoSuchFieldException(name);
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+
+  private static Throwable unwrap(Throwable throwable) {
+    return throwable instanceof java.lang.reflect.InvocationTargetException
+        ? ((java.lang.reflect.InvocationTargetException) throwable).getCause() : throwable;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type, InvocationHandler handler) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type}, handler);
+  }
+
+  private static Object defaultValue(Method method) {
+    Class<?> type = method.getReturnType();
+    if (type == boolean.class) return false;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0F;
+    if (type == double.class) return 0D;
+    if (type == char.class) return (char) 0;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    return null;
+  }
+
+  private static final class Captured {
+    HttpClientConnectionOperator operator;
+    HttpConnectionFactory<?, ?> factory;
+    HttpClientConnectionManager manager;
+    int calls;
+  }
+
+  private static class Exposed extends ExtendedHttpClientBuilder {
+    final RuntimeException failure;
+    Exposed() { this(null); }
+    Exposed(RuntimeException failure) { this.failure = failure; }
+    ClientExecChain decorate(ClientExecChain chain) { return decorateMainExec(chain); }
+    protected ClientExecChain decorateMainExec(ClientExecChain chain) {
+      if (failure != null) throw failure;
+      return super.decorateMainExec(chain);
+    }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }
