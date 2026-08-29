@@ -25240,18 +25240,20 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference interface bytes are retained byte-identically; direct HttpConfigurable inheritance, caller dispatch, inherited generic methods, absence of defaults, and reflection match the differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpConfigurable",
       "symbol_kind": "METHOD",
       "member_name": "setHttpContextFilter",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/http/HttpContextFilter;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public-abstract caller dispatch, exact argument/null identity, failure identity, declaring-class metadata, and absence of default/bridge behavior match the differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter",

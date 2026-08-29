@@ -179,6 +179,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-abstract-http-context-filter-consumer" => {
             Some(ABSTRACT_HTTP_CONTEXT_FILTER_CONSUMER)
         }
+        "write-extended-http-configurable-consumer" => Some(EXTENDED_HTTP_CONFIGURABLE_CONSUMER),
         "write-http-context-filter-consumer" => Some(HTTP_CONTEXT_FILTER_CONSUMER),
         "write-http-context-retry-counter-consumer" => Some(HTTP_CONTEXT_RETRY_COUNTER_CONSUMER),
         "write-http-stream-tools-consumer" => Some(HTTP_STREAM_TOOLS_CONSUMER),
@@ -61354,6 +61355,137 @@ public final class GateAbstractHttpContextFilter {
 
   private static final class Derived extends AbstractHttpContextFilter {
     Derived(HttpContextFilter delegate) { super(delegate); }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const EXTENDED_HTTP_CONFIGURABLE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpConfigurable;
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpConfigurable;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.impl.client.HttpClientBuilder;
+
+public final class GateExtendedHttpConfigurable {
+  public static void main(String[] args) throws Exception {
+    callerImplementation();
+    failureIdentity();
+    reflection();
+    System.out.println(
+        "contracts=caller-implementation,direct-method,inherited-methods,dispatch-order,"
+        + "argument-identity,null-forwarding,failure-identity,generics,public-abstract-interface,"
+        + "no-defaults,reflection");
+  }
+
+  private static void callerImplementation() {
+    RecordingConfigurable implementation = new RecordingConfigurable();
+    ExtendedHttpConfigurable configurable = implementation;
+    HttpContextFilter filter = proxy(HttpContextFilter.class);
+    Function<RequestConfig, RequestConfig> function = value -> value;
+    Consumer<HttpClientBuilder> consumer = value -> {};
+
+    configurable.setHttpContextFilter(filter);
+    configurable.configureRequests(function);
+    configurable.configureBuilder(consumer);
+    check(implementation.events.toString().equals("filter,requests,builder,"),
+        "dispatch order");
+    check(implementation.filter == filter && implementation.function == function
+        && implementation.consumer == consumer, "argument identity");
+
+    configurable.setHttpContextFilter(null);
+    configurable.configureRequests(null);
+    configurable.configureBuilder(null);
+    check(implementation.events.toString().equals(
+        "filter,requests,builder,filter,requests,builder,"), "null dispatch order");
+    check(implementation.filter == null && implementation.function == null
+        && implementation.consumer == null, "null forwarding");
+  }
+
+  private static void failureIdentity() {
+    RuntimeException sentinel = new RuntimeException("sentinel");
+    ExtendedHttpConfigurable configurable = (ExtendedHttpConfigurable) Proxy.newProxyInstance(
+        ExtendedHttpConfigurable.class.getClassLoader(),
+        new Class<?>[] {ExtendedHttpConfigurable.class},
+        (instance, method, arguments) -> { throw sentinel; });
+    check(catchThrowable(() -> configurable.setHttpContextFilter(null)) == sentinel,
+        "direct failure");
+    check(catchThrowable(() -> configurable.configureRequests(null)) == sentinel,
+        "inherited request failure");
+    check(catchThrowable(() -> configurable.configureBuilder(null)) == sentinel,
+        "inherited builder failure");
+  }
+
+  private static void reflection() throws Exception {
+    Class<ExtendedHttpConfigurable> type = ExtendedHttpConfigurable.class;
+    check(type.isInterface() && Modifier.isPublic(type.getModifiers())
+        && Modifier.isAbstract(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == null
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {HttpConfigurable.class}),
+        "interface metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 1, "declared member counts");
+
+    Method direct = type.getDeclaredMethod("setHttpContextFilter", HttpContextFilter.class);
+    checkMethod(direct, void.class, ExtendedHttpConfigurable.class);
+    Method requests = type.getMethod("configureRequests", Function.class);
+    Method builder = type.getMethod("configureBuilder", Consumer.class);
+    checkMethod(requests, void.class, HttpConfigurable.class);
+    checkMethod(builder, void.class, HttpConfigurable.class);
+    check(requests.getGenericParameterTypes()[0].getTypeName().equals(
+        "java.util.function.Function<org.apache.http.client.config.RequestConfig, org.apache.http.client.config.RequestConfig>"),
+        "request generic signature");
+    check(builder.getGenericParameterTypes()[0].getTypeName().equals(
+        "java.util.function.Consumer<org.apache.http.impl.client.HttpClientBuilder>"),
+        "builder generic signature");
+    check(type.getMethods().length == 3, "complete public method count");
+  }
+
+  private static void checkMethod(Method method, Class<?> returnType, Class<?> declaringType) {
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && method.getReturnType() == returnType && method.getDeclaringClass() == declaringType
+        && method.getExceptionTypes().length == 0 && !method.isDefault()
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs(),
+        method.getName() + " metadata");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type},
+        (instance, method, arguments) -> null);
+  }
+
+  private static Throwable catchThrowable(ThrowingAction action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+
+  @FunctionalInterface
+  private interface ThrowingAction { void run() throws Throwable; }
+
+  private static final class RecordingConfigurable implements ExtendedHttpConfigurable {
+    final StringBuilder events = new StringBuilder();
+    HttpContextFilter filter;
+    Function<RequestConfig, RequestConfig> function;
+    Consumer<HttpClientBuilder> consumer;
+
+    public void setHttpContextFilter(HttpContextFilter value) {
+      filter = value; events.append("filter,");
+    }
+    public void configureRequests(Function<RequestConfig, RequestConfig> value) {
+      function = value; events.append("requests,");
+    }
+    public void configureBuilder(Consumer<HttpClientBuilder> value) {
+      consumer = value; events.append("builder,");
+    }
   }
 
   private static void check(boolean condition, String message) {

@@ -464,6 +464,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-units-consumer \
   --output "$WORK/GateUnits.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-abstract-http-context-filter-consumer \
   --output "$WORK/GateAbstractHttpContextFilter.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-extended-http-configurable-consumer \
+  --output "$WORK/GateExtendedHttpConfigurable.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-http-context-filter-consumer \
   --output "$WORK/GateHttpContextFilter.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-http-context-retry-counter-consumer \
@@ -816,6 +818,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateThumbnailTools.java" \
   "$WORK/GateUnits.java" \
   "$WORK/GateAbstractHttpContextFilter.java" \
+  "$WORK/GateExtendedHttpConfigurable.java" \
   "$WORK/GateHttpContextFilter.java" \
   "$WORK/GateHttpContextRetryCounter.java" \
   "$WORK/GateHttpStreamTools.java" \
@@ -2282,6 +2285,17 @@ cmp "$WORK/abstract-http-context-filter-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,abstract,subclassable,interface,delegation-order,argument-identity,boolean-results,null-delegate-defaults,null-forwarding,failure-identity,private-state,reflection' \
   "$WORK/abstract-http-context-filter-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateExtendedHttpConfigurable \
+  >"$WORK/extended-http-configurable-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateExtendedHttpConfigurable >"$WORK/extended-http-configurable-candidate.txt"
+cmp "$WORK/extended-http-configurable-reference.txt" \
+  "$WORK/extended-http-configurable-candidate.txt"
+grep --fixed-strings \
+  'contracts=caller-implementation,direct-method,inherited-methods,dispatch-order,argument-identity,null-forwarding,failure-identity,generics,public-abstract-interface,no-defaults,reflection' \
+  "$WORK/extended-http-configurable-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateHttpContextFilter \
   >"$WORK/http-context-filter-reference.txt"
