@@ -197,6 +197,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-byte-buffer-input-stream-consumer" => Some(BYTE_BUFFER_INPUT_STREAM_CONSUMER),
         "write-byte-buffer-output-stream-consumer" => Some(BYTE_BUFFER_OUTPUT_STREAM_CONSUMER),
         "write-chained-input-stream-consumer" => Some(CHAINED_INPUT_STREAM_CONSUMER),
+        "write-detached-byte-channel-consumer" => Some(DETACHED_BYTE_CHANNEL_CONSUMER),
         "write-extended-http-configurable-consumer" => Some(EXTENDED_HTTP_CONFIGURABLE_CONSUMER),
         "write-http-configurable-consumer" => Some(HTTP_CONFIGURABLE_CONSUMER),
         "write-http-context-filter-consumer" => Some(HTTP_CONTEXT_FILTER_CONSUMER),
@@ -64790,6 +64791,148 @@ public final class GateChainedInputStream {
 
   private static final class Derived extends ChainedInputStream {
     Derived(Provider provider) { super(provider); }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const DETACHED_BYTE_CHANNEL_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.io.DetachedByteChannel;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
+import java.nio.channels.ReadableByteChannel;
+
+public final class GateDetachedByteChannel {
+  public static void main(String[] args) throws Exception {
+    constructionAndDelegation();
+    closureAndBoundaries();
+    reflection();
+    System.out.println("contracts=constructor,delegate-identity,initial-state,read-delegation,read-arguments,read-position,read-result,read-io-identity,open-delegate-state,close-detaches,close-idempotent,closed-state,closed-read,closed-read-fresh,closed-read-no-delegate,null-delegate,null-close,subclassable,private-state,reflection");
+  }
+
+  private static void constructionAndDelegation() throws Exception {
+    TrackingChannel delegate = new TrackingChannel(new byte[] {11, 22, 33});
+    DetachedByteChannel channel = new DetachedByteChannel(delegate);
+    check(field(channel, "delegate") == delegate, "delegate identity");
+    check(!(Boolean) field(channel, "closed") && channel.isOpen(), "initial state");
+
+    ByteBuffer output = ByteBuffer.allocate(4);
+    output.position(1);
+    check(channel.read(output) == 3, "read result");
+    check(delegate.lastBuffer == output && delegate.readCalls == 1, "read delegation");
+    check(output.position() == 4 && output.get(1) == 11 && output.get(2) == 22
+        && output.get(3) == 33,
+        "read position and bytes");
+
+    delegate.open = false;
+    check(!channel.isOpen(), "delegate open state");
+    delegate.open = true;
+    check(channel.isOpen(), "delegate reopen state");
+
+    IOException failure = new IOException("read-failure");
+    delegate.readFailure = failure;
+    check(catchThrowable(() -> channel.read(ByteBuffer.allocate(1))) == failure,
+        "read IO identity");
+  }
+
+  private static void closureAndBoundaries() throws Exception {
+    TrackingChannel delegate = new TrackingChannel(new byte[] {7});
+    DetachedByteChannel channel = new DetachedByteChannel(delegate);
+    channel.close();
+    check((Boolean) field(channel, "closed"), "close state");
+    check(delegate.closeCalls == 0 && delegate.open && !channel.isOpen(),
+        "close detaches without delegate close");
+    channel.close();
+    check(delegate.closeCalls == 0, "close idempotent");
+
+    ByteBuffer output = ByteBuffer.allocate(1);
+    ClosedChannelException first = (ClosedChannelException) catchThrowable(() -> channel.read(output));
+    ClosedChannelException second = (ClosedChannelException) catchThrowable(() -> channel.read(output));
+    check(first != null && second != null && first != second, "closed read fresh exception");
+    check(delegate.readCalls == 0 && output.position() == 0, "closed read no delegate");
+
+    DetachedByteChannel nullDelegate = new DetachedByteChannel(null);
+    check(field(nullDelegate, "delegate") == null, "null delegate identity");
+    check(catchThrowable(nullDelegate::isOpen) instanceof NullPointerException,
+        "null delegate isOpen");
+    nullDelegate.close();
+    check(!nullDelegate.isOpen(), "null delegate close state");
+    check(catchThrowable(() -> nullDelegate.read(ByteBuffer.allocate(0)))
+        instanceof ClosedChannelException, "null delegate closed read");
+  }
+
+  private static void reflection() throws Exception {
+    Class<DetachedByteChannel> type = DetachedByteChannel.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers()),
+        "class modifiers");
+    check(type.getSuperclass() == Object.class && type.getInterfaces().length == 1
+        && type.getInterfaces()[0] == ReadableByteChannel.class, "interface shape");
+    check(type.getDeclaredFields().length == 2 && type.getDeclaredMethods().length == 3,
+        "member counts");
+    Field delegate = type.getDeclaredField("delegate");
+    check(delegate.getType() == ReadableByteChannel.class
+        && (delegate.getModifiers() & (Modifier.PRIVATE | Modifier.FINAL))
+            == (Modifier.PRIVATE | Modifier.FINAL), "delegate field");
+    Field closed = type.getDeclaredField("closed");
+    check(closed.getType() == boolean.class && Modifier.isPrivate(closed.getModifiers()),
+        "closed field");
+    check(type.getDeclaredConstructor(ReadableByteChannel.class).getExceptionTypes().length == 0,
+        "constructor exceptions");
+    Method read = type.getDeclaredMethod("read", ByteBuffer.class);
+    Method isOpen = type.getDeclaredMethod("isOpen");
+    Method close = type.getDeclaredMethod("close");
+    check(Modifier.isPublic(read.getModifiers()) && read.getExceptionTypes().length == 1
+        && read.getExceptionTypes()[0] == IOException.class, "read shape");
+    check(Modifier.isPublic(isOpen.getModifiers()) && isOpen.getExceptionTypes().length == 0,
+        "isOpen shape");
+    check(Modifier.isPublic(close.getModifiers()) && close.getExceptionTypes().length == 1
+        && close.getExceptionTypes()[0] == IOException.class, "close shape");
+    new Derived(new TrackingChannel(new byte[0]));
+  }
+
+  private static Object field(Object instance, String name) throws Exception {
+    Field field = DetachedByteChannel.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(instance);
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+
+  private static final class TrackingChannel implements ReadableByteChannel {
+    private final ByteBuffer source;
+    boolean open = true;
+    int readCalls;
+    int closeCalls;
+    ByteBuffer lastBuffer;
+    IOException readFailure;
+
+    TrackingChannel(byte[] bytes) { source = ByteBuffer.wrap(bytes); }
+
+    public int read(ByteBuffer output) throws IOException {
+      readCalls++;
+      lastBuffer = output;
+      if (readFailure != null) throw readFailure;
+      int count = Math.min(output.remaining(), source.remaining());
+      for (int i = 0; i < count; i++) output.put(source.get());
+      return count == 0 ? -1 : count;
+    }
+
+    public boolean isOpen() { return open; }
+    public void close() { closeCalls++; open = false; }
+  }
+
+  private static final class Derived extends DetachedByteChannel {
+    Derived(ReadableByteChannel delegate) { super(delegate); }
   }
 
   private interface ThrowingRunnable { void run() throws Throwable; }

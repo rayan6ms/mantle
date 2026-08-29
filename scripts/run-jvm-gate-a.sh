@@ -484,6 +484,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-byte-buffer-output-stream-cons
   --output "$WORK/GateByteBufferOutputStream.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-chained-input-stream-consumer \
   --output "$WORK/GateChainedInputStream.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-detached-byte-channel-consumer \
+  --output "$WORK/GateDetachedByteChannel.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-extended-http-configurable-consumer \
   --output "$WORK/GateExtendedHttpConfigurable.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-http-configurable-consumer \
@@ -850,6 +852,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateByteBufferInputStream.java" \
   "$WORK/GateByteBufferOutputStream.java" \
   "$WORK/GateChainedInputStream.java" \
+  "$WORK/GateDetachedByteChannel.java" \
   "$WORK/GateExtendedHttpConfigurable.java" \
   "$WORK/GateHttpConfigurable.java" \
   "$WORK/GateHttpContextFilter.java" \
@@ -2425,6 +2428,17 @@ cmp "$WORK/chained-input-stream-reference.txt" "$WORK/chained-input-stream-candi
 grep --fixed-strings \
   'contracts=constructor,provider-identity,lazy-provider,initial-state,single-read,unsigned-read,ordered-rotation,close-before-next,terminal-null,terminal-latch,bulk-delegation,bulk-zero,bulk-terminal,skip-delegation,skip-zero-terminal,skip-terminal,empty-stream-cap,cap-resume,provider-io-identity,read-io-identity,close-io-identity,close-retry,manual-close-resume,null-provider,mark-unsupported,subclassable,private-state,provider-interface,reflection' \
   "$WORK/chained-input-stream-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateDetachedByteChannel \
+  >"$WORK/detached-byte-channel-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateDetachedByteChannel >"$WORK/detached-byte-channel-candidate.txt"
+cmp "$WORK/detached-byte-channel-reference.txt" \
+  "$WORK/detached-byte-channel-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,delegate-identity,initial-state,read-delegation,read-arguments,read-position,read-result,read-io-identity,open-delegate-state,close-detaches,close-idempotent,closed-state,closed-read,closed-read-fresh,closed-read-no-delegate,null-delegate,null-close,subclassable,private-state,reflection' \
+  "$WORK/detached-byte-channel-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateExtendedHttpConfigurable \
   >"$WORK/extended-http-configurable-reference.txt"
