@@ -176,6 +176,9 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-ring-buffer-math-consumer" => Some(RING_BUFFER_MATH_CONSUMER),
         "write-thumbnail-tools-consumer" => Some(THUMBNAIL_TOOLS_CONSUMER),
         "write-units-consumer" => Some(UNITS_CONSUMER),
+        "write-abstract-http-context-filter-consumer" => {
+            Some(ABSTRACT_HTTP_CONTEXT_FILTER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -61182,6 +61185,169 @@ public final class GateUnits {
   }
 
   private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const ABSTRACT_HTTP_CONTEXT_FILTER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.http.AbstractHttpContextFilter;
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.protocol.HttpClientContext;
+import java.lang.reflect.Proxy;
+
+public final class GateAbstractHttpContextFilter {
+  public static void main(String[] args) throws Exception {
+    HttpClientContext context = HttpClientContext.create();
+    HttpUriRequest request = proxy(HttpUriRequest.class);
+    HttpResponse response = proxy(HttpResponse.class);
+    Throwable error = new IllegalStateException("synthetic");
+    StringBuilder events = new StringBuilder();
+    HttpContextFilter delegate = new HttpContextFilter() {
+      public void onContextOpen(HttpClientContext value) {
+        check(value == context, "open context"); events.append("open,");
+      }
+      public void onContextClose(HttpClientContext value) {
+        check(value == context, "close context"); events.append("close,");
+      }
+      public void onRequest(HttpClientContext value, HttpUriRequest item, boolean repetition) {
+        check(value == context && item == request && repetition, "request args");
+        events.append("request,");
+      }
+      public boolean onRequestResponse(HttpClientContext value, HttpUriRequest item,
+                                       HttpResponse result) {
+        check(value == context && item == request && result == response, "response args");
+        events.append("response,"); return true;
+      }
+      public boolean onRequestException(HttpClientContext value, HttpUriRequest item,
+                                        Throwable failure) {
+        check(value == context && item == request && failure == error, "exception args");
+        events.append("exception,"); return true;
+      }
+    };
+    Derived filter = new Derived(delegate);
+    filter.onContextOpen(context);
+    filter.onContextClose(context);
+    filter.onRequest(context, request, true);
+    check(filter.onRequestResponse(context, request, response), "response result");
+    check(filter.onRequestException(context, request, error), "exception result");
+    check(events.toString().equals("open,close,request,response,exception,"), "delegation order");
+    privateState(filter, delegate);
+
+    Derived empty = new Derived(null);
+    empty.onContextOpen(null);
+    empty.onContextClose(null);
+    empty.onRequest(null, null, false);
+    check(!empty.onRequestResponse(null, null, null) &&
+        !empty.onRequestException(null, null, null), "null delegate defaults");
+
+    RuntimeException openFailure = new RuntimeException("open");
+    RuntimeException closeFailure = new RuntimeException("close");
+    RuntimeException requestFailure = new RuntimeException("request");
+    RuntimeException responseFailure = new RuntimeException("response");
+    RuntimeException exceptionFailure = new RuntimeException("exception");
+    HttpContextFilter failing = new HttpContextFilter() {
+      public void onContextOpen(HttpClientContext value) { throw openFailure; }
+      public void onContextClose(HttpClientContext value) { throw closeFailure; }
+      public void onRequest(HttpClientContext value, HttpUriRequest item, boolean repetition) {
+        throw requestFailure;
+      }
+      public boolean onRequestResponse(HttpClientContext value, HttpUriRequest item,
+                                       HttpResponse result) { throw responseFailure; }
+      public boolean onRequestException(HttpClientContext value, HttpUriRequest item,
+                                        Throwable failure) { throw exceptionFailure; }
+    };
+    Derived failingFilter = new Derived(failing);
+    check(catchThrowable(() -> failingFilter.onContextOpen(context)) == openFailure,
+        "open failure identity");
+    check(catchThrowable(() -> failingFilter.onContextClose(context)) == closeFailure,
+        "close failure identity");
+    check(catchThrowable(() -> failingFilter.onRequest(context, request, false)) == requestFailure,
+        "request failure identity");
+    check(catchThrowable(() -> failingFilter.onRequestResponse(context, request, response))
+        == responseFailure, "response failure identity");
+    check(catchThrowable(() -> failingFilter.onRequestException(context, request, error))
+        == exceptionFailure, "exception failure identity");
+
+    reflection();
+    System.out.println("abstract-http-context-filter-ok contracts=constructor,abstract,subclassable,interface,delegation-order,argument-identity,boolean-results,null-delegate-defaults,null-forwarding,failure-identity,private-state,reflection");
+  }
+
+  private static void privateState(AbstractHttpContextFilter filter, HttpContextFilter delegate)
+      throws Exception {
+    Field field = AbstractHttpContextFilter.class.getDeclaredField("delegate");
+    check(field.getType() == HttpContextFilter.class &&
+        field.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL) && !field.isSynthetic(),
+        "delegate field");
+    field.setAccessible(true);
+    check(field.get(filter) == delegate, "delegate identity");
+  }
+
+  private static void reflection() throws Exception {
+    Class<AbstractHttpContextFilter> type = AbstractHttpContextFilter.class;
+    check(Modifier.isPublic(type.getModifiers()) && Modifier.isAbstract(type.getModifiers()) &&
+        !Modifier.isFinal(type.getModifiers()) && type.getSuperclass() == Object.class &&
+        java.util.Arrays.equals(type.getInterfaces(), new Class<?>[] {HttpContextFilter.class}),
+        "class shape");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredMethods().length == 5 &&
+        type.getDeclaredConstructors().length == 1, "declared shape");
+    Constructor<AbstractHttpContextFilter> constructor = type.getDeclaredConstructor(
+        HttpContextFilter.class);
+    check(constructor.getModifiers() == Modifier.PROTECTED && !constructor.isSynthetic() &&
+        constructor.getExceptionTypes().length == 0, "constructor shape");
+    method(type, "onContextOpen", void.class, HttpClientContext.class);
+    method(type, "onContextClose", void.class, HttpClientContext.class);
+    method(type, "onRequest", void.class, HttpClientContext.class, HttpUriRequest.class,
+        boolean.class);
+    method(type, "onRequestResponse", boolean.class, HttpClientContext.class,
+        HttpUriRequest.class, HttpResponse.class);
+    method(type, "onRequestException", boolean.class, HttpClientContext.class,
+        HttpUriRequest.class, Throwable.class);
+  }
+
+  private static void method(Class<?> type, String name, Class<?> returnType,
+                             Class<?>... parameters) throws Exception {
+    Method method = type.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == returnType &&
+        method.getExceptionTypes().length == 0 && !method.isSynthetic(), name + " shape");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type},
+        (instance, method, arguments) -> defaultValue(method.getReturnType()));
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class Derived extends AbstractHttpContextFilter {
+    Derived(HttpContextFilter delegate) { super(delegate); }
+  }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

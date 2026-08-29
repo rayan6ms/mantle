@@ -363,6 +363,8 @@ const PLAYER_LIBRARY_VERSION_RESOURCE: &str = "com/sedmelluq/discord/lavaplayer/
 const RING_BUFFER_MATH_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/RingBufferMath";
 const THUMBNAIL_TOOLS_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/ThumbnailTools";
 const UNITS_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/Units";
+const ABSTRACT_HTTP_CONTEXT_FILTER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/http/AbstractHttpContextFilter";
 const ABSTRACT_MUTABLE_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AbstractMutableAudioFrame";
 const IMMUTABLE_FRAME_CLASS: &str =
@@ -956,6 +958,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     STREAMING_DATA_FORMATS_EXTRACTOR_CLASS,
     YOUTUBE_TRACK_FORMAT_EXTRACTOR_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
+    ABSTRACT_HTTP_CONTEXT_FILTER_CLASS,
     COPY_ON_UPDATE_IDENTITY_LIST_CLASS,
     DATA_FORMAT_TOOLS_CLASS,
     DATA_FORMAT_TOOLS_TEXT_RANGE_CLASS,
@@ -1114,6 +1117,7 @@ pub fn emit(
     let mut ring_buffer_math_bytes = None;
     let mut thumbnail_tools_bytes = None;
     let mut units_bytes = None;
+    let mut abstract_http_context_filter_bytes = None;
     let mut vorbis_comment_parser_bytes = None;
     let mut extended_m3u_parser_bytes = None;
     let mut extended_m3u_line_bytes = None;
@@ -1289,6 +1293,8 @@ pub fn emit(
             thumbnail_tools_bytes = Some(bytes);
         } else if *binary_name == UNITS_CLASS {
             units_bytes = Some(bytes);
+        } else if *binary_name == ABSTRACT_HTTP_CONTEXT_FILTER_CLASS {
+            abstract_http_context_filter_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -1467,6 +1473,12 @@ pub fn emit(
                 units_bytes
                     .as_ref()
                     .expect("units source bytes are retained"),
+            );
+        } else if name == format!("{ABSTRACT_HTTP_CONTEXT_FILTER_CLASS}.class") {
+            bytes.clone_from(
+                abstract_http_context_filter_bytes
+                    .as_ref()
+                    .expect("abstract HTTP context filter source bytes are retained"),
             );
         } else if name == format!("{MPEG_AUDIO_TRACK_CLASS}.class") {
             bytes.clone_from(
@@ -2421,6 +2433,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | RING_BUFFER_MATH_CLASS
             | THUMBNAIL_TOOLS_CLASS
             | UNITS_CLASS
+            | ABSTRACT_HTTP_CONTEXT_FILTER_CLASS
             | OGG_FLAC_CODEC_HANDLER_CLASS
             | OGG_FLAC_CODEC_HANDLER_BLUEPRINT_CLASS
             | OGG_FLAC_TRACK_HANDLER_CLASS
