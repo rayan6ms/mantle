@@ -173,6 +173,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-json-browser-consumer" => Some(JSON_BROWSER_CONSUMER),
         "write-ordered-executor-consumer" => Some(ORDERED_EXECUTOR_CONSUMER),
         "write-player-library-consumer" => Some(PLAYER_LIBRARY_CONSUMER),
+        "write-ring-buffer-math-consumer" => Some(RING_BUFFER_MATH_CONSUMER),
         _ => None,
     }
 }
@@ -60820,6 +60821,174 @@ public final class GatePlayerLibrary {
     boolean closed;
     TrackingStream(String value) { super(value.getBytes(StandardCharsets.UTF_8)); }
     @Override public void close() throws IOException { closed = true; super.close(); }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const RING_BUFFER_MATH_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.RingBufferMath;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.util.function.Function;
+
+public final class GateRingBufferMath {
+  public static void main(String[] args) throws Exception {
+    int[] inputCalls = {0};
+    int[] outputCalls = {0};
+    double[] lastInput = {Double.NaN};
+    double[] lastOutput = {Double.NaN};
+    Function<Double, Double> input = value -> {
+      inputCalls[0]++;
+      lastInput[0] = value;
+      return value * 2.0;
+    };
+    Function<Double, Double> output = value -> {
+      outputCalls[0]++;
+      lastOutput[0] = value;
+      return value + 10.0;
+    };
+
+    RingBufferMath ring = new RingBufferMath(3, input, output);
+    check(bits(ring.mean()) == bits(10.0) && bits(lastOutput[0]) == bits(0.0), "empty mean");
+    check(inputCalls[0] == 0 && outputCalls[0] == 1, "empty processor calls");
+    ring.add(1.0);
+    check(bits(lastInput[0]) == bits(1.0) && bits(ring.mean()) == bits(12.0), "first value");
+    ring.add(2.0);
+    check(bits(ring.mean()) == bits(13.0), "partial mean");
+    ring.add(3.0);
+    check(bits(ring.mean()) == bits(14.0), "full mean");
+    ring.add(4.0);
+    check(bits(ring.mean()) == bits(16.0), "first overwrite");
+    ring.add(-1.0);
+    check(bits(ring.mean()) == bits(14.0), "wrapped overwrite");
+    check(inputCalls[0] == 5 && outputCalls[0] == 6, "processor call counts");
+    privateState(ring, input, output);
+
+    RingBufferMath single = new RingBufferMath(1, Function.identity(), Function.identity());
+    single.add(7.0);
+    check(bits(single.mean()) == bits(7.0), "single first");
+    single.add(-2.0);
+    check(bits(single.mean()) == bits(-2.0), "single overwrite");
+
+    int[] zeroInputs = {0};
+    RingBufferMath zero = new RingBufferMath(0, value -> { zeroInputs[0]++; return value; },
+        Function.identity());
+    check(bits(zero.mean()) == bits(0.0), "zero capacity empty mean");
+    check(catchThrowable(() -> zero.add(3.0)) instanceof ArrayIndexOutOfBoundsException &&
+        zeroInputs[0] == 1, "zero capacity add order");
+    check(catchThrowable(() -> new RingBufferMath(-1, Function.identity(), Function.identity()))
+        instanceof NegativeArraySizeException, "negative capacity");
+
+    RingBufferMath nullInput = new RingBufferMath(1, null, Function.identity());
+    check(catchThrowable(() -> nullInput.add(1.0)) instanceof NullPointerException, "null input");
+    RingBufferMath nullOutput = new RingBufferMath(1, Function.identity(), null);
+    check(catchThrowable(nullOutput::mean) instanceof NullPointerException, "null output");
+    RingBufferMath nullInputValue = new RingBufferMath(1, value -> null, Function.identity());
+    check(catchThrowable(() -> nullInputValue.add(1.0)) instanceof NullPointerException,
+        "null input result");
+    RingBufferMath nullOutputValue = new RingBufferMath(1, Function.identity(), value -> null);
+    check(catchThrowable(nullOutputValue::mean) instanceof NullPointerException,
+        "null output result");
+
+    RuntimeException inputFailure = new RuntimeException("input");
+    RingBufferMath failingInput = new RingBufferMath(1, value -> { throw inputFailure; },
+        Function.identity());
+    check(catchThrowable(() -> failingInput.add(1.0)) == inputFailure, "input failure identity");
+    RuntimeException outputFailure = new RuntimeException("output");
+    RingBufferMath failingOutput = new RingBufferMath(1, Function.identity(),
+        value -> { throw outputFailure; });
+    check(catchThrowable(failingOutput::mean) == outputFailure, "output failure identity");
+
+    RingBufferMath nonFinite = new RingBufferMath(1, Function.identity(), Function.identity());
+    nonFinite.add(Double.NaN);
+    check(Double.isNaN(nonFinite.mean()), "nan mean");
+    nonFinite.add(1.0);
+    check(Double.isNaN(nonFinite.mean()), "nan retention");
+    RingBufferMath infinity = new RingBufferMath(1, Function.identity(), Function.identity());
+    infinity.add(Double.POSITIVE_INFINITY);
+    check(infinity.mean() == Double.POSITIVE_INFINITY, "infinite mean");
+    infinity.add(1.0);
+    check(Double.isNaN(infinity.mean()), "infinite overwrite arithmetic");
+    RingBufferMath signedZero = new RingBufferMath(1, Function.identity(), Function.identity());
+    signedZero.add(-0.0);
+    check(bits(signedZero.mean()) == bits(0.0), "signed zero arithmetic");
+
+    reflection();
+    check(new Derived(2, Function.identity(), Function.identity()) instanceof RingBufferMath,
+        "subclassable");
+    System.out.println("ring-buffer-math-ok contracts=constructor,subclassable,empty-mean,input-transform,output-transform,partial-mean,full-mean,wraparound,overwrite,capacity-one,zero-capacity,negative-capacity,null-processors,null-results,processor-failure-identity,nan,infinity,signed-zero,private-state,generics,reflection");
+  }
+
+  private static void privateState(RingBufferMath ring, Function<Double, Double> input,
+                                   Function<Double, Double> output) throws Exception {
+    Field values = field("values", double[].class, Modifier.PRIVATE | Modifier.FINAL);
+    Field inputProcessor = field("inputProcessor", Function.class, Modifier.PRIVATE | Modifier.FINAL);
+    Field outputProcessor = field("outputProcessor", Function.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    Field sum = field("sum", double.class, Modifier.PRIVATE);
+    Field position = field("position", int.class, Modifier.PRIVATE);
+    Field size = field("size", int.class, Modifier.PRIVATE);
+    values.setAccessible(true); inputProcessor.setAccessible(true); outputProcessor.setAccessible(true);
+    sum.setAccessible(true); position.setAccessible(true); size.setAccessible(true);
+    double[] stored = (double[]) values.get(ring);
+    check(stored.length == 3 && bits(stored[0]) == bits(8.0) && bits(stored[1]) == bits(-2.0) &&
+        bits(stored[2]) == bits(6.0), "stored values");
+    check(inputProcessor.get(ring) == input && outputProcessor.get(ring) == output,
+        "processor identity");
+    check(bits(sum.getDouble(ring)) == bits(12.0) && position.getInt(ring) == 2 &&
+        size.getInt(ring) == 3, "rolling state");
+    check(inputProcessor.getGenericType() instanceof ParameterizedType &&
+        outputProcessor.getGenericType().getTypeName().equals(
+            "java.util.function.Function<java.lang.Double, java.lang.Double>"), "field generics");
+  }
+
+  private static Field field(String name, Class<?> type, int modifiers) throws Exception {
+    Field field = RingBufferMath.class.getDeclaredField(name);
+    check(field.getType() == type && field.getModifiers() == modifiers && !field.isSynthetic(),
+        name + " field");
+    return field;
+  }
+
+  private static void reflection() throws Exception {
+    Class<RingBufferMath> type = RingBufferMath.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers()) &&
+        type.getSuperclass() == Object.class && type.getInterfaces().length == 0, "class shape");
+    check(type.getDeclaredFields().length == 6 && type.getDeclaredMethods().length == 2 &&
+        type.getDeclaredConstructors().length == 1, "declared shape");
+    Constructor<RingBufferMath> constructor = type.getConstructor(int.class, Function.class,
+        Function.class);
+    check(Modifier.isPublic(constructor.getModifiers()) && !constructor.isSynthetic() &&
+        constructor.getExceptionTypes().length == 0 &&
+        constructor.getGenericParameterTypes()[1].getTypeName().equals(
+            "java.util.function.Function<java.lang.Double, java.lang.Double>"),
+        "constructor shape");
+    Method add = type.getDeclaredMethod("add", double.class);
+    Method mean = type.getDeclaredMethod("mean");
+    check(add.getModifiers() == Modifier.PUBLIC && add.getReturnType() == void.class &&
+        add.getExceptionTypes().length == 0 && !add.isSynthetic(), "add shape");
+    check(mean.getModifiers() == Modifier.PUBLIC && mean.getReturnType() == double.class &&
+        mean.getExceptionTypes().length == 0 && !mean.isSynthetic(), "mean shape");
+  }
+
+  private static long bits(double value) { return Double.doubleToRawLongBits(value); }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class Derived extends RingBufferMath {
+    Derived(int size, Function<Double, Double> input, Function<Double, Double> output) {
+      super(size, input, output);
+    }
   }
 
   private static void check(boolean condition, String message) {

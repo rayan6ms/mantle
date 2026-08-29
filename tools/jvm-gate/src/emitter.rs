@@ -360,6 +360,7 @@ const ORDERED_EXECUTOR_CHANNEL_RUNNABLE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/OrderedExecutor$ChannelRunnable";
 const PLAYER_LIBRARY_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/PlayerLibrary";
 const PLAYER_LIBRARY_VERSION_RESOURCE: &str = "com/sedmelluq/discord/lavaplayer/tools/version.txt";
+const RING_BUFFER_MATH_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/RingBufferMath";
 const ABSTRACT_MUTABLE_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AbstractMutableAudioFrame";
 const IMMUTABLE_FRAME_CLASS: &str =
@@ -968,6 +969,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     JSON_BROWSER_CLASS,
     ORDERED_EXECUTOR_CLASS,
     PLAYER_LIBRARY_CLASS,
+    RING_BUFFER_MATH_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/AudioItem",
     AUDIO_REFERENCE_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/AudioPlaylist",
@@ -1105,6 +1107,7 @@ pub fn emit(
     let mut ordered_executor_bytes = None;
     let mut ordered_executor_channel_runnable_bytes = None;
     let mut player_library_bytes = None;
+    let mut ring_buffer_math_bytes = None;
     let mut vorbis_comment_parser_bytes = None;
     let mut extended_m3u_parser_bytes = None;
     let mut extended_m3u_line_bytes = None;
@@ -1274,6 +1277,8 @@ pub fn emit(
             ordered_executor_channel_runnable_bytes = Some(bytes);
         } else if *binary_name == PLAYER_LIBRARY_CLASS {
             player_library_bytes = Some(bytes);
+        } else if *binary_name == RING_BUFFER_MATH_CLASS {
+            ring_buffer_math_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -1434,6 +1439,12 @@ pub fn emit(
                 player_library_bytes
                     .as_ref()
                     .expect("player library source bytes are retained"),
+            );
+        } else if name == format!("{RING_BUFFER_MATH_CLASS}.class") {
+            bytes.clone_from(
+                ring_buffer_math_bytes
+                    .as_ref()
+                    .expect("ring buffer math source bytes are retained"),
             );
         } else if name == format!("{MPEG_AUDIO_TRACK_CLASS}.class") {
             bytes.clone_from(
@@ -2385,6 +2396,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | ORDERED_EXECUTOR_CLASS
             | ORDERED_EXECUTOR_CHANNEL_RUNNABLE_CLASS
             | PLAYER_LIBRARY_CLASS
+            | RING_BUFFER_MATH_CLASS
             | OGG_FLAC_CODEC_HANDLER_CLASS
             | OGG_FLAC_CODEC_HANDLER_BLUEPRINT_CLASS
             | OGG_FLAC_TRACK_HANDLER_CLASS
