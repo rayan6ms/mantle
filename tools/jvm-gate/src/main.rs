@@ -181,6 +181,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-http-context-filter-consumer" => Some(HTTP_CONTEXT_FILTER_CONSUMER),
         "write-http-context-retry-counter-consumer" => Some(HTTP_CONTEXT_RETRY_COUNTER_CONSUMER),
+        "write-http-stream-tools-consumer" => Some(HTTP_STREAM_TOOLS_CONSUMER),
         _ => None,
     }
 }
@@ -61743,6 +61744,295 @@ public final class GateHttpContextRetryCounter {
       writes++;
       writtenValue = value;
     }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const HTTP_STREAM_TOOLS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpStreamTools;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.net.URI;
+import java.util.Arrays;
+import org.apache.http.HttpEntity;
+import org.apache.http.StatusLine;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpUriRequest;
+
+public final class GateHttpStreamTools {
+  public static void main(String[] args) throws Exception {
+    successStatusesAndOwnership();
+    invalidStatuses();
+    checkedFailures();
+    uncheckedFailures();
+    nullsAndSuccessBoundary();
+    reflection();
+    System.out.println(
+        "contracts=constructor,subclassable,execute-identity,status-200,status-203,status-206,"
+        + "rejected-statuses,error-message,checked-wrapping,unchecked-identity,pre-success-close,"
+        + "post-success-response-retention,stream-identity,stream-ownership,nulls,reflection");
+  }
+
+  private static void successStatusesAndOwnership() throws Exception {
+    for (int status : new int[] {200, 203, 206}) {
+      RecordingStream content = new RecordingStream();
+      ResponseFixture response = new ResponseFixture(status, content);
+      RecordingHttpInterface http = new RecordingHttpInterface(response.proxy);
+      HttpUriRequest request = new HttpGet("https://example.test/audio?case=" + status);
+      InputStream result = HttpStreamTools.streamContent(http, request);
+
+      check(result == content, "stream identity " + status);
+      check(http.executions == 1 && http.lastRequest == request, "execute identity " + status);
+      check(response.statusCalls == 1 && response.entityCalls == 1 && response.contentCalls == 1,
+          "success call counts " + status);
+      check(response.closes == 0 && content.closes == 0, "success ownership " + status);
+      result.close();
+      check(content.closes == 1 && response.closes == 0, "caller stream close " + status);
+    }
+  }
+
+  private static void invalidStatuses() {
+    URI uri = URI.create("https://example.test/rejected");
+    for (int status : new int[] {-1, 0, 199, 201, 202, 204, 205, 207, 299, 300, 404, 500}) {
+      ResponseFixture response = new ResponseFixture(status, new RecordingStream());
+      RecordingHttpInterface http = new RecordingHttpInterface(response.proxy);
+      RuntimeException failure = expectRuntime(() ->
+          HttpStreamTools.streamContent(http, new HttpGet(uri)));
+      check(failure.getClass() == RuntimeException.class && failure.getCause() instanceof IOException,
+          "invalid status wrapping " + status);
+      check(failure.getCause().getMessage().equals(
+          "Invalid status code from " + uri + " URL: " + status),
+          "invalid status message " + status);
+      check(response.closes == 1 && response.entityCalls == 0 && response.contentCalls == 0,
+          "invalid status closure " + status);
+    }
+  }
+
+  private static void checkedFailures() {
+    IOException executeFailure = new IOException("execute");
+    RecordingHttpInterface failingHttp = new RecordingHttpInterface(null);
+    failingHttp.checkedFailure = executeFailure;
+    RuntimeException executeWrapper = expectRuntime(() ->
+        HttpStreamTools.streamContent(failingHttp, new HttpGet("https://example.test/execute")));
+    check(executeWrapper.getClass() == RuntimeException.class
+        && executeWrapper.getCause() == executeFailure && failingHttp.executions == 1,
+        "execute IOException wrapping");
+
+    IOException contentFailure = new IOException("content");
+    ResponseFixture response = new ResponseFixture(200, null);
+    response.contentFailure = contentFailure;
+    RuntimeException contentWrapper = expectRuntime(() -> HttpStreamTools.streamContent(
+        new RecordingHttpInterface(response.proxy), new HttpGet("https://example.test/content")));
+    check(contentWrapper.getClass() == RuntimeException.class
+        && contentWrapper.getCause() == contentFailure, "content IOException wrapping");
+    check(response.statusCalls == 1 && response.entityCalls == 1 && response.contentCalls == 1
+        && response.closes == 0, "content failure after success boundary");
+  }
+
+  private static void uncheckedFailures() {
+    RuntimeException executeFailure = new IllegalStateException("execute-runtime");
+    RecordingHttpInterface failingHttp = new RecordingHttpInterface(null);
+    failingHttp.runtimeFailure = executeFailure;
+    check(catchThrowable(() -> HttpStreamTools.streamContent(
+        failingHttp, new HttpGet("https://example.test/runtime"))) == executeFailure,
+        "execute runtime identity");
+
+    RuntimeException statusFailure = new IllegalArgumentException("status-runtime");
+    ResponseFixture statusResponse = new ResponseFixture(200, new RecordingStream());
+    statusResponse.statusFailure = statusFailure;
+    check(catchThrowable(() -> HttpStreamTools.streamContent(
+        new RecordingHttpInterface(statusResponse.proxy),
+        new HttpGet("https://example.test/status"))) == statusFailure,
+        "status runtime identity");
+    check(statusResponse.closes == 1 && statusResponse.entityCalls == 0,
+        "status failure closes response");
+
+    RuntimeException contentFailure = new IllegalStateException("content-runtime");
+    ResponseFixture contentResponse = new ResponseFixture(200, null);
+    contentResponse.runtimeContentFailure = contentFailure;
+    check(catchThrowable(() -> HttpStreamTools.streamContent(
+        new RecordingHttpInterface(contentResponse.proxy),
+        new HttpGet("https://example.test/content-runtime"))) == contentFailure,
+        "content runtime identity");
+    check(contentResponse.closes == 0, "content runtime retains successful response");
+  }
+
+  private static void nullsAndSuccessBoundary() {
+    HttpUriRequest request = new HttpGet("https://example.test/nulls");
+    check(catchThrowable(() -> HttpStreamTools.streamContent(null, request))
+        instanceof NullPointerException, "null interface");
+
+    RecordingHttpInterface nullResponse = new RecordingHttpInterface(null);
+    check(catchThrowable(() -> HttpStreamTools.streamContent(nullResponse, request))
+        instanceof NullPointerException, "null response");
+    check(nullResponse.executions == 1, "null response execute count");
+
+    ResponseFixture nullStatus = new ResponseFixture(200, new RecordingStream());
+    nullStatus.nullStatus = true;
+    check(catchThrowable(() -> HttpStreamTools.streamContent(
+        new RecordingHttpInterface(nullStatus.proxy), request)) instanceof NullPointerException,
+        "null status line");
+    check(nullStatus.closes == 1, "null status closes response");
+
+    ResponseFixture nullEntity = new ResponseFixture(200, new RecordingStream());
+    nullEntity.nullEntity = true;
+    check(catchThrowable(() -> HttpStreamTools.streamContent(
+        new RecordingHttpInterface(nullEntity.proxy), request)) instanceof NullPointerException,
+        "null entity");
+    check(nullEntity.closes == 0, "null entity after success retains response");
+
+    ResponseFixture invalid = new ResponseFixture(500, new RecordingStream());
+    check(catchThrowable(() -> HttpStreamTools.streamContent(
+        new RecordingHttpInterface(invalid.proxy), null)) instanceof NullPointerException,
+        "null request on error path");
+    check(invalid.closes == 1, "null request error closes response");
+  }
+
+  private static void reflection() throws Exception {
+    Class<HttpStreamTools> type = HttpStreamTools.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers()) && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0, "class metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 1 && type.getDeclaredClasses().length == 0,
+        "member counts");
+    Constructor<HttpStreamTools> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0
+        && constructor.newInstance().getClass() == type, "constructor metadata");
+    check(new Derived() instanceof HttpStreamTools, "subclassability");
+
+    Method method = type.getDeclaredMethod("streamContent", HttpInterface.class,
+        HttpUriRequest.class);
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && method.getReturnType() == InputStream.class
+        && Arrays.equals(method.getParameterTypes(),
+            new Class<?>[] {HttpInterface.class, HttpUriRequest.class})
+        && method.getExceptionTypes().length == 0 && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs(), "streamContent metadata");
+  }
+
+  private static RuntimeException expectRuntime(ThrowingOperation operation) {
+    Throwable failure = catchThrowable(operation);
+    check(failure instanceof RuntimeException, "expected runtime failure");
+    return (RuntimeException) failure;
+  }
+
+  private static Throwable catchThrowable(ThrowingOperation operation) {
+    try { operation.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+
+  private interface ThrowingOperation { void run() throws Throwable; }
+
+  private static final class Derived extends HttpStreamTools {}
+
+  private static final class RecordingHttpInterface extends HttpInterface {
+    final CloseableHttpResponse response;
+    HttpUriRequest lastRequest;
+    IOException checkedFailure;
+    RuntimeException runtimeFailure;
+    int executions;
+
+    RecordingHttpInterface(CloseableHttpResponse response) {
+      super(null, null, false, null);
+      this.response = response;
+    }
+
+    public CloseableHttpResponse execute(HttpUriRequest request) throws IOException {
+      executions++;
+      lastRequest = request;
+      if (checkedFailure != null) throw checkedFailure;
+      if (runtimeFailure != null) throw runtimeFailure;
+      return response;
+    }
+  }
+
+  private static final class ResponseFixture {
+    final CloseableHttpResponse proxy;
+    final int status;
+    final InputStream content;
+    IOException contentFailure;
+    RuntimeException statusFailure;
+    RuntimeException runtimeContentFailure;
+    boolean nullStatus;
+    boolean nullEntity;
+    int statusCalls;
+    int entityCalls;
+    int contentCalls;
+    int closes;
+
+    ResponseFixture(int status, InputStream content) {
+      this.status = status;
+      this.content = content;
+      HttpEntity entity = proxy(HttpEntity.class, (method, arguments) -> {
+        if (method.getName().equals("getContent")) {
+          contentCalls++;
+          if (contentFailure != null) throw contentFailure;
+          if (runtimeContentFailure != null) throw runtimeContentFailure;
+          return content;
+        }
+        return defaultValue(method.getReturnType());
+      });
+      StatusLine statusLine = proxy(StatusLine.class, (method, arguments) -> {
+        if (method.getName().equals("getStatusCode")) return status;
+        return defaultValue(method.getReturnType());
+      });
+      proxy = proxy(CloseableHttpResponse.class, (method, arguments) -> {
+        if (method.getName().equals("getStatusLine")) {
+          statusCalls++;
+          if (statusFailure != null) throw statusFailure;
+          return nullStatus ? null : statusLine;
+        }
+        if (method.getName().equals("getEntity")) {
+          entityCalls++;
+          return nullEntity ? null : entity;
+        }
+        if (method.getName().equals("close")) {
+          closes++;
+          return null;
+        }
+        return defaultValue(method.getReturnType());
+      });
+    }
+  }
+
+  private static final class RecordingStream extends InputStream {
+    int closes;
+    public int read() { return -1; }
+    public void close() { closes++; }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type, Invocation invocation) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type},
+        (instance, method, arguments) -> invocation.invoke(method, arguments));
+  }
+
+  private interface Invocation {
+    Object invoke(Method method, Object[] arguments) throws Throwable;
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
   }
 
   private static void check(boolean condition, String message) {

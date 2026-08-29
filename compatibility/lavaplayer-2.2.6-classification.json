@@ -25368,27 +25368,30 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference class bytes are retained byte-identically; response/status handling, ownership boundaries, failure behavior, subclassability, and reflection match the differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.http.HttpStreamTools",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public zero-argument constructor, Object superclass, and subclassability match the reference.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.http.HttpStreamTools",
       "symbol_kind": "METHOD",
       "member_name": "streamContent",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/io/HttpInterface;Lorg/apache/http/client/methods/HttpUriRequest;)Ljava/io/InputStream;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Request identity, 200/203/206 acceptance, rejected-status diagnostics, checked wrapping, unchecked identity, stream identity, and pre/post-success ownership match the differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.http.MultiHttpConfigurable",

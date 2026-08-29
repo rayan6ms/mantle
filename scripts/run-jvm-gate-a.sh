@@ -468,6 +468,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-http-context-filter-consumer \
   --output "$WORK/GateHttpContextFilter.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-http-context-retry-counter-consumer \
   --output "$WORK/GateHttpContextRetryCounter.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-http-stream-tools-consumer \
+  --output "$WORK/GateHttpStreamTools.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-container-probe-consumer \
   --output "$WORK/GateFlacContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-file-loader-consumer \
@@ -812,6 +814,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateAbstractHttpContextFilter.java" \
   "$WORK/GateHttpContextFilter.java" \
   "$WORK/GateHttpContextRetryCounter.java" \
+  "$WORK/GateHttpStreamTools.java" \
   "$WORK/GateAdtsStreamProvider.java" \
   "$WORK/GateAacPacketRouter.java" \
   "$WORK/GateMpegAacTrackConsumer.java" \
@@ -2294,6 +2297,16 @@ cmp "$WORK/http-context-retry-counter-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,attribute-key,missing-zero,lazy-holder,holder-reuse,context-isolation,key-sharing,key-isolation,explicit-values,repetition-reset,repetition-increment,integer-overflow,subclass-dispatch,failure-identity,nulls,wrong-type,private-state,nested-holder,reflection' \
   "$WORK/http-context-retry-counter-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateHttpStreamTools \
+  >"$WORK/http-stream-tools-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateHttpStreamTools >"$WORK/http-stream-tools-candidate.txt"
+cmp "$WORK/http-stream-tools-reference.txt" "$WORK/http-stream-tools-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,subclassable,execute-identity,status-200,status-203,status-206,rejected-statuses,error-message,checked-wrapping,unchecked-identity,pre-success-close,post-success-response-retention,stream-identity,stream-ownership,nulls,reflection' \
+  "$WORK/http-stream-tools-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_vorbis_track_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggVorbisTrackHandler >"$WORK/ogg-vorbis-track-handler-reference.txt"
