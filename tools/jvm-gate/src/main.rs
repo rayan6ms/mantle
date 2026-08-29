@@ -194,6 +194,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-bit-buffer-reader-consumer" => Some(BIT_BUFFER_READER_CONSUMER),
         "write-bit-stream-reader-consumer" => Some(BIT_STREAM_READER_CONSUMER),
         "write-bit-stream-writer-consumer" => Some(BIT_STREAM_WRITER_CONSUMER),
+        "write-byte-buffer-input-stream-consumer" => Some(BYTE_BUFFER_INPUT_STREAM_CONSUMER),
         "write-extended-http-configurable-consumer" => Some(EXTENDED_HTTP_CONFIGURABLE_CONSUMER),
         "write-http-configurable-consumer" => Some(HTTP_CONFIGURABLE_CONSUMER),
         "write-http-context-filter-consumer" => Some(HTTP_CONTEXT_FILTER_CONSUMER),
@@ -64249,6 +64250,131 @@ public final class GateBitStreamWriter {
 
   private static final class Derived extends BitStreamWriter {
     Derived(OutputStream stream) { super(stream); }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const BYTE_BUFFER_INPUT_STREAM_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.io.ByteBufferInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+
+public final class GateByteBufferInputStream {
+  public static void main(String[] args) throws Exception {
+    constructionAndSingleReads();
+    bulkReadsAndBoundaries();
+    validationAndNulls();
+    reflection();
+    System.out.println("contracts=constructor,buffer-identity,live-state,available,unsigned-single,position,single-eof,bulk-offset,bulk-position,zero-length,over-read-underflow,underflow-position,bulk-eof,eof-validation-order,null-buffer,read-only-buffer,inherited-close,inherited-mark,subclassable,private-state,reflection");
+  }
+
+  private static void constructionAndSingleReads() throws Exception {
+    ByteBuffer buffer = ByteBuffer.wrap(new byte[] {(byte) 0x80, (byte) 0xFF, 1});
+    ByteBufferInputStream stream = new ByteBufferInputStream(buffer);
+    check(field(stream, "buffer") == buffer, "buffer identity");
+    check(stream.available() == 3, "initial available");
+    buffer.position(1);
+    check(stream.available() == 2, "external position is live");
+    check(stream.read() == 255 && buffer.position() == 2, "unsigned single read");
+    stream.close();
+    check(stream.read() == 1, "inherited close is no-op");
+    check(stream.read() == -1 && stream.available() == 0, "single EOF");
+    check(!stream.markSupported(), "inherited mark support");
+
+    ByteBuffer readOnly = ByteBuffer.wrap(new byte[] {(byte) 0xFE}).asReadOnlyBuffer();
+    ByteBufferInputStream readOnlyStream = new ByteBufferInputStream(readOnly);
+    check(readOnlyStream.read() == 254, "read-only buffer");
+  }
+
+  private static void bulkReadsAndBoundaries() throws Exception {
+    ByteBuffer buffer = ByteBuffer.wrap(new byte[] {10, 11, 12, 13});
+    ByteBufferInputStream stream = new ByteBufferInputStream(buffer);
+    byte[] target = new byte[] {99, 99, 99, 99, 99};
+    check(stream.read(target, 1, 2) == 2, "bulk count");
+    check(Arrays.equals(target, new byte[] {99, 10, 11, 99, 99}), "bulk offset");
+    check(buffer.position() == 2 && stream.available() == 2, "bulk position");
+    check(stream.read(target, 0, 0) == 0 && buffer.position() == 2,
+        "zero length with remaining data");
+
+    Throwable underflow = catchThrowable(() -> stream.read(target, 0, 3));
+    check(underflow instanceof BufferUnderflowException, "over-read underflow");
+    check(buffer.position() == 2 && stream.available() == 2, "underflow position");
+    check(stream.read(target, 3, 2) == 2, "final bulk count");
+    check(target[3] == 12 && target[4] == 13, "final bulk bytes");
+    check(stream.read() == -1, "bulk exhaustion");
+
+    check(stream.read(new byte[0], 0, 0) == -1, "zero length at EOF");
+    check(stream.read(null, -10, -20) == -1, "EOF skips argument validation");
+  }
+
+  private static void validationAndNulls() throws Exception {
+    ByteBufferInputStream nullArray = new ByteBufferInputStream(ByteBuffer.wrap(new byte[] {1}));
+    check(catchThrowable(() -> nullArray.read(null, 0, 1)) instanceof NullPointerException,
+        "null array with data");
+    ByteBufferInputStream badRange = new ByteBufferInputStream(ByteBuffer.wrap(new byte[] {1}));
+    check(catchThrowable(() -> badRange.read(new byte[1], 1, 1))
+        instanceof IndexOutOfBoundsException, "range validation with data");
+    ByteBufferInputStream negative = new ByteBufferInputStream(ByteBuffer.wrap(new byte[] {1}));
+    check(catchThrowable(() -> negative.read(new byte[1], 0, -1))
+        instanceof IndexOutOfBoundsException, "negative length with data");
+
+    ByteBufferInputStream nullBuffer = new ByteBufferInputStream(null);
+    check(field(nullBuffer, "buffer") == null, "null buffer identity");
+    check(catchThrowable(nullBuffer::read) instanceof NullPointerException, "null single read");
+    check(catchThrowable(() -> nullBuffer.read(null, 0, 0)) instanceof NullPointerException,
+        "null bulk read");
+    check(catchThrowable(nullBuffer::available) instanceof NullPointerException,
+        "null available");
+  }
+
+  private static void reflection() throws Exception {
+    Class<ByteBufferInputStream> type = ByteBufferInputStream.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers()),
+        "class modifiers");
+    check(type.getSuperclass() == InputStream.class && type.getInterfaces().length == 0,
+        "superclass");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredMethods().length == 3,
+        "member counts");
+    Field buffer = type.getDeclaredField("buffer");
+    check(buffer.getType() == ByteBuffer.class
+        && (buffer.getModifiers() & (Modifier.PRIVATE | Modifier.FINAL))
+            == (Modifier.PRIVATE | Modifier.FINAL), "buffer field shape");
+    check(type.getDeclaredConstructor(ByteBuffer.class).getExceptionTypes().length == 0,
+        "constructor exceptions");
+    for (Method method : new Method[] {
+        type.getDeclaredMethod("read"),
+        type.getDeclaredMethod("read", byte[].class, int.class, int.class),
+        type.getDeclaredMethod("available")}) {
+      check(Modifier.isPublic(method.getModifiers()) && method.getExceptionTypes().length == 1
+          && method.getExceptionTypes()[0] == IOException.class,
+          method.getName() + " shape");
+    }
+    new Derived(ByteBuffer.allocate(0));
+  }
+
+  private static Object field(Object instance, String name) throws Exception {
+    Field field = instance.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(instance);
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+
+  private static final class Derived extends ByteBufferInputStream {
+    Derived(ByteBuffer buffer) { super(buffer); }
   }
 
   private interface ThrowingRunnable { void run() throws Throwable; }
