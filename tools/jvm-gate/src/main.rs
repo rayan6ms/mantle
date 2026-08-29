@@ -198,6 +198,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-byte-buffer-output-stream-consumer" => Some(BYTE_BUFFER_OUTPUT_STREAM_CONSUMER),
         "write-chained-input-stream-consumer" => Some(CHAINED_INPUT_STREAM_CONSUMER),
         "write-detached-byte-channel-consumer" => Some(DETACHED_BYTE_CHANNEL_CONSUMER),
+        "write-direct-buffer-stream-broker-consumer" => Some(DIRECT_BUFFER_STREAM_BROKER_CONSUMER),
         "write-extended-http-configurable-consumer" => Some(EXTENDED_HTTP_CONFIGURABLE_CONSUMER),
         "write-http-configurable-consumer" => Some(HTTP_CONFIGURABLE_CONSUMER),
         "write-http-context-filter-consumer" => Some(HTTP_CONTEXT_FILTER_CONSUMER),
@@ -64933,6 +64934,161 @@ public final class GateDetachedByteChannel {
 
   private static final class Derived extends DetachedByteChannel {
     Derived(ReadableByteChannel delegate) { super(delegate); }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const DIRECT_BUFFER_STREAM_BROKER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.io.DirectBufferStreamBroker;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+
+public final class GateDirectBufferStreamBroker {
+  public static void main(String[] args) throws Exception {
+    constructionAndBufferViews();
+    consumeAndTruncation();
+    limitsAndFailures();
+    reflection();
+    System.out.println("contracts=constructor,initial-size,copy-buffer,direct-buffer,empty-view,consume-all,buffer-view,extract-bytes,extract-copy,clear,truncate,read-limit,reset-capacity,reset-state,consume-io-identity,subclassable,private-state,reflection");
+  }
+
+  private static void constructionAndBufferViews() throws Exception {
+    DirectBufferStreamBroker broker = new DirectBufferStreamBroker(8);
+    ByteBuffer current = (ByteBuffer) field(broker, "currentBuffer");
+    check(current.isDirect() && current.capacity() == 8 && current.position() == 0,
+        "initial direct buffer");
+    check(((Integer) field(broker, "initialSize")) == 8, "initial size");
+    check(((byte[]) field(broker, "copyBuffer")).length == 512, "copy buffer");
+    ByteBuffer view = broker.getBuffer();
+    check(view.isDirect() && view.position() == 0 && view.limit() == 0,
+        "empty buffer view");
+    view.position(0);
+    broker.clear();
+    check(current.position() == 0 && current.limit() == current.capacity(), "clear state");
+  }
+
+  private static void consumeAndTruncation() throws Exception {
+    DirectBufferStreamBroker broker = new DirectBufferStreamBroker(2);
+    byte[] source = new byte[] {1, 2, 3, 4, 5};
+    check(broker.consumeNext(new ByteArrayInputStream(source), 10, 10), "consume all result");
+    check(Arrays.equals(broker.extractBytes(), source), "extract bytes");
+    check(Arrays.equals(broker.extractBytes(), source), "extract repeat bytes");
+    ByteBuffer view = broker.getBuffer();
+    check(view.remaining() == 5 && view.get() == 1 && view.get(4) == 5,
+        "buffer view contents");
+    view.position(0);
+    check(broker.getBuffer().position() == 0, "buffer view duplicate");
+    check(!broker.isTruncated(), "not truncated");
+
+    DirectBufferStreamBroker truncated = new DirectBufferStreamBroker(2);
+    check(truncated.consumeNext(new ByteArrayInputStream(new byte[] {9, 8, 7, 6}), 2, 10),
+        "truncated stream fully read");
+    check(Arrays.equals(truncated.extractBytes(), new byte[] {9, 8}), "saved prefix");
+    check(!truncated.isTruncated(), "read count remains zero");
+    truncated.clear();
+    check(truncated.getBuffer().remaining() == 0 && !truncated.isTruncated(),
+        "clear preserves zero read count");
+  }
+
+  private static void limitsAndFailures() throws Exception {
+    DirectBufferStreamBroker limited = new DirectBufferStreamBroker(4);
+    check(limited.consumeNext(new ByteArrayInputStream(new byte[] {1, 2, 3, 4, 5}), 10, 3),
+        "read limit result");
+    check(Arrays.equals(limited.extractBytes(), new byte[] {1, 2, 3, 4, 5})
+        && !limited.isTruncated(), "read limit state");
+
+    DirectBufferStreamBroker reset = new DirectBufferStreamBroker(2);
+    reset.consumeNext(new ByteArrayInputStream(new byte[] {1, 2, 3}), 10, 10);
+    ByteBuffer before = (ByteBuffer) field(reset, "currentBuffer");
+    check(before.capacity() >= 3, "grown capacity");
+    reset.resetAndCompact();
+    ByteBuffer after = (ByteBuffer) field(reset, "currentBuffer");
+    check(after != before && after.isDirect() && after.capacity() == 2
+        && after.position() == 0, "reset capacity and identity");
+    check(!reset.isTruncated(), "reset preserves zero read count");
+
+    IOException failure = new IOException("consume-failure");
+    FailingInput input = new FailingInput(failure);
+    DirectBufferStreamBroker failing = new DirectBufferStreamBroker(4);
+    check(catchThrowable(() -> failing.consumeNext(input, 10, 10)) == failure,
+        "consume IO identity");
+    check(input.readCalls == 1, "consume failure call count");
+  }
+
+  private static void reflection() throws Exception {
+    Class<DirectBufferStreamBroker> type = DirectBufferStreamBroker.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers()),
+        "class modifiers");
+    check(type.getSuperclass() == Object.class && type.getInterfaces().length == 0,
+        "superclass");
+    check(type.getDeclaredFields().length == 4 && type.getDeclaredMethods().length == 7,
+        "member counts");
+    Field copyBuffer = type.getDeclaredField("copyBuffer");
+    check(copyBuffer.getType() == byte[].class
+        && (copyBuffer.getModifiers() & (Modifier.PRIVATE | Modifier.FINAL))
+            == (Modifier.PRIVATE | Modifier.FINAL), "copy buffer field");
+    Field initialSize = type.getDeclaredField("initialSize");
+    check(initialSize.getType() == int.class
+        && (initialSize.getModifiers() & (Modifier.PRIVATE | Modifier.FINAL))
+            == (Modifier.PRIVATE | Modifier.FINAL), "initial size field");
+    check(type.getDeclaredField("readByteCount").getType() == int.class
+        && Modifier.isPrivate(type.getDeclaredField("readByteCount").getModifiers()),
+        "read count field");
+    check(type.getDeclaredField("currentBuffer").getType() == ByteBuffer.class
+        && Modifier.isPrivate(type.getDeclaredField("currentBuffer").getModifiers()),
+        "current buffer field");
+    check(type.getDeclaredConstructor(int.class).getExceptionTypes().length == 0,
+        "constructor shape");
+    for (Method method : new Method[] {
+        type.getDeclaredMethod("resetAndCompact"), type.getDeclaredMethod("clear"),
+        type.getDeclaredMethod("getBuffer"), type.getDeclaredMethod("isTruncated"),
+        type.getDeclaredMethod("extractBytes")}) {
+      check(Modifier.isPublic(method.getModifiers()) && method.getExceptionTypes().length == 0,
+          method.getName() + " shape");
+    }
+    Method consume = type.getDeclaredMethod("consumeNext", InputStream.class, int.class, int.class);
+    check(Modifier.isPublic(consume.getModifiers()) && consume.getExceptionTypes().length == 1
+        && consume.getExceptionTypes()[0] == IOException.class, "consume shape");
+    Method ensure = type.getDeclaredMethod("ensureCapacity", int.class);
+    check(Modifier.isPrivate(ensure.getModifiers()) && ensure.getExceptionTypes().length == 0,
+        "private ensure shape");
+    new Derived(1);
+  }
+
+  private static Object field(Object instance, String name) throws Exception {
+    Field field = DirectBufferStreamBroker.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(instance);
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+
+  private static final class FailingInput extends InputStream {
+    final IOException failure;
+    int readCalls;
+    FailingInput(IOException failure) { this.failure = failure; }
+    public int read() throws IOException { throw failure; }
+    public int read(byte[] bytes, int offset, int length) throws IOException {
+      readCalls++;
+      throw failure;
+    }
+  }
+
+  private static final class Derived extends DirectBufferStreamBroker {
+    Derived(int initialSize) { super(initialSize); }
   }
 
   private interface ThrowingRunnable { void run() throws Throwable; }

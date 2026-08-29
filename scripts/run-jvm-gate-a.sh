@@ -486,6 +486,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-chained-input-stream-consumer 
   --output "$WORK/GateChainedInputStream.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-detached-byte-channel-consumer \
   --output "$WORK/GateDetachedByteChannel.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-direct-buffer-stream-broker-consumer \
+  --output "$WORK/GateDirectBufferStreamBroker.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-extended-http-configurable-consumer \
   --output "$WORK/GateExtendedHttpConfigurable.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-http-configurable-consumer \
@@ -853,6 +855,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateByteBufferOutputStream.java" \
   "$WORK/GateChainedInputStream.java" \
   "$WORK/GateDetachedByteChannel.java" \
+  "$WORK/GateDirectBufferStreamBroker.java" \
   "$WORK/GateExtendedHttpConfigurable.java" \
   "$WORK/GateHttpConfigurable.java" \
   "$WORK/GateHttpContextFilter.java" \
@@ -2439,6 +2442,17 @@ cmp "$WORK/detached-byte-channel-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,delegate-identity,initial-state,read-delegation,read-arguments,read-position,read-result,read-io-identity,open-delegate-state,close-detaches,close-idempotent,closed-state,closed-read,closed-read-fresh,closed-read-no-delegate,null-delegate,null-close,subclassable,private-state,reflection' \
   "$WORK/detached-byte-channel-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateDirectBufferStreamBroker \
+  >"$WORK/direct-buffer-stream-broker-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateDirectBufferStreamBroker >"$WORK/direct-buffer-stream-broker-candidate.txt"
+cmp "$WORK/direct-buffer-stream-broker-reference.txt" \
+  "$WORK/direct-buffer-stream-broker-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,initial-size,copy-buffer,direct-buffer,empty-view,consume-all,buffer-view,extract-bytes,extract-copy,clear,truncate,read-limit,reset-capacity,reset-state,consume-io-identity,subclassable,private-state,reflection' \
+  "$WORK/direct-buffer-stream-broker-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateExtendedHttpConfigurable \
   >"$WORK/extended-http-configurable-reference.txt"
