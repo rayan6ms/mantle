@@ -412,6 +412,7 @@ const DETACHED_BYTE_CHANNEL_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/io/DetachedByteChannel";
 const DIRECT_BUFFER_STREAM_BROKER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/io/DirectBufferStreamBroker";
+const EMPTY_INPUT_STREAM_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/io/EmptyInputStream";
 const ABSTRACT_MUTABLE_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AbstractMutableAudioFrame";
 const IMMUTABLE_FRAME_CLASS: &str =
@@ -1031,6 +1032,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     CHAINED_INPUT_STREAM_PROVIDER_CLASS,
     DETACHED_BYTE_CHANNEL_CLASS,
     DIRECT_BUFFER_STREAM_BROKER_CLASS,
+    EMPTY_INPUT_STREAM_CLASS,
     COPY_ON_UPDATE_IDENTITY_LIST_CLASS,
     DATA_FORMAT_TOOLS_CLASS,
     DATA_FORMAT_TOOLS_TEXT_RANGE_CLASS,
@@ -1215,6 +1217,7 @@ pub fn emit(
     let mut chained_input_stream_provider_bytes = None;
     let mut detached_byte_channel_bytes = None;
     let mut direct_buffer_stream_broker_bytes = None;
+    let mut empty_input_stream_bytes = None;
     let mut vorbis_comment_parser_bytes = None;
     let mut extended_m3u_parser_bytes = None;
     let mut extended_m3u_line_bytes = None;
@@ -1440,6 +1443,8 @@ pub fn emit(
             detached_byte_channel_bytes = Some(bytes);
         } else if *binary_name == DIRECT_BUFFER_STREAM_BROKER_CLASS {
             direct_buffer_stream_broker_bytes = Some(bytes);
+        } else if *binary_name == EMPTY_INPUT_STREAM_CLASS {
+            empty_input_stream_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -1772,6 +1777,12 @@ pub fn emit(
                 direct_buffer_stream_broker_bytes
                     .as_ref()
                     .expect("direct buffer stream broker source bytes are retained"),
+            );
+        } else if name == format!("{EMPTY_INPUT_STREAM_CLASS}.class") {
+            bytes.clone_from(
+                empty_input_stream_bytes
+                    .as_ref()
+                    .expect("empty input stream source bytes are retained"),
             );
         } else if name == format!("{MPEG_AUDIO_TRACK_CLASS}.class") {
             bytes.clone_from(

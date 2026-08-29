@@ -199,6 +199,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-chained-input-stream-consumer" => Some(CHAINED_INPUT_STREAM_CONSUMER),
         "write-detached-byte-channel-consumer" => Some(DETACHED_BYTE_CHANNEL_CONSUMER),
         "write-direct-buffer-stream-broker-consumer" => Some(DIRECT_BUFFER_STREAM_BROKER_CONSUMER),
+        "write-empty-input-stream-consumer" => Some(EMPTY_INPUT_STREAM_CONSUMER),
         "write-extended-http-configurable-consumer" => Some(EXTENDED_HTTP_CONFIGURABLE_CONSUMER),
         "write-http-configurable-consumer" => Some(HTTP_CONFIGURABLE_CONSUMER),
         "write-http-context-filter-consumer" => Some(HTTP_CONTEXT_FILTER_CONSUMER),
@@ -65092,6 +65093,72 @@ public final class GateDirectBufferStreamBroker {
   }
 
   private interface ThrowingRunnable { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const EMPTY_INPUT_STREAM_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.io.EmptyInputStream;
+import java.io.InputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateEmptyInputStream {
+  public static void main(String[] args) throws Exception {
+    singletonAndReads();
+    inheritedBehavior();
+    reflection();
+    System.out.println("contracts=singleton,constructor,available,read,eof-repeat,bulk-eof,skip-zero,inherited-close,inherited-mark,subclassable,public-constant,private-state,reflection");
+  }
+
+  private static void singletonAndReads() throws Exception {
+    EmptyInputStream singleton = EmptyInputStream.INSTANCE;
+    check(singleton != null && singleton == EmptyInputStream.INSTANCE, "singleton identity");
+    check(singleton.available() == 0 && singleton.read() == -1 && singleton.read() == -1,
+        "empty reads");
+    check(new EmptyInputStream() != singleton, "constructor creates distinct instance");
+    check(new EmptyInputStream().available() == 0, "constructed availability");
+  }
+
+  private static void inheritedBehavior() throws Exception {
+    EmptyInputStream stream = new EmptyInputStream();
+    byte[] target = new byte[] {9, 9};
+    check(stream.read(target, 0, 2) == -1 && Arrays.equals(target, new byte[] {9, 9}),
+        "inherited bulk EOF");
+    check(stream.read(target, 0, 0) == 0, "bulk zero inherited behavior");
+    check(stream.skip(42) == 0, "inherited skip");
+    stream.close();
+    check(stream.read() == -1 && !stream.markSupported(), "inherited close and mark");
+  }
+
+  private static void reflection() throws Exception {
+    Class<EmptyInputStream> type = EmptyInputStream.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers()),
+        "class modifiers");
+    check(type.getSuperclass() == InputStream.class && type.getInterfaces().length == 0,
+        "superclass");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredMethods().length == 2,
+        "member counts");
+    Field instance = type.getDeclaredField("INSTANCE");
+    check(instance.getType() == type
+        && (instance.getModifiers() & (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL))
+            == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL), "INSTANCE field");
+    check(type.getDeclaredConstructor().getExceptionTypes().length == 0,
+        "constructor shape");
+    Method available = type.getDeclaredMethod("available");
+    Method read = type.getDeclaredMethod("read");
+    check(Modifier.isPublic(available.getModifiers()) && available.getReturnType() == int.class
+        && available.getExceptionTypes().length == 0, "available shape");
+    check(Modifier.isPublic(read.getModifiers()) && read.getReturnType() == int.class
+        && read.getExceptionTypes().length == 0, "read shape");
+    new Derived();
+  }
+
+  private static final class Derived extends EmptyInputStream {}
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }

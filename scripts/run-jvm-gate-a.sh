@@ -488,6 +488,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-detached-byte-channel-consumer
   --output "$WORK/GateDetachedByteChannel.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-direct-buffer-stream-broker-consumer \
   --output "$WORK/GateDirectBufferStreamBroker.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-empty-input-stream-consumer \
+  --output "$WORK/GateEmptyInputStream.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-extended-http-configurable-consumer \
   --output "$WORK/GateExtendedHttpConfigurable.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-http-configurable-consumer \
@@ -856,6 +858,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateChainedInputStream.java" \
   "$WORK/GateDetachedByteChannel.java" \
   "$WORK/GateDirectBufferStreamBroker.java" \
+  "$WORK/GateEmptyInputStream.java" \
   "$WORK/GateExtendedHttpConfigurable.java" \
   "$WORK/GateHttpConfigurable.java" \
   "$WORK/GateHttpContextFilter.java" \
@@ -2453,6 +2456,17 @@ cmp "$WORK/direct-buffer-stream-broker-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,initial-size,copy-buffer,direct-buffer,empty-view,consume-all,buffer-view,extract-bytes,extract-copy,clear,truncate,read-limit,reset-capacity,reset-state,consume-io-identity,subclassable,private-state,reflection' \
   "$WORK/direct-buffer-stream-broker-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateEmptyInputStream \
+  >"$WORK/empty-input-stream-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateEmptyInputStream >"$WORK/empty-input-stream-candidate.txt"
+cmp "$WORK/empty-input-stream-reference.txt" \
+  "$WORK/empty-input-stream-candidate.txt"
+grep --fixed-strings \
+  'contracts=singleton,constructor,available,read,eof-repeat,bulk-eof,bulk-zero,skip-zero,inherited-close,inherited-mark,subclassable,public-constant,private-state,reflection' \
+  "$WORK/empty-input-stream-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateExtendedHttpConfigurable \
   >"$WORK/extended-http-configurable-reference.txt"
