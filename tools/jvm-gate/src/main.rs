@@ -171,6 +171,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-future-tools-consumer" => Some(FUTURE_TOOLS_CONSUMER),
         "write-garbage-collection-monitor-consumer" => Some(GARBAGE_COLLECTION_MONITOR_CONSUMER),
         "write-json-browser-consumer" => Some(JSON_BROWSER_CONSUMER),
+        "write-ordered-executor-consumer" => Some(ORDERED_EXECUTOR_CONSUMER),
         _ => None,
     }
 }
@@ -60439,6 +60440,267 @@ public final class GateOpusPacketRouter {
     int flushCalls;
     Derived(AudioProcessingContext context) { super(context, 48_000, 2); }
     @Override public void flush() { flushCalls++; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const ORDERED_EXECUTOR_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.OrderedExecutor;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.AbstractExecutorService;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+
+public final class GateOrderedExecutor {
+  public static void main(String[] args) throws Exception {
+    QueueExecutor delegate = new QueueExecutor();
+    OrderedExecutor executor = new OrderedExecutor(delegate);
+    check(new Derived(delegate) instanceof OrderedExecutor, "subclassability");
+    check(delegateService(executor) == delegate, "delegate identity");
+    check(states(executor).getClass() == ConcurrentHashMap.class, "state map implementation");
+    check(states(executor).isEmpty(), "initial state");
+
+    List<String> events = new ArrayList<>();
+    EqualKey firstKey = new EqualKey("shared");
+    EqualKey equalKey = new EqualKey("shared");
+    Future<Void> first = executor.submit(firstKey, () -> { events.add("shared-1"); });
+    Future<String> second = executor.submit(equalKey, () -> {
+      events.add("shared-2");
+      return "callable-result";
+    });
+    Future<Integer> independent = executor.submit(new EqualKey("other"), () -> {
+      events.add("other");
+      return 17;
+    });
+    check(delegate.size() == 2, "one worker per equality channel");
+    check(!first.isDone() && !second.isDone() && !independent.isDone(), "deferred futures");
+    delegate.runAt(1);
+    check(independent.get() == 17, "independent callable result");
+    check(!first.isDone() && events.equals(Collections.singletonList("other")),
+        "different key independence");
+    delegate.runNext();
+    check(first.get() == null, "runnable future value");
+    check("callable-result".equals(second.get()), "callable future value");
+    check(events.equals(List.of("other", "shared-1", "shared-2")), "equal-key fifo");
+    check(states(executor).isEmpty(), "state removed after drain");
+
+    IllegalStateException taskFailure = new IllegalStateException("task-failure");
+    Future<String> failed = executor.submit("task-failure", () -> { throw taskFailure; });
+    Future<Void> afterFailure = executor.submit("task-failure", () -> { events.add("after-failure"); });
+    check(delegate.size() == 1, "failed task shares channel worker");
+    delegate.runNext();
+    Throwable failedGet = catchThrowable(failed::get);
+    check(failedGet instanceof ExecutionException && failedGet.getCause() == taskFailure,
+        "task failure identity");
+    check(afterFailure.get() == null && events.contains("after-failure"),
+        "task failure continuation");
+
+    Future<Void> cancelled = executor.submit("cancel", () -> { events.add("cancelled-ran"); });
+    Future<Void> afterCancel = executor.submit("cancel", () -> { events.add("after-cancel"); });
+    check(cancelled.cancel(true), "pending cancellation");
+    delegate.runNext();
+    check(catchThrowable(cancelled::get) instanceof CancellationException, "cancelled get");
+    check(afterCancel.get() == null && !events.contains("cancelled-ran") && events.contains("after-cancel"),
+        "cancelled task skipped without blocking channel");
+
+    RuntimeException channelFailure = new RuntimeException("channel-failure");
+    Future<Void> beforeChannelFailure =
+        executor.submit("channel-failure", () -> { events.add("before-channel-failure"); });
+    BlockingQueue<Runnable> channelQueue = states(executor).get("channel-failure");
+    channelQueue.add(() -> { throw channelFailure; });
+    Future<Void> afterChannelFailure =
+        executor.submit("channel-failure", () -> { events.add("after-channel-failure"); });
+    Throwable workerFailure = delegate.runNextFailure();
+    check(workerFailure == channelFailure, "channel failure identity");
+    check(beforeChannelFailure.get() == null && !afterChannelFailure.isDone(),
+        "channel failure stops current drain");
+    check(delegate.size() == 1, "channel failure schedules recovery worker");
+    delegate.runNext();
+    check(afterChannelFailure.get() == null && events.contains("after-channel-failure"),
+        "channel failure recovery");
+    check(states(executor).isEmpty(), "recovered state removed");
+
+    check(catchThrowable(() -> executor.submit(null, (Runnable) () -> {}))
+        instanceof NullPointerException, "null key");
+    check(catchThrowable(() -> executor.submit("null-runnable", (Runnable) null))
+        instanceof NullPointerException, "null runnable");
+    check(catchThrowable(() -> executor.submit("null-callable", (Callable<Object>) null))
+        instanceof NullPointerException, "null callable");
+
+    RejectingExecutor rejectingDelegate = new RejectingExecutor();
+    OrderedExecutor rejecting = new OrderedExecutor(rejectingDelegate);
+    check(catchThrowable(() -> rejecting.submit("rejected", () -> {}))
+        instanceof RejectedExecutionException, "delegate rejection");
+    check(states(rejecting).size() == 1, "rejection retains channel state");
+    Future<Void> stranded = rejecting.submit("rejected", () -> {});
+    check(!stranded.isDone() && rejectingDelegate.calls == 1,
+        "retained rejected channel strands later work");
+    check(stranded.cancel(false), "stranded future cancellable");
+
+    check(catchThrowable(() -> new OrderedExecutor(null).submit("null-delegate", () -> {}))
+        instanceof NullPointerException, "null delegate deferred failure");
+
+    verifyReflection();
+    System.out.println("ordered-executor-ok contracts=constructor,subclassable,delegate-state,runnable-future,callable-future,equal-key-fifo,different-key-independence,task-failure-continuation,cancellation,channel-failure-recovery,null-inputs,rejection-retention,generics,nested-state,reflection");
+  }
+
+  private static void verifyReflection() throws Exception {
+    Class<OrderedExecutor> type = OrderedExecutor.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers()),
+        "class modifiers");
+    check(type.getSuperclass() == Object.class && type.getInterfaces().length == 0,
+        "class hierarchy");
+    Constructor<?>[] constructors = type.getDeclaredConstructors();
+    check(constructors.length == 1 && Modifier.isPublic(constructors[0].getModifiers()),
+        "constructor count and visibility");
+    check(List.of(constructors[0].getParameterTypes()).equals(List.of(ExecutorService.class)),
+        "constructor parameter");
+
+    Method runnableSubmit = type.getDeclaredMethod("submit", Object.class, Runnable.class);
+    Method callableSubmit = type.getDeclaredMethod("submit", Object.class, Callable.class);
+    check(type.getDeclaredMethods().length == 5, "declared method count");
+    check(Modifier.isPublic(runnableSubmit.getModifiers()) &&
+        runnableSubmit.getReturnType() == Future.class, "runnable submit shape");
+    check(Modifier.isPublic(callableSubmit.getModifiers()) &&
+        callableSubmit.getReturnType() == Future.class, "callable submit shape");
+    check(runnableSubmit.getTypeParameters().length == 0, "runnable type parameters");
+    check(callableSubmit.getTypeParameters().length == 1 &&
+        "T".equals(callableSubmit.getTypeParameters()[0].getName()), "callable type parameter");
+    check("java.util.concurrent.Future<java.lang.Void>".equals(
+        runnableSubmit.getGenericReturnType().getTypeName()), "runnable generic return");
+    check("java.util.concurrent.Future<T>".equals(
+        callableSubmit.getGenericReturnType().getTypeName()), "callable generic return");
+    Type callableParameter = callableSubmit.getGenericParameterTypes()[1];
+    check(callableParameter instanceof ParameterizedType &&
+        "java.util.concurrent.Callable<T>".equals(callableParameter.getTypeName()),
+        "callable generic parameter");
+
+    Field delegateField = type.getDeclaredField("delegateService");
+    Field statesField = type.getDeclaredField("states");
+    check(type.getDeclaredFields().length == 2, "declared field count");
+    check(delegateField.getType() == ExecutorService.class &&
+        Modifier.isPrivate(delegateField.getModifiers()) && Modifier.isFinal(delegateField.getModifiers()),
+        "delegate field shape");
+    check(statesField.getType() == ConcurrentMap.class && Modifier.isPrivate(statesField.getModifiers()) &&
+        Modifier.isFinal(statesField.getModifiers()), "states field shape");
+    check("java.util.concurrent.ConcurrentMap<java.lang.Object, java.util.concurrent.BlockingQueue<java.lang.Runnable>>"
+        .equals(statesField.getGenericType().getTypeName()), "states generic signature");
+
+    Class<?>[] nested = type.getDeclaredClasses();
+    check(nested.length == 1 && nested[0].getName().endsWith("$ChannelRunnable"),
+        "nested class identity");
+    Class<?> channel = nested[0];
+    check(Modifier.isPrivate(channel.getModifiers()) && !Modifier.isStatic(channel.getModifiers()),
+        "nested class modifiers");
+    check(channel.getInterfaces().length == 1 && channel.getInterfaces()[0] == Runnable.class,
+        "nested runnable interface");
+    check(channel.getDeclaredConstructors().length == 1 &&
+        Modifier.isPrivate(channel.getDeclaredConstructors()[0].getModifiers()),
+        "nested constructor");
+    check(channel.getDeclaredMethods().length == 2 &&
+        channel.getDeclaredMethod("run").getReturnType() == void.class, "nested methods");
+    Field key = channel.getDeclaredField("key");
+    Field outer = channel.getDeclaredField("this$0");
+    check(key.getType() == Object.class && Modifier.isPrivate(key.getModifiers()) &&
+        Modifier.isFinal(key.getModifiers()), "nested key field");
+    check(outer.getType() == type && outer.isSynthetic() && Modifier.isFinal(outer.getModifiers()),
+        "nested outer field");
+    check(type.getNestHost() == type && channel.getNestHost() == type &&
+        type.getNestMembers().length == 2, "nest metadata");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static ConcurrentMap<Object, BlockingQueue<Runnable>> states(OrderedExecutor executor)
+      throws Exception {
+    Field field = OrderedExecutor.class.getDeclaredField("states");
+    field.setAccessible(true);
+    return (ConcurrentMap<Object, BlockingQueue<Runnable>>) field.get(executor);
+  }
+
+  private static ExecutorService delegateService(OrderedExecutor executor) throws Exception {
+    Field field = OrderedExecutor.class.getDeclaredField("delegateService");
+    field.setAccessible(true);
+    return (ExecutorService) field.get(executor);
+  }
+
+  private static Throwable catchThrowable(ThrowingAction action) {
+    try {
+      action.run();
+      return null;
+    } catch (Throwable throwable) {
+      return throwable;
+    }
+  }
+
+  @FunctionalInterface
+  private interface ThrowingAction {
+    void run() throws Throwable;
+  }
+
+  private static class QueueExecutor extends AbstractExecutorService {
+    private final List<Runnable> tasks = new ArrayList<>();
+    private boolean shutdown;
+
+    @Override public void execute(Runnable command) {
+      if (shutdown) throw new RejectedExecutionException("shutdown");
+      tasks.add(Objects.requireNonNull(command));
+    }
+    int size() { return tasks.size(); }
+    void runNext() { runAt(0); }
+    void runAt(int index) { tasks.remove(index).run(); }
+    Throwable runNextFailure() { return catchThrowable(this::runNext); }
+    @Override public void shutdown() { shutdown = true; }
+    @Override public List<Runnable> shutdownNow() {
+      shutdown = true;
+      List<Runnable> pending = new ArrayList<>(tasks);
+      tasks.clear();
+      return pending;
+    }
+    @Override public boolean isShutdown() { return shutdown; }
+    @Override public boolean isTerminated() { return shutdown && tasks.isEmpty(); }
+    @Override public boolean awaitTermination(long timeout, TimeUnit unit) { return isTerminated(); }
+  }
+
+  private static final class RejectingExecutor extends QueueExecutor {
+    int calls;
+    @Override public void execute(Runnable command) {
+      calls++;
+      throw new RejectedExecutionException("rejected");
+    }
+  }
+
+  private static final class EqualKey {
+    private final String value;
+    EqualKey(String value) { this.value = value; }
+    @Override public boolean equals(Object other) {
+      return other instanceof EqualKey && value.equals(((EqualKey) other).value);
+    }
+    @Override public int hashCode() { return value.hashCode(); }
+  }
+
+  private static final class Derived extends OrderedExecutor {
+    Derived(ExecutorService delegate) { super(delegate); }
   }
 
   private static void check(boolean condition, String message) {

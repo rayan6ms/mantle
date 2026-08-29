@@ -24720,36 +24720,40 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The byte-identical checked class preserves public construction and subclassing, private delegate/channel state, equality-keyed FIFO scheduling, recovery behavior, nested worker metadata, and reflection.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.OrderedExecutor",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Ljava/util/concurrent/ExecutorService;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The byte-identical checked constructor preserves delegate identity, ConcurrentHashMap state initialization, nullable delegate acceptance, and public metadata.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.OrderedExecutor",
       "symbol_kind": "METHOD",
       "member_name": "submit",
       "descriptor": "(Ljava/lang/Object;Ljava/lang/Runnable;)Ljava/util/concurrent/Future;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The byte-identical checked runnable submission preserves null-valued futures, equality-keyed FIFO queues, cross-key independence, cancellation, failure continuation and recovery, null failures, and rejection-state retention.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.OrderedExecutor",
       "symbol_kind": "METHOD",
       "member_name": "submit",
       "descriptor": "(Ljava/lang/Object;Ljava/util/concurrent/Callable;)Ljava/util/concurrent/Future;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The byte-identical checked generic callable submission preserves result and failure identity, equality-keyed FIFO queues, cross-key independence, null failures, and Future<T> signature metadata.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.PlayerLibrary",

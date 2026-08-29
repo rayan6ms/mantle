@@ -452,6 +452,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-garbage-collection-monitor-con
   --output "$WORK/GateGarbageCollectionMonitor.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-json-browser-consumer \
   --output "$WORK/GateJsonBrowser.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-ordered-executor-consumer \
+  --output "$WORK/GateOrderedExecutor.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-container-probe-consumer \
   --output "$WORK/GateFlacContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-file-loader-consumer \
@@ -788,6 +790,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateFutureTools.java" \
   "$WORK/GateGarbageCollectionMonitor.java" \
   "$WORK/GateJsonBrowser.java" \
+  "$WORK/GateOrderedExecutor.java" \
   "$WORK/GateAdtsStreamProvider.java" \
   "$WORK/GateAacPacketRouter.java" \
   "$WORK/GateMpegAacTrackConsumer.java" \
@@ -2193,6 +2196,16 @@ cmp "$WORK/json-browser-reference.txt" "$WORK/json-browser-candidate.txt"
 grep --fixed-strings \
   'contracts=null-singleton,mapper-flags,string-parse,stream-parse,stream-ownership,comments,unquoted-fields,parse-failures,new-map,new-list,map-list-detection,index-bounds,key-missing,wrapper-freshness,ordered-values,ordered-keys,mutable-snapshots,map-put-browser,map-put-object,map-remove,node-sharing,list-add,list-insert,list-index-clamping,list-remove,wrong-container-failures,text-shapes,defaults,boolean-coercion,long-coercion,int-coercion,safe-text,format,null-detection,class-conversion,type-reference-conversion,conversion-wrapping,generics,private-state,synthetic-lambda,reflection' \
   "$WORK/json-browser-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOrderedExecutor >"$WORK/ordered-executor-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOrderedExecutor >"$WORK/ordered-executor-candidate.txt"
+cmp "$WORK/ordered-executor-reference.txt" "$WORK/ordered-executor-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,subclassable,delegate-state,runnable-future,callable-future,equal-key-fifo,different-key-independence,task-failure-continuation,cancellation,channel-failure-recovery,null-inputs,rejection-retention,generics,nested-state,reflection' \
+  "$WORK/ordered-executor-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_vorbis_track_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggVorbisTrackHandler >"$WORK/ogg-vorbis-track-handler-reference.txt"
