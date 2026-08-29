@@ -3964,9 +3964,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[3].completed_slices[].symbols] | add) == .cohorts[3].classified_symbols and
   (.cohorts[3].classified_symbols + .cohorts[3].remaining_symbols) == .cohorts[3].symbols and
   .cohorts[4].status == "IN_PROGRESS" and
-  .cohorts[4].classified_symbols == 261 and
-  .cohorts[4].remaining_symbols == 130 and
-  (.cohorts[4].completed_slices | length) == 41 and
+  .cohorts[4].classified_symbols == 284 and
+  .cohorts[4].remaining_symbols == 107 and
+  (.cohorts[4].completed_slices | length) == 42 and
   .cohorts[4].completed_slices[0] == {
     id: "copy-on-update-identity-list-contracts",
     classes: 1,
@@ -4500,11 +4500,31 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "tools/jvm-gate/src/main.rs"
     ]
   } and
+  .cohorts[4].completed_slices[41] == {
+    id: "http-client-tools-contracts",
+    classes: 2,
+    fields: 1,
+    methods: 20,
+    symbols: 23,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
   ([.cohorts[4].completed_slices[].symbols] | add) == .cohorts[4].classified_symbols and
   (.cohorts[4].classified_symbols + .cohorts[4].remaining_symbols) == .cohorts[4].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 2537 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 2560 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 2388 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 2411 and
+  ([$classifications.symbols[] |
+    select((.binary_name == "com.sedmelluq.discord.lavaplayer.tools.io.HttpClientTools" or
+      .binary_name == "com.sedmelluq.discord.lavaplayer.tools.io.HttpClientTools$NoRedirectsStrategy") and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 23 and
   ([$classifications.symbols[] |
     select(.binary_name == "com.sedmelluq.discord.lavaplayer.tools.io.GreedyInputStream" and
       .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
@@ -5995,6 +6015,8 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.tools.io.EmptyInputStream",
         "com.sedmelluq.discord.lavaplayer.tools.io.ExtendedBufferedInputStream",
         "com.sedmelluq.discord.lavaplayer.tools.io.GreedyInputStream",
+        "com.sedmelluq.discord.lavaplayer.tools.io.HttpClientTools",
+        "com.sedmelluq.discord.lavaplayer.tools.io.HttpClientTools$NoRedirectsStrategy",
         "com.sedmelluq.discord.lavaplayer.tools.io.HttpConfigurable",
         "com.sedmelluq.discord.lavaplayer.tools.DataFormatTools",
         "com.sedmelluq.discord.lavaplayer.tools.DataFormatTools$TextRange",
@@ -6460,7 +6482,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "http-client-tools-contracts" and
+  .phase_entry.next_slice == "http-interface-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 JQ
@@ -6468,7 +6490,7 @@ JQ
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '374 reference classes / 2,533 symbols' \
+  '376 reference classes / 2,556 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -6478,4 +6500,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 2,537 classified symbols and 225 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 2,560 classified symbols and 202 unassessed symbols.\n'

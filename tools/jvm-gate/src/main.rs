@@ -204,6 +204,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
             Some(EXTENDED_BUFFERED_INPUT_STREAM_CONSUMER)
         }
         "write-greedy-input-stream-consumer" => Some(GREEDY_INPUT_STREAM_CONSUMER),
+        "write-http-client-tools-consumer" => Some(HTTP_CLIENT_TOOLS_CONSUMER),
         "write-extended-http-configurable-consumer" => Some(EXTENDED_HTTP_CONFIGURABLE_CONSUMER),
         "write-http-configurable-consumer" => Some(HTTP_CONFIGURABLE_CONSUMER),
         "write-http-context-filter-consumer" => Some(HTTP_CONTEXT_FILTER_CONSUMER),
@@ -65545,6 +65546,236 @@ public final class GateGreedyInputStream {
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }
+}
+"#;
+
+const HTTP_CLIENT_TOOLS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpClientTools;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import java.io.IOException;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import javax.net.ssl.SSLException;
+import org.apache.http.ConnectionClosedException;
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
+import org.apache.http.HttpVersion;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.message.BasicHeader;
+import org.apache.http.message.BasicHttpResponse;
+import org.apache.http.message.BasicStatusLine;
+
+public final class GateHttpClientTools {
+  public static void main(String[] args) throws Exception {
+    configurationAndBuilders();
+    redirectsAndStatuses();
+    contentTypesAndHeaders();
+    retryPredicates();
+    responseHelpers();
+    noRedirectsStrategy();
+    reflection();
+    System.out.println("contracts=public-config,timeout-update,shared-builder,default-manager,cookieless-manager,redirect-relative,redirect-absolute,redirect-invalid,redirect-status,redirect-missing,success-statuses,assert-success,assert-redirect,raw-content-type,json-content-type,assert-json,header-value,retry-reset,retry-timeout,retry-ssl,retry-premature,retry-conscrypt,retry-nested,null-exception,fetch-json,fetch-json-404,fetch-json-error,fetch-lines,fetch-lines-error,no-redirects,reflection");
+  }
+
+  private static void configurationAndBuilders() {
+    check(HttpClientTools.DEFAULT_REQUEST_CONFIG.getConnectTimeout() == 3000
+        && HttpClientTools.DEFAULT_REQUEST_CONFIG.getConnectionRequestTimeout() == 3000
+        && HttpClientTools.DEFAULT_REQUEST_CONFIG.getSocketTimeout() == 3000,
+        "default request config");
+    HttpClientTools.setDefaultRequestTimeout(11, 22, 33);
+    check(HttpClientTools.DEFAULT_REQUEST_CONFIG.getConnectTimeout() == 11
+        && HttpClientTools.DEFAULT_REQUEST_CONFIG.getConnectionRequestTimeout() == 22
+        && HttpClientTools.DEFAULT_REQUEST_CONFIG.getSocketTimeout() == 33,
+        "timeout update");
+    check(HttpClientTools.createSharedCookiesHttpBuilder() != null, "shared builder");
+    check(HttpClientTools.createDefaultThreadLocalManager() != null, "default manager");
+    check(HttpClientTools.createCookielessThreadLocalManager() != null, "cookieless manager");
+  }
+
+  private static void redirectsAndStatuses() {
+    HttpResponse redirect = response(HttpStatus.SC_MOVED_TEMPORARILY, null);
+    redirect.addHeader(new BasicHeader("Location", "../next"));
+    check("https://example.test/next".equals(
+        HttpClientTools.getRedirectLocation("https://example.test/path/item", redirect)),
+        "relative redirect");
+    redirect.setStatusCode(HttpStatus.SC_TEMPORARY_REDIRECT);
+    redirect.setHeader("Location", "https://other.test/final");
+    check("https://other.test/final".equals(
+        HttpClientTools.getRedirectLocation("https://example.test/path", redirect)),
+        "absolute redirect");
+    redirect.setHeader("Location", "::invalid");
+    check("::invalid".equals(
+        HttpClientTools.getRedirectLocation("http://[invalid", redirect)), "invalid redirect fallback");
+    redirect.setStatusCode(HttpStatus.SC_OK);
+    check(HttpClientTools.getRedirectLocation("https://example.test", redirect) == null,
+        "non-redirect status");
+    redirect.setStatusCode(HttpStatus.SC_MOVED_TEMPORARILY);
+    redirect.removeHeaders("Location");
+    check(HttpClientTools.getRedirectLocation("https://example.test", redirect) == null,
+        "missing redirect location");
+
+    check(HttpClientTools.isSuccessWithContent(HttpStatus.SC_OK)
+        && HttpClientTools.isSuccessWithContent(HttpStatus.SC_PARTIAL_CONTENT)
+        && HttpClientTools.isSuccessWithContent(HttpStatus.SC_NON_AUTHORITATIVE_INFORMATION)
+        && !HttpClientTools.isSuccessWithContent(HttpStatus.SC_CREATED), "success statuses");
+    check(HttpClientTools.isSuccessWithContent(HttpStatus.SC_OK), "success status helper");
+    checkNoThrow(() -> HttpClientTools.assertSuccessWithContent(
+        response(HttpStatus.SC_OK, null), "ok"));
+    IOException invalid = catchIOException(() -> HttpClientTools.assertSuccessWithContent(
+        response(HttpStatus.SC_BAD_GATEWAY, null), "channel"));
+    check(invalid != null && "Invalid status code for channel: 502".equals(invalid.getMessage()),
+        "assert success failure");
+    checkNoThrow(() -> HttpClientTools.assertSuccessWithRedirectContent(
+        response(HttpStatus.SC_MOVED_TEMPORARILY, null), "redirect"));
+    invalid = catchIOException(() -> HttpClientTools.assertSuccessWithRedirectContent(
+        response(HttpStatus.SC_OK, null), "redirect"));
+    check(invalid != null && "Invalid status code for redirect: 200".equals(invalid.getMessage()),
+        "assert redirect failure");
+  }
+
+  private static void contentTypesAndHeaders() throws Exception {
+    HttpResponse json = response(HttpStatus.SC_OK, new StringEntity("{}"));
+    json.addHeader(new BasicHeader("Content-Type", "application/json; charset=UTF-8"));
+    check("application/json; charset=UTF-8".equals(HttpClientTools.getRawContentType(json))
+        && HttpClientTools.hasJsonContentType(json), "json content type");
+    checkNoThrow(() -> HttpClientTools.assertJsonContentType(json));
+    json.setHeader("Content-Type", "text/plain");
+    check(!HttpClientTools.hasJsonContentType(json)
+        && "text/plain".equals(HttpClientTools.getHeaderValue(json, "Content-Type")),
+        "non-json content type and header");
+    check(HttpClientTools.getRawContentType(response(HttpStatus.SC_OK, null)) == null
+        && HttpClientTools.getHeaderValue(json, "Missing") == null, "missing headers");
+    Throwable failure = catchThrowable(() -> HttpClientTools.assertJsonContentType(json));
+    check(failure instanceof RuntimeException && !(failure instanceof FriendlyException)
+        && failure.getMessage().startsWith("Expected JSON content type, got text/plain EID: "),
+        "assert json failure");
+  }
+
+  private static void retryPredicates() {
+    check(HttpClientTools.isConnectionResetException(new SocketException("Connection reset"))
+        && HttpClientTools.isConnectionResetException(new SSLException("Connection reset"))
+        && !HttpClientTools.isConnectionResetException(new SocketException("other")),
+        "connection reset predicate");
+    check(HttpClientTools.isRetriableNetworkException(new SocketTimeoutException("Read timed out"))
+        && HttpClientTools.isRetriableNetworkException(new SSLException("SSL peer shut down incorrectly"))
+        && HttpClientTools.isRetriableNetworkException(
+            new ConnectionClosedException("Premature end of Content-Length delimited message body")),
+        "retry predicates");
+    check(HttpClientTools.isRetriableNetworkException(
+        new SSLException("I/O error during system call: Connection reset by peer"))
+        && HttpClientTools.isRetriableNetworkException(
+            new SSLException("outer", new SocketException("Connection reset"))),
+        "conscrypt and nested SSL");
+    check(!HttpClientTools.isRetriableNetworkException(null)
+        && !HttpClientTools.isConnectionResetException(null), "null exception");
+  }
+
+  private static void responseHelpers() throws Exception {
+    HttpUriRequest request = new HttpGet("https://example.test/data");
+    CloseableHttpResponse jsonResponse = closeableResponse(HttpStatus.SC_OK, "{\"value\":7}");
+    JsonBrowser browser = HttpClientTools.fetchResponseAsJson(
+        new StubHttpInterface(jsonResponse), request);
+    check(browser != null && browser.get("value").asInt(-1) == 7, "fetch JSON");
+    check(HttpClientTools.fetchResponseAsJson(
+        new StubHttpInterface(closeableResponse(HttpStatus.SC_NOT_FOUND, "{}")), request) == null,
+        "fetch JSON 404");
+    Throwable error = catchThrowable(() -> HttpClientTools.fetchResponseAsJson(
+        new StubHttpInterface(closeableResponse(HttpStatus.SC_INTERNAL_SERVER_ERROR, "{}")), request));
+    check(error instanceof FriendlyException && error.getCause() instanceof IllegalStateException,
+        "fetch JSON error");
+
+    String[] lines = HttpClientTools.fetchResponseLines(
+        new StubHttpInterface(closeableResponse(HttpStatus.SC_OK, "one\ntwo\n")), request, "lines");
+    check(Arrays.equals(lines, new String[] {"one", "two"}), "fetch lines");
+    IOException linesError = catchIOException(() -> HttpClientTools.fetchResponseLines(
+        new StubHttpInterface(closeableResponse(HttpStatus.SC_BAD_REQUEST, "bad")), request, "lines"));
+    check(linesError != null && "Unexpected response code 400 from lines".equals(linesError.getMessage()),
+        "fetch lines error");
+  }
+
+  private static void noRedirectsStrategy() throws Exception {
+    HttpClientTools.NoRedirectsStrategy strategy = new HttpClientTools.NoRedirectsStrategy();
+    check(!strategy.isRedirected(null, null, null) && strategy.getRedirect(null, null, null) == null,
+        "no redirects");
+  }
+
+  private static void reflection() throws Exception {
+    Class<HttpClientTools> type = HttpClientTools.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == Object.class && type.getInterfaces().length == 0,
+        "outer class shape");
+    check(type.getDeclaredFields().length == 3 && type.getDeclaredMethods().length == 23
+        && type.getDeclaredConstructor().getExceptionTypes().length == 0,
+        "outer member counts");
+    Field config = type.getDeclaredField("DEFAULT_REQUEST_CONFIG");
+    check(config.getType().getName().equals("org.apache.http.client.config.RequestConfig")
+        && Modifier.isPublic(config.getModifiers()) && Modifier.isStatic(config.getModifiers())
+        && !Modifier.isFinal(config.getModifiers()), "config field");
+    check(type.getDeclaredMethod("setDefaultRequestTimeout", int.class, int.class, int.class)
+        .getExceptionTypes().length == 0
+        && type.getDeclaredMethod("getRedirectLocation", String.class, HttpResponse.class)
+            .getReturnType() == String.class
+        && type.getDeclaredMethod("fetchResponseLines", HttpInterface.class,
+            HttpUriRequest.class, String.class).getExceptionTypes().length == 1,
+        "public method shapes");
+
+    Class<?> nested = Class.forName(
+        "com.sedmelluq.discord.lavaplayer.tools.io.HttpClientTools$NoRedirectsStrategy");
+    check(Modifier.isPublic(nested.getModifiers()) && !Modifier.isFinal(nested.getModifiers())
+        && nested.getSuperclass() == Object.class && nested.getInterfaces().length == 1
+        && nested.getDeclaredFields().length == 0 && nested.getDeclaredMethods().length == 2,
+        "nested class shape");
+    check(nested.getDeclaredConstructor().getExceptionTypes().length == 0, "nested constructor shape");
+  }
+
+  private static BasicHttpResponse response(int status, org.apache.http.HttpEntity entity) {
+    BasicHttpResponse response = new BasicHttpResponse(
+        new BasicStatusLine(HttpVersion.HTTP_1_1, status, "status"));
+    response.setEntity(entity);
+    return response;
+  }
+
+  private static CloseableHttpResponse closeableResponse(int status, String body) {
+    return new CloseableResponse(response(status,
+        new StringEntity(body, java.nio.charset.StandardCharsets.UTF_8)));
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+  private static IOException catchIOException(ThrowingRunnable action) {
+    Throwable throwable = catchThrowable(action);
+    return throwable instanceof IOException ? (IOException) throwable : null;
+  }
+  private static void checkNoThrow(ThrowingRunnable action) {
+    Throwable throwable = catchThrowable(action);
+    if (throwable != null) throw new AssertionError(throwable);
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+
+  private static final class CloseableResponse extends BasicHttpResponse
+      implements CloseableHttpResponse {
+    CloseableResponse(HttpResponse source) { super(source.getStatusLine()); setEntity(source.getEntity()); }
+    public void close() {}
+  }
+
+  private static final class StubHttpInterface extends HttpInterface {
+    private final CloseableHttpResponse response;
+    StubHttpInterface(CloseableHttpResponse response) { super(null, null, false, null); this.response = response; }
+    public CloseableHttpResponse execute(HttpUriRequest request) { return response; }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
 }
 "#;
 

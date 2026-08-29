@@ -4008,8 +4008,8 @@
       "objective": "Cover public utilities, HTTP configuration surfaces, scheduling, and exception behavior.",
       "exit_evidence": "Utility/HTTP behavioral tests, external-type resolution, per-symbol ledger entries, and Revapi diff.",
       "status": "IN_PROGRESS",
-      "classified_symbols": 261,
-      "remaining_symbols": 130,
+      "classified_symbols": 284,
+      "remaining_symbols": 107,
       "completed_slices": [
         {
           "id": "copy-on-update-identity-list-contracts",
@@ -4543,6 +4543,19 @@
             "tools/jvm-gate/src/emitter.rs",
             "tools/jvm-gate/src/main.rs"
           ]
+        },
+        {
+          "id": "http-client-tools-contracts",
+          "classes": 2,
+          "fields": 1,
+          "methods": 20,
+          "symbols": 23,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
         }
       ]
     },
@@ -4624,7 +4637,7 @@
   "phase_entry": {
     "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
     "first_execution_cohort": "core-player-track",
-    "next_slice": "http-client-tools-contracts",
+    "next_slice": "http-interface-contracts",
     "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
   }
 }

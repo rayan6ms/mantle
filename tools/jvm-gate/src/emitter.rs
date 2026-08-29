@@ -378,6 +378,11 @@ const SIMPLE_HTTP_CLIENT_CONNECTION_MANAGER_REQUEST_CLASS: &str =
 const EXTENDED_HTTP_CONFIGURABLE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable";
 const HTTP_CONFIGURABLE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable";
+const HTTP_CLIENT_TOOLS_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/io/HttpClientTools";
+const HTTP_CLIENT_TOOLS_NO_REDIRECTS_STRATEGY_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/io/HttpClientTools$NoRedirectsStrategy";
+const HTTP_CLIENT_TOOLS_NO_RESPONSE_RETRY_HANDLER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/io/HttpClientTools$NoResponseRetryHandler";
 const HTTP_CONTEXT_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/http/HttpContextFilter";
 const HTTP_CONTEXT_RETRY_COUNTER_CLASS: &str =
@@ -1010,6 +1015,8 @@ const REFERENCE_CLASSES: &[&str] = &[
     STREAMING_DATA_FORMATS_EXTRACTOR_CLASS,
     YOUTUBE_TRACK_FORMAT_EXTRACTOR_CLASS,
     HTTP_CONFIGURABLE_CLASS,
+    HTTP_CLIENT_TOOLS_CLASS,
+    HTTP_CLIENT_TOOLS_NO_REDIRECTS_STRATEGY_CLASS,
     ABSTRACT_HTTP_CONTEXT_FILTER_CLASS,
     EXTENDED_CONNECTION_OPERATOR_CLASS,
     EXTENDED_CONNECTION_OPERATOR_ADDITIONAL_DETAILS_CLASS,
@@ -1119,6 +1126,7 @@ const PRIVATE_SUPPORT_CLASSES: &[&str] = &[
     WAV_FILE_INFO_BUILDER_CLASS,
     ORDERED_EXECUTOR_CHANNEL_RUNNABLE_CLASS,
     HTTP_CONTEXT_RETRY_COUNTER_RETRY_COUNT_CLASS,
+    HTTP_CLIENT_TOOLS_NO_RESPONSE_RETRY_HANDLER_CLASS,
 ];
 
 #[derive(Serialize)]
@@ -1226,6 +1234,9 @@ pub fn emit(
     let mut empty_input_stream_bytes = None;
     let mut extended_buffered_input_stream_bytes = None;
     let mut greedy_input_stream_bytes = None;
+    let mut http_client_tools_bytes = None;
+    let mut http_client_tools_no_redirects_strategy_bytes = None;
+    let mut http_client_tools_no_response_retry_handler_bytes = None;
     let mut vorbis_comment_parser_bytes = None;
     let mut extended_m3u_parser_bytes = None;
     let mut extended_m3u_line_bytes = None;
@@ -1457,6 +1468,12 @@ pub fn emit(
             extended_buffered_input_stream_bytes = Some(bytes);
         } else if *binary_name == GREEDY_INPUT_STREAM_CLASS {
             greedy_input_stream_bytes = Some(bytes);
+        } else if *binary_name == HTTP_CLIENT_TOOLS_CLASS {
+            http_client_tools_bytes = Some(bytes);
+        } else if *binary_name == HTTP_CLIENT_TOOLS_NO_REDIRECTS_STRATEGY_CLASS {
+            http_client_tools_no_redirects_strategy_bytes = Some(bytes);
+        } else if *binary_name == HTTP_CLIENT_TOOLS_NO_RESPONSE_RETRY_HANDLER_CLASS {
+            http_client_tools_no_response_retry_handler_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -1807,6 +1824,24 @@ pub fn emit(
                 greedy_input_stream_bytes
                     .as_ref()
                     .expect("greedy input stream source bytes are retained"),
+            );
+        } else if name == format!("{HTTP_CLIENT_TOOLS_CLASS}.class") {
+            bytes.clone_from(
+                http_client_tools_bytes
+                    .as_ref()
+                    .expect("HTTP client tools source bytes are retained"),
+            );
+        } else if name == format!("{HTTP_CLIENT_TOOLS_NO_REDIRECTS_STRATEGY_CLASS}.class") {
+            bytes.clone_from(
+                http_client_tools_no_redirects_strategy_bytes
+                    .as_ref()
+                    .expect("HTTP client no-redirects source bytes are retained"),
+            );
+        } else if name == format!("{HTTP_CLIENT_TOOLS_NO_RESPONSE_RETRY_HANDLER_CLASS}.class") {
+            bytes.clone_from(
+                http_client_tools_no_response_retry_handler_bytes
+                    .as_ref()
+                    .expect("HTTP client retry handler source bytes are retained"),
             );
         } else if name == format!("{MPEG_AUDIO_TRACK_CLASS}.class") {
             bytes.clone_from(

@@ -494,6 +494,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-extended-buffered-input-stream
   --output "$WORK/GateExtendedBufferedInputStream.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-greedy-input-stream-consumer \
   --output "$WORK/GateGreedyInputStream.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-http-client-tools-consumer \
+  --output "$WORK/GateHttpClientTools.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-extended-http-configurable-consumer \
   --output "$WORK/GateExtendedHttpConfigurable.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-http-configurable-consumer \
@@ -865,6 +867,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateEmptyInputStream.java" \
   "$WORK/GateExtendedBufferedInputStream.java" \
   "$WORK/GateGreedyInputStream.java" \
+  "$WORK/GateHttpClientTools.java" \
   "$WORK/GateExtendedHttpConfigurable.java" \
   "$WORK/GateHttpConfigurable.java" \
   "$WORK/GateHttpContextFilter.java" \
@@ -2495,6 +2498,17 @@ cmp "$WORK/greedy-input-stream-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,delegate-identity,no-eager-read,greedy-read,read-arguments,offset-preservation,partial-eof,immediate-eof,repeated-eof,zero-length,negative-length,invalid-read,null-read,greedy-skip,skip-arguments,skip-fallback-read,partial-skip-eof,nonpositive-skip,read-io-identity,partial-read-failure,skip-io-identity,fallback-io-identity,inherited-single-read,inherited-available,inherited-mark-reset,inherited-close,null-input,subclassable,private-state,reflection' \
   "$WORK/greedy-input-stream-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateHttpClientTools \
+  >"$WORK/http-client-tools-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateHttpClientTools >"$WORK/http-client-tools-candidate.txt"
+cmp "$WORK/http-client-tools-reference.txt" \
+  "$WORK/http-client-tools-candidate.txt"
+grep --fixed-strings \
+  'contracts=public-config,timeout-update,shared-builder,default-manager,cookieless-manager,redirect-relative,redirect-absolute,redirect-invalid,redirect-status,redirect-missing,success-statuses,assert-success,assert-redirect,raw-content-type,json-content-type,assert-json,header-value,retry-reset,retry-timeout,retry-ssl,retry-premature,retry-conscrypt,retry-nested,null-exception,fetch-json,fetch-json-404,fetch-json-error,fetch-lines,fetch-lines-error,no-redirects,reflection' \
+  "$WORK/http-client-tools-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateExtendedHttpConfigurable \
   >"$WORK/extended-http-configurable-reference.txt"
