@@ -464,6 +464,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-units-consumer \
   --output "$WORK/GateUnits.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-abstract-http-context-filter-consumer \
   --output "$WORK/GateAbstractHttpContextFilter.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-http-context-filter-consumer \
+  --output "$WORK/GateHttpContextFilter.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-container-probe-consumer \
   --output "$WORK/GateFlacContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-file-loader-consumer \
@@ -806,6 +808,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateThumbnailTools.java" \
   "$WORK/GateUnits.java" \
   "$WORK/GateAbstractHttpContextFilter.java" \
+  "$WORK/GateHttpContextFilter.java" \
   "$WORK/GateAdtsStreamProvider.java" \
   "$WORK/GateAacPacketRouter.java" \
   "$WORK/GateMpegAacTrackConsumer.java" \
@@ -2267,6 +2270,16 @@ cmp "$WORK/abstract-http-context-filter-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,abstract,subclassable,interface,delegation-order,argument-identity,boolean-results,null-delegate-defaults,null-forwarding,failure-identity,private-state,reflection' \
   "$WORK/abstract-http-context-filter-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateHttpContextFilter \
+  >"$WORK/http-context-filter-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateHttpContextFilter >"$WORK/http-context-filter-candidate.txt"
+cmp "$WORK/http-context-filter-reference.txt" "$WORK/http-context-filter-candidate.txt"
+grep --fixed-strings \
+  'contracts=caller-implementation,callback-order,argument-identity,repetition-flags,boolean-results,failure-identity,public-abstract-interface,no-defaults,reflection' \
+  "$WORK/http-context-filter-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_vorbis_track_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggVorbisTrackHandler >"$WORK/ogg-vorbis-track-handler-reference.txt"

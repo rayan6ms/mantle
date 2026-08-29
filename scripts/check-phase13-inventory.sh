@@ -3964,9 +3964,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[3].completed_slices[].symbols] | add) == .cohorts[3].classified_symbols and
   (.cohorts[3].classified_symbols + .cohorts[3].remaining_symbols) == .cohorts[3].symbols and
   .cohorts[4].status == "IN_PROGRESS" and
-  .cohorts[4].classified_symbols == 131 and
-  .cohorts[4].remaining_symbols == 260 and
-  (.cohorts[4].completed_slices | length) == 19 and
+  .cohorts[4].classified_symbols == 137 and
+  .cohorts[4].remaining_symbols == 254 and
+  (.cohorts[4].completed_slices | length) == 20 and
   .cohorts[4].completed_slices[0] == {
     id: "copy-on-update-identity-list-contracts",
     classes: 1,
@@ -4214,11 +4214,30 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "tools/jvm-gate/src/main.rs"
     ]
   } and
+  .cohorts[4].completed_slices[19] == {
+    id: "http-context-filter-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 5,
+    symbols: 6,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
   ([.cohorts[4].completed_slices[].symbols] | add) == .cohorts[4].classified_symbols and
   (.cohorts[4].classified_symbols + .cohorts[4].remaining_symbols) == .cohorts[4].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 2407 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 2413 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 2258 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 2264 and
+  ([$classifications.symbols[] |
+    select(.binary_name == "com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 6 and
   ([$classifications.symbols[] |
     select(.binary_name == "com.sedmelluq.discord.lavaplayer.tools.http.AbstractHttpContextFilter" and
       .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
@@ -5547,6 +5566,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.format.transcoder.PcmChunkEncoder",
         "com.sedmelluq.discord.lavaplayer.tools.CopyOnUpdateIdentityList",
         "com.sedmelluq.discord.lavaplayer.tools.http.AbstractHttpContextFilter",
+        "com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter",
         "com.sedmelluq.discord.lavaplayer.tools.DataFormatTools",
         "com.sedmelluq.discord.lavaplayer.tools.DataFormatTools$TextRange",
         "com.sedmelluq.discord.lavaplayer.tools.DecodedException",
@@ -6011,7 +6031,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "http-context-filter-contracts" and
+  .phase_entry.next_slice == "http-context-retry-counter-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 JQ
@@ -6019,7 +6039,7 @@ JQ
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '346 reference classes / 2,400 symbols' \
+  '347 reference classes / 2,406 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -6029,4 +6049,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 2,407 classified symbols and 355 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 2,413 classified symbols and 349 unassessed symbols.\n'

@@ -365,6 +365,8 @@ const THUMBNAIL_TOOLS_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/Thum
 const UNITS_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/Units";
 const ABSTRACT_HTTP_CONTEXT_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/http/AbstractHttpContextFilter";
+const HTTP_CONTEXT_FILTER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/http/HttpContextFilter";
 const ABSTRACT_MUTABLE_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AbstractMutableAudioFrame";
 const IMMUTABLE_FRAME_CLASS: &str =
@@ -959,6 +961,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_TRACK_FORMAT_EXTRACTOR_CLASS,
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
     ABSTRACT_HTTP_CONTEXT_FILTER_CLASS,
+    HTTP_CONTEXT_FILTER_CLASS,
     COPY_ON_UPDATE_IDENTITY_LIST_CLASS,
     DATA_FORMAT_TOOLS_CLASS,
     DATA_FORMAT_TOOLS_TEXT_RANGE_CLASS,
