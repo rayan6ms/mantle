@@ -172,6 +172,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-garbage-collection-monitor-consumer" => Some(GARBAGE_COLLECTION_MONITOR_CONSUMER),
         "write-json-browser-consumer" => Some(JSON_BROWSER_CONSUMER),
         "write-ordered-executor-consumer" => Some(ORDERED_EXECUTOR_CONSUMER),
+        "write-player-library-consumer" => Some(PLAYER_LIBRARY_CONSUMER),
         _ => None,
     }
 }
@@ -60701,6 +60702,124 @@ public final class GateOrderedExecutor {
 
   private static final class Derived extends OrderedExecutor {
     Derived(ExecutorService delegate) { super(delegate); }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const PLAYER_LIBRARY_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.PlayerLibrary;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.net.URL;
+import java.net.URLConnection;
+import java.net.URLStreamHandler;
+import java.nio.charset.StandardCharsets;
+
+public final class GatePlayerLibrary {
+  private static final String PLAYER_LIBRARY = "com.sedmelluq.discord.lavaplayer.tools.PlayerLibrary";
+  private static final String VERSION_RESOURCE = "com/sedmelluq/discord/lavaplayer/tools/version.txt";
+
+  public static void main(String[] args) throws Exception {
+    check("2.2.6".equals(PlayerLibrary.VERSION), "packaged version resource");
+    Constructor<PlayerLibrary> constructor = PlayerLibrary.class.getConstructor();
+    check(Modifier.isPublic(constructor.getModifiers()) && constructor.newInstance() != null,
+        "public construction");
+    reflection();
+    checkIsolated("custom-✓", ResourceMode.CUSTOM);
+    checkIsolated("UNKNOWN", ResourceMode.MISSING);
+    checkIsolated("UNKNOWN", ResourceMode.FAILING);
+    System.out.println("player-library-ok contracts=version-resource,constructor,utf8-resource,missing-resource,failing-resource,stream-ownership,field,private-loader,reflection");
+  }
+
+  private static void reflection() throws Exception {
+    Class<PlayerLibrary> type = PlayerLibrary.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers()) &&
+        type.getSuperclass() == Object.class && type.getInterfaces().length == 0,
+        "class shape");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredMethods().length == 1 &&
+        type.getDeclaredConstructors().length == 1, "declared shape");
+    Field version = type.getDeclaredField("VERSION");
+    check(version.getType() == String.class &&
+        version.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL) &&
+        !version.isSynthetic(), "VERSION field");
+    Method loader = type.getDeclaredMethod("readVersion");
+    check(loader.getReturnType() == String.class &&
+        loader.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC) && !loader.isSynthetic(),
+        "private loader");
+  }
+
+  private static void checkIsolated(String expected, ResourceMode mode) throws Exception {
+    TrackingStream stream = mode == ResourceMode.CUSTOM
+        ? new TrackingStream("custom-✓") : null;
+    ByteClassLoader loader = new ByteClassLoader(classBytes(), mode, stream);
+    Class<?> type = Class.forName(PLAYER_LIBRARY, true, loader);
+    Field version = type.getField("VERSION");
+    check(expected.equals(version.get(null)), mode + " value");
+    if (stream != null) check(!stream.closed, "resource stream remains open");
+    check(type.getClassLoader() == loader, mode + " class loader identity");
+  }
+
+  private static byte[] classBytes() throws IOException {
+    try (InputStream stream = GatePlayerLibrary.class.getClassLoader()
+        .getResourceAsStream(PLAYER_LIBRARY.replace('.', '/') + ".class")) {
+      if (stream == null) throw new IOException("PlayerLibrary class resource missing");
+      return stream.readAllBytes();
+    }
+  }
+
+  private enum ResourceMode { CUSTOM, MISSING, FAILING }
+
+  private static final class ByteClassLoader extends ClassLoader {
+    private final byte[] bytes;
+    private final ResourceMode mode;
+    private final TrackingStream stream;
+    ByteClassLoader(byte[] bytes, ResourceMode mode, TrackingStream stream) {
+      super(GatePlayerLibrary.class.getClassLoader());
+      this.bytes = bytes; this.mode = mode; this.stream = stream;
+    }
+    @Override protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+      if (PLAYER_LIBRARY.equals(name)) {
+        Class<?> loaded = findLoadedClass(name);
+        if (loaded == null) loaded = defineClass(name, bytes, 0, bytes.length);
+        if (resolve) resolveClass(loaded);
+        return loaded;
+      }
+      return super.loadClass(name, resolve);
+    }
+    @Override public URL getResource(String name) {
+      if (!VERSION_RESOURCE.equals(name)) return super.getResource(name);
+      if (mode == ResourceMode.MISSING) return null;
+      try {
+        return new URL(null, "memory:" + mode, new URLStreamHandler() {
+          @Override protected URLConnection openConnection(URL url) {
+            return new URLConnection(url) {
+              @Override public void connect() {}
+              @Override public InputStream getInputStream() throws IOException {
+                if (mode == ResourceMode.FAILING) throw new IOException("synthetic resource failure");
+                return stream;
+              }
+            };
+          }
+        });
+      } catch (java.net.MalformedURLException failure) {
+        throw new IllegalStateException(failure);
+      }
+    }
+  }
+
+  private static final class TrackingStream extends ByteArrayInputStream {
+    boolean closed;
+    TrackingStream(String value) { super(value.getBytes(StandardCharsets.UTF_8)); }
+    @Override public void close() throws IOException { closed = true; super.close(); }
   }
 
   private static void check(boolean condition, String message) {

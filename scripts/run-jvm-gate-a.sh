@@ -454,6 +454,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-json-browser-consumer \
   --output "$WORK/GateJsonBrowser.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-ordered-executor-consumer \
   --output "$WORK/GateOrderedExecutor.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-player-library-consumer \
+  --output "$WORK/GatePlayerLibrary.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-container-probe-consumer \
   --output "$WORK/GateFlacContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-file-loader-consumer \
@@ -791,6 +793,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateGarbageCollectionMonitor.java" \
   "$WORK/GateJsonBrowser.java" \
   "$WORK/GateOrderedExecutor.java" \
+  "$WORK/GatePlayerLibrary.java" \
   "$WORK/GateAdtsStreamProvider.java" \
   "$WORK/GateAacPacketRouter.java" \
   "$WORK/GateMpegAacTrackConsumer.java" \
@@ -2206,6 +2209,15 @@ cmp "$WORK/ordered-executor-reference.txt" "$WORK/ordered-executor-candidate.txt
 grep --fixed-strings \
   'contracts=constructor,subclassable,delegate-state,runnable-future,callable-future,equal-key-fifo,different-key-independence,task-failure-continuation,cancellation,channel-failure-recovery,null-inputs,rejection-retention,generics,nested-state,reflection' \
   "$WORK/ordered-executor-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePlayerLibrary >"$WORK/player-library-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GatePlayerLibrary >"$WORK/player-library-candidate.txt"
+cmp "$WORK/player-library-reference.txt" "$WORK/player-library-candidate.txt"
+grep --fixed-strings \
+  'contracts=version-resource,constructor,utf8-resource,missing-resource,failing-resource,stream-ownership,field,private-loader,reflection' \
+  "$WORK/player-library-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_vorbis_track_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggVorbisTrackHandler >"$WORK/ogg-vorbis-track-handler-reference.txt"

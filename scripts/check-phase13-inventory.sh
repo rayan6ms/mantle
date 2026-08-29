@@ -284,7 +284,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
     id: "audio-frame-provider-tools-contracts",
     classes: 1,
     fields: 0,
-    methods: 3,
+    methods: 2,
     symbols: 3,
     classification: "A_EXACT",
     evidence: [
@@ -3964,9 +3964,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[3].completed_slices[].symbols] | add) == .cohorts[3].classified_symbols and
   (.cohorts[3].classified_symbols + .cohorts[3].remaining_symbols) == .cohorts[3].symbols and
   .cohorts[4].status == "IN_PROGRESS" and
-  .cohorts[4].classified_symbols == 105 and
-  .cohorts[4].remaining_symbols == 286 and
-  (.cohorts[4].completed_slices | length) == 14 and
+  .cohorts[4].classified_symbols == 108 and
+  .cohorts[4].remaining_symbols == 283 and
+  (.cohorts[4].completed_slices | length) == 15 and
   .cohorts[4].completed_slices[0] == {
     id: "copy-on-update-identity-list-contracts",
     classes: 1,
@@ -4149,11 +4149,30 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "tools/jvm-gate/src/main.rs"
     ]
   } and
+  .cohorts[4].completed_slices[14] == {
+    id: "player-library-contracts",
+    classes: 1,
+    fields: 1,
+    methods: 1,
+    symbols: 3,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
   ([.cohorts[4].completed_slices[].symbols] | add) == .cohorts[4].classified_symbols and
   (.cohorts[4].classified_symbols + .cohorts[4].remaining_symbols) == .cohorts[4].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 2381 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 2384 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 2232 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 2235 and
+  ([$classifications.symbols[] |
+    select(.binary_name == "com.sedmelluq.discord.lavaplayer.tools.PlayerLibrary" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 3 and
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.container.mpeg.reader.MpegReader" and
@@ -5342,6 +5361,17 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack$AudioDetails",
         "com.sedmelluq.discord.lavaplayer.container.matroska.format.MatroskaFileTrack$Type",
         "com.sedmelluq.discord.lavaplayer.container.matroska.format.MutableMatroskaElement",
+        "com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamTrack",
+        "com.sedmelluq.discord.lavaplayer.container.playlists.M3uPlaylistContainerProbe",
+        "com.sedmelluq.discord.lavaplayer.container.playlists.PlainPlaylistContainerProbe",
+        "com.sedmelluq.discord.lavaplayer.container.playlists.PlsPlaylistContainerProbe",
+        "com.sedmelluq.discord.lavaplayer.container.wav.WavAudioTrack",
+        "com.sedmelluq.discord.lavaplayer.container.wav.WavContainerProbe",
+        "com.sedmelluq.discord.lavaplayer.container.wav.WavFileInfo",
+        "com.sedmelluq.discord.lavaplayer.container.wav.WavFileLoader",
+        "com.sedmelluq.discord.lavaplayer.container.wav.WavTrackProvider",
+        "com.sedmelluq.discord.lavaplayer.container.wav.WaveFormatType",
+        "com.sedmelluq.discord.lavaplayer.natives.ConnectorNativeLibLoader",
         "com.sedmelluq.discord.lavaplayer.container.mp3.Mp3AudioTrack",
         "com.sedmelluq.discord.lavaplayer.container.mp3.Mp3ConstantRateSeeker",
         "com.sedmelluq.discord.lavaplayer.container.mp3.Mp3ContainerProbe",
@@ -5452,6 +5482,8 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.tools.FutureTools",
         "com.sedmelluq.discord.lavaplayer.tools.GarbageCollectionMonitor",
         "com.sedmelluq.discord.lavaplayer.tools.JsonBrowser",
+        "com.sedmelluq.discord.lavaplayer.tools.OrderedExecutor",
+        "com.sedmelluq.discord.lavaplayer.tools.PlayerLibrary",
         "com.sedmelluq.discord.lavaplayer.source.AudioSourceManager",
         "com.sedmelluq.discord.lavaplayer.source.AudioSourceManagers",
         "com.sedmelluq.discord.lavaplayer.source.ProbingAudioSourceManager",
@@ -5899,7 +5931,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "player-library-contracts" and
+  .phase_entry.next_slice == "ring-buffer-math-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 JQ
@@ -5907,7 +5939,7 @@ JQ
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '341 reference classes / 2,374 symbols' \
+  '342 reference classes / 2,377 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -5917,4 +5949,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 2,381 classified symbols and 381 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 2,384 classified symbols and 378 unassessed symbols.\n'
