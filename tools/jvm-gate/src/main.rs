@@ -174,6 +174,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-ordered-executor-consumer" => Some(ORDERED_EXECUTOR_CONSUMER),
         "write-player-library-consumer" => Some(PLAYER_LIBRARY_CONSUMER),
         "write-ring-buffer-math-consumer" => Some(RING_BUFFER_MATH_CONSUMER),
+        "write-thumbnail-tools-consumer" => Some(THUMBNAIL_TOOLS_CONSUMER),
         _ => None,
     }
 }
@@ -60990,6 +60991,119 @@ public final class GateRingBufferMath {
       super(size, input, output);
     }
   }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const THUMBNAIL_TOOLS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
+import com.sedmelluq.discord.lavaplayer.tools.ThumbnailTools;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+
+public final class GateThumbnailTools {
+  public static void main(String[] args) throws Exception {
+    youtubeMusic();
+    youtube();
+    soundCloud();
+    reflection();
+    System.out.println("thumbnail-tools-ok contracts=constructor,subclassable,youtube-music-rewrite,youtube-music-fallback,youtube-music-missing,youtube-last-maxres,youtube-last-non-maxres,youtube-empty-fallback,soundcloud-artwork,soundcloud-artwork-fallback,soundcloud-avatar-fallback,soundcloud-replace-all,missing-fields,malformed-values,reflection");
+  }
+
+  private static void youtubeMusic() throws Exception {
+    JsonBrowser data = JsonBrowser.parse(
+        "{thumbnail:{thumbnails:[{url:\"https://img.example/video.jpg?x=1&y=2\"}]}}");
+    check(ThumbnailTools.getYouTubeMusicThumbnail(data, "ignored")
+        .equals("https://img.example/video.jpg?x=w1000-h1000"), "music query rewrite");
+    JsonBrowser explicitNull = JsonBrowser.parse("{thumbnail:{thumbnails:[null]}}");
+    check(ThumbnailTools.getYouTubeMusicThumbnail(explicitNull, "music-id")
+        .equals("https://i.ytimg.com/vi/music-id/mqdefault.jpg"), "music null fallback");
+    JsonBrowser missing = JsonBrowser.parse("{}");
+    check(ThumbnailTools.getYouTubeMusicThumbnail(missing, "missing-id")
+        .equals("https://i.ytimg.com/vi/missing-id/mqdefault.jpg"), "music missing fallback");
+    check(catchThrowable(() -> ThumbnailTools.getYouTubeMusicThumbnail(
+        JsonBrowser.parse("{thumbnail:{thumbnails:[{url:null}]}}"), "id"))
+        instanceof NullPointerException, "music null url failure");
+  }
+
+  private static void youtube() throws Exception {
+    JsonBrowser data = JsonBrowser.parse(
+        "{thumbnail:{thumbnails:[{url:\"https://img.example/maxresdefault.jpg\"},"
+            + "{url:\"https://img.example/medium.jpg\"},"
+            + "{url:\"https://img.example/maxresdefault.jpg?x=1\"}]}}");
+    check(ThumbnailTools.getYouTubeThumbnail(data, "id")
+        .equals("https://img.example/maxresdefault.jpg?x=1"), "last maxres");
+    JsonBrowser lastNonMax = JsonBrowser.parse(
+        "{thumbnail:{thumbnails:[{url:\"https://img.example/maxresdefault.jpg\"},"
+            + "{url:\"https://img.example/medium.jpg\"}]}}");
+    check(ThumbnailTools.getYouTubeThumbnail(lastNonMax, "video-id")
+        .equals("https://i.ytimg.com/vi/video-id/mqdefault.jpg"), "last non-max fallback");
+    check(ThumbnailTools.getYouTubeThumbnail(JsonBrowser.parse("{}"), "empty-id")
+        .equals("https://i.ytimg.com/vi/empty-id/mqdefault.jpg"), "empty fallback");
+    check(ThumbnailTools.getYouTubeThumbnail(JsonBrowser.parse(
+        "{thumbnail:{thumbnails:[]}}"), "empty-list-id")
+        .equals("https://i.ytimg.com/vi/empty-list-id/mqdefault.jpg"), "empty list fallback");
+    check(catchThrowable(() -> ThumbnailTools.getYouTubeThumbnail(JsonBrowser.parse(
+        "{thumbnail:{thumbnails:[{url:null}]}}"), "id")) instanceof NullPointerException,
+        "youtube null url failure");
+  }
+
+  private static void soundCloud() throws Exception {
+    JsonBrowser artwork = JsonBrowser.parse(
+        "{artwork_url:\"https://cdn.example/large.jpg?large.jpg\",user:{avatar_url:\"ignored\"}}");
+    check(ThumbnailTools.getSoundCloudThumbnail(artwork)
+        .equals("https://cdn.example/original.jpg?original.jpg"), "artwork replace all");
+    JsonBrowser fallback = JsonBrowser.parse(
+        "{artwork_url:null,user:{avatar_url:\"https://cdn.example/large.jpg\"}}");
+    check(ThumbnailTools.getSoundCloudThumbnail(fallback)
+        .equals("https://cdn.example/original.jpg"), "avatar fallback");
+    check(ThumbnailTools.getSoundCloudThumbnail(JsonBrowser.parse(
+        "{user:{avatar_url:\"https://cdn.example/large.jpg\"}}"))
+        .equals("https://cdn.example/original.jpg"), "missing artwork fallback");
+    check(catchThrowable(() -> ThumbnailTools.getSoundCloudThumbnail(JsonBrowser.parse(
+        "{artwork_url:null}"))) instanceof NullPointerException, "missing avatar failure");
+    check(ThumbnailTools.getSoundCloudThumbnail(JsonBrowser.parse("{artwork_url:7}"))
+        .equals("7"), "non-text artwork coercion");
+  }
+
+  private static void reflection() throws Exception {
+    Class<ThumbnailTools> type = ThumbnailTools.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers()) &&
+        type.getSuperclass() == Object.class && type.getInterfaces().length == 0,
+        "class shape");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredMethods().length == 3 &&
+        type.getDeclaredConstructors().length == 1, "declared shape");
+    Constructor<ThumbnailTools> constructor = type.getConstructor();
+    check(Modifier.isPublic(constructor.getModifiers()) && !constructor.isSynthetic() &&
+        constructor.getExceptionTypes().length == 0 && constructor.newInstance() != null,
+        "constructor shape");
+    Method music = method(type, "getYouTubeMusicThumbnail", JsonBrowser.class, String.class);
+    Method youtube = method(type, "getYouTubeThumbnail", JsonBrowser.class, String.class);
+    Method soundCloud = method(type, "getSoundCloudThumbnail", JsonBrowser.class);
+    check(Modifier.isPublic(music.getModifiers()) && Modifier.isStatic(music.getModifiers()) &&
+        music.getReturnType() == String.class && music.getExceptionTypes().length == 0 &&
+        !music.isSynthetic(), "music method");
+    check(Modifier.isPublic(youtube.getModifiers()) && Modifier.isStatic(youtube.getModifiers()) &&
+        youtube.getReturnType() == String.class && youtube.getExceptionTypes().length == 0 &&
+        !youtube.isSynthetic(), "youtube method");
+    check(Modifier.isPublic(soundCloud.getModifiers()) && Modifier.isStatic(soundCloud.getModifiers()) &&
+        soundCloud.getReturnType() == String.class && soundCloud.getExceptionTypes().length == 0 &&
+        !soundCloud.isSynthetic(), "soundcloud method");
+  }
+
+  private static Method method(Class<?> type, String name, Class<?>... parameters) throws Exception {
+    return type.getDeclaredMethod(name, parameters);
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

@@ -24858,45 +24858,70 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference class bytes are retained byte-identically; URL helper branches and structural reflection match the differential oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.ThumbnailTools",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "()V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Public no-argument construction and class metadata match the reference contract.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.ThumbnailTools",
       "symbol_kind": "METHOD",
       "member_name": "getYouTubeMusicThumbnail",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Ljava/lang/String;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "First-thumbnail query rewriting, fallback formatting, and malformed-value behavior match the reference oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.ThumbnailTools",
       "symbol_kind": "METHOD",
       "member_name": "getYouTubeThumbnail",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;Ljava/lang/String;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Last-thumbnail maxres selection, fallback formatting, and malformed-value behavior match the reference oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.ThumbnailTools",
       "symbol_kind": "METHOD",
       "member_name": "getSoundCloudThumbnail",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/JsonBrowser;)Ljava/lang/String;",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Artwork/avatar fallback and global large-to-original replacement match the reference oracle.",
+      "tests": [
+        "scripts/run-jvm-gate-a.sh",
+        "tools/jvm-gate/src/emitter.rs",
+        "tools/jvm-gate/src/main.rs"
+      ]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.Units",
