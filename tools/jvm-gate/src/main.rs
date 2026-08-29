@@ -183,6 +183,9 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-http-context-retry-counter-consumer" => Some(HTTP_CONTEXT_RETRY_COUNTER_CONSUMER),
         "write-http-stream-tools-consumer" => Some(HTTP_STREAM_TOOLS_CONSUMER),
         "write-multi-http-configurable-consumer" => Some(MULTI_HTTP_CONFIGURABLE_CONSUMER),
+        "write-settable-http-request-filter-consumer" => {
+            Some(SETTABLE_HTTP_REQUEST_FILTER_CONSUMER)
+        }
         _ => None,
     }
 }
@@ -62304,6 +62307,259 @@ public final class GateMultiHttpConfigurable {
     if (type == char.class) return (char) 0;
     return null;
   }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const SETTABLE_HTTP_REQUEST_FILTER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter;
+import com.sedmelluq.discord.lavaplayer.tools.http.SettableHttpRequestFilter;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.protocol.HttpClientContext;
+
+public final class GateSettableHttpRequestFilter {
+  public static void main(String[] args) throws Exception {
+    stateAndForwarding();
+    replacementAndSnapshot();
+    nullDelegateAndArguments();
+    failureIdentity();
+    reflection();
+    System.out.println(
+        "contracts=constructor,initial-null,set-get-identity,replacement,clear,per-call-snapshot,"
+        + "callback-order,argument-identity,repetition-flags,boolean-results,null-delegate-defaults,"
+        + "null-forwarding,failure-identity,interface,subclassable,private-state,reflection");
+  }
+
+  private static void stateAndForwarding() throws Exception {
+    SettableHttpRequestFilter filter = new SettableHttpRequestFilter();
+    check(filter.get() == null, "initial null");
+    Field field = SettableHttpRequestFilter.class.getDeclaredField("filter");
+    field.setAccessible(true);
+    check(field.get(filter) == null, "initial private state");
+
+    HttpClientContext context = HttpClientContext.create();
+    HttpUriRequest request = proxy(HttpUriRequest.class);
+    HttpResponse response = proxy(HttpResponse.class);
+    Throwable error = new IllegalStateException("request-error");
+    RecordingFilter delegate = new RecordingFilter();
+    delegate.responseResult = true;
+    delegate.exceptionResult = false;
+    filter.set(delegate);
+    check(filter.get() == delegate && field.get(filter) == delegate, "set/get identity");
+
+    filter.onContextOpen(context);
+    filter.onRequest(context, request, false);
+    filter.onRequest(context, request, true);
+    check(filter.onRequestResponse(context, request, response), "response true");
+    check(!filter.onRequestException(context, request, error), "exception false");
+    filter.onContextClose(context);
+    check(delegate.events.toString().equals(
+        "open,request-false,request-true,response,exception,close,"), "callback order");
+    check(delegate.lastContext == context && delegate.lastRequest == request
+        && delegate.lastResponse == response && delegate.lastError == error,
+        "argument identity");
+  }
+
+  private static void replacementAndSnapshot() {
+    SettableHttpRequestFilter filter = new SettableHttpRequestFilter();
+    RecordingFilter replacement = new RecordingFilter();
+    replacement.responseResult = false;
+    replacement.exceptionResult = true;
+    HttpContextFilter swapping = new HttpContextFilter() {
+      public void onContextOpen(HttpClientContext context) {
+        replacement.events.append("installed-after-open,");
+        filter.set(replacement);
+      }
+      public void onContextClose(HttpClientContext context) {}
+      public void onRequest(HttpClientContext context, HttpUriRequest request,
+                            boolean repetition) {}
+      public boolean onRequestResponse(HttpClientContext context, HttpUriRequest request,
+                                       HttpResponse response) {
+        filter.set(replacement);
+        return true;
+      }
+      public boolean onRequestException(HttpClientContext context, HttpUriRequest request,
+                                        Throwable error) { return false; }
+    };
+
+    filter.set(swapping);
+    filter.onContextOpen(null);
+    check(filter.get() == replacement
+        && replacement.events.toString().equals("installed-after-open,"),
+        "callback replacement visibility");
+    filter.onContextClose(null);
+    check(replacement.events.toString().equals("installed-after-open,close,"),
+        "next-call replacement");
+
+    filter.set(swapping);
+    check(filter.onRequestResponse(null, null, null), "captured delegate result");
+    check(filter.get() == replacement, "response callback replacement");
+    check(!filter.onRequestResponse(null, null, null), "replacement response result");
+    check(filter.onRequestException(null, null, null), "replacement exception result");
+  }
+
+  private static void nullDelegateAndArguments() {
+    SettableHttpRequestFilter filter = new SettableHttpRequestFilter();
+    filter.onContextOpen(null);
+    filter.onContextClose(null);
+    filter.onRequest(null, null, false);
+    check(!filter.onRequestResponse(null, null, null)
+        && !filter.onRequestException(null, null, null), "null delegate defaults");
+
+    RecordingFilter delegate = new RecordingFilter();
+    delegate.responseResult = true;
+    delegate.exceptionResult = true;
+    filter.set(delegate);
+    filter.onContextOpen(null);
+    filter.onContextClose(null);
+    filter.onRequest(null, null, false);
+    check(filter.onRequestResponse(null, null, null)
+        && filter.onRequestException(null, null, null), "null argument results");
+    check(delegate.lastContext == null && delegate.lastRequest == null
+        && delegate.lastResponse == null && delegate.lastError == null,
+        "null argument forwarding");
+
+    int calls = delegate.calls;
+    filter.set(null);
+    check(filter.get() == null, "clear state");
+    filter.onContextOpen(null);
+    filter.onContextClose(null);
+    filter.onRequest(null, null, true);
+    check(!filter.onRequestResponse(null, null, null)
+        && !filter.onRequestException(null, null, null) && delegate.calls == calls,
+        "cleared delegate defaults");
+  }
+
+  private static void failureIdentity() {
+    RuntimeException sentinel = new RuntimeException("sentinel");
+    HttpContextFilter failing = new HttpContextFilter() {
+      public void onContextOpen(HttpClientContext context) { throw sentinel; }
+      public void onContextClose(HttpClientContext context) { throw sentinel; }
+      public void onRequest(HttpClientContext context, HttpUriRequest request,
+                            boolean repetition) { throw sentinel; }
+      public boolean onRequestResponse(HttpClientContext context, HttpUriRequest request,
+                                       HttpResponse response) { throw sentinel; }
+      public boolean onRequestException(HttpClientContext context, HttpUriRequest request,
+                                        Throwable error) { throw sentinel; }
+    };
+    SettableHttpRequestFilter filter = new SettableHttpRequestFilter();
+    filter.set(failing);
+    check(catchThrowable(() -> filter.onContextOpen(null)) == sentinel, "open failure");
+    check(catchThrowable(() -> filter.onContextClose(null)) == sentinel, "close failure");
+    check(catchThrowable(() -> filter.onRequest(null, null, false)) == sentinel,
+        "request failure");
+    check(catchThrowable(() -> filter.onRequestResponse(null, null, null)) == sentinel,
+        "response failure");
+    check(catchThrowable(() -> filter.onRequestException(null, null, null)) == sentinel,
+        "exception failure");
+  }
+
+  private static void reflection() throws Exception {
+    Class<SettableHttpRequestFilter> type = SettableHttpRequestFilter.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers()) && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {HttpContextFilter.class}),
+        "class metadata");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 7, "member counts");
+    Field field = type.getDeclaredField("filter");
+    check(field.getType() == HttpContextFilter.class && field.getModifiers() == Modifier.PRIVATE
+        && !field.isSynthetic(), "field metadata");
+    Constructor<SettableHttpRequestFilter> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    check(new Derived() instanceof HttpContextFilter, "subclassability");
+
+    method(type, "get", HttpContextFilter.class);
+    method(type, "set", void.class, HttpContextFilter.class);
+    method(type, "onContextOpen", void.class, HttpClientContext.class);
+    method(type, "onContextClose", void.class, HttpClientContext.class);
+    method(type, "onRequest", void.class, HttpClientContext.class, HttpUriRequest.class,
+        boolean.class);
+    method(type, "onRequestResponse", boolean.class, HttpClientContext.class,
+        HttpUriRequest.class, HttpResponse.class);
+    method(type, "onRequestException", boolean.class, HttpClientContext.class,
+        HttpUriRequest.class, Throwable.class);
+  }
+
+  private static void method(Class<?> type, String name, Class<?> returnType,
+                             Class<?>... parameters) throws Exception {
+    Method method = type.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == returnType
+        && method.getExceptionTypes().length == 0 && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), name + " metadata");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type},
+        (instance, method, arguments) -> defaultValue(method.getReturnType()));
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
+  }
+
+  private static Throwable catchThrowable(ThrowingAction action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+
+  @FunctionalInterface
+  private interface ThrowingAction { void run() throws Throwable; }
+
+  private static class RecordingFilter implements HttpContextFilter {
+    final StringBuilder events = new StringBuilder();
+    int calls;
+    boolean responseResult;
+    boolean exceptionResult;
+    HttpClientContext lastContext;
+    HttpUriRequest lastRequest;
+    HttpResponse lastResponse;
+    Throwable lastError;
+
+    public void onContextOpen(HttpClientContext context) {
+      calls++; lastContext = context; events.append("open,");
+    }
+    public void onContextClose(HttpClientContext context) {
+      calls++; lastContext = context; events.append("close,");
+    }
+    public void onRequest(HttpClientContext context, HttpUriRequest request,
+                          boolean repetition) {
+      calls++; lastContext = context; lastRequest = request;
+      events.append(repetition ? "request-true," : "request-false,");
+    }
+    public boolean onRequestResponse(HttpClientContext context, HttpUriRequest request,
+                                     HttpResponse response) {
+      calls++; lastContext = context; lastRequest = request; lastResponse = response;
+      events.append("response,"); return responseResult;
+    }
+    public boolean onRequestException(HttpClientContext context, HttpUriRequest request,
+                                      Throwable error) {
+      calls++; lastContext = context; lastRequest = request; lastError = error;
+      events.append("exception,"); return exceptionResult;
+    }
+  }
+
+  private static final class Derived extends SettableHttpRequestFilter {}
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

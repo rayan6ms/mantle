@@ -472,6 +472,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-http-stream-tools-consumer \
   --output "$WORK/GateHttpStreamTools.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-multi-http-configurable-consumer \
   --output "$WORK/GateMultiHttpConfigurable.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-settable-http-request-filter-consumer \
+  --output "$WORK/GateSettableHttpRequestFilter.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-container-probe-consumer \
   --output "$WORK/GateFlacContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-file-loader-consumer \
@@ -818,6 +820,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateHttpContextRetryCounter.java" \
   "$WORK/GateHttpStreamTools.java" \
   "$WORK/GateMultiHttpConfigurable.java" \
+  "$WORK/GateSettableHttpRequestFilter.java" \
   "$WORK/GateAdtsStreamProvider.java" \
   "$WORK/GateAacPacketRouter.java" \
   "$WORK/GateMpegAacTrackConsumer.java" \
@@ -2321,6 +2324,17 @@ cmp "$WORK/multi-http-configurable-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,collection-identity,live-collection,ordered-forwarding,duplicates,filter-identity,function-identity,consumer-identity,null-arguments,empty,partial-failure,failure-identity,null-element,null-collection,iterator-failure,generics,interface,subclassable,private-state,reflection' \
   "$WORK/multi-http-configurable-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateSettableHttpRequestFilter \
+  >"$WORK/settable-http-request-filter-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateSettableHttpRequestFilter >"$WORK/settable-http-request-filter-candidate.txt"
+cmp "$WORK/settable-http-request-filter-reference.txt" \
+  "$WORK/settable-http-request-filter-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,initial-null,set-get-identity,replacement,clear,per-call-snapshot,callback-order,argument-identity,repetition-flags,boolean-results,null-delegate-defaults,null-forwarding,failure-identity,interface,subclassable,private-state,reflection' \
+  "$WORK/settable-http-request-filter-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_vorbis_track_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggVorbisTrackHandler >"$WORK/ogg-vorbis-track-handler-reference.txt"
