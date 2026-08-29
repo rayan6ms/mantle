@@ -188,6 +188,9 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-extended-http-client-builder-consumer" => {
             Some(EXTENDED_HTTP_CLIENT_BUILDER_CONSUMER)
         }
+        "write-abstract-http-interface-manager-consumer" => {
+            Some(ABSTRACT_HTTP_INTERFACE_MANAGER_CONSUMER)
+        }
         "write-extended-http-configurable-consumer" => Some(EXTENDED_HTTP_CONFIGURABLE_CONSUMER),
         "write-http-configurable-consumer" => Some(HTTP_CONFIGURABLE_CONSUMER),
         "write-http-context-filter-consumer" => Some(HTTP_CONTEXT_FILTER_CONSUMER),
@@ -19350,6 +19353,7 @@ import com.sedmelluq.discord.lavaplayer.container.playlists.ExtendedM3uParser;
 import com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamSegmentUrlProvider;
 import com.sedmelluq.discord.lavaplayer.source.stream.M3uStreamSegmentUrlProvider;
 import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -63582,6 +63586,231 @@ public final class GateExtendedHttpClientBuilder {
       if (failure != null) throw failure;
       return super.decorateMainExec(chain);
     }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const ABSTRACT_HTTP_INTERFACE_MANAGER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.io.AbstractHttpInterfaceManager;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+
+public final class GateAbstractHttpInterfaceManager {
+  public static void main(String[] args) throws Exception {
+    constructionAndLazyClient();
+    closeAndFailures();
+    requestReconfiguration();
+    builderReconfiguration();
+    reflection();
+    System.out.println("contracts=constructor,default-state,identity-retention,lazy-build,shared-identity,close-clear,close-state,close-failure,closed-boundary,request-callback,request-reset,request-builder-config,request-null,request-failure,builder-callback,builder-reset,builder-failure,build-failure,interface,abstract,subclassable,private-state,generics,reflection");
+  }
+
+  private static void constructionAndLazyClient() throws Exception {
+    RecordingBuilder builder = new RecordingBuilder();
+    RequestConfig config = RequestConfig.custom().setSocketTimeout(17).build();
+    Exposed manager = new Exposed(builder, config);
+    check(field(manager, "clientBuilder") == builder, "builder identity");
+    check(field(manager, "requestConfig") == config, "request config identity");
+    check(field(manager, "lock") != null && field(manager, "sharedClient") == null,
+        "initial private state");
+    check(Boolean.FALSE.equals(field(manager, "closed")), "initial open state");
+    CloseableHttpClient first = manager.client();
+    check(first == builder.lastBuilt && builder.builds == 1, "lazy build");
+    check(manager.client() == first && builder.builds == 1, "shared identity");
+    check(manager.client() == first, "repeated shared access");
+
+    Exposed nulls = new Exposed(null, null);
+    check(field(nulls, "clientBuilder") == null && field(nulls, "requestConfig") == null,
+        "nullable constructor arguments");
+  }
+
+  private static void closeAndFailures() throws Exception {
+    RecordingBuilder builder = new RecordingBuilder();
+    Exposed manager = new Exposed(builder, RequestConfig.DEFAULT);
+    CloseableHttpClient client = manager.client();
+    manager.close();
+    check(builder.lastBuilt.closeCalls == 1 && field(manager, "sharedClient") == null,
+        "close clears and closes");
+    check(Boolean.TRUE.equals(field(manager, "closed")), "close marks closed");
+    check(catchThrowable(manager::client) instanceof IllegalStateException
+        && catchThrowable(manager::client).getMessage().equals(
+            "Cannot get http client for a closed manager."), "closed boundary");
+    manager.close();
+    check(builder.lastBuilt.closeCalls == 1, "repeated close no-op");
+
+    RecordingBuilder failingBuilder = new RecordingBuilder();
+    Exposed failing = new Exposed(failingBuilder, RequestConfig.DEFAULT);
+    FakeClient failingClient = (FakeClient) failing.client();
+    IOException closeFailure = new IOException("close");
+    failingClient.closeFailure = closeFailure;
+    check(catchThrowable(failing::close) == closeFailure, "close failure identity");
+    check(Boolean.TRUE.equals(field(failing, "closed")) && field(failing, "sharedClient") == null,
+        "close failure state");
+
+    RecordingBuilder buildFailureBuilder = new RecordingBuilder();
+    RuntimeException buildFailure = new RuntimeException("build");
+    buildFailureBuilder.buildFailure = buildFailure;
+    Exposed buildFailureManager = new Exposed(buildFailureBuilder, RequestConfig.DEFAULT);
+    check(catchThrowable(buildFailureManager::client) == buildFailure, "build failure identity");
+    check(Boolean.FALSE.equals(field(buildFailureManager, "closed"))
+        && field(buildFailureManager, "sharedClient") == null, "build failure state");
+  }
+
+  private static void requestReconfiguration() throws Exception {
+    RecordingBuilder builder = new RecordingBuilder();
+    RequestConfig original = RequestConfig.custom().setConnectTimeout(21).build();
+    Exposed manager = new Exposed(builder, original);
+    FakeClient first = (FakeClient) manager.client();
+    RequestConfig replacement = RequestConfig.custom().setSocketTimeout(42).build();
+    AtomicReference<RequestConfig> seen = new AtomicReference<>();
+    manager.configureRequests(current -> {
+      seen.set(current);
+      check(current == original, "request callback identity");
+      return replacement;
+    });
+    check(seen.get() == original && first.closeCalls == 1, "request close before callback");
+    check(field(manager, "requestConfig") == replacement, "request config replacement");
+    check(field(builder, "defaultRequestConfig") == replacement, "builder request config");
+    check(Boolean.FALSE.equals(field(manager, "closed")) && manager.client() != first
+        && builder.builds == 2, "request reset and rebuild");
+
+    builder.lastBuilt.closeFailure = new IOException("ignored");
+    RequestConfig third = RequestConfig.custom().setConnectionRequestTimeout(63).build();
+    manager.configureRequests(current -> third);
+    check(field(manager, "requestConfig") == third && Boolean.FALSE.equals(field(manager, "closed")),
+        "request close failure is caught");
+    manager.configureRequests(current -> null);
+    check(field(manager, "requestConfig") == null && field(builder, "defaultRequestConfig") == null,
+        "request null result");
+
+    RuntimeException callbackFailure = new RuntimeException("request callback");
+    check(catchThrowable(() -> manager.configureRequests(current -> { throw callbackFailure; }))
+        == callbackFailure, "request callback failure identity");
+    check(Boolean.FALSE.equals(field(manager, "closed")), "request callback failure reopens");
+    check(catchThrowable(() -> manager.configureRequests(null)) instanceof NullPointerException,
+        "null request callback");
+    check(Boolean.FALSE.equals(field(manager, "closed")), "null request callback reopens");
+  }
+
+  private static void builderReconfiguration() throws Exception {
+    RecordingBuilder builder = new RecordingBuilder();
+    Exposed manager = new Exposed(builder, RequestConfig.DEFAULT);
+    FakeClient first = (FakeClient) manager.client();
+    AtomicReference<HttpClientBuilder> seen = new AtomicReference<>();
+    manager.configureBuilder(seen::set);
+    check(seen.get() == builder && first.closeCalls == 1, "builder callback identity");
+    check(Boolean.FALSE.equals(field(manager, "closed")) && manager.client() != first
+        && builder.builds == 2, "builder reset and rebuild");
+
+    RuntimeException callbackFailure = new RuntimeException("builder callback");
+    check(catchThrowable(() -> manager.configureBuilder(b -> { throw callbackFailure; }))
+        == callbackFailure, "builder callback failure identity");
+    check(Boolean.FALSE.equals(field(manager, "closed")), "builder callback failure reopens");
+    check(catchThrowable(() -> manager.configureBuilder(null)) instanceof NullPointerException,
+        "null builder callback");
+    check(Boolean.FALSE.equals(field(manager, "closed")), "null builder callback reopens");
+  }
+
+  private static void reflection() throws Exception {
+    Class<AbstractHttpInterfaceManager> type = AbstractHttpInterfaceManager.class;
+    check(Modifier.isPublic(type.getModifiers()) && Modifier.isAbstract(type.getModifiers()),
+        "class modifiers");
+    check(type.getSuperclass() == Object.class && type.getInterfaces().length == 1
+        && type.getInterfaces()[0].getName().equals(
+            "com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager"), "interface");
+    check(type.getDeclaredFields().length == 6 && type.getDeclaredMethods().length == 4,
+        "member counts");
+    check(type.getDeclaredConstructors().length == 1
+        && Modifier.isPublic(type.getDeclaredConstructors()[0].getModifiers()), "constructor shape");
+    check(type.getDeclaredConstructor(HttpClientBuilder.class, RequestConfig.class) != null,
+        "constructor parameters");
+    check(type.getDeclaredMethod("close").getExceptionTypes()[0] == IOException.class,
+        "close checked exception");
+    Method requests = type.getDeclaredMethod("configureRequests", Function.class);
+    Method builder = type.getDeclaredMethod("configureBuilder", Consumer.class);
+    check(requests.getGenericParameterTypes()[0].getTypeName().contains("RequestConfig")
+        && requests.getGenericParameterTypes()[0].getTypeName().contains("Function"),
+        "request generic signature");
+    check(builder.getGenericParameterTypes()[0].getTypeName().contains("HttpClientBuilder")
+        && builder.getGenericParameterTypes()[0].getTypeName().contains("Consumer"),
+        "builder generic signature");
+    Method shared = type.getDeclaredMethod("getSharedClient");
+    check(Modifier.isProtected(shared.getModifiers())
+        && shared.getReturnType() == CloseableHttpClient.class, "shared client shape");
+    new Exposed(null, null);
+  }
+
+  private static Object field(Object instance, String name) throws Exception {
+    Class<?> type = instance.getClass();
+    while (type != null) {
+      try {
+        Field field = type.getDeclaredField(name);
+        field.setAccessible(true);
+        return field.get(instance);
+      } catch (NoSuchFieldException ignored) {
+        type = type.getSuperclass();
+      }
+    }
+    throw new NoSuchFieldException(name);
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+
+  private static final class FakeClient extends CloseableHttpClient {
+    int closeCalls;
+    IOException closeFailure;
+    protected org.apache.http.client.methods.CloseableHttpResponse doExecute(
+        org.apache.http.HttpHost host, org.apache.http.HttpRequest request,
+        org.apache.http.protocol.HttpContext context) throws IOException {
+      return null;
+    }
+    public void close() throws IOException {
+      closeCalls++;
+      if (closeFailure != null) throw closeFailure;
+    }
+    public org.apache.http.params.HttpParams getParams() { return null; }
+    public org.apache.http.conn.ClientConnectionManager getConnectionManager() { return null; }
+  }
+
+  private static final class RecordingBuilder extends HttpClientBuilder {
+    FakeClient next = new FakeClient();
+    FakeClient lastBuilt;
+    int builds;
+    RuntimeException buildFailure;
+    public CloseableHttpClient build() {
+      builds++;
+      if (buildFailure != null) throw buildFailure;
+      FakeClient result = next;
+      lastBuilt = result;
+      next = new FakeClient();
+      return result;
+    }
+  }
+
+  private static final class Exposed extends AbstractHttpInterfaceManager {
+    Exposed(HttpClientBuilder builder, RequestConfig requestConfig) {
+      super(builder, requestConfig);
+    }
+    CloseableHttpClient client() { return getSharedClient(); }
+    public HttpInterface getInterface() { return null; }
+    public void setHttpContextFilter(HttpContextFilter filter) { }
   }
 
   private interface ThrowingRunnable { void run() throws Throwable; }

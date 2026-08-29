@@ -395,6 +395,8 @@ const EXTENDED_HTTP_CLIENT_BUILDER_CONNECTION_MANAGER_FACTORY_CLASS: &str = "com
 const EXTENDED_HTTP_CLIENT_BUILDER_GARBAGE_PARSER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpClientBuilder$GarbageAllergicHttpResponseParser";
 const EXTENDED_HTTP_CLIENT_BUILDER_ICY_PARSER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpClientBuilder$IcyHttpLineParser";
+const ABSTRACT_HTTP_INTERFACE_MANAGER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/io/AbstractHttpInterfaceManager";
 const ABSTRACT_MUTABLE_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AbstractMutableAudioFrame";
 const IMMUTABLE_FRAME_CLASS: &str =
@@ -1004,6 +1006,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     EXTENDED_HTTP_CLIENT_BUILDER_CONNECTION_MANAGER_FACTORY_CLASS,
     EXTENDED_HTTP_CLIENT_BUILDER_GARBAGE_PARSER_CLASS,
     EXTENDED_HTTP_CLIENT_BUILDER_ICY_PARSER_CLASS,
+    ABSTRACT_HTTP_INTERFACE_MANAGER_CLASS,
     COPY_ON_UPDATE_IDENTITY_LIST_CLASS,
     DATA_FORMAT_TOOLS_CLASS,
     DATA_FORMAT_TOOLS_TEXT_RANGE_CLASS,
@@ -1178,6 +1181,7 @@ pub fn emit(
     let mut extended_http_client_builder_connection_manager_factory_bytes = None;
     let mut extended_http_client_builder_garbage_parser_bytes = None;
     let mut extended_http_client_builder_icy_parser_bytes = None;
+    let mut abstract_http_interface_manager_bytes = None;
     let mut vorbis_comment_parser_bytes = None;
     let mut extended_m3u_parser_bytes = None;
     let mut extended_m3u_line_bytes = None;
@@ -1383,6 +1387,8 @@ pub fn emit(
             extended_http_client_builder_garbage_parser_bytes = Some(bytes);
         } else if *binary_name == EXTENDED_HTTP_CLIENT_BUILDER_ICY_PARSER_CLASS {
             extended_http_client_builder_icy_parser_bytes = Some(bytes);
+        } else if *binary_name == ABSTRACT_HTTP_INTERFACE_MANAGER_CLASS {
+            abstract_http_interface_manager_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -1655,6 +1661,12 @@ pub fn emit(
                 extended_http_client_builder_icy_parser_bytes
                     .as_ref()
                     .expect("extended HTTP client builder ICY parser source bytes are retained"),
+            );
+        } else if name == format!("{ABSTRACT_HTTP_INTERFACE_MANAGER_CLASS}.class") {
+            bytes.clone_from(
+                abstract_http_interface_manager_bytes
+                    .as_ref()
+                    .expect("abstract HTTP interface manager source bytes are retained"),
             );
         } else if name == format!("{MPEG_AUDIO_TRACK_CLASS}.class") {
             bytes.clone_from(

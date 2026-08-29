@@ -470,6 +470,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-simple-http-client-connection-
   --output "$WORK/GateSimpleHttpClientConnectionManager.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-extended-http-client-builder-consumer \
   --output "$WORK/GateExtendedHttpClientBuilder.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-abstract-http-interface-manager-consumer \
+  --output "$WORK/GateAbstractHttpInterfaceManager.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-extended-http-configurable-consumer \
   --output "$WORK/GateExtendedHttpConfigurable.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-http-configurable-consumer \
@@ -829,6 +831,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateExtendedConnectionOperator.java" \
   "$WORK/GateSimpleHttpClientConnectionManager.java" \
   "$WORK/GateExtendedHttpClientBuilder.java" \
+  "$WORK/GateAbstractHttpInterfaceManager.java" \
   "$WORK/GateExtendedHttpConfigurable.java" \
   "$WORK/GateHttpConfigurable.java" \
   "$WORK/GateHttpContextFilter.java" \
@@ -2331,6 +2334,17 @@ cmp "$WORK/extended-http-client-builder-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,default-state,setter-identity,null-retention,decorator-identity,manager-factory,operator-factory,custom-sockets,ssl-protocols,build-reset,repeated-build,factory-failure,build-failure-cleanup,icy-parser,garbage-parser,parser-delegation,default-manager,manager-limits,subclassable,private-state,nested-types,generics,reflection' \
   "$WORK/extended-http-client-builder-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateAbstractHttpInterfaceManager \
+  >"$WORK/abstract-http-interface-manager-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateAbstractHttpInterfaceManager >"$WORK/abstract-http-interface-manager-candidate.txt"
+cmp "$WORK/abstract-http-interface-manager-reference.txt" \
+  "$WORK/abstract-http-interface-manager-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,default-state,identity-retention,lazy-build,shared-identity,close-clear,close-state,close-failure,closed-boundary,request-callback,request-reset,request-builder-config,request-null,request-failure,builder-callback,builder-reset,builder-failure,build-failure,interface,abstract,subclassable,private-state,generics,reflection' \
+  "$WORK/abstract-http-interface-manager-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateExtendedHttpConfigurable \
   >"$WORK/extended-http-configurable-reference.txt"
