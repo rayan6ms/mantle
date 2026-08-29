@@ -191,6 +191,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-abstract-http-interface-manager-consumer" => {
             Some(ABSTRACT_HTTP_INTERFACE_MANAGER_CONSUMER)
         }
+        "write-bit-buffer-reader-consumer" => Some(BIT_BUFFER_READER_CONSUMER),
         "write-extended-http-configurable-consumer" => Some(EXTENDED_HTTP_CONFIGURABLE_CONSUMER),
         "write-http-configurable-consumer" => Some(HTTP_CONFIGURABLE_CONSUMER),
         "write-http-context-filter-consumer" => Some(HTTP_CONTEXT_FILTER_CONSUMER),
@@ -63811,6 +63812,115 @@ public final class GateAbstractHttpInterfaceManager {
     CloseableHttpClient client() { return getSharedClient(); }
     public HttpInterface getInterface() { return null; }
     public void setHttpContextFilter(HttpContextFilter filter) { }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const BIT_BUFFER_READER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.io.BitBufferReader;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
+
+public final class GateBitBufferReader {
+  public static void main(String[] args) throws Exception {
+    constructionAndUnsignedReads();
+    signedAndAlignmentReads();
+    failuresAndSubclassing();
+    reflection();
+    System.out.println("contracts=constructor,buffer-identity,unsigned-long,unsigned-integer,cross-byte,position,signed-long,signed-integer,remaining-bits,all-zeroes,byte-unsigned,eof-failure,null-failure,subclassable,private-state,reflection");
+  }
+
+  private static void constructionAndUnsignedReads() throws Exception {
+    ByteBuffer buffer = ByteBuffer.wrap(new byte[] {(byte) 0xB2, (byte) 0x5A, (byte) 0xFF});
+    BitBufferReader reader = new BitBufferReader(buffer);
+    check(field(reader, "buffer") == buffer, "buffer identity");
+    check(reader.asLong(3) == 5L, "first unsigned bits");
+    check(reader.asInteger(5) == 18, "second unsigned bits");
+    check(buffer.position() == 1, "position after partial byte");
+    check(reader.asLong(12) == 0x5AFL, "cross-byte unsigned long");
+    check(buffer.position() == 3, "position after cross-byte read");
+
+    ByteBuffer integerBuffer = ByteBuffer.wrap(new byte[] {(byte) 0xAB, (byte) 0xCD, (byte) 0xEF});
+    BitBufferReader integerReader = new BitBufferReader(integerBuffer);
+    check(integerReader.asInteger(20) == 0xABCDE, "unsigned integer width");
+    check(integerBuffer.position() == 3, "integer position");
+  }
+
+  private static void signedAndAlignmentReads() throws Exception {
+    BitBufferReader signed = new BitBufferReader(ByteBuffer.wrap(new byte[] {(byte) 0xF0, 0x70}));
+    check(signed.asSignedLong(4) == -1L, "negative signed long");
+    check(signed.asSignedLong(4) == 0L, "zero signed long");
+    BitBufferReader signedInteger = new BitBufferReader(ByteBuffer.wrap(new byte[] {(byte) 0x80}));
+    check(signedInteger.asSignedInteger(8) == -128, "negative signed integer");
+
+    BitBufferReader remaining = new BitBufferReader(ByteBuffer.wrap(new byte[] {(byte) 0xB5}));
+    check(remaining.asLong(3) == 5L, "alignment prefix");
+    check(remaining.readRemainingBits() == 0x15, "remaining bits value");
+    check(remaining.readRemainingBits() == 0, "remaining bits consumed");
+
+    BitBufferReader zeroes = new BitBufferReader(ByteBuffer.wrap(new byte[] {0, 0x10}));
+    check(zeroes.readAllZeroes() == 11, "all zeroes count");
+    Derived byteReader = new Derived(ByteBuffer.wrap(new byte[] {(byte) 0xFF}));
+    check(byteReader.readBytePublic() == 255, "unsigned byte");
+  }
+
+  private static void failuresAndSubclassing() throws Exception {
+    BitBufferReader empty = new BitBufferReader(ByteBuffer.allocate(0));
+    Throwable eof = catchThrowable(() -> empty.asLong(1));
+    check(eof instanceof BufferUnderflowException, "buffer EOF identity");
+    BitBufferReader nullBuffer = new BitBufferReader(null);
+    check(catchThrowable(() -> nullBuffer.asInteger(1)) instanceof NullPointerException,
+        "null buffer failure");
+    BitBufferReader zeroWidth = new BitBufferReader(ByteBuffer.wrap(new byte[] {1}));
+    check(zeroWidth.asLong(0) == 0L && zeroWidth.asInteger(-3) == 0,
+        "non-positive widths are no-op");
+    new Derived(ByteBuffer.allocate(0));
+  }
+
+  private static void reflection() throws Exception {
+    Class<BitBufferReader> type = BitBufferReader.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers()),
+        "class modifiers");
+    check(type.getSuperclass().getName().equals(
+        "com.sedmelluq.discord.lavaplayer.tools.io.BitStreamReader"), "superclass");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredMethods().length == 3,
+        "member counts");
+    Field buffer = type.getDeclaredField("buffer");
+    check(buffer.getType() == ByteBuffer.class
+        && (buffer.getModifiers() & (Modifier.PRIVATE | Modifier.FINAL))
+            == (Modifier.PRIVATE | Modifier.FINAL), "private buffer field");
+    check(type.getDeclaredConstructor(ByteBuffer.class).getExceptionTypes().length == 0,
+        "constructor exceptions");
+    Method asLong = type.getDeclaredMethod("asLong", int.class);
+    Method asInteger = type.getDeclaredMethod("asInteger", int.class);
+    Method readByte = type.getDeclaredMethod("readByte");
+    check(asLong.getExceptionTypes().length == 0 && asInteger.getExceptionTypes().length == 0,
+        "wrapped read exceptions");
+    check(readByte.getExceptionTypes().length == 1 && readByte.getExceptionTypes()[0] == java.io.IOException.class,
+        "protected read exception");
+  }
+
+  private static Object field(Object instance, String name) throws Exception {
+    Field field = instance.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(instance);
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+
+  private static final class Derived extends BitBufferReader {
+    Derived(ByteBuffer buffer) { super(buffer); }
+    int readBytePublic() throws java.io.IOException { return readByte(); }
   }
 
   private interface ThrowingRunnable { void run() throws Throwable; }

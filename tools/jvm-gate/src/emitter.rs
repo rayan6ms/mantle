@@ -397,6 +397,7 @@ const EXTENDED_HTTP_CLIENT_BUILDER_ICY_PARSER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpClientBuilder$IcyHttpLineParser";
 const ABSTRACT_HTTP_INTERFACE_MANAGER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/io/AbstractHttpInterfaceManager";
+const BIT_BUFFER_READER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/io/BitBufferReader";
 const ABSTRACT_MUTABLE_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AbstractMutableAudioFrame";
 const IMMUTABLE_FRAME_CLASS: &str =
@@ -1007,6 +1008,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     EXTENDED_HTTP_CLIENT_BUILDER_GARBAGE_PARSER_CLASS,
     EXTENDED_HTTP_CLIENT_BUILDER_ICY_PARSER_CLASS,
     ABSTRACT_HTTP_INTERFACE_MANAGER_CLASS,
+    BIT_BUFFER_READER_CLASS,
     COPY_ON_UPDATE_IDENTITY_LIST_CLASS,
     DATA_FORMAT_TOOLS_CLASS,
     DATA_FORMAT_TOOLS_TEXT_RANGE_CLASS,
@@ -1182,6 +1184,7 @@ pub fn emit(
     let mut extended_http_client_builder_garbage_parser_bytes = None;
     let mut extended_http_client_builder_icy_parser_bytes = None;
     let mut abstract_http_interface_manager_bytes = None;
+    let mut bit_buffer_reader_bytes = None;
     let mut vorbis_comment_parser_bytes = None;
     let mut extended_m3u_parser_bytes = None;
     let mut extended_m3u_line_bytes = None;
@@ -1389,6 +1392,8 @@ pub fn emit(
             extended_http_client_builder_icy_parser_bytes = Some(bytes);
         } else if *binary_name == ABSTRACT_HTTP_INTERFACE_MANAGER_CLASS {
             abstract_http_interface_manager_bytes = Some(bytes);
+        } else if *binary_name == BIT_BUFFER_READER_CLASS {
+            bit_buffer_reader_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -1667,6 +1672,12 @@ pub fn emit(
                 abstract_http_interface_manager_bytes
                     .as_ref()
                     .expect("abstract HTTP interface manager source bytes are retained"),
+            );
+        } else if name == format!("{BIT_BUFFER_READER_CLASS}.class") {
+            bytes.clone_from(
+                bit_buffer_reader_bytes
+                    .as_ref()
+                    .expect("bit buffer reader source bytes are retained"),
             );
         } else if name == format!("{MPEG_AUDIO_TRACK_CLASS}.class") {
             bytes.clone_from(

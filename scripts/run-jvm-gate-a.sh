@@ -472,6 +472,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-extended-http-client-builder-c
   --output "$WORK/GateExtendedHttpClientBuilder.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-abstract-http-interface-manager-consumer \
   --output "$WORK/GateAbstractHttpInterfaceManager.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-bit-buffer-reader-consumer \
+  --output "$WORK/GateBitBufferReader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-extended-http-configurable-consumer \
   --output "$WORK/GateExtendedHttpConfigurable.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-http-configurable-consumer \
@@ -832,6 +834,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateSimpleHttpClientConnectionManager.java" \
   "$WORK/GateExtendedHttpClientBuilder.java" \
   "$WORK/GateAbstractHttpInterfaceManager.java" \
+  "$WORK/GateBitBufferReader.java" \
   "$WORK/GateExtendedHttpConfigurable.java" \
   "$WORK/GateHttpConfigurable.java" \
   "$WORK/GateHttpContextFilter.java" \
@@ -2345,6 +2348,16 @@ cmp "$WORK/abstract-http-interface-manager-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,default-state,identity-retention,lazy-build,shared-identity,close-clear,close-state,close-failure,closed-boundary,request-callback,request-reset,request-builder-config,request-null,request-failure,builder-callback,builder-reset,builder-failure,build-failure,interface,abstract,subclassable,private-state,generics,reflection' \
   "$WORK/abstract-http-interface-manager-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateBitBufferReader \
+  >"$WORK/bit-buffer-reader-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateBitBufferReader >"$WORK/bit-buffer-reader-candidate.txt"
+cmp "$WORK/bit-buffer-reader-reference.txt" "$WORK/bit-buffer-reader-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,buffer-identity,unsigned-long,unsigned-integer,cross-byte,position,signed-long,signed-integer,remaining-bits,all-zeroes,byte-unsigned,eof-failure,null-failure,subclassable,private-state,reflection' \
+  "$WORK/bit-buffer-reader-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateExtendedHttpConfigurable \
   >"$WORK/extended-http-configurable-reference.txt"
