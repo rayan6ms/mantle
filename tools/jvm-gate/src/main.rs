@@ -203,6 +203,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-extended-buffered-input-stream-consumer" => {
             Some(EXTENDED_BUFFERED_INPUT_STREAM_CONSUMER)
         }
+        "write-greedy-input-stream-consumer" => Some(GREEDY_INPUT_STREAM_CONSUMER),
         "write-extended-http-configurable-consumer" => Some(EXTENDED_HTTP_CONFIGURABLE_CONSUMER),
         "write-http-configurable-consumer" => Some(HTTP_CONFIGURABLE_CONSUMER),
         "write-http-context-filter-consumer" => Some(HTTP_CONTEXT_FILTER_CONSUMER),
@@ -65280,6 +65281,263 @@ public final class GateExtendedBufferedInputStream {
   }
 
   private static final class Derived extends ExtendedBufferedInputStream {
+    Derived(InputStream input) { super(input); }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const GREEDY_INPUT_STREAM_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.io.GreedyInputStream;
+import java.io.ByteArrayInputStream;
+import java.io.FilterInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+public final class GateGreedyInputStream {
+  public static void main(String[] args) throws Exception {
+    constructorAndGreedyRead();
+    readEofAndBoundaries();
+    greedySkipAndFallback();
+    failuresAndInheritedBehavior();
+    reflection();
+    System.out.println("contracts=constructor,delegate-identity,no-eager-read,greedy-read,read-arguments,offset-preservation,partial-eof,immediate-eof,repeated-eof,zero-length,negative-length,invalid-read,null-read,greedy-skip,skip-arguments,skip-fallback-read,partial-skip-eof,nonpositive-skip,read-io-identity,partial-read-failure,skip-io-identity,fallback-io-identity,inherited-single-read,inherited-available,inherited-mark-reset,inherited-close,null-input,subclassable,private-state,reflection");
+  }
+
+  private static void constructorAndGreedyRead() throws Exception {
+    ChunkedInput source = new ChunkedInput(new byte[] {1, 2, 3, 4, 5, 6}, 2);
+    GreedyInputStream stream = new GreedyInputStream(source);
+    check(delegate(stream) == source && source.bulkCalls == 0 && source.singleCalls == 0,
+        "constructor identity and no eager read");
+    byte[] target = new byte[] {9, 9, 9, 9, 9, 9, 9};
+    check(stream.read(target, 1, 5) == 5, "greedy read result");
+    check(Arrays.equals(target, new byte[] {9, 1, 2, 3, 4, 5, 9}),
+        "greedy read bytes and offset preservation");
+    check(source.bulkLengths.equals(Arrays.asList(5, 3, 1))
+        && source.bulkOffsets.equals(Arrays.asList(1, 3, 5)), "greedy read arguments");
+  }
+
+  private static void readEofAndBoundaries() throws Exception {
+    ChunkedInput partialSource = new ChunkedInput(new byte[] {10, 11, 12}, 2);
+    GreedyInputStream partial = new GreedyInputStream(partialSource);
+    byte[] target = new byte[5];
+    check(partial.read(target, 0, 5) == 3
+        && Arrays.equals(target, new byte[] {10, 11, 12, 0, 0}), "partial EOF");
+    check(partial.read(target, 0, 5) == -1, "repeated EOF");
+
+    GreedyInputStream empty = new GreedyInputStream(new ByteArrayInputStream(new byte[0]));
+    check(empty.read(new byte[1], 0, 1) == -1, "immediate EOF");
+
+    ChunkedInput untouched = new ChunkedInput(new byte[] {1}, 1);
+    GreedyInputStream boundaries = new GreedyInputStream(untouched);
+    check(boundaries.read(null, 50, 0) == 0 && boundaries.read(null, -50, -1) == 0
+        && untouched.bulkCalls == 0, "non-positive length bypasses delegate validation");
+    check(catchThrowable(() -> boundaries.read(null, 0, 1)) instanceof NullPointerException,
+        "positive null buffer");
+    check(catchThrowable(() -> boundaries.read(new byte[1], 1, 1))
+        instanceof IndexOutOfBoundsException, "invalid positive range");
+  }
+
+  private static void greedySkipAndFallback() throws Exception {
+    ChunkedInput source = new ChunkedInput(new byte[] {20, 21, 22, 23, 24, 25}, 2);
+    GreedyInputStream stream = new GreedyInputStream(source);
+    check(stream.skip(5) == 5 && source.skipLengths.equals(Arrays.asList(5L, 3L, 1L)),
+        "greedy skip and arguments");
+    check(stream.read() == 25, "skip position");
+
+    ZeroSkipInput fallbackSource = new ZeroSkipInput(new byte[] {30, 31, 32, 33});
+    GreedyInputStream fallback = new GreedyInputStream(fallbackSource);
+    check(fallback.skip(3) == 3 && fallbackSource.skipCalls == 3
+        && fallbackSource.singleCalls == 3 && fallback.read() == 33,
+        "zero-skip fallback reads one byte");
+
+    ZeroSkipInput partialSource = new ZeroSkipInput(new byte[] {40, 41});
+    GreedyInputStream partial = new GreedyInputStream(partialSource);
+    check(partial.skip(5) == 2 && partialSource.skipCalls == 3
+        && partialSource.singleCalls == 3, "partial skip EOF");
+
+    ChunkedInput untouched = new ChunkedInput(new byte[] {1}, 1);
+    GreedyInputStream boundaries = new GreedyInputStream(untouched);
+    check(boundaries.skip(0) == 0 && boundaries.skip(-1) == 0
+        && untouched.skipCalls == 0 && untouched.singleCalls == 0,
+        "non-positive skip bypasses delegate");
+  }
+
+  private static void failuresAndInheritedBehavior() throws Exception {
+    IOException readFailure = new IOException("read-failure");
+    FailingInput failingRead = new FailingInput(readFailure, false);
+    GreedyInputStream readStream = new GreedyInputStream(failingRead);
+    check(catchThrowable(() -> readStream.read(new byte[1], 0, 1)) == readFailure,
+        "read IOException identity");
+
+    IOException partialFailure = new IOException("partial-failure");
+    PartialThenFailInput partialSource = new PartialThenFailInput(partialFailure);
+    byte[] partialTarget = new byte[4];
+    check(catchThrowable(() -> new GreedyInputStream(partialSource)
+        .read(partialTarget, 0, 4)) == partialFailure
+        && Arrays.equals(partialTarget, new byte[] {50, 51, 0, 0})
+        && partialSource.bulkCalls == 2, "partial read failure identity and mutation");
+
+    IOException skipFailure = new IOException("skip-failure");
+    FailingInput failingSkip = new FailingInput(skipFailure, true);
+    check(catchThrowable(() -> new GreedyInputStream(failingSkip).skip(1)) == skipFailure,
+        "skip IOException identity");
+
+    IOException fallbackFailure = new IOException("fallback-failure");
+    ZeroSkipFailingRead fallbackSource = new ZeroSkipFailingRead(fallbackFailure);
+    check(catchThrowable(() -> new GreedyInputStream(fallbackSource).skip(1)) == fallbackFailure,
+        "fallback read IOException identity");
+
+    RecordingInput inheritedSource = new RecordingInput(new byte[] {60, 61, 62});
+    GreedyInputStream inherited = new GreedyInputStream(inheritedSource);
+    check(inherited.read() == 60 && inheritedSource.singleCalls == 1,
+        "inherited single read");
+    check(inherited.available() == 2, "inherited available");
+    check(inherited.markSupported(), "inherited mark support");
+    inherited.mark(2);
+    check(inherited.read() == 61, "inherited marked read");
+    inherited.reset();
+    check(inherited.read() == 61, "inherited reset");
+    inherited.close();
+    check(inheritedSource.closed, "inherited close");
+
+    GreedyInputStream nullInput = new GreedyInputStream(null);
+    check(catchThrowable(() -> nullInput.read(new byte[1], 0, 1))
+        instanceof NullPointerException, "null input read");
+    check(catchThrowable(() -> nullInput.skip(1)) instanceof NullPointerException,
+        "null input skip");
+  }
+
+  private static void reflection() throws Exception {
+    Class<GreedyInputStream> type = GreedyInputStream.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers()),
+        "class modifiers");
+    check(type.getSuperclass() == FilterInputStream.class && type.getInterfaces().length == 0,
+        "superclass");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredMethods().length == 2,
+        "member counts");
+    check(type.getDeclaredConstructor(InputStream.class).getExceptionTypes().length == 0,
+        "constructor shape");
+    Method read = type.getDeclaredMethod("read", byte[].class, int.class, int.class);
+    Method skip = type.getDeclaredMethod("skip", long.class);
+    check(Modifier.isPublic(read.getModifiers()) && read.getReturnType() == int.class
+        && Arrays.equals(read.getExceptionTypes(), new Class<?>[] {IOException.class}),
+        "read shape");
+    check(Modifier.isPublic(skip.getModifiers()) && skip.getReturnType() == long.class
+        && Arrays.equals(skip.getExceptionTypes(), new Class<?>[] {IOException.class}),
+        "skip shape");
+    new Derived(new ByteArrayInputStream(new byte[0]));
+  }
+
+  private static InputStream delegate(GreedyInputStream stream) throws Exception {
+    Field field = FilterInputStream.class.getDeclaredField("in");
+    field.setAccessible(true);
+    return (InputStream) field.get(stream);
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+
+  private static class ChunkedInput extends InputStream {
+    final ByteArrayInputStream delegate;
+    final int maximumChunk;
+    final List<Integer> bulkOffsets = new ArrayList<>();
+    final List<Integer> bulkLengths = new ArrayList<>();
+    final List<Long> skipLengths = new ArrayList<>();
+    int bulkCalls;
+    int singleCalls;
+    int skipCalls;
+    ChunkedInput(byte[] bytes, int maximumChunk) {
+      this.delegate = new ByteArrayInputStream(bytes);
+      this.maximumChunk = maximumChunk;
+    }
+    public int read() {
+      singleCalls++;
+      return delegate.read();
+    }
+    public int read(byte[] bytes, int offset, int length) {
+      bulkCalls++;
+      bulkOffsets.add(offset);
+      bulkLengths.add(length);
+      return delegate.read(bytes, offset, Math.min(length, maximumChunk));
+    }
+    public long skip(long maximum) {
+      skipCalls++;
+      skipLengths.add(maximum);
+      return delegate.skip(Math.min(maximum, maximumChunk));
+    }
+  }
+
+  private static final class ZeroSkipInput extends InputStream {
+    final ByteArrayInputStream delegate;
+    int skipCalls;
+    int singleCalls;
+    ZeroSkipInput(byte[] bytes) { delegate = new ByteArrayInputStream(bytes); }
+    public int read() { singleCalls++; return delegate.read(); }
+    public long skip(long maximum) { skipCalls++; return 0; }
+  }
+
+  private static final class FailingInput extends InputStream {
+    final IOException failure;
+    final boolean failSkip;
+    FailingInput(IOException failure, boolean failSkip) {
+      this.failure = failure;
+      this.failSkip = failSkip;
+    }
+    public int read() throws IOException { throw failure; }
+    public int read(byte[] bytes, int offset, int length) throws IOException {
+      if (!failSkip) throw failure;
+      return -1;
+    }
+    public long skip(long maximum) throws IOException {
+      if (failSkip) throw failure;
+      return 0;
+    }
+  }
+
+  private static final class PartialThenFailInput extends InputStream {
+    final IOException failure;
+    int bulkCalls;
+    PartialThenFailInput(IOException failure) { this.failure = failure; }
+    public int read() { return -1; }
+    public int read(byte[] bytes, int offset, int length) throws IOException {
+      bulkCalls++;
+      if (bulkCalls == 1) {
+        bytes[offset] = 50;
+        bytes[offset + 1] = 51;
+        return 2;
+      }
+      throw failure;
+    }
+  }
+
+  private static final class ZeroSkipFailingRead extends InputStream {
+    final IOException failure;
+    ZeroSkipFailingRead(IOException failure) { this.failure = failure; }
+    public int read() throws IOException { throw failure; }
+    public long skip(long maximum) { return 0; }
+  }
+
+  private static final class RecordingInput extends ByteArrayInputStream {
+    int singleCalls;
+    boolean closed;
+    RecordingInput(byte[] bytes) { super(bytes); }
+    public synchronized int read() { singleCalls++; return super.read(); }
+    public void close() throws IOException { closed = true; super.close(); }
+  }
+
+  private static final class Derived extends GreedyInputStream {
     Derived(InputStream input) { super(input); }
   }
 

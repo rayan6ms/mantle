@@ -492,6 +492,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-empty-input-stream-consumer \
   --output "$WORK/GateEmptyInputStream.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-extended-buffered-input-stream-consumer \
   --output "$WORK/GateExtendedBufferedInputStream.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-greedy-input-stream-consumer \
+  --output "$WORK/GateGreedyInputStream.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-extended-http-configurable-consumer \
   --output "$WORK/GateExtendedHttpConfigurable.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-http-configurable-consumer \
@@ -862,6 +864,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateDirectBufferStreamBroker.java" \
   "$WORK/GateEmptyInputStream.java" \
   "$WORK/GateExtendedBufferedInputStream.java" \
+  "$WORK/GateGreedyInputStream.java" \
   "$WORK/GateExtendedHttpConfigurable.java" \
   "$WORK/GateHttpConfigurable.java" \
   "$WORK/GateHttpContextFilter.java" \
@@ -2481,6 +2484,17 @@ cmp "$WORK/extended-buffered-input-stream-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor-default,constructor-sized,initial-count,buffered-count,discard-buffer,refill-after-discard,bulk-read,mark-reset,inherited-available,inherited-close,invalid-size,null-input,subclassable,private-state,reflection' \
   "$WORK/extended-buffered-input-stream-candidate.txt" >/dev/null
+java --add-opens java.base/java.io=ALL-UNNAMED -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateGreedyInputStream \
+  >"$WORK/greedy-input-stream-reference.txt"
+java --add-opens java.base/java.io=ALL-UNNAMED -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateGreedyInputStream >"$WORK/greedy-input-stream-candidate.txt"
+cmp "$WORK/greedy-input-stream-reference.txt" \
+  "$WORK/greedy-input-stream-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,delegate-identity,no-eager-read,greedy-read,read-arguments,offset-preservation,partial-eof,immediate-eof,repeated-eof,zero-length,negative-length,invalid-read,null-read,greedy-skip,skip-arguments,skip-fallback-read,partial-skip-eof,nonpositive-skip,read-io-identity,partial-read-failure,skip-io-identity,fallback-io-identity,inherited-single-read,inherited-available,inherited-mark-reset,inherited-close,null-input,subclassable,private-state,reflection' \
+  "$WORK/greedy-input-stream-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateExtendedHttpConfigurable \
   >"$WORK/extended-http-configurable-reference.txt"
