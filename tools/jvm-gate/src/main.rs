@@ -175,6 +175,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-player-library-consumer" => Some(PLAYER_LIBRARY_CONSUMER),
         "write-ring-buffer-math-consumer" => Some(RING_BUFFER_MATH_CONSUMER),
         "write-thumbnail-tools-consumer" => Some(THUMBNAIL_TOOLS_CONSUMER),
+        "write-units-consumer" => Some(UNITS_CONSUMER),
         _ => None,
     }
 }
@@ -61097,6 +61098,83 @@ public final class GateThumbnailTools {
 
   private static Method method(Class<?> type, String name, Class<?>... parameters) throws Exception {
     return type.getDeclaredMethod(name, parameters);
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const UNITS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.Units;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+
+public final class GateUnits {
+  public static void main(String[] args) throws Exception {
+    check(Units.CONTENT_LENGTH_UNKNOWN == Long.MAX_VALUE, "content length sentinel");
+    check(Units.DURATION_MS_UNKNOWN == Long.MAX_VALUE, "duration ms sentinel");
+    check(Units.DURATION_SEC_UNKNOWN == Long.MAX_VALUE, "duration sec sentinel");
+    check(Units.BITRATE_UNKNOWN == -1L, "bitrate sentinel");
+
+    check(Units.secondsToMillis(0L) == 0L, "zero conversion");
+    check(Units.secondsToMillis(1L) == 1000L, "positive conversion");
+    check(Units.secondsToMillis(-1L) == -1000L, "negative conversion");
+    check(Units.secondsToMillis(Long.MIN_VALUE) == 0L, "long overflow conversion");
+    long maximum = Long.MAX_VALUE / 1000L;
+    check(Units.secondsToMillis(maximum) == 9_223_372_036_854_775_000L,
+        "maximum conversion");
+    check(Units.secondsToMillis(Long.MAX_VALUE) == Long.MAX_VALUE, "unknown conversion");
+    Throwable overflow = catchThrowable(() -> Units.secondsToMillis(maximum + 1L));
+    check(overflow instanceof RuntimeException && !(overflow instanceof ArithmeticException) &&
+        overflow.getMessage().equals("Cannot convert 9223372036854776 to millis - would overflow."),
+        "overflow failure");
+    Throwable negativeOverflow = catchThrowable(() -> Units.secondsToMillis(Long.MAX_VALUE - 1L));
+    check(negativeOverflow instanceof RuntimeException && negativeOverflow.getMessage()
+        .equals("Cannot convert 9223372036854775806 to millis - would overflow."),
+        "sentinel-near overflow");
+    reflection();
+    System.out.println("units-ok contracts=constants,constructor,zero,positive,negative,long-overflow,maximum,unknown-sentinel,overflow-message,sentinel-near-overflow,private-state,reflection");
+  }
+
+  private static void reflection() throws Exception {
+    Class<Units> type = Units.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers()) &&
+        type.getSuperclass() == Object.class && type.getInterfaces().length == 0,
+        "class shape");
+    check(type.getDeclaredFields().length == 5 && type.getDeclaredMethods().length == 1 &&
+        type.getDeclaredConstructors().length == 1, "declared shape");
+    field(type, "CONTENT_LENGTH_UNKNOWN", Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
+    field(type, "DURATION_MS_UNKNOWN", Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
+    field(type, "DURATION_SEC_UNKNOWN", Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
+    field(type, "BITRATE_UNKNOWN", Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
+    Field maximum = field(type, "SECONDS_MAXIMUM", Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    maximum.setAccessible(true);
+    check(maximum.getLong(null) == Long.MAX_VALUE / 1000L, "private maximum");
+    Constructor<Units> constructor = type.getConstructor();
+    check(Modifier.isPublic(constructor.getModifiers()) && !constructor.isSynthetic() &&
+        constructor.getExceptionTypes().length == 0 && constructor.newInstance() != null,
+        "constructor shape");
+    Method conversion = type.getDeclaredMethod("secondsToMillis", long.class);
+    check(conversion.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC) &&
+        conversion.getReturnType() == long.class && conversion.getExceptionTypes().length == 0 &&
+        !conversion.isSynthetic(), "conversion shape");
+  }
+
+  private static Field field(Class<?> type, String name, int modifiers) throws Exception {
+    Field field = type.getDeclaredField(name);
+    check(field.getType() == long.class && field.getModifiers() == modifiers && !field.isSynthetic(),
+        name + " field");
+    return field;
   }
 
   private static Throwable catchThrowable(ThrowingRunnable action) {

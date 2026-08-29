@@ -460,6 +460,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-ring-buffer-math-consumer \
   --output "$WORK/GateRingBufferMath.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-thumbnail-tools-consumer \
   --output "$WORK/GateThumbnailTools.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-units-consumer \
+  --output "$WORK/GateUnits.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-container-probe-consumer \
   --output "$WORK/GateFlacContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-file-loader-consumer \
@@ -800,6 +802,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GatePlayerLibrary.java" \
   "$WORK/GateRingBufferMath.java" \
   "$WORK/GateThumbnailTools.java" \
+  "$WORK/GateUnits.java" \
   "$WORK/GateAdtsStreamProvider.java" \
   "$WORK/GateAacPacketRouter.java" \
   "$WORK/GateMpegAacTrackConsumer.java" \
@@ -2242,6 +2245,15 @@ cmp "$WORK/thumbnail-tools-reference.txt" "$WORK/thumbnail-tools-candidate.txt"
 grep --fixed-strings \
   'contracts=constructor,subclassable,youtube-music-rewrite,youtube-music-fallback,youtube-music-missing,youtube-last-maxres,youtube-last-non-maxres,youtube-empty-fallback,soundcloud-artwork,soundcloud-artwork-fallback,soundcloud-avatar-fallback,soundcloud-replace-all,missing-fields,malformed-values,reflection' \
   "$WORK/thumbnail-tools-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateUnits >"$WORK/units-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateUnits >"$WORK/units-candidate.txt"
+cmp "$WORK/units-reference.txt" "$WORK/units-candidate.txt"
+grep --fixed-strings \
+  'contracts=constants,constructor,zero,positive,negative,long-overflow,maximum,unknown-sentinel,overflow-message,sentinel-near-overflow,private-state,reflection' \
+  "$WORK/units-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_vorbis_track_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggVorbisTrackHandler >"$WORK/ogg-vorbis-track-handler-reference.txt"

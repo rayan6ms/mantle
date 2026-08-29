@@ -362,6 +362,7 @@ const PLAYER_LIBRARY_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/Playe
 const PLAYER_LIBRARY_VERSION_RESOURCE: &str = "com/sedmelluq/discord/lavaplayer/tools/version.txt";
 const RING_BUFFER_MATH_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/RingBufferMath";
 const THUMBNAIL_TOOLS_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/ThumbnailTools";
+const UNITS_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/Units";
 const ABSTRACT_MUTABLE_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AbstractMutableAudioFrame";
 const IMMUTABLE_FRAME_CLASS: &str =
@@ -972,6 +973,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     PLAYER_LIBRARY_CLASS,
     RING_BUFFER_MATH_CLASS,
     THUMBNAIL_TOOLS_CLASS,
+    UNITS_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/AudioItem",
     AUDIO_REFERENCE_CLASS,
     "com/sedmelluq/discord/lavaplayer/track/AudioPlaylist",
@@ -1111,6 +1113,7 @@ pub fn emit(
     let mut player_library_bytes = None;
     let mut ring_buffer_math_bytes = None;
     let mut thumbnail_tools_bytes = None;
+    let mut units_bytes = None;
     let mut vorbis_comment_parser_bytes = None;
     let mut extended_m3u_parser_bytes = None;
     let mut extended_m3u_line_bytes = None;
@@ -1284,6 +1287,8 @@ pub fn emit(
             ring_buffer_math_bytes = Some(bytes);
         } else if *binary_name == THUMBNAIL_TOOLS_CLASS {
             thumbnail_tools_bytes = Some(bytes);
+        } else if *binary_name == UNITS_CLASS {
+            units_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -1456,6 +1461,12 @@ pub fn emit(
                 thumbnail_tools_bytes
                     .as_ref()
                     .expect("thumbnail tools source bytes are retained"),
+            );
+        } else if name == format!("{UNITS_CLASS}.class") {
+            bytes.clone_from(
+                units_bytes
+                    .as_ref()
+                    .expect("units source bytes are retained"),
             );
         } else if name == format!("{MPEG_AUDIO_TRACK_CLASS}.class") {
             bytes.clone_from(
@@ -2409,6 +2420,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | PLAYER_LIBRARY_CLASS
             | RING_BUFFER_MATH_CLASS
             | THUMBNAIL_TOOLS_CLASS
+            | UNITS_CLASS
             | OGG_FLAC_CODEC_HANDLER_CLASS
             | OGG_FLAC_CODEC_HANDLER_BLUEPRINT_CLASS
             | OGG_FLAC_TRACK_HANDLER_CLASS
