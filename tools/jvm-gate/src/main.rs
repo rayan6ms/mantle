@@ -182,6 +182,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-http-context-filter-consumer" => Some(HTTP_CONTEXT_FILTER_CONSUMER),
         "write-http-context-retry-counter-consumer" => Some(HTTP_CONTEXT_RETRY_COUNTER_CONSUMER),
         "write-http-stream-tools-consumer" => Some(HTTP_STREAM_TOOLS_CONSUMER),
+        "write-multi-http-configurable-consumer" => Some(MULTI_HTTP_CONFIGURABLE_CONSUMER),
         _ => None,
     }
 }
@@ -62020,6 +62021,275 @@ public final class GateHttpStreamTools {
 
   private interface Invocation {
     Object invoke(Method method, Object[] arguments) throws Throwable;
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const MULTI_HTTP_CONFIGURABLE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpConfigurable;
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter;
+import com.sedmelluq.discord.lavaplayer.tools.http.MultiHttpConfigurable;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.AbstractCollection;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.impl.client.HttpClientBuilder;
+
+public final class GateMultiHttpConfigurable {
+  public static void main(String[] args) throws Exception {
+    orderedForwardingAndIdentity();
+    liveCollectionAndNullArguments();
+    partialFailures();
+    malformedCollections();
+    reflection();
+    System.out.println(
+        "contracts=constructor,collection-identity,live-collection,ordered-forwarding,duplicates,"
+        + "filter-identity,function-identity,consumer-identity,null-arguments,empty,partial-failure,"
+        + "failure-identity,null-element,null-collection,iterator-failure,generics,interface,"
+        + "subclassable,private-state,reflection");
+  }
+
+  private static void orderedForwardingAndIdentity() {
+    List<String> events = new ArrayList<>();
+    RecordingConfigurable first = new RecordingConfigurable("first", events);
+    RecordingConfigurable second = new RecordingConfigurable("second", events);
+    List<ExtendedHttpConfigurable> delegates = new ArrayList<>(
+        Arrays.asList(first, second, first));
+    MultiHttpConfigurable multi = new MultiHttpConfigurable(delegates);
+    HttpContextFilter filter = proxy(HttpContextFilter.class);
+    Function<RequestConfig, RequestConfig> function = value -> value;
+    Consumer<HttpClientBuilder> consumer = value -> {};
+
+    multi.setHttpContextFilter(filter);
+    check(events.equals(Arrays.asList("first:filter", "second:filter", "first:filter")),
+        "filter order and duplicates");
+    check(first.lastFilter == filter && second.lastFilter == filter
+        && first.filterCalls == 2 && second.filterCalls == 1, "filter identity");
+
+    events.clear();
+    multi.configureRequests(function);
+    check(events.equals(Arrays.asList("first:requests", "second:requests", "first:requests")),
+        "request order and duplicates");
+    check(first.lastFunction == function && second.lastFunction == function
+        && first.requestCalls == 2 && second.requestCalls == 1, "function identity");
+
+    events.clear();
+    multi.configureBuilder(consumer);
+    check(events.equals(Arrays.asList("first:builder", "second:builder", "first:builder")),
+        "builder order and duplicates");
+    check(first.lastConsumer == consumer && second.lastConsumer == consumer
+        && first.builderCalls == 2 && second.builderCalls == 1, "consumer identity");
+  }
+
+  private static void liveCollectionAndNullArguments() throws Exception {
+    List<String> events = new ArrayList<>();
+    RecordingConfigurable first = new RecordingConfigurable("first", events);
+    RecordingConfigurable replacement = new RecordingConfigurable("replacement", events);
+    List<ExtendedHttpConfigurable> delegates = new ArrayList<>();
+    delegates.add(first);
+    MultiHttpConfigurable multi = new MultiHttpConfigurable(delegates);
+
+    Field field = MultiHttpConfigurable.class.getDeclaredField("configurables");
+    field.setAccessible(true);
+    check(field.get(multi) == delegates, "collection identity");
+    delegates.clear();
+    delegates.add(replacement);
+    multi.setHttpContextFilter(null);
+    multi.configureRequests(null);
+    multi.configureBuilder(null);
+    check(events.equals(Arrays.asList(
+        "replacement:filter", "replacement:requests", "replacement:builder")),
+        "live collection visibility");
+    check(replacement.lastFilter == null && replacement.lastFunction == null
+        && replacement.lastConsumer == null, "null argument forwarding");
+    check(first.filterCalls == 0 && first.requestCalls == 0 && first.builderCalls == 0,
+        "removed delegate absence");
+
+    MultiHttpConfigurable empty = new MultiHttpConfigurable(new ArrayList<>());
+    empty.setHttpContextFilter(null);
+    empty.configureRequests(null);
+    empty.configureBuilder(null);
+  }
+
+  private static void partialFailures() {
+    for (Operation operation : Operation.values()) {
+      List<String> events = new ArrayList<>();
+      RecordingConfigurable first = new RecordingConfigurable("first", events);
+      RecordingConfigurable failing = new RecordingConfigurable("failing", events);
+      RecordingConfigurable last = new RecordingConfigurable("last", events);
+      RuntimeException sentinel = new RuntimeException(operation.name());
+      failing.failureOperation = operation;
+      failing.failure = sentinel;
+      MultiHttpConfigurable multi = new MultiHttpConfigurable(
+          Arrays.asList(first, failing, last));
+      Throwable actual;
+      if (operation == Operation.FILTER) {
+        actual = catchThrowable(() -> multi.setHttpContextFilter(null));
+      } else if (operation == Operation.REQUESTS) {
+        actual = catchThrowable(() -> multi.configureRequests(null));
+      } else {
+        actual = catchThrowable(() -> multi.configureBuilder(null));
+      }
+      String suffix = operation == Operation.FILTER ? "filter"
+          : operation == Operation.REQUESTS ? "requests" : "builder";
+      check(actual == sentinel, operation + " failure identity");
+      check(events.equals(Arrays.asList("first:" + suffix, "failing:" + suffix)),
+          operation + " partial prefix");
+      check(last.filterCalls + last.requestCalls + last.builderCalls == 0,
+          operation + " suffix skipped");
+    }
+  }
+
+  private static void malformedCollections() throws Exception {
+    List<String> events = new ArrayList<>();
+    RecordingConfigurable first = new RecordingConfigurable("first", events);
+    RecordingConfigurable last = new RecordingConfigurable("last", events);
+    MultiHttpConfigurable nullElement = new MultiHttpConfigurable(
+        Arrays.asList(first, null, last));
+    check(catchThrowable(() -> nullElement.setHttpContextFilter(null))
+        instanceof NullPointerException, "null element failure");
+    check(events.equals(Arrays.asList("first:filter")) && last.filterCalls == 0,
+        "null element prefix");
+
+    MultiHttpConfigurable nullCollection = new MultiHttpConfigurable(null);
+    Field field = MultiHttpConfigurable.class.getDeclaredField("configurables");
+    field.setAccessible(true);
+    check(field.get(nullCollection) == null, "null collection retention");
+    check(catchThrowable(() -> nullCollection.configureRequests(null))
+        instanceof NullPointerException, "null collection use");
+
+    RuntimeException sentinel = new RuntimeException("iterator");
+    Collection<ExtendedHttpConfigurable> broken = new AbstractCollection<>() {
+      public Iterator<ExtendedHttpConfigurable> iterator() { throw sentinel; }
+      public int size() { return 0; }
+    };
+    MultiHttpConfigurable iteratorFailure = new MultiHttpConfigurable(broken);
+    check(catchThrowable(() -> iteratorFailure.configureBuilder(null)) == sentinel,
+        "iterator failure identity");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MultiHttpConfigurable> type = MultiHttpConfigurable.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers()) && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {ExtendedHttpConfigurable.class}),
+        "class metadata");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 3, "member counts");
+    Field field = type.getDeclaredField("configurables");
+    check(field.getType() == Collection.class
+        && field.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL) && !field.isSynthetic()
+        && field.getGenericType().getTypeName().equals(
+            "java.util.Collection<com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpConfigurable>"),
+        "field metadata");
+    Constructor<MultiHttpConfigurable> constructor = type.getDeclaredConstructor(Collection.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0
+        && constructor.getGenericParameterTypes()[0].getTypeName().equals(
+            "java.util.Collection<com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpConfigurable>"),
+        "constructor metadata");
+    check(new Derived(new ArrayList<>()) instanceof ExtendedHttpConfigurable, "subclassability");
+
+    method(type, "setHttpContextFilter", HttpContextFilter.class,
+        "com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter");
+    method(type, "configureRequests", Function.class,
+        "java.util.function.Function<org.apache.http.client.config.RequestConfig, org.apache.http.client.config.RequestConfig>");
+    method(type, "configureBuilder", Consumer.class,
+        "java.util.function.Consumer<org.apache.http.impl.client.HttpClientBuilder>");
+  }
+
+  private static void method(Class<?> type, String name, Class<?> parameter,
+                             String genericParameter) throws Exception {
+    Method method = type.getDeclaredMethod(name, parameter);
+    check(method.getModifiers() == Modifier.PUBLIC && method.getReturnType() == void.class
+        && method.getExceptionTypes().length == 0 && !method.isBridge() && !method.isSynthetic()
+        && !method.isVarArgs()
+        && method.getGenericParameterTypes()[0].getTypeName().equals(genericParameter),
+        name + " metadata");
+  }
+
+  private static Throwable catchThrowable(ThrowingOperation operation) {
+    try { operation.run(); return null; } catch (Throwable failure) { return failure; }
+  }
+
+  private interface ThrowingOperation { void run() throws Throwable; }
+
+  private enum Operation { FILTER, REQUESTS, BUILDER }
+
+  private static final class Derived extends MultiHttpConfigurable {
+    Derived(Collection<ExtendedHttpConfigurable> delegates) { super(delegates); }
+  }
+
+  private static final class RecordingConfigurable implements ExtendedHttpConfigurable {
+    final String name;
+    final List<String> events;
+    HttpContextFilter lastFilter;
+    Function<RequestConfig, RequestConfig> lastFunction;
+    Consumer<HttpClientBuilder> lastConsumer;
+    Operation failureOperation;
+    RuntimeException failure;
+    int filterCalls;
+    int requestCalls;
+    int builderCalls;
+
+    RecordingConfigurable(String name, List<String> events) {
+      this.name = name;
+      this.events = events;
+    }
+
+    public void setHttpContextFilter(HttpContextFilter filter) {
+      filterCalls++;
+      lastFilter = filter;
+      events.add(name + ":filter");
+      if (failureOperation == Operation.FILTER) throw failure;
+    }
+
+    public void configureRequests(Function<RequestConfig, RequestConfig> configurator) {
+      requestCalls++;
+      lastFunction = configurator;
+      events.add(name + ":requests");
+      if (failureOperation == Operation.REQUESTS) throw failure;
+    }
+
+    public void configureBuilder(Consumer<HttpClientBuilder> configurator) {
+      builderCalls++;
+      lastConsumer = configurator;
+      events.add(name + ":builder");
+      if (failureOperation == Operation.BUILDER) throw failure;
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type},
+        (instance, method, arguments) -> defaultValue(method.getReturnType()));
   }
 
   private static Object defaultValue(Class<?> type) {

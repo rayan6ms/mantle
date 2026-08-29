@@ -372,6 +372,8 @@ const HTTP_CONTEXT_RETRY_COUNTER_CLASS: &str =
 const HTTP_CONTEXT_RETRY_COUNTER_RETRY_COUNT_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/http/HttpContextRetryCounter$RetryCount";
 const HTTP_STREAM_TOOLS_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/http/HttpStreamTools";
+const MULTI_HTTP_CONFIGURABLE_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/http/MultiHttpConfigurable";
 const ABSTRACT_MUTABLE_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AbstractMutableAudioFrame";
 const IMMUTABLE_FRAME_CLASS: &str =
@@ -969,6 +971,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     HTTP_CONTEXT_FILTER_CLASS,
     HTTP_CONTEXT_RETRY_COUNTER_CLASS,
     HTTP_STREAM_TOOLS_CLASS,
+    MULTI_HTTP_CONFIGURABLE_CLASS,
     COPY_ON_UPDATE_IDENTITY_LIST_CLASS,
     DATA_FORMAT_TOOLS_CLASS,
     DATA_FORMAT_TOOLS_TEXT_RANGE_CLASS,
@@ -1132,6 +1135,7 @@ pub fn emit(
     let mut http_context_retry_counter_bytes = None;
     let mut http_context_retry_counter_retry_count_bytes = None;
     let mut http_stream_tools_bytes = None;
+    let mut multi_http_configurable_bytes = None;
     let mut vorbis_comment_parser_bytes = None;
     let mut extended_m3u_parser_bytes = None;
     let mut extended_m3u_line_bytes = None;
@@ -1315,6 +1319,8 @@ pub fn emit(
             http_context_retry_counter_retry_count_bytes = Some(bytes);
         } else if *binary_name == HTTP_STREAM_TOOLS_CLASS {
             http_stream_tools_bytes = Some(bytes);
+        } else if *binary_name == MULTI_HTTP_CONFIGURABLE_CLASS {
+            multi_http_configurable_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -1517,6 +1523,12 @@ pub fn emit(
                 http_stream_tools_bytes
                     .as_ref()
                     .expect("HTTP stream tools source bytes are retained"),
+            );
+        } else if name == format!("{MULTI_HTTP_CONFIGURABLE_CLASS}.class") {
+            bytes.clone_from(
+                multi_http_configurable_bytes
+                    .as_ref()
+                    .expect("multi HTTP configurable source bytes are retained"),
             );
         } else if name == format!("{MPEG_AUDIO_TRACK_CLASS}.class") {
             bytes.clone_from(
@@ -2475,6 +2487,7 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | HTTP_CONTEXT_RETRY_COUNTER_CLASS
             | HTTP_CONTEXT_RETRY_COUNTER_RETRY_COUNT_CLASS
             | HTTP_STREAM_TOOLS_CLASS
+            | MULTI_HTTP_CONFIGURABLE_CLASS
             | OGG_FLAC_CODEC_HANDLER_CLASS
             | OGG_FLAC_CODEC_HANDLER_BLUEPRINT_CLASS
             | OGG_FLAC_TRACK_HANDLER_CLASS

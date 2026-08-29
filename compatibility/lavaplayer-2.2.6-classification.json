@@ -25398,45 +25398,50 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference class bytes are retained byte-identically; live collection retention, ordered forwarding, failure boundaries, generic metadata, subclassability, and reflection match the differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.http.MultiHttpConfigurable",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Ljava/util/Collection;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "The public constructor retains the exact Collection instance without copying or validation, including null, and preserves its generic signature.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.http.MultiHttpConfigurable",
       "symbol_kind": "METHOD",
       "member_name": "setHttpContextFilter",
       "descriptor": "(Lcom/sedmelluq/discord/lavaplayer/tools/http/HttpContextFilter;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Ordered and duplicate filter forwarding, exact argument identity, live mutations, null handling, and prefix-only failure propagation match the differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.http.MultiHttpConfigurable",
       "symbol_kind": "METHOD",
       "member_name": "configureRequests",
       "descriptor": "(Ljava/util/function/Function;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Ordered and duplicate request-configurator forwarding, exact argument identity, null handling, generic metadata, and prefix-only failure propagation match the differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.http.MultiHttpConfigurable",
       "symbol_kind": "METHOD",
       "member_name": "configureBuilder",
       "descriptor": "(Ljava/util/function/Consumer;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Ordered and duplicate builder-consumer forwarding, exact argument identity, null handling, generic metadata, and prefix-only failure propagation match the differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.http.SettableHttpRequestFilter",

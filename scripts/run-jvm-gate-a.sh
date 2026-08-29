@@ -470,6 +470,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-http-context-retry-counter-con
   --output "$WORK/GateHttpContextRetryCounter.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-http-stream-tools-consumer \
   --output "$WORK/GateHttpStreamTools.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-multi-http-configurable-consumer \
+  --output "$WORK/GateMultiHttpConfigurable.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-container-probe-consumer \
   --output "$WORK/GateFlacContainerProbe.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-flac-file-loader-consumer \
@@ -815,6 +817,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateHttpContextFilter.java" \
   "$WORK/GateHttpContextRetryCounter.java" \
   "$WORK/GateHttpStreamTools.java" \
+  "$WORK/GateMultiHttpConfigurable.java" \
   "$WORK/GateAdtsStreamProvider.java" \
   "$WORK/GateAacPacketRouter.java" \
   "$WORK/GateMpegAacTrackConsumer.java" \
@@ -2307,6 +2310,17 @@ cmp "$WORK/http-stream-tools-reference.txt" "$WORK/http-stream-tools-candidate.t
 grep --fixed-strings \
   'contracts=constructor,subclassable,execute-identity,status-200,status-203,status-206,rejected-statuses,error-message,checked-wrapping,unchecked-identity,pre-success-close,post-success-response-retention,stream-identity,stream-ownership,nulls,reflection' \
   "$WORK/http-stream-tools-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMultiHttpConfigurable \
+  >"$WORK/multi-http-configurable-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMultiHttpConfigurable >"$WORK/multi-http-configurable-candidate.txt"
+cmp "$WORK/multi-http-configurable-reference.txt" \
+  "$WORK/multi-http-configurable-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,collection-identity,live-collection,ordered-forwarding,duplicates,filter-identity,function-identity,consumer-identity,null-arguments,empty,partial-failure,failure-identity,null-element,null-collection,iterator-failure,generics,interface,subclassable,private-state,reflection' \
+  "$WORK/multi-http-configurable-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$ogg_vorbis_track_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggVorbisTrackHandler >"$WORK/ogg-vorbis-track-handler-reference.txt"
