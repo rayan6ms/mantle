@@ -200,6 +200,9 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-detached-byte-channel-consumer" => Some(DETACHED_BYTE_CHANNEL_CONSUMER),
         "write-direct-buffer-stream-broker-consumer" => Some(DIRECT_BUFFER_STREAM_BROKER_CONSUMER),
         "write-empty-input-stream-consumer" => Some(EMPTY_INPUT_STREAM_CONSUMER),
+        "write-extended-buffered-input-stream-consumer" => {
+            Some(EXTENDED_BUFFERED_INPUT_STREAM_CONSUMER)
+        }
         "write-extended-http-configurable-consumer" => Some(EXTENDED_HTTP_CONFIGURABLE_CONSUMER),
         "write-http-configurable-consumer" => Some(HTTP_CONFIGURABLE_CONSUMER),
         "write-http-context-filter-consumer" => Some(HTTP_CONTEXT_FILTER_CONSUMER),
@@ -65159,6 +65162,128 @@ public final class GateEmptyInputStream {
   }
 
   private static final class Derived extends EmptyInputStream {}
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const EXTENDED_BUFFERED_INPUT_STREAM_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.io.ExtendedBufferedInputStream;
+import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateExtendedBufferedInputStream {
+  public static void main(String[] args) throws Exception {
+    constructorsAndBufferedCount();
+    discardAndInheritedBehavior();
+    boundariesAndFailures();
+    reflection();
+    System.out.println("contracts=constructor-default,constructor-sized,initial-count,buffered-count,discard-buffer,refill-after-discard,bulk-read,mark-reset,inherited-available,inherited-close,invalid-size,null-input,subclassable,private-state,reflection");
+  }
+
+  private static void constructorsAndBufferedCount() throws Exception {
+    ExtendedBufferedInputStream defaults = new ExtendedBufferedInputStream(
+        new ByteArrayInputStream(new byte[] {1, 2, 3}));
+    check(defaults.getBufferedByteCount() == 0, "initial default count");
+    check(defaults.read() == 1 && defaults.getBufferedByteCount() == 2,
+        "default buffered count");
+
+    ExtendedBufferedInputStream sized = new ExtendedBufferedInputStream(
+        new ByteArrayInputStream(new byte[] {4, 5, 6, 7, 8}), 4);
+    check(sized.getBufferedByteCount() == 0, "initial sized count");
+    check(sized.read() == 4 && sized.getBufferedByteCount() == 3,
+        "sized buffered count");
+    byte[] target = new byte[2];
+    check(sized.read(target, 0, 2) == 2 && Arrays.equals(target, new byte[] {5, 6})
+        && sized.getBufferedByteCount() == 1, "bulk read and count");
+  }
+
+  private static void discardAndInheritedBehavior() throws Exception {
+    CountingInput source = new CountingInput(new byte[] {10, 11, 12, 13, 14, 15});
+    ExtendedBufferedInputStream stream = new ExtendedBufferedInputStream(source, 3);
+    check(stream.read() == 10 && stream.getBufferedByteCount() == 2, "discard setup");
+    int readsBefore = source.readCalls;
+    stream.discardBuffer();
+    check(stream.getBufferedByteCount() == 0 && source.readCalls == readsBefore,
+        "discard state");
+    check(stream.read() == 13 && source.readCalls == readsBefore + 1,
+        "refill after discard");
+
+    ByteArrayInputStream markedSource = new ByteArrayInputStream(new byte[] {20, 21, 22, 23});
+    ExtendedBufferedInputStream marked = new ExtendedBufferedInputStream(markedSource, 4);
+    check(marked.read() == 20, "mark setup");
+    marked.mark(4);
+    check(marked.read() == 21 && marked.read() == 22, "mark reads");
+    marked.reset();
+    check(marked.read() == 21, "inherited mark reset");
+    check(marked.available() == 2, "inherited available");
+    marked.close();
+    check(catchThrowable(marked::read) instanceof IOException, "inherited close");
+  }
+
+  private static void boundariesAndFailures() throws Exception {
+    check(catchThrowable(() -> new ExtendedBufferedInputStream(
+        new ByteArrayInputStream(new byte[0]), 0)) instanceof IllegalArgumentException,
+        "invalid zero size");
+    check(catchThrowable(() -> new ExtendedBufferedInputStream(
+        new ByteArrayInputStream(new byte[0]), -1)) instanceof IllegalArgumentException,
+        "invalid negative size");
+    ExtendedBufferedInputStream nullDefault = new ExtendedBufferedInputStream(null);
+    ExtendedBufferedInputStream nullSized = new ExtendedBufferedInputStream(null, 2);
+    check(catchThrowable(nullDefault::read) instanceof IOException,
+        "null input default read");
+    check(catchThrowable(nullSized::read) instanceof IOException,
+        "null input sized read");
+  }
+
+  private static void reflection() throws Exception {
+    Class<ExtendedBufferedInputStream> type = ExtendedBufferedInputStream.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers()),
+        "class modifiers");
+    check(type.getSuperclass() == BufferedInputStream.class && type.getInterfaces().length == 0,
+        "superclass");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredMethods().length == 2,
+        "member counts");
+    check(type.getDeclaredConstructor(InputStream.class).getExceptionTypes().length == 0
+        && type.getDeclaredConstructor(InputStream.class, int.class).getExceptionTypes().length == 0,
+        "constructor shape");
+    Method count = type.getDeclaredMethod("getBufferedByteCount");
+    Method discard = type.getDeclaredMethod("discardBuffer");
+    check(Modifier.isPublic(count.getModifiers()) && count.getReturnType() == int.class
+        && count.getExceptionTypes().length == 0, "count shape");
+    check(Modifier.isPublic(discard.getModifiers()) && discard.getReturnType() == void.class
+        && discard.getExceptionTypes().length == 0, "discard shape");
+    new Derived(new ByteArrayInputStream(new byte[0]));
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+
+  private static final class CountingInput extends InputStream {
+    private final ByteArrayInputStream delegate;
+    int readCalls;
+    CountingInput(byte[] bytes) { delegate = new ByteArrayInputStream(bytes); }
+    public int read() { return delegate.read(); }
+    public int read(byte[] bytes, int offset, int length) {
+      readCalls++;
+      return delegate.read(bytes, offset, length);
+    }
+    public int available() { return delegate.available(); }
+    public void close() throws IOException { delegate.close(); }
+  }
+
+  private static final class Derived extends ExtendedBufferedInputStream {
+    Derived(InputStream input) { super(input); }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }

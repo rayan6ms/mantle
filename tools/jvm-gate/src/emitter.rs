@@ -413,6 +413,8 @@ const DETACHED_BYTE_CHANNEL_CLASS: &str =
 const DIRECT_BUFFER_STREAM_BROKER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/io/DirectBufferStreamBroker";
 const EMPTY_INPUT_STREAM_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/io/EmptyInputStream";
+const EXTENDED_BUFFERED_INPUT_STREAM_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/io/ExtendedBufferedInputStream";
 const ABSTRACT_MUTABLE_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AbstractMutableAudioFrame";
 const IMMUTABLE_FRAME_CLASS: &str =
@@ -1033,6 +1035,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     DETACHED_BYTE_CHANNEL_CLASS,
     DIRECT_BUFFER_STREAM_BROKER_CLASS,
     EMPTY_INPUT_STREAM_CLASS,
+    EXTENDED_BUFFERED_INPUT_STREAM_CLASS,
     COPY_ON_UPDATE_IDENTITY_LIST_CLASS,
     DATA_FORMAT_TOOLS_CLASS,
     DATA_FORMAT_TOOLS_TEXT_RANGE_CLASS,
@@ -1218,6 +1221,7 @@ pub fn emit(
     let mut detached_byte_channel_bytes = None;
     let mut direct_buffer_stream_broker_bytes = None;
     let mut empty_input_stream_bytes = None;
+    let mut extended_buffered_input_stream_bytes = None;
     let mut vorbis_comment_parser_bytes = None;
     let mut extended_m3u_parser_bytes = None;
     let mut extended_m3u_line_bytes = None;
@@ -1445,6 +1449,8 @@ pub fn emit(
             direct_buffer_stream_broker_bytes = Some(bytes);
         } else if *binary_name == EMPTY_INPUT_STREAM_CLASS {
             empty_input_stream_bytes = Some(bytes);
+        } else if *binary_name == EXTENDED_BUFFERED_INPUT_STREAM_CLASS {
+            extended_buffered_input_stream_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -1783,6 +1789,12 @@ pub fn emit(
                 empty_input_stream_bytes
                     .as_ref()
                     .expect("empty input stream source bytes are retained"),
+            );
+        } else if name == format!("{EXTENDED_BUFFERED_INPUT_STREAM_CLASS}.class") {
+            bytes.clone_from(
+                extended_buffered_input_stream_bytes
+                    .as_ref()
+                    .expect("extended buffered input stream source bytes are retained"),
             );
         } else if name == format!("{MPEG_AUDIO_TRACK_CLASS}.class") {
             bytes.clone_from(
