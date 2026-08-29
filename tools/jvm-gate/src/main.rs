@@ -193,6 +193,7 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-bit-buffer-reader-consumer" => Some(BIT_BUFFER_READER_CONSUMER),
         "write-bit-stream-reader-consumer" => Some(BIT_STREAM_READER_CONSUMER),
+        "write-bit-stream-writer-consumer" => Some(BIT_STREAM_WRITER_CONSUMER),
         "write-extended-http-configurable-consumer" => Some(EXTENDED_HTTP_CONFIGURABLE_CONSUMER),
         "write-http-configurable-consumer" => Some(HTTP_CONFIGURABLE_CONSUMER),
         "write-http-context-filter-consumer" => Some(HTTP_CONTEXT_FILTER_CONSUMER),
@@ -64056,6 +64057,198 @@ public final class GateBitStreamReader {
 
   private static final class Derived extends BitStreamReader {
     Derived(InputStream stream) { super(stream); }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const BIT_STREAM_WRITER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.io.BitStreamWriter;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateBitStreamWriter {
+  public static void main(String[] args) throws Exception {
+    constructionAndBitPacking();
+    largeWidthsAndNoOps();
+    failuresAndFlushState();
+    reflection();
+    System.out.println("contracts=constructor,stream-identity,initial-state,msb-packing,partial-byte,exact-byte-deferred,cross-byte,flush-padding,flush-reset,flush-noop,underlying-flush-not-called,large-widths,non-positive-widths,checked-write-failure,checked-flush-failure,failure-state,retry,null-stream,subclassable,private-state,reflection");
+  }
+
+  private static void constructionAndBitPacking() throws Exception {
+    TrackingOutput stream = new TrackingOutput();
+    BitStreamWriter writer = new BitStreamWriter(stream);
+    check(field(writer, "stream") == stream, "stream identity");
+    check((Integer) field(writer, "currentByte") == 0
+        && (Integer) field(writer, "bitsUnused") == 8, "initial state");
+
+    writer.write(0b101, 3);
+    check(stream.bytes().length == 0, "partial byte is buffered");
+    check((Integer) field(writer, "currentByte") == 0xA0
+        && (Integer) field(writer, "bitsUnused") == 5, "first packed bits");
+    writer.write(0b11, 2);
+    check((Integer) field(writer, "currentByte") == 0xB8
+        && (Integer) field(writer, "bitsUnused") == 3, "continued packed bits");
+    writer.flush();
+    check(Arrays.equals(stream.bytes(), new byte[] {(byte) 0xB8}), "flush padding");
+    check((Integer) field(writer, "currentByte") == 0
+        && (Integer) field(writer, "bitsUnused") == 8, "flush reset");
+    writer.flush();
+    check(stream.bytes().length == 1 && stream.flushes == 0, "flush empty and underlying flush");
+
+    TrackingOutput crossStream = new TrackingOutput();
+    BitStreamWriter cross = new BitStreamWriter(crossStream);
+    cross.write(0xABL, 8);
+    check(crossStream.bytes().length == 0 && (Integer) field(cross, "bitsUnused") == 0,
+        "exact byte deferred");
+    cross.write(0xCL, 4);
+    check(Arrays.equals(crossStream.bytes(), new byte[] {(byte) 0xAB}), "cross-byte emission");
+    cross.flush();
+    check(Arrays.equals(crossStream.bytes(), new byte[] {(byte) 0xAB, (byte) 0xC0}),
+        "cross-byte padding");
+  }
+
+  private static void largeWidthsAndNoOps() throws Exception {
+    TrackingOutput stream = new TrackingOutput();
+    BitStreamWriter writer = new BitStreamWriter(stream);
+    writer.write(0x0123456789ABCDEFL, 64);
+    check(Arrays.equals(stream.bytes(), new byte[] {1, 0x23, 0x45, 0x67, (byte) 0x89, (byte) 0xAB, (byte) 0xCD}),
+        "64-bit streaming");
+    writer.flush();
+    check(Arrays.equals(stream.bytes(), new byte[] {1, 0x23, 0x45, 0x67, (byte) 0x89, (byte) 0xAB, (byte) 0xCD, (byte) 0xEF}),
+        "64-bit final byte");
+
+    TrackingOutput wideStream = new TrackingOutput();
+    BitStreamWriter wide = new BitStreamWriter(wideStream);
+    wide.write(0x8000000000000000L, 65);
+    wide.flush();
+    check(wideStream.bytes().length == 9, "widths beyond long are finite");
+
+    TrackingOutput noOpStream = new TrackingOutput();
+    BitStreamWriter noOp = new BitStreamWriter(noOpStream);
+    noOp.write(0xFFFFL, 0);
+    noOp.write(0xFFFFL, -4);
+    check(noOpStream.bytes().length == 0 && (Integer) field(noOp, "bitsUnused") == 8,
+        "non-positive widths are no-op");
+  }
+
+  private static void failuresAndFlushState() throws Exception {
+    IOException writeFailure = new IOException("write");
+    FailOnceOutput writeStream = new FailOnceOutput(writeFailure);
+    BitStreamWriter writeWriter = new BitStreamWriter(writeStream);
+    writeWriter.write(0xA5L, 8);
+    Throwable writeThrown = catchThrowable(() -> writeWriter.write(1L, 1));
+    check(writeThrown == writeFailure, "write IOException identity");
+    check((Integer) field(writeWriter, "currentByte") == 0xA5
+        && (Integer) field(writeWriter, "bitsUnused") == 0, "failed write retains state");
+    writeWriter.write(1L, 1);
+    writeWriter.flush();
+    check(Arrays.equals(writeStream.bytes(), new byte[] {(byte) 0xA5, (byte) 0x80})
+        && writeStream.attempts == 3, "write retry");
+
+    IOException failure = new IOException("write");
+    FailOnceOutput stream = new FailOnceOutput(failure);
+    BitStreamWriter writer = new BitStreamWriter(stream);
+    writer.write(0xA5L, 8);
+    Throwable first = catchThrowable(writer::flush);
+    check(first == failure, "flush IOException identity");
+    check((Integer) field(writer, "currentByte") == 0xA5
+        && (Integer) field(writer, "bitsUnused") == 0, "failed flush retains state");
+    writer.flush();
+    check(Arrays.equals(stream.bytes(), new byte[] {(byte) 0xA5})
+        && stream.attempts == 2, "flush retry");
+
+    IOException partialFailure = new IOException("partial");
+    FailOnceOutput partialStream = new FailOnceOutput(partialFailure);
+    BitStreamWriter partial = new BitStreamWriter(partialStream);
+    partial.write(1L, 1);
+    Throwable partialThrown = catchThrowable(partial::flush);
+    check(partialThrown == partialFailure, "partial flush IOException identity");
+    check((Integer) field(partial, "currentByte") == 0x80
+        && (Integer) field(partial, "bitsUnused") == 7, "partial failure retains state");
+
+    BitStreamWriter nullWriter = new BitStreamWriter(null);
+    check(field(nullWriter, "stream") == null, "null stream identity");
+    nullWriter.write(1L, 1);
+    Throwable nullFailure = catchThrowable(nullWriter::flush);
+    check(nullFailure instanceof NullPointerException, "null stream failure");
+    check((Integer) field(nullWriter, "currentByte") == 0x80
+        && (Integer) field(nullWriter, "bitsUnused") == 7, "null failure retains state");
+  }
+
+  private static void reflection() throws Exception {
+    Class<BitStreamWriter> type = BitStreamWriter.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers()),
+        "class modifiers");
+    check(type.getSuperclass() == Object.class && type.getInterfaces().length == 0, "superclass");
+    check(type.getDeclaredFields().length == 3 && type.getDeclaredMethods().length == 3,
+        "member counts");
+    Field stream = type.getDeclaredField("stream");
+    check(stream.getType() == OutputStream.class
+        && (stream.getModifiers() & (Modifier.PRIVATE | Modifier.FINAL))
+            == (Modifier.PRIVATE | Modifier.FINAL), "stream field shape");
+    for (String name : new String[] {"currentByte", "bitsUnused"}) {
+      Field field = type.getDeclaredField(name);
+      check(field.getType() == int.class && Modifier.isPrivate(field.getModifiers())
+          && !Modifier.isFinal(field.getModifiers()), name + " field shape");
+    }
+    check(type.getDeclaredConstructor(OutputStream.class).getExceptionTypes().length == 0,
+        "constructor exceptions");
+    check(type.getDeclaredMethod("write", long.class, int.class).getExceptionTypes().length == 1
+        && type.getDeclaredMethod("write", long.class, int.class).getExceptionTypes()[0] == IOException.class,
+        "write exceptions");
+    check(type.getDeclaredMethod("flush").getExceptionTypes().length == 1
+        && type.getDeclaredMethod("flush").getExceptionTypes()[0] == IOException.class,
+        "flush exceptions");
+    Method send = type.getDeclaredMethod("sendOnFullByte");
+    check(Modifier.isPrivate(send.getModifiers()) && send.getExceptionTypes().length == 1
+        && send.getExceptionTypes()[0] == IOException.class, "private helper shape");
+    new Derived(new ByteArrayOutputStream());
+  }
+
+  private static Object field(Object instance, String name) throws Exception {
+    Field field = instance.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(instance);
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+
+  private static final class TrackingOutput extends OutputStream {
+    final ByteArrayOutputStream delegate = new ByteArrayOutputStream();
+    int flushes;
+    public void write(int value) { delegate.write(value); }
+    public void flush() { flushes++; }
+    byte[] bytes() { return delegate.toByteArray(); }
+  }
+
+  private static final class FailOnceOutput extends OutputStream {
+    final IOException failure;
+    final ByteArrayOutputStream delegate = new ByteArrayOutputStream();
+    int attempts;
+    FailOnceOutput(IOException failure) { this.failure = failure; }
+    public void write(int value) throws IOException {
+      attempts++;
+      if (attempts == 1) throw failure;
+      delegate.write(value);
+    }
+    byte[] bytes() { return delegate.toByteArray(); }
+  }
+
+  private static final class Derived extends BitStreamWriter {
+    Derived(OutputStream stream) { super(stream); }
   }
 
   private interface ThrowingRunnable { void run() throws Throwable; }

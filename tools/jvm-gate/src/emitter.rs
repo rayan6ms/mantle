@@ -399,6 +399,7 @@ const ABSTRACT_HTTP_INTERFACE_MANAGER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/io/AbstractHttpInterfaceManager";
 const BIT_BUFFER_READER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/io/BitBufferReader";
 const BIT_STREAM_READER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader";
+const BIT_STREAM_WRITER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/io/BitStreamWriter";
 const ABSTRACT_MUTABLE_FRAME_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/track/playback/AbstractMutableAudioFrame";
 const IMMUTABLE_FRAME_CLASS: &str =
@@ -1011,6 +1012,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     ABSTRACT_HTTP_INTERFACE_MANAGER_CLASS,
     BIT_BUFFER_READER_CLASS,
     BIT_STREAM_READER_CLASS,
+    BIT_STREAM_WRITER_CLASS,
     COPY_ON_UPDATE_IDENTITY_LIST_CLASS,
     DATA_FORMAT_TOOLS_CLASS,
     DATA_FORMAT_TOOLS_TEXT_RANGE_CLASS,
@@ -1188,6 +1190,7 @@ pub fn emit(
     let mut abstract_http_interface_manager_bytes = None;
     let mut bit_buffer_reader_bytes = None;
     let mut bit_stream_reader_bytes = None;
+    let mut bit_stream_writer_bytes = None;
     let mut vorbis_comment_parser_bytes = None;
     let mut extended_m3u_parser_bytes = None;
     let mut extended_m3u_line_bytes = None;
@@ -1399,6 +1402,8 @@ pub fn emit(
             bit_buffer_reader_bytes = Some(bytes);
         } else if *binary_name == BIT_STREAM_READER_CLASS {
             bit_stream_reader_bytes = Some(bytes);
+        } else if *binary_name == BIT_STREAM_WRITER_CLASS {
+            bit_stream_writer_bytes = Some(bytes);
         }
         classes.push(transform_reference_class(class)?);
     }
@@ -1689,6 +1694,12 @@ pub fn emit(
                 bit_stream_reader_bytes
                     .as_ref()
                     .expect("bit stream reader source bytes are retained"),
+            );
+        } else if name == format!("{BIT_STREAM_WRITER_CLASS}.class") {
+            bytes.clone_from(
+                bit_stream_writer_bytes
+                    .as_ref()
+                    .expect("bit stream writer source bytes are retained"),
             );
         } else if name == format!("{MPEG_AUDIO_TRACK_CLASS}.class") {
             bytes.clone_from(
