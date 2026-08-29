@@ -365,6 +365,12 @@ const THUMBNAIL_TOOLS_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/Thum
 const UNITS_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/Units";
 const ABSTRACT_HTTP_CONTEXT_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/http/AbstractHttpContextFilter";
+const EXTENDED_CONNECTION_OPERATOR_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/http/ExtendedConnectionOperator";
+const EXTENDED_CONNECTION_OPERATOR_ADDITIONAL_DETAILS_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/http/ExtendedConnectionOperator$AdditionalDetails";
+const EXTENDED_CONNECTION_OPERATOR_RESOLVED_ADDRESSES_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/http/ExtendedConnectionOperator$ResolvedAddresses";
 const EXTENDED_HTTP_CONFIGURABLE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable";
 const HTTP_CONFIGURABLE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable";
@@ -973,6 +979,9 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_TRACK_FORMAT_EXTRACTOR_CLASS,
     HTTP_CONFIGURABLE_CLASS,
     ABSTRACT_HTTP_CONTEXT_FILTER_CLASS,
+    EXTENDED_CONNECTION_OPERATOR_CLASS,
+    EXTENDED_CONNECTION_OPERATOR_ADDITIONAL_DETAILS_CLASS,
+    EXTENDED_CONNECTION_OPERATOR_RESOLVED_ADDRESSES_CLASS,
     EXTENDED_HTTP_CONFIGURABLE_CLASS,
     HTTP_CONTEXT_FILTER_CLASS,
     HTTP_CONTEXT_RETRY_COUNTER_CLASS,
@@ -1139,6 +1148,9 @@ pub fn emit(
     let mut thumbnail_tools_bytes = None;
     let mut units_bytes = None;
     let mut abstract_http_context_filter_bytes = None;
+    let mut extended_connection_operator_bytes = None;
+    let mut extended_connection_operator_additional_details_bytes = None;
+    let mut extended_connection_operator_resolved_addresses_bytes = None;
     let mut http_context_retry_counter_bytes = None;
     let mut http_context_retry_counter_retry_count_bytes = None;
     let mut http_stream_tools_bytes = None;
@@ -1321,6 +1333,12 @@ pub fn emit(
             units_bytes = Some(bytes);
         } else if *binary_name == ABSTRACT_HTTP_CONTEXT_FILTER_CLASS {
             abstract_http_context_filter_bytes = Some(bytes);
+        } else if *binary_name == EXTENDED_CONNECTION_OPERATOR_CLASS {
+            extended_connection_operator_bytes = Some(bytes);
+        } else if *binary_name == EXTENDED_CONNECTION_OPERATOR_ADDITIONAL_DETAILS_CLASS {
+            extended_connection_operator_additional_details_bytes = Some(bytes);
+        } else if *binary_name == EXTENDED_CONNECTION_OPERATOR_RESOLVED_ADDRESSES_CLASS {
+            extended_connection_operator_resolved_addresses_bytes = Some(bytes);
         } else if *binary_name == HTTP_CONTEXT_RETRY_COUNTER_CLASS {
             http_context_retry_counter_bytes = Some(bytes);
         } else if *binary_name == HTTP_CONTEXT_RETRY_COUNTER_RETRY_COUNT_CLASS {
@@ -1515,6 +1533,24 @@ pub fn emit(
                 abstract_http_context_filter_bytes
                     .as_ref()
                     .expect("abstract HTTP context filter source bytes are retained"),
+            );
+        } else if name == format!("{EXTENDED_CONNECTION_OPERATOR_CLASS}.class") {
+            bytes.clone_from(
+                extended_connection_operator_bytes
+                    .as_ref()
+                    .expect("extended connection operator source bytes are retained"),
+            );
+        } else if name == format!("{EXTENDED_CONNECTION_OPERATOR_ADDITIONAL_DETAILS_CLASS}.class") {
+            bytes.clone_from(
+                extended_connection_operator_additional_details_bytes
+                    .as_ref()
+                    .expect("extended connection operator details source bytes are retained"),
+            );
+        } else if name == format!("{EXTENDED_CONNECTION_OPERATOR_RESOLVED_ADDRESSES_CLASS}.class") {
+            bytes.clone_from(
+                extended_connection_operator_resolved_addresses_bytes
+                    .as_ref()
+                    .expect("extended connection operator addresses source bytes are retained"),
             );
         } else if name == format!("{HTTP_CONTEXT_RETRY_COUNTER_CLASS}.class") {
             bytes.clone_from(
@@ -2500,6 +2536,9 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | THUMBNAIL_TOOLS_CLASS
             | UNITS_CLASS
             | ABSTRACT_HTTP_CONTEXT_FILTER_CLASS
+            | EXTENDED_CONNECTION_OPERATOR_CLASS
+            | EXTENDED_CONNECTION_OPERATOR_ADDITIONAL_DETAILS_CLASS
+            | EXTENDED_CONNECTION_OPERATOR_RESOLVED_ADDRESSES_CLASS
             | HTTP_CONTEXT_RETRY_COUNTER_CLASS
             | HTTP_CONTEXT_RETRY_COUNTER_RETRY_COUNT_CLASS
             | HTTP_STREAM_TOOLS_CLASS

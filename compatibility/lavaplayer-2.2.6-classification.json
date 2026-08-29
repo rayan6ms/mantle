@@ -25096,45 +25096,50 @@
       "symbol_kind": "CLASS",
       "member_name": null,
       "descriptor": null,
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Reference outer and private nested class bytes are retained byte-identically; collaborator/default state, resolution precedence, connection retries, failure enrichment, upgrades, subclassability, and reflection match the differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.http.ExtendedConnectionOperator",
       "symbol_kind": "METHOD",
       "member_name": "<init>",
       "descriptor": "(Lorg/apache/http/config/Lookup;Lorg/apache/http/conn/SchemePortResolver;Lorg/apache/http/conn/DnsResolver;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Registry identity, nullable registry retention, custom resolver identity, default singleton resolver substitution, generic metadata, and private final state match the differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.http.ExtendedConnectionOperator",
       "symbol_kind": "METHOD",
       "member_name": "setResolvedAddresses",
       "descriptor": "(Lorg/apache/http/protocol/HttpContext;Lorg/apache/http/HttpHost;[Ljava/net/InetAddress;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Exact host/array identity, private holder shape, overwrite/empty-array behavior, null-triggered clearing, host equality matching, and null-context failure match the differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.http.ExtendedConnectionOperator",
       "symbol_kind": "METHOD",
       "member_name": "connect",
       "descriptor": "(Lorg/apache/http/conn/ManagedHttpClientConnection;Lorg/apache/http/HttpHost;Ljava/net/InetSocketAddress;ILorg/apache/http/config/SocketConfig;Lorg/apache/http/protocol/HttpContext;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Socket-factory and address precedence, ordered family-aware attempts, full socket configuration, returned-socket binding, retry boundaries, terminal wrappers, runtime identity, no-route behavior, suppressed diagnostics, arguments, and checked signature match the differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.http.ExtendedConnectionOperator",
       "symbol_kind": "METHOD",
       "member_name": "upgrade",
       "descriptor": "(Lorg/apache/http/conn/ManagedHttpClientConnection;Lorg/apache/http/HttpHost;Lorg/apache/http/protocol/HttpContext;)V",
-      "assessment": "UNASSESSED",
-      "notes": "Classification requires compatibility evidence from a later phase.",
-      "tests": []
+      "assessment": "CLASSIFIED",
+      "classification": "A_EXACT",
+      "notes": "Layered factory lookup, existing-socket/host/port/context identity, result binding, unsupported-scheme diagnostics, failure identity, and checked signature match the differential oracle.",
+      "tests": ["scripts/run-jvm-gate-a.sh", "tools/jvm-gate/src/emitter.rs", "tools/jvm-gate/src/main.rs"]
     },
     {
       "binary_name": "com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpClientBuilder",

@@ -179,6 +179,9 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-abstract-http-context-filter-consumer" => {
             Some(ABSTRACT_HTTP_CONTEXT_FILTER_CONSUMER)
         }
+        "write-extended-connection-operator-consumer" => {
+            Some(EXTENDED_CONNECTION_OPERATOR_CONSUMER)
+        }
         "write-extended-http-configurable-consumer" => Some(EXTENDED_HTTP_CONFIGURABLE_CONSUMER),
         "write-http-configurable-consumer" => Some(HTTP_CONFIGURABLE_CONSUMER),
         "write-http-context-filter-consumer" => Some(HTTP_CONTEXT_FILTER_CONSUMER),
@@ -61356,6 +61359,501 @@ public final class GateAbstractHttpContextFilter {
 
   private static final class Derived extends AbstractHttpContextFilter {
     Derived(HttpContextFilter delegate) { super(delegate); }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const EXTENDED_CONNECTION_OPERATOR_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.http.ExtendedConnectionOperator;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.net.ConnectException;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.NoRouteToHostException;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import org.apache.http.HttpHost;
+import org.apache.http.config.Lookup;
+import org.apache.http.config.SocketConfig;
+import org.apache.http.conn.ConnectTimeoutException;
+import org.apache.http.conn.DnsResolver;
+import org.apache.http.conn.HttpClientConnectionOperator;
+import org.apache.http.conn.HttpHostConnectException;
+import org.apache.http.conn.ManagedHttpClientConnection;
+import org.apache.http.conn.SchemePortResolver;
+import org.apache.http.conn.UnsupportedSchemeException;
+import org.apache.http.conn.socket.ConnectionSocketFactory;
+import org.apache.http.conn.socket.LayeredConnectionSocketFactory;
+import org.apache.http.impl.conn.DefaultSchemePortResolver;
+import org.apache.http.impl.conn.SystemDefaultDnsResolver;
+import org.apache.http.protocol.BasicHttpContext;
+import org.apache.http.protocol.HttpContext;
+
+public final class GateExtendedConnectionOperator {
+  private static final String RESOLVED_ADDRESSES = "lp.resolved-addresses";
+  private static final String SOCKET_FACTORY_REGISTRY = "http.socket-factory-registry";
+
+  public static void main(String[] args) throws Exception {
+    constructorState();
+    resolvedAddressState();
+    connectOrderAndConfiguration();
+    resolutionPrecedence();
+    terminalFailures();
+    upgradeBehavior();
+    reflection();
+    System.out.println(
+        "contracts=constructor,default-resolvers,collaborator-identity,resolved-address-state,"
+        + "host-match,array-identity,clear-overwrite,address-precedence,context-registry,"
+        + "ordered-attempts,address-family-filtering,socket-configuration,returned-socket-binding,"
+        + "retry-boundary,timeout-wrapping,connect-wrapping,no-route,runtime-identity,"
+        + "suppressed-details,layered-upgrade,unsupported-upgrade,argument-identity,generics,"
+        + "interface,subclassable,private-state,nested-types,reflection");
+  }
+
+  private static void constructorState() throws Exception {
+    RecordingFactory factory = new RecordingFactory();
+    RecordingLookup registry = new RecordingLookup(factory);
+    SchemePortResolver ports = host -> 8123;
+    DnsResolver dns = host -> new InetAddress[] {ipv4(10)};
+    ExtendedConnectionOperator custom = new ExtendedConnectionOperator(registry, ports, dns);
+    check(fieldValue(custom, "socketFactoryRegistry") == registry
+        && fieldValue(custom, "schemePortResolver") == ports
+        && fieldValue(custom, "dnsResolver") == dns, "custom collaborator identity");
+
+    ExtendedConnectionOperator defaults = new ExtendedConnectionOperator(registry, null, null);
+    check(fieldValue(defaults, "schemePortResolver") == DefaultSchemePortResolver.INSTANCE
+        && fieldValue(defaults, "dnsResolver") == SystemDefaultDnsResolver.INSTANCE,
+        "default resolvers");
+    ExtendedConnectionOperator nullRegistry = new ExtendedConnectionOperator(null, null, null);
+    check(fieldValue(nullRegistry, "socketFactoryRegistry") == null, "null registry retention");
+  }
+
+  private static void resolvedAddressState() throws Exception {
+    BasicHttpContext context = new BasicHttpContext();
+    HttpHost host = new HttpHost("override.test", 8080, "plain");
+    InetAddress[] addresses = new InetAddress[] {ipv4(11), ipv6(12)};
+    ExtendedConnectionOperator.setResolvedAddresses(context, host, addresses);
+    Object holder = context.getAttribute(RESOLVED_ADDRESSES);
+    check(holder != null && holder.getClass().getSimpleName().equals("ResolvedAddresses"),
+        "holder type");
+    Field hostField = holder.getClass().getDeclaredField("host");
+    Field addressesField = holder.getClass().getDeclaredField("addresses");
+    hostField.setAccessible(true);
+    addressesField.setAccessible(true);
+    check(hostField.get(holder) == host && addressesField.get(holder) == addresses,
+        "holder identity");
+
+    InetAddress[] replacement = new InetAddress[0];
+    ExtendedConnectionOperator.setResolvedAddresses(context, host, replacement);
+    Object replacementHolder = context.getAttribute(RESOLVED_ADDRESSES);
+    check(replacementHolder != holder && addressesField.get(replacementHolder) == replacement,
+        "overwrite and empty array");
+    ExtendedConnectionOperator.setResolvedAddresses(context, null, replacement);
+    check(context.getAttribute(RESOLVED_ADDRESSES) == null, "null host clears");
+    ExtendedConnectionOperator.setResolvedAddresses(context, host, addresses);
+    ExtendedConnectionOperator.setResolvedAddresses(context, host, null);
+    check(context.getAttribute(RESOLVED_ADDRESSES) == null, "null addresses clear");
+    check(catchThrowable(() -> ExtendedConnectionOperator.setResolvedAddresses(null, host, addresses))
+        instanceof NullPointerException, "null context");
+  }
+
+  private static void connectOrderAndConfiguration() throws Exception {
+    RecordingFactory factory = new RecordingFactory();
+    factory.failures.add(new ConnectException("first"));
+    factory.failures.add(null);
+    RecordingLookup registry = new RecordingLookup(factory);
+    RecordingPorts ports = new RecordingPorts(9443);
+    RecordingDns dns = new RecordingDns(new InetAddress[] {ipv4(21), ipv6(22), ipv4(23)});
+    ExtendedConnectionOperator operator = new ExtendedConnectionOperator(registry, ports, dns);
+    ConnectionHandler handler = new ConnectionHandler(new RecordingSocket());
+    ManagedHttpClientConnection connection = connection(handler);
+    HttpHost host = new HttpHost("connect.test", -1, "plain");
+    InetSocketAddress local = new InetSocketAddress(ipv4(99), 5050);
+    BasicHttpContext context = new BasicHttpContext();
+    SocketConfig config = SocketConfig.custom()
+        .setSoTimeout(1234)
+        .setSoReuseAddress(true)
+        .setTcpNoDelay(false)
+        .setSoKeepAlive(true)
+        .setRcvBufSize(2048)
+        .setSndBufSize(4096)
+        .setSoLinger(7)
+        .build();
+
+    operator.connect(connection, host, local, 77, config, context);
+    check(registry.names.equals(Arrays.asList("plain")) && ports.hosts.equals(Arrays.asList(host))
+        && dns.hosts.equals(Arrays.asList("connect.test")), "lookup order and identity");
+    check(factory.remotes.size() == 2
+        && factory.remotes.get(0).getAddress().equals(ipv4(21))
+        && factory.remotes.get(1).getAddress().equals(ipv4(23)),
+        "ordered compatible attempts");
+    check(factory.locals.equals(Arrays.asList(local, local))
+        && factory.timeouts.equals(Arrays.asList(77, 77))
+        && factory.hosts.equals(Arrays.asList(host, host))
+        && factory.contexts.equals(Arrays.asList(context, context)), "connect argument identity");
+    check(factory.created.size() == 2 && handler.bound == factory.created.get(1),
+        "successful returned socket binding");
+    for (RecordingSocket socket : factory.created) {
+      check(socket.soTimeout == 1234 && socket.reuseAddress && !socket.tcpNoDelay
+          && socket.keepAlive && socket.receiveBufferSize == 2048
+          && socket.sendBufferSize == 4096 && socket.linger == 7,
+          "socket configuration");
+    }
+  }
+
+  private static void resolutionPrecedence() throws Exception {
+    RecordingFactory baseFactory = new RecordingFactory();
+    RecordingFactory overrideFactory = new RecordingFactory();
+    RecordingLookup baseRegistry = new RecordingLookup(baseFactory);
+    RecordingLookup overrideRegistry = new RecordingLookup(overrideFactory);
+    RecordingPorts ports = new RecordingPorts(7331);
+    RecordingDns dns = new RecordingDns(new InetAddress[] {ipv4(31)});
+    ExtendedConnectionOperator operator = new ExtendedConnectionOperator(baseRegistry, ports, dns);
+    BasicHttpContext context = new BasicHttpContext();
+    context.setAttribute(SOCKET_FACTORY_REGISTRY, overrideRegistry);
+    HttpHost storedHost = new HttpHost("stored.test", -1, "plain");
+    InetAddress[] stored = new InetAddress[] {ipv4(32)};
+    ExtendedConnectionOperator.setResolvedAddresses(context, storedHost, stored);
+    operator.connect(connection(new ConnectionHandler(new RecordingSocket())),
+        new HttpHost("stored.test", -1, "plain"), null, 1, SocketConfig.DEFAULT, context);
+    check(baseRegistry.names.isEmpty() && overrideRegistry.names.equals(Arrays.asList("plain"))
+        && dns.hosts.isEmpty() && overrideFactory.remotes.get(0).getAddress() == stored[0],
+        "context registry and stored resolution precedence");
+
+    RecordingFactory directFactory = new RecordingFactory();
+    RecordingDns directDns = new RecordingDns(new InetAddress[] {ipv4(33)});
+    ExtendedConnectionOperator directOperator = new ExtendedConnectionOperator(
+        new RecordingLookup(directFactory), ports, directDns);
+    InetAddress directAddress = ipv4(34);
+    HttpHost directHost = new HttpHost(directAddress, 7442, "plain");
+    directOperator.connect(connection(new ConnectionHandler(new RecordingSocket())), directHost,
+        null, 2, SocketConfig.DEFAULT, new BasicHttpContext());
+    check(directDns.hosts.isEmpty()
+        && directFactory.remotes.get(0).getAddress() == directAddress,
+        "host address precedence");
+  }
+
+  private static void terminalFailures() throws Exception {
+    HttpHost host = new HttpHost("failure.test", 8080, "plain");
+    InetAddress[] one = new InetAddress[] {ipv4(41)};
+
+    RecordingFactory timeoutFactory = new RecordingFactory();
+    timeoutFactory.failures.add(new SocketTimeoutException("timeout"));
+    Throwable timeout = connectFailure(timeoutFactory, one, host, null);
+    check(timeout instanceof ConnectTimeoutException && timeout.getCause() instanceof IOException,
+        "timeout wrapping");
+    checkDetails(timeout, "timeout details");
+
+    RecordingFactory refusedFactory = new RecordingFactory();
+    refusedFactory.failures.add(new ConnectException("refused"));
+    Throwable refused = connectFailure(refusedFactory, one, host, null);
+    check(refused instanceof HttpHostConnectException
+        && refused.getCause() instanceof ConnectException, "connect wrapping");
+    checkDetails(refused, "connect details");
+
+    RuntimeException sentinel = new RuntimeException("runtime");
+    RecordingFactory runtimeFactory = new RecordingFactory();
+    runtimeFactory.failures.add(sentinel);
+    Throwable runtime = connectFailure(runtimeFactory, one, host, null);
+    check(runtime == sentinel, "runtime identity");
+    checkDetails(runtime, "runtime details");
+
+    RecordingFactory incompatibleFactory = new RecordingFactory();
+    Throwable incompatible = connectFailure(incompatibleFactory, one, host,
+        new InetSocketAddress(ipv6(42), 1000));
+    check(incompatible instanceof NoRouteToHostException
+        && incompatible.getMessage().equals(
+            "Local address protocol does not match any remote addresses."), "no route failure");
+    check(incompatibleFactory.created.isEmpty(), "incompatible address skipped");
+    checkDetails(incompatible, "no route details");
+  }
+
+  private static Throwable connectFailure(RecordingFactory factory, InetAddress[] addresses,
+                                          HttpHost host, InetSocketAddress local) throws Exception {
+    ExtendedConnectionOperator operator = new ExtendedConnectionOperator(
+        new RecordingLookup(factory), value -> host.getPort(), value -> addresses);
+    return catchThrowable(() -> operator.connect(
+        connection(new ConnectionHandler(new RecordingSocket())), host, local, 55,
+        SocketConfig.DEFAULT, new BasicHttpContext()));
+  }
+
+  private static void checkDetails(Throwable failure, String message) {
+    check(failure.getSuppressed().length == 1
+        && failure.getSuppressed()[0].getClass().getName().endsWith("$AdditionalDetails")
+        && failure.getSuppressed()[0].getMessage().startsWith(
+            "Encountered when opening a connection with the following details:")
+        && failure.getSuppressed()[0].getStackTrace().length == 0, message);
+  }
+
+  private static void upgradeBehavior() throws Exception {
+    RecordingLayeredFactory layered = new RecordingLayeredFactory();
+    RecordingLookup registry = new RecordingLookup(layered);
+    RecordingPorts ports = new RecordingPorts(8443);
+    ExtendedConnectionOperator operator = new ExtendedConnectionOperator(registry, ports,
+        host -> new InetAddress[] {ipv4(51)});
+    RecordingSocket original = new RecordingSocket();
+    ConnectionHandler handler = new ConnectionHandler(original);
+    ManagedHttpClientConnection connection = connection(handler);
+    HttpHost host = new HttpHost("upgrade.test", -1, "secure");
+    BasicHttpContext context = new BasicHttpContext();
+    operator.upgrade(connection, host, context);
+    check(layered.input == original && layered.hostName.equals("upgrade.test")
+        && layered.port == 8443 && layered.context == context
+        && handler.bound == layered.output, "layered upgrade arguments and binding");
+
+    RecordingFactory plain = new RecordingFactory();
+    ExtendedConnectionOperator unsupported = new ExtendedConnectionOperator(
+        new RecordingLookup(plain), ports, value -> new InetAddress[] {ipv4(52)});
+    Throwable failure = catchThrowable(() -> unsupported.upgrade(connection, host, context));
+    check(failure instanceof UnsupportedSchemeException
+        && failure.getMessage().equals("secure protocol does not support connection upgrade"),
+        "unsupported upgrade");
+
+    IOException sentinel = new IOException("layered");
+    layered.failure = sentinel;
+    check(catchThrowable(() -> operator.upgrade(connection, host, context)) == sentinel,
+        "upgrade failure identity");
+  }
+
+  private static void reflection() throws Exception {
+    Class<ExtendedConnectionOperator> type = ExtendedConnectionOperator.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isAbstract(type.getModifiers())
+        && !Modifier.isFinal(type.getModifiers()) && type.getSuperclass() == Object.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {HttpClientConnectionOperator.class}),
+        "class metadata");
+    check(type.getDeclaredFields().length == 5 && type.getDeclaredConstructors().length == 1
+        && type.getDeclaredMethods().length == 16 && type.getDeclaredClasses().length == 2,
+        "member counts");
+    field(type, "SOCKET_FACTORY_REGISTRY", String.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    field(type, "RESOLVED_ADDRESSES", String.class,
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+    Field registry = field(type, "socketFactoryRegistry", Lookup.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    check(registry.getGenericType().getTypeName().equals(
+        "org.apache.http.config.Lookup<org.apache.http.conn.socket.ConnectionSocketFactory>"),
+        "registry generic field");
+    field(type, "schemePortResolver", SchemePortResolver.class,
+        Modifier.PRIVATE | Modifier.FINAL);
+    field(type, "dnsResolver", DnsResolver.class, Modifier.PRIVATE | Modifier.FINAL);
+
+    Constructor<ExtendedConnectionOperator> constructor = type.getDeclaredConstructor(
+        Lookup.class, SchemePortResolver.class, DnsResolver.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && !constructor.isSynthetic()
+        && constructor.getExceptionTypes().length == 0
+        && constructor.getGenericParameterTypes()[0].getTypeName().equals(
+            "org.apache.http.config.Lookup<org.apache.http.conn.socket.ConnectionSocketFactory>"),
+        "constructor metadata");
+    method(type, "setResolvedAddresses", void.class, Modifier.PUBLIC | Modifier.STATIC,
+        new Class<?>[0], HttpContext.class, HttpHost.class, InetAddress[].class);
+    method(type, "connect", void.class, Modifier.PUBLIC, new Class<?>[] {IOException.class},
+        ManagedHttpClientConnection.class, HttpHost.class, InetSocketAddress.class, int.class,
+        SocketConfig.class, HttpContext.class);
+    method(type, "upgrade", void.class, Modifier.PUBLIC, new Class<?>[] {IOException.class},
+        ManagedHttpClientConnection.class, HttpHost.class, HttpContext.class);
+    check(new Derived(null, null, null) instanceof HttpClientConnectionOperator, "subclassability");
+
+    Class<?> additional = nested(type, "AdditionalDetails");
+    check(additional.getSuperclass() == Exception.class
+        && additional.getDeclaredFields().length == 0
+        && additional.getDeclaredMethods().length == 0
+        && additional.getDeclaredConstructors().length == 1
+        && additional.getDeclaredConstructors()[0].getModifiers() == Modifier.PROTECTED,
+        "additional details metadata");
+    Class<?> resolved = nested(type, "ResolvedAddresses");
+    check(resolved.getSuperclass() == Object.class && resolved.getDeclaredFields().length == 2
+        && resolved.getDeclaredMethods().length == 0
+        && resolved.getDeclaredConstructors().length == 1
+        && resolved.getDeclaredConstructors()[0].getModifiers() == Modifier.PRIVATE,
+        "resolved addresses metadata");
+    check((additional.getModifiers() & (Modifier.PRIVATE | Modifier.STATIC))
+            == (Modifier.PRIVATE | Modifier.STATIC)
+        && (resolved.getModifiers() & (Modifier.PRIVATE | Modifier.STATIC))
+            == (Modifier.PRIVATE | Modifier.STATIC)
+        && type.getNestMembers().length == 3, "nested modifiers and nest");
+  }
+
+  private static Field field(Class<?> type, String name, Class<?> fieldType, int modifiers)
+      throws Exception {
+    Field field = type.getDeclaredField(name);
+    check(field.getType() == fieldType && field.getModifiers() == modifiers
+        && !field.isSynthetic(), name + " field metadata");
+    return field;
+  }
+
+  private static Class<?> nested(Class<?> type, String simpleName) {
+    for (Class<?> candidate : type.getDeclaredClasses()) {
+      if (candidate.getSimpleName().equals(simpleName)) return candidate;
+    }
+    throw new AssertionError("missing nested class " + simpleName);
+  }
+
+  private static void method(Class<?> type, String name, Class<?> returnType, int modifiers,
+                             Class<?>[] exceptions, Class<?>... parameters) throws Exception {
+    Method method = type.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == modifiers && method.getReturnType() == returnType
+        && Arrays.equals(method.getExceptionTypes(), exceptions) && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), name + " metadata");
+  }
+
+  private static Object fieldValue(Object instance, String name) throws Exception {
+    Field field = ExtendedConnectionOperator.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(instance);
+  }
+
+  private static InetAddress ipv4(int value) throws UnknownHostException {
+    return InetAddress.getByAddress(new byte[] {127, 0, 0, (byte) value});
+  }
+
+  private static InetAddress ipv6(int value) throws UnknownHostException {
+    byte[] bytes = new byte[16];
+    bytes[15] = (byte) value;
+    return InetAddress.getByAddress(bytes);
+  }
+
+  private static ManagedHttpClientConnection connection(ConnectionHandler handler) {
+    return (ManagedHttpClientConnection) Proxy.newProxyInstance(
+        ManagedHttpClientConnection.class.getClassLoader(),
+        new Class<?>[] {ManagedHttpClientConnection.class}, handler);
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    if (type == char.class) return (char) 0;
+    return null;
+  }
+
+  private static Throwable catchThrowable(ThrowingAction action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+
+  @FunctionalInterface
+  private interface ThrowingAction { void run() throws Throwable; }
+
+  private static final class ConnectionHandler implements InvocationHandler {
+    Socket socket;
+    Socket bound;
+    ConnectionHandler(Socket socket) { this.socket = socket; }
+    public Object invoke(Object proxy, Method method, Object[] arguments) {
+      if (method.getName().equals("getSocket")) return socket;
+      if (method.getName().equals("bind")) {
+        bound = (Socket) arguments[0]; socket = bound; return null;
+      }
+      return defaultValue(method.getReturnType());
+    }
+  }
+
+  private static final class RecordingSocket extends Socket {
+    int soTimeout;
+    boolean reuseAddress;
+    boolean tcpNoDelay;
+    boolean keepAlive;
+    int receiveBufferSize;
+    int sendBufferSize;
+    int linger = -1;
+    @Override public void setSoTimeout(int value) { soTimeout = value; }
+    @Override public void setReuseAddress(boolean value) { reuseAddress = value; }
+    @Override public void setTcpNoDelay(boolean value) { tcpNoDelay = value; }
+    @Override public void setKeepAlive(boolean value) { keepAlive = value; }
+    @Override public void setReceiveBufferSize(int value) { receiveBufferSize = value; }
+    @Override public void setSendBufferSize(int value) { sendBufferSize = value; }
+    @Override public void setSoLinger(boolean enabled, int value) { linger = enabled ? value : -1; }
+  }
+
+  private static class RecordingFactory implements ConnectionSocketFactory {
+    final List<RecordingSocket> created = new ArrayList<>();
+    final List<Throwable> failures = new ArrayList<>();
+    final List<Integer> timeouts = new ArrayList<>();
+    final List<HttpHost> hosts = new ArrayList<>();
+    final List<InetSocketAddress> remotes = new ArrayList<>();
+    final List<InetSocketAddress> locals = new ArrayList<>();
+    final List<HttpContext> contexts = new ArrayList<>();
+    int attempts;
+    public Socket createSocket(HttpContext context) {
+      RecordingSocket socket = new RecordingSocket(); created.add(socket); return socket;
+    }
+    public Socket connectSocket(int timeout, Socket socket, HttpHost host,
+                                InetSocketAddress remote, InetSocketAddress local,
+                                HttpContext context) throws IOException {
+      timeouts.add(timeout); hosts.add(host); remotes.add(remote); locals.add(local);
+      contexts.add(context);
+      Throwable failure = attempts < failures.size() ? failures.get(attempts) : null;
+      attempts++;
+      if (failure instanceof IOException) throw (IOException) failure;
+      if (failure instanceof RuntimeException) throw (RuntimeException) failure;
+      if (failure instanceof Error) throw (Error) failure;
+      return socket;
+    }
+  }
+
+  private static final class RecordingLayeredFactory implements LayeredConnectionSocketFactory {
+    final RecordingSocket output = new RecordingSocket();
+    Socket input;
+    String hostName;
+    int port;
+    HttpContext context;
+    IOException failure;
+    public Socket createSocket(HttpContext value) { return new RecordingSocket(); }
+    public Socket connectSocket(int timeout, Socket socket, HttpHost host,
+                                InetSocketAddress remote, InetSocketAddress local,
+                                HttpContext value) { return socket; }
+    public Socket createLayeredSocket(Socket socket, String host, int resolvedPort,
+                                      HttpContext value) throws IOException {
+      input = socket; hostName = host; port = resolvedPort; context = value;
+      if (failure != null) throw failure;
+      return output;
+    }
+  }
+
+  private static final class RecordingLookup implements Lookup<ConnectionSocketFactory> {
+    final ConnectionSocketFactory factory;
+    final List<String> names = new ArrayList<>();
+    RecordingLookup(ConnectionSocketFactory factory) { this.factory = factory; }
+    public ConnectionSocketFactory lookup(String name) { names.add(name); return factory; }
+  }
+
+  private static final class RecordingPorts implements SchemePortResolver {
+    final int port;
+    final List<HttpHost> hosts = new ArrayList<>();
+    RecordingPorts(int port) { this.port = port; }
+    public int resolve(HttpHost host) { hosts.add(host); return port; }
+  }
+
+  private static final class RecordingDns implements DnsResolver {
+    final InetAddress[] addresses;
+    final List<String> hosts = new ArrayList<>();
+    RecordingDns(InetAddress[] addresses) { this.addresses = addresses; }
+    public InetAddress[] resolve(String host) { hosts.add(host); return addresses; }
+  }
+
+  private static final class Derived extends ExtendedConnectionOperator {
+    Derived(Lookup<ConnectionSocketFactory> registry, SchemePortResolver ports, DnsResolver dns) {
+      super(registry, ports, dns);
+    }
   }
 
   private static void check(boolean condition, String message) {

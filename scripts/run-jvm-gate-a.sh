@@ -464,6 +464,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-units-consumer \
   --output "$WORK/GateUnits.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-abstract-http-context-filter-consumer \
   --output "$WORK/GateAbstractHttpContextFilter.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-extended-connection-operator-consumer \
+  --output "$WORK/GateExtendedConnectionOperator.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-extended-http-configurable-consumer \
   --output "$WORK/GateExtendedHttpConfigurable.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-http-configurable-consumer \
@@ -820,6 +822,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateThumbnailTools.java" \
   "$WORK/GateUnits.java" \
   "$WORK/GateAbstractHttpContextFilter.java" \
+  "$WORK/GateExtendedConnectionOperator.java" \
   "$WORK/GateExtendedHttpConfigurable.java" \
   "$WORK/GateHttpConfigurable.java" \
   "$WORK/GateHttpContextFilter.java" \
@@ -2288,6 +2291,17 @@ cmp "$WORK/abstract-http-context-filter-reference.txt" \
 grep --fixed-strings \
   'contracts=constructor,abstract,subclassable,interface,delegation-order,argument-identity,boolean-results,null-delegate-defaults,null-forwarding,failure-identity,private-state,reflection' \
   "$WORK/abstract-http-context-filter-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateExtendedConnectionOperator \
+  >"$WORK/extended-connection-operator-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateExtendedConnectionOperator >"$WORK/extended-connection-operator-candidate.txt"
+cmp "$WORK/extended-connection-operator-reference.txt" \
+  "$WORK/extended-connection-operator-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,default-resolvers,collaborator-identity,resolved-address-state,host-match,array-identity,clear-overwrite,address-precedence,context-registry,ordered-attempts,address-family-filtering,socket-configuration,returned-socket-binding,retry-boundary,timeout-wrapping,connect-wrapping,no-route,runtime-identity,suppressed-details,layered-upgrade,unsupported-upgrade,argument-identity,generics,interface,subclassable,private-state,nested-types,reflection' \
+  "$WORK/extended-connection-operator-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateExtendedHttpConfigurable \
   >"$WORK/extended-http-configurable-reference.txt"

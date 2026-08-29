@@ -3964,9 +3964,9 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.cohorts[3].completed_slices[].symbols] | add) == .cohorts[3].classified_symbols and
   (.cohorts[3].classified_symbols + .cohorts[3].remaining_symbols) == .cohorts[3].symbols and
   .cohorts[4].status == "IN_PROGRESS" and
-  .cohorts[4].classified_symbols == 164 and
-  .cohorts[4].remaining_symbols == 227 and
-  (.cohorts[4].completed_slices | length) == 26 and
+  .cohorts[4].classified_symbols == 169 and
+  .cohorts[4].remaining_symbols == 222 and
+  (.cohorts[4].completed_slices | length) == 27 and
   .cohorts[4].completed_slices[0] == {
     id: "copy-on-update-identity-list-contracts",
     classes: 1,
@@ -4305,11 +4305,31 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "tools/jvm-gate/src/main.rs"
     ]
   } and
+  .cohorts[4].completed_slices[26] == {
+    id: "extended-connection-operator-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 4,
+    symbols: 5,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
   ([.cohorts[4].completed_slices[].symbols] | add) == .cohorts[4].classified_symbols and
   (.cohorts[4].classified_symbols + .cohorts[4].remaining_symbols) == .cohorts[4].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 2440 and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 2445 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 2291 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 2296 and
+  ([$classifications.symbols[] |
+    select(.binary_name ==
+      "com.sedmelluq.discord.lavaplayer.tools.http.ExtendedConnectionOperator" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 5 and
   ([$classifications.symbols[] |
     select(.binary_name == "com.sedmelluq.discord.lavaplayer.tools.io.HttpConfigurable" and
       .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
@@ -5683,6 +5703,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.format.transcoder.PcmChunkEncoder",
         "com.sedmelluq.discord.lavaplayer.tools.CopyOnUpdateIdentityList",
         "com.sedmelluq.discord.lavaplayer.tools.http.AbstractHttpContextFilter",
+        "com.sedmelluq.discord.lavaplayer.tools.http.ExtendedConnectionOperator",
         "com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpConfigurable",
         "com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter",
         "com.sedmelluq.discord.lavaplayer.tools.http.HttpContextRetryCounter",
@@ -6154,7 +6175,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "extended-connection-operator-contracts" and
+  .phase_entry.next_slice == "simple-http-client-connection-manager-contracts" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 JQ
@@ -6162,7 +6183,7 @@ JQ
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '352 reference classes / 2,430 symbols' \
+  '355 reference classes / 2,438 symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -6172,4 +6193,4 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 2,440 classified symbols and 322 unassessed symbols.\n'
+printf 'Phase 13 inventory tracks 2,445 classified symbols and 317 unassessed symbols.\n'
