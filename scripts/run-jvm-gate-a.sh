@@ -466,6 +466,8 @@ cargo run --locked -q -p mantle-jvm-gate -- write-abstract-http-context-filter-c
   --output "$WORK/GateAbstractHttpContextFilter.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-extended-http-configurable-consumer \
   --output "$WORK/GateExtendedHttpConfigurable.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-http-configurable-consumer \
+  --output "$WORK/GateHttpConfigurable.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-http-context-filter-consumer \
   --output "$WORK/GateHttpContextFilter.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-http-context-retry-counter-consumer \
@@ -819,6 +821,7 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateUnits.java" \
   "$WORK/GateAbstractHttpContextFilter.java" \
   "$WORK/GateExtendedHttpConfigurable.java" \
+  "$WORK/GateHttpConfigurable.java" \
   "$WORK/GateHttpContextFilter.java" \
   "$WORK/GateHttpContextRetryCounter.java" \
   "$WORK/GateHttpStreamTools.java" \
@@ -2296,6 +2299,16 @@ cmp "$WORK/extended-http-configurable-reference.txt" \
 grep --fixed-strings \
   'contracts=caller-implementation,direct-method,inherited-methods,dispatch-order,argument-identity,null-forwarding,failure-identity,generics,public-abstract-interface,no-defaults,reflection' \
   "$WORK/extended-http-configurable-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateHttpConfigurable \
+  >"$WORK/http-configurable-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateHttpConfigurable >"$WORK/http-configurable-candidate.txt"
+cmp "$WORK/http-configurable-reference.txt" "$WORK/http-configurable-candidate.txt"
+grep --fixed-strings \
+  'contracts=caller-implementation,dispatch-order,function-identity,consumer-identity,null-forwarding,failure-identity,generics,public-abstract-interface,no-defaults,reflection' \
+  "$WORK/http-configurable-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateHttpContextFilter \
   >"$WORK/http-context-filter-reference.txt"

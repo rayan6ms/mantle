@@ -367,6 +367,7 @@ const ABSTRACT_HTTP_CONTEXT_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/http/AbstractHttpContextFilter";
 const EXTENDED_HTTP_CONFIGURABLE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable";
+const HTTP_CONFIGURABLE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable";
 const HTTP_CONTEXT_FILTER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/http/HttpContextFilter";
 const HTTP_CONTEXT_RETRY_COUNTER_CLASS: &str =
@@ -970,7 +971,7 @@ const REFERENCE_CLASSES: &[&str] = &[
     OFFLINE_YOUTUBE_TRACK_FORMAT_EXTRACTOR_CLASS,
     STREAMING_DATA_FORMATS_EXTRACTOR_CLASS,
     YOUTUBE_TRACK_FORMAT_EXTRACTOR_CLASS,
-    "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable",
+    HTTP_CONFIGURABLE_CLASS,
     ABSTRACT_HTTP_CONTEXT_FILTER_CLASS,
     EXTENDED_HTTP_CONFIGURABLE_CLASS,
     HTTP_CONTEXT_FILTER_CLASS,
