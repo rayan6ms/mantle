@@ -182,6 +182,9 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-extended-connection-operator-consumer" => {
             Some(EXTENDED_CONNECTION_OPERATOR_CONSUMER)
         }
+        "write-simple-http-client-connection-manager-consumer" => {
+            Some(SIMPLE_HTTP_CLIENT_CONNECTION_MANAGER_CONSUMER)
+        }
         "write-extended-http-configurable-consumer" => Some(EXTENDED_HTTP_CONFIGURABLE_CONSUMER),
         "write-http-configurable-consumer" => Some(HTTP_CONFIGURABLE_CONSUMER),
         "write-http-context-filter-consumer" => Some(HTTP_CONTEXT_FILTER_CONSUMER),
@@ -63299,6 +63302,390 @@ public final class GateSettableHttpRequestFilter {
   }
 
   private static final class Derived extends SettableHttpRequestFilter {}
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+}
+"#;
+
+const SIMPLE_HTTP_CLIENT_CONNECTION_MANAGER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.http.SimpleHttpClientConnectionManager;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import org.apache.http.HttpClientConnection;
+import org.apache.http.HttpHost;
+import org.apache.http.config.ConnectionConfig;
+import org.apache.http.config.SocketConfig;
+import org.apache.http.conn.ConnectionRequest;
+import org.apache.http.conn.HttpClientConnectionOperator;
+import org.apache.http.conn.HttpConnectionFactory;
+import org.apache.http.conn.ManagedHttpClientConnection;
+import org.apache.http.conn.routing.HttpRoute;
+import org.apache.http.impl.conn.ManagedHttpClientConnectionFactory;
+import org.apache.http.protocol.HttpContext;
+
+public final class GateSimpleHttpClientConnectionManager {
+  public static void main(String[] args) throws Exception {
+    constructorAndConfiguration();
+    requestLifecycle();
+    releaseLifecycle();
+    connectAndUpgrade();
+    noOps();
+    reflection();
+    System.out.println("contracts=constructor,default-factory,default-config,collaborator-identity,setter-identity,null-configuration,fresh-request,captured-route,state-ignored,cancel,timeout-ignored,repeated-get,late-bound-config,factory-failure,release-close,release-arguments,io-wrapping,runtime-identity,error-identity,connect-target,connect-proxy,local-address,socket-config,upgrade-target,operator-failures,managed-cast,no-ops,interface,subclassable,private-state,anonymous-state,generics,reflection");
+  }
+
+  private static void constructorAndConfiguration() throws Exception {
+    RecordingOperator operator = new RecordingOperator();
+    RecordingFactory factory = new RecordingFactory();
+    SimpleHttpClientConnectionManager manager =
+        new SimpleHttpClientConnectionManager(operator, factory);
+    check(field(manager, "connectionOperator") == operator, "operator identity");
+    check(field(manager, "connectionFactory") == factory, "factory identity");
+    check(field(manager, "socketConfig") == SocketConfig.DEFAULT, "default socket config");
+    check(field(manager, "connectionConfig") == ConnectionConfig.DEFAULT,
+        "default connection config");
+
+    SimpleHttpClientConnectionManager defaults =
+        new SimpleHttpClientConnectionManager(operator, null);
+    check(field(defaults, "connectionFactory") == ManagedHttpClientConnectionFactory.INSTANCE,
+        "default factory singleton");
+    SimpleHttpClientConnectionManager nullOperator =
+        new SimpleHttpClientConnectionManager(null, factory);
+    check(field(nullOperator, "connectionOperator") == null, "null operator retained");
+
+    SocketConfig socket = SocketConfig.custom().setSoTimeout(41).build();
+    ConnectionConfig connection = ConnectionConfig.custom().setBufferSize(1234).build();
+    manager.setSocketConfig(socket);
+    manager.setConnectionConfig(connection);
+    check(field(manager, "socketConfig") == socket, "socket setter identity");
+    check(field(manager, "connectionConfig") == connection, "connection setter identity");
+    manager.setSocketConfig(null);
+    manager.setConnectionConfig(null);
+    check(field(manager, "socketConfig") == null, "null socket config");
+    check(field(manager, "connectionConfig") == null, "null connection config");
+  }
+
+  private static void requestLifecycle() throws Exception {
+    RecordingOperator operator = new RecordingOperator();
+    RecordingFactory factory = new RecordingFactory();
+    SimpleHttpClientConnectionManager manager =
+        new SimpleHttpClientConnectionManager(operator, factory);
+    HttpRoute route = new HttpRoute(new HttpHost("request.example", 8181));
+    Object state = new Object();
+    ConnectionRequest first = manager.requestConnection(route, state);
+    ConnectionRequest second = manager.requestConnection(route, state);
+    check(first != second, "fresh request");
+    check(!first.cancel() && !first.cancel(), "cancel always false");
+
+    Field routeField = first.getClass().getDeclaredField("val$route");
+    routeField.setAccessible(true);
+    Field outerField = first.getClass().getDeclaredField("this$0");
+    outerField.setAccessible(true);
+    check(routeField.get(first) == route, "captured route identity");
+    check(outerField.get(first) == manager, "captured manager identity");
+
+    ConnectionConfig late = ConnectionConfig.custom().setBufferSize(4321).build();
+    manager.setConnectionConfig(late);
+    HttpClientConnection one = first.get(Long.MIN_VALUE, null);
+    HttpClientConnection two = first.get(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+    check(one != two, "fresh connection per get");
+    check(factory.routes.size() == 2 && factory.routes.get(0) == route
+        && factory.routes.get(1) == route, "route forwarded per get");
+    check(factory.configs.get(0) == late && factory.configs.get(1) == late,
+        "late config forwarded");
+    manager.setConnectionConfig(null);
+    first.get(0, TimeUnit.DAYS);
+    check(factory.configs.get(2) == null, "null config forwarded");
+
+    RuntimeException failure = new RuntimeException("factory");
+    factory.failure = failure;
+    check(catchThrowable(() -> first.get(1, TimeUnit.SECONDS)) == failure,
+        "factory failure identity");
+  }
+
+  private static void releaseLifecycle() throws Exception {
+    SimpleHttpClientConnectionManager manager = new SimpleHttpClientConnectionManager(
+        new RecordingOperator(), new RecordingFactory());
+    ConnectionHandler normal = new ConnectionHandler();
+    manager.releaseConnection(normal.proxy(), new Object(), Long.MIN_VALUE, null);
+    check(normal.closeCalls == 1, "release closes once");
+
+    IOException io = new IOException("close");
+    ConnectionHandler checked = new ConnectionHandler();
+    checked.closeFailure = io;
+    Throwable wrapped = catchThrowable(() ->
+        manager.releaseConnection(checked.proxy(), null, Long.MAX_VALUE, TimeUnit.DAYS));
+    check(wrapped.getClass() == RuntimeException.class && wrapped.getCause() == io,
+        "io wrapped with cause identity");
+
+    RuntimeException runtime = new RuntimeException("runtime");
+    ConnectionHandler unchecked = new ConnectionHandler();
+    unchecked.closeFailure = runtime;
+    check(catchThrowable(() -> manager.releaseConnection(
+        unchecked.proxy(), null, 0, TimeUnit.SECONDS)) == runtime, "runtime identity");
+    AssertionError error = new AssertionError("error");
+    ConnectionHandler erroneous = new ConnectionHandler();
+    erroneous.closeFailure = error;
+    check(catchThrowable(() -> manager.releaseConnection(
+        erroneous.proxy(), null, 0, TimeUnit.SECONDS)) == error, "error identity");
+    check(catchThrowable(() -> manager.releaseConnection(null, null, 0, null))
+        instanceof NullPointerException, "null connection boundary");
+  }
+
+  private static void connectAndUpgrade() throws Exception {
+    RecordingOperator operator = new RecordingOperator();
+    SimpleHttpClientConnectionManager manager = new SimpleHttpClientConnectionManager(
+        operator, new RecordingFactory());
+    ManagedHttpClientConnection connection = new ConnectionHandler().proxy();
+    HttpContext context = proxy(HttpContext.class, (proxy, method, args) -> defaultValue(method));
+    SocketConfig socket = SocketConfig.custom().setSoTimeout(99).build();
+    manager.setSocketConfig(socket);
+    HttpHost target = new HttpHost("target.example", 8443, "https");
+    HttpRoute direct = new HttpRoute(target);
+    manager.connect(connection, direct, 321, context);
+    check(operator.connectCalls == 1 && operator.connection == connection,
+        "connect connection identity");
+    check(operator.host == direct.getTargetHost() && operator.local == null,
+        "direct target and local");
+    check(operator.timeout == 321 && operator.socketConfig == socket
+        && operator.context == context, "connect arguments");
+
+    InetAddress local = InetAddress.getByAddress(new byte[] {127, 0, 0, 7});
+    HttpHost proxyHost = new HttpHost("proxy.example", 9090);
+    HttpRoute proxied = new HttpRoute(target, local, proxyHost, false);
+    manager.connect(connection, proxied, -7, context);
+    check(operator.host == proxied.getProxyHost(), "proxy selected");
+    check(operator.local.equals(new InetSocketAddress(local, 0)), "local address");
+    check(operator.timeout == -7, "negative timeout forwarded");
+
+    manager.upgrade(connection, proxied, context);
+    check(operator.upgradeCalls == 1 && operator.connection == connection,
+        "upgrade connection");
+    check(operator.host == proxied.getTargetHost() && operator.context == context,
+        "upgrade uses target");
+
+    IOException io = new IOException("operator");
+    operator.connectFailure = io;
+    check(catchThrowable(() -> manager.connect(connection, direct, 1, context)) == io,
+        "connect io identity");
+    operator.connectFailure = null;
+    RuntimeException runtime = new RuntimeException("upgrade");
+    operator.upgradeFailure = runtime;
+    check(catchThrowable(() -> manager.upgrade(connection, direct, context)) == runtime,
+        "upgrade runtime identity");
+
+    HttpClientConnection plain = proxy(HttpClientConnection.class,
+        (proxy, method, args) -> defaultValue(method));
+    check(catchThrowable(() -> manager.connect(plain, direct, 0, context))
+        instanceof ClassCastException, "connect managed cast");
+    check(catchThrowable(() -> manager.upgrade(plain, direct, context))
+        instanceof ClassCastException, "upgrade managed cast");
+    SimpleHttpClientConnectionManager missing =
+        new SimpleHttpClientConnectionManager(null, new RecordingFactory());
+    check(catchThrowable(() -> missing.connect(connection, direct, 0, context))
+        instanceof NullPointerException, "null operator connect");
+  }
+
+  private static void noOps() throws Exception {
+    RecordingOperator operator = new RecordingOperator();
+    RecordingFactory factory = new RecordingFactory();
+    SimpleHttpClientConnectionManager manager =
+        new SimpleHttpClientConnectionManager(operator, factory);
+    HttpClientConnection connection = new ConnectionHandler().proxy();
+    manager.routeComplete(connection, null, null);
+    manager.closeIdleConnections(Long.MIN_VALUE, null);
+    manager.closeExpiredConnections();
+    manager.shutdown();
+    manager.shutdown();
+    check(operator.connectCalls == 0 && operator.upgradeCalls == 0,
+        "no-op operator isolation");
+    check(factory.routes.isEmpty(), "no-op factory isolation");
+  }
+
+  private static void reflection() throws Exception {
+    Class<SimpleHttpClientConnectionManager> type = SimpleHttpClientConnectionManager.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && !Modifier.isAbstract(type.getModifiers()), "class modifiers");
+    check(Arrays.equals(type.getInterfaces(),
+        new Class<?>[] {org.apache.http.conn.HttpClientConnectionManager.class}), "interface");
+    check(type.getDeclaredConstructors().length == 1, "constructor count");
+    Constructor<?> constructor = type.getDeclaredConstructors()[0];
+    check(Modifier.isPublic(constructor.getModifiers()), "constructor public");
+    check(Arrays.equals(constructor.getParameterTypes(), new Class<?>[] {
+        HttpClientConnectionOperator.class, HttpConnectionFactory.class}),
+        "constructor parameters");
+    check(type.getDeclaredFields().length == 4, "field count");
+    checkField(type, "connectionOperator", HttpClientConnectionOperator.class,
+        Modifier.PRIVATE | Modifier.FINAL, false);
+    checkField(type, "connectionFactory", HttpConnectionFactory.class,
+        Modifier.PRIVATE | Modifier.FINAL, false);
+    checkField(type, "socketConfig", SocketConfig.class,
+        Modifier.PRIVATE | Modifier.VOLATILE, false);
+    checkField(type, "connectionConfig", ConnectionConfig.class,
+        Modifier.PRIVATE | Modifier.VOLATILE, false);
+    check(type.getDeclaredField("connectionFactory").getGenericType().getTypeName().equals(
+        "org.apache.http.conn.HttpConnectionFactory<org.apache.http.conn.routing.HttpRoute, org.apache.http.conn.ManagedHttpClientConnection>"),
+        "factory generic type");
+    check(type.getDeclaredMethods().length == 10, "method count");
+    check(type.getDeclaredClasses().length == 0, "no named nested classes");
+    check(type.getDeclaredMethod("routeComplete", HttpClientConnection.class, HttpRoute.class,
+        HttpContext.class).getExceptionTypes().length == 0, "routeComplete exceptions");
+
+    SimpleHttpClientConnectionManager manager = new SimpleHttpClientConnectionManager(
+        new RecordingOperator(), new RecordingFactory());
+    Class<?> anonymous = manager.requestConnection(new HttpRoute(new HttpHost("a")), null)
+        .getClass();
+    check(anonymous.getName().equals(type.getName() + "$1"), "anonymous name");
+    check(!Modifier.isPublic(anonymous.getModifiers()) && !Modifier.isFinal(anonymous.getModifiers()),
+        "anonymous modifiers");
+    check(Arrays.equals(anonymous.getInterfaces(), new Class<?>[] {ConnectionRequest.class}),
+        "anonymous interface");
+    check(anonymous.getDeclaredFields().length == 2 && anonymous.getDeclaredMethods().length == 2,
+        "anonymous members");
+    checkField(anonymous, "val$route", HttpRoute.class, Modifier.FINAL, true);
+    checkField(anonymous, "this$0", SimpleHttpClientConnectionManager.class, Modifier.FINAL, true);
+    Method get = anonymous.getDeclaredMethod("get", long.class, TimeUnit.class);
+    check(Modifier.isPublic(get.getModifiers()) && get.getReturnType() == HttpClientConnection.class,
+        "anonymous get signature");
+    check(get.getExceptionTypes().length == 0, "anonymous get exceptions");
+    new Derived(new RecordingOperator(), new RecordingFactory());
+  }
+
+  private static void checkField(Class<?> type, String name, Class<?> fieldType,
+                                 int expectedModifiers, boolean synthetic) throws Exception {
+    Field field = type.getDeclaredField(name);
+    int relevant = field.getModifiers() & (Modifier.PUBLIC | Modifier.PROTECTED |
+        Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL | Modifier.VOLATILE);
+    check(field.getType() == fieldType && relevant == expectedModifiers,
+        name + " field shape");
+    check(field.isSynthetic() == synthetic, name + " synthetic");
+  }
+
+  private static Object field(Object instance, String name) throws Exception {
+    Field field = instance.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(instance);
+  }
+
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable throwable) { return throwable; }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type, InvocationHandler handler) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type}, handler);
+  }
+
+  private static Object defaultValue(Method method) {
+    Class<?> type = method.getReturnType();
+    if (type == boolean.class) return false;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0F;
+    if (type == double.class) return 0D;
+    if (type == char.class) return (char) 0;
+    return null;
+  }
+
+  private static final class RecordingFactory
+      implements HttpConnectionFactory<HttpRoute, ManagedHttpClientConnection> {
+    final List<HttpRoute> routes = new ArrayList<>();
+    final List<ConnectionConfig> configs = new ArrayList<>();
+    RuntimeException failure;
+
+    public ManagedHttpClientConnection create(HttpRoute route, ConnectionConfig config) {
+      routes.add(route);
+      configs.add(config);
+      if (failure != null) throw failure;
+      return new ConnectionHandler().proxy();
+    }
+  }
+
+  private static final class RecordingOperator implements HttpClientConnectionOperator {
+    int connectCalls;
+    int upgradeCalls;
+    ManagedHttpClientConnection connection;
+    HttpHost host;
+    InetSocketAddress local;
+    int timeout;
+    SocketConfig socketConfig;
+    HttpContext context;
+    Throwable connectFailure;
+    Throwable upgradeFailure;
+
+    public void connect(ManagedHttpClientConnection connection, HttpHost host,
+                        InetSocketAddress local, int timeout, SocketConfig socketConfig,
+                        HttpContext context) throws IOException {
+      connectCalls++;
+      this.connection = connection;
+      this.host = host;
+      this.local = local;
+      this.timeout = timeout;
+      this.socketConfig = socketConfig;
+      this.context = context;
+      throwConfigured(connectFailure);
+    }
+
+    public void upgrade(ManagedHttpClientConnection connection, HttpHost host,
+                        HttpContext context) throws IOException {
+      upgradeCalls++;
+      this.connection = connection;
+      this.host = host;
+      this.context = context;
+      throwConfigured(upgradeFailure);
+    }
+
+    private static void throwConfigured(Throwable throwable) throws IOException {
+      if (throwable == null) return;
+      if (throwable instanceof IOException) throw (IOException) throwable;
+      if (throwable instanceof RuntimeException) throw (RuntimeException) throwable;
+      if (throwable instanceof Error) throw (Error) throwable;
+      throw new AssertionError(throwable);
+    }
+  }
+
+  private static final class ConnectionHandler implements InvocationHandler {
+    int closeCalls;
+    Throwable closeFailure;
+
+    ManagedHttpClientConnection proxy() {
+      return GateSimpleHttpClientConnectionManager.proxy(
+          ManagedHttpClientConnection.class, this);
+    }
+
+    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+      if (method.getName().equals("close") && method.getParameterCount() == 0) {
+        closeCalls++;
+        if (closeFailure != null) throw closeFailure;
+      }
+      if (method.getName().equals("toString")) return "connection";
+      return defaultValue(method);
+    }
+  }
+
+  private static final class Derived extends SimpleHttpClientConnectionManager {
+    Derived(HttpClientConnectionOperator operator,
+            HttpConnectionFactory<HttpRoute, ManagedHttpClientConnection> factory) {
+      super(operator, factory);
+    }
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
 
   private static void check(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);

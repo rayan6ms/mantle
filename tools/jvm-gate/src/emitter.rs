@@ -371,6 +371,10 @@ const EXTENDED_CONNECTION_OPERATOR_ADDITIONAL_DETAILS_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/http/ExtendedConnectionOperator$AdditionalDetails";
 const EXTENDED_CONNECTION_OPERATOR_RESOLVED_ADDRESSES_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/http/ExtendedConnectionOperator$ResolvedAddresses";
+const SIMPLE_HTTP_CLIENT_CONNECTION_MANAGER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/http/SimpleHttpClientConnectionManager";
+const SIMPLE_HTTP_CLIENT_CONNECTION_MANAGER_REQUEST_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/http/SimpleHttpClientConnectionManager$1";
 const EXTENDED_HTTP_CONFIGURABLE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable";
 const HTTP_CONFIGURABLE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable";
@@ -982,6 +986,8 @@ const REFERENCE_CLASSES: &[&str] = &[
     EXTENDED_CONNECTION_OPERATOR_CLASS,
     EXTENDED_CONNECTION_OPERATOR_ADDITIONAL_DETAILS_CLASS,
     EXTENDED_CONNECTION_OPERATOR_RESOLVED_ADDRESSES_CLASS,
+    SIMPLE_HTTP_CLIENT_CONNECTION_MANAGER_CLASS,
+    SIMPLE_HTTP_CLIENT_CONNECTION_MANAGER_REQUEST_CLASS,
     EXTENDED_HTTP_CONFIGURABLE_CLASS,
     HTTP_CONTEXT_FILTER_CLASS,
     HTTP_CONTEXT_RETRY_COUNTER_CLASS,
@@ -1151,6 +1157,8 @@ pub fn emit(
     let mut extended_connection_operator_bytes = None;
     let mut extended_connection_operator_additional_details_bytes = None;
     let mut extended_connection_operator_resolved_addresses_bytes = None;
+    let mut simple_http_client_connection_manager_bytes = None;
+    let mut simple_http_client_connection_manager_request_bytes = None;
     let mut http_context_retry_counter_bytes = None;
     let mut http_context_retry_counter_retry_count_bytes = None;
     let mut http_stream_tools_bytes = None;
@@ -1339,6 +1347,10 @@ pub fn emit(
             extended_connection_operator_additional_details_bytes = Some(bytes);
         } else if *binary_name == EXTENDED_CONNECTION_OPERATOR_RESOLVED_ADDRESSES_CLASS {
             extended_connection_operator_resolved_addresses_bytes = Some(bytes);
+        } else if *binary_name == SIMPLE_HTTP_CLIENT_CONNECTION_MANAGER_CLASS {
+            simple_http_client_connection_manager_bytes = Some(bytes);
+        } else if *binary_name == SIMPLE_HTTP_CLIENT_CONNECTION_MANAGER_REQUEST_CLASS {
+            simple_http_client_connection_manager_request_bytes = Some(bytes);
         } else if *binary_name == HTTP_CONTEXT_RETRY_COUNTER_CLASS {
             http_context_retry_counter_bytes = Some(bytes);
         } else if *binary_name == HTTP_CONTEXT_RETRY_COUNTER_RETRY_COUNT_CLASS {
@@ -1551,6 +1563,18 @@ pub fn emit(
                 extended_connection_operator_resolved_addresses_bytes
                     .as_ref()
                     .expect("extended connection operator addresses source bytes are retained"),
+            );
+        } else if name == format!("{SIMPLE_HTTP_CLIENT_CONNECTION_MANAGER_CLASS}.class") {
+            bytes.clone_from(
+                simple_http_client_connection_manager_bytes
+                    .as_ref()
+                    .expect("simple HTTP client connection manager source bytes are retained"),
+            );
+        } else if name == format!("{SIMPLE_HTTP_CLIENT_CONNECTION_MANAGER_REQUEST_CLASS}.class") {
+            bytes.clone_from(
+                simple_http_client_connection_manager_request_bytes
+                    .as_ref()
+                    .expect("simple HTTP client connection request source bytes are retained"),
             );
         } else if name == format!("{HTTP_CONTEXT_RETRY_COUNTER_CLASS}.class") {
             bytes.clone_from(
@@ -2539,6 +2563,8 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | EXTENDED_CONNECTION_OPERATOR_CLASS
             | EXTENDED_CONNECTION_OPERATOR_ADDITIONAL_DETAILS_CLASS
             | EXTENDED_CONNECTION_OPERATOR_RESOLVED_ADDRESSES_CLASS
+            | SIMPLE_HTTP_CLIENT_CONNECTION_MANAGER_CLASS
+            | SIMPLE_HTTP_CLIENT_CONNECTION_MANAGER_REQUEST_CLASS
             | HTTP_CONTEXT_RETRY_COUNTER_CLASS
             | HTTP_CONTEXT_RETRY_COUNTER_RETRY_COUNT_CLASS
             | HTTP_STREAM_TOOLS_CLASS
