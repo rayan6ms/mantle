@@ -20103,7 +20103,8 @@ public final class GateVorbisCommentParser {
     try {
       Locale.setDefault(new Locale("tr", "TR"));
       byte[] encoded = comments(7, "vendor-data", "title=First", "ARTIST=Voice",
-          "TiTlE=Last=Part", "IGNORED", "=empty-key", "EMPTY=", "mötley=Grüße");
+          "TiTlE=Last=Part", "IGNORED", "=empty-key", "EMPTY=",
+          "m\u00f6tley=Gr\u00fc\u00dfe");
       byte[] input = Arrays.copyOf(encoded, encoded.length + 3);
       input[encoded.length] = 91; input[encoded.length + 1] = 92; input[encoded.length + 2] = 93;
       ByteBuffer buffer = ByteBuffer.wrap(input);
@@ -20112,7 +20113,8 @@ public final class GateVorbisCommentParser {
           "fresh concrete hash map with parsed tags");
       check("Last=Part".equals(tags.get("TITLE")) && "Voice".equals(tags.get("ARTIST"))
           && "empty-key".equals(tags.get("")) && "".equals(tags.get("EMPTY"))
-          && "Grüße".equals(tags.get("MÖTLEY")) && !tags.containsKey("IGNORED"),
+          && "Gr\u00fc\u00dfe".equals(tags.get("M\u00d6TLEY"))
+          && !tags.containsKey("IGNORED"),
           "UTF-8, ROOT case folding, first equals, empty values, and duplicate replacement");
       check(buffer.position() == encoded.length && buffer.remaining() == 3
           && buffer.get() == 91, "exact input position and trailing bytes");
