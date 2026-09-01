@@ -722,8 +722,10 @@ if command -v cygpath >/dev/null 2>&1; then
   matroska_classes_argument="$(cygpath -w "$MATROSKA_CLASSES")"
   mpeg_classes_argument="$(cygpath -w "$MPEG_CLASSES")"
   mpeg_file_loader_classes_argument="$(cygpath -w "$MPEG_FILE_LOADER_CLASSES")"
+  ogg_codec_classes_argument="$(cygpath -w "$OGG_CODEC_CLASSES")"
   ogg_flac_classes_argument="$(cygpath -w "$OGG_FLAC_CLASSES")"
   ogg_opus_classes_argument="$(cygpath -w "$OGG_OPUS_CLASSES")"
+  ogg_probe_classes_argument="$(cygpath -w "$OGG_PROBE_CLASSES")"
   ogg_vorbis_classes_argument="$(cygpath -w "$OGG_VORBIS_CLASSES")"
   ogg_vorbis_track_classes_argument="$(cygpath -w "$OGG_VORBIS_TRACK_CLASSES")"
   wav_audio_track_classes_argument="$(cygpath -w "$WAV_AUDIO_TRACK_CLASSES")"
@@ -741,8 +743,10 @@ else
   matroska_classes_argument="$MATROSKA_CLASSES"
   mpeg_classes_argument="$MPEG_CLASSES"
   mpeg_file_loader_classes_argument="$MPEG_FILE_LOADER_CLASSES"
+  ogg_codec_classes_argument="$OGG_CODEC_CLASSES"
   ogg_flac_classes_argument="$OGG_FLAC_CLASSES"
   ogg_opus_classes_argument="$OGG_OPUS_CLASSES"
+  ogg_probe_classes_argument="$OGG_PROBE_CLASSES"
   ogg_vorbis_classes_argument="$OGG_VORBIS_CLASSES"
   ogg_vorbis_track_classes_argument="$OGG_VORBIS_TRACK_CLASSES"
   wav_audio_track_classes_argument="$WAV_AUDIO_TRACK_CLASSES"
@@ -1832,21 +1836,21 @@ grep --fixed-strings \
   'contracts=track-info,input-identity,null-construction,packet-wrapper,non-closing,blueprint-load,handler-load,processing-context,initialise-zeroes,read-callback,seek-callback,full-width-timecode,chained-blueprints,handler-reuse,wait-on-end,executor-control,empty-stream,io-identity,io-wrapping,interruption-identity,runtime-identity,null-handler,null-executor,identifier-dispatch,input-ownership,subclassable,eager-logger,private-state,synthetic-callback,throws,reflection' \
   "$WORK/ogg-audio-track-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateOggCodecHandler \
+  -cp "$ogg_codec_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateOggCodecHandler \
   >"$WORK/ogg-codec-handler-reference.txt"
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggCodecHandler >"$WORK/ogg-codec-handler-candidate.txt"
 cmp "$WORK/ogg-codec-handler-reference.txt" "$WORK/ogg-codec-handler-candidate.txt"
 grep --fixed-strings \
   'contracts=public-interface,no-fields,no-constructors,four-abstract-methods,identifier-int,maximum-length-int,packet-identity,broker-identity,blueprint-identity,metadata-identity,null-arguments,null-returns,checked-failure-identity,runtime-failure-identity,implementation-dispatch,throws,reflection' \
   "$WORK/ogg-codec-handler-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$OGG_PROBE_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_probe_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggContainerProbe "$ROOT/tests/media/fixtures/tone-opus-tags.ogg" \
   >"$WORK/ogg-container-probe-reference.txt"
 java -Xverify:all \
-  -cp "$OGG_PROBE_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_probe_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggContainerProbe "$ROOT/tests/media/fixtures/tone-opus-tags.ogg" \
   >"$WORK/ogg-container-probe-candidate.txt"
 cmp "$WORK/ogg-container-probe-reference.txt" "$WORK/ogg-container-probe-candidate.txt"
@@ -1854,10 +1858,10 @@ grep --fixed-strings \
   'contracts=name,no-hints,null-hints,empty-miss,non-ogg-miss,current-position,rewind,null-reference-miss,matched-null-reference,null-input,read-failure-identity,seek-failure-identity,runtime-failure-identity,provider-failure-identity,truncated-supported,metadata-failure-swallowed,provider-overlay,tagged-opus,title,artist,isrc,duration,descriptor-identity,stream-ownership,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,private-helper,private-state,throws,reflection' \
   "$WORK/ogg-container-probe-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggMetadata >"$WORK/ogg-metadata-reference.txt"
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggMetadata >"$WORK/ogg-metadata-candidate.txt"
 cmp "$WORK/ogg-metadata-reference.txt" "$WORK/ogg-metadata-candidate.txt"
 grep --fixed-strings \
@@ -1865,10 +1869,10 @@ grep --fixed-strings \
   "$WORK/ogg-metadata-candidate.txt" >/dev/null
 # Preserve Ogg packet/page semantics while bounding the reference's whole-content seek-table allocation.
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggPacketInputStream reference >"$WORK/ogg-packet-input-stream-reference.txt"
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggPacketInputStream candidate >"$WORK/ogg-packet-input-stream-candidate.txt"
 grep --fixed-strings \
   'common=public-input-stream,13-fields,1-constructor,17-methods,private-state-enum,constructor-capture,track-boundaries,packet-boundaries,single-read,bulk-read,zero-length-read,available,multiple-packets,page-continuation,empty-pages,chained-tracks,last-page,physical-eof,invalid-header,invalid-version,truncated-header,premature-packet-eof,checked-failure-identity,seek-point-identity,ceiling-selection,track-seeking,seek-table,position-restore,size-info,hard-seek-gates,delegated-close,subclassable,generics,throws,reflection;scan=legacy-content-length-allocation' \
@@ -1877,90 +1881,90 @@ grep --fixed-strings \
   'common=public-input-stream,13-fields,1-constructor,17-methods,private-state-enum,constructor-capture,track-boundaries,packet-boundaries,single-read,bulk-read,zero-length-read,available,multiple-packets,page-continuation,empty-pages,chained-tracks,last-page,physical-eof,invalid-header,invalid-version,truncated-header,premature-packet-eof,checked-failure-identity,seek-point-identity,ceiling-selection,track-seeking,seek-table,position-restore,size-info,hard-seek-gates,delegated-close,subclassable,generics,throws,reflection;scan=bounded-64-mib' \
   "$WORK/ogg-packet-input-stream-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggPageHeader >"$WORK/ogg-page-header-reference.txt"
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggPageHeader >"$WORK/ogg-page-header-candidate.txt"
 cmp "$WORK/ogg-page-header-reference.txt" "$WORK/ogg-page-header-candidate.txt"
 grep --fixed-strings \
   'contracts=constants,individual-flags,combined-flags,unrelated-flags,negative-flags,full-width-fields,negative-segment-count,no-validation,immutable-public-state,identity-semantics,subclassable,field-order,constructor,throws,reflection' \
   "$WORK/ogg-page-header-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggPageScanner >"$WORK/ogg-page-scanner-reference.txt"
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggPageScanner >"$WORK/ogg-page-scanner-candidate.txt"
 cmp "$WORK/ogg-page-scanner-reference.txt" "$WORK/ogg-page-scanner-candidate.txt"
 grep --fixed-strings \
   'contracts=public-scanner,9-fields,1-constructor,3-methods,direct-state,live-data,data-length-window,signature-search,version-gate,lacing-capacity,payload-capacity,checksum-ignored,stream-fields-ignored,last-page,contiguous-pages,absolute-offset,end-index-size-arithmetic,granule-endianness,sample-rate,timecode-truncation,seek-order,persistent-page-sequence,fresh-mutable-list,strict-tail-boundary,short-input,null-input,invalid-length,identity-semantics,subclassable,generics,throws,reflection' \
   "$WORK/ogg-page-scanner-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggSeekPoint >"$WORK/ogg-seek-point-reference.txt"
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggSeekPoint >"$WORK/ogg-seek-point-candidate.txt"
 cmp "$WORK/ogg-seek-point-reference.txt" "$WORK/ogg-seek-point-candidate.txt"
 grep --fixed-strings \
   'contracts=public-value,4-fields,1-constructor,4-getters,direct-assignment,full-width-values,negative-values,independent-values,stable-getters,immutable-private-state,identity-semantics,subclassable,override-dispatch,field-order,throws,reflection' \
   "$WORK/ogg-seek-point-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggStreamSizeInfo >"$WORK/ogg-stream-size-info-reference.txt"
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggStreamSizeInfo >"$WORK/ogg-stream-size-info-candidate.txt"
 cmp "$WORK/ogg-stream-size-info-reference.txt" "$WORK/ogg-stream-size-info-candidate.txt"
 grep --fixed-strings \
   'contracts=public-value,5-fields,1-constructor,1-method,direct-assignment,full-width-values,negative-values,no-validation,duration-multiply-first,integer-truncation,signed-division,long-overflow,zero-rate-failure,unrelated-fields,immutable-public-state,identity-semantics,subclassable,override-dispatch,field-order,throws,reflection' \
   "$WORK/ogg-stream-size-info-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggTrackBlueprint >"$WORK/ogg-track-blueprint-reference.txt"
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggTrackBlueprint >"$WORK/ogg-track-blueprint-candidate.txt"
 cmp "$WORK/ogg-track-blueprint-reference.txt" "$WORK/ogg-track-blueprint-candidate.txt"
 grep --fixed-strings \
   'contracts=public-interface,no-fields,no-constructors,2-abstract-methods,stream-identity,null-stream,handler-identity,null-return,full-width-sample-rate,implementation-dispatch,runtime-failure-identity,no-defaults,no-generics,throws,reflection' \
   "$WORK/ogg-track-blueprint-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggTrackHandler >"$WORK/ogg-track-handler-reference.txt"
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggTrackHandler >"$WORK/ogg-track-handler-candidate.txt"
 cmp "$WORK/ogg-track-handler-reference.txt" "$WORK/ogg-track-handler-candidate.txt"
 grep --fixed-strings \
   'contracts=public-interface,closeable-parent,no-fields,no-constructors,3-declared-methods,context-identity,null-context,full-width-initial-timecodes,provide-dispatch,full-width-seek,inherited-close,ordered-dispatch,checked-failure-identity,runtime-failure-identity,no-defaults,no-generics,throws,reflection' \
   "$WORK/ogg-track-handler-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggTrackLoader >"$WORK/ogg-track-loader-reference.txt"
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggTrackLoader >"$WORK/ogg-track-loader-candidate.txt"
 cmp "$WORK/ogg-track-loader-reference.txt" "$WORK/ogg-track-loader-candidate.txt"
 grep --fixed-strings \
   'contracts=public-loader,2-fields,1-constructor,2-public-static-methods,private-detection,provider-order,maximum-first-packet,track-boundary,packet-boundary,identifier-read,selection-order,stream-identity,broker-identity,blueprint-identity,metadata-identity,null-provider-returns,long-first-packet,unknown-codec,short-header,null-stream,checked-failure-identity,runtime-failure-identity,subclassable,private-nested-detection,throws,reflection' \
   "$WORK/ogg-track-loader-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggFlacCodecHandler >"$WORK/ogg-flac-codec-handler-reference.txt"
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggFlacCodecHandler >"$WORK/ogg-flac-codec-handler-candidate.txt"
 cmp "$WORK/ogg-flac-codec-handler-reference.txt" "$WORK/ogg-flac-codec-handler-candidate.txt"
 grep --fixed-strings \
   'contracts=identifier,maximum-length,public-construction,stream-info,metadata-blocks,tag-parse,metadata-duration,seek-table,seek-point-forwarding,blueprint-sample-rate,handler-info-identity,handler-stream-identity,empty-tags,unknown-identifier,short-native-header,wrong-native-header,missing-metadata,metadata-io-identity,blueprint-io-identity,metadata-size-lookup,subclassable,private-blueprint,private-methods,throws,reflection' \
   "$WORK/ogg-flac-codec-handler-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggOpusCodecHandler >"$WORK/ogg-opus-codec-handler-reference.txt"
 java -Xverify:all \
-  -cp "$OGG_CODEC_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$ogg_codec_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggOpusCodecHandler >"$WORK/ogg-opus-codec-handler-candidate.txt"
 cmp "$WORK/ogg-opus-codec-handler-reference.txt" "$WORK/ogg-opus-codec-handler-candidate.txt"
 grep --fixed-strings \
