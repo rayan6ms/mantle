@@ -721,19 +721,17 @@ impl MediaSession {
         let ebml_output_sample_rate = ebml_metadata
             .as_ref()
             .and_then(|metadata| metadata.output_sample_rate);
-        let media_duration = duration_to_std(
-            format.media_info().time_base,
-            format
-                .media_info()
-                .duration
-                .unwrap_or(SymphoniaDuration::ZERO),
-        )
-        .filter(|duration| !duration.is_zero());
+        let media_time_base = format.media_info().time_base;
+        let media_duration = format
+            .media_info()
+            .duration
+            .and_then(|duration| duration_to_std(media_time_base, duration))
+            .filter(|duration| !duration.is_zero());
         let track = format
             .default_track(TrackType::Audio)
             .ok_or(MediaError::NoAudioTrack)?;
         let track_id = track.id;
-        let time_base = track.time_base;
+        let time_base = track.time_base.or(media_time_base);
         let mut duration = track
             .duration
             .and_then(|duration| duration_to_std(time_base, duration))
@@ -2600,7 +2598,9 @@ impl<'a> BitReader<'a> {
 
 fn timestamp_to_std(time_base: Option<TimeBase>, timestamp: Timestamp) -> Option<StdDuration> {
     let nanos = time_base?.calc_time(timestamp)?.as_nanos();
-    u64::try_from(nanos).ok().map(StdDuration::from_nanos)
+    u64::try_from(nanos.max(0))
+        .ok()
+        .map(StdDuration::from_nanos)
 }
 
 fn duration_to_std(

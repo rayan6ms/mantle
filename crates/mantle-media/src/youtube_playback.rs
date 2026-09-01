@@ -683,7 +683,7 @@ impl PcmTranscoder {
             return Ok(false);
         }
         if !self.timestamp_initialized {
-            self.base_timestamp = self.decoded.timestamp();
+            self.base_timestamp = Some(self.decoded.timestamp().unwrap_or_default());
             self.timestamp_initialized = true;
         }
         append_interleaved(
@@ -710,7 +710,7 @@ impl PcmTranscoder {
             self.resampled_offset = 0;
         }
         if !self.timestamp_initialized {
-            self.base_timestamp = self.resampled.timestamp();
+            self.base_timestamp = Some(self.resampled.timestamp().unwrap_or_default());
             self.timestamp_initialized = true;
         }
         append_interleaved(
