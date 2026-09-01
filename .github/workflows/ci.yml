@@ -133,7 +133,7 @@ jobs:
               --output "$reference/$artifact"
             expected=$(jq -r --arg file "$artifact" \
               '.published_artifacts[] | select(.file == $file) | .sha256' \
-              reference/lavaplayer-2.2.6.lock.json)
+              reference/lavaplayer-2.2.6.lock.json | tr -d '\r')
             actual=$(sha256sum "$reference/$artifact" | awk '{print $1}')
             if [[ "$actual" != "$expected" ]]; then
               printf '%s SHA-256 mismatch: expected %s, got %s\n' "$artifact" "$expected" "$actual" >&2
@@ -143,7 +143,7 @@ jobs:
           mvn -q -f "$reference/lavaplayer-2.2.6.pom" dependency:copy-dependencies \
             -DincludeScope=runtime -DoutputDirectory="$PWD/$reference/dependencies"
           expected_count=$(jq '.resolved_runtime_artifacts | length' \
-            reference/lavaplayer-2.2.6.lock.json)
+            reference/lavaplayer-2.2.6.lock.json | tr -d '\r')
           actual_count=$(find "$reference/dependencies" -maxdepth 1 -type f -name '*.jar' | wc -l)
           if [[ "$actual_count" -ne "$expected_count" ]]; then
             printf 'Expected %s runtime artifacts, found %s.\n' "$expected_count" "$actual_count" >&2
@@ -156,7 +156,7 @@ jobs:
               exit 1
             fi
           done < <(jq -r '.resolved_runtime_artifacts[] | [.file, .sha256] | @tsv' \
-            reference/lavaplayer-2.2.6.lock.json)
+            reference/lavaplayer-2.2.6.lock.json | tr -d '\r')
       - shell: bash
         run: scripts/run-jvm-gate-a.sh
 
