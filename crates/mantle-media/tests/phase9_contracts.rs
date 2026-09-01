@@ -285,6 +285,46 @@ fn malformed_and_truncated_mp3_terminate_within_bounds() {
         )
         .is_err()
     );
+
+    let oversized_frame = b"ID3\x03\x00\x00\x00\x00\x00\x0aTIT2\xfe\xff\xdf\xff\x00\x00";
+    let result = MediaSession::open(
+        Box::new(MemoryInput::new(oversized_frame.as_slice())),
+        Some("mp3"),
+        MediaLimits::default(),
+    );
+    assert!(
+        matches!(
+            result,
+            Err(MediaError::Backend {
+                operation: "metadata preflight",
+                ref message,
+            }) if message.contains("4278181887 bytes")
+        ),
+        "{:?}",
+        result.err()
+    );
+}
+
+#[test]
+fn forward_only_tagged_mp3_uses_bounded_metadata_preflight() {
+    let bytes = fs::read(fixture("tone-mp3-vbr-id3.mp3")).unwrap();
+    let mut session = MediaSession::open(
+        Box::new(ForwardOnlyInput::new(bytes)),
+        Some("mp3"),
+        MediaLimits::default(),
+    )
+    .unwrap();
+    assert!(!session.info().seekable);
+    assert_eq!(
+        session.info().metadata,
+        MediaMetadata {
+            title: Some("Mantle VBR Title".to_owned()),
+            author: Some("Mantle VBR Artist".to_owned()),
+            isrc: Some("BRMNT2600002".to_owned()),
+        }
+    );
+    let mut frame = PcmFrame::with_capacity(session.limits().max_pcm_samples_per_frame);
+    assert!(session.read_pcm(&mut frame).unwrap());
 }
 
 #[test]

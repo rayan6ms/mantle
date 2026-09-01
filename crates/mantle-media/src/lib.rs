@@ -263,6 +263,95 @@ impl MediaInput for MemoryInput {
     }
 }
 
+struct PrefixInput {
+    prefix: Cursor<Box<[u8]>>,
+    inner: Box<dyn MediaInput>,
+    byte_len: Option<u64>,
+}
+
+impl Read for PrefixInput {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let prefix_count = self.prefix.read(buffer)?;
+        if prefix_count != 0 || buffer.is_empty() {
+            return Ok(prefix_count);
+        }
+        self.inner.read(buffer)
+    }
+}
+
+impl Seek for PrefixInput {
+    fn seek(&mut self, _: SeekFrom) -> io::Result<u64> {
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "prefixed media input is not seekable",
+        ))
+    }
+}
+
+impl MediaInput for PrefixInput {
+    fn is_seekable(&self) -> bool {
+        false
+    }
+
+    fn byte_len(&self) -> Option<u64> {
+        self.byte_len
+    }
+}
+
+struct OffsetInput {
+    inner: Box<dyn MediaInput>,
+    physical_offset: u64,
+    logical_position: u64,
+}
+
+impl Read for OffsetInput {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let count = self.inner.read(buffer)?;
+        self.logical_position = self.logical_position.saturating_add(count as u64);
+        Ok(count)
+    }
+}
+
+impl Seek for OffsetInput {
+    fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+        if !self.inner.is_seekable() {
+            return Err(io::Error::new(
+                io::ErrorKind::Unsupported,
+                "offset media input is not seekable",
+            ));
+        }
+        let logical_length = self.byte_len().ok_or_else(|| {
+            io::Error::new(io::ErrorKind::Unsupported, "media input length is unknown")
+        })?;
+        let target = match position {
+            SeekFrom::Start(position) => Some(position),
+            SeekFrom::Current(delta) => self.logical_position.checked_add_signed(delta),
+            SeekFrom::End(delta) => logical_length.checked_add_signed(delta),
+        }
+        .filter(|target| *target <= logical_length)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "invalid media seek"))?;
+        let physical = self
+            .physical_offset
+            .checked_add(target)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "media seek overflow"))?;
+        self.inner.seek(SeekFrom::Start(physical))?;
+        self.logical_position = target;
+        Ok(target)
+    }
+}
+
+impl MediaInput for OffsetInput {
+    fn is_seekable(&self) -> bool {
+        self.inner.is_seekable()
+    }
+
+    fn byte_len(&self) -> Option<u64> {
+        self.inner
+            .byte_len()
+            .and_then(|length| length.checked_sub(self.physical_offset))
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Container {
     Wave,
@@ -622,6 +711,7 @@ impl MediaSession {
             seekable,
             ebml_metadata,
             adts_config,
+            id3_metadata,
         } = probe_media_input(input, extension_hint, limits, &cancellation)?;
 
         let container = map_container(
@@ -687,14 +777,13 @@ impl MediaSession {
         if matches!(codec, Codec::HeAacV1 | Codec::HeAacV2) {
             channels = 2;
         }
-        let mut metadata = extract_metadata(
+        let metadata = merged_session_metadata(
             format.as_mut(),
             u64::from(track_id),
             limits.max_metadata_string_bytes,
+            ebml_metadata.and_then(|metadata| metadata.segment_title),
+            id3_metadata,
         );
-        if metadata.title.is_none() {
-            metadata.title = ebml_metadata.and_then(|metadata| metadata.segment_title);
-        }
         let decoder = create_pcm_decoder(&params, codec, limits)?;
         cancellation.check()?;
 
@@ -906,6 +995,253 @@ struct ProbedMedia {
     seekable: bool,
     ebml_metadata: Option<EbmlMetadata>,
     adts_config: Option<AdtsConfig>,
+    id3_metadata: MediaMetadata,
+}
+
+fn inspect_initial_id3v2(
+    mut input: Box<dyn MediaInput>,
+    limits: MediaLimits,
+) -> Result<(Box<dyn MediaInput>, MediaMetadata), MediaError> {
+    const HEADER_BYTES: usize = 10;
+
+    let byte_len = input.byte_len();
+    let seekable = input.is_seekable();
+    let initial_position = if seekable {
+        input.stream_position()?
+    } else {
+        0
+    };
+    let mut header = [0_u8; HEADER_BYTES];
+    let header_len = read_up_to(input.as_mut(), &mut header)?;
+    let valid_header = header_len == HEADER_BYTES
+        && &header[..3] == b"ID3"
+        && (2..=4).contains(&header[3])
+        && header[4] != 0xff;
+    let Some(body_len) = valid_header
+        .then(|| decode_syncsafe(&header[6..10]))
+        .flatten()
+    else {
+        if seekable {
+            input.seek(SeekFrom::Start(initial_position))?;
+            return Ok((input, MediaMetadata::default()));
+        }
+        let replay = PrefixInput {
+            prefix: Cursor::new(header[..header_len].to_vec().into_boxed_slice()),
+            inner: input,
+            byte_len,
+        };
+        return Ok((Box::new(replay), MediaMetadata::default()));
+    };
+
+    if body_len > limits.max_metadata_string_bytes {
+        return Err(metadata_preflight_error(format!(
+            "ID3v2 tag declares {body_len} bytes; limit is {}",
+            limits.max_metadata_string_bytes
+        )));
+    }
+
+    let mut body = vec![0_u8; body_len];
+    input.read_exact(&mut body)?;
+    let footer_len = usize::from(header[3] == 4 && header[5] & 0x10 != 0) * HEADER_BYTES;
+    if footer_len != 0 {
+        let mut footer = [0_u8; HEADER_BYTES];
+        input.read_exact(&mut footer)?;
+    }
+    let metadata = parse_id3v2_metadata(header[3], header[5], &mut body, limits)?;
+    let stripped_len = HEADER_BYTES
+        .checked_add(body_len)
+        .and_then(|length| length.checked_add(footer_len))
+        .ok_or_else(|| metadata_preflight_error("ID3v2 tag length overflow"))?;
+    let physical_offset = initial_position
+        .checked_add(stripped_len as u64)
+        .ok_or_else(|| metadata_preflight_error("ID3v2 input offset overflow"))?;
+    let stripped = OffsetInput {
+        inner: input,
+        physical_offset,
+        logical_position: 0,
+    };
+    Ok((Box::new(stripped), metadata))
+}
+
+fn read_up_to(reader: &mut dyn MediaInput, buffer: &mut [u8]) -> io::Result<usize> {
+    let mut offset = 0;
+    while offset < buffer.len() {
+        let count = reader.read(&mut buffer[offset..])?;
+        if count == 0 {
+            break;
+        }
+        offset += count;
+    }
+    Ok(offset)
+}
+
+fn decode_syncsafe(bytes: &[u8]) -> Option<usize> {
+    if bytes.len() != 4 || bytes.iter().any(|byte| byte & 0x80 != 0) {
+        return None;
+    }
+    Some(
+        bytes
+            .iter()
+            .fold(0_usize, |value, byte| (value << 7) | usize::from(*byte)),
+    )
+}
+
+fn decode_id3_unsynchronisation(bytes: &mut Vec<u8>) {
+    let mut source = 0;
+    let mut destination = 0;
+    while source < bytes.len() {
+        bytes[destination] = bytes[source];
+        destination += 1;
+        source += 1;
+        if bytes[source - 1] == 0xff && bytes.get(source) == Some(&0) {
+            source += 1;
+        }
+    }
+    bytes.truncate(destination);
+}
+
+fn parse_id3v2_metadata(
+    version: u8,
+    flags: u8,
+    body: &mut Vec<u8>,
+    limits: MediaLimits,
+) -> Result<MediaMetadata, MediaError> {
+    if version == 2 && flags & 0x40 != 0 {
+        return Err(metadata_preflight_error(
+            "compressed ID3v2.2 tags are unsupported",
+        ));
+    }
+    if version < 4 && flags & 0x80 != 0 {
+        decode_id3_unsynchronisation(body);
+    }
+
+    let mut offset = id3_extended_header_len(version, flags, body)?;
+    let header_len = if version == 2 { 6 } else { 10 };
+    let id_len = if version == 2 { 3 } else { 4 };
+    let mut metadata = MediaMetadata::default();
+
+    while body.len().saturating_sub(offset) >= header_len {
+        let id = &body[offset..offset + id_len];
+        if !id
+            .iter()
+            .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit())
+        {
+            break;
+        }
+        let frame_len = match version {
+            2 => {
+                usize::from(body[offset + 3]) << 16
+                    | usize::from(body[offset + 4]) << 8
+                    | usize::from(body[offset + 5])
+            }
+            3 => u32::from_be_bytes(body[offset + 4..offset + 8].try_into().unwrap()) as usize,
+            4 => decode_syncsafe(&body[offset + 4..offset + 8])
+                .ok_or_else(|| metadata_preflight_error("invalid ID3v2.4 frame size"))?,
+            _ => unreachable!(),
+        };
+        let frame_start = offset + header_len;
+        let remaining = body.len() - frame_start;
+        if frame_len > remaining {
+            return Err(metadata_preflight_error(format!(
+                "ID3v2 frame declares {frame_len} bytes with only {remaining} remaining"
+            )));
+        }
+        let frame_end = frame_start + frame_len;
+        let format_flags = if version == 2 {
+            0
+        } else {
+            u16::from_be_bytes(body[offset + 8..offset + 10].try_into().unwrap())
+        };
+        let safely_decodable = match version {
+            2 => true,
+            3 => format_flags & 0x00e0 == 0,
+            4 => format_flags.trailing_zeros() >= 4,
+            _ => false,
+        };
+        if frame_len != 0 && safely_decodable {
+            let value = decode_id3_text(
+                &body[frame_start..frame_end],
+                limits.max_metadata_string_bytes,
+            );
+            match id {
+                b"TT2" | b"TIT2" if metadata.title.is_none() => metadata.title = value,
+                b"TP1" | b"TPE1" if metadata.author.is_none() => metadata.author = value,
+                b"TRC" | b"TSRC" if metadata.isrc.is_none() => metadata.isrc = value,
+                _ => {}
+            }
+        }
+        offset = frame_end;
+    }
+    Ok(metadata)
+}
+
+fn id3_extended_header_len(version: u8, flags: u8, body: &[u8]) -> Result<usize, MediaError> {
+    if flags & 0x40 == 0 || version == 2 {
+        return Ok(0);
+    }
+    if body.len() < 4 {
+        return Err(metadata_preflight_error("truncated ID3v2 extended header"));
+    }
+    let length = if version == 3 {
+        let payload = u32::from_be_bytes(body[..4].try_into().unwrap()) as usize;
+        if !matches!(payload, 6 | 10) {
+            return Err(metadata_preflight_error("invalid ID3v2.3 extended header"));
+        }
+        4 + payload
+    } else {
+        let total = decode_syncsafe(&body[..4])
+            .ok_or_else(|| metadata_preflight_error("invalid ID3v2.4 extended header"))?;
+        if total < 6 {
+            return Err(metadata_preflight_error("invalid ID3v2.4 extended header"));
+        }
+        total
+    };
+    if length > body.len() {
+        return Err(metadata_preflight_error("truncated ID3v2 extended header"));
+    }
+    Ok(length)
+}
+
+fn decode_id3_text(frame: &[u8], limit: usize) -> Option<String> {
+    let (&encoding, payload) = frame.split_first()?;
+    let mut value = match encoding {
+        0 => payload.iter().map(|byte| char::from(*byte)).collect(),
+        1 | 2 => {
+            let (payload, little_endian) = if encoding == 2 {
+                (payload, false)
+            } else if payload.starts_with(&[0xff, 0xfe]) {
+                (&payload[2..], true)
+            } else if payload.starts_with(&[0xfe, 0xff]) {
+                (&payload[2..], false)
+            } else {
+                return None;
+            };
+            if payload.len() % 2 != 0 {
+                return None;
+            }
+            let units = payload.chunks_exact(2).map(|bytes| {
+                if little_endian {
+                    u16::from_le_bytes([bytes[0], bytes[1]])
+                } else {
+                    u16::from_be_bytes([bytes[0], bytes[1]])
+                }
+            });
+            String::from_utf16(&units.collect::<Vec<_>>()).ok()?
+        }
+        3 => String::from_utf8(payload.to_vec()).ok()?,
+        _ => return None,
+    };
+    if let Some(terminator) = value.find('\0') {
+        value.truncate(terminator);
+    }
+    (!value.is_empty() && value.len() <= limit).then_some(value)
+}
+
+fn metadata_preflight_error(message: impl Into<String>) -> MediaError {
+    MediaError::Backend {
+        operation: "metadata preflight",
+        message: message.into(),
+    }
 }
 
 fn probe_media_input(
@@ -914,7 +1250,7 @@ fn probe_media_input(
     limits: MediaLimits,
     cancellation: &MediaCancellation,
 ) -> Result<ProbedMedia, MediaError> {
-    let mut input = input;
+    let (mut input, id3_metadata) = inspect_initial_id3v2(input, limits)?;
     let seekable = input.is_seekable();
     let ebml_metadata = if seekable {
         inspect_ebml_metadata(
@@ -982,6 +1318,7 @@ fn probe_media_input(
             seekable,
             ebml_metadata,
             adts_config,
+            id3_metadata,
         }),
         Err(_) if probe_state.exceeded.load(Ordering::Acquire) => {
             Err(MediaError::ProbeLimitExceeded {
@@ -1599,6 +1936,26 @@ impl SymphoniaMediaSource for InputAdapter {
     fn byte_len(&self) -> Option<u64> {
         self.input.byte_len()
     }
+}
+
+fn merged_session_metadata(
+    format: &mut dyn FormatReader,
+    track_id: u64,
+    max_string_bytes: usize,
+    ebml_title: Option<String>,
+    id3: MediaMetadata,
+) -> MediaMetadata {
+    let mut metadata = extract_metadata(format, track_id, max_string_bytes);
+    if metadata.title.is_none() {
+        metadata.title = ebml_title.or(id3.title);
+    }
+    if metadata.author.is_none() {
+        metadata.author = id3.author;
+    }
+    if metadata.isrc.is_none() {
+        metadata.isrc = id3.isrc;
+    }
+    metadata
 }
 
 fn extract_metadata(
