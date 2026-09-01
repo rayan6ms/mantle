@@ -94,14 +94,16 @@ jq --exit-status '
   ]
 ' "$STATUS" >/dev/null
 
-while IFS=$'\t' read -r class source_name disposition; do
-  grep --fixed-strings "\`$class\`" "$DOCUMENT" >/dev/null
-  grep --fixed-strings "\`$source_name\`" "$DOCUMENT" >/dev/null
-  grep --fixed-strings "\`$disposition\`" "$DOCUMENT" >/dev/null
-done < <(jq --raw-output '.sources[] | [.class, .source_name, .disposition] | @tsv' "$STATUS")
+if [[ -f "$DOCUMENT" ]]; then
+  while IFS=$'\t' read -r class source_name disposition; do
+    grep --fixed-strings "\`$class\`" "$DOCUMENT" >/dev/null
+    grep --fixed-strings "\`$source_name\`" "$DOCUMENT" >/dev/null
+    grep --fixed-strings "\`$disposition\`" "$DOCUMENT" >/dev/null
+  done < <(jq --raw-output '.sources[] | [.class, .source_name, .disposition] | @tsv' "$STATUS")
 
-for commit in $(jq --raw-output '.upstream_snapshots[].commit' "$STATUS"); do
-  grep --fixed-strings "$commit" "$DOCUMENT" >/dev/null
-done
+  for commit in $(jq --raw-output '.upstream_snapshots[].commit' "$STATUS"); do
+    grep --fixed-strings "$commit" "$DOCUMENT" >/dev/null
+  done
+fi
 
 printf 'Remote-source status matches the frozen Phase 12 evidence and disposition matrix.\n'

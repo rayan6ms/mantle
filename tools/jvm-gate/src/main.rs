@@ -2314,6 +2314,7 @@ import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
 import com.sedmelluq.discord.lavaplayer.track.playback.TerminatorAudioFrame;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
 
@@ -2614,6 +2615,7 @@ import com.sedmelluq.discord.lavaplayer.format.AudioDataFormat;
 import com.sedmelluq.discord.lavaplayer.player.AudioConfiguration;
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayerOptions;
 import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioProcessingContext;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -3749,6 +3751,7 @@ import java.lang.invoke.MethodHandles;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Proxy;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
@@ -26345,6 +26348,8 @@ public final class GateWavAudioTrack {
 "#;
 
 const WAV_TRACK_PROVIDER_CONSUMER: &str = r#"
+package com.sedmelluq.discord.lavaplayer.container.wav;
+
 import com.sedmelluq.discord.lavaplayer.container.wav.WavFileInfo;
 import com.sedmelluq.discord.lavaplayer.container.wav.WavTrackProvider;
 import com.sedmelluq.discord.lavaplayer.filter.AudioPipeline;
@@ -28441,6 +28446,8 @@ public final class GateJsonBrowser {
 "#;
 
 const WAV_FILE_LOADER_CONSUMER: &str = r#"
+package com.sedmelluq.discord.lavaplayer.container.wav;
+
 import com.sedmelluq.discord.lavaplayer.container.wav.WavFileInfo;
 import com.sedmelluq.discord.lavaplayer.container.wav.WavFileLoader;
 import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
@@ -65117,7 +65124,7 @@ public final class GateEmptyInputStream {
     singletonAndReads();
     inheritedBehavior();
     reflection();
-    System.out.println("contracts=singleton,constructor,available,read,eof-repeat,bulk-eof,skip-zero,inherited-close,inherited-mark,subclassable,public-constant,private-state,reflection");
+    System.out.println("contracts=singleton,constructor,available,read,eof-repeat,bulk-eof,bulk-zero,skip-zero,inherited-close,inherited-mark,subclassable,public-constant,private-state,reflection");
   }
 
   private static void singletonAndReads() throws Exception {

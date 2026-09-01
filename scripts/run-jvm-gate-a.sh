@@ -19,6 +19,9 @@ readonly OGG_VORBIS_CLASSES="$WORK/ogg-vorbis-consumer-classes"
 readonly OGG_VORBIS_TRACK_CLASSES="$WORK/ogg-vorbis-track-consumer-classes"
 readonly OGG_VORBIS_TRACK_SOURCES="$WORK/ogg-vorbis-track-sources"
 readonly OGG_PROBE_CLASSES="$WORK/ogg-probe-consumer-classes"
+readonly WAV_AUDIO_TRACK_CLASSES="$WORK/wav-audio-track-consumer-classes"
+readonly WAV_FILE_LOADER_CLASSES="$WORK/wav-file-loader-consumer-classes"
+readonly WAV_TRACK_PROVIDER_CLASSES="$WORK/wav-track-provider-consumer-classes"
 readonly MPEG_FILE_LOADER_CLASSES="$WORK/mpeg-file-loader-consumer-classes"
 readonly JAR="$WORK/mantle-gate-a.jar"
 readonly MISMATCH_JAR="$WORK/mantle-gate-a-mismatch.jar"
@@ -32,12 +35,14 @@ rm -rf -- "$CLASSES" "$FLAC_CLASSES" "$MP3_CLASSES" "$FLAC_LOADER_CLASSES" \
   "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES" "$MPEG_CLASSES" \
   "$MPEG_FILE_LOADER_CLASSES" "$OGG_CODEC_CLASSES" "$OGG_FLAC_CLASSES" \
   "$OGG_OPUS_CLASSES" "$OGG_VORBIS_CLASSES" "$OGG_VORBIS_TRACK_CLASSES" \
-  "$OGG_VORBIS_TRACK_SOURCES" "$OGG_PROBE_CLASSES"
+  "$OGG_VORBIS_TRACK_SOURCES" "$OGG_PROBE_CLASSES" \
+  "$WAV_AUDIO_TRACK_CLASSES" "$WAV_FILE_LOADER_CLASSES" "$WAV_TRACK_PROVIDER_CLASSES"
 mkdir -p "$CLASSES" "$FLAC_CLASSES" "$MP3_CLASSES" "$FLAC_LOADER_CLASSES" \
   "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES" "$MPEG_CLASSES" \
   "$MPEG_FILE_LOADER_CLASSES" "$OGG_CODEC_CLASSES" "$OGG_FLAC_CLASSES" \
   "$OGG_OPUS_CLASSES" "$OGG_VORBIS_CLASSES" "$OGG_VORBIS_TRACK_CLASSES" \
-  "$OGG_VORBIS_TRACK_SOURCES" "$OGG_PROBE_CLASSES"
+  "$OGG_VORBIS_TRACK_SOURCES" "$OGG_PROBE_CLASSES" \
+  "$WAV_AUDIO_TRACK_CLASSES" "$WAV_FILE_LOADER_CLASSES" "$WAV_TRACK_PROVIDER_CLASSES"
 cargo build --locked -p mantle-jvm --features gate-a-direct-attachment
 cargo run --locked -q -p mantle-jvm-gate -- emit \
   --reference-jar "$REFERENCE_JAR" --output "$JAR" --expected-abi 1 \
@@ -45,7 +50,7 @@ cargo run --locked -q -p mantle-jvm-gate -- emit \
 cargo run --locked -q -p mantle-jvm-gate -- verify-structure \
   --reference-jar "$REFERENCE_JAR" --candidate-jar "$JAR"
 
-for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame audio-frame-provider-tools audio-processing-context audio-player-options decoded-track-holder track-state-listener audio-output-hook audio-load-result-handler functional-result-handler audio-player-lifecycle-manager audio-player-interface default-audio-player default-audio-player-manager internal-audio-track audio-track-executor local-audio-track-executor-callback local-audio-track-executor track-marker-tracker base-audio-track primordial-audio-track-executor delegated-audio-track audio-track-info-builder abstract-audio-frame-buffer allocating-audio-frame-buffer non-allocating-audio-frame-buffer audio-filter-interface float-pcm-audio-filter short-pcm-audio-filter universal-pcm-audio-filter user-provided-audio-filters converter-audio-filter to-float-audio-filter to-short-audio-filter to-split-short-audio-filter equalizer volume audio-data-format audio-data-format-tools pcm-filter-factory pcm-format resampling-pcm-audio-filter audio-post-processor buffering-post-processor channel-count-pcm-audio-filter composite-audio-filter filter-chain-builder final-pcm-audio-filter audio-filter-chain audio-pipeline audio-pipeline-factory audio-source-manager-interface audio-source-managers probing-audio-source-manager local-audio-source-manager local-audio-track local-seekable-input-stream heartbeating-http-stream nico-audio-source-manager nico-audio-track default-sound-cloud-data-loader default-sound-cloud-data-reader default-sound-cloud-format-handler default-sound-cloud-playlist-loader default-sound-cloud-track-format sound-cloud-audio-source-manager sound-cloud-audio-source-manager-builder sound-cloud-audio-track sound-cloud-client-id-tracker sound-cloud-data-loader sound-cloud-data-reader sound-cloud-format-handler sound-cloud-helper sound-cloud-http-context-filter sound-cloud-m3u-audio-track sound-cloud-m3u-info sound-cloud-mp3-segment-decoder sound-cloud-opus-segment-decoder sound-cloud-playlist-loader sound-cloud-segment-decoder sound-cloud-segment-decoder-factory sound-cloud-track-format m3u-stream-audio-track m3u-stream-segment-url-provider mpeg-ts-m3u-stream-audio-track twitch-constants twitch-stream-audio-source-manager twitch-stream-audio-track twitch-stream-segment-url-provider bandcamp-audio-source-manager bandcamp-audio-track beam-audio-source-manager beam-audio-track beam-segment-url-provider getyarn-audio-source-manager getyarn-audio-track http-audio-source-manager http-audio-track vimeo-audio-source-manager vimeo-playback-format vimeo-audio-track abstract-yandex-music-api-loader yandex-music-api-extractor default-yandex-music-direct-url-loader default-yandex-music-playlist-loader default-yandex-music-track-loader default-yandex-search-provider yandex-http-context-filter yandex-music-api-loader yandex-music-audio-source-manager yandex-music-audio-track yandex-music-direct-url-loader yandex-music-playlist-loader yandex-music-search-result-loader yandex-music-track-loader yandex-music-utils default-youtube-link-router default-youtube-playlist-loader default-youtube-track-details default-youtube-track-details-loader youtube-cached-player-script youtube-info-status youtube-access-token-tracker youtube-cached-auth-script youtube-audio-source-manager youtube-audio-track youtube-cipher-operation youtube-client-config youtube-constants youtube-format-info youtube-http-context-filter youtube-link-router youtube-mix-loader youtube-mix-provider youtube-mpeg-stream-audio-track youtube-payload-helper youtube-persistent-http-stream youtube-playlist-loader youtube-search-music-provider youtube-search-music-result-loader youtube-search-provider youtube-search-result-loader youtube-signature-cipher youtube-signature-cipher-manager youtube-signature-resolver youtube-track-details youtube-track-details-loader; do
+for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame audio-frame-provider-tools audio-processing-context audio-player-options decoded-track-holder track-state-listener audio-output-hook audio-load-result-handler functional-result-handler audio-player-lifecycle-manager audio-player-interface audio-player-manager-interface default-audio-player default-audio-player-manager internal-audio-track audio-track-executor local-audio-track-executor-callback local-audio-track-executor track-marker-tracker base-audio-track primordial-audio-track-executor delegated-audio-track audio-track-info-builder abstract-audio-frame-buffer allocating-audio-frame-buffer non-allocating-audio-frame-buffer audio-filter-interface float-pcm-audio-filter short-pcm-audio-filter universal-pcm-audio-filter user-provided-audio-filters converter-audio-filter to-float-audio-filter to-short-audio-filter to-split-short-audio-filter equalizer volume audio-data-format audio-data-format-tools pcm-filter-factory pcm-format resampling-pcm-audio-filter audio-post-processor buffering-post-processor channel-count-pcm-audio-filter composite-audio-filter filter-chain-builder final-pcm-audio-filter audio-filter-chain audio-pipeline audio-pipeline-factory audio-source-manager-interface audio-source-managers probing-audio-source-manager local-audio-source-manager local-audio-track local-seekable-input-stream heartbeating-http-stream nico-audio-source-manager nico-audio-track default-sound-cloud-data-loader default-sound-cloud-data-reader default-sound-cloud-format-handler default-sound-cloud-playlist-loader default-sound-cloud-track-format sound-cloud-audio-source-manager sound-cloud-audio-source-manager-builder sound-cloud-audio-track sound-cloud-client-id-tracker sound-cloud-data-loader sound-cloud-data-reader sound-cloud-format-handler sound-cloud-helper sound-cloud-http-context-filter sound-cloud-m3u-audio-track sound-cloud-m3u-info sound-cloud-mp3-segment-decoder sound-cloud-opus-segment-decoder sound-cloud-playlist-loader sound-cloud-segment-decoder sound-cloud-segment-decoder-factory sound-cloud-track-format m3u-stream-audio-track m3u-stream-segment-url-provider mpeg-ts-m3u-stream-audio-track twitch-constants twitch-stream-audio-source-manager twitch-stream-audio-track twitch-stream-segment-url-provider bandcamp-audio-source-manager bandcamp-audio-track beam-audio-source-manager beam-audio-track beam-segment-url-provider getyarn-audio-source-manager getyarn-audio-track http-audio-source-manager http-audio-track vimeo-audio-source-manager vimeo-playback-format vimeo-audio-track abstract-yandex-music-api-loader yandex-music-api-extractor default-yandex-music-direct-url-loader default-yandex-music-playlist-loader default-yandex-music-track-loader default-yandex-search-provider yandex-http-context-filter yandex-music-api-loader yandex-music-audio-source-manager yandex-music-audio-track yandex-music-direct-url-loader yandex-music-playlist-loader yandex-music-search-result-loader yandex-music-track-loader yandex-music-utils default-youtube-link-router default-youtube-playlist-loader default-youtube-track-details default-youtube-track-details-loader youtube-cached-player-script youtube-info-status youtube-access-token-tracker youtube-cached-auth-script youtube-audio-source-manager youtube-audio-track youtube-cipher-operation youtube-client-config youtube-constants youtube-format-info youtube-http-context-filter youtube-link-router youtube-mix-loader youtube-mix-provider youtube-mpeg-stream-audio-track youtube-payload-helper youtube-persistent-http-stream youtube-playlist-loader youtube-search-music-provider youtube-search-music-result-loader youtube-search-provider youtube-search-result-loader youtube-signature-cipher youtube-signature-cipher-manager youtube-signature-resolver youtube-track-details youtube-track-details-loader; do
   case "$consumer" in
     smoke) consumer_class='Smoke' ;;
     probe) consumer_class='Probe' ;;
@@ -720,6 +725,9 @@ if command -v cygpath >/dev/null 2>&1; then
   ogg_opus_classes_argument="$(cygpath -w "$OGG_OPUS_CLASSES")"
   ogg_vorbis_classes_argument="$(cygpath -w "$OGG_VORBIS_CLASSES")"
   ogg_vorbis_track_classes_argument="$(cygpath -w "$OGG_VORBIS_TRACK_CLASSES")"
+  wav_audio_track_classes_argument="$(cygpath -w "$WAV_AUDIO_TRACK_CLASSES")"
+  wav_file_loader_classes_argument="$(cygpath -w "$WAV_FILE_LOADER_CLASSES")"
+  wav_track_provider_classes_argument="$(cygpath -w "$WAV_TRACK_PROVIDER_CLASSES")"
   jar_argument="$(cygpath -w "$JAR")"
   reference_argument="$(cygpath -w "$REFERENCE_JAR")"
 else
@@ -735,6 +743,9 @@ else
   ogg_opus_classes_argument="$OGG_OPUS_CLASSES"
   ogg_vorbis_classes_argument="$OGG_VORBIS_CLASSES"
   ogg_vorbis_track_classes_argument="$OGG_VORBIS_TRACK_CLASSES"
+  wav_audio_track_classes_argument="$WAV_AUDIO_TRACK_CLASSES"
+  wav_file_loader_classes_argument="$WAV_FILE_LOADER_CLASSES"
+  wav_track_provider_classes_argument="$WAV_TRACK_PROVIDER_CLASSES"
   jar_argument="$JAR"
   reference_argument="$REFERENCE_JAR"
 fi
@@ -804,15 +815,18 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_VORBIS_CLA
   "$WORK/GateM3uPlaylistContainerProbe.java" \
   "$WORK/GatePlainPlaylistContainerProbe.java" \
   "$WORK/GatePlsPlaylistContainerProbe.java" \
-  "$WORK/GateWavAudioTrack.java" \
-  "$WORK/WavGateSupport.java" \
   "$WORK/GateWavContainerProbe.java" \
   "$WORK/GateWavFileInfo.java" \
-  "$WORK/GateWavFileLoader.java" \
-  "$WORK/GateWavTrackProvider.java" \
   "$WORK/GateWaveFormatType.java" \
   "$WORK/GateVorbisCommentParser.java" \
   "$WORK/OggVorbisTrackHandler.java"
+javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$WAV_AUDIO_TRACK_CLASSES" \
+  "$WORK/GateWavAudioTrack.java" \
+  "$WORK/WavGateSupport.java"
+javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$WAV_FILE_LOADER_CLASSES" \
+  "$WORK/GateWavFileLoader.java"
+javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$WAV_TRACK_PROVIDER_CLASSES" \
+  "$WORK/GateWavTrackProvider.java"
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OGG_VORBIS_TRACK_CLASSES" \
   "$OGG_VORBIS_TRACK_SOURCES/GateOggVorbisTrackHandler.java" \
   "$OGG_VORBIS_TRACK_SOURCES/VorbisDecoder.java" \
@@ -2070,10 +2084,10 @@ grep --fixed-strings \
   'contracts=public-construction,public-probe,name-identity,hints-false,non-pls-null,wildcard-header,case-sensitive-header,unsupported-empty,unsupported-reason,indexed-file-title-pairing,unknown-title,http-https-icy-links,scheme-filtering,duplicate-last-value,whitespace-patterns,unsupported-create-track,interface-implementation,private-header,mutable-private-patterns,checked-probe-throws,map-entry-inner-metadata,reflection' \
   "$WORK/pls-playlist-container-probe-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$ogg_vorbis_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$wav_audio_track_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateWavAudioTrack >"$WORK/wav-audio-track-reference.txt"
 java -Xverify:all \
-  -cp "$ogg_vorbis_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$wav_audio_track_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateWavAudioTrack >"$WORK/wav-audio-track-candidate.txt"
 cmp "$WORK/wav-audio-track-reference.txt" \
   "$WORK/wav-audio-track-candidate.txt"
@@ -2103,22 +2117,22 @@ grep --fixed-strings \
   'contracts=constructor,field-identity,negative-values,duration,duration-overflow,negative-duration,zero-rate-failure,padding,odd-bit-padding,public-shape,final-fields,throws,reflection' \
   "$WORK/wav-file-info-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$ogg_vorbis_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
-  GateWavFileLoader >"$WORK/wav-file-loader-reference.txt"
+  -cp "$wav_file_loader_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  com.sedmelluq.discord.lavaplayer.container.wav.GateWavFileLoader >"$WORK/wav-file-loader-reference.txt"
 java -Xverify:all \
-  -cp "$ogg_vorbis_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
-  GateWavFileLoader >"$WORK/wav-file-loader-candidate.txt"
+  -cp "$wav_file_loader_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  com.sedmelluq.discord.lavaplayer.container.wav.GateWavFileLoader >"$WORK/wav-file-loader-candidate.txt"
 cmp "$WORK/wav-file-loader-reference.txt" \
   "$WORK/wav-file-loader-candidate.txt"
 grep --fixed-strings \
   'contracts=constants,constructor,input-identity,pcm-parse,position,duration,unknown-format,bad-alignment,non-wav,load-track-order,load-track-failure,private-builder,reflection' \
   "$WORK/wav-file-loader-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$ogg_vorbis_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
-  GateWavTrackProvider >"$WORK/wav-track-provider-reference.txt"
+  -cp "$wav_track_provider_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  com.sedmelluq.discord.lavaplayer.container.wav.GateWavTrackProvider >"$WORK/wav-track-provider-reference.txt"
 java -Xverify:all \
-  -cp "$ogg_vorbis_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
-  GateWavTrackProvider >"$WORK/wav-track-provider-candidate.txt"
+  -cp "$wav_track_provider_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  com.sedmelluq.discord.lavaplayer.container.wav.GateWavTrackProvider >"$WORK/wav-track-provider-candidate.txt"
 cmp "$WORK/wav-track-provider-reference.txt" \
   "$WORK/wav-track-provider-candidate.txt"
 grep --fixed-strings \

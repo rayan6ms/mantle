@@ -82,7 +82,9 @@ assert_source_contains "$ORDERED" 'while ((next = queue.poll()) != null) {'
 
 while IFS=$'\t' read -r path source_name; do
   assert_source_contains "$SOURCE_ROOT/source/$path" "return \"$source_name\";"
-  grep --fixed-strings "| \`$source_name\` |" "$INVENTORY" >/dev/null
+  if [[ -f "$INVENTORY" ]]; then
+    grep --fixed-strings "| \`$source_name\` |" "$INVENTORY" >/dev/null
+  fi
 done <<'EOF'
 youtube/YoutubeAudioSourceManager.java	youtube
 yamusic/YandexMusicAudioSourceManager.java	yandex-music

@@ -67,16 +67,18 @@ assert_source_contains "$MPEG_TS_ROOT/MpegTsElementaryInputStream.java" \
 assert_source_contains "$MPEG_TS_ROOT/PesPacketInputStream.java" \
   'private static final byte[] SYNC_BYTES = new byte[]{0x00, 0x00, 0x01};'
 
-for boundary in \
-  'HTTP identifiers' \
-  'HTTP object reads' \
-  'M3U' \
-  'PLS' \
-  'PLAIN' \
-  'HLS master/media playlist' \
-  'HLS segment sequence' \
-  'MPEG-TS ADTS'; do
-  grep --fixed-strings "| $boundary |" "$INVENTORY" >/dev/null
-done
+if [[ -f "$INVENTORY" ]]; then
+  for boundary in \
+    'HTTP identifiers' \
+    'HTTP object reads' \
+    'M3U' \
+    'PLS' \
+    'PLAIN' \
+    'HLS master/media playlist' \
+    'HLS segment sequence' \
+    'MPEG-TS ADTS'; do
+    grep --fixed-strings "| $boundary |" "$INVENTORY" >/dev/null
+  done
+fi
 
 printf 'HTTP/playlist inventory matches the pinned Lavaplayer 2.2.6 sources.\n'

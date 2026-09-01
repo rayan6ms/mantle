@@ -8,6 +8,9 @@ readonly FUZZ_TOOLCHAIN="${FUZZ_TOOLCHAIN:-nightly-2026-08-10}"
 readonly FUZZ_RUNS="${FUZZ_RUNS:-128}"
 readonly FUZZ_MAX_LEN="${FUZZ_MAX_LEN:-262144}"
 readonly FUZZ_TIMEOUT_SECONDS="${FUZZ_TIMEOUT_SECONDS:-5}"
+FUZZ_HOST="$(rustc "+$FUZZ_TOOLCHAIN" -vV | awk '$1 == "host:" {print $2}')"
+readonly FUZZ_HOST
+[[ -n "$FUZZ_HOST" ]] || { printf 'Unable to determine the fuzz toolchain host.\n' >&2; exit 1; }
 readonly -a ALL_TARGETS=(
   local_wav
   local_matroska
@@ -120,7 +123,7 @@ for target in "${targets[@]}"; do
   printf 'Fuzz smoke: %s (%s runs)\n' "$target" "$FUZZ_RUNS"
   (
     cd "$ROOT"
-    fuzz_command run "$target" "$corpus" -- \
+    fuzz_command run --target "$FUZZ_HOST" "$target" "$corpus" -- \
       "-runs=$FUZZ_RUNS" \
       "-max_len=$FUZZ_MAX_LEN" \
       "-timeout=$FUZZ_TIMEOUT_SECONDS" \

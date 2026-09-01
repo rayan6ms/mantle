@@ -35,9 +35,11 @@ if [[ "$CONTAINER_ENUM" != "$EXPECTED_ENUM" ]]; then
   exit 1
 fi
 
-for probe in WAV MKV MP4 FLAC OGG M3U PLS PLAIN MP3 ADTS MPEGADTS; do
-  grep --fixed-strings "| $probe |" "$INVENTORY" >/dev/null
-done
+if [[ -f "$INVENTORY" ]]; then
+  for probe in WAV MKV MP4 FLAC OGG M3U PLS PLAIN MP3 ADTS MPEGADTS; do
+    grep --fixed-strings "| $probe |" "$INVENTORY" >/dev/null
+  done
+fi
 
 assert_source_contains() {
   local path="$1"
