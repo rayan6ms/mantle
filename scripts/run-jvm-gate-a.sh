@@ -1222,10 +1222,11 @@ grep --fixed-strings \
   'dispatch=track,start,volume,filter,buffer,pause,listener,cleanup,inherited-frame;' \
   "$WORK/audio-player-interface-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$classes_argument$classpath_separator$reference_argument" GateAudioPlayerManagerInterface \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateAudioPlayerManagerInterface \
   >"$WORK/audio-player-manager-interface-reference.txt"
 java -Xverify:all \
-  -cp "$GATE_CLASSPATH$classpath_separator$reference_argument" GateAudioPlayerManagerInterface \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateAudioPlayerManagerInterface \
   >"$WORK/audio-player-manager-interface-candidate.txt"
 cmp "$WORK/audio-player-manager-interface-reference.txt" \
   "$WORK/audio-player-manager-interface-candidate.txt"

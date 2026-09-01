@@ -3,7 +3,7 @@
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Barrier};
 
 use mantle_media::{EncodedPacket, MediaLimits, MediaSession, PcmFrame};
 
@@ -11,10 +11,9 @@ struct CountingAllocator;
 
 thread_local! {
     static COUNT_THIS_THREAD: Cell<bool> = const { Cell::new(false) };
+    static ALLOCATION_CALLS: Cell<usize> = const { Cell::new(0) };
+    static ALLOCATION_BYTES: Cell<usize> = const { Cell::new(0) };
 }
-
-static ALLOCATION_CALLS: AtomicUsize = AtomicUsize::new(0);
-static ALLOCATION_BYTES: AtomicUsize = AtomicUsize::new(0);
 
 #[global_allocator]
 static ALLOCATOR: CountingAllocator = CountingAllocator;
@@ -50,22 +49,22 @@ unsafe impl GlobalAlloc for CountingAllocator {
 fn record_allocation(bytes: usize) {
     COUNT_THIS_THREAD.with(|enabled| {
         if enabled.get() {
-            ALLOCATION_CALLS.fetch_add(1, Ordering::Relaxed);
-            ALLOCATION_BYTES.fetch_add(bytes, Ordering::Relaxed);
+            ALLOCATION_CALLS.with(|calls| calls.set(calls.get().saturating_add(1)));
+            ALLOCATION_BYTES.with(|total| total.set(total.get().saturating_add(bytes)));
         }
     });
 }
 
 fn measured<T>(operation: impl FnOnce() -> T) -> (T, usize, usize) {
-    ALLOCATION_CALLS.store(0, Ordering::Relaxed);
-    ALLOCATION_BYTES.store(0, Ordering::Relaxed);
+    ALLOCATION_CALLS.with(|calls| calls.set(0));
+    ALLOCATION_BYTES.with(|bytes| bytes.set(0));
     COUNT_THIS_THREAD.with(|enabled| enabled.set(true));
     let result = operation();
     COUNT_THIS_THREAD.with(|enabled| enabled.set(false));
     (
         result,
-        ALLOCATION_CALLS.load(Ordering::Relaxed),
-        ALLOCATION_BYTES.load(Ordering::Relaxed),
+        ALLOCATION_CALLS.with(Cell::get),
+        ALLOCATION_BYTES.with(Cell::get),
     )
 }
 
@@ -73,6 +72,40 @@ fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../tests/media/fixtures")
         .join(name)
+}
+
+#[test]
+fn concurrent_allocation_measurements_are_isolated() {
+    let start = Arc::new(Barrier::new(2));
+    let finish = Arc::new(Barrier::new(2));
+
+    let idle_start = Arc::clone(&start);
+    let idle_finish = Arc::clone(&finish);
+    let idle = std::thread::spawn(move || {
+        measured(|| {
+            idle_start.wait();
+            idle_finish.wait();
+        })
+    });
+
+    let allocating = std::thread::spawn(move || {
+        measured(|| {
+            start.wait();
+            let allocation = Box::new([0_u8; 64]);
+            std::hint::black_box(&allocation);
+            finish.wait();
+            allocation
+        })
+    });
+
+    let ((), idle_calls, idle_bytes) = idle.join().unwrap();
+    let (allocation, allocating_calls, allocating_bytes) = allocating.join().unwrap();
+    std::hint::black_box(allocation);
+
+    assert_eq!(idle_calls, 0);
+    assert_eq!(idle_bytes, 0);
+    assert_eq!(allocating_calls, 1);
+    assert_eq!(allocating_bytes, 64);
 }
 
 #[test]
