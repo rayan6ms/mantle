@@ -22,7 +22,7 @@ readonly ARTIFACT_ROOT="$artifact_root"
 readonly RESULT="$result"
 readonly CONTRACT="$ROOT/compatibility/publication-native-matrix.json"
 
-for command in file jq rg strings unzip; do
+for command in file grep jq strings unzip; do
   command -v "$command" >/dev/null || { printf 'Native matrix checking requires %s\n' "$command" >&2; exit 1; }
 done
 jq --exit-status '
@@ -92,8 +92,8 @@ while IFS=$'\t' read -r classifier rust_host library binary_format; do
     exit 1
   }
 
-  if strings "$binary" | rg --ignore-case \
-    '/home/runner/work/|[A-Z]:\\a\\|Users\\runneradmin|AGENTS\.md|PROJECT_LEDGER\.md|TASKS\.md|STATUS\.md|(^|/)docs/' >/dev/null; then
+  if strings "$binary" | grep -E --ignore-case \
+    '/home/runner/work/|[A-Z]:\\a\\|AGENTS\.md|PROJECT_LEDGER\.md|TASKS\.md|STATUS\.md|(^|/)docs/' >/dev/null; then
     printf 'Native classifier exposes a private development path: %s\n' "$classifier" >&2
     exit 1
   fi

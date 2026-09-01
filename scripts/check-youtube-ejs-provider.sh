@@ -73,17 +73,17 @@ check_sha3_512 "$packaged_adapter" \
   2872a0596fdc33b49251b2aab1caf58c614a9064cac43a4aa2875fd5f9566b75757f25955b0a0e1f2b8cf60ff1a19aa034bd94bc3d5b991b966f0de8bf3c387a
 [[ $(wc -c < "$packaged_adapter") -eq 382691 ]]
 cmp "$source_dir/LICENSE" "$package_dir/LICENSE"
-rg -F 'This is free and unencumbered software released into the public domain.' \
+grep -F 'This is free and unencumbered software released into the public domain.' \
   "$package_dir/LICENSE" >/dev/null
-rg -F 'Name: meriyah' "$packaged_adapter" >/dev/null
-rg -F 'Name: astring' "$packaged_adapter" >/dev/null
+grep -F 'Name: meriyah' "$packaged_adapter" >/dev/null
+grep -F 'Name: astring' "$packaged_adapter" >/dev/null
 
-rg -F 'core_sha3=c163a6f376db6ce3da47d516a28a8f2a0554ae95c58dc766f0a6e2b3894f2cef1ee07fa84beb442fa471aac4f300985added1657c7c94c4d1cfefe68920ab599' "$builder" >/dev/null
-rg -F 'lib_sha3=1ee3753a8222fc855f5c39db30a9ccbb7967dbe1fb810e86dc9a89aa073a0907f294c720e9b65427d560a35aa1ce6af19ef854d9126a05ca00afe03f72047733' "$builder" >/dev/null
-rg -F "MANTLE_YOUTUBE_CIPHER_V1\\t" "$tail_file" >/dev/null
-rg -F "state !== 'denied'" "$tail_file" >/dev/null
+grep -F 'core_sha3=c163a6f376db6ce3da47d516a28a8f2a0554ae95c58dc766f0a6e2b3894f2cef1ee07fa84beb442fa471aac4f300985added1657c7c94c4d1cfefe68920ab599' "$builder" >/dev/null
+grep -F 'lib_sha3=1ee3753a8222fc855f5c39db30a9ccbb7967dbe1fb810e86dc9a89aa073a0907f294c720e9b65427d560a35aa1ce6af19ef854d9126a05ca00afe03f72047733' "$builder" >/dev/null
+grep -F "MANTLE_YOUTUBE_CIPHER_V1\\t" "$tail_file" >/dev/null
+grep -F "state !== 'denied'" "$tail_file" >/dev/null
 for permission in read write net env sys run ffi import; do
-  rg -F "OsString::from(\"--deny-$permission\")" "$process_provider" >/dev/null
+  grep -F "OsString::from(\"--deny-$permission\")" "$process_provider" >/dev/null
 done
 bash -n "$builder"
 

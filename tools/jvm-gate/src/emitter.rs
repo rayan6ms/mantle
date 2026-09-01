@@ -7007,6 +7007,7 @@ fn wav_audio_track_replacement(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn audio_track_replacement(
     pool: &mut ConstantPool<'static>,
     name: &str,
@@ -7305,6 +7306,7 @@ fn wav_container_probe_replacement(
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn wav_container_probe_probe(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
     let owner = pool.add_class(WAV_CONTAINER_PROBE_CLASS)?;
     let reference = pool.add_class(AUDIO_REFERENCE_CLASS)?;
