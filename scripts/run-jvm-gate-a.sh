@@ -594,7 +594,7 @@ cargo run --locked -q -p mantle-jvm-gate -- write-streaming-data-formats-extract
 cargo run --locked -q -p mantle-jvm-gate -- write-youtube-track-format-extractor-consumer \
   --output "$WORK/GateYoutubeTrackFormatExtractor.java"
 
-javac --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
+javac -encoding UTF-8 --release 11 -cp "$REFERENCE_JAR" -d "$CLASSES" \
   "$WORK/GateSmoke.java" "$WORK/GateProbe.java" "$WORK/GateIntegration.java" \
   "$WORK/GateEvents.java" "$WORK/GateTrackValues.java" "$WORK/GateTrackEnums.java" \
   "$WORK/GateTrackContracts.java" "$WORK/GateAudioFrames.java" \
