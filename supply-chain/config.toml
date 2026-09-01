@@ -361,55 +361,55 @@ version = "2.6.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.symphonia]]
-version = "0.6.0"
+version = "0.6.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.symphonia-bundle-flac]]
-version = "0.6.0"
+version = "0.6.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.symphonia-bundle-mp3]]
-version = "0.6.0"
+version = "0.6.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.symphonia-codec-aac]]
-version = "0.6.0"
+version = "0.6.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.symphonia-codec-pcm]]
-version = "0.6.0"
+version = "0.6.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.symphonia-codec-vorbis]]
-version = "0.6.0"
+version = "0.6.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.symphonia-common]]
-version = "0.6.0"
+version = "0.6.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.symphonia-core]]
-version = "0.6.0"
+version = "0.6.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.symphonia-format-isomp4]]
-version = "0.6.0"
+version = "0.6.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.symphonia-format-mkv]]
-version = "0.6.0"
+version = "0.6.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.symphonia-format-ogg]]
-version = "0.6.0"
+version = "0.6.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.symphonia-format-riff]]
-version = "0.6.0"
+version = "0.6.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.symphonia-metadata]]
-version = "0.6.0"
+version = "0.6.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.syn]]
