@@ -720,6 +720,7 @@ if command -v cygpath >/dev/null 2>&1; then
   flac_loader_classes_argument="$(cygpath -w "$FLAC_LOADER_CLASSES")"
   flac_metadata_reader_classes_argument="$(cygpath -w "$FLAC_METADATA_READER_CLASSES")"
   matroska_classes_argument="$(cygpath -w "$MATROSKA_CLASSES")"
+  mpeg_classes_argument="$(cygpath -w "$MPEG_CLASSES")"
   mpeg_file_loader_classes_argument="$(cygpath -w "$MPEG_FILE_LOADER_CLASSES")"
   ogg_flac_classes_argument="$(cygpath -w "$OGG_FLAC_CLASSES")"
   ogg_opus_classes_argument="$(cygpath -w "$OGG_OPUS_CLASSES")"
@@ -738,6 +739,7 @@ else
   flac_loader_classes_argument="$FLAC_LOADER_CLASSES"
   flac_metadata_reader_classes_argument="$FLAC_METADATA_READER_CLASSES"
   matroska_classes_argument="$MATROSKA_CLASSES"
+  mpeg_classes_argument="$MPEG_CLASSES"
   mpeg_file_loader_classes_argument="$MPEG_FILE_LOADER_CLASSES"
   ogg_flac_classes_argument="$OGG_FLAC_CLASSES"
   ogg_opus_classes_argument="$OGG_OPUS_CLASSES"
@@ -1770,60 +1772,60 @@ grep --fixed-strings \
   'contracts=track-info,input-identity,null-construction,processing-context,header-parse,read-callback,seek-callback,full-timecode,executor-control,input-ownership,context-failure,null-executor,identifier-dispatch,loop-failure,callback-failure,parse-failure,close-finally,close-replacement,subclassable,eager-logger,private-state,throws,reflection' \
   "$WORK/mp3-audio-track-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$MPEG_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMpegAudioTrack \
+  -cp "$mpeg_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMpegAudioTrack \
   >"$WORK/mpeg-audio-track-reference.txt"
 java -Xverify:all \
-  -cp "$MPEG_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$mpeg_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateMpegAudioTrack >"$WORK/mpeg-audio-track-candidate.txt"
 cmp "$WORK/mpeg-audio-track-reference.txt" "$WORK/mpeg-audio-track-candidate.txt"
 grep --fixed-strings \
   'contracts=track-info,input-identity,null-construction,track-selection,context,initialise,reader,duration,read-callback,seek-callback,full-width-timecode,executor-control,input-ownership,unsupported,parse-failure,context-failure,initialise-failure,reader-failure,loop-failure,callback-failure,close-finally,close-replacement,subclassable,eager-logger,private-state,throws,reflection' \
   "$WORK/mpeg-audio-track-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$MPEG_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMpegContainerProbe \
+  -cp "$mpeg_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMpegContainerProbe \
   >"$WORK/mpeg-container-probe-reference.txt"
 java -Xverify:all \
-  -cp "$MPEG_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$mpeg_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateMpegContainerProbe >"$WORK/mpeg-container-probe-candidate.txt"
 cmp "$WORK/mpeg-container-probe-reference.txt" "$WORK/mpeg-container-probe-candidate.txt"
 grep --fixed-strings \
   'contracts=name,constant-hints,always-no-hints,iso-tag,wildcard,rewind,scan-miss,short-input,unsupported-audio,unsupported-reader,metadata,duration,probe-identity,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,private-state,throws,reflection' \
   "$WORK/mpeg-container-probe-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$MPEG_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMpegAdtsContainerProbe \
+  -cp "$mpeg_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMpegAdtsContainerProbe \
   >"$WORK/mpeg-adts-container-probe-reference.txt"
 java -Xverify:all \
-  -cp "$MPEG_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$mpeg_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateMpegAdtsContainerProbe >"$WORK/mpeg-adts-container-probe-candidate.txt"
 cmp "$WORK/mpeg-adts-container-probe-reference.txt" "$WORK/mpeg-adts-container-probe-candidate.txt"
 grep --fixed-strings \
   'contracts=name,hint-extension,case-insensitive,wrong-hints,empty-miss,non-ts-miss,no-rewind,null-reference,null-input,io-identity,track-factory,ignored-parameters,null-track-arguments,subclassable,eager-logger,private-state,throws,reflection' \
   "$WORK/mpeg-adts-container-probe-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$MPEG_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMpegTsElementaryInputStream \
+  -cp "$mpeg_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMpegTsElementaryInputStream \
   >"$WORK/mpeg-ts-elementary-input-stream-reference.txt"
 java -Xverify:all \
-  -cp "$MPEG_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$mpeg_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateMpegTsElementaryInputStream >"$WORK/mpeg-ts-elementary-input-stream-candidate.txt"
 cmp "$WORK/mpeg-ts-elementary-input-stream-reference.txt" "$WORK/mpeg-ts-elementary-input-stream-candidate.txt"
 grep --fixed-strings \
   'contracts=constant,constructor,wrapper,no-eager-read,metadata-freshness,metadata-nulls,empty-eof,short-input,invalid-packet,null-buffer,failure-identity,public-shape,private-state,reflection' \
   "$WORK/mpeg-ts-elementary-input-stream-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$MPEG_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePesPacketInputStream \
+  -cp "$mpeg_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePesPacketInputStream \
   >"$WORK/pes-packet-input-stream-reference.txt"
 java -Xverify:all \
-  -cp "$MPEG_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$mpeg_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GatePesPacketInputStream >"$WORK/pes-packet-input-stream-candidate.txt"
 cmp "$WORK/pes-packet-input-stream-reference.txt" "$WORK/pes-packet-input-stream-candidate.txt"
 grep --fixed-strings \
   'contracts=constructor,greedy-wrapper,no-eager-read,buffers,private-state,sync-scan,header-skip,single-read,bulk-read,packet-boundaries,multiple-packets,available,zero-length,signed-length,truncated-headers,premature-payload-eof,failure-identity,subclassable,throws,reflection' \
   "$WORK/pes-packet-input-stream-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$MPEG_CLASSES$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateOggAudioTrack \
+  -cp "$mpeg_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateOggAudioTrack \
   >"$WORK/ogg-audio-track-reference.txt"
 java -Xverify:all \
-  -cp "$MPEG_CLASSES$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  -cp "$mpeg_classes_argument$classpath_separator$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
   GateOggAudioTrack >"$WORK/ogg-audio-track-candidate.txt"
 cmp "$WORK/ogg-audio-track-reference.txt" "$WORK/ogg-audio-track-candidate.txt"
 grep --fixed-strings \
