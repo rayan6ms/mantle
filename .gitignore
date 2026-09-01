@@ -1,3 +1,17 @@
 /.cache/
 /target/
 .env
+
+# Private local development, agent context, and retained evidence.
+/docs/
+/logs/
+/.agents/
+/.codex/
+/.t3/
+/.claude/
+
+# Markdown is private unless explicitly useful to public repository users.
+*.md
+!/README.md
+!/SECURITY.md
+!/COMPATIBILITY.md
