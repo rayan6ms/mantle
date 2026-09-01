@@ -34526,14 +34526,15 @@ public final class GateFlacMetadataReader {
       FlacMetadataReaderGateSupport.reset();
       byte[] vendor = "vendor".getBytes(StandardCharsets.UTF_8);
       String[] comments = {
-          "title=Hello=World", "artist=", "ignored", "=blank", "mixi=value", "mötley=Crüe"
+          "title=Hello=World", "artist=", "ignored", "=blank", "mixi=value", "m\u00f6tley=Cr\u00fce"
       };
       byte[] body = commentBody(vendor, comments);
       DataInputStream input = input(concat(header(false, 4, 0), body));
       check(FlacMetadataReader.readMetadataBlock(input, input, new FlacTrackInfoBuilder())
           && input.available() == 0
           && FlacMetadataReaderGateSupport.tags.equals(Arrays.asList(
-              "TİTLE=Hello=World", "ARTİST=", "=blank", "MİXİ=value", "MÖTLEY=Crüe")),
+              "T\u0130TLE=Hello=World", "ART\u0130ST=", "=blank", "M\u0130X\u0130=value",
+              "M\u00d6TLEY=Cr\u00fce")),
           "comment parsing uses UTF-8, split limit two, and default-locale uppercase");
     } finally {
       Locale.setDefault(previous);
