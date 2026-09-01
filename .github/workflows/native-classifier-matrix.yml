@@ -1,0 +1,94 @@
+name: Native classifier matrix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/native-classifier-matrix.yml
+      - Cargo.lock
+      - Cargo.toml
+      - rust-toolchain.toml
+      - compatibility/publication-native-matrix.json
+      - crates/**
+      - scripts/check-publication-native-matrix.sh
+      - scripts/package-native-classifier.sh
+      - third_party/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.classifier }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - classifier: linux-x86_64
+            runner: ubuntu-24.04
+            library: target/release/libmantle_jvm.so
+          - classifier: linux-aarch64
+            runner: ubuntu-24.04-arm
+            library: target/release/libmantle_jvm.so
+          - classifier: macos-x86_64
+            runner: macos-15-intel
+            library: target/release/libmantle_jvm.dylib
+          - classifier: macos-aarch64
+            runner: macos-15
+            library: target/release/libmantle_jvm.dylib
+          - classifier: windows-x86_64
+            runner: windows-2025
+            library: target/release/mantle_jvm.dll
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: Swatinem/rust-cache@v2
+      - name: Build release native library
+        shell: bash
+        run: cargo build --locked --release -p mantle-jvm
+      - name: Test native boundary
+        shell: bash
+        run: cargo test --locked --release -p mantle-jvm --lib
+      - name: Package classifier
+        shell: bash
+        run: |
+          scripts/package-native-classifier.sh \
+            --classifier '${{ matrix.classifier }}' \
+            --library '${{ matrix.library }}' \
+            --output 'target/publication-native-matrix/mantle-native-1.0.0-${{ matrix.classifier }}.jar' \
+            --metadata 'target/publication-native-matrix/mantle-native-1.0.0-${{ matrix.classifier }}.json'
+      - uses: actions/upload-artifact@v7
+        with:
+          name: native-${{ matrix.classifier }}
+          path: target/publication-native-matrix/mantle-native-1.0.0-${{ matrix.classifier }}.*
+          if-no-files-found: error
+          retention-days: 14
+
+  verify:
+    name: Verify complete native matrix
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: native-*
+          path: target/publication-native-matrix/artifacts
+          merge-multiple: true
+      - name: Verify classifier matrix
+        run: scripts/check-publication-native-matrix.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: publication-native-matrix-result
+          path: target/publication-native-matrix/result.json
+          if-no-files-found: error
+          retention-days: 30

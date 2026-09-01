@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "status": "VALIDATING",
+  "slice": "publication-native-matrix",
+  "version": "1.0.0",
+  "artifact_id": "mantle-native",
+  "classifiers": [
+    {
+      "id": "linux-x86_64",
+      "runner": "ubuntu-24.04",
+      "rust_host": "x86_64-unknown-linux-gnu",
+      "library": "libmantle_jvm.so",
+      "binary_format": "elf-x86_64"
+    },
+    {
+      "id": "linux-aarch64",
+      "runner": "ubuntu-24.04-arm",
+      "rust_host": "aarch64-unknown-linux-gnu",
+      "library": "libmantle_jvm.so",
+      "binary_format": "elf-aarch64"
+    },
+    {
+      "id": "macos-x86_64",
+      "runner": "macos-15-intel",
+      "rust_host": "x86_64-apple-darwin",
+      "library": "libmantle_jvm.dylib",
+      "binary_format": "mach-o-x86_64"
+    },
+    {
+      "id": "macos-aarch64",
+      "runner": "macos-15",
+      "rust_host": "aarch64-apple-darwin",
+      "library": "libmantle_jvm.dylib",
+      "binary_format": "mach-o-arm64"
+    },
+    {
+      "id": "windows-x86_64",
+      "runner": "windows-2025",
+      "rust_host": "x86_64-pc-windows-msvc",
+      "library": "mantle_jvm.dll",
+      "binary_format": "pe-x86_64"
+    }
+  ],
+  "required_checks": [
+    "release-build",
+    "mantle-jvm-tests",
+    "classifier-layout",
+    "rust-host-match",
+    "binary-format-match",
+    "private-path-scan",
+    "sha256-evidence"
+  ]
+}
