@@ -32,8 +32,8 @@ grep --fixed-strings 'libfuzzer-sys = "=0.4.13"' "$MANIFEST" >/dev/null
 
 awk '
   function check_package() {
-    if (name ~ /^symphonia/ && version != "0.6.0") {
-      printf "Fuzz lock drifted from production: %s is %s, expected 0.6.0\n", name, version > "/dev/stderr"
+    if (name ~ /^symphonia/ && version != "0.6.1") {
+      printf "Fuzz lock drifted from production: %s is %s, expected 0.6.1\n", name, version > "/dev/stderr"
       failed = 1
     }
     if (name ~ /^symphonia/) {
