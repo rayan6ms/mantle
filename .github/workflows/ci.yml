@@ -122,19 +122,41 @@ jobs:
           distribution: temurin
           java-version: ${{ matrix.java }}
       - uses: Swatinem/rust-cache@v2
-      - name: Fetch frozen Lavaplayer API
+      - name: Fetch frozen API and runtime dependencies
         shell: bash
         run: |
-          mkdir -p .cache/reference/lavaplayer-2.2.6
-          curl --fail --location --silent --show-error \
-            https://repo1.maven.org/maven2/dev/arbjerg/lavaplayer/2.2.6/lavaplayer-2.2.6.jar \
-            --output .cache/reference/lavaplayer-2.2.6/lavaplayer-2.2.6.jar
-          expected='84aba896d988e12ea24c25f87f2e88eca4be7adac31893eacabf93401da1282d'
-          actual=$(sha256sum .cache/reference/lavaplayer-2.2.6/lavaplayer-2.2.6.jar | awk '{print $1}')
-          if [[ "$actual" != "$expected" ]]; then
-            printf 'Lavaplayer JAR SHA-256 mismatch: expected %s, got %s\n' "$expected" "$actual" >&2
+          reference=.cache/reference/lavaplayer-2.2.6
+          mkdir -p "$reference/dependencies"
+          for artifact in lavaplayer-2.2.6.jar lavaplayer-2.2.6.pom; do
+            curl --fail --location --silent --show-error \
+              "https://repo1.maven.org/maven2/dev/arbjerg/lavaplayer/2.2.6/$artifact" \
+              --output "$reference/$artifact"
+            expected=$(jq -r --arg file "$artifact" \
+              '.published_artifacts[] | select(.file == $file) | .sha256' \
+              reference/lavaplayer-2.2.6.lock.json)
+            actual=$(sha256sum "$reference/$artifact" | awk '{print $1}')
+            if [[ "$actual" != "$expected" ]]; then
+              printf '%s SHA-256 mismatch: expected %s, got %s\n' "$artifact" "$expected" "$actual" >&2
+              exit 1
+            fi
+          done
+          mvn -q -f "$reference/lavaplayer-2.2.6.pom" dependency:copy-dependencies \
+            -DincludeScope=runtime -DoutputDirectory="$PWD/$reference/dependencies"
+          expected_count=$(jq '.resolved_runtime_artifacts | length' \
+            reference/lavaplayer-2.2.6.lock.json)
+          actual_count=$(find "$reference/dependencies" -maxdepth 1 -type f -name '*.jar' | wc -l)
+          if [[ "$actual_count" -ne "$expected_count" ]]; then
+            printf 'Expected %s runtime artifacts, found %s.\n' "$expected_count" "$actual_count" >&2
             exit 1
           fi
+          while IFS=$'\t' read -r artifact expected; do
+            actual=$(sha256sum "$reference/dependencies/$artifact" | awk '{print $1}')
+            if [[ "$actual" != "$expected" ]]; then
+              printf '%s SHA-256 mismatch: expected %s, got %s\n' "$artifact" "$expected" "$actual" >&2
+              exit 1
+            fi
+          done < <(jq -r '.resolved_runtime_artifacts[] | [.file, .sha256] | @tsv' \
+            reference/lavaplayer-2.2.6.lock.json)
       - shell: bash
         run: scripts/run-jvm-gate-a.sh
 
