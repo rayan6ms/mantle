@@ -607,12 +607,21 @@ fn sound_cloud_consumer_source(command: &str) -> Option<&'static str> {
 }
 
 fn write_consumer(args: &[String], source: &str) -> Result<()> {
+    validate_consumer_source(source)?;
     let output = required_path(args, "--output")?;
     if let Some(parent) = output.parent() {
         fs::create_dir_all(parent)?;
     }
     fs::write(output, source)?;
     Ok(())
+}
+
+fn validate_consumer_source(source: &str) -> Result<()> {
+    if source.is_ascii() {
+        Ok(())
+    } else {
+        Err("generated Java consumer source must be ASCII; use Java Unicode escapes".into())
+    }
 }
 
 const SMOKE_CONSUMER: &str = r#"
@@ -12729,10 +12738,10 @@ public final class GateMediaContainerDetection {
   }
 
   private static void regex() throws Exception {
-    MemoryStream stream = new MemoryStream("xx-héllo-yy".getBytes(StandardCharsets.UTF_8));
+    MemoryStream stream = new MemoryStream("xx-h\u00e9llo-yy".getBytes(StandardCharsets.UTF_8));
     stream.seek(2);
     check(MediaContainerDetection.matchNextBytesAsRegex(stream, 20,
-        Pattern.compile("héllo"), StandardCharsets.UTF_8) && stream.getPosition() == 2,
+        Pattern.compile("h\u00e9llo"), StandardCharsets.UTF_8) && stream.getPosition() == 2,
         "regex uses supplied charset and rewinds");
     check(!MediaContainerDetection.matchNextBytesAsRegex(stream, 4,
         Pattern.compile("absent"), StandardCharsets.UTF_8) && stream.getPosition() == 2,
@@ -22895,11 +22904,11 @@ public final class GateMpegReader {
     check(code.length() == 4 && code.charAt(0) == 0 && code.charAt(1) == 255
         && code.charAt(2) == 128 && code.charAt(3) == 'A', "direct FourCC byte mapping");
 
-    byte[] utf = "A€😀".getBytes(StandardCharsets.UTF_8);
-    check("A€😀".equals(reader(utf).readUtfString(utf.length)),
+    byte[] utf = "A\u20ac\ud83d\ude00".getBytes(StandardCharsets.UTF_8);
+    check("A\u20ac\ud83d\ude00".equals(reader(utf).readUtfString(utf.length)),
         "fixed-size UTF-8 decoding");
     check("".equals(reader(new byte[0]).readUtfString(0)), "zero-size UTF string");
-    check("�".equals(reader(bytes(0xC3)).readUtfString(1)),
+    check("\ufffd".equals(reader(bytes(0xC3)).readUtfString(1)),
         "malformed fixed UTF uses replacement character");
     check(catchThrowable(() -> reader(new byte[0]).readUtfString(-1))
         instanceof NegativeArraySizeException, "negative UTF size is not normalized");
@@ -22909,7 +22918,7 @@ public final class GateMpegReader {
     check("hello".equals(reader(bytes('h', 'e', 'l', 'l', 'o', 0, 'x'))
         .readTerminatedString()), "terminated UTF stops at first null");
     check("".equals(reader(bytes(0)).readTerminatedString()), "empty terminated string");
-    check("�".equals(reader(bytes(0xC3, 0)).readTerminatedString()),
+    check("\ufffd".equals(reader(bytes(0xC3, 0)).readTerminatedString()),
         "malformed terminated UTF uses replacement character");
     check(catchThrowable(() -> reader(bytes('n', 'o')).readTerminatedString())
         instanceof EOFException, "unterminated string propagates EOFException");
@@ -26808,10 +26817,10 @@ public final class GateDataFormatTools {
     ByteArrayOutputStream bytes = new ByteArrayOutputStream();
     DataOutputStream output = new DataOutputStream(bytes);
     DataFormatTools.writeNullableText(output, null);
-    DataFormatTools.writeNullableText(output, "héllo");
+    DataFormatTools.writeNullableText(output, "h\u00e9llo");
     output.flush();
     DataInputStream input = new DataInputStream(new ByteArrayInputStream(bytes.toByteArray()));
-    check(DataFormatTools.readNullableText(input) == null && "héllo".equals(DataFormatTools.readNullableText(input)),
+    check(DataFormatTools.readNullableText(input) == null && "h\u00e9llo".equals(DataFormatTools.readNullableText(input)),
         "nullable text round trip");
   }
 
@@ -39843,7 +39852,8 @@ public final class GateProbingAudioSourceManager {
     checkEncoded(manager, "known", "", "known|");
     checkEncoded(manager, "known", "a|b", "known|a|b");
     checkEncoded(manager, null, "value", "null|value");
-    checkEncoded(manager, "žluťoučký", "水|😀", "žluťoučký|水|😀");
+    checkEncoded(manager, "\u017elu\u0165ou\u010dk\u00fd", "\u6c34|\ud83d\ude00",
+        "\u017elu\u0165ou\u010dk\u00fd|\u6c34|\ud83d\ude00");
 
     int[] calls = new int[1];
     MediaContainerDescriptor descriptor = new MediaContainerDescriptor(probe("known", calls), "p");
@@ -41124,7 +41134,7 @@ public final class GateSoundCloudClientIdTracker {
       check(field("clientId").get(missing) == null
           && field("lastClientIdUpdate").getLong(missing) == 0L, "missing state unchanged");
 
-      for (String invalid : new String[] {"", "space id", "é", "x".repeat(257)}) {
+      for (String invalid : new String[] {"", "space id", "\u00e9", "x".repeat(257)}) {
         System.setProperty(PROPERTY, invalid);
         SoundCloudClientIdTracker rejected =
             new SoundCloudClientIdTracker(manager(acquisitions));
@@ -43273,7 +43283,7 @@ public final class GateDefaultSoundCloudDataLoader {
 
   private static void behaviorContract() throws Exception {
     DefaultSoundCloudDataLoader loader = new DefaultSoundCloudDataLoader();
-    String sourceUrl = "https://soundcloud.com/a b/tr?x=1&emoji=é";
+    String sourceUrl = "https://soundcloud.com/a b/tr?x=1&emoji=\u00e9";
     String expectedUri = "https://api-v2.soundcloud.com/resolve?url="
         + "https%3A%2F%2Fsoundcloud.com%2Fa+b%2Ftr%3Fx%3D1%26emoji%3D%C3%A9";
 
@@ -43857,7 +43867,7 @@ public final class GateDefaultSoundCloudPlaylistLoader {
 
     ExposedLoader helpers = new ExposedLoader(dataLoader, dataReader, formatHandler);
     check("https://api-v2.soundcloud.com/tracks?ids=1%2Ca+b%2C%C3%A9".equals(
-        helpers.build(Arrays.asList("1", "a b", "é")).toASCIIString()),
+        helpers.build(Arrays.asList("1", "a b", "\u00e9")).toASCIIString()),
         "track URL encoding");
     check("https://api-v2.soundcloud.com/tracks?ids=".equals(
         helpers.build(Collections.emptyList()).toASCIIString()), "empty track URL");
@@ -60786,7 +60796,7 @@ public final class GatePlayerLibrary {
     check(Modifier.isPublic(constructor.getModifiers()) && constructor.newInstance() != null,
         "public construction");
     reflection();
-    checkIsolated("custom-✓", ResourceMode.CUSTOM);
+    checkIsolated("custom-\u2713", ResourceMode.CUSTOM);
     checkIsolated("UNKNOWN", ResourceMode.MISSING);
     checkIsolated("UNKNOWN", ResourceMode.FAILING);
     System.out.println("player-library-ok contracts=version-resource,constructor,utf8-resource,missing-resource,failing-resource,stream-ownership,field,private-loader,reflection");
@@ -60811,7 +60821,7 @@ public final class GatePlayerLibrary {
 
   private static void checkIsolated(String expected, ResourceMode mode) throws Exception {
     TrackingStream stream = mode == ResourceMode.CUSTOM
-        ? new TrackingStream("custom-✓") : null;
+        ? new TrackingStream("custom-\u2713") : null;
     ByteClassLoader loader = new ByteClassLoader(classBytes(), mode, stream);
     Class<?> type = Class.forName(PLAYER_LIBRARY, true, loader);
     Field version = type.getField("VERSION");
@@ -66188,4 +66198,15 @@ fn required_value(args: &[String], name: &str) -> Result<String> {
         .find(|pair| pair[0] == name)
         .map(|pair| pair[1].clone())
         .ok_or_else(|| format!("missing required option {name}").into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_consumer_source;
+
+    #[test]
+    fn generated_java_consumers_require_encoding_portable_source() {
+        assert!(validate_consumer_source(r#""\u00e9""#).is_ok());
+        assert!(validate_consumer_source("\u{e9}").is_err());
+    }
 }
