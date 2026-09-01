@@ -1244,6 +1244,372 @@ fn metadata_preflight_error(message: impl Into<String>) -> MediaError {
     }
 }
 
+fn container_preflight_error(message: impl Into<String>) -> MediaError {
+    MediaError::Backend {
+        operation: "container preflight",
+        message: message.into(),
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+fn inspect_mp4_packet_sizes(
+    input: &mut dyn MediaInput,
+    max_probe_bytes: u64,
+    max_packet_bytes: usize,
+    cancellation: &MediaCancellation,
+) -> Result<(), MediaError> {
+    const MAX_DEPTH: usize = 16;
+
+    fn read_at(
+        input: &mut dyn MediaInput,
+        position: u64,
+        buffer: &mut [u8],
+        inspected: &mut u64,
+        limit: u64,
+        cancellation: &MediaCancellation,
+    ) -> Result<(), MediaError> {
+        cancellation.check()?;
+        let requested = buffer.len() as u64;
+        *inspected = inspected
+            .checked_add(requested)
+            .ok_or(MediaError::ProbeLimitExceeded { limit })?;
+        if *inspected > limit {
+            return Err(MediaError::ProbeLimitExceeded { limit });
+        }
+        input.seek(SeekFrom::Start(position))?;
+        input.read_exact(buffer)?;
+        cancellation.check()
+    }
+
+    fn reject_oversized_packet(size: u32, limit: usize) -> Result<(), MediaError> {
+        if u64::from(size) > limit as u64 {
+            return Err(container_preflight_error(format!(
+                "MP4 sample declares {size} bytes; limit is {limit}"
+            )));
+        }
+        Ok(())
+    }
+
+    fn require_bytes(
+        position: u64,
+        length: u64,
+        end: u64,
+        message: &'static str,
+    ) -> Result<(), MediaError> {
+        if position
+            .checked_add(length)
+            .is_none_or(|required_end| required_end > end)
+        {
+            return Err(container_preflight_error(message));
+        }
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+    fn inspect_range(
+        input: &mut dyn MediaInput,
+        start: u64,
+        end: u64,
+        depth: usize,
+        inspected: &mut u64,
+        probe_limit: u64,
+        packet_limit: usize,
+        cancellation: &MediaCancellation,
+    ) -> Result<(), MediaError> {
+        if depth > MAX_DEPTH {
+            return Err(container_preflight_error(
+                "MP4 box nesting exceeds the preflight limit",
+            ));
+        }
+
+        let mut position = start;
+        while end.saturating_sub(position) >= 8 {
+            let mut header = [0_u8; 16];
+            read_at(
+                input,
+                position,
+                &mut header[..8],
+                inspected,
+                probe_limit,
+                cancellation,
+            )?;
+            let short_size = u32::from_be_bytes(header[..4].try_into().expect("fixed slice"));
+            let kind: [u8; 4] = header[4..8].try_into().expect("fixed slice");
+            let (box_size, header_size) = match short_size {
+                0 => (end - position, 8_u64),
+                1 => {
+                    read_at(
+                        input,
+                        position + 8,
+                        &mut header[8..16],
+                        inspected,
+                        probe_limit,
+                        cancellation,
+                    )?;
+                    (
+                        u64::from_be_bytes(header[8..16].try_into().expect("fixed slice")),
+                        16,
+                    )
+                }
+                size => (u64::from(size), 8),
+            };
+            if box_size < header_size {
+                return Err(container_preflight_error(
+                    "MP4 box is smaller than its header",
+                ));
+            }
+            let box_end = position
+                .checked_add(box_size)
+                .filter(|box_end| *box_end <= end)
+                .ok_or_else(|| container_preflight_error("MP4 box exceeds its parent"))?;
+            let payload = position + header_size;
+
+            match &kind {
+                b"stsz" => {
+                    require_bytes(payload, 12, box_end, "MP4 sample-size box is truncated")?;
+                    let mut fields = [0_u8; 12];
+                    read_at(
+                        input,
+                        payload,
+                        &mut fields,
+                        inspected,
+                        probe_limit,
+                        cancellation,
+                    )?;
+                    let default_size =
+                        u32::from_be_bytes(fields[4..8].try_into().expect("fixed slice"));
+                    let sample_count =
+                        u32::from_be_bytes(fields[8..12].try_into().expect("fixed slice"));
+                    if default_size != 0 {
+                        reject_oversized_packet(default_size, packet_limit)?;
+                    } else {
+                        let table_bytes =
+                            u64::from(sample_count).checked_mul(4).ok_or_else(|| {
+                                container_preflight_error("MP4 sample-size table overflows")
+                            })?;
+                        require_bytes(
+                            payload + 12,
+                            table_bytes,
+                            box_end,
+                            "MP4 sample-size table is truncated",
+                        )?;
+                        let mut cursor = payload + 12;
+                        let mut remaining = sample_count;
+                        let mut chunk = [0_u8; 1024];
+                        while remaining != 0 {
+                            let entries = remaining.min(256);
+                            let bytes = entries as usize * 4;
+                            read_at(
+                                input,
+                                cursor,
+                                &mut chunk[..bytes],
+                                inspected,
+                                probe_limit,
+                                cancellation,
+                            )?;
+                            for value in chunk[..bytes].chunks_exact(4) {
+                                reject_oversized_packet(
+                                    u32::from_be_bytes(value.try_into().expect("fixed slice")),
+                                    packet_limit,
+                                )?;
+                            }
+                            cursor += bytes as u64;
+                            remaining -= entries;
+                        }
+                    }
+                }
+                b"tfhd" => {
+                    require_bytes(
+                        payload,
+                        8,
+                        box_end,
+                        "MP4 track-fragment header is truncated",
+                    )?;
+                    let mut fields = [0_u8; 8];
+                    read_at(
+                        input,
+                        payload,
+                        &mut fields,
+                        inspected,
+                        probe_limit,
+                        cancellation,
+                    )?;
+                    let flags = u32::from_be_bytes(fields[..4].try_into().expect("fixed slice"))
+                        & 0x00ff_ffff;
+                    let mut cursor = payload + 8;
+                    if flags & 0x0000_0001 != 0 {
+                        cursor += 8;
+                    }
+                    if flags & 0x0000_0002 != 0 {
+                        cursor += 4;
+                    }
+                    if flags & 0x0000_0008 != 0 {
+                        cursor += 4;
+                    }
+                    if flags & 0x0000_0010 != 0 {
+                        let mut size = [0_u8; 4];
+                        require_bytes(
+                            cursor,
+                            4,
+                            box_end,
+                            "MP4 track-fragment header is truncated",
+                        )?;
+                        read_at(
+                            input,
+                            cursor,
+                            &mut size,
+                            inspected,
+                            probe_limit,
+                            cancellation,
+                        )?;
+                        reject_oversized_packet(u32::from_be_bytes(size), packet_limit)?;
+                    }
+                }
+                b"trex" => {
+                    require_bytes(payload, 20, box_end, "MP4 track-extension box is truncated")?;
+                    let mut fields = [0_u8; 20];
+                    read_at(
+                        input,
+                        payload,
+                        &mut fields,
+                        inspected,
+                        probe_limit,
+                        cancellation,
+                    )?;
+                    reject_oversized_packet(
+                        u32::from_be_bytes(fields[16..20].try_into().expect("fixed slice")),
+                        packet_limit,
+                    )?;
+                }
+                b"trun" => {
+                    require_bytes(payload, 8, box_end, "MP4 fragment table is truncated")?;
+                    let mut fields = [0_u8; 8];
+                    read_at(
+                        input,
+                        payload,
+                        &mut fields,
+                        inspected,
+                        probe_limit,
+                        cancellation,
+                    )?;
+                    let flags = u32::from_be_bytes(fields[..4].try_into().expect("fixed slice"))
+                        & 0x00ff_ffff;
+                    let sample_count =
+                        u32::from_be_bytes(fields[4..8].try_into().expect("fixed slice"));
+                    let mut cursor = payload + 8;
+                    if flags & 0x0000_0001 != 0 {
+                        cursor += 4;
+                    }
+                    if flags & 0x0000_0004 != 0 {
+                        cursor += 4;
+                    }
+                    let duration = usize::from(flags & 0x0000_0100 != 0) * 4;
+                    let size_offset = duration;
+                    let stride = duration
+                        + usize::from(flags & 0x0000_0200 != 0) * 4
+                        + usize::from(flags & 0x0000_0400 != 0) * 4
+                        + usize::from(flags & 0x0000_0800 != 0) * 4;
+                    let table_bytes = u64::from(sample_count)
+                        .checked_mul(stride as u64)
+                        .ok_or_else(|| container_preflight_error("MP4 fragment table overflows"))?;
+                    require_bytes(
+                        cursor,
+                        table_bytes,
+                        box_end,
+                        "MP4 fragment table is truncated",
+                    )?;
+                    if flags & 0x0000_0200 != 0 {
+                        let mut remaining = sample_count;
+                        let mut chunk = [0_u8; 4096];
+                        while remaining != 0 {
+                            let entries = remaining.min(
+                                u32::try_from(chunk.len() / stride)
+                                    .expect("fixed buffer and MP4 field width fit u32"),
+                            );
+                            let bytes = entries as usize * stride;
+                            read_at(
+                                input,
+                                cursor,
+                                &mut chunk[..bytes],
+                                inspected,
+                                probe_limit,
+                                cancellation,
+                            )?;
+                            for entry in chunk[..bytes].chunks_exact(stride) {
+                                reject_oversized_packet(
+                                    u32::from_be_bytes(
+                                        entry[size_offset..size_offset + 4]
+                                            .try_into()
+                                            .expect("fixed slice"),
+                                    ),
+                                    packet_limit,
+                                )?;
+                            }
+                            cursor += bytes as u64;
+                            remaining -= entries;
+                        }
+                    }
+                }
+                b"moov" | b"trak" | b"mdia" | b"minf" | b"stbl" | b"edts" | b"udta" | b"moof"
+                | b"traf" | b"mvex" => inspect_range(
+                    input,
+                    payload,
+                    box_end,
+                    depth + 1,
+                    inspected,
+                    probe_limit,
+                    packet_limit,
+                    cancellation,
+                )?,
+                b"meta" => {
+                    if payload + 4 > box_end {
+                        return Err(container_preflight_error("MP4 metadata box is truncated"));
+                    }
+                    inspect_range(
+                        input,
+                        payload + 4,
+                        box_end,
+                        depth + 1,
+                        inspected,
+                        probe_limit,
+                        packet_limit,
+                        cancellation,
+                    )?;
+                }
+                _ => {}
+            }
+
+            position = box_end;
+            if short_size == 0 {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    let Some(input_len) = input.byte_len() else {
+        return Err(container_preflight_error(
+            "MP4 input length is unavailable for bounded preflight",
+        ));
+    };
+    let initial_position = input.stream_position()?;
+    let mut inspected = 0;
+    let result = inspect_range(
+        input,
+        initial_position,
+        input_len,
+        0,
+        &mut inspected,
+        max_probe_bytes,
+        max_packet_bytes,
+        cancellation,
+    );
+    let restored = input.seek(SeekFrom::Start(initial_position));
+    result?;
+    restored?;
+    Ok(())
+}
+
 fn probe_media_input(
     input: Box<dyn MediaInput>,
     extension_hint: Option<&str>,
@@ -1252,6 +1618,20 @@ fn probe_media_input(
 ) -> Result<ProbedMedia, MediaError> {
     let (mut input, id3_metadata) = inspect_initial_id3v2(input, limits)?;
     let seekable = input.is_seekable();
+    if seekable
+        && extension_hint.is_some_and(|extension| {
+            extension.eq_ignore_ascii_case("m4a")
+                || extension.eq_ignore_ascii_case("mp4")
+                || extension.eq_ignore_ascii_case("mov")
+        })
+    {
+        inspect_mp4_packet_sizes(
+            input.as_mut(),
+            limits.max_probe_bytes,
+            limits.max_packet_bytes,
+            cancellation,
+        )?;
+    }
     let ebml_metadata = if seekable {
         inspect_ebml_metadata(
             input.as_mut(),
