@@ -50,10 +50,13 @@ jq --exit-status '
   .verification.validation_contract == "compatibility/publication-central-validation-deployment.json" and
   .verification.public_maven_resolution == "REQUIRED" and
   .verification.public_native_loader_smoke == "REQUIRED" and
-  (.hosted_evidence.status == "PENDING" or
-    (.hosted_evidence.status == "PASS" and
-     (.hosted_evidence.workflow_run | type) == "number" and
-     (.hosted_evidence.result_sha256 | test("^[0-9a-f]{64}$")))) and
+  .hosted_evidence == {
+    status: "PASS",
+    workflow_source_digest: "d1dbd9c087d1fb08e639e41b37a978a05601fa7f",
+    workflow_run: 33601586857,
+    jobs_passed: 1,
+    result_sha256: "8de7b144f0161b93d79077ddae7830b76fe3c3b7bb47d64c2d2f1c8b3f0c466f"
+  } and
   .release_policy == {
     user_managed_validation_preceded_publication: true,
     deployment_consumer_gate_preceded_publication: true,
@@ -93,6 +96,8 @@ jq --exit-status '
   .channels.maven.public_repository == "https://repo.maven.apache.org/maven2" and
   (.gates[] | select(.id == "central_public_release") |
     .status == "PASS" and
+    .workflow == ".github/workflows/central-public-release.yml" and
+    .hosted_evidence == "https://github.com/rayan6ms/mantle/actions/runs/33601586857" and
     .terminal_state == "PUBLISHED" and
     .repository_file_count == 60 and
     .repository_manifest_sha256 == "1ab7f682451ea5d3283b6cb29df20f23d71da80eca59569eea96645b3ae41a6d") and

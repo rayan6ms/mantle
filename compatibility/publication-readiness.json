@@ -155,6 +155,8 @@
       "status": "PASS",
       "scope": "terminal Portal publication plus exact 60-file public repository and unauthenticated Maven/JVM/native consumer verification",
       "checker": "scripts/check-publication-central-release.sh",
+      "workflow": ".github/workflows/central-public-release.yml",
+      "hosted_evidence": "https://github.com/rayan6ms/mantle/actions/runs/33601586857",
       "deployment_id": "9205c170-5232-4817-980f-0ff92e581ee9",
       "terminal_state": "PUBLISHED",
       "public_repository": "https://repo.maven.apache.org/maven2",

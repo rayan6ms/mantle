@@ -35,7 +35,11 @@
     "public_native_loader_smoke": "REQUIRED"
   },
   "hosted_evidence": {
-    "status": "PENDING"
+    "status": "PASS",
+    "workflow_source_digest": "d1dbd9c087d1fb08e639e41b37a978a05601fa7f",
+    "workflow_run": 33601586857,
+    "jobs_passed": 1,
+    "result_sha256": "8de7b144f0161b93d79077ddae7830b76fe3c3b7bb47d64c2d2f1c8b3f0c466f"
   },
   "release_policy": {
     "user_managed_validation_preceded_publication": true,
