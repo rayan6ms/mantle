@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "status": "IN_PROGRESS",
+  "phase": "publication-readiness",
+  "compatibility_baseline": "dev.arbjerg:lavaplayer:2.2.6",
+  "completed_slice": "publication-central-bundle",
+  "completed_slices": [
+    "publication-artifact-boundary",
+    "publication-native-matrix",
+    "publication-central-bundle"
+  ],
+  "publication_ready": false,
+  "channels": {
+    "maven": {
+      "status": "PREFLIGHT_PASS",
+      "group_id": "io.github.rayan6ms",
+      "version": "1.0.0",
+      "artifact_boundary_files": [
+        "io/github/rayan6ms/mantle-lavaplayer/1.0.0/mantle-lavaplayer-1.0.0.jar",
+        "io/github/rayan6ms/mantle-lavaplayer/1.0.0/mantle-lavaplayer-1.0.0.pom",
+        "io/github/rayan6ms/mantle-native/1.0.0/mantle-native-1.0.0-linux-x86_64.jar",
+        "io/github/rayan6ms/mantle-native/1.0.0/mantle-native-1.0.0.pom"
+      ],
+      "central_deployables": [
+        "io/github/rayan6ms/mantle-lavaplayer/1.0.0/mantle-lavaplayer-1.0.0.jar",
+        "io/github/rayan6ms/mantle-lavaplayer/1.0.0/mantle-lavaplayer-1.0.0.pom",
+        "io/github/rayan6ms/mantle-lavaplayer/1.0.0/mantle-lavaplayer-1.0.0-sources.jar",
+        "io/github/rayan6ms/mantle-lavaplayer/1.0.0/mantle-lavaplayer-1.0.0-javadoc.jar",
+        "io/github/rayan6ms/mantle-native/1.0.0/mantle-native-1.0.0.pom",
+        "io/github/rayan6ms/mantle-native/1.0.0/mantle-native-1.0.0-linux-x86_64.jar",
+        "io/github/rayan6ms/mantle-native/1.0.0/mantle-native-1.0.0-linux-aarch64.jar",
+        "io/github/rayan6ms/mantle-native/1.0.0/mantle-native-1.0.0-macos-x86_64.jar",
+        "io/github/rayan6ms/mantle-native/1.0.0/mantle-native-1.0.0-macos-aarch64.jar",
+        "io/github/rayan6ms/mantle-native/1.0.0/mantle-native-1.0.0-windows-x86_64.jar"
+      ],
+      "repository_file_count_with_integrity": 60,
+      "source_artifact": "TRUTHFUL_PLACEHOLDER_NOTICE",
+      "documentation_artifact": "TRUTHFUL_PLACEHOLDER_NOTICE",
+      "publishing_type": "USER_MANAGED",
+      "network_upload_performed": false
+    },
+    "cargo_registry": {
+      "status": "DISABLED",
+      "workspace_packages": 12,
+      "fuzz_packages": 1,
+      "policy": "Every Cargo package retains publish = false; Rust source archives are not part of the public release."
+    },
+    "repository_snapshot": {
+      "status": "NOT_PUBLISHED",
+      "policy": "The development repository, agent files, plans, tests, scripts, and local evidence are not release artifacts."
+    }
+  },
+  "archive_policy": {
+    "jvm": {
+      "allowed": [
+        "**/*.class",
+        "META-INF/MANIFEST.MF",
+        "certificates/bundled.txt",
+        "certificates/dst-root-ca-x3.jks",
+        "com/sedmelluq/discord/lavaplayer/tools/version.txt"
+      ]
+    },
+    "native_classifiers": {
+      "allowed": [
+        "META-INF/",
+        "META-INF/MANIFEST.MF",
+        "native/",
+        "native/libmantle_jvm.so",
+        "native/libmantle_jvm.dylib",
+        "native/mantle_jvm.dll"
+      ],
+      "policy": "Each classified JAR contains exactly one platform-appropriate library."
+    },
+    "forbidden": [
+      "AGENTS.md",
+      "docs/**",
+      "**/*.md",
+      "scripts/**",
+      "compatibility/**",
+      "reference/**",
+      "tests/**",
+      "target/**",
+      ".github/**",
+      ".git/**",
+      ".agents/**",
+      ".codex/**",
+      "TASKS.md",
+      "STATUS.md",
+      "PROJECT_LEDGER.md",
+      "COMPATIBILITY.md"
+    ]
+  },
+  "gates": [
+    {
+      "id": "artifact_boundary",
+      "status": "PASS",
+      "checker": "scripts/check-publication-artifact-boundary.sh",
+      "result": "target/publication-readiness/artifact-boundary/result.json"
+    },
+    {
+      "id": "dependency_audits",
+      "status": "BLOCKED",
+      "ledger": "D-001",
+      "remaining_exact_version_exemptions": 140
+    },
+    {
+      "id": "native_classifier_matrix",
+      "status": "PASS",
+      "staged": ["linux-x86_64", "linux-aarch64", "macos-x86_64", "macos-aarch64", "windows-x86_64"],
+      "remaining": [],
+      "hosted_evidence": "https://github.com/rayan6ms/mantle/actions/runs/33571198765"
+    },
+    {
+      "id": "central_metadata_and_signing",
+      "status": "PREFLIGHT_PASS",
+      "scope": "repository/SCM metadata, Central placeholder companions, four checksum formats, detached PGP signatures, and exact bundle layout",
+      "checker": "scripts/check-publication-central-bundle.sh",
+      "network_upload_performed": false,
+      "external_prerequisites": ["verified Central namespace", "release PGP key", "Central Portal user token"]
+    },
+    {
+      "id": "sbom_and_provenance",
+      "status": "INCOMPLETE",
+      "scope": "release SBOM plus GitHub build-provenance and SBOM attestations"
+    }
+  ],
+  "active_blockers": ["D-001", "central-release-identity", "sbom-and-provenance"],
+  "next_slice": "publication-sbom-provenance"
+}

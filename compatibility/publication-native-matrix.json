@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "VALIDATING",
+  "status": "PASS",
   "slice": "publication-native-matrix",
   "version": "1.0.0",
   "artifact_id": "mantle-native",
@@ -49,5 +49,12 @@
     "binary-format-match",
     "private-path-scan",
     "sha256-evidence"
-  ]
+  ],
+  "hosted_evidence": {
+    "workflow_run": 33571198765,
+    "url": "https://github.com/rayan6ms/mantle/actions/runs/33571198765",
+    "jobs_passed": 6,
+    "classifier_jobs_passed": 5,
+    "aggregate_verifier_passed": true
+  }
 }

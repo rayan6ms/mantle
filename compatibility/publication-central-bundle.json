@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "status": "IMPLEMENTED",
+  "slice": "publication-central-bundle",
+  "version": "1.0.0",
+  "group_id": "io.github.rayan6ms",
+  "repository_url": "https://github.com/rayan6ms/mantle",
+  "publisher": {
+    "api": "https://central.sonatype.com/api/v1/publisher/upload",
+    "publishing_type": "USER_MANAGED",
+    "network_upload": false
+  },
+  "coordinates": [
+    {
+      "artifact_id": "mantle-lavaplayer",
+      "packaging": "jar",
+      "primary_jar": true,
+      "required_companions": ["sources", "javadoc"]
+    },
+    {
+      "artifact_id": "mantle-native",
+      "packaging": "pom",
+      "primary_jar": false,
+      "classifiers": [
+        "linux-x86_64",
+        "linux-aarch64",
+        "macos-x86_64",
+        "macos-aarch64",
+        "windows-x86_64"
+      ]
+    }
+  ],
+  "metadata": {
+    "license_name": "Apache License, Version 2.0",
+    "license_url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+    "developer_id": "rayan6ms",
+    "developer_name": "rayan6ms",
+    "developer_url": "https://github.com/rayan6ms",
+    "scm_connection": "scm:git:https://github.com/rayan6ms/mantle.git",
+    "scm_developer_connection": "scm:git:ssh://git@github.com/rayan6ms/mantle.git"
+  },
+  "integrity": {
+    "checksums": ["md5", "sha1", "sha256", "sha512"],
+    "detached_ascii_armored_pgp_for_every_deployable": true,
+    "checksum_signatures": false,
+    "signature_checksums": false
+  },
+  "placeholder_policy": {
+    "source_jar": "NOTICE.txt states that Mantle emits JVM classes directly from Rust and does not have Java source files.",
+    "javadoc_jar": "NOTICE.txt links to the repository and explains that no conventional Java source Javadoc exists.",
+    "forbidden_entries": ["**/*.java", "**/*.kt", "**/*.kts"]
+  },
+  "external_prerequisites": [
+    "The io.github.rayan6ms namespace is verified in Central Portal.",
+    "A release PGP key and public-key distribution are configured.",
+    "A Central Portal user token is configured only in the protected release environment."
+  ],
+  "next_validation": "Upload with USER_MANAGED publishing only after D-001 is resolved, then require Central state VALIDATED before any explicit publish action."
+}
