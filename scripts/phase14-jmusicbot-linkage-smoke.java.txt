@@ -1,0 +1,12 @@
+public final class JMusicBotLinkageSmoke {
+  private JMusicBotLinkageSmoke() {}
+
+  public static void main(String[] args) throws Exception {
+    if (args.length != 2) {
+      throw new IllegalArgumentException("expected Beam and Getyarn class names");
+    }
+    for (String className : args) {
+      Class.forName(className, false, JMusicBotLinkageSmoke.class.getClassLoader());
+    }
+  }
+}

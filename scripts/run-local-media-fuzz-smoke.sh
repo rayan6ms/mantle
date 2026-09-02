@@ -8,6 +8,7 @@ readonly FUZZ_TOOLCHAIN="${FUZZ_TOOLCHAIN:-nightly-2026-08-10}"
 readonly FUZZ_RUNS="${FUZZ_RUNS:-128}"
 readonly FUZZ_MAX_LEN="${FUZZ_MAX_LEN:-262144}"
 readonly FUZZ_TIMEOUT_SECONDS="${FUZZ_TIMEOUT_SECONDS:-5}"
+readonly FUZZ_SANITIZER="${FUZZ_SANITIZER:-address}"
 FUZZ_HOST="$(rustc "+$FUZZ_TOOLCHAIN" -vV | awk '$1 == "host:" {print $2}')"
 readonly FUZZ_HOST
 [[ -n "$FUZZ_HOST" ]] || { printf 'Unable to determine the fuzz toolchain host.\n' >&2; exit 1; }
@@ -25,6 +26,14 @@ if ! [[ "$FUZZ_RUNS" =~ ^[1-9][0-9]*$ ]]; then
   printf 'FUZZ_RUNS must be a positive integer.\n' >&2
   exit 2
 fi
+case "$FUZZ_SANITIZER" in
+  address|leak|thread|none)
+    ;;
+  *)
+    printf 'FUZZ_SANITIZER must be one of: address, leak, thread, none.\n' >&2
+    exit 2
+    ;;
+esac
 
 if ! command -v cmake >/dev/null && [[ -x "$ROOT/.cache/media-toolchains/xaac-root/usr/bin/cmake" ]]; then
   export PATH="$ROOT/.cache/media-toolchains/xaac-root/usr/bin:$PATH"
@@ -41,6 +50,14 @@ fuzz_command() {
     cargo "+$FUZZ_TOOLCHAIN" fuzz "$@"
   fi
 }
+
+fuzz_run_args=()
+if [[ "$FUZZ_SANITIZER" == "thread" ]]; then
+  # ThreadSanitizer changes Rust's ABI; build the standard library with the
+  # same sanitizer so the nightly compiler does not mix sanitized and plain
+  # dependencies.
+  fuzz_run_args+=(--build-std)
+fi
 
 fuzz_version="$(fuzz_command --version)"
 if [[ "$fuzz_version" != *"0.13.2"* ]]; then
@@ -123,7 +140,8 @@ for target in "${targets[@]}"; do
   printf 'Fuzz smoke: %s (%s runs)\n' "$target" "$FUZZ_RUNS"
   (
     cd "$ROOT"
-    fuzz_command run --target "$FUZZ_HOST" "$target" "$corpus" -- \
+    fuzz_command run "${fuzz_run_args[@]}" --target "$FUZZ_HOST" \
+      --sanitizer "$FUZZ_SANITIZER" "$target" "$corpus" -- \
       "-runs=$FUZZ_RUNS" \
       "-max_len=$FUZZ_MAX_LEN" \
       "-timeout=$FUZZ_TIMEOUT_SECONDS" \

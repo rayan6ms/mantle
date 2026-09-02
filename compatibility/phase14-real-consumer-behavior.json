@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "compatibility_baseline": "dev.arbjerg:lavaplayer:2.2.6",
+  "mantle_artifact": "io.github.rayan6ms:mantle-lavaplayer:1.0.0",
+  "native_classifier": "linux-x86_64",
+  "scenarios": [
+    {
+      "id": "player_scheduler_and_frames",
+      "behaviors": [
+        "normal_player_scheduler",
+        "jda_style_frame_provider",
+        "listeners"
+      ],
+      "consumers": [
+        "lavalink",
+        "jmusicbot",
+        "simplevoicechat_music"
+      ],
+      "checks": [
+        "start and no-interrupt scheduling",
+        "start/end listener order",
+        "immutable frame delivery",
+        "reusable MutableAudioFrame delivery",
+        "pause and resume state"
+      ]
+    },
+    {
+      "id": "ordered_group_loading",
+      "behaviors": [
+        "ordered_loading"
+      ],
+      "consumers": [
+        "jmusicbot",
+        "simplevoicechat_music"
+      ],
+      "checks": [
+        "shared-key callback FIFO",
+        "completed futures",
+        "distinct loaded tracks"
+      ]
+    },
+    {
+      "id": "consumer_track_state",
+      "behaviors": [
+        "user_data",
+        "markers"
+      ],
+      "consumers": [
+        "lavalink",
+        "jmusicbot",
+        "youtube_source"
+      ],
+      "checks": [
+        "JMusicBot QueuedTrack typed metadata",
+        "youtube-source delegated-track typed metadata",
+        "marker bypass at an exact seek boundary"
+      ]
+    },
+    {
+      "id": "source_serialization_and_extension",
+      "behaviors": [
+        "serialized_tracks",
+        "source_configuration",
+        "custom_source_or_subclass"
+      ],
+      "consumers": [
+        "lavalink",
+        "jmusicbot",
+        "simplevoicechat_music",
+        "youtube_source"
+      ],
+      "checks": [
+        "configuration mutation",
+        "source registration and lookup",
+        "unmodifiable live source view",
+        "full MessageOutput/MessageInput track round trip",
+        "youtube-source DelegatedAudioTrack construction",
+        "JMusicBot transformative source subclass linkage"
+      ]
+    }
+  ]
+}

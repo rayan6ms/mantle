@@ -480,4 +480,82 @@ mod tests {
         assert_eq!(releases.outstanding(), 0);
         assert_eq!(releases.pending_releases(), 0);
     }
+
+    #[test]
+    fn phase15_bounded_release_queue_survives_concurrent_workers_and_shutdown() {
+        use std::thread;
+
+        const CAPACITY: usize = 32;
+        const WORKERS: usize = 4;
+        const ATTEMPTS_PER_WORKER: usize = 128;
+        let releases = JvmOrderingKeyReleaseQueue::new(CAPACITY);
+        let mut workers = Vec::with_capacity(WORKERS);
+        for worker in 0..WORKERS {
+            let releases = releases.clone();
+            workers.push(thread::spawn(move || {
+                for attempt in 0..ATTEMPTS_PER_WORKER {
+                    if releases.reserve() {
+                        releases.enqueue(
+                            OpaqueLoadKey::from_opaque(
+                                u64::try_from(worker * ATTEMPTS_PER_WORKER + attempt + 1)
+                                    .expect("bounded test key fits"),
+                            )
+                            .expect("test key is non-zero"),
+                        );
+                    }
+                    if attempt % 7 == 0 {
+                        let _ = releases.take_all();
+                    }
+                }
+            }));
+        }
+        let shutdown = {
+            let releases = releases.clone();
+            thread::spawn(move || {
+                for _ in 0..8 {
+                    let _ = releases.take_all();
+                    thread::yield_now();
+                }
+                releases.shutdown();
+            })
+        };
+        for worker in workers {
+            worker.join().expect("worker thread must not panic");
+        }
+        shutdown.join().expect("shutdown thread must not panic");
+
+        assert!(releases.outstanding() <= CAPACITY);
+        assert!(releases.pending_releases() <= CAPACITY);
+        releases.shutdown();
+        assert_eq!(releases.outstanding(), 0);
+        assert_eq!(releases.pending_releases(), 0);
+        assert!(!releases.reserve());
+    }
+
+    #[test]
+    fn phase15_loom_terminal_release_is_exactly_once() {
+        loom::model(|| {
+            use loom::sync::atomic::{AtomicUsize, Ordering};
+            use loom::sync::{Arc, Mutex};
+            use loom::thread;
+
+            let token = Arc::new(Mutex::new(Some(OpaqueLoadKey::from_opaque(1).unwrap())));
+            let releases = Arc::new(AtomicUsize::new(0));
+            let mut terminals = Vec::with_capacity(2);
+            for _ in 0..2 {
+                let token = Arc::clone(&token);
+                let releases = Arc::clone(&releases);
+                terminals.push(thread::spawn(move || {
+                    let mut token = token.lock().expect("model mutex must not be poisoned");
+                    if token.take().is_some() {
+                        releases.fetch_add(1, Ordering::SeqCst);
+                    }
+                }));
+            }
+            for terminal in terminals {
+                terminal.join().expect("model terminal must not panic");
+            }
+            assert_eq!(releases.load(Ordering::SeqCst), 1);
+        });
+    }
 }

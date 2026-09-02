@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "status": "COMPLETE",
+  "slice": "phase15-native-soak",
+  "compatibility_baseline": "dev.arbjerg:lavaplayer:2.2.6",
+  "toolchain": {
+    "rust": "1.97.1",
+    "profile": "release"
+  },
+  "bounds": {
+    "duration_seconds": 86400,
+    "checkpoint_seconds": 60,
+    "cycle_delay_ms": 1000,
+    "workloads": 5,
+    "max_checkpoints": 1442,
+    "memory_window_samples": 8,
+    "max_rss_growth_kib": 8192,
+    "max_pss_growth_kib": 8192,
+    "max_threads": 1
+  },
+  "workloads": [
+    {
+      "id": "wav-decode-local",
+      "file": "reference.wav",
+      "sha256": "bf32b086fb9c2e34e68f17a3bcb9a9af9c267a931c680306cd4e52c1ed10304f",
+      "fingerprint": {"output_units": 3750, "decoded_samples": 8640000, "encoded_bytes": 0, "checksum": 14132146698075154372}
+    },
+    {
+      "id": "mp3-decode-local",
+      "file": "reference.mp3",
+      "sha256": "1abf476602d54b3421a268d95620360890cf013e5ad3be612992b96781a099c3",
+      "fingerprint": {"output_units": 3751, "decoded_samples": 8642304, "encoded_bytes": 0, "checksum": 13380413900603900762}
+    },
+    {
+      "id": "aac-decode-local",
+      "file": "reference.m4a",
+      "sha256": "8a50ebb40d55a20ccc7ef4487a0f9e5426689f4f7ced16166cf6f2f5e986b833",
+      "fingerprint": {"output_units": 4220, "decoded_samples": 8642560, "encoded_bytes": 0, "checksum": 4095778934306294462}
+    },
+    {
+      "id": "flac-decode-local",
+      "file": "reference.flac",
+      "sha256": "827be0ee05f1ca087fd908b1d86e0e4af27868b90e4cc6a6f13b256ded24ea88",
+      "fingerprint": {"output_units": 938, "decoded_samples": 8640000, "encoded_bytes": 0, "checksum": 8519652763592345261}
+    },
+    {
+      "id": "opus-passthrough-local",
+      "file": "reference.webm",
+      "sha256": "95506dac7bfc5ff3f4881e5e90799ca2ce7b5aa7783a4f3eeeaebc88701a0321",
+      "fingerprint": {"output_units": 4501, "decoded_samples": 0, "encoded_bytes": 1440320, "checksum": 4857389069523898131}
+    }
+  ],
+  "oracle": {
+    "determinism": "Every completed session must equal its same-process warmed fingerprint.",
+    "memory": "First and last eight checkpoint medians may grow by at most 8192 KiB for both RSS and PSS.",
+    "lifecycle": "The process must remain single-threaded and emit one bounded checkpoint per minute plus edge samples.",
+    "completion": "Only an elapsed 86400-second run with the exact full bounds is accepted; smoke evidence is rejected by default."
+  },
+  "campaigns": {
+    "smoke": {
+      "status": "PASS",
+      "duration_seconds": 3,
+      "sessions": 59,
+      "completed_cycles": 11,
+      "rss_growth_kib": 0,
+      "pss_growth_kib": 0
+    },
+    "full": {
+      "status": "PASS",
+      "duration_seconds": 86400,
+      "started_at": "2026-08-30T23:40:58+00:00",
+      "expected_finish_at": "2026-08-31T23:40:58+00:00",
+      "finished_at": "2026-08-31T23:40:59+00:00",
+      "elapsed_seconds": 86400.007908426,
+      "sessions": 74112,
+      "completed_cycles": 14822,
+      "fingerprint_mismatches": 0,
+      "checkpoints": 1441,
+      "rss_growth_kib": -1432,
+      "pss_growth_kib": -1427,
+      "max_threads": 1,
+      "supervisor": "systemd-user",
+      "invocation_id": "4ece347e537e4cf4ade4345b413f0d58",
+      "cpu_quota_percent": 25,
+      "memory_max_bytes": 268435456,
+      "tasks_max": 16
+    }
+  },
+  "interrupted_attempts": [
+    {
+      "started_at": "2026-08-30T23:05:34+00:00",
+      "last_elapsed_seconds": 1080.072882042,
+      "sessions": 1026,
+      "completed_cycles": 205,
+      "reason": "interactive command session ended before the configured duration",
+      "evidence": "target/phase15/native-soak-interrupted-20260830T230534Z/interruption.json"
+    }
+  ],
+  "active_blockers": [],
+  "evidence": {
+    "runner": "scripts/run-phase15-native-soak.sh",
+    "checker": "scripts/check-phase15-native-soak.sh",
+    "metadata": "target/phase15/native-soak/run-metadata.json",
+    "progress": "target/phase15/native-soak/progress.jsonl",
+    "result": "target/phase15/native-soak/result.json",
+    "smoke_result": "target/phase15/native-soak-smoke/result.json",
+    "interrupted_attempt": "target/phase15/native-soak-interrupted-20260830T230534Z/interruption.json",
+    "sha256": {
+      "result": "754fe6a7b055e1dff7e59a19c9952c9388b5a46162c6e1aee0b7ad669cf3a37c",
+      "progress": "a056d08bee5d6355fc15e9f441b218a34101f91d3f6e7534d58523de925a96b9",
+      "metadata": "c8de7ecaabb49165d9b1f782dba0d386c3dcbf9177d00ab916a4442fe205fcc8"
+    }
+  },
+  "next_slice": "phase15-replay-fault-soak"
+}

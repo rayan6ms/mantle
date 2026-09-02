@@ -6,6 +6,9 @@ rust-version.workspace = true
 license.workspace = true
 publish = false
 
+[features]
+phase15-rtsan-probe = []
+
 [dependencies]
 mantle-opus = { version = "0.0.0", path = "../mantle-opus" }
 rtrb.workspace = true
@@ -13,3 +16,9 @@ rubato.workspace = true
 
 [lints]
 workspace = true
+
+[[example]]
+name = "phase15-rtsan-probe"
+path = "examples/phase15_rtsan_probe.rs"
+crate-type = ["staticlib"]
+required-features = ["phase15-rtsan-probe"]

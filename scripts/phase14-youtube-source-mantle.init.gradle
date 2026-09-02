@@ -1,0 +1,29 @@
+// Ephemeral Phase 14 migration overlay. The consumer checkout is never edited.
+import org.gradle.api.attributes.java.TargetJvmVersion
+def mantleRepository = uri('__LOCAL_REPO__')
+def classpathOutput = file('__CLASSPATH_OUTPUT__')
+def runtimeClasspathOutput = file('__RUNTIME_CLASSPATH_OUTPUT__')
+
+gradle.beforeProject { project ->
+    project.repositories {
+        maven { url = mantleRepository }
+    }
+
+    if (project.path == ':v2') {
+        // Lavaplayer is compileOnly in the upstream extension; add its required runtime helper
+        // only to the generated smoke classpath, without changing the consumer dependency model.
+        project.dependencies.add('runtimeOnly', 'commons-io:commons-io:2.13.0')
+        project.configurations.matching { it.name == 'compileClasspath' || it.name == 'testCompileClasspath' }.all {
+            attributes {
+                attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 11)
+            }
+        }
+        project.tasks.register('phase14WriteCompileClasspath') {
+            doLast {
+                classpathOutput.parentFile.mkdirs()
+                classpathOutput.text = project.sourceSets.main.compileClasspath.asPath + System.lineSeparator()
+                runtimeClasspathOutput.text = project.sourceSets.main.runtimeClasspath.asPath + System.lineSeparator()
+            }
+        }
+    }
+}

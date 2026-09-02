@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "status": "COMPLETE",
+  "slice": "phase15-concurrency-lifecycle",
+  "compatibility_baseline": "dev.arbjerg:lavaplayer:2.2.6",
+  "toolchain": {"rust": "1.97.1", "loom": "0.5.6", "java": "JDK 25"},
+  "bounds": {
+    "loom_models": 1,
+    "real_thread_workers": 4,
+    "real_thread_attempts_per_worker": 128,
+    "jni_explicit_wrappers": 2048,
+    "jni_gc_wrappers": 1024,
+    "jni_timeout_seconds": 30
+  },
+  "campaigns": {
+    "loom": {"status": "PASS", "models": 1, "invariant": "terminal release handoff is exactly once"},
+    "real_thread_queue": {"status": "PASS", "workers": 4, "attempts_per_worker": 128, "capacity": 32, "invariant": "queued and outstanding releases stay within capacity across shutdown"},
+    "jni_leak_stress": {"status": "PASS", "explicit_wrappers": 2048, "gc_wrappers": 1024, "classloader_collected": true, "leak_manager": "PASS", "dispatcher_exit": "PASS"}
+  },
+  "jni": {"explicit_wrappers": 2048, "gc_wrappers": 1024, "classloader_collected": true, "leak_manager": "PASS", "dispatcher_exit": "PASS"},
+  "active_blockers": [],
+  "evidence": {
+    "checker": "scripts/check-phase15-concurrency-lifecycle.sh",
+    "result": "target/phase15/concurrency-lifecycle/result.json",
+    "logs": ["target/phase15/concurrency-lifecycle/loom-queue.log", "target/phase15/concurrency-lifecycle/core-lifecycle.log", "target/phase15/concurrency-lifecycle/jni-lifecycle.log"]
+  },
+  "next_slice": "phase15-dependency-audit"
+}

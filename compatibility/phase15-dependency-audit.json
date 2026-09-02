@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "status": "COMPLETE",
+  "slice": "phase15-dependency-audit",
+  "compatibility_baseline": "dev.arbjerg:lavaplayer:2.2.6",
+  "toolchain": {
+    "rust": "1.97.1",
+    "cargo_audit": "0.22.2",
+    "cargo_deny": "0.20.2",
+    "cargo_vet": "0.10.2"
+  },
+  "bounds": {
+    "lockfiles": 2,
+    "workspace_dependencies": 182,
+    "fuzz_dependencies": 105,
+    "audit_imports": 6,
+    "fully_audited_dependencies": 30,
+    "exact_version_exemptions": 140,
+    "safe_to_deploy_exemptions": 120,
+    "safe_to_run_exemptions": 20,
+    "accepted_duplicate_crates": 2
+  },
+  "campaigns": {
+    "workspace_advisories": {"status": "PASS", "vulnerabilities": 0, "warnings": 0},
+    "fuzz_advisories": {"status": "PASS", "vulnerabilities": 0, "warnings": 0},
+    "deny": {
+      "status": "PASS",
+      "advisory_errors": 0,
+      "ban_errors": 0,
+      "license_errors": 0,
+      "source_errors": 0,
+      "accepted_duplicates": ["getrandom", "windows-sys"]
+    },
+    "vet": {
+      "status": "PASS_WITH_EXEMPTIONS",
+      "imports": ["bytecode-alliance", "embark-studios", "google", "isrg", "mozilla", "zcash"],
+      "fully_audited_dependencies": 30,
+      "exact_version_exemptions": 140
+    }
+  },
+  "release_constraints": [
+    "D-001: replace all remaining Cargo Vet exemptions with imported or local audits before publishing a Mantle production crate"
+  ],
+  "active_blockers": [],
+  "evidence": {
+    "checker": "scripts/check-phase15-dependency-audit.sh",
+    "result": "target/phase15/dependency-audit/result.json",
+    "logs": [
+      "target/phase15/dependency-audit/workspace-audit.json",
+      "target/phase15/dependency-audit/fuzz-audit.json",
+      "target/phase15/dependency-audit/cargo-deny.jsonl",
+      "target/phase15/dependency-audit/cargo-vet.json"
+    ]
+  },
+  "next_slice": "phase15-realtime-sanitizer"
+}

@@ -1,0 +1,18 @@
+// Ephemeral Phase 14 migration overlay. The consumer checkout is never edited.
+def mantleRepository = uri('__LOCAL_REPO__')
+def classpathOutput = file('__CLASSPATH_OUTPUT__')
+
+gradle.beforeProject { project ->
+    project.repositories {
+        maven { url = mantleRepository }
+    }
+
+    project.tasks.register('phase14WriteCompileClasspath') {
+        doLast {
+            def sourceSets = project.extensions.findByName('sourceSets')
+            assert sourceSets != null : 'Simple Voice Chat Music source sets are unavailable'
+            classpathOutput.parentFile.mkdirs()
+            classpathOutput.text = sourceSets.main.compileClasspath.asPath + System.lineSeparator()
+        }
+    }
+}

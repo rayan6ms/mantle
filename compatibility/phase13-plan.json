@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "IN_PROGRESS",
+  "status": "COMPLETE",
   "compatibility_baseline": "lavaplayer-2.2.6",
   "inventory": "reference/lavaplayer-2.2.6-inventory.json",
   "classification_ledger": "compatibility/lavaplayer-2.2.6-classification.json",
@@ -2498,11 +2498,12 @@
           "fields": 0,
           "methods": 3,
           "symbols": 4,
-          "classification": "A_EXACT",
+          "classification": "D_LEGACY",
           "evidence": [
             "scripts/run-jvm-gate-a.sh",
             "tools/jvm-gate/src/emitter.rs",
-            "tools/jvm-gate/src/main.rs"
+            "tools/jvm-gate/src/main.rs",
+            "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md"
           ]
         },
         {
@@ -2511,11 +2512,12 @@
           "fields": 0,
           "methods": 4,
           "symbols": 5,
-          "classification": "A_EXACT",
+          "classification": "D_LEGACY",
           "evidence": [
             "scripts/run-jvm-gate-a.sh",
             "tools/jvm-gate/src/emitter.rs",
-            "tools/jvm-gate/src/main.rs"
+            "tools/jvm-gate/src/main.rs",
+            "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md"
           ]
         },
         {
@@ -2750,11 +2752,12 @@
           "fields": 0,
           "methods": 5,
           "symbols": 6,
-          "classification": "A_EXACT",
+          "classification": "MIXED_A_EXACT_D_LEGACY",
           "evidence": [
             "scripts/run-jvm-gate-a.sh",
             "tools/jvm-gate/src/emitter.rs",
-            "tools/jvm-gate/src/main.rs"
+            "tools/jvm-gate/src/main.rs",
+            "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md"
           ]
         },
         {
@@ -4007,9 +4010,9 @@
       "symbols": 391,
       "objective": "Cover public utilities, HTTP configuration surfaces, scheduling, and exception behavior.",
       "exit_evidence": "Utility/HTTP behavioral tests, external-type resolution, per-symbol ledger entries, and Revapi diff.",
-      "status": "IN_PROGRESS",
-      "classified_symbols": 284,
-      "remaining_symbols": 107,
+      "status": "COMPLETE",
+      "classified_symbols": 391,
+      "remaining_symbols": 0,
       "completed_slices": [
         {
           "id": "copy-on-update-identity-list-contracts",
@@ -4556,6 +4559,175 @@
             "tools/jvm-gate/src/emitter.rs",
             "tools/jvm-gate/src/main.rs"
           ]
+        },
+        {
+          "id": "http-interface-contracts",
+          "classes": 1,
+          "fields": 6,
+          "methods": 7,
+          "symbols": 8,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
+        },
+        {
+          "id": "http-interface-manager-contracts",
+          "classes": 1,
+          "fields": 0,
+          "methods": 1,
+          "symbols": 2,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
+        },
+        {
+          "id": "message-input-contracts",
+          "classes": 1,
+          "fields": 0,
+          "methods": 4,
+          "symbols": 5,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
+        },
+        {
+          "id": "message-output-contracts",
+          "classes": 1,
+          "fields": 0,
+          "methods": 5,
+          "symbols": 6,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
+        },
+        {
+          "id": "non-seekable-input-stream-contracts",
+          "classes": 1,
+          "fields": 0,
+          "methods": 8,
+          "symbols": 9,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
+        },
+        {
+          "id": "persistent-http-stream-contracts",
+          "classes": 1,
+          "fields": 4,
+          "methods": 22,
+          "symbols": 27,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
+        },
+        {
+          "id": "resettable-bounded-input-stream-contracts",
+          "classes": 1,
+          "fields": 0,
+          "methods": 8,
+          "symbols": 9,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
+        },
+        {
+          "id": "saved-head-seekable-input-stream-contracts",
+          "classes": 1,
+          "fields": 0,
+          "methods": 13,
+          "symbols": 14,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
+        },
+        {
+          "id": "seekable-input-stream-contracts",
+          "classes": 1,
+          "fields": 1,
+          "methods": 9,
+          "symbols": 11,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
+        },
+        {
+          "id": "simple-http-interface-manager-contracts",
+          "classes": 1,
+          "fields": 1,
+          "methods": 3,
+          "symbols": 4,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
+        },
+        {
+          "id": "stream-tools-contracts",
+          "classes": 1,
+          "fields": 0,
+          "methods": 2,
+          "symbols": 3,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
+        },
+        {
+          "id": "thread-local-http-interface-manager-contracts",
+          "classes": 1,
+          "fields": 0,
+          "methods": 3,
+          "symbols": 4,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
+        },
+        {
+          "id": "trust-manager-builder-contracts",
+          "classes": 1,
+          "fields": 0,
+          "methods": 4,
+          "symbols": 5,
+          "classification": "A_EXACT",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs"
+          ]
         }
       ]
     },
@@ -4570,10 +4742,116 @@
       "methods": 59,
       "symbols": 95,
       "objective": "Classify the legacy native surface explicitly without inheriting obsolete implementation choices.",
-      "exit_evidence": "Explicit legacy/unsupported decisions or tests for every symbol, plus the applicable Revapi diff."
+      "exit_evidence": "Explicit legacy/unsupported decisions or tests for every symbol, plus the applicable Revapi diff.",
+      "status": "COMPLETE",
+    "classified_symbols": 95,
+    "remaining_symbols": 0,
+      "completed_slices": [
+        {
+          "id": "connector-native-lib-loader-contracts",
+          "classes": 1,
+          "fields": 0,
+          "methods": 2,
+          "symbols": 3,
+          "classification": "D_LEGACY",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs",
+            "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md"
+          ]
+        },
+        {
+          "id": "aac-decoder-contracts",
+          "classes": 2,
+          "fields": 6,
+          "methods": 8,
+          "symbols": 16,
+          "classification": "MIXED_A_EXACT_D_LEGACY",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs",
+            "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md"
+          ]
+        },
+        {
+          "id": "mp3-decoder-contracts",
+          "classes": 2,
+          "fields": 7,
+          "methods": 21,
+          "symbols": 30,
+          "classification": "MIXED_A_EXACT_D_LEGACY",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs",
+            "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md"
+          ]
+        },
+      {
+        "id": "opus-codec-contracts",
+        "classes": 2,
+        "fields": 0,
+        "methods": 7,
+          "symbols": 9,
+          "classification": "MIXED_A_EXACT_D_LEGACY",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs",
+            "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md"
+          ]
+        }
+        ,{
+          "id": "samplerate-converter-contracts",
+          "classes": 3,
+          "fields": 5,
+          "methods": 12,
+          "symbols": 17,
+          "classification": "MIXED_A_EXACT_D_LEGACY",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs",
+            "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md"
+          ]
+        },
+        {
+          "id": "cpu-statistics-contracts",
+          "classes": 2,
+          "fields": 5,
+          "methods": 6,
+          "symbols": 13,
+          "classification": "MIXED_A_EXACT_D_LEGACY",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs",
+            "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md"
+          ]
+        },
+        {
+          "id": "vorbis-decoder-contracts",
+          "classes": 1,
+          "fields": 0,
+          "methods": 6,
+          "symbols": 7,
+          "classification": "D_LEGACY",
+          "evidence": [
+            "scripts/run-jvm-gate-a.sh",
+            "tools/jvm-gate/src/emitter.rs",
+            "tools/jvm-gate/src/main.rs",
+            "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md"
+          ]
+        }
+      ]
     }
   ],
   "artifact_workstreams": {
+    "status": "COMPLETE",
+    "contract": "compatibility/mantle-1.0-artifact-contract.json",
+    "published_pom": "compatibility/mantle-lavaplayer-1.0.0.pom",
     "resources": {
       "expected_count": 4,
       "paths": [
@@ -4632,12 +4910,19 @@
       "Preserve required resources and metadata deliberately rather than copying the reference artifact wholesale.",
       "Resolve Java 25+ native-access packaging before claiming future-JDK support.",
       "Generate JVM artifacts without committed Java or Kotlin source."
+    ],
+    "evidence": [
+      "scripts/check-phase13-artifacts.sh",
+      "scripts/run-jvm-gate-a.sh",
+      "compatibility/mantle-1.0-artifact-contract.json",
+      "compatibility/mantle-lavaplayer-1.0.0.pom",
+      "docs/architecture/ADR-0025-thin-jvm-artifact-packaging.md"
     ]
   },
   "phase_entry": {
     "precondition": "The complete Phase 12 live-service policy has passed, with replay-only credential-gated integrations documented explicitly.",
     "first_execution_cohort": "core-player-track",
-    "next_slice": "http-interface-contracts",
+    "next_slice": "phase14-real-consumer-inventory",
     "phase_exit": "No unexplained Revapi or binary structural difference remains in A_EXACT scope."
   }
 }

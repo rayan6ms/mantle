@@ -360,6 +360,13 @@ const ORDERED_EXECUTOR_CHANNEL_RUNNABLE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/OrderedExecutor$ChannelRunnable";
 const PLAYER_LIBRARY_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/PlayerLibrary";
 const PLAYER_LIBRARY_VERSION_RESOURCE: &str = "com/sedmelluq/discord/lavaplayer/tools/version.txt";
+const BUILTIN_CERTIFICATE_LIST_RESOURCE: &str = "certificates/bundled.txt";
+const DST_ROOT_CA_X3_RESOURCE: &str = "certificates/dst-root-ca-x3.jks";
+const COMPATIBILITY_RESOURCES: [&str; 3] = [
+    BUILTIN_CERTIFICATE_LIST_RESOURCE,
+    DST_ROOT_CA_X3_RESOURCE,
+    PLAYER_LIBRARY_VERSION_RESOURCE,
+];
 const RING_BUFFER_MATH_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/RingBufferMath";
 const THUMBNAIL_TOOLS_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/ThumbnailTools";
 const UNITS_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/Units";
@@ -379,6 +386,21 @@ const EXTENDED_HTTP_CONFIGURABLE_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpConfigurable";
 const HTTP_CONFIGURABLE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/io/HttpConfigurable";
 const HTTP_CLIENT_TOOLS_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/io/HttpClientTools";
+const HTTP_INTERFACE_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/io/HttpInterface";
+const HTTP_INTERFACE_MANAGER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/io/HttpInterfaceManager";
+const MESSAGE_INPUT_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/io/MessageInput";
+const MESSAGE_OUTPUT_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/io/MessageOutput";
+const NON_SEEKABLE_INPUT_STREAM_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/io/NonSeekableInputStream";
+const PERSISTENT_HTTP_STREAM_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/io/PersistentHttpStream";
+const RESETTABLE_BOUNDED_INPUT_STREAM_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/io/ResettableBoundedInputStream";
+const SAVED_HEAD_SEEKABLE_INPUT_STREAM_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/io/SavedHeadSeekableInputStream";
+const SEEKABLE_INPUT_STREAM_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/io/SeekableInputStream";
 const HTTP_CLIENT_TOOLS_NO_REDIRECTS_STRATEGY_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/io/HttpClientTools$NoRedirectsStrategy";
 const HTTP_CLIENT_TOOLS_NO_RESPONSE_RETRY_HANDLER_CLASS: &str =
@@ -402,6 +424,34 @@ const EXTENDED_HTTP_CLIENT_BUILDER_ICY_PARSER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/http/ExtendedHttpClientBuilder$IcyHttpLineParser";
 const ABSTRACT_HTTP_INTERFACE_MANAGER_CLASS: &str =
     "com/sedmelluq/discord/lavaplayer/tools/io/AbstractHttpInterfaceManager";
+const SIMPLE_HTTP_INTERFACE_MANAGER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/io/SimpleHttpInterfaceManager";
+const STREAM_TOOLS_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/io/StreamTools";
+const THREAD_LOCAL_HTTP_INTERFACE_MANAGER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/io/ThreadLocalHttpInterfaceManager";
+const TRUST_MANAGER_BUILDER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/tools/io/TrustManagerBuilder";
+const CONNECTOR_NATIVE_LIB_LOADER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/natives/ConnectorNativeLibLoader";
+const AAC_DECODER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/natives/aac/AacDecoder";
+const AAC_DECODER_STREAM_INFO_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/natives/aac/AacDecoder$StreamInfo";
+const MP3_DECODER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/natives/mp3/Mp3Decoder";
+const MP3_DECODER_MPEG_VERSION_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/natives/mp3/Mp3Decoder$MpegVersion";
+const OPUS_DECODER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/natives/opus/OpusDecoder";
+const OPUS_ENCODER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/natives/opus/OpusEncoder";
+const SAMPLERATE_CONVERTER_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/natives/samplerate/SampleRateConverter";
+const SAMPLERATE_PROGRESS_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/natives/samplerate/SampleRateConverter$Progress";
+const SAMPLERATE_RESAMPLING_TYPE_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/natives/samplerate/SampleRateConverter$ResamplingType";
+const CPU_STATISTICS_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/natives/statistics/CpuStatistics";
+const CPU_STATISTICS_TIMES_CLASS: &str =
+    "com/sedmelluq/discord/lavaplayer/natives/statistics/CpuStatistics$Times";
+const VORBIS_DECODER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/natives/vorbis/VorbisDecoder";
 const BIT_BUFFER_READER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/io/BitBufferReader";
 const BIT_STREAM_READER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/io/BitStreamReader";
 const BIT_STREAM_WRITER_CLASS: &str = "com/sedmelluq/discord/lavaplayer/tools/io/BitStreamWriter";
@@ -1016,6 +1066,15 @@ const REFERENCE_CLASSES: &[&str] = &[
     YOUTUBE_TRACK_FORMAT_EXTRACTOR_CLASS,
     HTTP_CONFIGURABLE_CLASS,
     HTTP_CLIENT_TOOLS_CLASS,
+    HTTP_INTERFACE_CLASS,
+    HTTP_INTERFACE_MANAGER_CLASS,
+    MESSAGE_INPUT_CLASS,
+    MESSAGE_OUTPUT_CLASS,
+    NON_SEEKABLE_INPUT_STREAM_CLASS,
+    PERSISTENT_HTTP_STREAM_CLASS,
+    RESETTABLE_BOUNDED_INPUT_STREAM_CLASS,
+    SAVED_HEAD_SEEKABLE_INPUT_STREAM_CLASS,
+    SEEKABLE_INPUT_STREAM_CLASS,
     HTTP_CLIENT_TOOLS_NO_REDIRECTS_STRATEGY_CLASS,
     ABSTRACT_HTTP_CONTEXT_FILTER_CLASS,
     EXTENDED_CONNECTION_OPERATOR_CLASS,
@@ -1034,6 +1093,23 @@ const REFERENCE_CLASSES: &[&str] = &[
     EXTENDED_HTTP_CLIENT_BUILDER_GARBAGE_PARSER_CLASS,
     EXTENDED_HTTP_CLIENT_BUILDER_ICY_PARSER_CLASS,
     ABSTRACT_HTTP_INTERFACE_MANAGER_CLASS,
+    SIMPLE_HTTP_INTERFACE_MANAGER_CLASS,
+    STREAM_TOOLS_CLASS,
+    THREAD_LOCAL_HTTP_INTERFACE_MANAGER_CLASS,
+    TRUST_MANAGER_BUILDER_CLASS,
+    CONNECTOR_NATIVE_LIB_LOADER_CLASS,
+    AAC_DECODER_CLASS,
+    AAC_DECODER_STREAM_INFO_CLASS,
+    MP3_DECODER_CLASS,
+    MP3_DECODER_MPEG_VERSION_CLASS,
+    OPUS_DECODER_CLASS,
+    OPUS_ENCODER_CLASS,
+    SAMPLERATE_CONVERTER_CLASS,
+    SAMPLERATE_PROGRESS_CLASS,
+    SAMPLERATE_RESAMPLING_TYPE_CLASS,
+    CPU_STATISTICS_CLASS,
+    CPU_STATISTICS_TIMES_CLASS,
+    VORBIS_DECODER_CLASS,
     BIT_BUFFER_READER_CLASS,
     BIT_STREAM_READER_CLASS,
     BIT_STREAM_WRITER_CLASS,
@@ -1222,6 +1298,10 @@ pub fn emit(
     let mut extended_http_client_builder_garbage_parser_bytes = None;
     let mut extended_http_client_builder_icy_parser_bytes = None;
     let mut abstract_http_interface_manager_bytes = None;
+    let mut simple_http_interface_manager_bytes = None;
+    let mut stream_tools_bytes = None;
+    let mut thread_local_http_interface_manager_bytes = None;
+    let mut trust_manager_builder_bytes = None;
     let mut bit_buffer_reader_bytes = None;
     let mut bit_stream_reader_bytes = None;
     let mut bit_stream_writer_bytes = None;
@@ -1235,6 +1315,15 @@ pub fn emit(
     let mut extended_buffered_input_stream_bytes = None;
     let mut greedy_input_stream_bytes = None;
     let mut http_client_tools_bytes = None;
+    let mut http_interface_bytes = None;
+    let mut http_interface_manager_bytes = None;
+    let mut message_input_bytes = None;
+    let mut message_output_bytes = None;
+    let mut non_seekable_input_stream_bytes = None;
+    let mut persistent_http_stream_bytes = None;
+    let mut resettable_bounded_input_stream_bytes = None;
+    let mut saved_head_seekable_input_stream_bytes = None;
+    let mut seekable_input_stream_bytes = None;
     let mut http_client_tools_no_redirects_strategy_bytes = None;
     let mut http_client_tools_no_response_retry_handler_bytes = None;
     let mut vorbis_comment_parser_bytes = None;
@@ -1444,6 +1533,14 @@ pub fn emit(
             extended_http_client_builder_icy_parser_bytes = Some(bytes);
         } else if *binary_name == ABSTRACT_HTTP_INTERFACE_MANAGER_CLASS {
             abstract_http_interface_manager_bytes = Some(bytes);
+        } else if *binary_name == SIMPLE_HTTP_INTERFACE_MANAGER_CLASS {
+            simple_http_interface_manager_bytes = Some(bytes);
+        } else if *binary_name == STREAM_TOOLS_CLASS {
+            stream_tools_bytes = Some(bytes);
+        } else if *binary_name == THREAD_LOCAL_HTTP_INTERFACE_MANAGER_CLASS {
+            thread_local_http_interface_manager_bytes = Some(bytes);
+        } else if *binary_name == TRUST_MANAGER_BUILDER_CLASS {
+            trust_manager_builder_bytes = Some(bytes);
         } else if *binary_name == BIT_BUFFER_READER_CLASS {
             bit_buffer_reader_bytes = Some(bytes);
         } else if *binary_name == BIT_STREAM_READER_CLASS {
@@ -1470,6 +1567,24 @@ pub fn emit(
             greedy_input_stream_bytes = Some(bytes);
         } else if *binary_name == HTTP_CLIENT_TOOLS_CLASS {
             http_client_tools_bytes = Some(bytes);
+        } else if *binary_name == HTTP_INTERFACE_CLASS {
+            http_interface_bytes = Some(bytes);
+        } else if *binary_name == HTTP_INTERFACE_MANAGER_CLASS {
+            http_interface_manager_bytes = Some(bytes);
+        } else if *binary_name == MESSAGE_INPUT_CLASS {
+            message_input_bytes = Some(bytes);
+        } else if *binary_name == MESSAGE_OUTPUT_CLASS {
+            message_output_bytes = Some(bytes);
+        } else if *binary_name == NON_SEEKABLE_INPUT_STREAM_CLASS {
+            non_seekable_input_stream_bytes = Some(bytes);
+        } else if *binary_name == PERSISTENT_HTTP_STREAM_CLASS {
+            persistent_http_stream_bytes = Some(bytes);
+        } else if *binary_name == RESETTABLE_BOUNDED_INPUT_STREAM_CLASS {
+            resettable_bounded_input_stream_bytes = Some(bytes);
+        } else if *binary_name == SAVED_HEAD_SEEKABLE_INPUT_STREAM_CLASS {
+            saved_head_seekable_input_stream_bytes = Some(bytes);
+        } else if *binary_name == SEEKABLE_INPUT_STREAM_CLASS {
+            seekable_input_stream_bytes = Some(bytes);
         } else if *binary_name == HTTP_CLIENT_TOOLS_NO_REDIRECTS_STRATEGY_CLASS {
             http_client_tools_no_redirects_strategy_bytes = Some(bytes);
         } else if *binary_name == HTTP_CLIENT_TOOLS_NO_RESPONSE_RETRY_HANDLER_CLASS {
@@ -1485,7 +1600,14 @@ pub fn emit(
     let mut jar = ZipWriter::new(File::create(output)?);
     let options = SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
     jar.start_file("META-INF/MANIFEST.MF", options)?;
-    jar.write_all(b"Manifest-Version: 1.0\r\nCreated-By: Mantle Rust Gate A emitter\r\n\r\n")?;
+    jar.write_all(
+        b"Manifest-Version: 1.0\r\n\
+Implementation-Title: Mantle Lavaplayer Compatibility\r\n\
+Implementation-Version: 1.0.0\r\n\
+Implementation-Vendor: Mantle\r\n\
+Automatic-Module-Name: io.github.rayan6ms.mantle.lavaplayer\r\n\
+Created-By: Mantle Rust compatibility emitter\r\n\r\n",
+    )?;
     classes.sort_by(|left, right| {
         left.class_name()
             .expect("emitted class has a name")
@@ -1753,6 +1875,30 @@ pub fn emit(
                     .as_ref()
                     .expect("abstract HTTP interface manager source bytes are retained"),
             );
+        } else if name == format!("{SIMPLE_HTTP_INTERFACE_MANAGER_CLASS}.class") {
+            bytes.clone_from(
+                simple_http_interface_manager_bytes
+                    .as_ref()
+                    .expect("simple HTTP interface manager source bytes are retained"),
+            );
+        } else if name == format!("{STREAM_TOOLS_CLASS}.class") {
+            bytes.clone_from(
+                stream_tools_bytes
+                    .as_ref()
+                    .expect("stream tools source bytes are retained"),
+            );
+        } else if name == format!("{THREAD_LOCAL_HTTP_INTERFACE_MANAGER_CLASS}.class") {
+            bytes.clone_from(
+                thread_local_http_interface_manager_bytes
+                    .as_ref()
+                    .expect("thread-local HTTP interface manager source bytes are retained"),
+            );
+        } else if name == format!("{TRUST_MANAGER_BUILDER_CLASS}.class") {
+            bytes.clone_from(
+                trust_manager_builder_bytes
+                    .as_ref()
+                    .expect("trust manager builder source bytes are retained"),
+            );
         } else if name == format!("{BIT_BUFFER_READER_CLASS}.class") {
             bytes.clone_from(
                 bit_buffer_reader_bytes
@@ -1830,6 +1976,60 @@ pub fn emit(
                 http_client_tools_bytes
                     .as_ref()
                     .expect("HTTP client tools source bytes are retained"),
+            );
+        } else if name == format!("{HTTP_INTERFACE_CLASS}.class") {
+            bytes.clone_from(
+                http_interface_bytes
+                    .as_ref()
+                    .expect("HTTP interface source bytes are retained"),
+            );
+        } else if name == format!("{HTTP_INTERFACE_MANAGER_CLASS}.class") {
+            bytes.clone_from(
+                http_interface_manager_bytes
+                    .as_ref()
+                    .expect("HTTP interface manager source bytes are retained"),
+            );
+        } else if name == format!("{MESSAGE_INPUT_CLASS}.class") {
+            bytes.clone_from(
+                message_input_bytes
+                    .as_ref()
+                    .expect("message input source bytes are retained"),
+            );
+        } else if name == format!("{MESSAGE_OUTPUT_CLASS}.class") {
+            bytes.clone_from(
+                message_output_bytes
+                    .as_ref()
+                    .expect("message output source bytes are retained"),
+            );
+        } else if name == format!("{NON_SEEKABLE_INPUT_STREAM_CLASS}.class") {
+            bytes.clone_from(
+                non_seekable_input_stream_bytes
+                    .as_ref()
+                    .expect("non-seekable input stream source bytes are retained"),
+            );
+        } else if name == format!("{PERSISTENT_HTTP_STREAM_CLASS}.class") {
+            bytes.clone_from(
+                persistent_http_stream_bytes
+                    .as_ref()
+                    .expect("persistent HTTP stream source bytes are retained"),
+            );
+        } else if name == format!("{RESETTABLE_BOUNDED_INPUT_STREAM_CLASS}.class") {
+            bytes.clone_from(
+                resettable_bounded_input_stream_bytes
+                    .as_ref()
+                    .expect("resettable bounded input stream source bytes are retained"),
+            );
+        } else if name == format!("{SAVED_HEAD_SEEKABLE_INPUT_STREAM_CLASS}.class") {
+            bytes.clone_from(
+                saved_head_seekable_input_stream_bytes
+                    .as_ref()
+                    .expect("saved-head seekable input stream source bytes are retained"),
+            );
+        } else if name == format!("{SEEKABLE_INPUT_STREAM_CLASS}.class") {
+            bytes.clone_from(
+                seekable_input_stream_bytes
+                    .as_ref()
+                    .expect("seekable input stream source bytes are retained"),
             );
         } else if name == format!("{HTTP_CLIENT_TOOLS_NO_REDIRECTS_STRATEGY_CLASS}.class") {
             bytes.clone_from(
@@ -2143,11 +2343,13 @@ pub fn emit(
         jar.start_file(name, options)?;
         jar.write_all(&bytes)?;
     }
-    let mut version = source.by_name(PLAYER_LIBRARY_VERSION_RESOURCE)?;
-    let mut version_bytes = Vec::new();
-    version.read_to_end(&mut version_bytes)?;
-    jar.start_file(PLAYER_LIBRARY_VERSION_RESOURCE, options)?;
-    jar.write_all(&version_bytes)?;
+    for resource_name in COMPATIBILITY_RESOURCES {
+        let mut resource = source.by_name(resource_name)?;
+        let mut resource_bytes = Vec::new();
+        resource.read_to_end(&mut resource_bytes)?;
+        jar.start_file(resource_name, options)?;
+        jar.write_all(&resource_bytes)?;
+    }
     jar.finish()?;
     if let Some(manifest_output) = manifest_output {
         if let Some(parent) = manifest_output.parent() {
@@ -2732,6 +2934,7 @@ fn retain_private_methods(class_name: &str) -> bool {
             | LEGACY_DASH_MPD_FORMATS_EXTRACTOR_CLASS
             | LEGACY_STREAM_MAP_FORMATS_EXTRACTOR_CLASS
             | STREAMING_DATA_FORMATS_EXTRACTOR_CLASS
+            | OPUS_DECODER_CLASS
     )
 }
 
@@ -2807,6 +3010,14 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | HTTP_STREAM_TOOLS_CLASS
             | MULTI_HTTP_CONFIGURABLE_CLASS
             | SETTABLE_HTTP_REQUEST_FILTER_CLASS
+            | HTTP_INTERFACE_CLASS
+            | HTTP_INTERFACE_MANAGER_CLASS
+            | SIMPLE_HTTP_INTERFACE_MANAGER_CLASS
+            | STREAM_TOOLS_CLASS
+            | THREAD_LOCAL_HTTP_INTERFACE_MANAGER_CLASS
+            | TRUST_MANAGER_BUILDER_CLASS
+            | SAVED_HEAD_SEEKABLE_INPUT_STREAM_CLASS
+            | SEEKABLE_INPUT_STREAM_CLASS
             | OGG_FLAC_CODEC_HANDLER_CLASS
             | OGG_FLAC_CODEC_HANDLER_BLUEPRINT_CLASS
             | OGG_FLAC_TRACK_HANDLER_CLASS
@@ -2842,6 +3053,10 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             | MPEG_STANDARD_TRACK_SEEK_INFO_BUILDER_CLASS
             | MPEG_STANDARD_SAMPLE_DURATION_ITERATOR_CLASS
             | MPEG_STANDARD_SAMPLE_CHUNKING_ITERATOR_CLASS
+            | MP3_DECODER_MPEG_VERSION_CLASS
+            | SAMPLERATE_PROGRESS_CLASS
+            | SAMPLERATE_RESAMPLING_TYPE_CLASS
+            | CPU_STATISTICS_TIMES_CLASS
     ) {
         return Ok(class);
     }
@@ -2899,6 +3114,34 @@ fn transform_reference_class(mut class: ClassFile<'static>) -> Result<ClassFile<
             continue;
         }
         if class_name == WAV_TRACK_PROVIDER_CLASS {
+            continue;
+        }
+        // MPEG header inspection is independent of the removed mpg123 connector. Preserve the
+        // frozen public parsing bytecode while replacing only native construction and decoding.
+        if class_name == MP3_DECODER_CLASS
+            && matches!(
+                name.as_str(),
+                "getFrameSampleRate"
+                    | "getFrameChannelCount"
+                    | "hasFrameSync"
+                    | "isUnsupportedVersion"
+                    | "isValidFrame"
+                    | "getFrameSize"
+                    | "getAverageFrameSize"
+                    | "getSamplesPerFrame"
+                    | "getMaximumFrameSize"
+            )
+        {
+            continue;
+        }
+        // Opus packet sizing is a pure bounded parser. Preserve its verified bytecode and private
+        // helpers while replacing only the native decoder/encoder lifecycle and frame operations.
+        if class_name == OPUS_DECODER_CLASS
+            && matches!(
+                name.as_str(),
+                "getPacketFrameSize" | "getPacketFrameCount" | "getPacketSamplesPerFrame"
+            )
+        {
             continue;
         }
         let had_code = method
@@ -3180,6 +3423,30 @@ fn replacement_body(
     }
     if class_name == LOCAL_SEEKABLE_INPUT_STREAM_CLASS {
         return local_seekable_input_stream_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == CONNECTOR_NATIVE_LIB_LOADER_CLASS {
+        return connector_native_lib_loader_replacement(pool, name, descriptor, required_locals);
+    }
+    if matches!(
+        class_name,
+        AAC_DECODER_CLASS | AAC_DECODER_STREAM_INFO_CLASS
+    ) {
+        return aac_decoder_replacement(pool, class_name, name, descriptor, required_locals);
+    }
+    if class_name == MP3_DECODER_CLASS {
+        return mp3_decoder_replacement(pool, name, descriptor, required_locals);
+    }
+    if matches!(class_name, OPUS_DECODER_CLASS | OPUS_ENCODER_CLASS) {
+        return opus_codec_replacement(pool, class_name, name, descriptor, required_locals);
+    }
+    if class_name == SAMPLERATE_CONVERTER_CLASS {
+        return samplerate_converter_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == CPU_STATISTICS_CLASS {
+        return cpu_statistics_replacement(pool, name, descriptor, required_locals);
+    }
+    if class_name == VORBIS_DECODER_CLASS {
+        return vorbis_decoder_replacement(pool, name, descriptor, required_locals);
     }
     if class_name == BANDCAMP_AUDIO_SOURCE_MANAGER_CLASS {
         return bandcamp_audio_source_manager_replacement(pool, name, descriptor, required_locals);
@@ -29239,6 +29506,747 @@ fn http_audio_track_clinit(pool: &mut ConstantPool<'static>) -> Result<Attribute
     )
 }
 
+fn aac_decoder_replacement(
+    pool: &mut ConstantPool<'static>,
+    class_name: &str,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (class_name, name, descriptor) {
+        (AAC_DECODER_CLASS, "<init>", "()V") => aac_decoder_constructor(pool),
+        (AAC_DECODER_CLASS, "configure", "(III)I") => {
+            aac_decoder_unsupported_after_release_check(pool, required_locals)
+        }
+        (AAC_DECODER_CLASS, "configure", "([B)I") => aac_decoder_configure_bytes(pool),
+        (AAC_DECODER_CLASS, "fill", "(Ljava/nio/ByteBuffer;)I") => {
+            aac_decoder_validate_direct_buffer(pool, "java/nio/ByteBuffer", required_locals)
+        }
+        (AAC_DECODER_CLASS, "decode", "(Ljava/nio/ShortBuffer;Z)Z") => {
+            aac_decoder_validate_direct_buffer(pool, "java/nio/ShortBuffer", required_locals)
+        }
+        (
+            AAC_DECODER_CLASS,
+            "resolveStreamInfo",
+            "()Lcom/sedmelluq/discord/lavaplayer/natives/aac/AacDecoder$StreamInfo;",
+        ) => aac_decoder_unsupported_after_release_check(pool, required_locals),
+        (AAC_DECODER_CLASS, "freeResources", "()V") => void_return(pool, required_locals),
+        (AAC_DECODER_STREAM_INFO_CLASS, "<init>", "(III)V") => {
+            aac_decoder_stream_info_constructor(pool)
+        }
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {class_name}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn aac_decoder_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let parent = pool.add_class("com/sedmelluq/lava/common/natives/NativeResourceHolder")?;
+    let init = pool.add_method_ref(parent, "<init>", "()V")?;
+    code(
+        pool,
+        1,
+        1,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(init),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn aac_decoder_unsupported_after_release_check(
+    pool: &mut ConstantPool<'static>,
+    required_locals: u16,
+) -> Result<Attribute> {
+    let parent = pool.add_class("com/sedmelluq/lava/common/natives/NativeResourceHolder")?;
+    let check = pool.add_method_ref(parent, "checkNotReleased", "()V")?;
+    let exception = pool.add_class("java/lang/UnsupportedOperationException")?;
+    let init = pool.add_method_ref(exception, "<init>", "(Ljava/lang/String;)V")?;
+    let message = pool.add_string(
+        "Legacy FDK AAC decoder JNI is unsupported; use Mantle's bounded media pipeline.",
+    )?;
+    code(
+        pool,
+        3,
+        required_locals,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(check),
+            Instruction::New(exception),
+            Instruction::Dup,
+            Instruction::Ldc_w(message),
+            Instruction::Invokespecial(init),
+            Instruction::Athrow,
+        ],
+    )
+}
+
+fn aac_decoder_configure_bytes(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let parent = pool.add_class("com/sedmelluq/lava/common/natives/NativeResourceHolder")?;
+    let check = pool.add_method_ref(parent, "checkNotReleased", "()V")?;
+    let argument = pool.add_class("java/lang/IllegalArgumentException")?;
+    let argument_init = pool.add_method_ref(argument, "<init>", "(Ljava/lang/String;)V")?;
+    let too_large = pool.add_string("Cannot process a header larger than size 8")?;
+    let unsupported = pool.add_class("java/lang/UnsupportedOperationException")?;
+    let unsupported_init = pool.add_method_ref(unsupported, "<init>", "(Ljava/lang/String;)V")?;
+    let unsupported_message = pool.add_string(
+        "Legacy FDK AAC decoder JNI is unsupported; use Mantle's bounded media pipeline.",
+    )?;
+    let valid_target = 9;
+    let mut body = code(
+        pool,
+        3,
+        2,
+        vec![
+            Instruction::Aload_1,
+            Instruction::Arraylength,
+            Instruction::Bipush(8),
+            Instruction::If_icmple(valid_target),
+            Instruction::New(argument),
+            Instruction::Dup,
+            Instruction::Ldc_w(too_large),
+            Instruction::Invokespecial(argument_init),
+            Instruction::Athrow,
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(check),
+            Instruction::New(unsupported),
+            Instruction::Dup,
+            Instruction::Ldc_w(unsupported_message),
+            Instruction::Invokespecial(unsupported_init),
+            Instruction::Athrow,
+        ],
+    )?;
+    add_stack_map_table(pool, &mut body, vec![same_stack_frame(valid_target)])?;
+    Ok(body)
+}
+
+fn aac_decoder_validate_direct_buffer(
+    pool: &mut ConstantPool<'static>,
+    buffer_class: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    let parent = pool.add_class("com/sedmelluq/lava/common/natives/NativeResourceHolder")?;
+    let check = pool.add_method_ref(parent, "checkNotReleased", "()V")?;
+    let buffer = pool.add_class(buffer_class)?;
+    let is_direct = pool.add_method_ref(buffer, "isDirect", "()Z")?;
+    let argument = pool.add_class("java/lang/IllegalArgumentException")?;
+    let argument_init = pool.add_method_ref(argument, "<init>", "(Ljava/lang/String;)V")?;
+    let direct_message = pool.add_string("Buffer argument must be a direct buffer.")?;
+    let unsupported = pool.add_class("java/lang/UnsupportedOperationException")?;
+    let unsupported_init = pool.add_method_ref(unsupported, "<init>", "(Ljava/lang/String;)V")?;
+    let unsupported_message = pool.add_string(
+        "Legacy FDK AAC decoder JNI is unsupported; use Mantle's bounded media pipeline.",
+    )?;
+    let direct_target = 10;
+    let mut body = code(
+        pool,
+        3,
+        required_locals,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(check),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(is_direct),
+            Instruction::Ifne(direct_target),
+            Instruction::New(argument),
+            Instruction::Dup,
+            Instruction::Ldc_w(direct_message),
+            Instruction::Invokespecial(argument_init),
+            Instruction::Athrow,
+            Instruction::New(unsupported),
+            Instruction::Dup,
+            Instruction::Ldc_w(unsupported_message),
+            Instruction::Invokespecial(unsupported_init),
+            Instruction::Athrow,
+        ],
+    )?;
+    add_stack_map_table(pool, &mut body, vec![same_stack_frame(direct_target)])?;
+    Ok(body)
+}
+
+fn aac_decoder_stream_info_constructor(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let object = pool.add_class("java/lang/Object")?;
+    let object_init = pool.add_method_ref(object, "<init>", "()V")?;
+    let owner = pool.add_class(AAC_DECODER_STREAM_INFO_CLASS)?;
+    let sample_rate = pool.add_field_ref(owner, "sampleRate", "I")?;
+    let channels = pool.add_field_ref(owner, "channels", "I")?;
+    let frame_size = pool.add_field_ref(owner, "frameSize", "I")?;
+    code(
+        pool,
+        2,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(object_init),
+            Instruction::Aload_0,
+            Instruction::Iload_1,
+            Instruction::Putfield(sample_rate),
+            Instruction::Aload_0,
+            Instruction::Iload_2,
+            Instruction::Putfield(channels),
+            Instruction::Aload_0,
+            Instruction::Iload_3,
+            Instruction::Putfield(frame_size),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn mp3_decoder_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => aac_decoder_constructor(pool),
+        ("decode", "(Ljava/nio/ByteBuffer;Ljava/nio/ShortBuffer;)I") => {
+            mp3_decoder_decode(pool, required_locals)
+        }
+        ("freeResources", "()V") => void_return(pool, required_locals),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {MP3_DECODER_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn mp3_decoder_decode(pool: &mut ConstantPool<'static>, required_locals: u16) -> Result<Attribute> {
+    let parent = pool.add_class("com/sedmelluq/lava/common/natives/NativeResourceHolder")?;
+    let check = pool.add_method_ref(parent, "checkNotReleased", "()V")?;
+    let byte_buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let short_buffer = pool.add_class("java/nio/ShortBuffer")?;
+    let byte_is_direct = pool.add_method_ref(byte_buffer, "isDirect", "()Z")?;
+    let short_is_direct = pool.add_method_ref(short_buffer, "isDirect", "()Z")?;
+    let argument = pool.add_class("java/lang/IllegalArgumentException")?;
+    let argument_init = pool.add_method_ref(argument, "<init>", "(Ljava/lang/String;)V")?;
+    let direct_message = pool.add_string("Arguments must be direct buffers.")?;
+    let unsupported = pool.add_class("java/lang/UnsupportedOperationException")?;
+    let unsupported_init = pool.add_method_ref(unsupported, "<init>", "(Ljava/lang/String;)V")?;
+    let unsupported_message = pool.add_string(
+        "Legacy mpg123 MP3 decoder JNI is unsupported; use Mantle's bounded media pipeline.",
+    )?;
+    let invalid_target = 9;
+    let unsupported_target = 14;
+    let mut body = code(
+        pool,
+        3,
+        required_locals,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(check),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(byte_is_direct),
+            Instruction::Ifeq(invalid_target),
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(short_is_direct),
+            Instruction::Ifne(unsupported_target),
+            Instruction::Goto(invalid_target),
+            Instruction::New(argument),
+            Instruction::Dup,
+            Instruction::Ldc_w(direct_message),
+            Instruction::Invokespecial(argument_init),
+            Instruction::Athrow,
+            Instruction::New(unsupported),
+            Instruction::Dup,
+            Instruction::Ldc_w(unsupported_message),
+            Instruction::Invokespecial(unsupported_init),
+            Instruction::Athrow,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            same_stack_frame(invalid_target),
+            same_stack_frame(unsupported_target - invalid_target - 1),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn opus_codec_replacement(
+    pool: &mut ConstantPool<'static>,
+    class_name: &str,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (class_name, name, descriptor) {
+        (OPUS_DECODER_CLASS, "<init>", "(II)V") | (OPUS_ENCODER_CLASS, "<init>", "(III)V") => {
+            opus_constructor(pool, required_locals)
+        }
+        (OPUS_DECODER_CLASS, "decode", "(Ljava/nio/ByteBuffer;Ljava/nio/ShortBuffer;)I") => {
+            opus_decoder_decode(pool, required_locals)
+        }
+        (OPUS_DECODER_CLASS | OPUS_ENCODER_CLASS, "freeResources", "()V") => {
+            void_return(pool, required_locals)
+        }
+        (OPUS_ENCODER_CLASS, "encode", "(Ljava/nio/ShortBuffer;ILjava/nio/ByteBuffer;)I") => {
+            opus_encoder_encode(pool, required_locals)
+        }
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {class_name}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn opus_constructor(pool: &mut ConstantPool<'static>, required_locals: u16) -> Result<Attribute> {
+    let parent = pool.add_class("com/sedmelluq/lava/common/natives/NativeResourceHolder")?;
+    let init = pool.add_method_ref(parent, "<init>", "()V")?;
+    code(
+        pool,
+        1,
+        required_locals,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokespecial(init),
+            Instruction::Return,
+        ],
+    )
+}
+
+fn opus_decoder_decode(
+    pool: &mut ConstantPool<'static>,
+    required_locals: u16,
+) -> Result<Attribute> {
+    two_direct_buffers_unsupported(
+        pool,
+        "java/nio/ByteBuffer",
+        "java/nio/ShortBuffer",
+        "Legacy Opus decoder JNI is unsupported; use Mantle's bounded media pipeline.",
+        2,
+        required_locals,
+    )
+}
+
+fn opus_encoder_encode(
+    pool: &mut ConstantPool<'static>,
+    required_locals: u16,
+) -> Result<Attribute> {
+    two_direct_buffers_unsupported(
+        pool,
+        "java/nio/ShortBuffer",
+        "java/nio/ByteBuffer",
+        "Legacy Opus encoder JNI is unsupported; use Mantle's bounded media pipeline.",
+        3,
+        required_locals,
+    )
+}
+
+fn samplerate_converter_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        (
+            "<init>",
+            "(Lcom/sedmelluq/discord/lavaplayer/natives/samplerate/SampleRateConverter$ResamplingType;III)V",
+        ) => opus_constructor(pool, required_locals),
+        ("reset", "()V")
+        | (
+            "process",
+            "([FII[FIIZLcom/sedmelluq/discord/lavaplayer/natives/samplerate/SampleRateConverter$Progress;)V",
+        ) => samplerate_unsupported_after_release_check(pool, required_locals),
+        ("freeResources", "()V") => void_return(pool, required_locals),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {SAMPLERATE_CONVERTER_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn samplerate_unsupported_after_release_check(
+    pool: &mut ConstantPool<'static>,
+    required_locals: u16,
+) -> Result<Attribute> {
+    let parent = pool.add_class("com/sedmelluq/lava/common/natives/NativeResourceHolder")?;
+    let check = pool.add_method_ref(parent, "checkNotReleased", "()V")?;
+    let exception = pool.add_class("java/lang/UnsupportedOperationException")?;
+    let init = pool.add_method_ref(exception, "<init>", "(Ljava/lang/String;)V")?;
+    let message = pool.add_string(
+        "Legacy libsamplerate conversion JNI is unsupported; use Mantle's bounded media pipeline.",
+    )?;
+    code(
+        pool,
+        3,
+        required_locals,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(check),
+            Instruction::New(exception),
+            Instruction::Dup,
+            Instruction::Ldc_w(message),
+            Instruction::Invokespecial(init),
+            Instruction::Athrow,
+        ],
+    )
+}
+
+fn cpu_statistics_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        (
+            "getSystemTimes",
+            "()Lcom/sedmelluq/discord/lavaplayer/natives/statistics/CpuStatistics$Times;",
+        ) => unsupported_body(
+            pool,
+            "Legacy connector CPU statistics JNI is unsupported; use Mantle-native observability.",
+            required_locals,
+        ),
+        (
+            "diff",
+            "(Lcom/sedmelluq/discord/lavaplayer/natives/statistics/CpuStatistics$Times;Lcom/sedmelluq/discord/lavaplayer/natives/statistics/CpuStatistics$Times;)Lcom/sedmelluq/discord/lavaplayer/natives/statistics/CpuStatistics$Times;",
+        ) => cpu_statistics_diff(pool, required_locals),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {CPU_STATISTICS_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn cpu_statistics_diff(
+    pool: &mut ConstantPool<'static>,
+    required_locals: u16,
+) -> Result<Attribute> {
+    let times = pool.add_class(CPU_STATISTICS_TIMES_CLASS)?;
+    let init = pool.add_method_ref(times, "<init>", "(JJJJJ)V")?;
+    let system_total = pool.add_field_ref(times, "systemTotal", "J")?;
+    let system_user = pool.add_field_ref(times, "systemUser", "J")?;
+    let system_kernel = pool.add_field_ref(times, "systemKernel", "J")?;
+    let process_user = pool.add_field_ref(times, "processUser", "J")?;
+    let process_kernel = pool.add_field_ref(times, "processKernel", "J")?;
+    code(
+        pool,
+        14,
+        required_locals,
+        vec![
+            Instruction::New(times),
+            Instruction::Dup,
+            Instruction::Aload_1,
+            Instruction::Getfield(system_total),
+            Instruction::Aload_0,
+            Instruction::Getfield(system_total),
+            Instruction::Lsub,
+            Instruction::Aload_1,
+            Instruction::Getfield(system_user),
+            Instruction::Aload_0,
+            Instruction::Getfield(system_user),
+            Instruction::Lsub,
+            Instruction::Aload_1,
+            Instruction::Getfield(system_kernel),
+            Instruction::Aload_0,
+            Instruction::Getfield(system_kernel),
+            Instruction::Lsub,
+            Instruction::Aload_1,
+            Instruction::Getfield(process_user),
+            Instruction::Aload_0,
+            Instruction::Getfield(process_user),
+            Instruction::Lsub,
+            Instruction::Aload_1,
+            Instruction::Getfield(process_kernel),
+            Instruction::Aload_0,
+            Instruction::Getfield(process_kernel),
+            Instruction::Lsub,
+            Instruction::Invokespecial(init),
+            Instruction::Areturn,
+        ],
+    )
+}
+
+fn vorbis_decoder_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => aac_decoder_constructor(pool),
+        ("initialise", "(Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;)V") => {
+            vorbis_decoder_validate_two_buffers(pool, required_locals)
+        }
+        ("getChannelCount", "()I") => integer_return(pool, 0, required_locals),
+        ("input", "(Ljava/nio/ByteBuffer;)V") => {
+            vorbis_decoder_validate_buffer(pool, required_locals)
+        }
+        ("output", "([[F)I") => vorbis_decoder_output(pool, required_locals),
+        ("freeResources", "()V") => void_return(pool, required_locals),
+        _ => unsupported_body(
+            pool,
+            &format!("Phase 13 does not implement {VORBIS_DECODER_CLASS}.{name}{descriptor}"),
+            required_locals,
+        ),
+    }
+}
+
+fn vorbis_decoder_validate_two_buffers(
+    pool: &mut ConstantPool<'static>,
+    required_locals: u16,
+) -> Result<Attribute> {
+    let parent = pool.add_class("com/sedmelluq/lava/common/natives/NativeResourceHolder")?;
+    let check = pool.add_method_ref(parent, "checkNotReleased", "()V")?;
+    let buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let is_direct = pool.add_method_ref(buffer, "isDirect", "()Z")?;
+    let argument = pool.add_class("java/lang/IllegalArgumentException")?;
+    let argument_init = pool.add_method_ref(argument, "<init>", "(Ljava/lang/String;)V")?;
+    let direct_message = pool.add_string("Buffer argument must be a direct buffer.")?;
+    let unsupported = pool.add_class("java/lang/UnsupportedOperationException")?;
+    let unsupported_init = pool.add_method_ref(unsupported, "<init>", "(Ljava/lang/String;)V")?;
+    let unsupported_message = pool.add_string(
+        "Legacy Vorbis decoder JNI is unsupported; use Mantle's bounded media pipeline.",
+    )?;
+    let invalid_target = 9;
+    let unsupported_target = 14;
+    let mut body = code(
+        pool,
+        3,
+        required_locals,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(check),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(is_direct),
+            Instruction::Ifeq(invalid_target),
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(is_direct),
+            Instruction::Ifne(unsupported_target),
+            Instruction::Goto(invalid_target),
+            Instruction::New(argument),
+            Instruction::Dup,
+            Instruction::Ldc_w(direct_message),
+            Instruction::Invokespecial(argument_init),
+            Instruction::Athrow,
+            Instruction::New(unsupported),
+            Instruction::Dup,
+            Instruction::Ldc_w(unsupported_message),
+            Instruction::Invokespecial(unsupported_init),
+            Instruction::Athrow,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            same_stack_frame(invalid_target),
+            same_stack_frame(unsupported_target - invalid_target - 1),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn vorbis_decoder_validate_buffer(
+    pool: &mut ConstantPool<'static>,
+    required_locals: u16,
+) -> Result<Attribute> {
+    let parent = pool.add_class("com/sedmelluq/lava/common/natives/NativeResourceHolder")?;
+    let check = pool.add_method_ref(parent, "checkNotReleased", "()V")?;
+    let buffer = pool.add_class("java/nio/ByteBuffer")?;
+    let is_direct = pool.add_method_ref(buffer, "isDirect", "()Z")?;
+    let argument = pool.add_class("java/lang/IllegalArgumentException")?;
+    let argument_init = pool.add_method_ref(argument, "<init>", "(Ljava/lang/String;)V")?;
+    let direct_message = pool.add_string("Buffer argument must be a direct buffer.")?;
+    let unsupported = pool.add_class("java/lang/UnsupportedOperationException")?;
+    let unsupported_init = pool.add_method_ref(unsupported, "<init>", "(Ljava/lang/String;)V")?;
+    let unsupported_message = pool.add_string(
+        "Legacy Vorbis decoder JNI is unsupported; use Mantle's bounded media pipeline.",
+    )?;
+    let unsupported_target = 10;
+    let mut body = code(
+        pool,
+        3,
+        required_locals,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(check),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(is_direct),
+            Instruction::Ifne(unsupported_target),
+            Instruction::New(argument),
+            Instruction::Dup,
+            Instruction::Ldc_w(direct_message),
+            Instruction::Invokespecial(argument_init),
+            Instruction::Athrow,
+            Instruction::New(unsupported),
+            Instruction::Dup,
+            Instruction::Ldc_w(unsupported_message),
+            Instruction::Invokespecial(unsupported_init),
+            Instruction::Athrow,
+        ],
+    )?;
+    add_stack_map_table(pool, &mut body, vec![same_stack_frame(unsupported_target)])?;
+    Ok(body)
+}
+
+fn vorbis_decoder_output(
+    pool: &mut ConstantPool<'static>,
+    required_locals: u16,
+) -> Result<Attribute> {
+    let parent = pool.add_class("com/sedmelluq/lava/common/natives/NativeResourceHolder")?;
+    let check = pool.add_method_ref(parent, "checkNotReleased", "()V")?;
+    let unsupported = pool.add_class("java/lang/UnsupportedOperationException")?;
+    let unsupported_init = pool.add_method_ref(unsupported, "<init>", "(Ljava/lang/String;)V")?;
+    let message = pool.add_string(
+        "Legacy Vorbis decoder JNI is unsupported; use Mantle's bounded media pipeline.",
+    )?;
+    code(
+        pool,
+        3,
+        required_locals,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(check),
+            Instruction::Aload_1,
+            Instruction::Arraylength,
+            Instruction::Pop,
+            Instruction::New(unsupported),
+            Instruction::Dup,
+            Instruction::Ldc_w(message),
+            Instruction::Invokespecial(unsupported_init),
+            Instruction::Athrow,
+        ],
+    )
+}
+
+fn two_direct_buffers_unsupported(
+    pool: &mut ConstantPool<'static>,
+    first_class: &str,
+    second_class: &str,
+    message: &str,
+    second_local: u8,
+    required_locals: u16,
+) -> Result<Attribute> {
+    let parent = pool.add_class("com/sedmelluq/lava/common/natives/NativeResourceHolder")?;
+    let check = pool.add_method_ref(parent, "checkNotReleased", "()V")?;
+    let first = pool.add_class(first_class)?;
+    let second = pool.add_class(second_class)?;
+    let first_direct = pool.add_method_ref(first, "isDirect", "()Z")?;
+    let second_direct = pool.add_method_ref(second, "isDirect", "()Z")?;
+    let argument = pool.add_class("java/lang/IllegalArgumentException")?;
+    let argument_init = pool.add_method_ref(argument, "<init>", "(Ljava/lang/String;)V")?;
+    let direct_message = pool.add_string("Arguments must be direct buffers.")?;
+    let unsupported = pool.add_class("java/lang/UnsupportedOperationException")?;
+    let unsupported_init = pool.add_method_ref(unsupported, "<init>", "(Ljava/lang/String;)V")?;
+    let unsupported_message = pool.add_string(message)?;
+    let invalid_target = 9;
+    let unsupported_target = 14;
+    let mut body = code(
+        pool,
+        3,
+        required_locals,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokevirtual(check),
+            Instruction::Aload_1,
+            Instruction::Invokevirtual(first_direct),
+            Instruction::Ifeq(invalid_target),
+            Instruction::Aload(second_local),
+            Instruction::Invokevirtual(second_direct),
+            Instruction::Ifne(unsupported_target),
+            Instruction::Goto(invalid_target),
+            Instruction::New(argument),
+            Instruction::Dup,
+            Instruction::Ldc_w(direct_message),
+            Instruction::Invokespecial(argument_init),
+            Instruction::Athrow,
+            Instruction::New(unsupported),
+            Instruction::Dup,
+            Instruction::Ldc_w(unsupported_message),
+            Instruction::Invokespecial(unsupported_init),
+            Instruction::Athrow,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            same_stack_frame(invalid_target),
+            same_stack_frame(unsupported_target - invalid_target - 1),
+        ],
+    )?;
+    Ok(body)
+}
+
+fn add_mp3_decoder_header_state(class: &mut ClassFile<'static>) -> Result<()> {
+    add_field(
+        class,
+        FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC | FieldAccessFlags::FINAL,
+        "SAMPLE_RATE_BASE",
+        "[I",
+    )?;
+    let owner = class.constant_pool.add_class(MP3_DECODER_CLASS)?;
+    let rates = class
+        .constant_pool
+        .add_field_ref(owner, "SAMPLE_RATE_BASE", "[I")?;
+    let body = code(
+        &mut class.constant_pool,
+        4,
+        0,
+        vec![
+            Instruction::Iconst_3,
+            Instruction::Newarray(ArrayType::Int),
+            Instruction::Dup,
+            Instruction::Iconst_0,
+            Instruction::Sipush(11_025),
+            Instruction::Iastore,
+            Instruction::Dup,
+            Instruction::Iconst_1,
+            Instruction::Sipush(12_000),
+            Instruction::Iastore,
+            Instruction::Dup,
+            Instruction::Iconst_2,
+            Instruction::Sipush(8_000),
+            Instruction::Iastore,
+            Instruction::Putstatic(rates),
+            Instruction::Return,
+        ],
+    )?;
+    add_method(
+        class,
+        MethodAccessFlags::STATIC,
+        "<clinit>",
+        "()V",
+        Some(body),
+    )
+}
+
+fn connector_native_lib_loader_replacement(
+    pool: &mut ConstantPool<'static>,
+    name: &str,
+    descriptor: &str,
+    required_locals: u16,
+) -> Result<Attribute> {
+    match (name, descriptor) {
+        ("<init>", "()V") => object_constructor(pool),
+        ("loadConnectorLibrary", "()V") => unsupported_body(
+            pool,
+            "Legacy Lavaplayer connector native loading is unsupported; load the Mantle native library through dev.mantle.internal.NativeLoader.load(path).",
+            required_locals,
+        ),
+        _ => unsupported_body(
+            pool,
+            &format!(
+                "Phase 13 does not implement {CONNECTOR_NATIVE_LIB_LOADER_CLASS}.{name}{descriptor}"
+            ),
+            required_locals,
+        ),
+    }
+}
+
 fn heartbeating_http_stream_replacement(
     pool: &mut ConstantPool<'static>,
     name: &str,
@@ -41814,6 +42822,9 @@ fn add_reference_implementation_state(
     }
     if class_name == BASIC_PLAYLIST_CLASS {
         add_basic_playlist_state(class)?;
+    }
+    if class_name == MP3_DECODER_CLASS {
+        add_mp3_decoder_header_state(class)?;
     }
     if class_name == M3U_CHANNEL_STREAM_INFO_CLASS {
         let owner = class
@@ -56230,6 +57241,22 @@ fn native_default_audio_player_manager_class() -> Result<ClassFile<'static>> {
         "(Lcom/sedmelluq/discord/lavaplayer/player/DefaultAudioPlayerManager;Lcom/sedmelluq/discord/lavaplayer/tools/io/MessageInput;)Lcom/sedmelluq/discord/lavaplayer/track/DecodedTrackHolder;",
         Some(decode),
     )?;
+    let encode_details = manager_helper_encode_track_details(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+        "encodeTrackDetails",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)[B",
+        Some(encode_details),
+    )?;
+    let decode_details = manager_helper_decode_track_details(&mut class.constant_pool)?;
+    add_method(
+        &mut class,
+        MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+        "decodeTrackDetails",
+        "(Ljava/util/List;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;[B)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+        Some(decode_details),
+    )?;
     Ok(class)
 }
 
@@ -63048,6 +64075,194 @@ fn manager_helper_read_nullable(pool: &mut ConstantPool<'static>) -> Result<Attr
     )
 }
 
+fn manager_helper_encode_track_details(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let track = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrack")?;
+    let get_source = pool.add_interface_method_ref(
+        track,
+        "getSourceManager",
+        "()Lcom/sedmelluq/discord/lavaplayer/source/AudioSourceManager;",
+    )?;
+    let source = pool.add_class("com/sedmelluq/discord/lavaplayer/source/AudioSourceManager")?;
+    let get_name =
+        pool.add_interface_method_ref(source, "getSourceName", "()Ljava/lang/String;")?;
+    let encode = pool.add_interface_method_ref(
+        source,
+        "encodeTrack",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;Ljava/io/DataOutput;)V",
+    )?;
+    let byte_output = pool.add_class("java/io/ByteArrayOutputStream")?;
+    let byte_output_init = pool.add_method_ref(byte_output, "<init>", "()V")?;
+    let to_byte_array = pool.add_method_ref(byte_output, "toByteArray", "()[B")?;
+    let data_output = pool.add_class("java/io/DataOutputStream")?;
+    let data_output_init =
+        pool.add_method_ref(data_output, "<init>", "(Ljava/io/OutputStream;)V")?;
+    let write_utf = pool.add_method_ref(data_output, "writeUTF", "(Ljava/lang/String;)V")?;
+    let native = pool.add_class(NATIVE_CLASS)?;
+    let native_encode = pool.add_method_ref(
+        native,
+        "encodeTrackDetails",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)[B",
+    )?;
+    let mut body = code(
+        pool,
+        3,
+        4,
+        vec![
+            Instruction::Aload_0,
+            Instruction::Invokeinterface(get_source, 1),
+            Instruction::Astore_1,
+            Instruction::Aload_1,
+            Instruction::Ifnonnull(8),
+            Instruction::Aload_0,
+            Instruction::Invokestatic(native_encode),
+            Instruction::Areturn,
+            Instruction::New(byte_output),
+            Instruction::Dup,
+            Instruction::Invokespecial(byte_output_init),
+            Instruction::Astore_2,
+            Instruction::New(data_output),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Invokespecial(data_output_init),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Aload_1,
+            Instruction::Invokeinterface(get_name, 1),
+            Instruction::Invokevirtual(write_utf),
+            Instruction::Aload_1,
+            Instruction::Aload_0,
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(encode, 3),
+            Instruction::Aload_2,
+            Instruction::Invokevirtual(to_byte_array),
+            Instruction::Areturn,
+        ],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::FullFrame {
+            frame_type: 255,
+            offset_delta: 8,
+            locals: vec![
+                VerificationType::Object { cpool_index: track },
+                VerificationType::Object {
+                    cpool_index: source,
+                },
+            ],
+            stack: vec![],
+        }],
+    )?;
+    Ok(body)
+}
+
+#[allow(clippy::too_many_lines)]
+fn manager_helper_decode_track_details(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
+    let list = pool.add_class("java/util/List")?;
+    let iterator = pool.add_interface_method_ref(list, "iterator", "()Ljava/util/Iterator;")?;
+    let iterator_class = pool.add_class("java/util/Iterator")?;
+    let has_next = pool.add_interface_method_ref(iterator_class, "hasNext", "()Z")?;
+    let next = pool.add_interface_method_ref(iterator_class, "next", "()Ljava/lang/Object;")?;
+    let byte_input = pool.add_class("java/io/ByteArrayInputStream")?;
+    let byte_input_init = pool.add_method_ref(byte_input, "<init>", "([B)V")?;
+    let data_input = pool.add_class("java/io/DataInputStream")?;
+    let data_input_init = pool.add_method_ref(data_input, "<init>", "(Ljava/io/InputStream;)V")?;
+    let read_utf = pool.add_method_ref(data_input, "readUTF", "()Ljava/lang/String;")?;
+    let source = pool.add_class("com/sedmelluq/discord/lavaplayer/source/AudioSourceManager")?;
+    let get_name =
+        pool.add_interface_method_ref(source, "getSourceName", "()Ljava/lang/String;")?;
+    let decode = pool.add_interface_method_ref(
+        source,
+        "decodeTrack",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;Ljava/io/DataInput;)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+    )?;
+    let string = pool.add_class("java/lang/String")?;
+    let equals = pool.add_method_ref(string, "equals", "(Ljava/lang/Object;)Z")?;
+    let native = pool.add_class(NATIVE_CLASS)?;
+    let native_decode = pool.add_method_ref(
+        native,
+        "decodeTrackDetails",
+        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;[B)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+    )?;
+    let info = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo")?;
+    let bytes = pool.add_class("[B")?;
+    let mut body = code(
+        pool,
+        5,
+        7,
+        vec![
+            Instruction::New(data_input),
+            Instruction::Dup,
+            Instruction::New(byte_input),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Invokespecial(byte_input_init),
+            Instruction::Invokespecial(data_input_init),
+            Instruction::Astore_3,
+            Instruction::Aload_3,
+            Instruction::Invokevirtual(read_utf),
+            Instruction::Astore(4),
+            Instruction::Aload_0,
+            Instruction::Invokeinterface(iterator, 1),
+            Instruction::Astore(5),
+            Instruction::Aload(5),
+            Instruction::Invokeinterface(has_next, 1),
+            Instruction::Ifeq(31),
+            Instruction::Aload(5),
+            Instruction::Invokeinterface(next, 1),
+            Instruction::Checkcast(source),
+            Instruction::Astore(6),
+            Instruction::Aload(4),
+            Instruction::Aload(6),
+            Instruction::Invokeinterface(get_name, 1),
+            Instruction::Invokevirtual(equals),
+            Instruction::Ifeq(14),
+            Instruction::Aload(6),
+            Instruction::Aload_1,
+            Instruction::Aload_3,
+            Instruction::Invokeinterface(decode, 3),
+            Instruction::Areturn,
+            Instruction::Aload_1,
+            Instruction::Aload_2,
+            Instruction::Invokestatic(native_decode),
+            Instruction::Areturn,
+        ],
+    )?;
+    let locals = vec![
+        VerificationType::Object { cpool_index: list },
+        VerificationType::Object { cpool_index: info },
+        VerificationType::Object { cpool_index: bytes },
+        VerificationType::Object {
+            cpool_index: data_input,
+        },
+        VerificationType::Object {
+            cpool_index: string,
+        },
+        VerificationType::Object {
+            cpool_index: iterator_class,
+        },
+    ];
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 14,
+                locals: locals.clone(),
+                stack: vec![],
+            },
+            StackFrame::FullFrame {
+                frame_type: 255,
+                offset_delta: 31 - 14 - 1,
+                locals,
+                stack: vec![],
+            },
+        ],
+    )?;
+    Ok(body)
+}
+
 fn manager_helper_shutdown(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
     let executor = pool.add_class("java/util/concurrent/ExecutorService")?;
     let shutdown_executor = pool.add_interface_method_ref(executor, "shutdown", "()V")?;
@@ -63659,42 +64874,109 @@ fn load_callback_run(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
 }
 
 fn manager_encode_track_details(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
-    let native = pool.add_class(NATIVE_CLASS)?;
+    let helper = pool.add_class(MANAGER_HELPER_CLASS)?;
     let encode = pool.add_method_ref(
-        native,
+        helper,
         "encodeTrackDetails",
         "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;)[B",
     )?;
-    code(
+    let io = pool.add_class("java/io/IOException")?;
+    let runtime = pool.add_class("java/lang/RuntimeException")?;
+    let runtime_init = pool.add_method_ref(runtime, "<init>", "(Ljava/lang/Throwable;)V")?;
+    let owner = pool.add_class(MANAGER_CLASS)?;
+    let track = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrack")?;
+    let mut body = code_with_exceptions(
         pool,
-        1,
-        2,
+        3,
+        3,
         vec![
             Instruction::Aload_1,
             Instruction::Invokestatic(encode),
             Instruction::Areturn,
+            Instruction::Astore_2,
+            Instruction::New(runtime),
+            Instruction::Dup,
+            Instruction::Aload_2,
+            Instruction::Invokespecial(runtime_init),
+            Instruction::Athrow,
         ],
-    )
+        vec![ExceptionTableEntry {
+            range_pc: 0..3,
+            handler_pc: 3,
+            catch_type: io,
+        }],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::FullFrame {
+            frame_type: 255,
+            offset_delta: 3,
+            locals: vec![
+                VerificationType::Object { cpool_index: owner },
+                VerificationType::Object { cpool_index: track },
+            ],
+            stack: vec![VerificationType::Object { cpool_index: io }],
+        }],
+    )?;
+    Ok(body)
 }
 
 fn manager_decode_track_details(pool: &mut ConstantPool<'static>) -> Result<Attribute> {
-    let native = pool.add_class(NATIVE_CLASS)?;
+    let manager = pool.add_class(MANAGER_CLASS)?;
+    let sources = pool.add_field_ref(manager, "mantleSources", "Ljava/util/ArrayList;")?;
+    let helper = pool.add_class(MANAGER_HELPER_CLASS)?;
     let decode = pool.add_method_ref(
-        native,
+        helper,
         "decodeTrackDetails",
-        "(Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;[B)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
+        "(Ljava/util/List;Lcom/sedmelluq/discord/lavaplayer/track/AudioTrackInfo;[B)Lcom/sedmelluq/discord/lavaplayer/track/AudioTrack;",
     )?;
-    code(
+    let io = pool.add_class("java/io/IOException")?;
+    let runtime = pool.add_class("java/lang/RuntimeException")?;
+    let runtime_init = pool.add_method_ref(runtime, "<init>", "(Ljava/lang/Throwable;)V")?;
+    let info = pool.add_class("com/sedmelluq/discord/lavaplayer/track/AudioTrackInfo")?;
+    let bytes = pool.add_class("[B")?;
+    let mut body = code_with_exceptions(
         pool,
-        2,
         3,
+        4,
         vec![
+            Instruction::Aload_0,
+            Instruction::Getfield(sources),
             Instruction::Aload_1,
             Instruction::Aload_2,
             Instruction::Invokestatic(decode),
             Instruction::Areturn,
+            Instruction::Astore_3,
+            Instruction::New(runtime),
+            Instruction::Dup,
+            Instruction::Aload_3,
+            Instruction::Invokespecial(runtime_init),
+            Instruction::Athrow,
         ],
-    )
+        vec![ExceptionTableEntry {
+            range_pc: 0..6,
+            handler_pc: 6,
+            catch_type: io,
+        }],
+    )?;
+    add_stack_map_table(
+        pool,
+        &mut body,
+        vec![StackFrame::FullFrame {
+            frame_type: 255,
+            offset_delta: 6,
+            locals: vec![
+                VerificationType::Object {
+                    cpool_index: manager,
+                },
+                VerificationType::Object { cpool_index: info },
+                VerificationType::Object { cpool_index: bytes },
+            ],
+            stack: vec![VerificationType::Object { cpool_index: io }],
+        }],
+    )?;
+    Ok(body)
 }
 
 fn clean_method(pool: &mut ConstantPool<'static>, owner: &str, field: &str) -> Result<Attribute> {

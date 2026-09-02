@@ -1,0 +1,271 @@
+{
+  "schema_version": 1,
+  "status": "COMPLETE",
+  "phase": "phase14-real-consumer-compatibility",
+  "compatibility_baseline": "dev.arbjerg:lavaplayer:2.2.6",
+  "mantle_artifact": "io.github.rayan6ms:mantle-lavaplayer:1.0.0",
+  "inventory": "reference/phase14-real-consumer-inventory.json",
+  "behavior_plan": "compatibility/phase14-real-consumer-behavior.json",
+  "evidence_dimensions": [
+    {
+      "dimension": "source",
+      "gates": [
+        "scripts/check-phase14-lavalink-source-compatibility.sh",
+        "scripts/check-phase14-jmusicbot-source-compatibility.sh",
+        "scripts/check-phase14-simplevoicechat-source-compatibility.sh",
+        "scripts/check-phase14-youtube-source-spi-compatibility.sh"
+      ],
+      "results": [
+        "lavalink-source-compatibility/result.json",
+        "jmusicbot-source-compatibility/result.json",
+        "simplevoicechat-source-compatibility/result.json",
+        "youtube-source-spi-compatibility/result.json"
+      ]
+    },
+    {
+      "dimension": "binary",
+      "gates": [
+        "scripts/check-phase14-lavalink-source-compatibility.sh",
+        "scripts/check-phase14-jmusicbot-source-compatibility.sh",
+        "scripts/check-phase14-simplevoicechat-source-compatibility.sh",
+        "scripts/check-phase14-youtube-source-spi-compatibility.sh"
+      ],
+      "results": [
+        "lavalink-source-compatibility/result.json",
+        "jmusicbot-source-compatibility/result.json",
+        "simplevoicechat-source-compatibility/result.json",
+        "youtube-source-spi-compatibility/result.json"
+      ]
+    },
+    {
+      "dimension": "semantic",
+      "gates": [
+        "scripts/check-phase14-real-consumer-behavior.sh"
+      ],
+      "results": [
+        "real-consumer-behavior/result.json"
+      ]
+    },
+    {
+      "dimension": "spi",
+      "gates": [
+        "scripts/check-phase14-youtube-source-spi-compatibility.sh",
+        "scripts/check-phase14-real-consumer-behavior.sh"
+      ],
+      "results": [
+        "youtube-source-spi-compatibility/result.json",
+        "real-consumer-behavior/result.json"
+      ]
+    },
+    {
+      "dimension": "serialization",
+      "gates": [
+        "scripts/check-phase14-youtube-source-spi-compatibility.sh",
+        "scripts/check-phase14-real-consumer-behavior.sh"
+      ],
+      "results": [
+        "youtube-source-spi-compatibility/result.json",
+        "real-consumer-behavior/result.json"
+      ]
+    },
+    {
+      "dimension": "artifact",
+      "gates": [
+        "scripts/check-phase14-lavalink-source-compatibility.sh"
+      ],
+      "results": [
+        "lavalink-source-compatibility/result.json"
+      ]
+    },
+    {
+      "dimension": "native_loading",
+      "gates": [
+        "scripts/check-phase14-lavalink-source-compatibility.sh",
+        "scripts/check-phase14-real-consumer-behavior.sh"
+      ],
+      "results": [
+        "lavalink-source-compatibility/result.json",
+        "real-consumer-behavior/result.json"
+      ]
+    },
+    {
+      "dimension": "behavior",
+      "gates": [
+        "scripts/check-phase14-real-consumer-behavior.sh"
+      ],
+      "results": [
+        "real-consumer-behavior/result.json"
+      ]
+    }
+  ],
+  "consumers": [
+    {
+      "id": "lavalink",
+      "revision": "3d24006d1eed2bd9b4f5916298cf87ab34408b6f",
+      "source_gate": "scripts/check-phase14-lavalink-source-compatibility.sh",
+      "result": "lavalink-source-compatibility/result.json",
+      "behaviors": [
+        "normal_player_scheduler",
+        "jda_style_frame_provider",
+        "listeners",
+        "markers",
+        "serialized_tracks",
+        "source_configuration"
+      ]
+    },
+    {
+      "id": "jmusicbot",
+      "revision": "859e5c5862decf433f8face5eaca3372d7d27b22",
+      "source_gate": "scripts/check-phase14-jmusicbot-source-compatibility.sh",
+      "result": "jmusicbot-source-compatibility/result.json",
+      "behaviors": [
+        "normal_player_scheduler",
+        "jda_style_frame_provider",
+        "listeners",
+        "ordered_loading",
+        "user_data",
+        "source_configuration",
+        "custom_source_or_subclass"
+      ]
+    },
+    {
+      "id": "simplevoicechat_music",
+      "revision": "f21305f4deafc4c5869a060e8dcfbbf24d73c82b",
+      "source_gate": "scripts/check-phase14-simplevoicechat-source-compatibility.sh",
+      "result": "simplevoicechat-source-compatibility/result.json",
+      "behaviors": [
+        "normal_player_scheduler",
+        "jda_style_frame_provider",
+        "listeners",
+        "ordered_loading",
+        "source_configuration"
+      ]
+    },
+    {
+      "id": "youtube_source",
+      "revision": "f45bbb7aebfcbc1c553769e04af6cd43afa8b7c3",
+      "source_gate": "scripts/check-phase14-youtube-source-spi-compatibility.sh",
+      "result": "youtube-source-spi-compatibility/result.json",
+      "behaviors": [
+        "user_data",
+        "serialized_tracks",
+        "source_configuration",
+        "custom_source_or_subclass"
+      ]
+    }
+  ],
+  "behavior_coverage": [
+    {
+      "behavior": "normal_player_scheduler",
+      "consumers": [
+        "lavalink",
+        "jmusicbot",
+        "simplevoicechat_music"
+      ]
+    },
+    {
+      "behavior": "jda_style_frame_provider",
+      "consumers": [
+        "lavalink",
+        "jmusicbot",
+        "simplevoicechat_music"
+      ]
+    },
+    {
+      "behavior": "listeners",
+      "consumers": [
+        "lavalink",
+        "jmusicbot",
+        "simplevoicechat_music"
+      ]
+    },
+    {
+      "behavior": "ordered_loading",
+      "consumers": [
+        "jmusicbot",
+        "simplevoicechat_music"
+      ]
+    },
+    {
+      "behavior": "user_data",
+      "consumers": [
+        "jmusicbot",
+        "youtube_source"
+      ]
+    },
+    {
+      "behavior": "markers",
+      "consumers": [
+        "lavalink"
+      ]
+    },
+    {
+      "behavior": "serialized_tracks",
+      "consumers": [
+        "lavalink",
+        "youtube_source"
+      ]
+    },
+    {
+      "behavior": "source_configuration",
+      "consumers": [
+        "lavalink",
+        "jmusicbot",
+        "simplevoicechat_music",
+        "youtube_source"
+      ]
+    },
+    {
+      "behavior": "custom_source_or_subclass",
+      "consumers": [
+        "jmusicbot",
+        "youtube_source"
+      ]
+    }
+  ],
+  "migration_boundaries": [
+    {
+      "ledger": "C-004",
+      "consumer": "lavalink",
+      "resolution": "boundary_redesign",
+      "regression_gate": "scripts/check-phase14-lavalink-source-compatibility.sh"
+    },
+    {
+      "ledger": "C-005",
+      "consumer": "jmusicbot",
+      "resolution": "claim_reduction",
+      "regression_gate": "scripts/check-phase14-jmusicbot-source-compatibility.sh"
+    },
+    {
+      "ledger": "C-006",
+      "consumer": "simplevoicechat_music",
+      "resolution": "build_normalization",
+      "regression_gate": "scripts/check-phase14-simplevoicechat-source-compatibility.sh"
+    },
+    {
+      "ledger": "C-007",
+      "consumer": "youtube_source",
+      "resolution": "build_normalization",
+      "regression_gate": "scripts/check-phase14-youtube-source-spi-compatibility.sh"
+    },
+    {
+      "ledger": "C-008",
+      "consumer": "youtube_source",
+      "resolution": "supported",
+      "regression_gate": "scripts/check-phase14-real-consumer-behavior.sh"
+    }
+  ],
+  "decision": {
+    "kill_gate": "PASS",
+    "material_unsupported_dependencies": [],
+    "documented_claim_reductions": [
+      {
+        "ledger": "C-005",
+        "scope": "Beam and Getyarn live-service operation",
+        "disposition": "linkage-only D_LEGACY classes; retired services are outside the operational compatibility claim"
+      }
+    ],
+    "compatibility_claim": "The four pinned consumers compile unchanged against Mantle after explicit generated build or packaging overlays, and all nine required deterministic behaviors match Lavaplayer 2.2.6. Beam and Getyarn retain linkage-only D_LEGACY status; their retired live services are not claimed operational.",
+    "next_phase": "phase15-hardening"
+  }
+}

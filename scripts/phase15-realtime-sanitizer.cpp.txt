@@ -1,0 +1,49 @@
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+extern "C" int mantle_phase15_rtsan_setup();
+extern "C" int mantle_phase15_rtsan_process(std::size_t iterations);
+extern "C" std::uint64_t mantle_phase15_rtsan_checksum();
+extern "C" void mantle_phase15_rtsan_teardown();
+
+constexpr std::size_t kIterations = 8192;
+
+int mantle_realtime_callback() [[clang::nonblocking]] {
+  return mantle_phase15_rtsan_process(kIterations);
+}
+
+void allocating_negative_control() [[clang::nonblocking]] {
+  void *allocation = std::malloc(64);
+  *static_cast<volatile unsigned char *>(allocation) = 0x5a;
+  std::free(allocation);
+}
+
+int main(int argc, char **argv) {
+  if (argc != 2) {
+    std::fprintf(stderr, "usage: %s positive|negative\n", argv[0]);
+    return 2;
+  }
+  if (std::strcmp(argv[1], "negative") == 0) {
+    allocating_negative_control();
+    std::fprintf(stderr, "negative control was not detected\n");
+    return 3;
+  }
+  if (std::strcmp(argv[1], "positive") != 0) {
+    return 2;
+  }
+  if (mantle_phase15_rtsan_setup() != 0) {
+    return 4;
+  }
+  const int status = mantle_realtime_callback();
+  const std::uint64_t checksum = mantle_phase15_rtsan_checksum();
+  mantle_phase15_rtsan_teardown();
+  if (status != 0) {
+    return 5;
+  }
+  std::printf("probe_status=PASS iterations=%zu checksum=%llu\n", kIterations,
+              static_cast<unsigned long long>(checksum));
+  return 0;
+}

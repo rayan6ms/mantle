@@ -1,0 +1,56 @@
+// Ephemeral Phase 14 migration overlay. The consumer checkout is never edited.
+def mantleRepository = uri('__LOCAL_REPO__')
+def nativeClassifier = '__NATIVE_CLASSIFIER__'
+def nativeOutput = file('__NATIVE_OUTPUT__')
+
+gradle.beforeProject { project ->
+    project.repositories {
+        maven { url = mantleRepository }
+    }
+
+    project.configurations.configureEach { configuration ->
+        configuration.resolutionStrategy.dependencySubstitution {
+            substitute module('dev.arbjerg:lavaplayer') using module('io.github.rayan6ms:mantle-lavaplayer:1.0.0') because 'Phase 14 Mantle compatibility migration'
+        }
+    }
+
+    if (project.name == 'Lavalink-Server') {
+        def mantleNative = project.configurations.maybeCreate('mantleNative')
+        mantleNative.canBeConsumed = false
+        mantleNative.canBeResolved = true
+        project.dependencies.add(mantleNative.name,
+            "io.github.rayan6ms:mantle-native:1.0.0:${nativeClassifier}")
+
+        project.tasks.register('verifyMantleNative') {
+            doLast {
+                assert project.tasks.findByName('lavaplayerNativesJar')?.enabled == false :
+                    "Lavalink's filename-based native packaging task was not disabled"
+                def nativeJar = mantleNative.resolve().find { true }
+                assert nativeJar != null : 'Mantle native classifier did not resolve'
+                assert nativeJar.name.contains("mantle-native-1.0.0-${nativeClassifier}") :
+                    "Unexpected native artifact: ${nativeJar.name}"
+                nativeOutput.mkdirs()
+                project.copy {
+                    from project.zipTree(nativeJar)
+                    into nativeOutput
+                    include 'native/**'
+                }
+                def libraries = project.fileTree(nativeOutput).matching { include 'native/**' }.files
+                assert libraries.size() == 1 : "Expected one selected Mantle native library, found ${libraries.size()}"
+                def library = libraries.iterator().next()
+                assert library.isFile() && library.absoluteFile == library :
+                    "Mantle native library path is not absolute: ${library.absolutePath}"
+                new File(nativeOutput, 'mantle-native.path').text = library.absolutePath + '\n'
+            }
+        }
+    }
+}
+
+gradle.projectsEvaluated {
+    gradle.allprojects { project ->
+        def legacyTask = project.tasks.findByName('lavaplayerNativesJar')
+        if (legacyTask != null) {
+            legacyTask.enabled = false
+        }
+    }
+}

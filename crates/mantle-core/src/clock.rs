@@ -50,7 +50,7 @@ impl ManualClock {
         let nanos = u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX);
         let _ = self
             .nanos
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
                 Some(current.saturating_add(nanos))
             });
     }
@@ -59,7 +59,7 @@ impl ManualClock {
         let nanos = u64::try_from(time.as_nanos()).unwrap_or(u64::MAX);
         let _ = self
             .nanos
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
                 Some(current.max(nanos))
             });
     }

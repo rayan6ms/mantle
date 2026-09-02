@@ -20,6 +20,18 @@ use serde::Serialize;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
+const MAX_SOAK_DURATION_SECONDS: u64 = 24 * 60 * 60;
+const MAX_SOAK_CHECKPOINTS: u64 = 1_442;
+const MAX_SOAK_CYCLE_DELAY_MS: u64 = 1_000;
+const SOAK_MEMORY_WINDOW: usize = 8;
+const SOAK_WORKLOADS: [(&str, &str); 5] = [
+    ("wav-decode-local", "reference.wav"),
+    ("mp3-decode-local", "reference.mp3"),
+    ("aac-decode-local", "reference.m4a"),
+    ("flac-decode-local", "reference.flac"),
+    ("opus-passthrough-local", "reference.webm"),
+];
+
 #[derive(Debug)]
 enum RunMode {
     Local(PathBuf),
@@ -40,6 +52,14 @@ struct ServeConfig {
     address: String,
 }
 
+#[derive(Debug)]
+struct SoakConfig {
+    fixture_root: PathBuf,
+    duration_seconds: u64,
+    checkpoint_seconds: u64,
+    cycle_delay_ms: u64,
+}
+
 #[derive(Clone, Copy, Debug, Serialize)]
 struct Summary {
     min: f64,
@@ -50,12 +70,70 @@ struct Summary {
     samples: usize,
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 struct Consumption {
     output_units: u64,
     decoded_samples: u64,
     encoded_bytes: u64,
     checksum: u64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct SoakFingerprint {
+    workload: &'static str,
+    output_units: u64,
+    decoded_samples: u64,
+    encoded_bytes: u64,
+    checksum: u64,
+}
+
+#[derive(Debug, Serialize)]
+struct SoakCheckpoint {
+    schema_version: u32,
+    kind: &'static str,
+    checkpoint: usize,
+    elapsed_seconds: f64,
+    sessions: u64,
+    completed_cycles: u64,
+    current_rss_kib: u64,
+    current_pss_kib: u64,
+    peak_rss_kib: u64,
+    threads: u64,
+}
+
+#[derive(Debug, Serialize)]
+struct SoakMemory {
+    first_window_samples: usize,
+    last_window_samples: usize,
+    first_rss_median_kib: u64,
+    last_rss_median_kib: u64,
+    rss_growth_kib: i64,
+    first_pss_median_kib: u64,
+    last_pss_median_kib: u64,
+    pss_growth_kib: i64,
+    peak_rss_kib: u64,
+    max_threads: u64,
+}
+
+#[derive(Debug, Serialize)]
+struct SoakResult {
+    schema_version: u32,
+    kind: &'static str,
+    status: &'static str,
+    configured_duration_seconds: u64,
+    elapsed_seconds: f64,
+    checkpoint_seconds: u64,
+    cycle_delay_ms: u64,
+    workloads: usize,
+    sessions: u64,
+    completed_cycles: u64,
+    fingerprint_mismatches: u64,
+    checkpoints: usize,
+    cpu_time_ms: f64,
+    voluntary_context_switches: u64,
+    involuntary_context_switches: u64,
+    memory: SoakMemory,
+    fingerprints: Vec<SoakFingerprint>,
 }
 
 enum PlaybackOutput {
@@ -196,8 +274,11 @@ fn run_main() -> Result<()> {
     let args = env::args().skip(1).collect::<Vec<_>>();
     match args.first().map(String::as_str) {
         Some("run") => run_benchmark(parse_run_config(&args[1..])?),
+        Some("soak") => run_soak(&parse_soak_config(&args[1..])?),
         Some("serve") => serve(&parse_serve_config(&args[1..])?),
-        _ => Err("usage: mantle-media-bench run <options> | serve <options>".into()),
+        _ => {
+            Err("usage: mantle-media-bench run <options> | soak <options> | serve <options>".into())
+        }
     }
 }
 
@@ -228,6 +309,39 @@ fn parse_serve_config(args: &[String]) -> Result<ServeConfig> {
     })
 }
 
+fn parse_soak_config(args: &[String]) -> Result<SoakConfig> {
+    let duration_seconds = bounded_u64(
+        args,
+        "--duration-seconds",
+        1,
+        MAX_SOAK_DURATION_SECONDS,
+        Some(MAX_SOAK_DURATION_SECONDS),
+    )?;
+    let checkpoint_seconds = bounded_u64(args, "--checkpoint-seconds", 1, 60 * 60, Some(60))?;
+    let cycle_delay_ms = bounded_u64(
+        args,
+        "--cycle-delay-ms",
+        0,
+        MAX_SOAK_CYCLE_DELAY_MS,
+        Some(250),
+    )?;
+    let checkpoints = duration_seconds
+        .div_ceil(checkpoint_seconds)
+        .saturating_add(2);
+    if checkpoints > MAX_SOAK_CHECKPOINTS {
+        return Err(format!(
+            "soak configuration would emit {checkpoints} checkpoints; limit is {MAX_SOAK_CHECKPOINTS}"
+        )
+        .into());
+    }
+    Ok(SoakConfig {
+        fixture_root: PathBuf::from(required_value(args, "--fixture-root")?),
+        duration_seconds,
+        checkpoint_seconds,
+        cycle_delay_ms,
+    })
+}
+
 fn value(args: &[String], name: &str) -> Option<String> {
     args.windows(2)
         .find(|pair| pair[0] == name)
@@ -236,6 +350,208 @@ fn value(args: &[String], name: &str) -> Option<String> {
 
 fn required_value(args: &[String], name: &str) -> Result<String> {
     value(args, name).ok_or_else(|| format!("missing required option {name}").into())
+}
+
+fn bounded_u64(
+    args: &[String],
+    name: &str,
+    minimum: u64,
+    maximum: u64,
+    default: Option<u64>,
+) -> Result<u64> {
+    let parsed = match value(args, name) {
+        Some(raw) => raw.parse()?,
+        None => default.ok_or_else(|| format!("missing required option {name}"))?,
+    };
+    if !(minimum..=maximum).contains(&parsed) {
+        return Err(format!("{name} must be between {minimum} and {maximum}").into());
+    }
+    Ok(parsed)
+}
+
+fn run_soak(config: &SoakConfig) -> Result<()> {
+    let mut fingerprints = Vec::with_capacity(SOAK_WORKLOADS.len());
+    for (workload, filename) in SOAK_WORKLOADS {
+        let consumption = consume_local_fixture(&config.fixture_root.join(filename))?;
+        fingerprints.push(SoakFingerprint {
+            workload,
+            output_units: consumption.output_units,
+            decoded_samples: consumption.decoded_samples,
+            encoded_bytes: consumption.encoded_bytes,
+            checksum: consumption.checksum,
+        });
+    }
+
+    let counters_before = read_proc_counters()?;
+    let clock_ticks = clock_ticks_per_second()?;
+    let started = Instant::now();
+    let duration = Duration::from_secs(config.duration_seconds);
+    let checkpoint_period = Duration::from_secs(config.checkpoint_seconds);
+    let cycle_delay = Duration::from_millis(config.cycle_delay_ms);
+    let checkpoint_capacity = usize::try_from(
+        config
+            .duration_seconds
+            .div_ceil(config.checkpoint_seconds)
+            .saturating_add(2),
+    )?;
+    let mut memory_samples = Vec::with_capacity(checkpoint_capacity);
+    let mut sessions = 0_u64;
+    let mut next_checkpoint = checkpoint_period;
+    let mut output = io::BufWriter::new(io::stdout().lock());
+    emit_soak_checkpoint(&mut output, started, sessions, &mut memory_samples)?;
+
+    'soak: while started.elapsed() < duration {
+        for (index, (_, filename)) in SOAK_WORKLOADS.iter().enumerate() {
+            if started.elapsed() >= duration {
+                break 'soak;
+            }
+            let consumption = consume_local_fixture(&config.fixture_root.join(filename))?;
+            let expected = fingerprints.get(index).ok_or("missing soak fingerprint")?;
+            if consumption.output_units != expected.output_units
+                || consumption.decoded_samples != expected.decoded_samples
+                || consumption.encoded_bytes != expected.encoded_bytes
+                || consumption.checksum != expected.checksum
+            {
+                return Err(format!("soak fingerprint mismatch for {}", expected.workload).into());
+            }
+            sessions = sessions.saturating_add(1);
+            if started.elapsed() >= next_checkpoint {
+                emit_soak_checkpoint(&mut output, started, sessions, &mut memory_samples)?;
+                next_checkpoint = next_checkpoint.saturating_add(checkpoint_period);
+            }
+            let remaining = duration.saturating_sub(started.elapsed());
+            thread_sleep(cycle_delay.min(remaining));
+        }
+    }
+
+    emit_soak_checkpoint(&mut output, started, sessions, &mut memory_samples)?;
+    let counters_after = read_proc_counters()?;
+    let cpu_ticks = counters_after
+        .cpu_ticks
+        .saturating_sub(counters_before.cpu_ticks);
+    let cpu_ticks = u32::try_from(cpu_ticks).map_err(|_| "soak CPU tick delta exceeds u32")?;
+    let cpu_time_ms = f64::from(cpu_ticks) * 1000.0 / f64::from(clock_ticks);
+    let result = SoakResult {
+        schema_version: 1,
+        kind: "result",
+        status: "PASS",
+        configured_duration_seconds: config.duration_seconds,
+        elapsed_seconds: started.elapsed().as_secs_f64(),
+        checkpoint_seconds: config.checkpoint_seconds,
+        cycle_delay_ms: config.cycle_delay_ms,
+        workloads: SOAK_WORKLOADS.len(),
+        sessions,
+        completed_cycles: sessions / u64::try_from(SOAK_WORKLOADS.len())?,
+        fingerprint_mismatches: 0,
+        checkpoints: memory_samples.len(),
+        cpu_time_ms,
+        voluntary_context_switches: counters_after
+            .voluntary_context_switches
+            .saturating_sub(counters_before.voluntary_context_switches),
+        involuntary_context_switches: counters_after
+            .involuntary_context_switches
+            .saturating_sub(counters_before.involuntary_context_switches),
+        memory: summarize_soak_memory(&memory_samples)?,
+        fingerprints,
+    };
+    serde_json::to_writer(&mut output, &result)?;
+    writeln!(output)?;
+    output.flush()?;
+    Ok(())
+}
+
+fn consume_local_fixture(path: &Path) -> Result<Consumption> {
+    let mut session = MediaSession::open_file(path, MediaLimits::default())?;
+    let mut output = PlaybackOutput::new(&session)?;
+    let mut consumption = Consumption::default();
+    read_one(&mut session, &mut output, &mut consumption)?;
+    consume_remaining(&mut session, &mut output, &mut consumption)?;
+    Ok(consumption)
+}
+
+fn emit_soak_checkpoint(
+    output: &mut impl Write,
+    started: Instant,
+    sessions: u64,
+    memory_samples: &mut Vec<ProcMemory>,
+) -> Result<()> {
+    if memory_samples.len() >= usize::try_from(MAX_SOAK_CHECKPOINTS)? {
+        return Err("soak checkpoint limit exceeded".into());
+    }
+    let memory = read_proc_memory()?;
+    memory_samples.push(memory);
+    let checkpoint = SoakCheckpoint {
+        schema_version: 1,
+        kind: "checkpoint",
+        checkpoint: memory_samples.len(),
+        elapsed_seconds: started.elapsed().as_secs_f64(),
+        sessions,
+        completed_cycles: sessions / u64::try_from(SOAK_WORKLOADS.len())?,
+        current_rss_kib: memory.current_rss_kib,
+        current_pss_kib: memory.current_pss_kib,
+        peak_rss_kib: memory.peak_rss_kib,
+        threads: memory.threads,
+    };
+    serde_json::to_writer(&mut *output, &checkpoint)?;
+    writeln!(output)?;
+    output.flush()?;
+    Ok(())
+}
+
+fn summarize_soak_memory(samples: &[ProcMemory]) -> Result<SoakMemory> {
+    if samples.is_empty() {
+        return Err("soak did not record a memory sample".into());
+    }
+    let window = samples.len().min(SOAK_MEMORY_WINDOW);
+    let first = &samples[..window];
+    let last = &samples[samples.len() - window..];
+    let rss_at_start = median_u64(first.iter().map(|sample| sample.current_rss_kib));
+    let rss_at_end = median_u64(last.iter().map(|sample| sample.current_rss_kib));
+    let proportional_at_start = median_u64(first.iter().map(|sample| sample.current_pss_kib));
+    let proportional_at_end = median_u64(last.iter().map(|sample| sample.current_pss_kib));
+    Ok(SoakMemory {
+        first_window_samples: window,
+        last_window_samples: window,
+        first_rss_median_kib: rss_at_start,
+        last_rss_median_kib: rss_at_end,
+        rss_growth_kib: signed_growth(rss_at_end, rss_at_start),
+        first_pss_median_kib: proportional_at_start,
+        last_pss_median_kib: proportional_at_end,
+        pss_growth_kib: signed_growth(proportional_at_end, proportional_at_start),
+        peak_rss_kib: samples
+            .iter()
+            .map(|sample| sample.peak_rss_kib)
+            .max()
+            .unwrap_or(0),
+        max_threads: samples
+            .iter()
+            .map(|sample| sample.threads)
+            .max()
+            .unwrap_or(0),
+    })
+}
+
+fn median_u64(values: impl Iterator<Item = u64>) -> u64 {
+    let mut values = values.collect::<Vec<_>>();
+    values.sort_unstable();
+    values[values.len() / 2]
+}
+
+fn signed_growth(end: u64, start: u64) -> i64 {
+    let difference = i128::from(end) - i128::from(start);
+    i64::try_from(difference).unwrap_or_else(|_| {
+        if difference.is_negative() {
+            i64::MIN
+        } else {
+            i64::MAX
+        }
+    })
+}
+
+fn thread_sleep(duration: Duration) {
+    if !duration.is_zero() {
+        std::thread::sleep(duration);
+    }
 }
 
 fn run_benchmark(config: RunConfig) -> Result<()> {
@@ -613,5 +929,64 @@ mod tests {
         let config = parse_run_config(&args).unwrap();
         assert!(matches!(config.input, RunMode::Http(_)));
         assert!(config.seek);
+    }
+
+    #[test]
+    fn accepts_only_bounded_soak_checkpoint_schedules() {
+        let full = [
+            "--fixture-root".to_owned(),
+            "/fixtures".to_owned(),
+            "--duration-seconds".to_owned(),
+            "86400".to_owned(),
+            "--checkpoint-seconds".to_owned(),
+            "60".to_owned(),
+            "--cycle-delay-ms".to_owned(),
+            "250".to_owned(),
+        ];
+        let config = parse_soak_config(&full).unwrap();
+        assert_eq!(config.duration_seconds, MAX_SOAK_DURATION_SECONDS);
+        assert_eq!(config.checkpoint_seconds, 60);
+        assert_eq!(config.cycle_delay_ms, 250);
+
+        let too_long = full.clone().map(|value| {
+            if value == "86400" {
+                "86401".to_owned()
+            } else {
+                value
+            }
+        });
+        assert!(parse_soak_config(&too_long).is_err());
+
+        let too_many_checkpoints = full.map(|value| {
+            if value == "60" {
+                "59".to_owned()
+            } else {
+                value
+            }
+        });
+        assert!(parse_soak_config(&too_many_checkpoints).is_err());
+    }
+
+    #[test]
+    fn summarizes_soak_memory_from_fixed_edge_windows() {
+        let samples = (0_u64..16)
+            .map(|index| ProcMemory {
+                peak_rss_kib: 400 + index,
+                current_rss_kib: if index < 8 { 100 + index } else { 192 + index },
+                current_pss_kib: if index < 8 { 80 + index } else { 122 + index },
+                threads: 1 + u64::from(index == 10),
+            })
+            .collect::<Vec<_>>();
+        let summary = summarize_soak_memory(&samples).unwrap();
+        assert_eq!(summary.first_window_samples, SOAK_MEMORY_WINDOW);
+        assert_eq!(summary.last_window_samples, SOAK_MEMORY_WINDOW);
+        assert_eq!(summary.first_rss_median_kib, 104);
+        assert_eq!(summary.last_rss_median_kib, 204);
+        assert_eq!(summary.rss_growth_kib, 100);
+        assert_eq!(summary.first_pss_median_kib, 84);
+        assert_eq!(summary.last_pss_median_kib, 134);
+        assert_eq!(summary.pss_growth_kib, 50);
+        assert_eq!(summary.peak_rss_kib, 415);
+        assert_eq!(summary.max_threads, 2);
     }
 }

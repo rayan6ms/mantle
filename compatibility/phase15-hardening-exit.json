@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "status": "COMPLETE",
+  "phase": "phase15-hardening-exit",
+  "compatibility_baseline": "dev.arbjerg:lavaplayer:2.2.6",
+  "hardening_plan": "compatibility/phase15-hardening-plan.json",
+  "preflight_resolution": {
+    "status": "RESOLVED",
+    "historical_result": "target/phase15/hardening-preflight/result.json",
+    "blocker": "B-001",
+    "resolution_gate": "scripts/check-phase15-sanitizer-fuzz.sh"
+  },
+  "required_gates": [
+    {
+      "id": "sanitizer_fuzz",
+      "status": "PASS",
+      "plan": "compatibility/phase15-sanitizer-fuzz.json",
+      "checker": "scripts/check-phase15-sanitizer-fuzz.sh",
+      "result": "target/phase15/sanitizer-fuzz/result.json"
+    },
+    {
+      "id": "concurrency_lifecycle",
+      "status": "PASS",
+      "plan": "compatibility/phase15-concurrency-lifecycle.json",
+      "checker": "scripts/check-phase15-concurrency-lifecycle.sh",
+      "result": "target/phase15/concurrency-lifecycle/result.json"
+    },
+    {
+      "id": "dependency_audit",
+      "status": "PASS",
+      "plan": "compatibility/phase15-dependency-audit.json",
+      "checker": "scripts/check-phase15-dependency-audit.sh",
+      "result": "target/phase15/dependency-audit/result.json"
+    },
+    {
+      "id": "realtime_sanitizer",
+      "status": "PASS",
+      "plan": "compatibility/phase15-realtime-sanitizer.json",
+      "checker": "scripts/check-phase15-realtime-sanitizer.sh",
+      "result": "target/phase15/realtime-sanitizer/result.json"
+    },
+    {
+      "id": "native_soak",
+      "status": "PASS",
+      "plan": "compatibility/phase15-native-soak.json",
+      "checker": "scripts/check-phase15-native-soak.sh",
+      "result": "target/phase15/native-soak/result.json"
+    },
+    {
+      "id": "replay_fault_soak",
+      "status": "PASS_WITH_REDUCED_DURATION",
+      "plan": "compatibility/phase15-replay-fault-soak.json",
+      "checker": "scripts/check-phase15-replay-fault-soak.sh",
+      "result": "target/phase15/replay-fault-soak-interrupted-20260901T153521Z/result.json"
+    }
+  ],
+  "evidence_dimensions": [
+    {"dimension": "property_tests", "gate": "sanitizer_fuzz"},
+    {"dimension": "fuzzing", "gate": "sanitizer_fuzz"},
+    {"dimension": "undefined_behavior", "gate": "sanitizer_fuzz"},
+    {"dimension": "native_sanitizers", "gate": "sanitizer_fuzz"},
+    {"dimension": "concurrency", "gate": "concurrency_lifecycle"},
+    {"dimension": "lifecycle", "gate": "concurrency_lifecycle"},
+    {"dimension": "supply_chain", "gate": "dependency_audit"},
+    {"dimension": "realtime", "gate": "realtime_sanitizer"},
+    {"dimension": "native_soak", "gate": "native_soak"},
+    {"dimension": "network_fault_soak", "gate": "replay_fault_soak"}
+  ],
+  "claim_reductions": [
+    {
+      "gate": "replay_fault_soak",
+      "omitted_claim": "72-hour endurance",
+      "accepted_observation_seconds": 142741.18608706,
+      "basis": "operator-constrained acceptance of the longest uninterrupted retained evidence after a host reboot"
+    }
+  ],
+  "publication": {
+    "ready": false,
+    "constraints": [
+      {
+        "ledger": "D-001",
+        "exact_version_exemptions": 140,
+        "removal_trigger": "replace all exemptions with imported or local audits before publishing a Mantle production crate"
+      }
+    ]
+  },
+  "decision": {
+    "hardening": "PASS_WITH_REDUCED_DURATION",
+    "phase15_complete": true,
+    "next_action": null
+  },
+  "active_blockers": []
+}

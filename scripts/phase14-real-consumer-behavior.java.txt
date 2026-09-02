@@ -1,0 +1,334 @@
+import com.jagrosh.jmusicbot.audio.QueuedTrack;
+import com.jagrosh.jmusicbot.audio.RequestMetadata;
+import com.sedmelluq.discord.lavaplayer.format.StandardAudioDataFormats;
+import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
+import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager;
+import com.sedmelluq.discord.lavaplayer.player.event.AudioEvent;
+import com.sedmelluq.discord.lavaplayer.player.event.AudioEventAdapter;
+import com.sedmelluq.discord.lavaplayer.player.event.TrackEndEvent;
+import com.sedmelluq.discord.lavaplayer.player.event.TrackStartEvent;
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.tools.io.MessageInput;
+import com.sedmelluq.discord.lavaplayer.tools.io.MessageOutput;
+import com.sedmelluq.discord.lavaplayer.track.AudioItem;
+import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackEndReason;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackState;
+import com.sedmelluq.discord.lavaplayer.track.DelegatedAudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.TrackMarker;
+import com.sedmelluq.discord.lavaplayer.track.TrackMarkerHandler.MarkerState;
+import com.sedmelluq.discord.lavaplayer.track.TrackStateListener;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrameBuffer;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioTrackExecutor;
+import com.sedmelluq.discord.lavaplayer.track.playback.ImmutableAudioFrame;
+import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
+import com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame;
+import dev.lavalink.youtube.YoutubeAudioSourceManager;
+import dev.lavalink.youtube.clients.Music;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+
+public final class Phase14RealConsumerBehavior {
+  private static final byte[] FRAME_BYTES = new byte[] {1, 2, 3, 4};
+
+  private Phase14RealConsumerBehavior() {}
+
+  private static void require(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+
+  public static void main(String[] args) throws Exception {
+    if (args.length == 1) {
+      require(args[0].startsWith("/"), "native path must be absolute");
+      Class.forName("dev.mantle.internal.NativeLoader")
+          .getMethod("load", String.class).invoke(null, args[0]);
+    } else if (args.length != 0) {
+      throw new IllegalArgumentException("expected zero or one native path");
+    }
+
+    DefaultAudioPlayerManager manager = new DefaultAudioPlayerManager();
+    TestSource source = new TestSource();
+    YoutubeAudioSourceManager youtube =
+        new YoutubeAudioSourceManager(true, false, false, new Music());
+    manager.registerSourceManager(source);
+    manager.registerSourceManager(youtube);
+
+    try {
+      sourceConfiguration(manager, source, youtube);
+      consumerTrackState(source, youtube);
+      playerSchedulerAndFrames(manager, source);
+      orderedGroupLoading(manager);
+      byte[] serialized = sourceSerializationAndExtension(manager, youtube);
+
+      System.out.printf(
+          "{\"custom_source_or_subclass\":\"PASS\","
+              + "\"jda_style_frame_provider\":\"PASS\","
+              + "\"listeners\":\"PASS\","
+              + "\"markers\":\"PASS\","
+              + "\"normal_player_scheduler\":\"PASS\","
+              + "\"ordered_loading\":\"PASS\","
+              + "\"serialized_sha256\":\"%s\","
+              + "\"serialized_tracks\":\"PASS\","
+              + "\"source_configuration\":\"PASS\","
+              + "\"user_data\":\"PASS\"}%n",
+          hex(MessageDigest.getInstance("SHA-256").digest(serialized)));
+    } finally {
+      manager.shutdown();
+    }
+    require(source.shutdowns.get() == 1, "custom source shutdown count");
+  }
+
+  private static void sourceConfiguration(
+      DefaultAudioPlayerManager manager, TestSource source, YoutubeAudioSourceManager youtube) {
+    manager.getConfiguration().setFilterHotSwapEnabled(true);
+    require(manager.getConfiguration().isFilterHotSwapEnabled(), "filter hot swap configuration");
+    require(manager.getSourceManagers().size() == 2, "registered source count");
+    require(manager.getSourceManagers().get(0) == source, "custom source order");
+    require(manager.getSourceManagers().get(1) == youtube, "youtube source order");
+    require(manager.source(TestSource.class) == source, "source class lookup");
+    try {
+      manager.getSourceManagers().clear();
+      throw new AssertionError("source view is mutable");
+    } catch (UnsupportedOperationException expected) {
+      // Real consumers inspect this live view but must not mutate it.
+    }
+  }
+
+  private static void consumerTrackState(TestSource source, YoutubeAudioSourceManager youtube) {
+    TestTrack track = source.newTrack("phase14:user-data");
+    QueuedTrack queued = new QueuedTrack(track, null);
+    require(queued.getTrack() == track, "JMusicBot queued-track identity");
+    require(track.getUserData(RequestMetadata.class) == RequestMetadata.EMPTY,
+        "JMusicBot typed request metadata");
+
+    AudioTrackInfo youtubeInfo = info("youtube-video");
+    AudioTrack youtubeTrack = youtube.buildAudioTrack(youtubeInfo);
+    require(youtubeTrack instanceof DelegatedAudioTrack, "youtube-source delegated track");
+    youtubeTrack.setUserData("youtube-user-data");
+    require("youtube-user-data".equals(youtubeTrack.getUserData(String.class)),
+        "youtube-source typed user data");
+    require(youtubeTrack.getUserData(Integer.class) == null, "typed user-data mismatch");
+
+    List<MarkerState> markerStates = new ArrayList<>();
+    TestTrack markerTrack = source.newTrack("phase14:marker");
+    markerTrack.setMarker(new TrackMarker(10L, markerStates::add));
+    markerTrack.setPosition(10L);
+    require(markerStates.equals(Collections.singletonList(MarkerState.BYPASSED)),
+        "marker bypass state " + markerStates);
+  }
+
+  private static void playerSchedulerAndFrames(
+      DefaultAudioPlayerManager manager, TestSource source) throws Exception {
+    AudioPlayer player = manager.createPlayer();
+    List<String> events = Collections.synchronizedList(new ArrayList<>());
+    AudioEventAdapter listener = new AudioEventAdapter() {
+      @Override
+      public void onEvent(AudioEvent event) {
+        if (event instanceof TrackStartEvent) {
+          events.add("start:" + ((TrackStartEvent) event).track.getIdentifier());
+        } else if (event instanceof TrackEndEvent) {
+          TrackEndEvent end = (TrackEndEvent) event;
+          events.add("end:" + end.track.getIdentifier() + ":" + end.endReason.name());
+        }
+      }
+    };
+    player.addListener(listener);
+
+    TestTrack immutableTrack = source.newTrack("phase14:immutable-frame");
+    require(player.startTrack(immutableTrack, false), "initial track start");
+    require(!player.startTrack(source.newTrack("phase14:no-interrupt"), true),
+        "no-interrupt scheduler");
+    require(player.getPlayingTrack() == immutableTrack, "scheduled track identity");
+    player.setPaused(true);
+    require(player.isPaused(), "pause state");
+    player.setPaused(false);
+    require(!player.isPaused(), "resume state");
+    AudioFrame immutable = player.provide();
+    require(immutable != null && Arrays.equals(immutable.getData(), FRAME_BYTES),
+        "JDA immutable frame");
+    require(player.provide() == null, "immutable frame consumed once");
+    player.stopTrack();
+
+    TestTrack reusableTrack = source.newTrack("phase14:mutable-frame");
+    require(player.startTrack(reusableTrack, false), "reusable track start");
+    MutableAudioFrame reusable = new MutableAudioFrame(ByteBuffer.allocate(32));
+    require(player.provide(reusable), "reusable frame delivery");
+    byte[] copied = new byte[reusable.getDataLength()];
+    reusable.getData(copied, 0);
+    require(Arrays.equals(copied, FRAME_BYTES), "reusable frame bytes");
+    require(!player.provide(reusable), "reusable frame consumed once");
+    player.stopTrack();
+    player.removeListener(listener);
+    player.destroy();
+
+    require(events.equals(Arrays.asList(
+        "start:phase14:immutable-frame",
+        "end:phase14:immutable-frame:STOPPED",
+        "start:phase14:mutable-frame",
+        "end:phase14:mutable-frame:STOPPED")), "listener event order " + events);
+  }
+
+  private static void orderedGroupLoading(DefaultAudioPlayerManager manager) throws Exception {
+    List<Integer> callbacks = Collections.synchronizedList(new ArrayList<>());
+    @SuppressWarnings("unchecked")
+    Future<Void>[] futures = new Future[12];
+    Object groupKey = new String("phase14-consumer-group");
+    for (int index = 0; index < futures.length; index++) {
+      final int callbackIndex = index;
+      futures[index] = manager.loadItemOrdered(
+          groupKey, new AudioReference("phase14:ordered:" + index, null),
+          new AudioLoadResultHandler() {
+            @Override public void trackLoaded(AudioTrack track) {
+              require(track.getIdentifier().equals("phase14:ordered:" + callbackIndex),
+                  "ordered track identity");
+              callbacks.add(callbackIndex);
+            }
+            @Override public void playlistLoaded(AudioPlaylist playlist) {
+              throw new AssertionError("unexpected playlist");
+            }
+            @Override public void noMatches() { throw new AssertionError("unexpected no-match"); }
+            @Override public void loadFailed(FriendlyException error) {
+              throw new AssertionError(error);
+            }
+          });
+    }
+    for (Future<Void> future : futures) {
+      future.get(10, TimeUnit.SECONDS);
+      require(future.isDone() && !future.isCancelled(), "ordered future completion");
+    }
+    for (int index = 0; index < futures.length; index++) {
+      require(callbacks.get(index) == index, "ordered callback FIFO " + callbacks);
+    }
+  }
+
+  private static byte[] sourceSerializationAndExtension(
+      DefaultAudioPlayerManager manager, YoutubeAudioSourceManager youtube) throws Exception {
+    AudioTrack track = youtube.buildAudioTrack(info("serialized-video"));
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    MessageOutput output = new MessageOutput(bytes);
+    manager.encodeTrack(output, track);
+    output.finish();
+    byte[] encoded = bytes.toByteArray();
+    require(encoded.length > 32, "serialized track length");
+
+    MessageInput input = new MessageInput(new ByteArrayInputStream(encoded));
+    AudioTrack decoded = manager.decodeTrack(input).decodedTrack;
+    require(decoded != null, "decoded track");
+    require(decoded.getIdentifier().equals(track.getIdentifier()), "decoded identifier");
+    require(decoded.getInfo().title.equals(track.getInfo().title), "decoded title");
+    require(decoded.getSourceManager() == youtube, "decoded source manager");
+
+    Class<?> transformative = Class.forName(
+        "com.jagrosh.jmusicbot.audio.TransformativeAudioSourceManager", false,
+        Phase14RealConsumerBehavior.class.getClassLoader());
+    require(YoutubeAudioSourceManager.class.isAssignableFrom(transformative),
+        "JMusicBot transformative source subclass");
+    return encoded;
+  }
+
+  private static AudioTrackInfo info(String identifier) {
+    return new AudioTrackInfo(
+        "Phase 14 title", "Phase 14 author", 20_000L, identifier, false,
+        "https://phase14.invalid/" + identifier, "https://phase14.invalid/artwork", "ISRC-PHASE14");
+  }
+
+  private static String hex(byte[] bytes) {
+    StringBuilder value = new StringBuilder(bytes.length * 2);
+    for (byte item : bytes) value.append(String.format("%02x", item & 0xff));
+    return value.toString();
+  }
+
+  private static final class TestSource implements AudioSourceManager {
+    private final AtomicInteger shutdowns = new AtomicInteger();
+
+    TestTrack newTrack(String identifier) { return new TestTrack(info(identifier), this); }
+    @Override public String getSourceName() { return "phase14-local"; }
+    @Override public AudioItem loadItem(AudioPlayerManager manager, AudioReference reference) {
+      return reference.identifier != null && reference.identifier.startsWith("phase14:ordered:")
+          ? newTrack(reference.identifier) : null;
+    }
+    @Override public boolean isTrackEncodable(AudioTrack track) {
+      return track instanceof TestTrack && track.getSourceManager() == this;
+    }
+    @Override public void encodeTrack(AudioTrack track, DataOutput output) throws IOException {
+      output.writeUTF("phase14-v1");
+    }
+    @Override public AudioTrack decodeTrack(AudioTrackInfo trackInfo, DataInput input)
+        throws IOException {
+      if (!"phase14-v1".equals(input.readUTF())) throw new IOException("wrong source details");
+      return new TestTrack(trackInfo, this);
+    }
+    @Override public void shutdown() { shutdowns.incrementAndGet(); }
+  }
+
+  private static final class TestTrack extends DelegatedAudioTrack {
+    private final TestSource source;
+
+    TestTrack(AudioTrackInfo info, TestSource source) {
+      super(info);
+      this.source = source;
+    }
+
+    @Override public AudioSourceManager getSourceManager() { return source; }
+    @Override public AudioTrackExecutor createLocalExecutor(AudioPlayerManager manager) {
+      return new TestExecutor();
+    }
+    @Override public void process(LocalAudioTrackExecutor executor) {}
+    @Override protected AudioTrack makeShallowClone() { return new TestTrack(trackInfo, source); }
+  }
+
+  private static final class TestExecutor implements AudioTrackExecutor {
+    private final AtomicReference<AudioFrame> frame = new AtomicReference<>(
+        new ImmutableAudioFrame(0L, FRAME_BYTES.clone(), 100, StandardAudioDataFormats.DISCORD_OPUS));
+    private volatile AudioTrackState state = AudioTrackState.INACTIVE;
+    private volatile long position;
+
+    @Override public AudioFrameBuffer getAudioBuffer() { return null; }
+    @Override public void execute(TrackStateListener listener) { state = AudioTrackState.PLAYING; }
+    @Override public void stop() { state = AudioTrackState.FINISHED; }
+    @Override public long getPosition() { return position; }
+    @Override public void setPosition(long value) { position = value; }
+    @Override public AudioTrackState getState() { return state; }
+    @Override public void setMarker(TrackMarker marker) {}
+    @Override public void addMarker(TrackMarker marker) {}
+    @Override public void removeMarker(TrackMarker marker) {}
+    @Override public boolean failedBeforeLoad() { return false; }
+    @Override public AudioFrame provide() { return frame.getAndSet(null); }
+    @Override public AudioFrame provide(long timeout, TimeUnit unit) { return provide(); }
+    @Override public boolean provide(MutableAudioFrame target) {
+      AudioFrame value = provide();
+      if (value == null) return false;
+      target.setTimecode(value.getTimecode());
+      target.setVolume(value.getVolume());
+      target.setFormat(value.getFormat());
+      target.store(value.getData(), 0, value.getDataLength());
+      return true;
+    }
+    @Override public boolean provide(MutableAudioFrame target, long timeout, TimeUnit unit)
+        throws TimeoutException, InterruptedException {
+      return provide(target);
+    }
+  }
+}

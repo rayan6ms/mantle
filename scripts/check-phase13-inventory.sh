@@ -7,6 +7,8 @@ readonly PLAN="$ROOT/compatibility/phase13-plan.json"
 readonly INVENTORY="$ROOT/reference/lavaplayer-2.2.6-inventory.json"
 readonly LEDGER="$ROOT/compatibility/lavaplayer-2.2.6-classification.json"
 readonly DOCUMENT="$ROOT/docs/compatibility/PHASE13_JVM_INVENTORY.md"
+readonly ARTIFACT_CONTRACT="$ROOT/compatibility/mantle-1.0-artifact-contract.json"
+readonly PUBLISHED_POM="$ROOT/compatibility/mantle-lavaplayer-1.0.0.pom"
 
 jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER" \
   --from-file /dev/stdin "$PLAN" >/dev/null <<'JQ'
@@ -37,7 +39,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ($inv | symbol_records) as $inventory_symbols |
   . as $plan |
   .schema_version == 1 and
-  .status == "IN_PROGRESS" and
+  .status == "COMPLETE" and
   .compatibility_baseline == "lavaplayer-2.2.6" and
   .inventory == "reference/lavaplayer-2.2.6-inventory.json" and
   .classification_ledger == "compatibility/lavaplayer-2.2.6-classification.json" and
@@ -84,6 +86,10 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([.existing_structural_slice.binary_names[] as $name |
     $inv.classes[] | select(.binary_name == $name) |
     1 + (.fields | length) + (.methods | length)] | add) == 498 and
+  .artifact_workstreams.status == "COMPLETE" and
+  .artifact_workstreams.contract == "compatibility/mantle-1.0-artifact-contract.json" and
+  .artifact_workstreams.published_pom == "compatibility/mantle-lavaplayer-1.0.0.pom" and
+  (.artifact_workstreams.evidence | index("scripts/check-phase13-artifacts.sh")) != null and
   .artifact_workstreams.resources.expected_count == $inv.counts.non_class_resources and
   (.artifact_workstreams.resources.paths | sort) == ([$inv.resources[].path] | sort) and
   .artifact_workstreams.pom_dependencies.expected_count == $inv.counts.pom_dependencies and
@@ -2478,11 +2484,12 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
     fields: 0,
     methods: 3,
     symbols: 4,
-    classification: "A_EXACT",
+    classification: "D_LEGACY",
     evidence: [
       "scripts/run-jvm-gate-a.sh",
       "tools/jvm-gate/src/emitter.rs",
-      "tools/jvm-gate/src/main.rs"
+      "tools/jvm-gate/src/main.rs",
+      "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md"
     ]
   } and
   .cohorts[2].completed_slices[32] == {
@@ -2491,11 +2498,12 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
     fields: 0,
     methods: 4,
     symbols: 5,
-    classification: "A_EXACT",
+    classification: "D_LEGACY",
     evidence: [
       "scripts/run-jvm-gate-a.sh",
       "tools/jvm-gate/src/emitter.rs",
-      "tools/jvm-gate/src/main.rs"
+      "tools/jvm-gate/src/main.rs",
+      "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md"
     ]
   } and
   .cohorts[2].completed_slices[33] == {
@@ -3811,11 +3819,12 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
     fields: 0,
     methods: 5,
     symbols: 6,
-    classification: "A_EXACT",
+    classification: "MIXED_A_EXACT_D_LEGACY",
     evidence: [
       "scripts/run-jvm-gate-a.sh",
       "tools/jvm-gate/src/emitter.rs",
-      "tools/jvm-gate/src/main.rs"
+      "tools/jvm-gate/src/main.rs",
+      "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md"
     ]
   } and
   .cohorts[3].completed_slices[15] == {
@@ -3963,10 +3972,10 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   } and
   ([.cohorts[3].completed_slices[].symbols] | add) == .cohorts[3].classified_symbols and
   (.cohorts[3].classified_symbols + .cohorts[3].remaining_symbols) == .cohorts[3].symbols and
-  .cohorts[4].status == "IN_PROGRESS" and
-  .cohorts[4].classified_symbols == 284 and
-  .cohorts[4].remaining_symbols == 107 and
-  (.cohorts[4].completed_slices | length) == 42 and
+  .cohorts[4].status == "COMPLETE" and
+  .cohorts[4].classified_symbols == 391 and
+  .cohorts[4].remaining_symbols == 0 and
+  (.cohorts[4].completed_slices | length) == 55 and
   .cohorts[4].completed_slices[0] == {
     id: "copy-on-update-identity-list-contracts",
     classes: 1,
@@ -4513,11 +4522,453 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       "tools/jvm-gate/src/main.rs"
     ]
   } and
+  .cohorts[4].completed_slices[42] == {
+    id: "http-interface-contracts",
+    classes: 1,
+    fields: 6,
+    methods: 7,
+    symbols: 8,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
+  .cohorts[4].completed_slices[43] == {
+    id: "http-interface-manager-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 1,
+    symbols: 2,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
+  .cohorts[4].completed_slices[44] == {
+    id: "message-input-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 4,
+    symbols: 5,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
+  .cohorts[4].completed_slices[45] == {
+    id: "message-output-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 5,
+    symbols: 6,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
+  .cohorts[4].completed_slices[46] == {
+    id: "non-seekable-input-stream-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 8,
+    symbols: 9,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
+  .cohorts[4].completed_slices[47] == {
+    id: "persistent-http-stream-contracts",
+    classes: 1,
+    fields: 4,
+    methods: 22,
+    symbols: 27,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
+  .cohorts[4].completed_slices[48] == {
+    id: "resettable-bounded-input-stream-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 8,
+    symbols: 9,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
+  .cohorts[4].completed_slices[49] == {
+    id: "saved-head-seekable-input-stream-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 13,
+    symbols: 14,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
+  .cohorts[4].completed_slices[50] == {
+    id: "seekable-input-stream-contracts",
+    classes: 1,
+    fields: 1,
+    methods: 9,
+    symbols: 11,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
+  .cohorts[4].completed_slices[51] == {
+    id: "simple-http-interface-manager-contracts",
+    classes: 1,
+    fields: 1,
+    methods: 3,
+    symbols: 4,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
+  .cohorts[4].completed_slices[52] == {
+    id: "stream-tools-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 2,
+    symbols: 3,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
+  .cohorts[4].completed_slices[53] == {
+    id: "thread-local-http-interface-manager-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 3,
+    symbols: 4,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
+  .cohorts[4].completed_slices[54] == {
+    id: "trust-manager-builder-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 4,
+    symbols: 5,
+    classification: "A_EXACT",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs"
+    ]
+  } and
   ([.cohorts[4].completed_slices[].symbols] | add) == .cohorts[4].classified_symbols and
   (.cohorts[4].classified_symbols + .cohorts[4].remaining_symbols) == .cohorts[4].symbols and
-  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 2560 and
+  .cohorts[5].status == "COMPLETE" and
+  .cohorts[5].classified_symbols == 95 and
+  .cohorts[5].remaining_symbols == 0 and
+  .cohorts[5].completed_slices[0] == {
+    id: "connector-native-lib-loader-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 2,
+    symbols: 3,
+    classification: "D_LEGACY",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs",
+      "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md"
+    ]
+  } and
+  .cohorts[5].completed_slices[1] == {
+    id: "aac-decoder-contracts",
+    classes: 2,
+    fields: 6,
+    methods: 8,
+    symbols: 16,
+    classification: "MIXED_A_EXACT_D_LEGACY",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs",
+      "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md"
+    ]
+  } and
+  .cohorts[5].completed_slices[2] == {
+    id: "mp3-decoder-contracts",
+    classes: 2,
+    fields: 7,
+    methods: 21,
+    symbols: 30,
+    classification: "MIXED_A_EXACT_D_LEGACY",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs",
+      "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md"
+    ]
+  } and
+  .cohorts[5].completed_slices[3] == {
+    id: "opus-codec-contracts",
+    classes: 2,
+    fields: 0,
+    methods: 7,
+    symbols: 9,
+    classification: "MIXED_A_EXACT_D_LEGACY",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs",
+      "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md"
+    ]
+  } and
+  .cohorts[5].completed_slices[4] == {
+    id: "samplerate-converter-contracts",
+    classes: 3,
+    fields: 5,
+    methods: 12,
+    symbols: 17,
+    classification: "MIXED_A_EXACT_D_LEGACY",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs",
+      "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md"
+    ]
+  } and
+  .cohorts[5].completed_slices[5] == {
+    id: "cpu-statistics-contracts",
+    classes: 2,
+    fields: 5,
+    methods: 6,
+    symbols: 13,
+    classification: "MIXED_A_EXACT_D_LEGACY",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs",
+      "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md"
+    ]
+  } and
+  .cohorts[5].completed_slices[6] == {
+    id: "vorbis-decoder-contracts",
+    classes: 1,
+    fields: 0,
+    methods: 6,
+    symbols: 7,
+    classification: "D_LEGACY",
+    evidence: [
+      "scripts/run-jvm-gate-a.sh",
+      "tools/jvm-gate/src/emitter.rs",
+      "tools/jvm-gate/src/main.rs",
+      "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md"
+    ]
+  } and
+  ([.cohorts[5].completed_slices[].symbols] | add) == .cohorts[5].classified_symbols and
+  (.cohorts[5].classified_symbols + .cohorts[5].remaining_symbols) == .cohorts[5].symbols and
+  ([$classifications.symbols[] | select(.assessment == "CLASSIFIED")] | length) == 2762 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 2411 and
+    select(.assessment == "CLASSIFIED" and .classification == "A_EXACT")] | length) == 2564 and
+  ([$classifications.symbols[] |
+    select((.binary_name ==
+        "com.sedmelluq.discord.lavaplayer.natives.statistics.CpuStatistics" or
+      .binary_name ==
+        "com.sedmelluq.discord.lavaplayer.natives.statistics.CpuStatistics$Times") and
+      .assessment == "CLASSIFIED" and
+      (if .binary_name ==
+          "com.sedmelluq.discord.lavaplayer.natives.statistics.CpuStatistics" and
+          (.member_name == null or (.member_name | IN("<init>", "getSystemTimes")))
+       then .classification == "D_LEGACY" and
+         (.tests | index(
+           "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md")) != null
+       else .classification == "A_EXACT"
+       end) and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 13 and
+  ([$classifications.symbols[] |
+    select(.binary_name ==
+      "com.sedmelluq.discord.lavaplayer.natives.vorbis.VorbisDecoder" and
+      .assessment == "CLASSIFIED" and .classification == "D_LEGACY" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null and
+      (.tests | index(
+        "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md")) != null)] |
+    length) == 7 and
+  ([$classifications.symbols[] |
+    select((.binary_name ==
+      "com.sedmelluq.discord.lavaplayer.natives.opus.OpusDecoder" or
+      .binary_name ==
+        "com.sedmelluq.discord.lavaplayer.natives.opus.OpusEncoder") and
+      .assessment == "CLASSIFIED" and
+      (if .binary_name ==
+          "com.sedmelluq.discord.lavaplayer.natives.opus.OpusDecoder" and
+          .member_name == "getPacketFrameSize"
+       then .classification == "A_EXACT"
+       else .classification == "D_LEGACY" and
+         (.tests | index(
+           "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md")) != null
+       end) and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 9 and
+  ([$classifications.symbols[] |
+    select(.binary_name ==
+      "com.sedmelluq.discord.lavaplayer.natives.ConnectorNativeLibLoader" and
+      .assessment == "CLASSIFIED" and .classification == "D_LEGACY" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null and
+      (.tests | index(
+        "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md")) != null)] |
+    length) == 3 and
+  ([$classifications.symbols[] |
+    select((.binary_name == "com.sedmelluq.discord.lavaplayer.natives.mp3.Mp3Decoder" or
+      .binary_name ==
+        "com.sedmelluq.discord.lavaplayer.natives.mp3.Mp3Decoder$MpegVersion") and
+      .assessment == "CLASSIFIED" and
+      (if .binary_name == "com.sedmelluq.discord.lavaplayer.natives.mp3.Mp3Decoder" and
+          (.member_name == null or (.member_name | IN("<init>", "decode", "freeResources")))
+       then .classification == "D_LEGACY" and
+         (.tests | index(
+           "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md")) != null
+       else .classification == "A_EXACT"
+       end) and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 30 and
+  ([$classifications.symbols[] |
+    select((.binary_name == "com.sedmelluq.discord.lavaplayer.natives.aac.AacDecoder" or
+      .binary_name ==
+        "com.sedmelluq.discord.lavaplayer.natives.aac.AacDecoder$StreamInfo") and
+      .assessment == "CLASSIFIED" and
+      (if .binary_name ==
+          "com.sedmelluq.discord.lavaplayer.natives.aac.AacDecoder$StreamInfo" or
+          .symbol_kind == "FIELD"
+       then .classification == "A_EXACT"
+       else .classification == "D_LEGACY" and
+         (.tests | index(
+           "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md")) != null
+       end) and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 16 and
+  ([$classifications.symbols[] |
+    select(.binary_name == "com.sedmelluq.discord.lavaplayer.tools.io.TrustManagerBuilder" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 5 and
+  ([$classifications.symbols[] |
+    select(.binary_name == "com.sedmelluq.discord.lavaplayer.tools.CopyOnUpdateIdentityList" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 5 and
+  ([$classifications.symbols[] |
+    select(.binary_name ==
+      "com.sedmelluq.discord.lavaplayer.tools.io.ThreadLocalHttpInterfaceManager" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 4 and
+  ([$classifications.symbols[] |
+    select(.binary_name == "com.sedmelluq.discord.lavaplayer.tools.io.StreamTools" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 3 and
+  ([$classifications.symbols[] |
+    select(.binary_name == "com.sedmelluq.discord.lavaplayer.tools.io.SimpleHttpInterfaceManager" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 4 and
+  ([$classifications.symbols[] |
+    select(.binary_name == "com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 11 and
+  ([$classifications.symbols[] |
+    select(.binary_name == "com.sedmelluq.discord.lavaplayer.tools.io.SavedHeadSeekableInputStream" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 14 and
+  ([$classifications.symbols[] |
+    select(.binary_name == "com.sedmelluq.discord.lavaplayer.tools.io.ResettableBoundedInputStream" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 9 and
+  ([$classifications.symbols[] |
+    select(.binary_name == "com.sedmelluq.discord.lavaplayer.tools.io.PersistentHttpStream" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 27 and
+  ([$classifications.symbols[] |
+    select(.binary_name == "com.sedmelluq.discord.lavaplayer.tools.io.NonSeekableInputStream" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 9 and
+  ([$classifications.symbols[] |
+    select(.binary_name == "com.sedmelluq.discord.lavaplayer.tools.io.MessageOutput" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 6 and
+  ([$classifications.symbols[] |
+    select(.binary_name == "com.sedmelluq.discord.lavaplayer.tools.io.MessageInput" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 5 and
+  ([$classifications.symbols[] |
+    select(.binary_name == "com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 2 and
+  ([$classifications.symbols[] |
+    select(.binary_name == "com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface" and
+      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 8 and
   ([$classifications.symbols[] |
     select((.binary_name == "com.sedmelluq.discord.lavaplayer.tools.io.HttpClientTools" or
       .binary_name == "com.sedmelluq.discord.lavaplayer.tools.io.HttpClientTools$NoRedirectsStrategy") and
@@ -4949,7 +5400,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([$classifications.symbols[] |
     select(.assessment == "CLASSIFIED" and .classification == "C_SEMANTIC")] | length) == 133 and
   ([$classifications.symbols[] |
-    select(.assessment == "CLASSIFIED" and .classification == "D_LEGACY")] | length) == 16 and
+    select(.assessment == "CLASSIFIED" and .classification == "D_LEGACY")] | length) == 65 and
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.container.common.AacPacketRouter" and
@@ -4963,7 +5414,15 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
       .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
       (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
       (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
-      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 6 and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 4 and
+  ([$classifications.symbols[] |
+    select(.binary_name ==
+      "com.sedmelluq.discord.lavaplayer.container.common.OpusPacketRouter" and
+      .assessment == "CLASSIFIED" and .classification == "D_LEGACY" and
+      (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
+      (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null and
+      (.tests | index("docs/architecture/ADR-0024-mantle-native-compatibility-surface.md")) != null)] | length) == 2 and
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.container.matroska.MatroskaTrackConsumer" and
@@ -5424,17 +5883,19 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.format.transcoder.OpusChunkDecoder" and
-      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      .assessment == "CLASSIFIED" and .classification == "D_LEGACY" and
       (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
       (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
-      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 4 and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null and
+      (.tests | index("docs/architecture/ADR-0024-mantle-native-compatibility-surface.md")) != null)] | length) == 4 and
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.format.transcoder.OpusChunkEncoder" and
-      .assessment == "CLASSIFIED" and .classification == "A_EXACT" and
+      .assessment == "CLASSIFIED" and .classification == "D_LEGACY" and
       (.tests | index("scripts/run-jvm-gate-a.sh")) != null and
       (.tests | index("tools/jvm-gate/src/emitter.rs")) != null and
-      (.tests | index("tools/jvm-gate/src/main.rs")) != null)] | length) == 5 and
+      (.tests | index("tools/jvm-gate/src/main.rs")) != null and
+      (.tests | index("docs/architecture/ADR-0024-mantle-native-compatibility-surface.md")) != null)] | length) == 5 and
   ([$classifications.symbols[] |
     select(.binary_name ==
       "com.sedmelluq.discord.lavaplayer.format.transcoder.PcmChunkDecoder" and
@@ -5892,7 +6353,6 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.container.wav.WavFileLoader",
         "com.sedmelluq.discord.lavaplayer.container.wav.WavTrackProvider",
         "com.sedmelluq.discord.lavaplayer.container.wav.WaveFormatType",
-        "com.sedmelluq.discord.lavaplayer.natives.ConnectorNativeLibLoader",
         "com.sedmelluq.discord.lavaplayer.container.mp3.Mp3AudioTrack",
         "com.sedmelluq.discord.lavaplayer.container.mp3.Mp3ConstantRateSeeker",
         "com.sedmelluq.discord.lavaplayer.container.mp3.Mp3ContainerProbe",
@@ -6003,6 +6463,7 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpClientBuilder",
         "com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpClientBuilder$ConnectionManagerFactory",
         "com.sedmelluq.discord.lavaplayer.tools.io.AbstractHttpInterfaceManager",
+        "com.sedmelluq.discord.lavaplayer.tools.io.SimpleHttpInterfaceManager",
         "com.sedmelluq.discord.lavaplayer.tools.io.BitBufferReader",
         "com.sedmelluq.discord.lavaplayer.tools.io.BitStreamReader",
         "com.sedmelluq.discord.lavaplayer.tools.io.BitStreamWriter",
@@ -6018,6 +6479,25 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.tools.io.HttpClientTools",
         "com.sedmelluq.discord.lavaplayer.tools.io.HttpClientTools$NoRedirectsStrategy",
         "com.sedmelluq.discord.lavaplayer.tools.io.HttpConfigurable",
+        "com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface",
+        "com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager",
+        "com.sedmelluq.discord.lavaplayer.tools.io.MessageInput",
+        "com.sedmelluq.discord.lavaplayer.tools.io.MessageOutput",
+        "com.sedmelluq.discord.lavaplayer.tools.io.NonSeekableInputStream",
+        "com.sedmelluq.discord.lavaplayer.tools.io.PersistentHttpStream",
+        "com.sedmelluq.discord.lavaplayer.tools.io.ResettableBoundedInputStream",
+        "com.sedmelluq.discord.lavaplayer.tools.io.SavedHeadSeekableInputStream",
+        "com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream",
+        "com.sedmelluq.discord.lavaplayer.tools.io.StreamTools",
+        "com.sedmelluq.discord.lavaplayer.tools.io.ThreadLocalHttpInterfaceManager",
+        "com.sedmelluq.discord.lavaplayer.tools.io.TrustManagerBuilder",
+        "com.sedmelluq.discord.lavaplayer.natives.ConnectorNativeLibLoader",
+        "com.sedmelluq.discord.lavaplayer.natives.aac.AacDecoder",
+        "com.sedmelluq.discord.lavaplayer.natives.aac.AacDecoder$StreamInfo",
+        "com.sedmelluq.discord.lavaplayer.natives.mp3.Mp3Decoder",
+        "com.sedmelluq.discord.lavaplayer.natives.mp3.Mp3Decoder$MpegVersion",
+        "com.sedmelluq.discord.lavaplayer.natives.opus.OpusDecoder",
+        "com.sedmelluq.discord.lavaplayer.natives.opus.OpusEncoder",
         "com.sedmelluq.discord.lavaplayer.tools.DataFormatTools",
         "com.sedmelluq.discord.lavaplayer.tools.DataFormatTools$TextRange",
         "com.sedmelluq.discord.lavaplayer.tools.DecodedException",
@@ -6143,7 +6623,13 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
         "com.sedmelluq.discord.lavaplayer.source.youtube.format.LegacyStreamMapFormatsExtractor",
         "com.sedmelluq.discord.lavaplayer.source.youtube.format.OfflineYoutubeTrackFormatExtractor",
         "com.sedmelluq.discord.lavaplayer.source.youtube.format.StreamingDataFormatsExtractor",
-        "com.sedmelluq.discord.lavaplayer.source.youtube.format.YoutubeTrackFormatExtractor"
+        "com.sedmelluq.discord.lavaplayer.source.youtube.format.YoutubeTrackFormatExtractor",
+        "com.sedmelluq.discord.lavaplayer.natives.samplerate.SampleRateConverter",
+        "com.sedmelluq.discord.lavaplayer.natives.samplerate.SampleRateConverter$Progress",
+        "com.sedmelluq.discord.lavaplayer.natives.samplerate.SampleRateConverter$ResamplingType",
+        "com.sedmelluq.discord.lavaplayer.natives.statistics.CpuStatistics",
+        "com.sedmelluq.discord.lavaplayer.natives.statistics.CpuStatistics$Times",
+        "com.sedmelluq.discord.lavaplayer.natives.vorbis.VorbisDecoder"
       ][]; . == $symbol.binary_name)) and
     (if $symbol.binary_name ==
         "com.sedmelluq.discord.lavaplayer.filter.converter.ToSplitShortAudioFilter"
@@ -6478,11 +6964,94 @@ jq --exit-status --slurpfile inventory "$INVENTORY" --slurpfile ledger "$LEDGER"
           "com.sedmelluq.discord.lavaplayer.container.ogg.OggPacketInputStream" and
           ($symbol.symbol_kind == "CLASS" or $symbol.member_name == "createSeekTable")
       then .classification == "C_SEMANTIC"
+      elif $symbol.binary_name ==
+          "com.sedmelluq.discord.lavaplayer.tools.io.SavedHeadSeekableInputStream"
+      then .classification == "A_EXACT"
+      elif $symbol.binary_name ==
+          "com.sedmelluq.discord.lavaplayer.container.common.OpusPacketRouter"
+      then if $symbol.symbol_kind == "CLASS" or $symbol.member_name == "process"
+        then .classification == "D_LEGACY" and
+          (.tests | index(
+            "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md")) != null
+        else .classification == "A_EXACT"
+        end
+      elif ($symbol.binary_name ==
+          "com.sedmelluq.discord.lavaplayer.format.transcoder.OpusChunkDecoder" or
+          $symbol.binary_name ==
+            "com.sedmelluq.discord.lavaplayer.format.transcoder.OpusChunkEncoder")
+      then .classification == "D_LEGACY" and
+        (.tests | index(
+          "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md")) != null
+      elif $symbol.binary_name ==
+          "com.sedmelluq.discord.lavaplayer.natives.ConnectorNativeLibLoader"
+      then .classification == "D_LEGACY" and
+        (.tests | index(
+          "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md")) != null
+      elif $symbol.binary_name ==
+          "com.sedmelluq.discord.lavaplayer.natives.mp3.Mp3Decoder" and
+          ($symbol.member_name == null or
+            ($symbol.member_name | IN("<init>", "decode", "freeResources")))
+      then .classification == "D_LEGACY" and
+        (.tests | index(
+          "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md")) != null
+      elif $symbol.binary_name ==
+          "com.sedmelluq.discord.lavaplayer.natives.mp3.Mp3Decoder" or
+          $symbol.binary_name ==
+            "com.sedmelluq.discord.lavaplayer.natives.mp3.Mp3Decoder$MpegVersion"
+      then .classification == "A_EXACT"
+      elif $symbol.binary_name ==
+          "com.sedmelluq.discord.lavaplayer.natives.opus.OpusDecoder" and
+          $symbol.member_name == "getPacketFrameSize"
+      then .classification == "A_EXACT"
+      elif $symbol.binary_name ==
+          "com.sedmelluq.discord.lavaplayer.natives.opus.OpusDecoder" or
+          $symbol.binary_name ==
+            "com.sedmelluq.discord.lavaplayer.natives.opus.OpusEncoder"
+      then .classification == "D_LEGACY" and
+        (.tests | index(
+          "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md")) != null
+      elif $symbol.binary_name ==
+          "com.sedmelluq.discord.lavaplayer.natives.aac.AacDecoder$StreamInfo" or
+          ($symbol.binary_name ==
+            "com.sedmelluq.discord.lavaplayer.natives.aac.AacDecoder" and
+            $symbol.symbol_kind == "FIELD")
+      then .classification == "A_EXACT"
+      elif $symbol.binary_name ==
+          "com.sedmelluq.discord.lavaplayer.natives.aac.AacDecoder"
+      then .classification == "D_LEGACY" and
+        (.tests | index(
+          "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md")) != null
+      elif ($symbol.binary_name | startswith(
+          "com.sedmelluq.discord.lavaplayer.natives.samplerate.SampleRateConverter$Progress")) or
+          ($symbol.binary_name | startswith(
+            "com.sedmelluq.discord.lavaplayer.natives.samplerate.SampleRateConverter$ResamplingType"))
+      then .classification == "A_EXACT"
+      elif $symbol.binary_name ==
+          "com.sedmelluq.discord.lavaplayer.natives.samplerate.SampleRateConverter"
+      then .classification == "D_LEGACY" and
+        (.tests | index(
+          "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md")) != null
+      elif ($symbol.binary_name | startswith(
+          "com.sedmelluq.discord.lavaplayer.natives.statistics.CpuStatistics"))
+      then if $symbol.binary_name ==
+          "com.sedmelluq.discord.lavaplayer.natives.statistics.CpuStatistics" and
+          ($symbol.member_name == null or
+            ($symbol.member_name | IN("<init>", "getSystemTimes")))
+        then .classification == "D_LEGACY" and
+          (.tests | index(
+            "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md")) != null
+        else .classification == "A_EXACT"
+        end
+      elif $symbol.binary_name ==
+          "com.sedmelluq.discord.lavaplayer.natives.vorbis.VorbisDecoder"
+      then .classification == "D_LEGACY" and
+        (.tests | index(
+          "docs/architecture/ADR-0024-mantle-native-compatibility-surface.md")) != null
       else .classification == "A_EXACT"
       end) and
     (.tests | index("scripts/run-jvm-gate-a.sh")) != null) and
   .phase_entry.first_execution_cohort == .cohorts[0].id and
-  .phase_entry.next_slice == "http-interface-contracts" and
+  .phase_entry.next_slice == "phase14-real-consumer-inventory" and
   (.phase_entry.precondition | contains("Phase 12")) and
   (.phase_entry.phase_exit | contains("Revapi"))
 JQ
@@ -6490,7 +7059,7 @@ JQ
 for required in \
   '399 exported classes' \
   '2,762 symbols' \
-  '376 reference classes / 2,556 symbols' \
+  '402 reference classes / 2,764 manifest symbols' \
   'C_SEMANTIC' \
   'D_LEGACY' \
   'core-player-track' \
@@ -6500,4 +7069,14 @@ done
 
 "$ROOT/scripts/check-no-jvm-source.sh"
 
-printf 'Phase 13 inventory tracks 2,560 classified symbols and 202 unassessed symbols.\n'
+jq --exit-status '
+  .status == "COMPLETE" and
+  .coordinate.group_id == "io.github.rayan6ms" and
+  .coordinate.artifact_id == "mantle-lavaplayer" and
+  (.resources | length) == 4 and
+  (.reference_dependencies | length) == 12 and
+  ([.external_public_type_groups[].expected_count] | add) == 35
+' "$ARTIFACT_CONTRACT" >/dev/null
+xmllint --noout "$PUBLISHED_POM"
+
+printf 'Phase 13 is complete: all 2,762 symbols and artifact contracts are accounted for.\n'

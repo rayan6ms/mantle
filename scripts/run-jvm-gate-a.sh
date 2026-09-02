@@ -3,6 +3,33 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly ROOT
+TOOLCHAIN_LINK_DIR=""
+
+# T3 Code's AppImage variables confuse rustup and CMake module discovery. On development hosts
+# without a system C++ package, reuse the checked media compiler and provide its driver with the
+# installed libstdc++ ABI for upstream libxaac's configure-only C++ probe.
+unset APPIMAGE APPDIR
+if ! command -v c++ >/dev/null 2>&1 && [[ -x "$ROOT/.cache/media-toolchains/xaac-root/usr/bin/c++" ]]; then
+  export CC="$ROOT/.cache/media-toolchains/xaac-root/usr/bin/cc"
+  export CXX="$ROOT/.cache/media-toolchains/xaac-root/usr/bin/c++"
+  export PATH="$ROOT/.cache/media-toolchains/xaac-root/usr/bin:$PATH"
+  export LD_LIBRARY_PATH="$ROOT/.cache/media-toolchains/xaac-root/usr/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  if [[ ! -e "$ROOT/.cache/media-toolchains/xaac-root/usr/lib64/libstdc++.so" && -e /usr/lib64/libstdc++.so.6 ]]; then
+    mkdir -p "$ROOT/.cache"
+    TOOLCHAIN_LINK_DIR="$(mktemp -d "$ROOT/.cache/libxaac-toolchain-links.XXXXXX")"
+    ln -s /usr/lib64/libstdc++.so.6 "$TOOLCHAIN_LINK_DIR/libstdc++.so"
+    export LIBRARY_PATH="$TOOLCHAIN_LINK_DIR${LIBRARY_PATH:+:$LIBRARY_PATH}"
+  fi
+fi
+
+cleanup() {
+  if [[ -n "$TOOLCHAIN_LINK_DIR" ]]; then
+    [[ ! -L "$TOOLCHAIN_LINK_DIR/libstdc++.so" ]] || unlink "$TOOLCHAIN_LINK_DIR/libstdc++.so"
+    rmdir "$TOOLCHAIN_LINK_DIR"
+  fi
+}
+trap cleanup EXIT
+
 readonly REFERENCE_JAR="${MANTLE_REFERENCE_JAR:-$ROOT/.cache/reference/lavaplayer-2.2.6/lavaplayer-2.2.6.jar}"
 readonly WORK="$ROOT/target/gate-a"
 readonly CLASSES="$WORK/consumer-classes"
@@ -19,12 +46,21 @@ readonly OGG_VORBIS_CLASSES="$WORK/ogg-vorbis-consumer-classes"
 readonly OGG_VORBIS_TRACK_CLASSES="$WORK/ogg-vorbis-track-consumer-classes"
 readonly OGG_VORBIS_TRACK_SOURCES="$WORK/ogg-vorbis-track-sources"
 readonly OGG_PROBE_CLASSES="$WORK/ogg-probe-consumer-classes"
+readonly AAC_DECODER_CLASSES="$WORK/aac-decoder-consumer-classes"
+readonly MP3_DECODER_CLASSES="$WORK/mp3-decoder-consumer-classes"
+readonly OPUS_CODEC_CLASSES="$WORK/opus-codec-consumer-classes"
+readonly SAMPLERATE_CLASSES="$WORK/samplerate-converter-consumer-classes"
+readonly CPU_STATISTICS_CLASSES="$WORK/cpu-statistics-consumer-classes"
+readonly VORBIS_DECODER_CLASSES="$WORK/vorbis-decoder-consumer-classes"
 readonly WAV_AUDIO_TRACK_CLASSES="$WORK/wav-audio-track-consumer-classes"
 readonly WAV_FILE_LOADER_CLASSES="$WORK/wav-file-loader-consumer-classes"
 readonly WAV_TRACK_PROVIDER_CLASSES="$WORK/wav-track-provider-consumer-classes"
 readonly MPEG_FILE_LOADER_CLASSES="$WORK/mpeg-file-loader-consumer-classes"
 readonly JAR="$WORK/mantle-gate-a.jar"
 readonly MISMATCH_JAR="$WORK/mantle-gate-a-mismatch.jar"
+readonly LIFETIME_EXPLICIT_COUNT="${MANTLE_LIFETIME_EXPLICIT_COUNT:-1000000}"
+readonly LIFETIME_GC_COUNT="${MANTLE_LIFETIME_GC_COUNT:-100000}"
+readonly LIFETIME_TIMEOUT_SECONDS="${MANTLE_LIFETIME_TIMEOUT_SECONDS:-30}"
 
 if [[ ! -f "$REFERENCE_JAR" ]]; then
   printf 'Gate A reference JAR not found: %s\n' "$REFERENCE_JAR" >&2
@@ -35,20 +71,26 @@ rm -rf -- "$CLASSES" "$FLAC_CLASSES" "$MP3_CLASSES" "$FLAC_LOADER_CLASSES" \
   "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES" "$MPEG_CLASSES" \
   "$MPEG_FILE_LOADER_CLASSES" "$OGG_CODEC_CLASSES" "$OGG_FLAC_CLASSES" \
   "$OGG_OPUS_CLASSES" "$OGG_VORBIS_CLASSES" "$OGG_VORBIS_TRACK_CLASSES" \
-  "$OGG_VORBIS_TRACK_SOURCES" "$OGG_PROBE_CLASSES" \
+  "$OGG_VORBIS_TRACK_SOURCES" "$OGG_PROBE_CLASSES" "$AAC_DECODER_CLASSES" "$MP3_DECODER_CLASSES" "$OPUS_CODEC_CLASSES" "$SAMPLERATE_CLASSES" "$CPU_STATISTICS_CLASSES" "$VORBIS_DECODER_CLASSES" \
   "$WAV_AUDIO_TRACK_CLASSES" "$WAV_FILE_LOADER_CLASSES" "$WAV_TRACK_PROVIDER_CLASSES"
 mkdir -p "$CLASSES" "$FLAC_CLASSES" "$MP3_CLASSES" "$FLAC_LOADER_CLASSES" \
   "$FLAC_METADATA_READER_CLASSES" "$MATROSKA_CLASSES" "$MPEG_CLASSES" \
   "$MPEG_FILE_LOADER_CLASSES" "$OGG_CODEC_CLASSES" "$OGG_FLAC_CLASSES" \
   "$OGG_OPUS_CLASSES" "$OGG_VORBIS_CLASSES" "$OGG_VORBIS_TRACK_CLASSES" \
-  "$OGG_VORBIS_TRACK_SOURCES" "$OGG_PROBE_CLASSES" \
+  "$OGG_VORBIS_TRACK_SOURCES" "$OGG_PROBE_CLASSES" "$AAC_DECODER_CLASSES" "$MP3_DECODER_CLASSES" "$OPUS_CODEC_CLASSES" "$SAMPLERATE_CLASSES" "$CPU_STATISTICS_CLASSES" "$VORBIS_DECODER_CLASSES" \
   "$WAV_AUDIO_TRACK_CLASSES" "$WAV_FILE_LOADER_CLASSES" "$WAV_TRACK_PROVIDER_CLASSES"
 cargo build --locked -p mantle-jvm --features gate-a-direct-attachment
 cargo run --locked -q -p mantle-jvm-gate -- emit \
   --reference-jar "$REFERENCE_JAR" --output "$JAR" --expected-abi 1 \
   --manifest-output "$WORK/emission-manifest.json"
+jq -e '
+  (.reference_shells | length) == 402 and
+  ([.reference_shells[] | 1 + .exported_fields + .exported_methods] | add) == 2764 and
+  (.internal_classes | length) == 23
+' "$WORK/emission-manifest.json" >/dev/null
 cargo run --locked -q -p mantle-jvm-gate -- verify-structure \
   --reference-jar "$REFERENCE_JAR" --candidate-jar "$JAR"
+MANTLE_ARTIFACT_JAR="$JAR" scripts/check-phase13-artifacts.sh
 
 for consumer in smoke probe integration classloader event track-value track-enum track-contract audio-frame audio-configuration frame-buffer-factory audio-frame-buffer audio-frame-rebuilder terminator-audio-frame reference-mutable-audio-frame audio-frame-provider-tools audio-processing-context audio-player-options decoded-track-holder track-state-listener audio-output-hook audio-load-result-handler functional-result-handler audio-player-lifecycle-manager audio-player-interface audio-player-manager-interface default-audio-player default-audio-player-manager internal-audio-track audio-track-executor local-audio-track-executor-callback local-audio-track-executor track-marker-tracker base-audio-track primordial-audio-track-executor delegated-audio-track audio-track-info-builder abstract-audio-frame-buffer allocating-audio-frame-buffer non-allocating-audio-frame-buffer audio-filter-interface float-pcm-audio-filter short-pcm-audio-filter universal-pcm-audio-filter user-provided-audio-filters converter-audio-filter to-float-audio-filter to-short-audio-filter to-split-short-audio-filter equalizer volume audio-data-format audio-data-format-tools pcm-filter-factory pcm-format resampling-pcm-audio-filter audio-post-processor buffering-post-processor channel-count-pcm-audio-filter composite-audio-filter filter-chain-builder final-pcm-audio-filter audio-filter-chain audio-pipeline audio-pipeline-factory audio-source-manager-interface audio-source-managers probing-audio-source-manager local-audio-source-manager local-audio-track local-seekable-input-stream heartbeating-http-stream nico-audio-source-manager nico-audio-track default-sound-cloud-data-loader default-sound-cloud-data-reader default-sound-cloud-format-handler default-sound-cloud-playlist-loader default-sound-cloud-track-format sound-cloud-audio-source-manager sound-cloud-audio-source-manager-builder sound-cloud-audio-track sound-cloud-client-id-tracker sound-cloud-data-loader sound-cloud-data-reader sound-cloud-format-handler sound-cloud-helper sound-cloud-http-context-filter sound-cloud-m3u-audio-track sound-cloud-m3u-info sound-cloud-mp3-segment-decoder sound-cloud-opus-segment-decoder sound-cloud-playlist-loader sound-cloud-segment-decoder sound-cloud-segment-decoder-factory sound-cloud-track-format m3u-stream-audio-track m3u-stream-segment-url-provider mpeg-ts-m3u-stream-audio-track twitch-constants twitch-stream-audio-source-manager twitch-stream-audio-track twitch-stream-segment-url-provider bandcamp-audio-source-manager bandcamp-audio-track beam-audio-source-manager beam-audio-track beam-segment-url-provider getyarn-audio-source-manager getyarn-audio-track http-audio-source-manager http-audio-track vimeo-audio-source-manager vimeo-playback-format vimeo-audio-track abstract-yandex-music-api-loader yandex-music-api-extractor default-yandex-music-direct-url-loader default-yandex-music-playlist-loader default-yandex-music-track-loader default-yandex-search-provider yandex-http-context-filter yandex-music-api-loader yandex-music-audio-source-manager yandex-music-audio-track yandex-music-direct-url-loader yandex-music-playlist-loader yandex-music-search-result-loader yandex-music-track-loader yandex-music-utils default-youtube-link-router default-youtube-playlist-loader default-youtube-track-details default-youtube-track-details-loader youtube-cached-player-script youtube-info-status youtube-access-token-tracker youtube-cached-auth-script youtube-audio-source-manager youtube-audio-track youtube-cipher-operation youtube-client-config youtube-constants youtube-format-info youtube-http-context-filter youtube-link-router youtube-mix-loader youtube-mix-provider youtube-mpeg-stream-audio-track youtube-payload-helper youtube-persistent-http-stream youtube-playlist-loader youtube-search-music-provider youtube-search-music-result-loader youtube-search-provider youtube-search-result-loader youtube-signature-cipher youtube-signature-cipher-manager youtube-signature-resolver youtube-track-details youtube-track-details-loader; do
   case "$consumer" in
@@ -477,6 +519,40 @@ cargo run --locked -q -p mantle-jvm-gate -- write-extended-http-client-builder-c
   --output "$WORK/GateExtendedHttpClientBuilder.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-abstract-http-interface-manager-consumer \
   --output "$WORK/GateAbstractHttpInterfaceManager.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-simple-http-interface-manager-consumer \
+  --output "$WORK/GateSimpleHttpInterfaceManager.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-stream-tools-consumer \
+  --output "$WORK/GateStreamTools.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-thread-local-http-interface-manager-consumer \
+  --output "$WORK/GateThreadLocalHttpInterfaceManager.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-trust-manager-builder-consumer \
+  --output "$WORK/GateTrustManagerBuilder.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-connector-native-lib-loader-consumer \
+  --output "$WORK/GateConnectorNativeLibLoader.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-aac-decoder-consumer \
+  --output "$WORK/GateAacDecoder.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-aac-decoder-support-consumer \
+  --output "$WORK/AacDecoderGateSupport.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mp3-decoder-consumer \
+  --output "$WORK/GateMp3Decoder.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-mp3-decoder-support-consumer \
+  --output "$WORK/Mp3DecoderGateSupport.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-opus-codec-consumer \
+  --output "$WORK/GateOpusCodec.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-opus-codec-support-consumer \
+  --output "$WORK/OpusCodecGateSupport.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-samplerate-converter-consumer \
+  --output "$WORK/GateSampleRateConverter.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-samplerate-converter-support-consumer \
+  --output "$WORK/SampleRateConverterGateSupport.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-cpu-statistics-consumer \
+  --output "$WORK/GateCpuStatistics.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-cpu-statistics-support-consumer \
+  --output "$WORK/CpuStatisticsGateSupport.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-vorbis-decoder-consumer \
+  --output "$WORK/GateVorbisDecoder.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-vorbis-decoder-support-consumer \
+  --output "$WORK/VorbisDecoderGateSupport.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-bit-buffer-reader-consumer \
   --output "$WORK/GateBitBufferReader.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-bit-stream-reader-consumer \
@@ -501,6 +577,24 @@ cargo run --locked -q -p mantle-jvm-gate -- write-greedy-input-stream-consumer \
   --output "$WORK/GateGreedyInputStream.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-http-client-tools-consumer \
   --output "$WORK/GateHttpClientTools.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-http-interface-consumer \
+  --output "$WORK/GateHttpInterface.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-http-interface-manager-consumer \
+  --output "$WORK/GateHttpInterfaceManager.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-message-input-consumer \
+  --output "$WORK/GateMessageInput.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-message-output-consumer \
+  --output "$WORK/GateMessageOutput.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-non-seekable-input-stream-consumer \
+  --output "$WORK/GateNonSeekableInputStream.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-persistent-http-stream-consumer \
+  --output "$WORK/GatePersistentHttpStream.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-resettable-bounded-input-stream-consumer \
+  --output "$WORK/GateResettableBoundedInputStream.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-saved-head-seekable-input-stream-consumer \
+  --output "$WORK/GateSavedHeadSeekableInputStream.java"
+cargo run --locked -q -p mantle-jvm-gate -- write-seekable-input-stream-consumer \
+  --output "$WORK/GateSeekableInputStream.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-extended-http-configurable-consumer \
   --output "$WORK/GateExtendedHttpConfigurable.java"
 cargo run --locked -q -p mantle-jvm-gate -- write-http-configurable-consumer \
@@ -728,6 +822,12 @@ if command -v cygpath >/dev/null 2>&1; then
   ogg_probe_classes_argument="$(cygpath -w "$OGG_PROBE_CLASSES")"
   ogg_vorbis_classes_argument="$(cygpath -w "$OGG_VORBIS_CLASSES")"
   ogg_vorbis_track_classes_argument="$(cygpath -w "$OGG_VORBIS_TRACK_CLASSES")"
+  aac_decoder_classes_argument="$(cygpath -w "$AAC_DECODER_CLASSES")"
+  mp3_decoder_classes_argument="$(cygpath -w "$MP3_DECODER_CLASSES")"
+  opus_codec_classes_argument="$(cygpath -w "$OPUS_CODEC_CLASSES")"
+  samplerate_classes_argument="$(cygpath -w "$SAMPLERATE_CLASSES")"
+  cpu_statistics_classes_argument="$(cygpath -w "$CPU_STATISTICS_CLASSES")"
+  vorbis_decoder_classes_argument="$(cygpath -w "$VORBIS_DECODER_CLASSES")"
   wav_audio_track_classes_argument="$(cygpath -w "$WAV_AUDIO_TRACK_CLASSES")"
   wav_file_loader_classes_argument="$(cygpath -w "$WAV_FILE_LOADER_CLASSES")"
   wav_track_provider_classes_argument="$(cygpath -w "$WAV_TRACK_PROVIDER_CLASSES")"
@@ -749,6 +849,12 @@ else
   ogg_probe_classes_argument="$OGG_PROBE_CLASSES"
   ogg_vorbis_classes_argument="$OGG_VORBIS_CLASSES"
   ogg_vorbis_track_classes_argument="$OGG_VORBIS_TRACK_CLASSES"
+  aac_decoder_classes_argument="$AAC_DECODER_CLASSES"
+  mp3_decoder_classes_argument="$MP3_DECODER_CLASSES"
+  opus_codec_classes_argument="$OPUS_CODEC_CLASSES"
+  samplerate_classes_argument="$SAMPLERATE_CLASSES"
+  cpu_statistics_classes_argument="$CPU_STATISTICS_CLASSES"
+  vorbis_decoder_classes_argument="$VORBIS_DECODER_CLASSES"
   wav_audio_track_classes_argument="$WAV_AUDIO_TRACK_CLASSES"
   wav_file_loader_classes_argument="$WAV_FILE_LOADER_CLASSES"
   wav_track_provider_classes_argument="$WAV_TRACK_PROVIDER_CLASSES"
@@ -766,6 +872,19 @@ while IFS= read -r dependency; do
   reference_provider_tools_classpath+="$classpath_separator$dependency_argument"
 done < <(find "$(dirname "$REFERENCE_JAR")/dependencies" -maxdepth 1 -type f -name '*.jar' -print | sort)
 readonly REFERENCE_PROVIDER_TOOLS_CLASSPATH="$reference_provider_tools_classpath"
+
+javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$AAC_DECODER_CLASSES" \
+  "$WORK/GateAacDecoder.java" "$WORK/AacDecoderGateSupport.java"
+javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$MP3_DECODER_CLASSES" \
+  "$WORK/GateMp3Decoder.java" "$WORK/Mp3DecoderGateSupport.java"
+javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$OPUS_CODEC_CLASSES" \
+  "$WORK/GateOpusCodec.java" "$WORK/OpusCodecGateSupport.java"
+javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$SAMPLERATE_CLASSES" \
+  "$WORK/GateSampleRateConverter.java" "$WORK/SampleRateConverterGateSupport.java"
+javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CPU_STATISTICS_CLASSES" \
+  "$WORK/GateCpuStatistics.java" "$WORK/CpuStatisticsGateSupport.java"
+javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$VORBIS_DECODER_CLASSES" \
+  "$WORK/GateVorbisDecoder.java" "$WORK/VorbisDecoderGateSupport.java"
 
 javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$FLAC_CLASSES" \
   "$WORK/GateFlacAudioTrack.java" \
@@ -876,6 +995,11 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateSimpleHttpClientConnectionManager.java" \
   "$WORK/GateExtendedHttpClientBuilder.java" \
   "$WORK/GateAbstractHttpInterfaceManager.java" \
+  "$WORK/GateSimpleHttpInterfaceManager.java" \
+  "$WORK/GateStreamTools.java" \
+  "$WORK/GateThreadLocalHttpInterfaceManager.java" \
+  "$WORK/GateTrustManagerBuilder.java" \
+  "$WORK/GateConnectorNativeLibLoader.java" \
   "$WORK/GateBitBufferReader.java" \
   "$WORK/GateBitStreamReader.java" \
   "$WORK/GateBitStreamWriter.java" \
@@ -888,6 +1012,15 @@ javac --release 11 -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" -d "$CLASSES" \
   "$WORK/GateExtendedBufferedInputStream.java" \
   "$WORK/GateGreedyInputStream.java" \
   "$WORK/GateHttpClientTools.java" \
+  "$WORK/GateHttpInterface.java" \
+  "$WORK/GateHttpInterfaceManager.java" \
+  "$WORK/GateMessageInput.java" \
+  "$WORK/GateMessageOutput.java" \
+  "$WORK/GateNonSeekableInputStream.java" \
+  "$WORK/GatePersistentHttpStream.java" \
+  "$WORK/GateResettableBoundedInputStream.java" \
+  "$WORK/GateSavedHeadSeekableInputStream.java" \
+  "$WORK/GateSeekableInputStream.java" \
   "$WORK/GateExtendedHttpConfigurable.java" \
   "$WORK/GateHttpConfigurable.java" \
   "$WORK/GateHttpContextFilter.java" \
@@ -1628,26 +1761,22 @@ grep --fixed-strings \
   'contracts=public-abstract-interface,no-fields,no-constructors,overload-signatures,close-signature,identity-dispatch,input-consumption,returned-array,caller-output,null-forwarding,failure-identity,reflection' \
   "$WORK/audio-chunk-encoder-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateOpusChunkDecoder \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateOpusChunkDecoder reference \
   >"$WORK/opus-chunk-decoder-reference.txt"
 java -Xverify:all \
   -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
-  GateOpusChunkDecoder >"$WORK/opus-chunk-decoder-candidate.txt"
-cmp "$WORK/opus-chunk-decoder-reference.txt" \
-  "$WORK/opus-chunk-decoder-candidate.txt"
+  GateOpusChunkDecoder candidate >"$WORK/opus-chunk-decoder-candidate.txt"
 grep --fixed-strings \
-  'contracts=constructor-geometry,direct-encoded-buffer,capacity-4096,buffer-reuse,silence-decode,output-clear-flip,oversize-order,null-order,heap-output,close-idempotence,closed-failure,private-state,reflection' \
+  'service=legacy-opus-decoder-unsupported' \
   "$WORK/opus-chunk-decoder-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateOpusChunkEncoder \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateOpusChunkEncoder reference \
   >"$WORK/opus-chunk-encoder-reference.txt"
 java -Xverify:all \
   -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
-  GateOpusChunkEncoder >"$WORK/opus-chunk-encoder-candidate.txt"
-cmp "$WORK/opus-chunk-encoder-reference.txt" \
-  "$WORK/opus-chunk-encoder-candidate.txt"
+  GateOpusChunkEncoder candidate >"$WORK/opus-chunk-encoder-candidate.txt"
 grep --fixed-strings \
-  'contracts=constructor-order,configuration-quality,format-identity,direct-staging-capacity,returning-array,exact-allocation,staging-consumption,direct-output,heap-output,array-offset-zero,input-preservation,null-order,heap-input,small-output,readonly-output,close-idempotence,closed-failure,private-state,reflection' \
+  'service=legacy-opus-encoder-unsupported' \
   "$WORK/opus-chunk-encoder-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePcmChunkDecoder \
@@ -2403,6 +2532,135 @@ grep --fixed-strings \
   'contracts=constructor,default-state,identity-retention,lazy-build,shared-identity,close-clear,close-state,close-failure,closed-boundary,request-callback,request-reset,request-builder-config,request-null,request-failure,builder-callback,builder-reset,builder-failure,build-failure,interface,abstract,subclassable,private-state,generics,reflection' \
   "$WORK/abstract-http-interface-manager-candidate.txt" >/dev/null
 java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateSimpleHttpInterfaceManager \
+  >"$WORK/simple-http-interface-manager-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateSimpleHttpInterfaceManager >"$WORK/simple-http-interface-manager-candidate.txt"
+cmp "$WORK/simple-http-interface-manager-reference.txt" \
+  "$WORK/simple-http-interface-manager-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,filter-holder,filter-null,fresh-interface,shared-client,fresh-context,acquired,filter-open,filter-close,reacquire,filter-replacement,abstract-shape,private-state,reflection' \
+  "$WORK/simple-http-interface-manager-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateStreamTools \
+  >"$WORK/stream-tools-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateStreamTools >"$WORK/stream-tools-candidate.txt"
+cmp "$WORK/stream-tools-reference.txt" "$WORK/stream-tools-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,partial-reads,zero-read-retry,offset-preservation,exact-length,early-eof,zero-length,negative-length,argument-validation-order,overreported-count,io-identity,runtime-identity,error-identity,null-boundaries,range-failure,subclassable,checked-throws,reflection' \
+  "$WORK/stream-tools-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateThreadLocalHttpInterfaceManager \
+  >"$WORK/thread-local-http-interface-manager-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateThreadLocalHttpInterfaceManager \
+  >"$WORK/thread-local-http-interface-manager-candidate.txt"
+cmp "$WORK/thread-local-http-interface-manager-reference.txt" \
+  "$WORK/thread-local-http-interface-manager-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,lazy-client,identity-retention,filter-holder,filter-null,thread-local-cache,nested-fallback,nested-not-cached,reuse-after-close,shared-client,fresh-context,per-thread-identity,per-thread-reuse,client-rollover,stale-cache-removal,closed-state,reconfiguration,filter-replacement,filter-live-close,null-filter,open-failure-identity,open-failure-retry,build-failure-identity,private-state,lambda-shape,generics,subclassable,reflection' \
+  "$WORK/thread-local-http-interface-manager-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateTrustManagerBuilder \
+  >"$WORK/trust-manager-builder-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateTrustManagerBuilder >"$WORK/trust-manager-builder-candidate.txt"
+cmp "$WORK/trust-manager-builder-reference.txt" "$WORK/trust-manager-builder-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,empty-list,fresh-list,empty-build,x509-selection,builtin-default-factory,builtin-certificate-order,builtin-append,builder-identity,missing-directory,null-directory,bundled-list,extended-list,utf8-trimming,blank-lines,missing-file,resource-order,repeated-resource-append,jks-certificate-only,partial-failure,extended-short-circuit,build-fresh-manager,build-no-mutation,custom-issuers,checked-failures,private-state,private-helpers,generics,subclassable,reflection' \
+  "$WORK/trust-manager-builder-candidate.txt" >/dev/null
+# D_LEGACY retains linkage while preventing the obsolete connector binaries from loading.
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateConnectorNativeLibLoader reference \
+  >"$WORK/connector-native-lib-loader-reference.txt"
+java -Xverify:all \
+  -cp "$CLASSES$classpath_separator$JAR" GateConnectorNativeLibLoader candidate \
+  >"$WORK/connector-native-lib-loader-candidate.txt"
+grep --fixed-strings \
+  'common=public-concrete,constructor,static-load,subclassable,reflection;legacy=two-loaders,windows-mpg123,connector,external-loader' \
+  "$WORK/connector-native-lib-loader-reference.txt" >/dev/null
+grep --fixed-strings \
+  'common=public-concrete,constructor,static-load,subclassable,reflection;legacy=retained-shell,no-external-loader,deterministic-unsupported' \
+  "$WORK/connector-native-lib-loader-candidate.txt" >/dev/null
+# MIXED_A_EXACT_D_LEGACY retains constants/value state while disabling the obsolete FDK JNI API.
+java -Xverify:all \
+  -cp "$aac_decoder_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateAacDecoder reference >"$WORK/aac-decoder-reference.txt"
+java -Xverify:all \
+  -cp "$aac_decoder_classes_argument$classpath_separator$jar_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateAacDecoder candidate >"$WORK/aac-decoder-candidate.txt"
+grep --fixed-strings \
+  'common=constants,public-concrete,native-resource-holder,3-fields,7-methods,stream-info,subclass-lifecycle,reflection;legacy=constructor-native-handle,configuration,raw-fallback,direct-fill,direct-decode,stream-info-resolution,close' \
+  "$WORK/aac-decoder-reference.txt" >/dev/null
+grep --fixed-strings \
+  'common=constants,public-concrete,native-resource-holder,3-fields,7-methods,stream-info,subclass-lifecycle,reflection;legacy=safe-constructor,no-native-state,validation-order,deterministic-unsupported,idempotent-close' \
+  "$WORK/aac-decoder-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$mp3_decoder_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMp3Decoder reference >"$WORK/mp3-decoder-reference.txt"
+java -Xverify:all \
+  -cp "$mp3_decoder_classes_argument$classpath_separator$jar_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMp3Decoder candidate >"$WORK/mp3-decoder-candidate.txt"
+grep --fixed-strings \
+  'common=constants,header-parsing,mpeg-versions,enum,reflection,subclassable;legacy=native-construction,decode,close' \
+  "$WORK/mp3-decoder-reference.txt" >/dev/null
+grep --fixed-strings \
+  'common=constants,header-parsing,mpeg-versions,enum,reflection,subclassable;legacy=safe-constructor,no-native-state,validation-order,deterministic-unsupported,idempotent-close' \
+  "$WORK/mp3-decoder-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$opus_codec_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOpusCodec reference >"$WORK/opus-codec-reference.txt"
+java -Xverify:all \
+  -cp "$opus_codec_classes_argument$classpath_separator$jar_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateOpusCodec candidate >"$WORK/opus-codec-candidate.txt"
+grep --fixed-strings \
+  'common=packet-frame-sizing,reflection,subclassable;legacy=decoder-native,encoder-native,buffer-flips,close' \
+  "$WORK/opus-codec-reference.txt" >/dev/null
+grep --fixed-strings \
+  'common=packet-frame-sizing,reflection,subclassable;legacy=safe-construction,no-native-state,validation-order,deterministic-unsupported,idempotent-close' \
+  "$WORK/opus-codec-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$samplerate_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateSampleRateConverter reference >"$WORK/samplerate-converter-reference.txt"
+java -Xverify:all \
+  -cp "$samplerate_classes_argument$classpath_separator$jar_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateSampleRateConverter candidate >"$WORK/samplerate-converter-candidate.txt"
+grep --fixed-strings \
+  'common=progress,enum,reflection,subclassable;legacy=native-construction,reset,process,close' \
+  "$WORK/samplerate-converter-reference.txt" >/dev/null
+grep --fixed-strings \
+  'common=progress,enum,reflection,subclassable;legacy=safe-construction,no-native-state,deterministic-unsupported,idempotent-close' \
+  "$WORK/samplerate-converter-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$cpu_statistics_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateCpuStatistics reference >"$WORK/cpu-statistics-reference.txt"
+java -Xverify:all \
+  -cp "$cpu_statistics_classes_argument$classpath_separator$jar_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateCpuStatistics candidate >"$WORK/cpu-statistics-candidate.txt"
+grep --fixed-strings \
+  'common=times,diff,usage,overflow,null-order,reflection,subclassable;legacy=native-sampling' \
+  "$WORK/cpu-statistics-reference.txt" >/dev/null
+grep --fixed-strings \
+  'common=times,diff,usage,overflow,null-order,reflection,subclassable;legacy=safe-construction,no-native-state,deterministic-unsupported' \
+  "$WORK/cpu-statistics-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$vorbis_decoder_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateVorbisDecoder reference >"$WORK/vorbis-decoder-reference.txt"
+java -Xverify:all \
+  -cp "$vorbis_decoder_classes_argument$classpath_separator$jar_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateVorbisDecoder candidate >"$WORK/vorbis-decoder-candidate.txt"
+grep --fixed-strings \
+  'common=public-concrete,native-resource-holder,initial-channel,reflection,subclassable;legacy=native-construction,initialise,channel-count,input,output,close' \
+  "$WORK/vorbis-decoder-reference.txt" >/dev/null
+grep --fixed-strings \
+  'common=public-concrete,native-resource-holder,initial-channel,reflection,subclassable;legacy=safe-construction,no-native-state,validation-order,deterministic-unsupported,idempotent-close' \
+  "$WORK/vorbis-decoder-candidate.txt" >/dev/null
+java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateBitBufferReader \
   >"$WORK/bit-buffer-reader-reference.txt"
 java -Xverify:all \
@@ -2530,6 +2788,96 @@ cmp "$WORK/http-client-tools-reference.txt" \
 grep --fixed-strings \
   'contracts=public-config,timeout-update,shared-builder,default-manager,cookieless-manager,redirect-relative,redirect-absolute,redirect-invalid,redirect-status,redirect-missing,success-statuses,assert-success,assert-redirect,raw-content-type,json-content-type,assert-json,header-value,retry-reset,retry-timeout,retry-ssl,retry-premature,retry-conscrypt,retry-nested,null-exception,fetch-json,fetch-json-404,fetch-json-error,fetch-lines,fetch-lines-error,no-redirects,reflection' \
   "$WORK/http-client-tools-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateHttpInterface \
+  >"$WORK/http-interface-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateHttpInterface >"$WORK/http-interface-candidate.txt"
+cmp "$WORK/http-interface-reference.txt" "$WORK/http-interface-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor,private-state,acquire-open,acquire-latch,acquire-failure,execute-order,execute-identity,execute-filter-repeat,execute-exception-repeat,execute-exception-identity,final-location,redirect-location,accessors,close-order,close-owned,close-unowned,close-repeat,reflection' \
+  "$WORK/http-interface-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateHttpInterfaceManager \
+  >"$WORK/http-interface-manager-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateHttpInterfaceManager >"$WORK/http-interface-manager-candidate.txt"
+cmp "$WORK/http-interface-manager-reference.txt" "$WORK/http-interface-manager-candidate.txt"
+grep --fixed-strings \
+  'contracts=inheritance,caller-dispatch,argument-identity,null-forwarding,return-identity,failure-identity,generic-inheritance,close-dispatch,public-abstract-interface,no-fields,no-constructors,reflection' \
+  "$WORK/http-interface-manager-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMessageInput \
+  >"$WORK/message-input-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMessageInput >"$WORK/message-input-candidate.txt"
+cmp "$WORK/message-input-reference.txt" "$WORK/message-input-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor-state,framing,flag-extraction,zero-marker,bounded-read,bounded-eof,partial-skip,full-read-skip,repeated-skip,truncated-skip,header-failure-identity,null-input,subclassable,private-state,checked-throws,reflection' \
+  "$WORK/message-input-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateMessageOutput \
+  >"$WORK/message-output-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateMessageOutput >"$WORK/message-output-candidate.txt"
+cmp "$WORK/message-output-reference.txt" "$WORK/message-output-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor-state,no-eager-write,start-identity,start-reset,default-header,flag-header,flag-masking,zero-payload,finish-marker,repeated-commit,repeated-finish,header-failure-identity,payload-failure-timing,payload-failure-identity,null-output,subclassable,private-state,checked-throws,reflection' \
+  "$WORK/message-output-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateNonSeekableInputStream \
+  >"$WORK/non-seekable-input-stream-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateNonSeekableInputStream >"$WORK/non-seekable-input-stream-candidate.txt"
+cmp "$WORK/non-seekable-input-stream-reference.txt" "$WORK/non-seekable-input-stream-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor-state,position,delegate-read,single-read,bulk-read,eof-position,seek-forward,seek-backward-failure,hard-seek-unsupported,non-seekable,empty-providers,provider-identity,close-forwarding,read-failure-identity,close-failure-identity,null-input,subclassable,private-state,checked-throws,reflection' \
+  "$WORK/non-seekable-input-stream-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GatePersistentHttpStream \
+  >"$WORK/persistent-http-stream-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GatePersistentHttpStream >"$WORK/persistent-http-stream-candidate.txt"
+cmp "$WORK/persistent-http-stream-reference.txt" "$WORK/persistent-http-stream-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor-state,unknown-length,known-length,connect-request,connect-latch,read-position,bulk-position,available,range-reconnect,release-connection,seek-hard,seek-capability,reset-failure,mark-unsupported,provider-empty,provider-icy,provider-fallback,close-clears,close-swallow,nonretriable-failure,status-check,status-retry,missing-entity,content-stream,protected-state,field-metadata,method-metadata,reflection' \
+  "$WORK/persistent-http-stream-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateResettableBoundedInputStream \
+  >"$WORK/resettable-bounded-input-stream-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateResettableBoundedInputStream >"$WORK/resettable-bounded-input-stream-candidate.txt"
+cmp "$WORK/resettable-bounded-input-stream-reference.txt" "$WORK/resettable-bounded-input-stream-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor-state,unbounded-default,reset-limit,single-read,bounded-bulk,bulk-position,eof-limit,skip-limit,available-limit,close-noop,mark-unsupported,read-failure-identity,bulk-failure-identity,skip-failure-identity,available-failure-identity,negative-limit,null-input,private-state,reflection' \
+  "$WORK/resettable-bounded-input-stream-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateSavedHeadSeekableInputStream \
+  >"$WORK/saved-head-seekable-input-stream-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateSavedHeadSeekableInputStream >"$WORK/saved-head-seekable-input-stream-candidate.txt"
+cmp "$WORK/saved-head-seekable-input-stream-reference.txt" "$WORK/saved-head-seekable-input-stream-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor-state,delegate-identity,content-length,max-skip,saved-buffer,load-rewind,head-capture,head-position,head-available,single-replay,bulk-replay,head-transition,direct-single,direct-bulk,direct-skip,direct-available,seek-within-head,seek-boundary,hard-seek-forwarding,negative-seek,disabled-single,disabled-bulk,disabled-skip,disabled-available,disabled-hard-seek,provider-identity,seek-capability,close-forwarding,load-failure-identity,read-failure-identity,bulk-failure-identity,skip-failure-identity,available-failure-identity,seek-failure-identity,close-failure-identity,empty-head,negative-size,null-delegate,private-state,generics,checked-throws,subclassable,reflection' \
+  "$WORK/saved-head-seekable-input-stream-candidate.txt" >/dev/null
+java -Xverify:all \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateSeekableInputStream \
+  >"$WORK/seekable-input-stream-reference.txt"
+java -Xverify:all \
+  -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
+  GateSeekableInputStream >"$WORK/seekable-input-stream-candidate.txt"
+cmp "$WORK/seekable-input-stream-reference.txt" "$WORK/seekable-input-stream-candidate.txt"
+grep --fixed-strings \
+  'contracts=constructor-state,content-length,max-skip,position,skip-fully,skip-partial,skip-fallback,skip-negative,eof-identity,eof-message,seek-forward-soft,seek-forward-hard,seek-backward-hard,seek-nonhard-backward,seek-nonhard-forward,seek-same,seek-failure-identity,skip-failure-identity,read-failure-identity,provider-identity,abstract-shape,private-state,method-metadata,generics,checked-throws,reflection' \
+  "$WORK/seekable-input-stream-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateExtendedHttpConfigurable \
   >"$WORK/extended-http-configurable-reference.txt"
@@ -2936,14 +3284,13 @@ grep --fixed-strings \
   'contracts=construction,context-identity,configurer-identity,null-construction,eager-logger,private-state,lazy-decoder,configurer-order,configurer-failure,null-configurer,decoder-reuse,input-identity,stream-info-lazy,pipeline-creation,pcm-format,native-output-buffer,delayed-seek,retained-seek,decode-loop,non-flush-mode,buffer-clear,interruption-identity,seek-forwarding,seek-overwrite,decoder-reset,decoder-close-failure,flush-noop,flush-mode,flush-loop,close-order,close-finally,close-failure,repeated-close,public-decoder,subclassable,generic-signatures,throws,reflection' \
   "$WORK/aac-packet-router-candidate.txt" >/dev/null
 java -Xverify:all \
-  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateOpusPacketRouter \
+  -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateOpusPacketRouter reference \
   >"$WORK/opus-packet-router-reference.txt"
 java -Xverify:all \
   -cp "$GATE_CLASSPATH$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
-  GateOpusPacketRouter >"$WORK/opus-packet-router-candidate.txt"
-cmp "$WORK/opus-packet-router-reference.txt" "$WORK/opus-packet-router-candidate.txt"
+  GateOpusPacketRouter candidate >"$WORK/opus-packet-router-candidate.txt"
 grep --fixed-strings \
-  'contracts=construction,context-identity,input-geometry,header-state,offered-frame,output-format,volume,private-state,eager-logger,heap-header,direct-header,position-preservation,direct-underflow,zero-frame,frame-size,format-rebuild,format-reuse,duration,timecode,seek-state,seek-forwarding,seek-failure-prefix,strict-seek-threshold,passthrough,input-window,frame-reuse,heap-staging,staging-growth,direct-identity,native-output,decode-limit,decode-order,interruption-identity,reencode-mode,passthrough-mode,mode-cleanup,volume-application,pipeline-creation,initial-seek,initialisation-cleanup,flush-noop,flush-forwarding,close-order,close-failure-prefix,buffer-cleanup,repeated-close,subclassable,private-helpers,throws,reflection' \
+  'service=legacy-opus-reencode-unsupported' \
   "$WORK/opus-packet-router-candidate.txt" >/dev/null
 java -Xverify:all \
   -cp "$flac_classes_argument$classpath_separator$REFERENCE_PROVIDER_TOOLS_CLASSPATH" \
@@ -4709,7 +5056,11 @@ grep --fixed-strings \
 java -Xverify:all -cp "$GATE_CLASSPATH" GateSmoke "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateIntegration "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" callbacks
-java -Xverify:all -Xmx256m -cp "$GATE_CLASSPATH" GateProbe "$native" lifetime
+java -Xverify:all -Xmx256m \
+  -Dmantle.lifetime.explicit="$LIFETIME_EXPLICIT_COUNT" \
+  -Dmantle.lifetime.gc="$LIFETIME_GC_COUNT" \
+  -Dmantle.lifetime.timeout-seconds="$LIFETIME_TIMEOUT_SECONDS" \
+  -cp "$GATE_CLASSPATH" GateProbe "$native" lifetime
 java -Xverify:all -cp "$classes_argument" GateClassloader "$jar_argument" "$native"
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" leak-manager
 java -Xverify:all -cp "$GATE_CLASSPATH" GateProbe "$native" dispatcher-exit

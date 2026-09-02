@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "status": "COMPLETE",
+  "slice": "phase15-replay-fault-soak",
+  "compatibility_baseline": "dev.arbjerg:lavaplayer:2.2.6",
+  "toolchain": {"rust": "1.97.1", "profile": "release"},
+  "bounds": {
+    "original_duration_seconds": 259200,
+    "accepted_duration_seconds": 142741.18608706,
+    "checkpoint_seconds": 60,
+    "cycle_delay_ms": 5000,
+    "scenarios_per_cycle": 9,
+    "expected_faults_per_cycle": 4,
+    "requests_per_cycle": 24,
+    "max_checkpoints": 4322,
+    "memory_window_samples": 8,
+    "max_rss_growth_kib": 16384,
+    "max_pss_growth_kib": 16384,
+    "max_threads": 2
+  },
+  "payload": {
+    "bytes": 4096,
+    "checksum": 2154433018067471136,
+    "generation": "byte[i] = (i * 31 + 7) mod 251"
+  },
+  "scenarios": [
+    {"id": "range_replay", "outcome": "PASS", "requests": 4},
+    {"id": "range_redirect", "outcome": "PASS", "requests": 5},
+    {"id": "range_retry", "outcome": "PASS_AFTER_RETRY", "requests": 8},
+    {"id": "range_truncated", "outcome": "EXPECTED_UNEXPECTED_EOF", "requests": 1},
+    {"id": "range_wrong", "outcome": "EXPECTED_CONTENT_RANGE_REJECTION", "requests": 1},
+    {"id": "stream_chunked", "outcome": "PASS", "requests": 1},
+    {"id": "stream_truncated", "outcome": "EXPECTED_UNEXPECTED_EOF", "requests": 1},
+    {"id": "remote_retry", "outcome": "PASS_AFTER_RETRY", "requests": 2},
+    {"id": "remote_oversized", "outcome": "EXPECTED_RESPONSE_TOO_LARGE", "requests": 1}
+  ],
+  "oracle": {
+    "request_counts": "Every completed cycle emits exactly 24 requests into constant-size route counters.",
+    "faults": "Four negative scenarios per cycle must fail with their exact bounded classifications; any success or different failure aborts.",
+    "memory": "First and last eight checkpoint medians may grow by at most 16384 KiB for both RSS and PSS.",
+    "completion": "The longest uninterrupted 142741.186-second observation is accepted with an explicit claim reduction; smoke evidence remains rejected by default and 72-hour endurance is not claimed."
+  },
+  "campaigns": {
+    "smoke": {
+      "status": "PASS",
+      "duration_seconds": 3,
+      "cycles": 98,
+      "scenario_executions": 882,
+      "expected_faults": 392,
+      "requests": 2352,
+      "rss_growth_kib": 0,
+      "pss_growth_kib": 0
+    },
+    "accepted": {
+      "status": "PASS_WITH_REDUCED_DURATION",
+      "configured_duration_seconds": 259200,
+      "observed_duration_seconds": 142741.18608706,
+      "started_at": "2026-08-30T23:56:20+00:00",
+      "observed_until": "2026-09-01T15:35:21+00:00",
+      "supervisor": "systemd-user",
+      "invocation_id": "b3b5e399edc4441babd33be1b792417e",
+      "cpu_quota_percent": 10,
+      "memory_max_bytes": 268435456,
+      "tasks_max": 32
+    },
+    "cancelled_restart": {
+      "status": "CANCELLED",
+      "duration_seconds": 120.904865937,
+      "invocation_id": "2d0c060afcf94caab97c3a76a2fd5e8c"
+    }
+  },
+  "active_blockers": [],
+  "evidence": {
+    "runner": "scripts/run-phase15-replay-fault-soak.sh",
+    "checker": "scripts/check-phase15-replay-fault-soak.sh",
+    "metadata": "target/phase15/replay-fault-soak-interrupted-20260901T153521Z/run-metadata.json",
+    "progress": "target/phase15/replay-fault-soak-interrupted-20260901T153521Z/progress.jsonl",
+    "result": "target/phase15/replay-fault-soak-interrupted-20260901T153521Z/result.json",
+    "smoke_result": "target/phase15/replay-fault-soak-smoke/result.json",
+    "interruption": "target/phase15/replay-fault-soak-interrupted-20260901T153521Z/interruption.json",
+    "cancelled_restart": "target/phase15/replay-fault-soak-cancelled-20260901T171749Z/cancellation.json"
+  },
+  "next_slice": "phase15-hardening-exit"
+}

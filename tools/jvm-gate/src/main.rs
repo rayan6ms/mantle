@@ -146,6 +146,7 @@ fn consumer_source(command: &str) -> Option<&'static str> {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn tools_consumer_source(command: &str) -> Option<&'static str> {
     match command {
         "write-copy-on-update-identity-list-consumer" => {
@@ -191,6 +192,29 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         "write-abstract-http-interface-manager-consumer" => {
             Some(ABSTRACT_HTTP_INTERFACE_MANAGER_CONSUMER)
         }
+        "write-simple-http-interface-manager-consumer" => {
+            Some(SIMPLE_HTTP_INTERFACE_MANAGER_CONSUMER)
+        }
+        "write-stream-tools-consumer" => Some(STREAM_TOOLS_CONSUMER),
+        "write-thread-local-http-interface-manager-consumer" => {
+            Some(THREAD_LOCAL_HTTP_INTERFACE_MANAGER_CONSUMER)
+        }
+        "write-trust-manager-builder-consumer" => Some(TRUST_MANAGER_BUILDER_CONSUMER),
+        "write-connector-native-lib-loader-consumer" => Some(CONNECTOR_NATIVE_LIB_LOADER_CONSUMER),
+        "write-aac-decoder-consumer" => Some(AAC_DECODER_CONSUMER),
+        "write-aac-decoder-support-consumer" => Some(AAC_DECODER_SUPPORT_CONSUMER),
+        "write-mp3-decoder-consumer" => Some(MP3_DECODER_CONSUMER),
+        "write-mp3-decoder-support-consumer" => Some(MP3_DECODER_SUPPORT_CONSUMER),
+        "write-opus-codec-consumer" => Some(OPUS_CODEC_CONSUMER),
+        "write-opus-codec-support-consumer" => Some(OPUS_CODEC_SUPPORT_CONSUMER),
+        "write-samplerate-converter-consumer" => Some(SAMPLERATE_CONVERTER_CONSUMER),
+        "write-samplerate-converter-support-consumer" => {
+            Some(SAMPLERATE_CONVERTER_SUPPORT_CONSUMER)
+        }
+        "write-cpu-statistics-consumer" => Some(CPU_STATISTICS_CONSUMER),
+        "write-cpu-statistics-support-consumer" => Some(CPU_STATISTICS_SUPPORT_CONSUMER),
+        "write-vorbis-decoder-consumer" => Some(VORBIS_DECODER_CONSUMER),
+        "write-vorbis-decoder-support-consumer" => Some(VORBIS_DECODER_SUPPORT_CONSUMER),
         "write-bit-buffer-reader-consumer" => Some(BIT_BUFFER_READER_CONSUMER),
         "write-bit-stream-reader-consumer" => Some(BIT_STREAM_READER_CONSUMER),
         "write-bit-stream-writer-consumer" => Some(BIT_STREAM_WRITER_CONSUMER),
@@ -205,6 +229,19 @@ fn tools_consumer_source(command: &str) -> Option<&'static str> {
         }
         "write-greedy-input-stream-consumer" => Some(GREEDY_INPUT_STREAM_CONSUMER),
         "write-http-client-tools-consumer" => Some(HTTP_CLIENT_TOOLS_CONSUMER),
+        "write-http-interface-consumer" => Some(HTTP_INTERFACE_CONSUMER),
+        "write-http-interface-manager-consumer" => Some(HTTP_INTERFACE_MANAGER_CONSUMER),
+        "write-message-input-consumer" => Some(MESSAGE_INPUT_CONSUMER),
+        "write-message-output-consumer" => Some(MESSAGE_OUTPUT_CONSUMER),
+        "write-non-seekable-input-stream-consumer" => Some(NON_SEEKABLE_INPUT_STREAM_CONSUMER),
+        "write-persistent-http-stream-consumer" => Some(PERSISTENT_HTTP_STREAM_CONSUMER),
+        "write-resettable-bounded-input-stream-consumer" => {
+            Some(RESETTABLE_BOUNDED_INPUT_STREAM_CONSUMER)
+        }
+        "write-saved-head-seekable-input-stream-consumer" => {
+            Some(SAVED_HEAD_SEEKABLE_INPUT_STREAM_CONSUMER)
+        }
+        "write-seekable-input-stream-consumer" => Some(SEEKABLE_INPUT_STREAM_CONSUMER),
         "write-extended-http-configurable-consumer" => Some(EXTENDED_HTTP_CONFIGURABLE_CONSUMER),
         "write-http-configurable-consumer" => Some(HTTP_CONFIGURABLE_CONSUMER),
         "write-http-context-filter-consumer" => Some(HTTP_CONTEXT_FILTER_CONSUMER),
@@ -1427,7 +1464,7 @@ public final class GateProbe {
     Method nativeHandle = probeClass.getMethod("nativeHandle");
     Method liveHandles = method("liveHandles");
     int baseline = (Integer) liveHandles.invoke(null);
-    final int explicitCount = 1_000_000;
+    final int explicitCount = boundedCount("mantle.lifetime.explicit", 1_000_000, 1_000_000);
     long explicitStart = System.nanoTime();
     long stale = 0;
     for (int index = 0; index < explicitCount; index++) {
@@ -1455,7 +1492,7 @@ public final class GateProbe {
     close.invoke(current);
     if ((Integer) liveHandles.invoke(null) != baseline) throw new AssertionError("explicit handle leak");
 
-    final int gcCount = 100_000;
+    final int gcCount = boundedCount("mantle.lifetime.gc", 100_000, 100_000);
     long cleanerStart = System.nanoTime();
     for (int index = 0; index < gcCount; index++) probeClass.getConstructor().newInstance();
     awaitHandles(liveHandles, baseline, 30_000);
@@ -1476,7 +1513,8 @@ public final class GateProbe {
     }
     Arrays.fill(tokens, null);
     int released = 0;
-    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(
+        boundedCount("mantle.lifetime.timeout-seconds", 30, 60));
     while (released < gcCount && System.nanoTime() < deadline) {
       System.gc();
       HandlePhantom reference;
@@ -1498,6 +1536,14 @@ public final class GateProbe {
         (double) cleanerNanos / gcCount,
         (double) phantomNanos / gcCount,
         (Integer) liveHandles.invoke(null));
+  }
+
+  private static int boundedCount(String property, int fallback, int maximum) {
+    int value = Integer.getInteger(property, fallback);
+    if (value < 1 || value > maximum) {
+      throw new IllegalArgumentException(property + " must be between 1 and " + maximum);
+    }
+    return value;
   }
 
   private static void awaitHandles(Method liveHandles, int expected, long timeoutMillis) throws Exception {
@@ -7066,6 +7112,7 @@ public final class GateAllocatingAudioFrameBuffer {
     checkField(type, "stopping", AtomicBoolean.class, Modifier.PRIVATE | Modifier.FINAL);
     Field log = type.getDeclaredField("log");
     log.setAccessible(true);
+    log.setAccessible(true);
     check(log.get(null) != null, "logger initialization");
 
     Constructor<?>[] constructors = type.getDeclaredConstructors();
@@ -11081,6 +11128,17 @@ public final class GateOpusChunkDecoder {
   private static final byte[] SILENCE = {(byte) 0xfc, (byte) 0xff, (byte) 0xfe};
 
   public static void main(String[] args) throws Exception {
+    check(args.length == 1, "expected reference or candidate disposition");
+    if (args[0].equals("candidate")) {
+      legacyDisposition();
+      reflection();
+      System.out.println(
+          "contracts=constructor-geometry,direct-encoded-buffer,capacity-4096,buffer-reuse,"
+          + "validation-order,close-idempotence,closed-failure,private-state,reflection;"
+          + "service=legacy-opus-decoder-unsupported");
+      return;
+    }
+    check(args[0].equals("reference"), "unknown disposition");
     decodeAndReuse();
     formatGeometry();
     failureOrdering();
@@ -11088,6 +11146,22 @@ public final class GateOpusChunkDecoder {
     reflection();
     System.out.println(
         "contracts=constructor-geometry,direct-encoded-buffer,capacity-4096,buffer-reuse,silence-decode,output-clear-flip,oversize-order,null-order,heap-output,close-idempotence,closed-failure,private-state,reflection");
+  }
+
+  private static void legacyDisposition() throws Exception {
+    OpusChunkDecoder decoder = decoder();
+    ShortBuffer output = directShortBuffer(2_048);
+    expect(UnsupportedOperationException.class, () -> decoder.decode(SILENCE, output));
+    ByteBuffer encoded = encodedBuffer(decoder);
+    check(encoded.position() == 0 && encoded.limit() == SILENCE.length
+        && output.position() == 0 && output.limit() == output.capacity(),
+        "packet and output preparation precede legacy rejection");
+    ShortBuffer heap = ShortBuffer.allocate(8);
+    expect(IllegalArgumentException.class, () -> decoder.decode(SILENCE, heap));
+    decoder.close();
+    decoder.close();
+    expect(IllegalStateException.class,
+        () -> decoder.decode(SILENCE, directShortBuffer(8)));
   }
 
   private static void decodeAndReuse() throws Exception {
@@ -11283,6 +11357,18 @@ public final class GateOpusChunkEncoder {
   private static final int FRAME_SAMPLES = 960;
 
   public static void main(String[] args) throws Exception {
+    check(args.length == 1, "expected reference or candidate disposition");
+    if (args[0].equals("candidate")) {
+      constructionAndPrivateState();
+      legacyDisposition();
+      reflection();
+      System.out.println(
+          "contracts=constructor-order,configuration-quality,format-identity,"
+          + "direct-staging-capacity,validation-order,close-idempotence,closed-failure,"
+          + "private-state,reflection;service=legacy-opus-encoder-unsupported");
+      return;
+    }
+    check(args[0].equals("reference"), "unknown disposition");
     constructionAndPrivateState();
     returningEncode();
     directAndHeapOutputs();
@@ -11292,6 +11378,19 @@ public final class GateOpusChunkEncoder {
     reflection();
     System.out.println(
         "contracts=constructor-order,configuration-quality,format-identity,direct-staging-capacity,returning-array,exact-allocation,staging-consumption,direct-output,heap-output,array-offset-zero,input-preservation,null-order,heap-input,small-output,readonly-output,close-idempotence,closed-failure,private-state,reflection");
+  }
+
+  private static void legacyDisposition() throws Exception {
+    OpusChunkEncoder encoder = encoder(7);
+    expect(UnsupportedOperationException.class, () -> encoder.encode(pcm()));
+    ByteBuffer staging = staging(encoder);
+    check(staging.position() == 0 && staging.limit() == staging.capacity(),
+        "staging is prepared before legacy rejection");
+    expect(IllegalArgumentException.class,
+        () -> encoder.encode(ShortBuffer.allocate(FRAME_SAMPLES * CHANNELS)));
+    encoder.close();
+    encoder.close();
+    expect(IllegalStateException.class, () -> encoder.encode(pcm()));
   }
 
   private static void constructionAndPrivateState() throws Exception {
@@ -19380,6 +19479,7 @@ import com.sedmelluq.discord.lavaplayer.container.playlists.HlsStreamSegmentUrlP
 import com.sedmelluq.discord.lavaplayer.source.stream.M3uStreamSegmentUrlProvider;
 import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
 import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpConfigurable;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -50306,6 +50406,7 @@ import com.sedmelluq.discord.lavaplayer.source.yamusic.AbstractYandexMusicApiLoa
 import com.sedmelluq.discord.lavaplayer.source.yamusic.DefaultYandexMusicTrackLoader;
 import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicApiLoader;
 import com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpConfigurable;
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter;
 import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -51275,6 +51376,7 @@ import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicPlaylistLoader
 import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicSearchResultLoader;
 import com.sedmelluq.discord.lavaplayer.source.yamusic.YandexMusicTrackLoader;
 import com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpConfigurable;
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter;
 import com.sedmelluq.discord.lavaplayer.tools.io.HttpConfigurable;
 import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
 import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager;
@@ -51434,6 +51536,9 @@ public final class GateYandexMusicAudioSourceManager {
         && manager.getMainHttpConfiguration() != combined, "combined configuration identity");
     Function<RequestConfig, RequestConfig> requests = value -> value;
     Consumer<HttpClientBuilder> builder = value -> {};
+    HttpContextFilter filter = proxy(HttpContextFilter.class,
+        (instance, method, arguments) -> defaultValue(method.getReturnType()));
+    combined.setHttpContextFilter(filter);
     manager.configureRequests(requests);
     manager.configureBuilder(builder);
     check(fixture.configurationOrder.equals(Arrays.asList(
@@ -59994,6 +60099,23 @@ public final class GateOpusPacketRouter {
   private static final Object UNSAFE = loadUnsafe();
 
   public static void main(String[] args) throws Exception {
+    check(args.length == 1, "expected reference or candidate disposition");
+    if (args[0].equals("candidate")) {
+      candidateLegacyDisposition();
+      passthroughAndSeek();
+      flushingAndClosing();
+      subclassingAndReflection();
+      System.out.println(
+          "contracts=construction,context-identity,input-geometry,header-state,offered-frame,"
+          + "output-format,volume,private-state,eager-logger,heap-header,direct-header,"
+          + "position-preservation,zero-frame,frame-size,format-rebuild,format-reuse,duration,"
+          + "timecode,seek-state,strict-seek-threshold,passthrough,input-window,frame-reuse,"
+          + "heap-staging,native-output,decode-limit,flush-noop,flush-forwarding,close-order,"
+          + "close-failure-prefix,buffer-cleanup,repeated-close,subclassable,private-helpers,"
+          + "throws,reflection;service=legacy-opus-reencode-unsupported");
+      return;
+    }
+    check(args[0].equals("reference"), "unknown disposition");
     constructionAndPacketTiming();
     passthroughAndSeek();
     downstreamRouting();
@@ -60002,6 +60124,54 @@ public final class GateOpusPacketRouter {
     subclassingAndReflection();
     System.out.println(
         "contracts=construction,context-identity,input-geometry,header-state,offered-frame,output-format,volume,private-state,eager-logger,heap-header,direct-header,position-preservation,direct-underflow,zero-frame,frame-size,format-rebuild,format-reuse,duration,timecode,seek-state,seek-forwarding,seek-failure-prefix,strict-seek-threshold,passthrough,input-window,frame-reuse,heap-staging,staging-growth,direct-identity,native-output,decode-limit,decode-order,interruption-identity,reencode-mode,passthrough-mode,mode-cleanup,volume-application,pipeline-creation,initial-seek,initialisation-cleanup,flush-noop,flush-forwarding,close-order,close-failure-prefix,buffer-cleanup,repeated-close,subclassable,private-helpers,throws,reflection");
+  }
+
+  private static void candidateLegacyDisposition() throws Exception {
+    RecordingFrameBuffer frames = new RecordingFrameBuffer();
+    OpusPacketRouter router = new OpusPacketRouter(
+        context(new OpusAudioDataFormat(2, 48_000, 960), frames), 48_000, 2);
+    ByteBuffer empty = ByteBuffer.allocate(0);
+    router.process(empty);
+    check(frames.consumeCalls == 0 && field(router, "inputFormat") == null,
+        "empty packet remains a no-op");
+
+    ByteBuffer passthrough = ByteBuffer.wrap(new byte[] {8, 0, 99});
+    router.process(passthrough);
+    check(frames.consumeCalls == 1 && frames.lastTimecode == 20L
+        && frames.lastDataLength == 3 && passthrough.position() == 0
+        && intField(router, "lastFrameSize") == 960
+        && longField(router, "currentTimecode") == 20L,
+        "matching Opus geometry retains exact passthrough");
+
+    ByteBuffer changed = ByteBuffer.allocateDirect(2);
+    changed.put((byte) 0).put((byte) 0).flip();
+    Throwable changedFailure = catchThrowable(() -> router.process(changed));
+    check(changedFailure instanceof UnsupportedOperationException
+        && changedFailure.getMessage().contains("Legacy Opus decoder JNI is unsupported")
+        && changed.position() == 0 && intField(router, "lastFrameSize") == 480
+        && longField(router, "currentFrameDuration") == 10L
+        && longField(router, "currentTimecode") == 30L
+        && field(router, "opusDecoder") != null && field(router, "downstream") != null
+        && field(router, "frameBuffer") instanceof ShortBuffer,
+        "changed geometry prepares routing state before legacy decode rejection");
+    router.close();
+    router.close();
+    check(field(router, "opusDecoder") == null && field(router, "downstream") == null
+        && field(router, "frameBuffer") == null, "legacy rejection remains safely closeable");
+
+    OpusPacketRouter heapRouter = new OpusPacketRouter(
+        context(new Pcm16AudioDataFormat(2, 48_000, 960, false),
+            new RecordingFrameBuffer()), 48_000, 2);
+    ByteBuffer heap = ByteBuffer.wrap(new byte[] {8, 0, 7});
+    Throwable heapFailure = catchThrowable(() -> heapRouter.process(heap));
+    ByteBuffer staging = (ByteBuffer) field(heapRouter, "directInput");
+    ShortBuffer pcm = (ShortBuffer) field(heapRouter, "frameBuffer");
+    check(heapFailure instanceof UnsupportedOperationException
+        && heap.position() == heap.limit() && staging.isDirect() && staging.capacity() == 203
+        && staging.position() == 0 && staging.limit() == 3
+        && pcm.isDirect() && pcm.capacity() == 1_920 && pcm.limit() == 960,
+        "heap packet staging and PCM limits precede legacy decode rejection");
+    heapRouter.close();
   }
 
   private static void constructionAndPacketTiming() throws Exception {
@@ -63854,6 +64024,2322 @@ public final class GateAbstractHttpInterfaceManager {
 }
 "#;
 
+const SIMPLE_HTTP_INTERFACE_MANAGER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter;
+import com.sedmelluq.discord.lavaplayer.tools.http.SettableHttpRequestFilter;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.tools.io.SimpleHttpInterfaceManager;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.protocol.HttpClientContext;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+
+public final class GateSimpleHttpInterfaceManager {
+  public static void main(String[] args) throws Exception {
+    constructionAndFilterState();
+    freshInterfacesAndAcquisition();
+    filterReplacement();
+    reflection();
+    System.out.println("contracts=constructor,filter-holder,filter-null,fresh-interface,shared-client,fresh-context,acquired,filter-open,filter-close,reacquire,filter-replacement,abstract-shape,private-state,reflection");
+  }
+
+  private static void constructionAndFilterState() throws Exception {
+    RecordingBuilder builder = new RecordingBuilder();
+    RequestConfig config = RequestConfig.custom().setSocketTimeout(23).build();
+    SimpleHttpInterfaceManager manager = new SimpleHttpInterfaceManager(builder, config);
+    Object holder = field(manager, "filterHolder");
+    check(holder instanceof SettableHttpRequestFilter, "filter holder type");
+    check(((SettableHttpRequestFilter) holder).get() == null, "filter starts null");
+    check(field(manager, "clientBuilder") == builder, "builder identity");
+    check(field(manager, "requestConfig") == config, "request config identity");
+    SimpleHttpInterfaceManager nullable = new SimpleHttpInterfaceManager(null, null);
+    check(((SettableHttpRequestFilter) field(nullable, "filterHolder")).get() == null,
+        "nullable constructor filter state");
+  }
+
+  private static void freshInterfacesAndAcquisition() throws Exception {
+    RecordingBuilder builder = new RecordingBuilder();
+    SimpleHttpInterfaceManager manager = new SimpleHttpInterfaceManager(builder, RequestConfig.DEFAULT);
+    CountingFilter filter = new CountingFilter();
+    manager.setHttpContextFilter(filter);
+    check(((SettableHttpRequestFilter) field(manager, "filterHolder")).get() == filter,
+        "filter replacement identity");
+
+    HttpInterface first = manager.getInterface();
+    HttpInterface second = manager.getInterface();
+    check(first != second, "fresh interface identity");
+    check(first.getHttpClient() == second.getHttpClient() && first.getHttpClient() == builder.lastBuilt,
+        "shared client identity");
+    check(first.getContext() != second.getContext(), "fresh context identity");
+    check(filter.opens.get() == 2, "filter open callbacks");
+    check(!first.acquire() && !second.acquire(), "interfaces initially acquired");
+    first.close();
+    check(filter.closes.get() == 1, "filter close callback");
+    check(first.acquire(), "reacquire after close");
+    first.close();
+    second.close();
+    check(filter.closes.get() == 3, "all close callbacks");
+    manager.close();
+  }
+
+  private static void filterReplacement() throws Exception {
+    RecordingBuilder builder = new RecordingBuilder();
+    SimpleHttpInterfaceManager manager = new SimpleHttpInterfaceManager(builder, RequestConfig.DEFAULT);
+    CountingFilter first = new CountingFilter();
+    CountingFilter second = new CountingFilter();
+    manager.setHttpContextFilter(first);
+    HttpInterface before = manager.getInterface();
+    manager.setHttpContextFilter(second);
+    HttpInterface after = manager.getInterface();
+    check(first.opens.get() == 1 && second.opens.get() == 1, "replacement applies to new contexts");
+    before.close();
+    after.close();
+    check(first.closes.get() == 0 && second.closes.get() == 2,
+        "interfaces retain holder and use current filter");
+    manager.setHttpContextFilter(null);
+    check(((SettableHttpRequestFilter) field(manager, "filterHolder")).get() == null,
+        "null filter replacement");
+    manager.close();
+  }
+
+  private static void reflection() throws Exception {
+    Class<SimpleHttpInterfaceManager> type = SimpleHttpInterfaceManager.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers()),
+        "class modifiers");
+    check(type.getSuperclass().getName().equals(
+        "com.sedmelluq.discord.lavaplayer.tools.io.AbstractHttpInterfaceManager"),
+        "superclass");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredMethods().length == 2,
+        "member counts");
+    Field holder = type.getDeclaredField("filterHolder");
+    check(holder.getType() == SettableHttpRequestFilter.class
+        && (holder.getModifiers() & (Modifier.PRIVATE | Modifier.FINAL))
+            == (Modifier.PRIVATE | Modifier.FINAL), "private final holder");
+    check(type.getDeclaredConstructors().length == 1
+        && Modifier.isPublic(type.getDeclaredConstructors()[0].getModifiers()),
+        "constructor shape");
+    check(type.getDeclaredConstructor(HttpClientBuilder.class, RequestConfig.class) != null,
+        "constructor parameters");
+    check(type.getDeclaredMethod("getInterface").getReturnType() == HttpInterface.class,
+        "interface return type");
+    check(type.getDeclaredMethod("setHttpContextFilter", HttpContextFilter.class)
+        .getExceptionTypes().length == 0, "filter setter exceptions");
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+
+  private static Object field(Object instance, String name) throws Exception {
+    Class<?> type = instance.getClass();
+    while (type != null) {
+      try {
+        Field field = type.getDeclaredField(name);
+        field.setAccessible(true);
+        return field.get(instance);
+      } catch (NoSuchFieldException ignored) {
+        type = type.getSuperclass();
+      }
+    }
+    throw new NoSuchFieldException(name);
+  }
+
+  private static final class CountingFilter implements HttpContextFilter {
+    final AtomicInteger opens = new AtomicInteger();
+    final AtomicInteger closes = new AtomicInteger();
+    public void onContextOpen(HttpClientContext context) { opens.incrementAndGet(); }
+    public void onContextClose(HttpClientContext context) { closes.incrementAndGet(); }
+    public void onRequest(HttpClientContext context, HttpUriRequest request, boolean repetition) { }
+    public boolean onRequestResponse(HttpClientContext context, HttpUriRequest request,
+                                     HttpResponse response) { return false; }
+    public boolean onRequestException(HttpClientContext context, HttpUriRequest request,
+                                      Throwable error) { return false; }
+  }
+
+  private static final class FakeClient extends CloseableHttpClient {
+    public CloseableHttpResponse doExecute(org.apache.http.HttpHost host,
+        org.apache.http.HttpRequest request, org.apache.http.protocol.HttpContext context)
+        throws IOException { return null; }
+    public void close() throws IOException { }
+    public org.apache.http.params.HttpParams getParams() { return null; }
+    public org.apache.http.conn.ClientConnectionManager getConnectionManager() { return null; }
+  }
+
+  private static final class RecordingBuilder extends HttpClientBuilder {
+    FakeClient lastBuilt;
+    int builds;
+    public CloseableHttpClient build() {
+      builds++;
+      lastBuilt = new FakeClient();
+      return lastBuilt;
+    }
+  }
+}
+"#;
+
+const THREAD_LOCAL_HTTP_INTERFACE_MANAGER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter;
+import com.sedmelluq.discord.lavaplayer.tools.http.SettableHttpRequestFilter;
+import com.sedmelluq.discord.lavaplayer.tools.io.AbstractHttpInterfaceManager;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.tools.io.ThreadLocalHttpInterfaceManager;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.protocol.HttpClientContext;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+
+public final class GateThreadLocalHttpInterfaceManager {
+  public static void main(String[] args) throws Exception {
+    constructionAndLazyState();
+    cachedAndNestedLifecycle();
+    threadIsolation();
+    clientReplacement();
+    filterReplacementAndFailure();
+    reflection();
+    System.out.println("contracts=constructor,lazy-client,identity-retention,filter-holder,filter-null,thread-local-cache,nested-fallback,nested-not-cached,reuse-after-close,shared-client,fresh-context,per-thread-identity,per-thread-reuse,client-rollover,stale-cache-removal,closed-state,reconfiguration,filter-replacement,filter-live-close,null-filter,open-failure-identity,open-failure-retry,build-failure-identity,private-state,lambda-shape,generics,subclassable,reflection");
+  }
+
+  private static void constructionAndLazyState() throws Exception {
+    RecordingBuilder builder = new RecordingBuilder();
+    RequestConfig config = RequestConfig.custom().setSocketTimeout(29).build();
+    ThreadLocalHttpInterfaceManager manager =
+        new ThreadLocalHttpInterfaceManager(builder, config);
+    check(builder.builds == 0 && field(manager, "clientBuilder") == builder
+        && field(manager, "requestConfig") == config, "constructor retains state lazily");
+    check(field(manager, "httpInterfaces") instanceof ThreadLocal
+        && field(manager, "filter") instanceof SettableHttpRequestFilter
+        && ((SettableHttpRequestFilter) field(manager, "filter")).get() == null,
+        "thread-local and filter holder initial state");
+    manager.close();
+
+    ThreadLocalHttpInterfaceManager nullable =
+        new ThreadLocalHttpInterfaceManager(null, null);
+    check(catchThrowable(nullable::getInterface) instanceof NullPointerException,
+        "null builder fails only on lazy acquisition");
+
+    RecordingBuilder failingBuilder = new RecordingBuilder();
+    RuntimeException buildFailure = new RuntimeException("build");
+    failingBuilder.buildFailure = buildFailure;
+    ThreadLocalHttpInterfaceManager failing =
+        new ThreadLocalHttpInterfaceManager(failingBuilder, RequestConfig.DEFAULT);
+    check(catchThrowable(failing::getInterface) == buildFailure && failingBuilder.builds == 1,
+        "build failure identity");
+    failingBuilder.buildFailure = null;
+    HttpInterface recovered = failing.getInterface();
+    check(failingBuilder.builds == 2, "failed lazy build is retried");
+    recovered.close();
+    failing.close();
+  }
+
+  private static void cachedAndNestedLifecycle() throws Exception {
+    RecordingBuilder builder = new RecordingBuilder();
+    ThreadLocalHttpInterfaceManager manager =
+        new ThreadLocalHttpInterfaceManager(builder, RequestConfig.DEFAULT);
+    CountingFilter filter = new CountingFilter();
+    manager.setHttpContextFilter(filter);
+
+    HttpInterface cached = manager.getInterface();
+    HttpInterface nested = manager.getInterface();
+    check(cached != nested && cached.getHttpClient() == nested.getHttpClient()
+        && cached.getHttpClient() == builder.lastBuilt
+        && cached.getContext() != nested.getContext() && !cached.acquire() && !nested.acquire(),
+        "nested acquisition uses a fresh context over the shared client");
+    nested.close();
+    HttpInterface anotherNested = manager.getInterface();
+    check(anotherNested != cached && anotherNested != nested,
+        "temporary nested interfaces are not cached");
+    anotherNested.close();
+    cached.close();
+
+    HttpInterface reused = manager.getInterface();
+    check(reused == cached && reused.getContext() == cached.getContext() && !reused.acquire(),
+        "closed thread-local interface is reacquired by identity");
+    reused.close();
+    check(filter.opens.get() == 4 && filter.closes.get() == 4 && builder.builds == 1
+        && builder.lastBuilt.closes == 0, "acquisition lifecycle and non-owned client");
+    manager.close();
+    check(builder.lastBuilt.closes == 1, "manager owns the shared client");
+  }
+
+  private static void threadIsolation() throws Exception {
+    RecordingBuilder builder = new RecordingBuilder();
+    ThreadLocalHttpInterfaceManager manager =
+        new ThreadLocalHttpInterfaceManager(builder, RequestConfig.DEFAULT);
+    CountingFilter filter = new CountingFilter();
+    manager.setHttpContextFilter(filter);
+    HttpInterface mainFirst = manager.getInterface();
+    mainFirst.close();
+
+    AtomicReference<HttpInterface> workerInterface = new AtomicReference<>();
+    AtomicReference<Throwable> workerFailure = new AtomicReference<>();
+    Thread worker = new Thread(() -> {
+      try {
+        HttpInterface first = manager.getInterface();
+        workerInterface.set(first);
+        first.close();
+        HttpInterface second = manager.getInterface();
+        check(second == first, "worker thread-local reuse");
+        second.close();
+      } catch (Throwable error) {
+        workerFailure.set(error);
+      }
+    }, "thread-local-manager-worker");
+    worker.start();
+    worker.join();
+    if (workerFailure.get() != null) throw new AssertionError(workerFailure.get());
+
+    HttpInterface mainSecond = manager.getInterface();
+    check(mainSecond == mainFirst && workerInterface.get() != mainFirst
+        && workerInterface.get().getContext() != mainFirst.getContext()
+        && workerInterface.get().getHttpClient() == mainFirst.getHttpClient(),
+        "threads isolate interface/context identity and share the client");
+    mainSecond.close();
+    check(filter.opens.get() == 4 && filter.closes.get() == 4 && builder.builds == 1,
+        "per-thread callback lifecycle");
+    manager.close();
+  }
+
+  private static void clientReplacement() throws Exception {
+    RecordingBuilder builder = new RecordingBuilder();
+    ThreadLocalHttpInterfaceManager manager =
+        new ThreadLocalHttpInterfaceManager(builder, RequestConfig.DEFAULT);
+    HttpInterface oldInterface = manager.getInterface();
+    FakeClient oldClient = builder.lastBuilt;
+    oldInterface.close();
+    AtomicReference<HttpClientBuilder> configured = new AtomicReference<>();
+    manager.configureBuilder(configured::set);
+    check(configured.get() == builder && oldClient.closes == 1,
+        "builder reconfiguration closes the previous shared client");
+
+    HttpInterface replacement = manager.getInterface();
+    check(builder.builds == 2 && replacement != oldInterface
+        && replacement.getHttpClient() != oldClient
+        && replacement.getContext() != oldInterface.getContext(),
+        "client identity mismatch removes the stale thread-local interface");
+    replacement.close();
+    check(manager.getInterface() == replacement, "replacement becomes the cached interface");
+    replacement.close();
+    manager.close();
+    Throwable closed = catchThrowable(manager::getInterface);
+    check(closed instanceof IllegalStateException
+        && "Cannot get http client for a closed manager.".equals(closed.getMessage()),
+        "closed manager fails before thread-local access");
+  }
+
+  private static void filterReplacementAndFailure() throws Exception {
+    RecordingBuilder builder = new RecordingBuilder();
+    ThreadLocalHttpInterfaceManager manager =
+        new ThreadLocalHttpInterfaceManager(builder, RequestConfig.DEFAULT);
+    CountingFilter first = new CountingFilter();
+    CountingFilter second = new CountingFilter();
+    manager.setHttpContextFilter(first);
+    HttpInterface cached = manager.getInterface();
+    manager.setHttpContextFilter(second);
+    cached.close();
+    check(first.opens.get() == 1 && first.closes.get() == 0 && second.closes.get() == 1,
+        "cached interface consults the live filter holder when closing");
+
+    RuntimeException openFailure = new RuntimeException("open");
+    second.openFailure = openFailure;
+    check(catchThrowable(manager::getInterface) == openFailure,
+        "filter open failure identity");
+    second.openFailure = null;
+    check(manager.getInterface() == cached,
+        "failed open leaves the cached interface available for retry");
+    manager.setHttpContextFilter(null);
+    cached.close();
+    check(((SettableHttpRequestFilter) field(manager, "filter")).get() == null
+        && second.opens.get() == 1 && second.closes.get() == 1,
+        "null filter replacement suppresses later callbacks");
+    manager.close();
+  }
+
+  private static void reflection() throws Exception {
+    Class<ThreadLocalHttpInterfaceManager> type = ThreadLocalHttpInterfaceManager.class;
+    check(type.getModifiers() == Modifier.PUBLIC
+        && type.getSuperclass() == AbstractHttpInterfaceManager.class
+        && type.getInterfaces().length == 0 && type.getDeclaredAnnotations().length == 0
+        && type.getDeclaredClasses().length == 0 && type.getDeclaredFields().length == 2
+        && type.getDeclaredMethods().length == 3 && type.getDeclaredConstructors().length == 1,
+        "class shape and member counts");
+    Field interfaces = type.getDeclaredField("httpInterfaces");
+    check(interfaces.getType() == ThreadLocal.class
+        && interfaces.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && interfaces.getGenericType() instanceof ParameterizedType
+        && interfaces.getGenericType().getTypeName().equals(
+            "java.lang.ThreadLocal<com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface>"),
+        "thread-local field metadata and generic signature");
+    Field filter = type.getDeclaredField("filter");
+    check(filter.getType() == SettableHttpRequestFilter.class
+        && filter.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL),
+        "filter field metadata");
+    Constructor<?> constructor =
+        type.getDeclaredConstructor(HttpClientBuilder.class, RequestConfig.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    check(method(type, "getInterface", Modifier.PUBLIC, HttpInterface.class, new Class<?>[0])
+        && method(type, "setHttpContextFilter", Modifier.PUBLIC, void.class,
+            new Class<?>[] {HttpContextFilter.class}), "public method metadata");
+    Method lambda = type.getDeclaredMethod("lambda$new$0");
+    check(lambda.getModifiers() == (Modifier.PRIVATE | 0x1000)
+        && lambda.getReturnType() == HttpInterface.class && lambda.isSynthetic()
+        && !lambda.isBridge() && !lambda.isVarArgs(), "private synthetic supplier shape");
+    check(new Derived(new RecordingBuilder(), RequestConfig.DEFAULT)
+        instanceof ThreadLocalHttpInterfaceManager, "subclassability");
+  }
+
+  private static boolean method(Class<?> type, String name, int modifiers, Class<?> result,
+      Class<?>[] parameters) throws Exception {
+    Method method = type.getDeclaredMethod(name, parameters);
+    return method.getModifiers() == modifiers && method.getReturnType() == result
+        && method.getExceptionTypes().length == 0 && !method.isSynthetic()
+        && !method.isBridge() && !method.isVarArgs();
+  }
+  private static Object field(Object instance, String name) throws Exception {
+    Class<?> type = instance.getClass();
+    while (type != null) {
+      try {
+        Field field = type.getDeclaredField(name);
+        field.setAccessible(true);
+        return field.get(instance);
+      } catch (NoSuchFieldException ignored) {
+        type = type.getSuperclass();
+      }
+    }
+    throw new NoSuchFieldException(name);
+  }
+  private static Throwable catchThrowable(ThrowingAction action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+  @FunctionalInterface private interface ThrowingAction { void run() throws Throwable; }
+
+  private static final class Derived extends ThreadLocalHttpInterfaceManager {
+    Derived(HttpClientBuilder builder, RequestConfig config) { super(builder, config); }
+  }
+  private static final class CountingFilter implements HttpContextFilter {
+    final AtomicInteger opens = new AtomicInteger();
+    final AtomicInteger closes = new AtomicInteger();
+    RuntimeException openFailure;
+    public void onContextOpen(HttpClientContext context) {
+      if (openFailure != null) throw openFailure;
+      opens.incrementAndGet();
+    }
+    public void onContextClose(HttpClientContext context) { closes.incrementAndGet(); }
+    public void onRequest(HttpClientContext context, HttpUriRequest request, boolean repeated) {}
+    public boolean onRequestResponse(HttpClientContext context, HttpUriRequest request,
+        HttpResponse response) { return false; }
+    public boolean onRequestException(HttpClientContext context, HttpUriRequest request,
+        Throwable error) { return false; }
+  }
+  @SuppressWarnings("deprecation")
+  private static final class FakeClient extends CloseableHttpClient {
+    int closes;
+    protected CloseableHttpResponse doExecute(org.apache.http.HttpHost host,
+        org.apache.http.HttpRequest request, org.apache.http.protocol.HttpContext context)
+        throws IOException { return null; }
+    public void close() { closes++; }
+    public org.apache.http.params.HttpParams getParams() { return null; }
+    public org.apache.http.conn.ClientConnectionManager getConnectionManager() { return null; }
+  }
+  private static final class RecordingBuilder extends HttpClientBuilder {
+    FakeClient lastBuilt;
+    RuntimeException buildFailure;
+    int builds;
+    public CloseableHttpClient build() {
+      builds++;
+      if (buildFailure != null) throw buildFailure;
+      lastBuilt = new FakeClient();
+      return lastBuilt;
+    }
+  }
+}
+"#;
+
+const TRUST_MANAGER_BUILDER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.io.TrustManagerBuilder;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.KeyStore;
+import java.security.cert.Certificate;
+import java.security.cert.X509Certificate;
+import java.util.Arrays;
+import java.util.List;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
+import org.slf4j.Logger;
+
+public final class GateTrustManagerBuilder {
+  public static void main(String[] args) throws Exception {
+    X509Certificate[] fixtureCertificates = createResourceFixtures();
+    constructionAndEmptyBuild(fixtureCertificates[0]);
+    builtinCertificates();
+    resourceLoading(fixtureCertificates);
+    resourceFailures(fixtureCertificates[0]);
+    buildWithCustomCertificates(fixtureCertificates);
+    reflection();
+    System.out.println("contracts=constructor,empty-list,fresh-list,empty-build,x509-selection,builtin-default-factory,builtin-certificate-order,builtin-append,builder-identity,missing-directory,null-directory,bundled-list,extended-list,utf8-trimming,blank-lines,missing-file,resource-order,repeated-resource-append,jks-certificate-only,partial-failure,extended-short-circuit,build-fresh-manager,build-no-mutation,custom-issuers,checked-failures,private-state,private-helpers,generics,subclassable,reflection");
+  }
+
+  private static void constructionAndEmptyBuild(X509Certificate sample) throws Exception {
+    TrustManagerBuilder first = new TrustManagerBuilder();
+    TrustManagerBuilder second = new TrustManagerBuilder();
+    check(certificates(first).isEmpty() && certificates(second).isEmpty()
+        && certificates(first) != certificates(second), "fresh mutable certificate lists");
+    X509TrustManager empty = first.build();
+    check(empty != null && empty.getAcceptedIssuers().length == 0
+        && certificates(first).isEmpty(), "empty build and no source mutation");
+    Throwable rejected = catchThrowable(() -> empty.checkServerTrusted(
+        new X509Certificate[] {sample}, sample.getPublicKey().getAlgorithm()));
+    check(rejected != null, "empty manager rejects a real chain");
+    check(first.build() != empty, "each build returns a fresh trust manager");
+  }
+
+  private static void builtinCertificates() throws Exception {
+    X509TrustManager system = defaultTrustManager();
+    X509Certificate[] expected = system.getAcceptedIssuers();
+    check(expected.length > 1, "default trust store fixture availability");
+    TrustManagerBuilder builder = new TrustManagerBuilder();
+    check(builder.addBuiltinCertificates() == builder, "builtin builder identity");
+    List<Certificate> loaded = certificates(builder);
+    check(loaded.size() == expected.length, "all builtin issuers appended");
+    for (int i = 0; i < expected.length; i++) {
+      check(sameCertificate(loaded.get(i), expected[i]), "builtin certificate order " + i);
+    }
+    check(builder.addBuiltinCertificates() == builder
+        && certificates(builder).size() == expected.length * 2,
+        "repeated builtin loading appends without deduplication");
+  }
+
+  private static void resourceLoading(X509Certificate[] expected) throws Exception {
+    TrustManagerBuilder builder = new TrustManagerBuilder();
+    check(builder.addFromResourceDirectory("/missing-trust-fixture") == builder
+        && builder.addFromResourceDirectory(null) == builder
+        && certificates(builder).isEmpty(), "missing and null-named directories are no-ops");
+    check(builder.addFromResourceDirectory("/gate-trust-fixture") == builder,
+        "resource builder identity");
+    List<Certificate> loaded = certificates(builder);
+    check(loaded.size() == 2 && sameCertificate(loaded.get(0), expected[0])
+        && sameCertificate(loaded.get(1), expected[1]),
+        "bundled/extended lists preserve trimmed resource order and skip missing files");
+    builder.addFromResourceDirectory("/gate-trust-fixture");
+    check(loaded.size() == 4 && sameCertificate(loaded.get(2), expected[0])
+        && sameCertificate(loaded.get(3), expected[1]),
+        "repeated directory loading appends in the same order");
+  }
+
+  private static void resourceFailures(X509Certificate expectedFirst) throws Exception {
+    TrustManagerBuilder builder = new TrustManagerBuilder();
+    Throwable failure = catchThrowable(() ->
+        builder.addFromResourceDirectory("/gate-trust-invalid"));
+    check(failure instanceof IOException, "malformed JKS checked failure");
+    List<Certificate> loaded = certificates(builder);
+    check(loaded.size() == 1 && sameCertificate(loaded.get(0), expectedFirst),
+        "earlier certificates remain after a later file fails");
+    check(!containsCertificate(loaded, fixtureCertificates()[1]),
+        "bundled failure prevents extended-list processing");
+  }
+
+  private static void buildWithCustomCertificates(X509Certificate[] expected) throws Exception {
+    TrustManagerBuilder builder = new TrustManagerBuilder();
+    builder.addFromResourceDirectory("/gate-trust-fixture");
+    int sourceSize = certificates(builder).size();
+    X509TrustManager first = builder.build();
+    X509TrustManager second = builder.build();
+    check(first != second && certificates(builder).size() == sourceSize,
+        "build is repeatable and does not mutate source certificates");
+    X509Certificate[] issuers = first.getAcceptedIssuers();
+    check(issuers.length == 2 && containsCertificate(Arrays.asList(issuers), expected[0])
+        && containsCertificate(Arrays.asList(issuers), expected[1]),
+        "custom JKS entries become accepted issuers");
+  }
+
+  private static X509Certificate[] createResourceFixtures() throws Exception {
+    X509Certificate[] issuers = defaultTrustManager().getAcceptedIssuers();
+    check(issuers.length > 1, "two default certificates for resource fixtures");
+    X509Certificate[] selected = new X509Certificate[] {issuers[0], issuers[1]};
+    Path root = Paths.get(GateTrustManagerBuilder.class.getProtectionDomain()
+        .getCodeSource().getLocation().toURI());
+    Path valid = root.resolve("gate-trust-fixture");
+    Files.createDirectories(valid);
+    writeStore(valid.resolve("first.jks"), selected[0], true);
+    writeStore(valid.resolve("second.jks"), selected[1], true);
+    Files.write(valid.resolve("bundled.txt"),
+        Arrays.asList("  first.jks  ", "", "missing.jks"), StandardCharsets.UTF_8);
+    Files.write(valid.resolve("extended.txt"),
+        Arrays.asList("", " second.jks "), StandardCharsets.UTF_8);
+
+    Path invalid = root.resolve("gate-trust-invalid");
+    Files.createDirectories(invalid);
+    writeStore(invalid.resolve("first.jks"), selected[0], true);
+    Files.write(invalid.resolve("broken.jks"), new byte[] {1, 2, 3, 4});
+    Files.write(invalid.resolve("bundled.txt"),
+        Arrays.asList("first.jks", "broken.jks"), StandardCharsets.UTF_8);
+    writeStore(invalid.resolve("extended-only.jks"), selected[1], true);
+    Files.write(invalid.resolve("extended.txt"),
+        Arrays.asList("extended-only.jks"), StandardCharsets.UTF_8);
+    FixtureHolder.certificates = selected;
+    return selected;
+  }
+
+  private static X509Certificate[] fixtureCertificates() {
+    return FixtureHolder.certificates;
+  }
+
+  private static void writeStore(Path path, X509Certificate certificate,
+      boolean certificateEntry) throws Exception {
+    KeyStore store = KeyStore.getInstance("JKS");
+    store.load(null, null);
+    if (certificateEntry) store.setCertificateEntry("certificate", certificate);
+    try (OutputStream output = Files.newOutputStream(path)) {
+      store.store(output, new char[0]);
+    }
+  }
+
+  private static X509TrustManager defaultTrustManager() throws Exception {
+    TrustManagerFactory factory = TrustManagerFactory.getInstance(
+        TrustManagerFactory.getDefaultAlgorithm());
+    factory.init((KeyStore) null);
+    for (TrustManager manager : factory.getTrustManagers()) {
+      if (manager instanceof X509TrustManager) return (X509TrustManager) manager;
+    }
+    throw new AssertionError("default X509 trust manager missing");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<Certificate> certificates(TrustManagerBuilder builder) throws Exception {
+    Field field = TrustManagerBuilder.class.getDeclaredField("certificates");
+    field.setAccessible(true);
+    return (List<Certificate>) field.get(builder);
+  }
+
+  private static boolean containsCertificate(List<? extends Certificate> values,
+      Certificate expected) throws Exception {
+    for (Certificate value : values) if (sameCertificate(value, expected)) return true;
+    return false;
+  }
+  private static boolean sameCertificate(Certificate first, Certificate second) throws Exception {
+    return first.getType().equals(second.getType())
+        && Arrays.equals(first.getEncoded(), second.getEncoded());
+  }
+
+  private static void reflection() throws Exception {
+    Class<TrustManagerBuilder> type = TrustManagerBuilder.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredAnnotations().length == 0
+        && type.getDeclaredClasses().length == 0 && type.getDeclaredFields().length == 2
+        && type.getDeclaredMethods().length == 8 && type.getDeclaredConstructors().length == 1,
+        "class shape and member counts");
+    Field log = type.getDeclaredField("log");
+    log.setAccessible(true);
+    check(log.getType() == Logger.class
+        && log.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && log.get(null) != null, "logger field metadata");
+    Field certificates = type.getDeclaredField("certificates");
+    check(certificates.getType() == List.class
+        && certificates.getModifiers() == (Modifier.PRIVATE | Modifier.FINAL)
+        && certificates.getGenericType() instanceof ParameterizedType
+        && certificates.getGenericType().getTypeName().equals(
+            "java.util.List<java.security.cert.Certificate>"),
+        "certificate field metadata and generic signature");
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    check(method(type, "addBuiltinCertificates", Modifier.PUBLIC, TrustManagerBuilder.class,
+            new Class<?>[0], new Class<?>[] {Exception.class})
+        && method(type, "addFromResourceDirectory", Modifier.PUBLIC, TrustManagerBuilder.class,
+            new Class<?>[] {String.class}, new Class<?>[] {Exception.class})
+        && method(type, "build", Modifier.PUBLIC, X509TrustManager.class,
+            new Class<?>[0], new Class<?>[] {Exception.class})
+        && method(type, "findFirstX509TrustManager", Modifier.PRIVATE, X509TrustManager.class,
+            new Class<?>[] {TrustManagerFactory.class}, new Class<?>[0])
+        && method(type, "addFromTrustManager", Modifier.PRIVATE, void.class,
+            new Class<?>[] {X509TrustManager.class}, new Class<?>[0])
+        && method(type, "addFromResourceList", Modifier.PRIVATE, void.class,
+            new Class<?>[] {String.class, String.class}, new Class<?>[] {Exception.class})
+        && method(type, "addFromResourceFile", Modifier.PRIVATE, void.class,
+            new Class<?>[] {String.class}, new Class<?>[] {Exception.class})
+        && method(type, "addFromKeyStore", Modifier.PRIVATE, void.class,
+            new Class<?>[] {KeyStore.class}, new Class<?>[] {Exception.class}),
+        "public and private method metadata");
+    check(new Derived() instanceof TrustManagerBuilder, "subclassability");
+  }
+
+  private static boolean method(Class<?> type, String name, int modifiers, Class<?> result,
+      Class<?>[] parameters, Class<?>[] exceptions) throws Exception {
+    Method method = type.getDeclaredMethod(name, parameters);
+    return method.getModifiers() == modifiers && method.getReturnType() == result
+        && Arrays.equals(method.getExceptionTypes(), exceptions) && !method.isSynthetic()
+        && !method.isBridge() && !method.isVarArgs();
+  }
+  private static Throwable catchThrowable(ThrowingAction action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+  @FunctionalInterface private interface ThrowingAction { void run() throws Throwable; }
+  private static final class FixtureHolder { static X509Certificate[] certificates; }
+  private static final class Derived extends TrustManagerBuilder {}
+}
+"#;
+
+const CONNECTOR_NATIVE_LIB_LOADER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.natives.ConnectorNativeLibLoader;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.function.Predicate;
+
+public final class GateConnectorNativeLibLoader {
+  private static final String UNSUPPORTED_MESSAGE =
+      "Legacy Lavaplayer connector native loading is unsupported; load the Mantle native "
+      + "library through dev.mantle.internal.NativeLoader.load(path).";
+
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "mode argument");
+    commonContract();
+    if (args[0].equals("reference")) {
+      referenceLegacyContract();
+      System.out.println("common=public-concrete,constructor,static-load,subclassable,reflection;"
+          + "legacy=two-loaders,windows-mpg123,connector,external-loader");
+    } else if (args[0].equals("candidate")) {
+      candidateLegacyContract();
+      System.out.println("common=public-concrete,constructor,static-load,subclassable,reflection;"
+          + "legacy=retained-shell,no-external-loader,deterministic-unsupported");
+    } else {
+      throw new AssertionError("unknown mode " + args[0]);
+    }
+  }
+
+  private static void commonContract() throws Exception {
+    ConnectorNativeLibLoader first = new ConnectorNativeLibLoader();
+    ConnectorNativeLibLoader second = new ConnectorNativeLibLoader();
+    check(first != second && new Derived() instanceof ConnectorNativeLibLoader,
+        "construction and subclassability");
+
+    Class<ConnectorNativeLibLoader> type = ConnectorNativeLibLoader.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredAnnotations().length == 0,
+        "class metadata");
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    Method load = type.getDeclaredMethod("loadConnectorLibrary");
+    check(load.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && load.getReturnType() == void.class && load.getParameterCount() == 0
+        && load.getExceptionTypes().length == 0 && !load.isSynthetic()
+        && !load.isBridge() && !load.isVarArgs(), "load method metadata");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static void referenceLegacyContract() throws Exception {
+    Class<ConnectorNativeLibLoader> type = ConnectorNativeLibLoader.class;
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredMethods().length == 2,
+        "reference private shape");
+    Field loadersField = type.getDeclaredField("loaders");
+    check(loadersField.getModifiers() == (Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL)
+        && loadersField.getType().isArray(), "reference loader array metadata");
+    loadersField.setAccessible(true);
+    Object[] loaders = (Object[]) loadersField.get(null);
+    check(loaders.length == 2 && loaders[0] != loaders[1], "reference loader order");
+
+    Field libraryName = loaders[0].getClass().getDeclaredField("libraryName");
+    Field systemFilter = loaders[0].getClass().getDeclaredField("systemFilter");
+    libraryName.setAccessible(true);
+    systemFilter.setAccessible(true);
+    check(libraryName.get(loaders[0]).equals("libmpg123-0")
+        && libraryName.get(loaders[1]).equals("connector"), "legacy library names");
+    Object filter = systemFilter.get(loaders[0]);
+    check(filter instanceof Predicate && systemFilter.get(loaders[1]) == null,
+        "legacy filter placement");
+
+    Class<?> architectureType = Class.forName(
+        "com.sedmelluq.lava.common.natives.architecture.ArchitectureType");
+    Class<?> operatingSystemType = Class.forName(
+        "com.sedmelluq.lava.common.natives.architecture.OperatingSystemType");
+    Class<?> systemType = Class.forName(
+        "com.sedmelluq.lava.common.natives.architecture.SystemType");
+    Class<?> architectures = Class.forName(
+        "com.sedmelluq.lava.common.natives.architecture.DefaultArchitectureTypes");
+    Class<?> operatingSystems = Class.forName(
+        "com.sedmelluq.lava.common.natives.architecture.DefaultOperatingSystemTypes");
+    Object x86 = architectures.getField("X86_64").get(null);
+    Object windows = operatingSystems.getField("WINDOWS").get(null);
+    Object linux = operatingSystems.getField("LINUX").get(null);
+    Constructor<?> systemConstructor =
+        systemType.getConstructor(architectureType, operatingSystemType);
+    Predicate<Object> predicate = (Predicate<Object>) filter;
+    check(predicate.test(systemConstructor.newInstance(x86, windows))
+        && !predicate.test(systemConstructor.newInstance(x86, linux)),
+        "legacy Windows-only mpg123 filter");
+  }
+
+  private static void candidateLegacyContract() {
+    Class<ConnectorNativeLibLoader> type = ConnectorNativeLibLoader.class;
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredMethods().length == 1,
+        "candidate removes external loader state");
+    Throwable first = catchThrowable(ConnectorNativeLibLoader::loadConnectorLibrary);
+    Throwable second = catchThrowable(ConnectorNativeLibLoader::loadConnectorLibrary);
+    check(first instanceof UnsupportedOperationException && second instanceof UnsupportedOperationException
+        && first != second && UNSUPPORTED_MESSAGE.equals(first.getMessage())
+        && UNSUPPORTED_MESSAGE.equals(second.getMessage()),
+        "deterministic unsupported legacy loading");
+  }
+
+  private static Throwable catchThrowable(ThrowingAction action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+  @FunctionalInterface private interface ThrowingAction { void run() throws Throwable; }
+  private static final class Derived extends ConnectorNativeLibLoader {}
+}
+"#;
+
+const AAC_DECODER_SUPPORT_CONSUMER: &str = r"
+package com.sedmelluq.discord.lavaplayer.natives.aac;
+
+import java.nio.ByteBuffer;
+import java.nio.ShortBuffer;
+
+public final class AacDecoderGateSupport {
+  public static long createResult;
+  public static int[] configureResults;
+  public static int fillResult;
+  public static int decodeResult;
+  public static long streamInfoResult;
+  public static int getInstanceCalls;
+  public static int createCalls;
+  public static int destroyCalls;
+  public static int configureCalls;
+  public static int fillCalls;
+  public static int decodeCalls;
+  public static int streamInfoCalls;
+  public static int lastTransport;
+  public static long lastInstance;
+  public static long[] configuredValues;
+  public static ByteBuffer lastByteBuffer;
+  public static ShortBuffer lastShortBuffer;
+  public static int lastOffset;
+  public static int lastLength;
+  public static boolean lastFlush;
+
+  private AacDecoderGateSupport() {}
+
+  public static void reset() {
+    createResult = 41L;
+    configureResults = new int[] {0};
+    fillResult = 0;
+    decodeResult = 0;
+    streamInfoResult = 0L;
+    getInstanceCalls = createCalls = destroyCalls = configureCalls = 0;
+    fillCalls = decodeCalls = streamInfoCalls = 0;
+    lastTransport = lastOffset = lastLength = 0;
+    lastInstance = 0L;
+    configuredValues = new long[8];
+    lastByteBuffer = null;
+    lastShortBuffer = null;
+    lastFlush = false;
+  }
+}
+
+class AacDecoderLibrary {
+  private static final AacDecoderLibrary INSTANCE = new AacDecoderLibrary();
+  private AacDecoderLibrary() {}
+
+  static AacDecoderLibrary getInstance() {
+    AacDecoderGateSupport.getInstanceCalls++;
+    return INSTANCE;
+  }
+
+  long create(int transportType) {
+    AacDecoderGateSupport.createCalls++;
+    AacDecoderGateSupport.lastTransport = transportType;
+    return AacDecoderGateSupport.createResult;
+  }
+
+  void destroy(long instance) {
+    AacDecoderGateSupport.destroyCalls++;
+    AacDecoderGateSupport.lastInstance = instance;
+  }
+
+  int configure(long instance, long bufferData) {
+    AacDecoderGateSupport.lastInstance = instance;
+    AacDecoderGateSupport.configuredValues[AacDecoderGateSupport.configureCalls] = bufferData;
+    int index = Math.min(AacDecoderGateSupport.configureCalls,
+        AacDecoderGateSupport.configureResults.length - 1);
+    AacDecoderGateSupport.configureCalls++;
+    return AacDecoderGateSupport.configureResults[index];
+  }
+
+  int fill(long instance, ByteBuffer buffer, int offset, int length) {
+    AacDecoderGateSupport.fillCalls++;
+    AacDecoderGateSupport.lastInstance = instance;
+    AacDecoderGateSupport.lastByteBuffer = buffer;
+    AacDecoderGateSupport.lastOffset = offset;
+    AacDecoderGateSupport.lastLength = length;
+    return AacDecoderGateSupport.fillResult;
+  }
+
+  int decode(long instance, ShortBuffer buffer, int length, boolean flush) {
+    AacDecoderGateSupport.decodeCalls++;
+    AacDecoderGateSupport.lastInstance = instance;
+    AacDecoderGateSupport.lastShortBuffer = buffer;
+    AacDecoderGateSupport.lastLength = length;
+    AacDecoderGateSupport.lastFlush = flush;
+    return AacDecoderGateSupport.decodeResult;
+  }
+
+  long getStreamInfo(long instance) {
+    AacDecoderGateSupport.streamInfoCalls++;
+    AacDecoderGateSupport.lastInstance = instance;
+    return AacDecoderGateSupport.streamInfoResult;
+  }
+}
+";
+
+const MP3_DECODER_SUPPORT_CONSUMER: &str = r"
+package com.sedmelluq.discord.lavaplayer.natives.mp3;
+
+import java.nio.ByteBuffer;
+import java.nio.ShortBuffer;
+
+public final class Mp3DecoderGateSupport {
+  public static long createResult;
+  public static int[] decodeResults;
+  public static int decodeCalls;
+  public static long lastInstance;
+  public static int lastInputLength;
+  public static int lastOutputLength;
+  public static ByteBuffer lastInput;
+  public static ShortBuffer lastOutput;
+
+  private Mp3DecoderGateSupport() {}
+
+  public static void reset() {
+    createResult = 73L;
+    decodeResults = new int[] {0};
+    decodeCalls = 0;
+    lastInstance = 0L;
+    lastInputLength = lastOutputLength = 0;
+    lastInput = null;
+    lastOutput = null;
+  }
+}
+
+class Mp3DecoderLibrary {
+  private static final Mp3DecoderLibrary INSTANCE = new Mp3DecoderLibrary();
+  private Mp3DecoderLibrary() {}
+
+  static Mp3DecoderLibrary getInstance() { return INSTANCE; }
+
+  long create() { return Mp3DecoderGateSupport.createResult; }
+
+  void destroy(long instance) { Mp3DecoderGateSupport.lastInstance = instance; }
+
+  int decode(long instance, ByteBuffer input, int inputLength, ShortBuffer output,
+      int outputLength) {
+    int index = Math.min(Mp3DecoderGateSupport.decodeCalls,
+        Mp3DecoderGateSupport.decodeResults.length - 1);
+    Mp3DecoderGateSupport.decodeCalls++;
+    Mp3DecoderGateSupport.lastInstance = instance;
+    Mp3DecoderGateSupport.lastInput = input;
+    Mp3DecoderGateSupport.lastInputLength = inputLength;
+    Mp3DecoderGateSupport.lastOutput = output;
+    Mp3DecoderGateSupport.lastOutputLength = outputLength;
+    return Mp3DecoderGateSupport.decodeResults[index];
+  }
+}
+";
+
+const MP3_DECODER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.natives.mp3.Mp3Decoder;
+import com.sedmelluq.discord.lavaplayer.natives.mp3.Mp3Decoder.MpegVersion;
+import com.sedmelluq.discord.lavaplayer.natives.mp3.Mp3DecoderGateSupport;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.ShortBuffer;
+import java.util.Arrays;
+
+public final class GateMp3Decoder {
+  private static final String UNSUPPORTED_MESSAGE =
+      "Legacy mpg123 MP3 decoder JNI is unsupported; use Mantle's bounded media pipeline.";
+
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "mode argument");
+    commonContract();
+    if (args[0].equals("reference")) {
+      referenceContract();
+      System.out.println("common=constants,header-parsing,mpeg-versions,enum,reflection,subclassable;legacy=native-construction,decode,close");
+    } else if (args[0].equals("candidate")) {
+      candidateContract();
+      System.out.println("common=constants,header-parsing,mpeg-versions,enum,reflection,subclassable;legacy=safe-constructor,no-native-state,validation-order,deterministic-unsupported,idempotent-close");
+    } else throw new AssertionError("unknown mode " + args[0]);
+  }
+
+  private static void commonContract() throws Exception {
+    Mp3DecoderGateSupport.reset();
+    check(Mp3Decoder.MPEG1_SAMPLES_PER_FRAME == 1152L
+        && Mp3Decoder.MPEG2_SAMPLES_PER_FRAME == 576L && Mp3Decoder.HEADER_SIZE == 4,
+        "decoder constants");
+    byte[] mpeg1 = {(byte)0xff, (byte)0xfb, (byte)0x90, 0};
+    byte[] mpeg2 = {(byte)0xff, (byte)0xf3, (byte)0x80, (byte)0xc0};
+    byte[] mpeg25 = {(byte)0xff, (byte)0xe3, (byte)0x42, 0};
+    check(MpegVersion.values().length == 3 && MpegVersion.values()[0] == MpegVersion.MPEG_1
+        && MpegVersion.values()[1] == MpegVersion.MPEG_2
+        && MpegVersion.values()[2] == MpegVersion.MPEG_2_5, "MPEG enum order");
+    check(MpegVersion.getVersion(mpeg1, 0) == MpegVersion.MPEG_1
+        && MpegVersion.getVersion(mpeg2, 0) == MpegVersion.MPEG_2
+        && MpegVersion.getVersion(mpeg25, 0) == MpegVersion.MPEG_2_5,
+        "MPEG version dispatch");
+    check(Mp3Decoder.getFrameSampleRate(mpeg1, 0) == 44_100
+        && Mp3Decoder.getFrameChannelCount(mpeg1, 0) == 2
+        && Mp3Decoder.hasFrameSync(mpeg1, 0) && !Mp3Decoder.isUnsupportedVersion(mpeg1, 0)
+        && Mp3Decoder.isValidFrame(mpeg1, 0)
+        && Mp3Decoder.getFrameSize(mpeg1, 0) == 417
+        && Mp3Decoder.getSamplesPerFrame(mpeg1, 0) == 1152L,
+        "MPEG-1 header parsing");
+    check(Mp3Decoder.getFrameSampleRate(mpeg2, 0) == 22_050
+        && Mp3Decoder.getFrameChannelCount(mpeg2, 0) == 1
+        && Mp3Decoder.getFrameSize(mpeg2, 0) == 208
+        && MpegVersion.MPEG_2.getBitRate(mpeg2, 0) == 64_000,
+        "MPEG-2 header parsing");
+    check(Mp3Decoder.getFrameSampleRate(mpeg25, 0) == 11_025
+        && Mp3Decoder.getFrameSize(mpeg25, 0) == 209
+        && MpegVersion.MPEG_2_5.getAverageFrameSize(mpeg25, 0) > 208.9
+        && MpegVersion.MAX_FRAME_SIZE == 1441 && Mp3Decoder.getMaximumFrameSize() == 1441,
+        "MPEG-2.5 and frame-size parsing");
+    byte[] reserved = {(byte)0xff, 0x0a, (byte)0x90, 0};
+    check(Mp3Decoder.isUnsupportedVersion(reserved, 0)
+        && catchThrowable(() -> MpegVersion.getVersion(reserved, 0)) instanceof IllegalArgumentException,
+        "reserved version handling");
+    byte[] invalid = {(byte)0xff, (byte)0xfa, 0x00, 0};
+    check(!Mp3Decoder.isValidFrame(invalid, 0), "invalid frame predicate");
+    reflection();
+  }
+
+  private static void referenceContract() {
+    Mp3DecoderGateSupport.reset();
+    Mp3DecoderGateSupport.decodeResults = new int[] {-11, 4};
+    Mp3Decoder decoder = new Mp3Decoder();
+    ByteBuffer input = ByteBuffer.allocateDirect(16);
+    input.position(2).limit(9);
+    ShortBuffer output = ByteBuffer.allocateDirect(24).order(ByteOrder.nativeOrder()).asShortBuffer();
+    output.position(1).limit(6);
+    check(decoder.decode(input, output) == 2 && Mp3DecoderGateSupport.decodeCalls == 2
+        && Mp3DecoderGateSupport.lastInput == input && Mp3DecoderGateSupport.lastInputLength == 0
+        && Mp3DecoderGateSupport.lastOutputLength == 10
+        && output.position() == 0 && output.limit() == 2, "native decode retry and output flip");
+    Mp3DecoderGateSupport.decodeResults = new int[] {-10};
+    check(decoder.decode(input, output) == 0, "need-more sentinel");
+    Mp3DecoderGateSupport.decodeResults = new int[] {-7};
+    Throwable failure = catchThrowable(() -> decoder.decode(input, output));
+    check(failure instanceof IllegalStateException
+        && failure.getMessage().equals("Decoding failed with error -7"), "decode error mapping");
+    check(catchThrowable(() -> decoder.decode(ByteBuffer.allocate(4), output)) instanceof IllegalArgumentException,
+        "heap input rejection");
+    decoder.close();
+    decoder.close();
+    check(Mp3DecoderGateSupport.lastInstance == 73L, "native destroy");
+    check(catchThrowable(() -> decoder.decode(input, output)) instanceof IllegalStateException,
+        "post-close rejection");
+    check(Mp3Decoder.class.getDeclaredFields().length == 8
+        && Mp3Decoder.class.getDeclaredMethods().length == 12, "reference private shape");
+  }
+
+  private static void candidateContract() {
+    Mp3DecoderGateSupport.reset();
+    Mp3Decoder decoder = new Mp3Decoder();
+    check(Mp3Decoder.class.getDeclaredFields().length == 4
+        && Mp3Decoder.class.getDeclaredMethods().length == 11, "candidate has no native state");
+    ByteBuffer input = ByteBuffer.allocateDirect(8);
+    ShortBuffer output = ByteBuffer.allocateDirect(16).asShortBuffer();
+    checkUnsupported(() -> decoder.decode(input, output));
+    check(catchThrowable(() -> decoder.decode(ByteBuffer.allocate(8), output)) instanceof IllegalArgumentException,
+        "candidate input validation");
+    check(catchThrowable(() -> decoder.decode(null, output)) instanceof NullPointerException,
+        "candidate null input validation");
+    check(catchThrowable(() -> decoder.decode(input, ShortBuffer.allocate(8))) instanceof IllegalArgumentException,
+        "candidate output validation");
+    decoder.close();
+    decoder.close();
+    check(Mp3DecoderGateSupport.lastInstance == 0L, "candidate close avoids native library");
+    check(catchThrowable(() -> decoder.decode(input, output)) instanceof IllegalStateException,
+        "candidate post-close rejection");
+  }
+
+  private static void reflection() throws Exception {
+    Class<Mp3Decoder> type = Mp3Decoder.class;
+    check(type.getModifiers() == Modifier.PUBLIC
+        && type.getSuperclass().getName().equals("com.sedmelluq.lava.common.natives.NativeResourceHolder")
+        && type.getInterfaces().length == 0 && type.getDeclaredClasses().length == 1,
+        "decoder metadata");
+    for (String name : new String[] {"MPEG1_SAMPLES_PER_FRAME", "MPEG2_SAMPLES_PER_FRAME", "HEADER_SIZE"}) {
+      Field field = type.getDeclaredField(name);
+      check(field.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL), name + " metadata");
+    }
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC, "constructor metadata");
+    checkMethod(type, "decode", Modifier.PUBLIC, int.class, new Class<?>[] {ByteBuffer.class, ShortBuffer.class});
+    for (String name : new String[] {"getFrameSampleRate", "getFrameChannelCount", "hasFrameSync",
+        "isUnsupportedVersion", "isValidFrame", "getFrameSize", "getAverageFrameSize",
+        "getSamplesPerFrame", "getMaximumFrameSize"}) {
+      Class<?> result = name.equals("hasFrameSync") || name.equals("isUnsupportedVersion")
+          || name.equals("isValidFrame") ? boolean.class
+          : name.equals("getAverageFrameSize") ? double.class
+          : name.equals("getSamplesPerFrame") ? long.class : int.class;
+      Class<?>[] parameters = name.equals("getMaximumFrameSize")
+          ? new Class<?>[0] : new Class<?>[] {byte[].class, int.class};
+      checkMethod(type, name, Modifier.PUBLIC | Modifier.STATIC, result, parameters);
+    }
+    check(MpegVersion.class.isEnum()
+        && (MpegVersion.class.getModifiers() & (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL))
+            == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL)
+        && MpegVersion.class.getEnclosingClass() == type && MpegVersion.class.getDeclaredConstructors().length == 1,
+        "enum metadata");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, int modifiers, Class<?> result,
+      Class<?>[] parameters) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == modifiers && method.getReturnType() == result
+        && method.getExceptionTypes().length == 0 && !method.isSynthetic(), name + " metadata");
+  }
+  private static void checkUnsupported(ThrowingAction action) {
+    Throwable error = catchThrowable(action);
+    check(error instanceof UnsupportedOperationException && UNSUPPORTED_MESSAGE.equals(error.getMessage()),
+        "deterministic unsupported failure");
+  }
+  private static Throwable catchThrowable(ThrowingAction action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
+  @FunctionalInterface private interface ThrowingAction { void run() throws Throwable; }
+}
+"#;
+
+const SAMPLERATE_CONVERTER_SUPPORT_CONSUMER: &str = r"
+package com.sedmelluq.discord.lavaplayer.natives.samplerate;
+
+public final class SampleRateConverterGateSupport {
+  public static int getInstanceCalls, createCalls, resetCalls, processCalls, destroyCalls;
+  public static int lastType, lastChannels, lastInputOffset, lastInputLength;
+  public static int lastOutputOffset, lastOutputLength;
+  public static long lastInstance;
+  public static float[] lastInput, lastOutput;
+  public static boolean lastEndOfInput;
+  public static double lastRatio;
+  public static int[] lastProgress;
+  public static long createResult = 71L;
+  public static int resetResult, processResult;
+
+  private SampleRateConverterGateSupport() {}
+  public static void reset() {
+    getInstanceCalls = createCalls = resetCalls = processCalls = destroyCalls = 0;
+    lastType = lastChannels = lastInputOffset = lastInputLength = 0;
+    lastOutputOffset = lastOutputLength = 0;
+    lastInstance = 0L; lastInput = lastOutput = null; lastEndOfInput = false;
+    lastRatio = 0.0; lastProgress = null; createResult = 71L;
+    resetResult = processResult = 0;
+  }
+}
+
+class SampleRateLibrary {
+  private static final SampleRateLibrary INSTANCE = new SampleRateLibrary();
+  private SampleRateLibrary() {}
+  static SampleRateLibrary getInstance() {
+    SampleRateConverterGateSupport.getInstanceCalls++; return INSTANCE;
+  }
+  long create(int type, int channels) {
+    SampleRateConverterGateSupport.createCalls++;
+    SampleRateConverterGateSupport.lastType = type;
+    SampleRateConverterGateSupport.lastChannels = channels;
+    return SampleRateConverterGateSupport.createResult;
+  }
+  void destroy(long instance) {
+    SampleRateConverterGateSupport.destroyCalls++;
+    SampleRateConverterGateSupport.lastInstance = instance;
+  }
+  void reset(long instance) {
+    SampleRateConverterGateSupport.resetCalls++;
+    SampleRateConverterGateSupport.lastInstance = instance;
+  }
+  int process(long instance, float[] input, int inputOffset, int inputLength, float[] output,
+      int outputOffset, int outputLength, boolean endOfInput, double ratio, int[] progress) {
+    SampleRateConverterGateSupport.processCalls++;
+    SampleRateConverterGateSupport.lastInstance = instance;
+    SampleRateConverterGateSupport.lastInput = input;
+    SampleRateConverterGateSupport.lastInputOffset = inputOffset;
+    SampleRateConverterGateSupport.lastInputLength = inputLength;
+    SampleRateConverterGateSupport.lastOutput = output;
+    SampleRateConverterGateSupport.lastOutputOffset = outputOffset;
+    SampleRateConverterGateSupport.lastOutputLength = outputLength;
+    SampleRateConverterGateSupport.lastEndOfInput = endOfInput;
+    SampleRateConverterGateSupport.lastRatio = ratio;
+    SampleRateConverterGateSupport.lastProgress = progress;
+    progress[0] = inputLength; progress[1] = outputLength;
+    return SampleRateConverterGateSupport.processResult;
+  }
+}
+";
+
+const SAMPLERATE_CONVERTER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.natives.samplerate.SampleRateConverter;
+import com.sedmelluq.discord.lavaplayer.natives.samplerate.SampleRateConverter.ResamplingType;
+import com.sedmelluq.discord.lavaplayer.natives.samplerate.SampleRateConverterGateSupport;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateSampleRateConverter {
+  private static final String UNSUPPORTED =
+      "Legacy libsamplerate conversion JNI is unsupported; use Mantle's bounded media pipeline.";
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "mode argument"); commonContract();
+    if (args[0].equals("reference")) { referenceContract();
+      System.out.println("common=progress,enum,reflection,subclassable;legacy=native-construction,reset,process,close");
+    } else if (args[0].equals("candidate")) { candidateContract();
+      System.out.println("common=progress,enum,reflection,subclassable;legacy=safe-construction,no-native-state,deterministic-unsupported,idempotent-close");
+    } else throw new AssertionError("unknown mode " + args[0]);
+  }
+  private static void commonContract() throws Exception {
+    SampleRateConverterGateSupport.reset();
+    check(Arrays.equals(ResamplingType.values(), new ResamplingType[] {
+      ResamplingType.SINC_BEST_QUALITY, ResamplingType.SINC_MEDIUM_QUALITY,
+      ResamplingType.SINC_FASTEST, ResamplingType.ZERO_ORDER_HOLD, ResamplingType.LINEAR}), "enum order");
+    check(ResamplingType.valueOf("LINEAR") == ResamplingType.LINEAR, "enum lookup");
+    SampleRateConverter.Progress progress = new SampleRateConverter.Progress();
+    check(progress.getInputUsed() == 0 && progress.getOutputGenerated() == 0
+      && SampleRateConverter.Progress.class.getDeclaredFields().length == 1, "progress defaults");
+    Derived derived = new Derived(); derived.close(); derived.close();
+    check(derived.frees == 1, "inherited close"); reflection();
+  }
+  private static void referenceContract() {
+    SampleRateConverterGateSupport.reset();
+    SampleRateConverter converter = new SampleRateConverter(ResamplingType.LINEAR, 2, 44100, 48000);
+    check(SampleRateConverterGateSupport.getInstanceCalls == 1 && SampleRateConverterGateSupport.createCalls == 1
+      && SampleRateConverterGateSupport.lastType == 4 && SampleRateConverterGateSupport.lastChannels == 2, "native construction");
+    converter.reset(); check(SampleRateConverterGateSupport.resetCalls == 1, "reset forwarding");
+    float[] input = {1,2,3,4,5}, output = new float[9]; SampleRateConverter.Progress progress = new SampleRateConverter.Progress();
+    converter.process(input, 1, 3, output, 2, 4, true, progress);
+    check(SampleRateConverterGateSupport.processCalls == 1 && SampleRateConverterGateSupport.lastInput == input
+      && SampleRateConverterGateSupport.lastInputOffset == 1 && SampleRateConverterGateSupport.lastInputLength == 3
+      && SampleRateConverterGateSupport.lastOutput == output && SampleRateConverterGateSupport.lastOutputOffset == 2
+      && SampleRateConverterGateSupport.lastOutputLength == 4 && SampleRateConverterGateSupport.lastEndOfInput
+      && Math.abs(SampleRateConverterGateSupport.lastRatio - (48000.0 / 44100.0)) < 1e-12
+      && SampleRateConverterGateSupport.lastProgress != null && progress.getInputUsed() == 3
+      && progress.getOutputGenerated() == 4, "process forwarding");
+    converter.close(); converter.close(); check(SampleRateConverterGateSupport.destroyCalls == 1, "destroy once");
+  }
+  private static void candidateContract() throws Exception {
+    SampleRateConverterGateSupport.reset(); SampleRateConverter converter =
+      new SampleRateConverter(ResamplingType.LINEAR, 2, 44100, 48000);
+    check(SampleRateConverterGateSupport.getInstanceCalls == 0 && SampleRateConverterGateSupport.createCalls == 0
+      && SampleRateConverter.class.getDeclaredFields().length == 0, "safe construction");
+    checkUnsupported(converter::reset);
+    checkUnsupported(() -> converter.process(new float[2], 0, 2, new float[2], 0, 2, false,
+      new SampleRateConverter.Progress()));
+    converter.close(); converter.close(); check(SampleRateConverterGateSupport.destroyCalls == 0, "no native destroy");
+    check(catchThrowable(converter::reset) instanceof IllegalStateException, "post-close reset");
+  }
+  private static void reflection() throws Exception {
+    Class<SampleRateConverter> type = SampleRateConverter.class;
+    check(type.getSuperclass().getName().equals("com.sedmelluq.lava.common.natives.NativeResourceHolder")
+      && Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers()), "class metadata");
+    Constructor<SampleRateConverter> constructor = type.getDeclaredConstructor(ResamplingType.class, int.class, int.class, int.class);
+    check(Modifier.isPublic(constructor.getModifiers()) && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    checkMethod(type, "reset", void.class, new Class<?>[0], Modifier.PUBLIC);
+    checkMethod(type, "process", void.class, new Class<?>[] {float[].class, int.class, int.class, float[].class, int.class, int.class, boolean.class, SampleRateConverter.Progress.class}, Modifier.PUBLIC);
+    checkMethod(type, "freeResources", void.class, new Class<?>[0], Modifier.PROTECTED);
+    check(ResamplingType.class.getDeclaredFields().length == 6 && ResamplingType.class.getDeclaredMethods().length == 2, "enum metadata");
+  }
+  private static void checkMethod(Class<?> owner, String name, Class<?> result, Class<?>[] parameters, int modifiers) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == modifiers && method.getReturnType() == result && method.getExceptionTypes().length == 0 && !method.isSynthetic(), name + " metadata");
+  }
+  private static void checkUnsupported(ThrowingAction action) {
+    Throwable error = catchThrowable(action);
+    check(error instanceof UnsupportedOperationException && UNSUPPORTED.equals(error.getMessage()), "deterministic unsupported");
+  }
+  private static Throwable catchThrowable(ThrowingAction action) { try { action.run(); return null; } catch (Throwable error) { return error; } }
+  private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
+  private static final class Derived extends SampleRateConverter {
+    int frees; Derived() { super(ResamplingType.LINEAR, 1, 48000, 48000); }
+    @Override protected void freeResources() { frees++; }
+  }
+  @FunctionalInterface private interface ThrowingAction { void run() throws Throwable; }
+}
+"#;
+
+const CPU_STATISTICS_SUPPORT_CONSUMER: &str = r"
+package com.sedmelluq.discord.lavaplayer.natives.statistics;
+
+public final class CpuStatisticsGateSupport {
+  public static int getInstanceCalls, getSystemTimesCalls, lastArrayLength;
+  public static long[] values = {101L, 23L, 29L, 31L, 37L};
+
+  private CpuStatisticsGateSupport() {}
+  public static void reset() {
+    getInstanceCalls = getSystemTimesCalls = lastArrayLength = 0;
+    values = new long[] {101L, 23L, 29L, 31L, 37L};
+  }
+}
+
+class CpuStatisticsLibrary {
+  private CpuStatisticsLibrary() {}
+  static CpuStatisticsLibrary getInstance() {
+    CpuStatisticsGateSupport.getInstanceCalls++;
+    return new CpuStatisticsLibrary();
+  }
+  void getSystemTimes(long[] target) {
+    CpuStatisticsGateSupport.getSystemTimesCalls++;
+    CpuStatisticsGateSupport.lastArrayLength = target.length;
+    System.arraycopy(CpuStatisticsGateSupport.values, 0, target, 0, target.length);
+  }
+  enum Timings {
+    SYSTEM_TOTAL, SYSTEM_USER, SYSTEM_KERNEL, PROCESS_USER, PROCESS_KERNEL;
+    int id() { return ordinal(); }
+  }
+}
+";
+
+const CPU_STATISTICS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.natives.statistics.CpuStatistics;
+import com.sedmelluq.discord.lavaplayer.natives.statistics.CpuStatistics.Times;
+import com.sedmelluq.discord.lavaplayer.natives.statistics.CpuStatisticsGateSupport;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateCpuStatistics {
+  private static final String UNSUPPORTED =
+      "Legacy connector CPU statistics JNI is unsupported; use Mantle-native observability.";
+
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "mode argument");
+    commonContract();
+    if (args[0].equals("reference")) {
+      referenceContract();
+      System.out.println("common=times,diff,usage,overflow,null-order,reflection,subclassable;legacy=native-sampling");
+    } else if (args[0].equals("candidate")) {
+      candidateContract();
+      System.out.println("common=times,diff,usage,overflow,null-order,reflection,subclassable;legacy=safe-construction,no-native-state,deterministic-unsupported");
+    } else {
+      throw new AssertionError("unknown mode " + args[0]);
+    }
+  }
+
+  private static void commonContract() throws Exception {
+    Times values = new Times(100L, 25L, 15L, 7L, 3L);
+    check(values.systemTotal == 100L && values.systemUser == 25L && values.systemKernel == 15L
+        && values.processUser == 7L && values.processKernel == 3L, "time fields");
+    check(Float.floatToRawIntBits(values.getSystemUsage()) == Float.floatToRawIntBits(0.4f)
+        && Float.floatToRawIntBits(values.getProcessUsage()) == Float.floatToRawIntBits(0.1f),
+        "usage ratios");
+    Times zero = new Times(0L, Long.MAX_VALUE, Long.MAX_VALUE, Long.MIN_VALUE, -1L);
+    check(Float.floatToRawIntBits(zero.getSystemUsage()) == 0
+        && Float.floatToRawIntBits(zero.getProcessUsage()) == 0, "zero total");
+    Times overflow = new Times(Long.MAX_VALUE, Long.MAX_VALUE, 1L, Long.MIN_VALUE, -1L);
+    check(overflow.getSystemUsage() < -0.9999999f && overflow.getProcessUsage() > 0.9999999f,
+        "long addition precedes float conversion");
+
+    Times old = new Times(Long.MAX_VALUE, -9L, Long.MIN_VALUE, 8L, 11L);
+    Times current = new Times(Long.MIN_VALUE, 4L, Long.MAX_VALUE, -3L, 29L);
+    Times diff = CpuStatistics.diff(old, current);
+    check(diff.systemTotal == 1L && diff.systemUser == 13L && diff.systemKernel == -1L
+        && diff.processUser == -11L && diff.processKernel == 18L, "wrapping differences");
+    check(catchThrowable(() -> CpuStatistics.diff(null, current)) instanceof NullPointerException,
+        "old null failure");
+    check(catchThrowable(() -> CpuStatistics.diff(old, null)) instanceof NullPointerException,
+        "current null failure");
+
+    CpuStatisticsGateSupport.reset();
+    new Derived();
+    check(CpuStatisticsGateSupport.getInstanceCalls == (isCandidate() ? 0 : 1), "subclass construction");
+    reflection();
+  }
+
+  private static void referenceContract() {
+    CpuStatisticsGateSupport.reset();
+    CpuStatistics statistics = new CpuStatistics();
+    Times values = statistics.getSystemTimes();
+    check(CpuStatisticsGateSupport.getInstanceCalls == 1
+        && CpuStatisticsGateSupport.getSystemTimesCalls == 1
+        && CpuStatisticsGateSupport.lastArrayLength == 5, "native sampling forwarding");
+    check(Arrays.equals(new long[] {values.systemTotal, values.systemUser, values.systemKernel,
+        values.processUser, values.processKernel}, CpuStatisticsGateSupport.values),
+        "native timing order");
+  }
+
+  private static void candidateContract() {
+    CpuStatisticsGateSupport.reset();
+    CpuStatistics statistics = new CpuStatistics();
+    check(CpuStatisticsGateSupport.getInstanceCalls == 0
+        && CpuStatistics.class.getDeclaredFields().length == 0, "safe construction");
+    Throwable error = catchThrowable(statistics::getSystemTimes);
+    check(error instanceof UnsupportedOperationException && UNSUPPORTED.equals(error.getMessage()),
+        "deterministic unsupported sampling");
+    check(CpuStatisticsGateSupport.getSystemTimesCalls == 0, "no native sampling");
+  }
+
+  private static void reflection() throws Exception {
+    Class<CpuStatistics> type = CpuStatistics.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredClasses().length == 1,
+        "statistics metadata");
+    Constructor<CpuStatistics> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0,
+        "statistics constructor metadata");
+    checkMethod(type, "getSystemTimes", Modifier.PUBLIC, Times.class, new Class<?>[0]);
+    checkMethod(type, "diff", Modifier.PUBLIC | Modifier.STATIC, Times.class,
+        new Class<?>[] {Times.class, Times.class});
+
+    check(Times.class.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && Times.class.getEnclosingClass() == type && Times.class.getInterfaces().length == 0,
+        "times metadata");
+    Constructor<Times> timesConstructor = Times.class.getDeclaredConstructor(
+        long.class, long.class, long.class, long.class, long.class);
+    check(timesConstructor.getModifiers() == Modifier.PUBLIC, "times constructor metadata");
+    String[] expectedFields = {"processKernel", "processUser", "systemKernel", "systemTotal", "systemUser"};
+    String[] actualFields = Arrays.stream(Times.class.getDeclaredFields()).map(Field::getName).sorted()
+        .toArray(String[]::new);
+    check(Arrays.equals(actualFields, expectedFields), "times field names");
+    for (Field field : Times.class.getDeclaredFields()) {
+      check(field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL) && field.getType() == long.class,
+          field.getName() + " metadata");
+    }
+    checkMethod(Times.class, "getSystemUsage", Modifier.PUBLIC, float.class, new Class<?>[0]);
+    checkMethod(Times.class, "getProcessUsage", Modifier.PUBLIC, float.class, new Class<?>[0]);
+  }
+
+  private static boolean isCandidate() {
+    return CpuStatistics.class.getDeclaredFields().length == 0;
+  }
+  private static void checkMethod(Class<?> owner, String name, int modifiers, Class<?> result,
+      Class<?>[] parameters) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == modifiers && method.getReturnType() == result
+        && method.getExceptionTypes().length == 0 && !method.isSynthetic(), name + " metadata");
+  }
+  private static Throwable catchThrowable(ThrowingAction action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+  private static final class Derived extends CpuStatistics {}
+  @FunctionalInterface private interface ThrowingAction { void run() throws Throwable; }
+}
+"#;
+
+const VORBIS_DECODER_SUPPORT_CONSUMER: &str = r"
+package com.sedmelluq.discord.lavaplayer.natives.vorbis;
+
+import java.nio.ByteBuffer;
+
+public final class VorbisDecoderGateSupport {
+  public static long createResult;
+  public static boolean initialiseResult;
+  public static int channelCountResult, inputResult, outputResult;
+  public static int getInstanceCalls, createCalls, destroyCalls, initialiseCalls;
+  public static int getChannelCountCalls, inputCalls, outputCalls;
+  public static long lastInstance;
+  public static ByteBuffer lastInfo, lastSetup, lastInput;
+  public static int lastInfoOffset, lastInfoLength, lastSetupOffset, lastSetupLength;
+  public static int lastInputOffset, lastInputLength, lastOutputLength;
+  public static float[][] lastChannels;
+
+  private VorbisDecoderGateSupport() {}
+
+  public static void reset() {
+    createResult = 83L;
+    initialiseResult = true;
+    channelCountResult = 2;
+    inputResult = 0;
+    outputResult = 3;
+    getInstanceCalls = createCalls = destroyCalls = initialiseCalls = 0;
+    getChannelCountCalls = inputCalls = outputCalls = 0;
+    lastInstance = 0L;
+    lastInfo = lastSetup = lastInput = null;
+    lastInfoOffset = lastInfoLength = lastSetupOffset = lastSetupLength = 0;
+    lastInputOffset = lastInputLength = lastOutputLength = 0;
+    lastChannels = null;
+  }
+}
+
+class VorbisDecoderLibrary {
+  private static final VorbisDecoderLibrary INSTANCE = new VorbisDecoderLibrary();
+  private VorbisDecoderLibrary() {}
+
+  static VorbisDecoderLibrary getInstance() {
+    VorbisDecoderGateSupport.getInstanceCalls++;
+    return INSTANCE;
+  }
+  long create() {
+    VorbisDecoderGateSupport.createCalls++;
+    return VorbisDecoderGateSupport.createResult;
+  }
+  void destroy(long instance) {
+    VorbisDecoderGateSupport.destroyCalls++;
+    VorbisDecoderGateSupport.lastInstance = instance;
+  }
+  boolean initialise(long instance, ByteBuffer info, int infoOffset, int infoLength,
+      ByteBuffer setup, int setupOffset, int setupLength) {
+    VorbisDecoderGateSupport.initialiseCalls++;
+    VorbisDecoderGateSupport.lastInstance = instance;
+    VorbisDecoderGateSupport.lastInfo = info;
+    VorbisDecoderGateSupport.lastInfoOffset = infoOffset;
+    VorbisDecoderGateSupport.lastInfoLength = infoLength;
+    VorbisDecoderGateSupport.lastSetup = setup;
+    VorbisDecoderGateSupport.lastSetupOffset = setupOffset;
+    VorbisDecoderGateSupport.lastSetupLength = setupLength;
+    return VorbisDecoderGateSupport.initialiseResult;
+  }
+  int getChannelCount(long instance) {
+    VorbisDecoderGateSupport.getChannelCountCalls++;
+    VorbisDecoderGateSupport.lastInstance = instance;
+    return VorbisDecoderGateSupport.channelCountResult;
+  }
+  int input(long instance, ByteBuffer input, int offset, int length) {
+    VorbisDecoderGateSupport.inputCalls++;
+    VorbisDecoderGateSupport.lastInstance = instance;
+    VorbisDecoderGateSupport.lastInput = input;
+    VorbisDecoderGateSupport.lastInputOffset = offset;
+    VorbisDecoderGateSupport.lastInputLength = length;
+    return VorbisDecoderGateSupport.inputResult;
+  }
+  int output(long instance, float[][] channels, int length) {
+    VorbisDecoderGateSupport.outputCalls++;
+    VorbisDecoderGateSupport.lastInstance = instance;
+    VorbisDecoderGateSupport.lastChannels = channels;
+    VorbisDecoderGateSupport.lastOutputLength = length;
+    return VorbisDecoderGateSupport.outputResult;
+  }
+}
+";
+
+const VORBIS_DECODER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.natives.vorbis.VorbisDecoder;
+import com.sedmelluq.discord.lavaplayer.natives.vorbis.VorbisDecoderGateSupport;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+
+public final class GateVorbisDecoder {
+  private static final String UNSUPPORTED =
+      "Legacy Vorbis decoder JNI is unsupported; use Mantle's bounded media pipeline.";
+
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "mode argument");
+    commonContract();
+    if (args[0].equals("reference")) {
+      referenceContract();
+      System.out.println("common=public-concrete,native-resource-holder,initial-channel,reflection,subclassable;legacy=native-construction,initialise,channel-count,input,output,close");
+    } else if (args[0].equals("candidate")) {
+      candidateContract();
+      System.out.println("common=public-concrete,native-resource-holder,initial-channel,reflection,subclassable;legacy=safe-construction,no-native-state,validation-order,deterministic-unsupported,idempotent-close");
+    } else {
+      throw new AssertionError("unknown mode " + args[0]);
+    }
+  }
+
+  private static void commonContract() throws Exception {
+    VorbisDecoderGateSupport.reset();
+    VorbisDecoder decoder = new VorbisDecoder();
+    check(decoder.getChannelCount() == 0, "initial channel count");
+    decoder.close();
+    decoder.close();
+
+    VorbisDecoderGateSupport.reset();
+    Derived derived = new Derived();
+    derived.close();
+    derived.close();
+    check(derived.frees == 1, "subclass cleanup once");
+    reflection();
+  }
+
+  private static void referenceContract() {
+    VorbisDecoderGateSupport.reset();
+    VorbisDecoder decoder = new VorbisDecoder();
+    check(VorbisDecoderGateSupport.getInstanceCalls == 1
+        && VorbisDecoderGateSupport.createCalls == 1, "native construction");
+
+    ByteBuffer info = ByteBuffer.allocateDirect(12);
+    info.position(2).limit(9);
+    ByteBuffer setup = ByteBuffer.allocateDirect(14);
+    setup.position(3).limit(11);
+    decoder.initialise(info, setup);
+    check(VorbisDecoderGateSupport.initialiseCalls == 1
+        && VorbisDecoderGateSupport.lastInstance == 83L
+        && VorbisDecoderGateSupport.lastInfo == info
+        && VorbisDecoderGateSupport.lastInfoOffset == 2
+        && VorbisDecoderGateSupport.lastInfoLength == 7
+        && VorbisDecoderGateSupport.lastSetup == setup
+        && VorbisDecoderGateSupport.lastSetupOffset == 3
+        && VorbisDecoderGateSupport.lastSetupLength == 8
+        && VorbisDecoderGateSupport.getChannelCountCalls == 1
+        && decoder.getChannelCount() == 2, "initialisation forwarding and channel state");
+
+    VorbisDecoderGateSupport.initialiseResult = false;
+    int channelCalls = VorbisDecoderGateSupport.getChannelCountCalls;
+    Throwable initialiseFailure = catchThrowable(() -> decoder.initialise(info, setup));
+    check(initialiseFailure instanceof IllegalStateException
+        && initialiseFailure.getMessage().equals("Could not initialise library.")
+        && VorbisDecoderGateSupport.getChannelCountCalls == channelCalls,
+        "initialisation failure mapping");
+    int initialiseCalls = VorbisDecoderGateSupport.initialiseCalls;
+    check(catchThrowable(() -> decoder.initialise(ByteBuffer.allocate(2), setup))
+        instanceof IllegalArgumentException
+        && catchThrowable(() -> decoder.initialise(info, ByteBuffer.allocate(2)))
+        instanceof IllegalArgumentException
+        && catchThrowable(() -> decoder.initialise(null, setup)) instanceof NullPointerException
+        && VorbisDecoderGateSupport.initialiseCalls == initialiseCalls,
+        "initialisation validation order");
+
+    ByteBuffer input = ByteBuffer.allocateDirect(15);
+    input.position(4).limit(12);
+    decoder.input(input);
+    check(VorbisDecoderGateSupport.inputCalls == 1
+        && VorbisDecoderGateSupport.lastInput == input
+        && VorbisDecoderGateSupport.lastInputOffset == 4
+        && VorbisDecoderGateSupport.lastInputLength == 8
+        && input.position() == 12, "input forwarding and consumption");
+    input.position(2).limit(10);
+    VorbisDecoderGateSupport.inputResult = 17;
+    Throwable inputFailure = catchThrowable(() -> decoder.input(input));
+    check(inputFailure instanceof IllegalStateException
+        && inputFailure.getMessage().equals("Passing input failed with error 17.")
+        && input.position() == 10, "input failure consumes before mapping");
+    int inputCalls = VorbisDecoderGateSupport.inputCalls;
+    check(catchThrowable(() -> decoder.input(ByteBuffer.allocate(3)))
+        instanceof IllegalArgumentException
+        && catchThrowable(() -> decoder.input(null)) instanceof NullPointerException
+        && VorbisDecoderGateSupport.inputCalls == inputCalls, "input validation");
+
+    float[][] channels = {new float[6], new float[8]};
+    VorbisDecoderGateSupport.outputResult = 4;
+    check(decoder.output(channels) == 4 && VorbisDecoderGateSupport.outputCalls == 1
+        && VorbisDecoderGateSupport.lastChannels == channels
+        && VorbisDecoderGateSupport.lastOutputLength == 6, "output forwarding");
+    VorbisDecoderGateSupport.outputResult = -1;
+    Throwable outputFailure = catchThrowable(() -> decoder.output(channels));
+    check(outputFailure instanceof IllegalStateException
+        && outputFailure.getMessage().equals("Retrieving output failed"), "output failure mapping");
+    int outputCalls = VorbisDecoderGateSupport.outputCalls;
+    check(catchThrowable(() -> decoder.output(new float[][] {new float[2]}))
+        instanceof IllegalStateException
+        && catchThrowable(() -> decoder.output(null)) instanceof NullPointerException
+        && VorbisDecoderGateSupport.outputCalls == outputCalls, "output validation");
+
+    decoder.close();
+    decoder.close();
+    check(VorbisDecoderGateSupport.destroyCalls == 1
+        && VorbisDecoderGateSupport.lastInstance == 83L, "native destroy once");
+  }
+
+  private static void candidateContract() {
+    VorbisDecoderGateSupport.reset();
+    VorbisDecoder decoder = new VorbisDecoder();
+    check(VorbisDecoderGateSupport.getInstanceCalls == 0
+        && VorbisDecoderGateSupport.createCalls == 0
+        && VorbisDecoder.class.getDeclaredFields().length == 0, "safe construction");
+    check(decoder.getChannelCount() == 0, "safe initial channel state");
+
+    ByteBuffer info = ByteBuffer.allocateDirect(8);
+    ByteBuffer setup = ByteBuffer.allocateDirect(8);
+    checkUnsupported(() -> decoder.initialise(info, setup));
+    check(catchThrowable(() -> decoder.initialise(ByteBuffer.allocate(2), setup))
+        instanceof IllegalArgumentException
+        && catchThrowable(() -> decoder.initialise(info, ByteBuffer.allocate(2)))
+        instanceof IllegalArgumentException
+        && catchThrowable(() -> decoder.initialise(null, setup)) instanceof NullPointerException,
+        "candidate initialisation validation");
+
+    ByteBuffer input = ByteBuffer.allocateDirect(9);
+    input.position(2).limit(7);
+    checkUnsupported(() -> decoder.input(input));
+    check(input.position() == 2 && input.limit() == 7, "unsupported input preserves state");
+    check(catchThrowable(() -> decoder.input(ByteBuffer.allocate(2)))
+        instanceof IllegalArgumentException
+        && catchThrowable(() -> decoder.input(null)) instanceof NullPointerException,
+        "candidate input validation");
+
+    checkUnsupported(() -> decoder.output(new float[][] {new float[3]}));
+    check(catchThrowable(() -> decoder.output(null)) instanceof NullPointerException,
+        "candidate output null validation");
+    decoder.close();
+    decoder.close();
+    check(VorbisDecoderGateSupport.destroyCalls == 0, "candidate close avoids legacy library");
+    check(catchThrowable(() -> decoder.input(input)) instanceof IllegalStateException,
+        "post-close rejection");
+  }
+
+  private static void reflection() throws Exception {
+    Class<VorbisDecoder> type = VorbisDecoder.class;
+    check(type.getModifiers() == Modifier.PUBLIC
+        && type.getSuperclass().getName().equals(
+            "com.sedmelluq.lava.common.natives.NativeResourceHolder")
+        && type.getInterfaces().length == 0 && type.getDeclaredClasses().length == 0,
+        "decoder metadata");
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    checkMethod(type, "initialise", Modifier.PUBLIC, void.class,
+        new Class<?>[] {ByteBuffer.class, ByteBuffer.class});
+    checkMethod(type, "getChannelCount", Modifier.PUBLIC, int.class, new Class<?>[0]);
+    checkMethod(type, "input", Modifier.PUBLIC, void.class, new Class<?>[] {ByteBuffer.class});
+    checkMethod(type, "output", Modifier.PUBLIC, int.class, new Class<?>[] {float[][].class});
+    checkMethod(type, "freeResources", Modifier.PROTECTED, void.class, new Class<?>[0]);
+    check(type.getDeclaredMethods().length == 5, "method count");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, int modifiers, Class<?> result,
+      Class<?>[] parameters) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == modifiers && method.getReturnType() == result
+        && method.getExceptionTypes().length == 0 && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), name + " metadata");
+  }
+  private static void checkUnsupported(ThrowingAction action) {
+    Throwable error = catchThrowable(action);
+    check(error instanceof UnsupportedOperationException && UNSUPPORTED.equals(error.getMessage()),
+        "deterministic unsupported failure");
+  }
+  private static Throwable catchThrowable(ThrowingAction action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+  private static final class Derived extends VorbisDecoder {
+    int frees;
+    @Override protected void freeResources() { frees++; }
+  }
+  @FunctionalInterface private interface ThrowingAction { void run() throws Throwable; }
+}
+"#;
+
+const OPUS_CODEC_SUPPORT_CONSUMER: &str = r#"
+package com.sedmelluq.discord.lavaplayer.natives.opus;
+
+import java.nio.ByteBuffer;
+import java.nio.ShortBuffer;
+
+public final class OpusCodecGateSupport {
+  public static long decoderCreateResult;
+  public static long encoderCreateResult;
+  public static int decoderDecodeResult;
+  public static int encoderEncodeResult;
+  public static int decoderGetInstanceCalls;
+  public static int encoderGetInstanceCalls;
+  public static int decoderCreateCalls;
+  public static int encoderCreateCalls;
+  public static int decoderDestroyCalls;
+  public static int encoderDestroyCalls;
+  public static int decoderDecodeCalls;
+  public static int encoderEncodeCalls;
+  public static long lastDecoderInstance;
+  public static long lastEncoderInstance;
+  public static ByteBuffer lastDecoderInput;
+  public static ShortBuffer lastDecoderOutput;
+  public static ShortBuffer lastEncoderInput;
+  public static ByteBuffer lastEncoderOutput;
+  public static int lastDecoderInputLength;
+  public static int lastDecoderOutputLength;
+  public static int lastEncoderSampleCount;
+  public static int lastEncoderOutputCapacity;
+
+  private OpusCodecGateSupport() {}
+
+  public static void reset() {
+    decoderCreateResult = 41L;
+    encoderCreateResult = 43L;
+    decoderDecodeResult = 3;
+    encoderEncodeResult = 7;
+    decoderGetInstanceCalls = encoderGetInstanceCalls = 0;
+    decoderCreateCalls = encoderCreateCalls = 0;
+    decoderDestroyCalls = encoderDestroyCalls = 0;
+    decoderDecodeCalls = encoderEncodeCalls = 0;
+    lastDecoderInstance = lastEncoderInstance = 0L;
+    lastDecoderInput = null;
+    lastDecoderOutput = null;
+    lastEncoderInput = null;
+    lastEncoderOutput = null;
+    lastDecoderInputLength = lastDecoderOutputLength = 0;
+    lastEncoderSampleCount = lastEncoderOutputCapacity = 0;
+  }
+}
+
+class OpusDecoderLibrary {
+  private static final OpusDecoderLibrary INSTANCE = new OpusDecoderLibrary();
+  private OpusDecoderLibrary() {}
+
+  static OpusDecoderLibrary getInstance() {
+    OpusCodecGateSupport.decoderGetInstanceCalls++;
+    return INSTANCE;
+  }
+
+  long create(int sampleRate, int channels) {
+    OpusCodecGateSupport.decoderCreateCalls++;
+    return OpusCodecGateSupport.decoderCreateResult;
+  }
+
+  void destroy(long instance) {
+    OpusCodecGateSupport.decoderDestroyCalls++;
+    OpusCodecGateSupport.lastDecoderInstance = instance;
+  }
+
+  int decode(long instance, ByteBuffer input, int inputLength, ShortBuffer output,
+      int outputLength) {
+    OpusCodecGateSupport.decoderDecodeCalls++;
+    OpusCodecGateSupport.lastDecoderInstance = instance;
+    OpusCodecGateSupport.lastDecoderInput = input;
+    OpusCodecGateSupport.lastDecoderInputLength = inputLength;
+    OpusCodecGateSupport.lastDecoderOutput = output;
+    OpusCodecGateSupport.lastDecoderOutputLength = outputLength;
+    return OpusCodecGateSupport.decoderDecodeResult;
+  }
+}
+
+class OpusEncoderLibrary {
+  static final int APPLICATION_AUDIO = 2049;
+  private static final OpusEncoderLibrary INSTANCE = new OpusEncoderLibrary();
+  private OpusEncoderLibrary() {}
+
+  static OpusEncoderLibrary getInstance() {
+    OpusCodecGateSupport.encoderGetInstanceCalls++;
+    return INSTANCE;
+  }
+
+  long create(int sampleRate, int channels, int application, int quality) {
+    if (application != APPLICATION_AUDIO) throw new AssertionError("application constant");
+    OpusCodecGateSupport.encoderCreateCalls++;
+    return OpusCodecGateSupport.encoderCreateResult;
+  }
+
+  void destroy(long instance) {
+    OpusCodecGateSupport.encoderDestroyCalls++;
+    OpusCodecGateSupport.lastEncoderInstance = instance;
+  }
+
+  int encode(long instance, ShortBuffer input, int sampleCount, ByteBuffer output,
+      int outputCapacity) {
+    OpusCodecGateSupport.encoderEncodeCalls++;
+    OpusCodecGateSupport.lastEncoderInstance = instance;
+    OpusCodecGateSupport.lastEncoderInput = input;
+    OpusCodecGateSupport.lastEncoderSampleCount = sampleCount;
+    OpusCodecGateSupport.lastEncoderOutput = output;
+    OpusCodecGateSupport.lastEncoderOutputCapacity = outputCapacity;
+    return OpusCodecGateSupport.encoderEncodeResult;
+  }
+}
+"#;
+
+const OPUS_CODEC_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.natives.opus.OpusDecoder;
+import com.sedmelluq.discord.lavaplayer.natives.opus.OpusEncoder;
+import com.sedmelluq.discord.lavaplayer.natives.opus.OpusCodecGateSupport;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.ShortBuffer;
+
+public final class GateOpusCodec {
+  private static final String DECODER_UNSUPPORTED =
+      "Legacy Opus decoder JNI is unsupported; use Mantle's bounded media pipeline.";
+  private static final String ENCODER_UNSUPPORTED =
+      "Legacy Opus encoder JNI is unsupported; use Mantle's bounded media pipeline.";
+
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "mode argument");
+    commonContract();
+    if (args[0].equals("reference")) {
+      referenceContract();
+      System.out.println("common=packet-frame-sizing,reflection,subclassable;legacy=decoder-native,encoder-native,buffer-flips,close");
+    } else if (args[0].equals("candidate")) {
+      candidateContract();
+      System.out.println("common=packet-frame-sizing,reflection,subclassable;legacy=safe-construction,no-native-state,validation-order,deterministic-unsupported,idempotent-close");
+    } else throw new AssertionError("unknown mode " + args[0]);
+  }
+
+  private static void commonContract() throws Exception {
+    OpusCodecGateSupport.reset();
+    byte[] one = {0x00};
+    byte[] two = {0x01};
+    byte[] many = {0x03, 0x04};
+    byte[] longFrame = {0x18};
+    check(OpusDecoder.getPacketFrameSize(48_000, one, 0, one.length) == 480,
+        "single frame sizing");
+    check(OpusDecoder.getPacketFrameSize(48_000, two, 0, two.length) == 960,
+        "two frame sizing");
+    check(OpusDecoder.getPacketFrameSize(48_000, many, 0, many.length) == 1_920,
+        "multi frame sizing");
+    check(OpusDecoder.getPacketFrameSize(48_000, longFrame, 0, longFrame.length) == 2_880,
+        "config sizing");
+    check(OpusDecoder.getPacketFrameSize(48_000, new byte[] {0x03}, 0, 1) == 0
+        && OpusDecoder.getPacketFrameSize(48_000, one, 0, 0) == 0
+        && OpusDecoder.getPacketFrameSize(48_000, new byte[] {(byte) 0x83, 0x3f}, 0, 2) == 0,
+        "invalid and duration limits");
+    check(OpusDecoder.getPacketFrameSize(48_000, new byte[] {0x00}, 1, 0) == 0,
+        "offset and empty handling");
+    reflection();
+    DerivedDecoder decoder = new DerivedDecoder();
+    decoder.close();
+    decoder.close();
+    check(decoder.frees == 1, "decoder inherited close");
+    DerivedEncoder encoder = new DerivedEncoder();
+    encoder.close();
+    encoder.close();
+    check(encoder.frees == 1, "encoder inherited close");
+  }
+
+  private static void referenceContract() {
+    OpusCodecGateSupport.reset();
+    OpusDecoder decoder = new OpusDecoder(48_000, 2);
+    check(OpusCodecGateSupport.decoderGetInstanceCalls == 1
+        && OpusCodecGateSupport.decoderCreateCalls == 1, "decoder native construction");
+    ByteBuffer input = ByteBuffer.allocateDirect(12);
+    input.position(2).limit(9);
+    ShortBuffer output = ByteBuffer.allocateDirect(24).order(ByteOrder.nativeOrder()).asShortBuffer();
+    output.position(1).limit(5);
+    check(decoder.decode(input, output) == 3 && output.position() == 0 && output.limit() == 6
+        && OpusCodecGateSupport.lastDecoderInput == input
+        && OpusCodecGateSupport.lastDecoderInputLength == 7
+        && OpusCodecGateSupport.lastDecoderOutput == output
+        && OpusCodecGateSupport.lastDecoderOutputLength == 6,
+        "decoder forwarding and flip");
+    decoder.close();
+    decoder.close();
+    check(OpusCodecGateSupport.decoderDestroyCalls == 1
+        && OpusCodecGateSupport.lastDecoderInstance == 41L, "decoder destroy");
+
+    OpusEncoder encoder = new OpusEncoder(48_000, 2, 7);
+    check(OpusCodecGateSupport.encoderGetInstanceCalls == 1
+        && OpusCodecGateSupport.encoderCreateCalls == 1, "encoder native construction");
+    ShortBuffer samples = ByteBuffer.allocateDirect(32).order(ByteOrder.nativeOrder()).asShortBuffer();
+    ByteBuffer encoded = ByteBuffer.allocateDirect(20);
+    encoded.position(3).limit(8);
+    check(encoder.encode(samples, 123, encoded) == 7 && encoded.position() == 0
+        && encoded.limit() == 7 && OpusCodecGateSupport.lastEncoderInput == samples
+        && OpusCodecGateSupport.lastEncoderSampleCount == 123
+        && OpusCodecGateSupport.lastEncoderOutput == encoded
+        && OpusCodecGateSupport.lastEncoderOutputCapacity == encoded.capacity(),
+        "encoder forwarding and flip");
+    encoder.close();
+    encoder.close();
+    check(OpusCodecGateSupport.encoderDestroyCalls == 1
+        && OpusCodecGateSupport.lastEncoderInstance == 43L, "encoder destroy");
+    check(OpusDecoder.class.getDeclaredFields().length == 3
+        && OpusDecoder.class.getDeclaredMethods().length == 5
+        && OpusEncoder.class.getDeclaredFields().length == 2
+        && OpusEncoder.class.getDeclaredMethods().length == 2, "reference private shape");
+  }
+
+  private static void candidateContract() throws Exception {
+    OpusCodecGateSupport.reset();
+    OpusDecoder decoder = new OpusDecoder(48_000, 2);
+    OpusEncoder encoder = new OpusEncoder(48_000, 2, 7);
+    check(OpusCodecGateSupport.decoderGetInstanceCalls == 0
+        && OpusCodecGateSupport.encoderGetInstanceCalls == 0
+        && OpusDecoder.class.getDeclaredFields().length == 0
+        && OpusDecoder.class.getDeclaredMethods().length == 5
+        && OpusEncoder.class.getDeclaredFields().length == 0
+        && OpusEncoder.class.getDeclaredMethods().length == 2, "candidate has no native state");
+    ByteBuffer directInput = ByteBuffer.allocateDirect(8);
+    ShortBuffer directOutput = ByteBuffer.allocateDirect(16).asShortBuffer();
+    checkUnsupported(() -> decoder.decode(directInput, directOutput), DECODER_UNSUPPORTED);
+    check(catchThrowable(() -> decoder.decode(ByteBuffer.allocate(8), directOutput))
+        instanceof IllegalArgumentException, "decoder input validation");
+    check(catchThrowable(() -> decoder.decode(null, directOutput)) instanceof NullPointerException,
+        "decoder null input validation");
+    check(catchThrowable(() -> decoder.decode(directInput, ShortBuffer.allocate(8)))
+        instanceof IllegalArgumentException, "decoder output validation");
+    ShortBuffer directSamples = ByteBuffer.allocateDirect(16).asShortBuffer();
+    ByteBuffer directEncoded = ByteBuffer.allocateDirect(16);
+    checkUnsupported(() -> encoder.encode(directSamples, 4, directEncoded), ENCODER_UNSUPPORTED);
+    check(catchThrowable(() -> encoder.encode(ShortBuffer.allocate(8), 4, directEncoded))
+        instanceof IllegalArgumentException, "encoder input validation");
+    check(catchThrowable(() -> encoder.encode(null, 4, directEncoded)) instanceof NullPointerException,
+        "encoder null input validation");
+    check(catchThrowable(() -> encoder.encode(directSamples, 4, ByteBuffer.allocate(8)))
+        instanceof IllegalArgumentException, "encoder output validation");
+    decoder.close();
+    encoder.close();
+    decoder.close();
+    encoder.close();
+    check(OpusCodecGateSupport.decoderDestroyCalls == 0 && OpusCodecGateSupport.encoderDestroyCalls == 0,
+        "candidate close avoids native libraries");
+    check(catchThrowable(() -> decoder.decode(directInput, directOutput)) instanceof IllegalStateException,
+        "decoder post-close rejection");
+    check(catchThrowable(() -> encoder.encode(directSamples, 4, directEncoded)) instanceof IllegalStateException,
+        "encoder post-close rejection");
+  }
+
+  private static void reflection() throws Exception {
+    check(OpusDecoder.class.getModifiers() == Modifier.PUBLIC
+        && OpusDecoder.class.getSuperclass().getName().equals(
+            "com.sedmelluq.lava.common.natives.NativeResourceHolder")
+        && OpusDecoder.class.getInterfaces().length == 0, "decoder metadata");
+    check(OpusEncoder.class.getModifiers() == Modifier.PUBLIC
+        && OpusEncoder.class.getSuperclass().getName().equals(
+            "com.sedmelluq.lava.common.natives.NativeResourceHolder")
+        && OpusEncoder.class.getInterfaces().length == 0, "encoder metadata");
+    Constructor<?> decoderConstructor = OpusDecoder.class.getDeclaredConstructor(int.class, int.class);
+    check(decoderConstructor.getModifiers() == Modifier.PUBLIC
+        && decoderConstructor.getExceptionTypes().length == 0, "decoder constructor metadata");
+    Constructor<?> encoderConstructor = OpusEncoder.class.getDeclaredConstructor(int.class, int.class, int.class);
+    check(encoderConstructor.getModifiers() == Modifier.PUBLIC
+        && encoderConstructor.getExceptionTypes().length == 0, "encoder constructor metadata");
+    checkMethod(OpusDecoder.class, "decode", int.class, Modifier.PUBLIC,
+        ByteBuffer.class, ShortBuffer.class);
+    checkMethod(OpusDecoder.class, "freeResources", void.class, Modifier.PROTECTED);
+    checkMethod(OpusDecoder.class, "getPacketFrameSize", int.class, Modifier.PUBLIC | Modifier.STATIC,
+        int.class, byte[].class, int.class, int.class);
+    checkMethod(OpusEncoder.class, "encode", int.class, Modifier.PUBLIC,
+        ShortBuffer.class, int.class, ByteBuffer.class);
+    checkMethod(OpusEncoder.class, "freeResources", void.class, Modifier.PROTECTED);
+  }
+
+  private static void checkMethod(Class<?> owner, String name, Class<?> result, int modifiers,
+      Class<?>... parameters) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getReturnType() == result && method.getModifiers() == modifiers
+        && method.getExceptionTypes().length == 0 && !method.isSynthetic(), name + " metadata");
+  }
+
+  private static void checkUnsupported(ThrowingAction action, String message) {
+    Throwable error = catchThrowable(action);
+    check(error instanceof UnsupportedOperationException && message.equals(error.getMessage()),
+        "deterministic unsupported failure");
+  }
+
+  private static Throwable catchThrowable(ThrowingAction action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+
+  @FunctionalInterface private interface ThrowingAction { void run() throws Throwable; }
+
+  private static final class DerivedDecoder extends OpusDecoder {
+    int frees;
+    DerivedDecoder() { super(48_000, 2); }
+    @Override protected void freeResources() { frees++; }
+  }
+
+  private static final class DerivedEncoder extends OpusEncoder {
+    int frees;
+    DerivedEncoder() { super(48_000, 2, 7); }
+    @Override protected void freeResources() { frees++; }
+  }
+}
+"#;
+
+const AAC_DECODER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.natives.aac.AacDecoder;
+import com.sedmelluq.discord.lavaplayer.natives.aac.AacDecoder.StreamInfo;
+import com.sedmelluq.discord.lavaplayer.natives.aac.AacDecoderGateSupport;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.ShortBuffer;
+import java.util.Arrays;
+
+public final class GateAacDecoder {
+  private static final String UNSUPPORTED_MESSAGE =
+      "Legacy FDK AAC decoder JNI is unsupported; use Mantle's bounded media pipeline.";
+
+  public static void main(String[] args) throws Exception {
+    check(args.length == 1, "mode argument");
+    commonContract();
+    if (args[0].equals("reference")) {
+      referenceContract();
+      System.out.println("common=constants,public-concrete,native-resource-holder,3-fields,7-methods,"
+          + "stream-info,subclass-lifecycle,reflection;legacy=constructor-native-handle,"
+          + "configuration,raw-fallback,direct-fill,direct-decode,stream-info-resolution,close");
+    } else if (args[0].equals("candidate")) {
+      candidateContract();
+      System.out.println("common=constants,public-concrete,native-resource-holder,3-fields,7-methods,"
+          + "stream-info,subclass-lifecycle,reflection;legacy=safe-constructor,no-native-state,"
+          + "validation-order,deterministic-unsupported,idempotent-close");
+    } else {
+      throw new AssertionError("unknown mode " + args[0]);
+    }
+  }
+
+  private static void commonContract() throws Exception {
+    AacDecoderGateSupport.reset();
+    check(AacDecoder.AAC_LC == 2 && AacDecoder.SBR == 5 && AacDecoder.PS == 29,
+        "profile constants");
+    StreamInfo first = new StreamInfo(48_000, 2, 1_024);
+    StreamInfo second = new StreamInfo(Integer.MIN_VALUE, -7, Integer.MAX_VALUE);
+    check(first.sampleRate == 48_000 && first.channels == 2 && first.frameSize == 1_024
+        && second.sampleRate == Integer.MIN_VALUE && second.channels == -7
+        && second.frameSize == Integer.MAX_VALUE, "stream info field capture");
+
+    Derived derived = new Derived();
+    derived.close();
+    derived.close();
+    check(derived.frees == 1, "inherited close calls overridden cleanup once");
+    reflection();
+  }
+
+  private static void referenceContract() {
+    AacDecoderGateSupport.reset();
+    AacDecoderGateSupport.createResult = 73L;
+    AacDecoder decoder = new AacDecoder();
+    check(AacDecoderGateSupport.getInstanceCalls == 1 && AacDecoderGateSupport.createCalls == 1
+        && AacDecoderGateSupport.lastTransport == 0, "legacy native construction");
+
+    AacDecoderGateSupport.configureResults = new int[] {0};
+    check(decoder.configure(AacDecoder.AAC_LC, 48_000, 2) == 0
+        && AacDecoderGateSupport.configureCalls == 1
+        && AacDecoderGateSupport.configuredValues[0] == 0x9011L,
+        "AAC LC audio-specific configuration");
+    check(decoder.configure(AacDecoder.SBR, 24_000, 2) == 0
+        && decoder.configure(AacDecoder.PS, 24_000, 1) == 0
+        && AacDecoderGateSupport.configureCalls == 3,
+        "SBR and PS configuration forwarding");
+
+    AacDecoderGateSupport.configureCalls = 0;
+    AacDecoderGateSupport.configureResults = new int[] {17, 0};
+    check(decoder.configure(new byte[] {0x12, 0x10, 0x7f}) == 0
+        && AacDecoderGateSupport.configureCalls == 2
+        && AacDecoderGateSupport.configuredValues[0] == 0x7f1012L
+        && AacDecoderGateSupport.configuredValues[1] == 0x1012L,
+        "raw configuration fallback parsing");
+    check(catchThrowable(() -> decoder.configure(new byte[9])) instanceof IllegalArgumentException
+        && catchThrowable(() -> decoder.configure((byte[]) null)) instanceof NullPointerException,
+        "raw configuration validation");
+
+    ByteBuffer input = ByteBuffer.allocateDirect(16);
+    input.position(3).limit(9);
+    AacDecoderGateSupport.fillResult = 4;
+    check(decoder.fill(input) == 4 && input.position() == 7
+        && AacDecoderGateSupport.lastByteBuffer == input
+        && AacDecoderGateSupport.lastOffset == 3 && AacDecoderGateSupport.lastLength == 9,
+        "direct fill consumption");
+    AacDecoderGateSupport.fillResult = -7;
+    int before = input.position();
+    Throwable fillFailure = catchThrowable(() -> decoder.fill(input));
+    check(fillFailure instanceof IllegalStateException
+        && fillFailure.getMessage().equals("Filling decoder failed with error 7")
+        && input.position() == before, "fill failure and position retention");
+    int fillCalls = AacDecoderGateSupport.fillCalls;
+    check(catchThrowable(() -> decoder.fill(ByteBuffer.allocate(4)))
+        instanceof IllegalArgumentException && AacDecoderGateSupport.fillCalls == fillCalls,
+        "heap fill rejection");
+
+    ShortBuffer output = ByteBuffer.allocateDirect(24).order(ByteOrder.nativeOrder()).asShortBuffer();
+    output.position(2).limit(5);
+    AacDecoderGateSupport.decodeResult = 0;
+    check(decoder.decode(output, true) && AacDecoderGateSupport.lastShortBuffer == output
+        && AacDecoderGateSupport.lastLength == output.capacity()
+        && AacDecoderGateSupport.lastFlush && output.position() == 2 && output.limit() == 5,
+        "decode success and ignored view bounds");
+    AacDecoderGateSupport.decodeResult = 4098;
+    check(!decoder.decode(output, false), "not-enough-bits sentinel");
+    AacDecoderGateSupport.decodeResult = 77;
+    Throwable decodeFailure = catchThrowable(() -> decoder.decode(output, false));
+    check(decodeFailure instanceof IllegalStateException
+        && decodeFailure.getMessage().equals("Error from decoder 77"), "decode error mapping");
+    int decodeCalls = AacDecoderGateSupport.decodeCalls;
+    check(catchThrowable(() -> decoder.decode(ShortBuffer.allocate(4), false))
+        instanceof IllegalArgumentException && AacDecoderGateSupport.decodeCalls == decodeCalls,
+        "heap decode rejection");
+
+    AacDecoderGateSupport.decodeResult = 4098;
+    check(decoder.resolveStreamInfo() == null, "stream info needs input");
+    AacDecoderGateSupport.decodeResult = 8204;
+    AacDecoderGateSupport.streamInfoResult = (48_000L << 32) | (1_024L << 16) | 2L;
+    StreamInfo info = decoder.resolveStreamInfo();
+    check(info.sampleRate == 48_000 && info.channels == 2 && info.frameSize == 1_024,
+        "combined stream info decoding");
+    AacDecoderGateSupport.streamInfoResult = 0;
+    check(catchThrowable(decoder::resolveStreamInfo) instanceof IllegalStateException,
+        "missing stream info failure");
+    AacDecoderGateSupport.decodeResult = 12;
+    check(catchThrowable(decoder::resolveStreamInfo) instanceof IllegalStateException,
+        "unexpected stream-info decode failure");
+
+    decoder.close();
+    decoder.close();
+    check(AacDecoderGateSupport.destroyCalls == 1 && AacDecoderGateSupport.lastInstance == 73L,
+        "legacy destroy exactly once");
+    Throwable closed = catchThrowable(() -> decoder.configure(AacDecoder.AAC_LC, 48_000, 2));
+    check(closed instanceof IllegalStateException
+        && closed.getMessage().equals("Cannot use the decoder after closing it."),
+        "post-close rejection");
+    check(AacDecoder.class.getDeclaredFields().length == 10
+        && AacDecoder.class.getDeclaredMethods().length == 10,
+        "reference private implementation shape");
+  }
+
+  private static void candidateContract() {
+    AacDecoderGateSupport.reset();
+    AacDecoder decoder = new AacDecoder();
+    check(AacDecoderGateSupport.getInstanceCalls == 0 && AacDecoderGateSupport.createCalls == 0
+        && AacDecoder.class.getDeclaredFields().length == 3
+        && AacDecoder.class.getDeclaredMethods().length == 6,
+        "candidate has no legacy native state");
+
+    checkUnsupported(() -> decoder.configure(AacDecoder.AAC_LC, 48_000, 2));
+    checkUnsupported(() -> decoder.configure(new byte[] {0x12, 0x10}));
+    check(catchThrowable(() -> decoder.configure(new byte[9])) instanceof IllegalArgumentException
+        && catchThrowable(() -> decoder.configure((byte[]) null)) instanceof NullPointerException,
+        "candidate raw validation order");
+
+    ByteBuffer directInput = ByteBuffer.allocateDirect(8);
+    directInput.position(2).limit(6);
+    checkUnsupported(() -> decoder.fill(directInput));
+    check(directInput.position() == 2 && directInput.limit() == 6,
+        "unsupported fill preserves buffer state");
+    check(catchThrowable(() -> decoder.fill(ByteBuffer.allocate(8)))
+        instanceof IllegalArgumentException
+        && catchThrowable(() -> decoder.fill(null)) instanceof NullPointerException,
+        "candidate fill validation");
+
+    ShortBuffer directOutput = ByteBuffer.allocateDirect(16).asShortBuffer();
+    checkUnsupported(() -> decoder.decode(directOutput, true));
+    check(catchThrowable(() -> decoder.decode(ShortBuffer.allocate(8), false))
+        instanceof IllegalArgumentException
+        && catchThrowable(() -> decoder.decode(null, false)) instanceof NullPointerException,
+        "candidate decode validation");
+    checkUnsupported(decoder::resolveStreamInfo);
+
+    decoder.close();
+    decoder.close();
+    check(AacDecoderGateSupport.destroyCalls == 0, "candidate close avoids legacy library");
+    Throwable closed = catchThrowable(() -> decoder.configure(AacDecoder.AAC_LC, 48_000, 2));
+    check(closed instanceof IllegalStateException
+        && closed.getMessage().equals("Cannot use the decoder after closing it."),
+        "candidate inherited post-close rejection");
+    check(catchThrowable(() -> decoder.configure(new byte[9])) instanceof IllegalArgumentException,
+        "oversized header validation precedes closed-state check");
+  }
+
+  private static void reflection() throws Exception {
+    Class<AacDecoder> type = AacDecoder.class;
+    check(type.getModifiers() == Modifier.PUBLIC
+        && type.getSuperclass().getName().equals(
+            "com.sedmelluq.lava.common.natives.NativeResourceHolder")
+        && type.getInterfaces().length == 0 && type.getDeclaredAnnotations().length == 0
+        && Arrays.equals(type.getDeclaredClasses(), new Class<?>[] {StreamInfo.class}),
+        "decoder class metadata");
+    for (String name : new String[] {"AAC_LC", "SBR", "PS"}) {
+      Field field = type.getDeclaredField(name);
+      check(field.getType() == int.class
+          && field.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL),
+          name + " metadata");
+    }
+    Constructor<?> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "decoder constructor metadata");
+    checkMethod(type, "configure", Modifier.PUBLIC, int.class,
+        new Class<?>[] {int.class, int.class, int.class});
+    checkMethod(type, "configure", Modifier.PUBLIC, int.class, new Class<?>[] {byte[].class});
+    checkMethod(type, "fill", Modifier.PUBLIC | Modifier.SYNCHRONIZED, int.class,
+        new Class<?>[] {ByteBuffer.class});
+    checkMethod(type, "decode", Modifier.PUBLIC | Modifier.SYNCHRONIZED, boolean.class,
+        new Class<?>[] {ShortBuffer.class, boolean.class});
+    checkMethod(type, "resolveStreamInfo", Modifier.PUBLIC | Modifier.SYNCHRONIZED,
+        StreamInfo.class, new Class<?>[0]);
+    checkMethod(type, "freeResources", Modifier.PROTECTED, void.class, new Class<?>[0]);
+
+    Class<StreamInfo> info = StreamInfo.class;
+    check(info.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && info.getSuperclass() == Object.class && info.getInterfaces().length == 0
+        && info.getEnclosingClass() == AacDecoder.class && info.getDeclaredFields().length == 3
+        && info.getDeclaredMethods().length == 0 && info.getDeclaredConstructors().length == 1,
+        "stream info class metadata");
+    for (String name : new String[] {"sampleRate", "channels", "frameSize"}) {
+      Field field = info.getDeclaredField(name);
+      check(field.getType() == int.class
+          && field.getModifiers() == (Modifier.PUBLIC | Modifier.FINAL),
+          name + " stream info metadata");
+    }
+    check(info.getDeclaredConstructor(int.class, int.class, int.class).getModifiers()
+        == Modifier.PUBLIC, "stream info constructor metadata");
+  }
+
+  private static void checkMethod(Class<?> owner, String name, int modifiers, Class<?> result,
+      Class<?>[] parameters) throws Exception {
+    Method method = owner.getDeclaredMethod(name, parameters);
+    check(method.getModifiers() == modifiers && method.getReturnType() == result
+        && method.getExceptionTypes().length == 0 && !method.isBridge()
+        && !method.isSynthetic() && !method.isVarArgs(), name + " metadata");
+  }
+
+  private static void checkUnsupported(ThrowingAction action) {
+    Throwable error = catchThrowable(action);
+    check(error instanceof UnsupportedOperationException
+        && UNSUPPORTED_MESSAGE.equals(error.getMessage()), "deterministic unsupported failure");
+  }
+  private static Throwable catchThrowable(ThrowingAction action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+  @FunctionalInterface private interface ThrowingAction { void run() throws Throwable; }
+  private static final class Derived extends AacDecoder {
+    int frees;
+    @Override protected void freeResources() { frees++; }
+  }
+}
+"#;
+
 const BIT_BUFFER_READER_CONSUMER: &str = r#"
 import com.sedmelluq.discord.lavaplayer.tools.io.BitBufferReader;
 import java.lang.reflect.Field;
@@ -65796,6 +68282,1916 @@ public final class GateHttpClientTools {
   }
 
   private interface ThrowingRunnable { void run() throws Throwable; }
+}
+"#;
+
+const HTTP_INTERFACE_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import java.io.Closeable;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import org.apache.http.HttpHost;
+import org.apache.http.HttpRequest;
+import org.apache.http.HttpResponse;
+import org.apache.http.ProtocolVersion;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.protocol.HttpClientContext;
+import org.apache.http.conn.ClientConnectionManager;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.message.BasicHttpResponse;
+import org.apache.http.params.HttpParams;
+import org.apache.http.protocol.HttpContext;
+
+public final class GateHttpInterface {
+  public static void main(String[] args) throws Exception {
+    constructionAndAcquisition();
+    executionAndRetries();
+    finalLocationAndAccessors();
+    closeOwnershipAndOrdering();
+    reflection();
+    System.out.println("contracts=constructor,private-state,acquire-open,acquire-latch,acquire-failure,execute-order,execute-identity,execute-filter-repeat,execute-exception-repeat,execute-exception-identity,final-location,redirect-location,accessors,close-order,close-owned,close-unowned,close-repeat,reflection");
+  }
+
+  private static void constructionAndAcquisition() throws Exception {
+    RecordingClient client = new RecordingClient();
+    HttpClientContext context = HttpClientContext.create();
+    RecordingFilter filter = new RecordingFilter();
+    HttpInterface http = new HttpInterface(client, context, false, filter);
+    check(field(http, "client") == client && field(http, "context") == context
+        && field(http, "filter") == filter && Boolean.TRUE.equals(field(http, "available")),
+        "constructor state");
+    check(field(http, "lastRequest") == null && http.getContext() == context
+        && http.getHttpClient() == client, "initial accessors");
+    check(http.acquire() && !http.acquire(), "acquire latch");
+    check(filter.events.equals(Arrays.asList("open")), "acquire callback");
+
+    RecordingFilter failing = new RecordingFilter();
+    failing.openFailure = new IllegalStateException("open");
+    HttpInterface failed = new HttpInterface(client, HttpClientContext.create(), false, failing);
+    Throwable error = catchThrowable(failed::acquire);
+    check(error == failing.openFailure && Boolean.TRUE.equals(field(failed, "available")),
+        "acquire failure state");
+  }
+
+  private static void executionAndRetries() throws Exception {
+    RecordingClient client = new RecordingClient();
+    CloseableResponse first = response(200);
+    CloseableResponse second = response(201);
+    client.outcomes.add(first);
+    client.outcomes.add(second);
+    RecordingFilter filter = new RecordingFilter();
+    filter.repeatResponses = 1;
+    HttpInterface http = new HttpInterface(client, HttpClientContext.create(), false, filter);
+    HttpUriRequest request = new org.apache.http.client.methods.HttpGet("https://example.test/a");
+    check(http.execute(request) == second && client.requests.equals(Arrays.asList(request, request)),
+        "execute response identity");
+    check(filter.events.equals(Arrays.asList("request:false", "response:200", "request:true", "response:201")),
+        "execute callback order");
+    check(field(http, "lastRequest") == request, "last request identity");
+
+    RecordingClient retryClient = new RecordingClient();
+    IOException retryFailure = new IOException("retry");
+    retryClient.outcomes.add(retryFailure);
+    retryClient.outcomes.add(response(202));
+    RecordingFilter retryFilter = new RecordingFilter();
+    retryFilter.repeatExceptions = 1;
+    HttpInterface retryHttp = new HttpInterface(retryClient, HttpClientContext.create(), false, retryFilter);
+    check(retryHttp.execute(request).getStatusLine().getStatusCode() == 202,
+        "exception retry result");
+    check(retryFilter.events.equals(Arrays.asList("request:false", "exception:IOException", "request:true", "response:202")),
+        "exception retry order");
+
+    RecordingClient identityClient = new RecordingClient();
+    RuntimeException runtime = new RuntimeException("runtime");
+    identityClient.outcomes.add(runtime);
+    RecordingFilter identityFilter = new RecordingFilter();
+    HttpInterface identityHttp = new HttpInterface(identityClient, HttpClientContext.create(), false, identityFilter);
+    Throwable error = catchThrowable(() -> identityHttp.execute(request));
+    check(error == runtime && identityFilter.events.equals(Arrays.asList("request:false", "exception:RuntimeException")),
+        "exception identity");
+  }
+
+  private static void finalLocationAndAccessors() throws Exception {
+    RecordingClient client = new RecordingClient();
+    RecordingFilter filter = new RecordingFilter();
+    HttpInterface http = new HttpInterface(client, HttpClientContext.create(), false, filter);
+    check(http.getFinalLocation() == null, "initial final location");
+    HttpUriRequest request = new org.apache.http.client.methods.HttpGet("https://example.test/original");
+    client.outcomes.add(response(204));
+    check(http.execute(request) != null
+        && URI.create("https://example.test/original").equals(http.getFinalLocation()),
+        "request final location");
+    List<URI> redirects = Arrays.asList(URI.create("https://example.test/one"), URI.create("https://example.test/final"));
+    http.getContext().setAttribute(HttpClientContext.REDIRECT_LOCATIONS, redirects);
+    check(http.getFinalLocation() == redirects.get(1), "redirect final location identity");
+  }
+
+  private static void closeOwnershipAndOrdering() throws Exception {
+    RecordingClient unownedClient = new RecordingClient();
+    RecordingFilter unownedFilter = new RecordingFilter();
+    HttpInterface unowned = new HttpInterface(unownedClient, HttpClientContext.create(), false, unownedFilter);
+    unowned.acquire();
+    unowned.close();
+    check(unownedClient.closeCount == 0 && Boolean.TRUE.equals(field(unowned, "available"))
+        && unownedFilter.events.equals(Arrays.asList("open", "close")), "unowned close");
+
+    RecordingClient ownedClient = new RecordingClient();
+    RecordingFilter ownedFilter = new RecordingFilter();
+    ownedFilter.client = ownedClient;
+    HttpInterface owned = new HttpInterface(ownedClient, HttpClientContext.create(), true, ownedFilter);
+    owned.acquire();
+    owned.close();
+    check(ownedClient.closeCount == 1 && ownedFilter.closeSawClientCount == 0,
+        "owned close ordering");
+    owned.close();
+    check(ownedClient.closeCount == 2 && ownedFilter.events.equals(Arrays.asList("open", "close", "close")),
+        "repeated close");
+  }
+
+  private static void reflection() throws Exception {
+    Class<HttpInterface> type = HttpInterface.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == Object.class && Arrays.equals(type.getInterfaces(), new Class<?>[] {Closeable.class}),
+        "class shape");
+    check(type.getDeclaredFields().length == 6 && type.getDeclaredMethods().length == 6,
+        "member counts");
+    check(fieldInfo(type, "client", CloseableHttpClient.class, Modifier.PRIVATE | Modifier.FINAL)
+        && fieldInfo(type, "context", HttpClientContext.class, Modifier.PRIVATE | Modifier.FINAL)
+        && fieldInfo(type, "ownedClient", boolean.class, Modifier.PRIVATE | Modifier.FINAL)
+        && fieldInfo(type, "filter", HttpContextFilter.class, Modifier.PRIVATE | Modifier.FINAL)
+        && fieldInfo(type, "lastRequest", HttpUriRequest.class, Modifier.PRIVATE)
+        && fieldInfo(type, "available", boolean.class, Modifier.PRIVATE), "field metadata");
+    check(type.getDeclaredConstructor(CloseableHttpClient.class, HttpClientContext.class, boolean.class,
+        HttpContextFilter.class).getExceptionTypes().length == 0
+        && type.getDeclaredMethod("execute", HttpUriRequest.class).getExceptionTypes().length == 1
+        && type.getDeclaredMethod("close").getExceptionTypes().length == 1, "method metadata");
+  }
+
+  private static Object field(Object target, String name) throws Exception {
+    Field field = target.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
+  }
+  private static boolean fieldInfo(Class<?> type, String name, Class<?> fieldType, int required) throws Exception {
+    Field field = type.getDeclaredField(name);
+    return field.getType() == fieldType && (field.getModifiers() & required) == required;
+  }
+  private static CloseableResponse response(int status) {
+    return new CloseableResponse(new BasicHttpResponse(new ProtocolVersion("HTTP", 1, 1), status, "status"));
+  }
+  private static Throwable catchThrowable(ThrowingRunnable action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+
+  private interface ThrowingRunnable { void run() throws Throwable; }
+
+  private static final class CloseableResponse extends BasicHttpResponse implements CloseableHttpResponse {
+    CloseableResponse(HttpResponse source) { super(source.getStatusLine()); setEntity(source.getEntity()); }
+    public void close() {}
+  }
+
+  private static final class RecordingClient extends CloseableHttpClient {
+    final List<Object> outcomes = new ArrayList<>();
+    final List<HttpUriRequest> requests = new ArrayList<>();
+    int next;
+    int closeCount;
+    public HttpParams getParams() { return null; }
+    public ClientConnectionManager getConnectionManager() { return null; }
+    protected CloseableHttpResponse doExecute(HttpHost host, HttpRequest request, HttpContext context)
+        throws IOException {
+      requests.add((HttpUriRequest) request);
+      Object outcome = outcomes.get(next++);
+      if (outcome instanceof IOException) throw (IOException) outcome;
+      if (outcome instanceof RuntimeException) throw (RuntimeException) outcome;
+      return (CloseableHttpResponse) outcome;
+    }
+    public void close() { closeCount++; }
+  }
+
+  private static final class RecordingFilter implements HttpContextFilter {
+    final List<String> events = new ArrayList<>();
+    int repeatResponses;
+    int repeatExceptions;
+    RuntimeException openFailure;
+    RecordingClient client;
+    int closeSawClientCount = -1;
+    public void onContextOpen(HttpClientContext context) {
+      events.add("open");
+      if (openFailure != null) throw openFailure;
+    }
+    public void onContextClose(HttpClientContext context) {
+      events.add("close");
+      if (client != null) closeSawClientCount = client.closeCount;
+    }
+    public void onRequest(HttpClientContext context, HttpUriRequest request, boolean repeated) {
+      events.add("request:" + repeated);
+    }
+    public boolean onRequestResponse(HttpClientContext context, HttpUriRequest request, HttpResponse response) {
+      events.add("response:" + response.getStatusLine().getStatusCode());
+      return repeatResponses-- > 0;
+    }
+    public boolean onRequestException(HttpClientContext context, HttpUriRequest request, Throwable error) {
+      events.add("exception:" + error.getClass().getSimpleName());
+      return repeatExceptions-- > 0;
+    }
+  }
+}
+"#;
+
+const HTTP_INTERFACE_MANAGER_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.http.ExtendedHttpConfigurable;
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpConfigurable;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager;
+import java.io.Closeable;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.impl.client.HttpClientBuilder;
+
+public final class GateHttpInterfaceManager {
+  public static void main(String[] args) throws Exception {
+    callerDispatch();
+    failureIdentity();
+    reflection();
+    System.out.println("contracts=inheritance,caller-dispatch,argument-identity,null-forwarding,return-identity,failure-identity,generic-inheritance,close-dispatch,public-abstract-interface,no-fields,no-constructors,reflection");
+  }
+
+  private static void callerDispatch() throws Exception {
+    RecordingManager implementation = new RecordingManager();
+    HttpInterfaceManager manager = implementation;
+    Function<RequestConfig, RequestConfig> requests = value -> value;
+    Consumer<HttpClientBuilder> builder = value -> {};
+    HttpContextFilter filter = proxy(HttpContextFilter.class);
+    HttpInterface result = new HttpInterface(null, null, false, null);
+    implementation.result = result;
+
+    manager.setHttpContextFilter(filter);
+    manager.configureRequests(requests);
+    manager.configureBuilder(builder);
+    check(manager.getInterface() == result && manager.getInterface() == result,
+        "return identity");
+    manager.setHttpContextFilter(null);
+    manager.configureRequests(null);
+    manager.configureBuilder(null);
+    manager.close();
+    check(implementation.events.equals(Arrays.asList("filter", "requests", "builder", "get", "get",
+        "filter", "requests", "builder", "close")) && implementation.requests == null
+        && implementation.builder == null && implementation.filter == null
+        && implementation.nullRequests && implementation.nullBuilder,
+        "caller dispatch");
+    check(manager instanceof ExtendedHttpConfigurable && manager instanceof Closeable,
+        "inherited interfaces");
+  }
+
+  private static void failureIdentity() {
+    RuntimeException sentinel = new RuntimeException("sentinel");
+    HttpInterfaceManager manager = (HttpInterfaceManager) Proxy.newProxyInstance(
+        HttpInterfaceManager.class.getClassLoader(), new Class<?>[] {HttpInterfaceManager.class},
+        (instance, method, arguments) -> { throw sentinel; });
+    check(catchThrowable(() -> manager.getInterface()) == sentinel, "get failure");
+    check(catchThrowable(() -> manager.configureRequests(null)) == sentinel, "request failure");
+    check(catchThrowable(() -> manager.configureBuilder(null)) == sentinel, "builder failure");
+    check(catchThrowable(manager::close) == sentinel, "close failure");
+  }
+
+  private static void reflection() throws Exception {
+    Class<HttpInterfaceManager> type = HttpInterfaceManager.class;
+    check(type.isInterface() && Modifier.isPublic(type.getModifiers())
+        && Modifier.isAbstract(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == null
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {ExtendedHttpConfigurable.class, Closeable.class}),
+        "interface metadata");
+    check(type.getDeclaredFields().length == 0 && type.getDeclaredConstructors().length == 0
+        && type.getDeclaredMethods().length == 1 && type.getMethods().length == 5,
+        "member counts");
+    Method get = type.getDeclaredMethod("getInterface");
+    check(get.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && get.getReturnType() == HttpInterface.class && get.getExceptionTypes().length == 0
+        && !get.isDefault() && !get.isBridge() && !get.isSynthetic() && !get.isVarArgs(),
+        "get metadata");
+    Method requests = type.getMethod("configureRequests", Function.class);
+    Method builder = type.getMethod("configureBuilder", Consumer.class);
+    check(requests.getDeclaringClass() == HttpConfigurable.class
+        && requests.getGenericParameterTypes()[0].getTypeName().equals(
+            "java.util.function.Function<org.apache.http.client.config.RequestConfig, org.apache.http.client.config.RequestConfig>")
+        && builder.getDeclaringClass() == HttpConfigurable.class
+        && builder.getGenericParameterTypes()[0].getTypeName().equals(
+            "java.util.function.Consumer<org.apache.http.impl.client.HttpClientBuilder>"),
+        "inherited generic metadata");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T proxy(Class<T> type) {
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type},
+        (instance, method, arguments) -> null);
+  }
+  private static Throwable catchThrowable(ThrowingAction action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+  @FunctionalInterface
+  private interface ThrowingAction { void run() throws Throwable; }
+
+  private static final class RecordingManager implements HttpInterfaceManager {
+    final java.util.List<String> events = new java.util.ArrayList<>();
+    Function<RequestConfig, RequestConfig> requests;
+    Consumer<HttpClientBuilder> builder;
+    HttpContextFilter filter;
+    HttpInterface result;
+    boolean nullRequests;
+    boolean nullBuilder;
+    public void configureRequests(Function<RequestConfig, RequestConfig> value) {
+      requests = value; nullRequests |= value == null; events.add("requests");
+    }
+    public void setHttpContextFilter(HttpContextFilter value) {
+      filter = value; events.add("filter");
+    }
+    public void configureBuilder(Consumer<HttpClientBuilder> value) {
+      builder = value; nullBuilder |= value == null; events.add("builder");
+    }
+    public HttpInterface getInterface() { events.add("get"); return result; }
+    public void close() { events.add("close"); }
+  }
+}
+"#;
+
+const MESSAGE_INPUT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.io.MessageInput;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInput;
+import java.io.DataOutputStream;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import org.apache.commons.io.input.CountingInputStream;
+
+public final class GateMessageInput {
+  public static void main(String[] args) throws Exception {
+    framingAndFlags();
+    boundedMessages();
+    skippingAndTruncation();
+    failureAndNullBoundaries();
+    reflection();
+    System.out.println("contracts=constructor-state,framing,flag-extraction,zero-marker,bounded-read,bounded-eof,partial-skip,full-read-skip,repeated-skip,truncated-skip,header-failure-identity,null-input,subclassable,private-state,checked-throws,reflection");
+  }
+
+  private static void framingAndFlags() throws Exception {
+    byte[] bytes = messages(
+        frame(2, new byte[] {0x12, 0x34, 0x56}),
+        frame(1, new byte[] {0x78, 0x56, 0x34, 0x12}),
+        header(3, 0));
+    MessageInput input = new MessageInput(new ByteArrayInputStream(bytes));
+    check(intField(input, "messageSize") == 0 && input.getMessageFlags() == 0,
+        "initial state");
+    DataInput first = input.nextMessage();
+    check(input.getMessageFlags() == 2 && intField(input, "messageSize") == 3
+        && first.readUnsignedByte() == 0x12, "first frame");
+    input.skipRemainingBytes();
+    check(intField(input, "messageSize") == 0, "skip resets size");
+    DataInput second = input.nextMessage();
+    check(input.getMessageFlags() == 1 && second.readInt() == 0x78563412,
+        "second frame");
+    input.skipRemainingBytes();
+    check(input.nextMessage() == null && input.getMessageFlags() == 3
+        && intField(input, "messageSize") == 0, "zero marker");
+
+    MessageInput maximum = new MessageInput(new ByteArrayInputStream(header(3, 0x3fffffff)));
+    check(maximum.nextMessage() != null && maximum.getMessageFlags() == 3
+        && intField(maximum, "messageSize") == 0x3fffffff, "maximum header fields");
+  }
+
+  private static void boundedMessages() throws Exception {
+    MessageInput input = new MessageInput(new ByteArrayInputStream(messages(
+        frame(0, new byte[] {9, 8}), frame(1, new byte[] {7}), header(0, 0))));
+    DataInput first = input.nextMessage();
+    check(first.readUnsignedByte() == 9 && first.readUnsignedByte() == 8,
+        "bounded payload");
+    check(catchThrowable(first::readByte) instanceof EOFException, "bounded eof");
+    input.skipRemainingBytes();
+    DataInput second = input.nextMessage();
+    check(second.readUnsignedByte() == 7 && input.getMessageFlags() == 1,
+        "next header preserved");
+    input.skipRemainingBytes();
+    check(input.nextMessage() == null, "final marker");
+  }
+
+  private static void skippingAndTruncation() throws Exception {
+    MessageInput partial = new MessageInput(new ByteArrayInputStream(messages(
+        frame(0, new byte[] {1, 2, 3, 4, 5}), frame(2, new byte[] {6}), header(0, 0))));
+    DataInput body = partial.nextMessage();
+    check(body.readUnsignedByte() == 1 && body.readUnsignedByte() == 2, "partial read");
+    partial.skipRemainingBytes();
+    check(partial.nextMessage().readUnsignedByte() == 6 && partial.getMessageFlags() == 2,
+        "partial skip");
+    partial.skipRemainingBytes();
+    partial.skipRemainingBytes();
+    check(partial.nextMessage() == null, "repeated skip");
+
+    MessageInput full = new MessageInput(new ByteArrayInputStream(messages(
+        frame(0, new byte[] {3}), frame(0, new byte[] {4}))));
+    check(full.nextMessage().readUnsignedByte() == 3, "full read");
+    full.skipRemainingBytes();
+    check(full.nextMessage().readUnsignedByte() == 4, "full read skip preserves next header");
+
+    MessageInput truncated = new MessageInput(new ByteArrayInputStream(messages(
+        header(0, 4), new byte[] {1})));
+    DataInput truncatedBody = truncated.nextMessage();
+    check(truncatedBody.readUnsignedByte() == 1, "truncated first byte");
+    check(catchThrowable(truncated::skipRemainingBytes) instanceof EOFException,
+        "truncated skip failure");
+  }
+
+  private static void failureAndNullBoundaries() throws Exception {
+    IOException sentinel = new IOException("sentinel");
+    MessageInput failed = new MessageInput(new FailingInputStream(sentinel));
+    check(catchThrowable(failed::nextMessage) == sentinel, "header failure identity");
+
+    MessageInput nullInput = new MessageInput(null);
+    check(catchThrowable(nullInput::nextMessage) instanceof NullPointerException,
+        "null input failure");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MessageInput> type = MessageInput.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == Object.class && type.getInterfaces().length == 0,
+        "class shape");
+    check(type.getDeclaredFields().length == 4 && type.getDeclaredMethods().length == 3
+        && type.getDeclaredConstructors().length == 1, "member counts");
+    check(fieldInfo(type, "countingInputStream", CountingInputStream.class,
+            Modifier.PRIVATE | Modifier.FINAL)
+        && fieldInfo(type, "dataInputStream", java.io.DataInputStream.class,
+            Modifier.PRIVATE | Modifier.FINAL)
+        && fieldInfo(type, "messageSize", int.class, Modifier.PRIVATE)
+        && fieldInfo(type, "messageFlags", int.class, Modifier.PRIVATE), "field metadata");
+    check(type.getDeclaredConstructor(InputStream.class).getExceptionTypes().length == 0,
+        "constructor metadata");
+    Method next = type.getDeclaredMethod("nextMessage");
+    Method flags = type.getDeclaredMethod("getMessageFlags");
+    Method skip = type.getDeclaredMethod("skipRemainingBytes");
+    check(next.getReturnType() == DataInput.class
+        && Arrays.equals(next.getExceptionTypes(), new Class<?>[] {IOException.class})
+        && flags.getReturnType() == int.class && flags.getExceptionTypes().length == 0
+        && skip.getReturnType() == void.class
+        && Arrays.equals(skip.getExceptionTypes(), new Class<?>[] {IOException.class}),
+        "method metadata");
+  }
+
+  private static byte[] frame(int flags, byte[] payload) throws IOException {
+    return messages(header(flags, payload.length), payload);
+  }
+  private static byte[] header(int flags, int size) throws IOException {
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    DataOutputStream output = new DataOutputStream(bytes);
+    output.writeInt((flags << 30) | size);
+    return bytes.toByteArray();
+  }
+  private static byte[] messages(byte[]... parts) throws IOException {
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    for (byte[] part : parts) bytes.write(part);
+    return bytes.toByteArray();
+  }
+  private static int intField(Object target, String name) throws Exception {
+    Field field = target.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.getInt(target);
+  }
+  private static boolean fieldInfo(Class<?> type, String name, Class<?> fieldType, int required)
+      throws Exception {
+    Field field = type.getDeclaredField(name);
+    return field.getType() == fieldType && (field.getModifiers() & required) == required;
+  }
+  private static Throwable catchThrowable(ThrowingAction action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+  @FunctionalInterface
+  private interface ThrowingAction { void run() throws Throwable; }
+
+  private static final class FailingInputStream extends InputStream {
+    final IOException failure;
+    FailingInputStream(IOException failure) { this.failure = failure; }
+    public int read() throws IOException { throw failure; }
+  }
+}
+"#;
+
+const MESSAGE_OUTPUT_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.io.MessageOutput;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutput;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateMessageOutput {
+  public static void main(String[] args) throws Exception {
+    framingAndFlags();
+    bufferReuseAndRepeatedCommit();
+    failureTimingAndIdentity();
+    nullBoundary();
+    reflection();
+    System.out.println("contracts=constructor-state,no-eager-write,start-identity,start-reset,default-header,flag-header,flag-masking,zero-payload,finish-marker,repeated-commit,repeated-finish,header-failure-identity,payload-failure-timing,payload-failure-identity,null-output,subclassable,private-state,checked-throws,reflection");
+  }
+
+  private static void framingAndFlags() throws Exception {
+    ByteArrayOutputStream target = new ByteArrayOutputStream();
+    MessageOutput output = new MessageOutput(target);
+    check(target.size() == 0, "constructor must not write");
+    DataOutput first = output.startMessage();
+    first.writeByte(0x12);
+    first.writeShort(0x3456);
+    output.commitMessage(2);
+    DataOutput second = output.startMessage();
+    check(second == first, "start identity");
+    second.writeInt(0x789abcde);
+    output.commitMessage();
+    output.startMessage();
+    output.commitMessage(-1);
+    output.finish();
+    check(Arrays.equals(target.toByteArray(), bytes(
+        0x80, 0x00, 0x00, 0x03, 0x12, 0x34, 0x56,
+        0x00, 0x00, 0x00, 0x04, 0x78, 0x9a, 0xbc, 0xde,
+        0xc0, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00)), "framed bytes");
+
+    ByteArrayOutputStream maskedTarget = new ByteArrayOutputStream();
+    MessageOutput masked = new MessageOutput(maskedTarget);
+    masked.startMessage().writeByte(7);
+    masked.commitMessage(4);
+    check(Arrays.equals(maskedTarget.toByteArray(), bytes(0, 0, 0, 1, 7)),
+        "flag masking");
+  }
+
+  private static void bufferReuseAndRepeatedCommit() throws Exception {
+    ByteArrayOutputStream target = new ByteArrayOutputStream();
+    MessageOutput output = new MessageOutput(target);
+    DataOutput data = output.startMessage();
+    data.writeInt(0x01020304);
+    output.startMessage();
+    data.writeByte(9);
+    output.commitMessage(1);
+    output.commitMessage(1);
+    output.finish();
+    output.finish();
+    check(Arrays.equals(target.toByteArray(), bytes(
+        0x40, 0, 0, 1, 9,
+        0x40, 0, 0, 1, 9,
+        0, 0, 0, 0,
+        0, 0, 0, 0)), "reuse and repeats");
+  }
+
+  private static void failureTimingAndIdentity() throws Exception {
+    IOException headerFailure = new IOException("header");
+    FailingOutputStream headerTarget = new FailingOutputStream(1, headerFailure);
+    MessageOutput header = new MessageOutput(headerTarget);
+    header.startMessage().writeByte(1);
+    check(catchThrowable(header::commitMessage) == headerFailure
+        && headerTarget.bytes.size() == 0 && headerTarget.bulkWrites == 1,
+        "header failure");
+
+    IOException payloadFailure = new IOException("payload");
+    FailingOutputStream payloadTarget = new FailingOutputStream(2, payloadFailure);
+    MessageOutput payload = new MessageOutput(payloadTarget);
+    payload.startMessage().writeByte(5);
+    check(catchThrowable(() -> payload.commitMessage(3)) == payloadFailure
+        && Arrays.equals(payloadTarget.bytes.toByteArray(), bytes(0xc0, 0, 0, 1))
+        && payloadTarget.bulkWrites == 2, "payload failure");
+  }
+
+  private static void nullBoundary() throws Exception {
+    MessageOutput output = new MessageOutput(null);
+    output.startMessage().writeByte(1);
+    check(catchThrowable(output::commitMessage) instanceof NullPointerException,
+        "null commit");
+    check(catchThrowable(output::finish) instanceof NullPointerException,
+        "null finish");
+  }
+
+  private static void reflection() throws Exception {
+    Class<MessageOutput> type = MessageOutput.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == Object.class && type.getInterfaces().length == 0,
+        "class shape");
+    check(type.getDeclaredFields().length == 4 && type.getDeclaredMethods().length == 4
+        && type.getDeclaredConstructors().length == 1, "member counts");
+    check(fieldInfo(type, "outputStream", OutputStream.class, Modifier.PRIVATE | Modifier.FINAL)
+        && fieldInfo(type, "dataOutputStream", DataOutputStream.class,
+            Modifier.PRIVATE | Modifier.FINAL)
+        && fieldInfo(type, "messageByteOutput", ByteArrayOutputStream.class,
+            Modifier.PRIVATE | Modifier.FINAL)
+        && fieldInfo(type, "messageDataOutput", DataOutputStream.class,
+            Modifier.PRIVATE | Modifier.FINAL), "field metadata");
+    check(type.getDeclaredConstructor(OutputStream.class).getExceptionTypes().length == 0,
+        "constructor metadata");
+    Method start = type.getDeclaredMethod("startMessage");
+    Method commit = type.getDeclaredMethod("commitMessage");
+    Method flagged = type.getDeclaredMethod("commitMessage", int.class);
+    Method finish = type.getDeclaredMethod("finish");
+    check(start.getReturnType() == DataOutput.class && start.getExceptionTypes().length == 0
+        && commit.getReturnType() == void.class
+        && Arrays.equals(commit.getExceptionTypes(), new Class<?>[] {IOException.class})
+        && flagged.getReturnType() == void.class
+        && Arrays.equals(flagged.getExceptionTypes(), new Class<?>[] {IOException.class})
+        && finish.getReturnType() == void.class
+        && Arrays.equals(finish.getExceptionTypes(), new Class<?>[] {IOException.class}),
+        "method metadata");
+  }
+
+  private static byte[] bytes(int... values) {
+    byte[] result = new byte[values.length];
+    for (int index = 0; index < values.length; index++) result[index] = (byte) values[index];
+    return result;
+  }
+  private static boolean fieldInfo(Class<?> type, String name, Class<?> fieldType, int required)
+      throws Exception {
+    Field field = type.getDeclaredField(name);
+    return field.getType() == fieldType && (field.getModifiers() & required) == required;
+  }
+  private static Throwable catchThrowable(ThrowingAction action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+  @FunctionalInterface
+  private interface ThrowingAction { void run() throws Throwable; }
+
+  private static final class FailingOutputStream extends OutputStream {
+    final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    final int failingBulkWrite;
+    final IOException failure;
+    int bulkWrites;
+    FailingOutputStream(int failingBulkWrite, IOException failure) {
+      this.failingBulkWrite = failingBulkWrite;
+      this.failure = failure;
+    }
+    public void write(int value) throws IOException { bytes.write(value); }
+    public void write(byte[] source, int offset, int length) throws IOException {
+      bulkWrites++;
+      if (bulkWrites == failingBulkWrite) throw failure;
+      bytes.write(source, offset, length);
+    }
+  }
+}
+"#;
+
+const NON_SEEKABLE_INPUT_STREAM_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.io.NonSeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.ByteArrayInputStream;
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.List;
+import org.apache.commons.io.input.CountingInputStream;
+
+public final class GateNonSeekableInputStream {
+  public static void main(String[] args) throws Exception {
+    constructionAndReads();
+    seekingAndProviders();
+    closeAndFailures();
+    nullBoundary();
+    reflection();
+    System.out.println("contracts=constructor-state,position,delegate-read,single-read,bulk-read,eof-position,seek-forward,seek-backward-failure,hard-seek-unsupported,non-seekable,empty-providers,provider-identity,close-forwarding,read-failure-identity,close-failure-identity,null-input,subclassable,private-state,checked-throws,reflection");
+  }
+
+  private static void constructionAndReads() throws Exception {
+    TrackingInputStream source = new TrackingInputStream(new byte[] {10, 20, 30, 40, 50});
+    NonSeekableInputStream input = new NonSeekableInputStream(source);
+    check(input.getPosition() == 0 && input.getContentLength() == Long.MAX_VALUE
+        && input.getMaxSkipDistance() == 0, "constructor state");
+    check(input.read() == 10 && input.getPosition() == 1, "single read");
+    byte[] buffer = new byte[] {-1, -1, -1, -1, -1};
+    check(input.read(buffer, 1, 3) == 3 && Arrays.equals(buffer, new byte[] {-1, 20, 30, 40, -1})
+        && input.getPosition() == 4, "bulk read");
+    check(input.read() == 50 && input.getPosition() == 5 && input.read() == -1
+        && input.getPosition() == 5, "eof position");
+  }
+
+  private static void seekingAndProviders() throws Exception {
+    NonSeekableInputStream input = new NonSeekableInputStream(new ByteArrayInputStream(
+        new byte[] {1, 2, 3, 4, 5, 6}));
+    input.seek(3);
+    check(input.getPosition() == 3 && input.read() == 4, "forward seek");
+    Throwable backward = catchThrowable(() -> input.seek(1));
+    check(backward instanceof UnsupportedOperationException && input.getPosition() == 4,
+        "backward seek failure");
+    ExposedInputStream exposed = new ExposedInputStream(new ByteArrayInputStream(new byte[0]));
+    Throwable hard = catchThrowable(() -> exposed.invokeSeekHard(99));
+    check(hard instanceof UnsupportedOperationException && !exposed.canSeekHard(),
+        "hard seek unsupported");
+    List<AudioTrackInfoProvider> first = input.getTrackInfoProviders();
+    List<AudioTrackInfoProvider> second = input.getTrackInfoProviders();
+    check(first.isEmpty() && first == second, "provider list");
+  }
+
+  private static void closeAndFailures() throws Exception {
+    TrackingInputStream source = new TrackingInputStream(new byte[] {1});
+    NonSeekableInputStream input = new NonSeekableInputStream(source);
+    input.close();
+    check(source.closed, "close forwarding");
+
+    IOException readFailure = new IOException("read");
+    NonSeekableInputStream failingRead = new NonSeekableInputStream(new FailingInputStream(readFailure, null));
+    check(catchThrowable(failingRead::read) == readFailure, "read failure identity");
+    IOException closeFailure = new IOException("close");
+    NonSeekableInputStream failingClose = new NonSeekableInputStream(new FailingInputStream(null, closeFailure));
+    check(catchThrowable(failingClose::close) == closeFailure, "close failure identity");
+  }
+
+  private static void nullBoundary() throws Exception {
+    NonSeekableInputStream input = new NonSeekableInputStream(null);
+    check(input.getPosition() == 0 && catchThrowable(input::read) instanceof NullPointerException,
+        "null input");
+  }
+
+  private static void reflection() throws Exception {
+    Class<NonSeekableInputStream> type = NonSeekableInputStream.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == SeekableInputStream.class && type.getInterfaces().length == 0,
+        "class shape");
+    check(type.getDeclaredFields().length == 1 && type.getDeclaredMethods().length == 7
+        && type.getDeclaredConstructors().length == 1, "member counts");
+    Field delegate = type.getDeclaredField("delegate");
+    check(delegate.getType() == CountingInputStream.class
+        && (delegate.getModifiers() & (Modifier.PRIVATE | Modifier.FINAL))
+            == (Modifier.PRIVATE | Modifier.FINAL), "field metadata");
+    check(type.getDeclaredConstructor(InputStream.class).getExceptionTypes().length == 0,
+        "constructor metadata");
+    Method position = type.getDeclaredMethod("getPosition");
+    Method hard = type.getDeclaredMethod("seekHard", long.class);
+    Method seekable = type.getDeclaredMethod("canSeekHard");
+    Method providers = type.getDeclaredMethod("getTrackInfoProviders");
+    Method read = type.getDeclaredMethod("read");
+    Method bulk = type.getDeclaredMethod("read", byte[].class, int.class, int.class);
+    Method close = type.getDeclaredMethod("close");
+    check(position.getModifiers() == Modifier.PUBLIC && position.getReturnType() == long.class
+        && hard.getModifiers() == Modifier.PROTECTED && hard.getReturnType() == void.class
+        && hard.getExceptionTypes().length == 0 && seekable.getModifiers() == Modifier.PUBLIC
+        && seekable.getReturnType() == boolean.class && providers.getModifiers() == Modifier.PUBLIC
+        && providers.getReturnType() == List.class && read.getReturnType() == int.class
+        && Arrays.equals(read.getExceptionTypes(), new Class<?>[] {IOException.class})
+        && bulk.getReturnType() == int.class
+        && Arrays.equals(bulk.getExceptionTypes(), new Class<?>[] {IOException.class})
+        && close.getReturnType() == void.class
+        && Arrays.equals(close.getExceptionTypes(), new Class<?>[] {IOException.class}),
+        "method metadata");
+  }
+
+  private static Throwable catchThrowable(ThrowingAction action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+  @FunctionalInterface
+  private interface ThrowingAction { void run() throws Throwable; }
+
+  private static final class ExposedInputStream extends NonSeekableInputStream {
+    ExposedInputStream(InputStream input) { super(input); }
+    void invokeSeekHard(long position) { seekHard(position); }
+  }
+  private static final class TrackingInputStream extends ByteArrayInputStream {
+    boolean closed;
+    TrackingInputStream(byte[] data) { super(data); }
+    public void close() { closed = true; }
+  }
+  private static final class FailingInputStream extends InputStream {
+    final IOException readFailure;
+    final IOException closeFailure;
+    FailingInputStream(IOException readFailure, IOException closeFailure) {
+      this.readFailure = readFailure; this.closeFailure = closeFailure;
+    }
+    public int read() throws IOException {
+      if (readFailure != null) throw readFailure;
+      return -1;
+    }
+    public void close() throws IOException {
+      if (closeFailure != null) throw closeFailure;
+    }
+  }
+}
+"#;
+
+const PERSISTENT_HTTP_STREAM_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.tools.io.PersistentHttpStream;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import org.apache.http.Header;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
+import org.apache.http.ProtocolVersion;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.protocol.HttpClientContext;
+import org.apache.http.conn.ClientConnectionManager;
+import org.apache.http.entity.BasicHttpEntity;
+import org.apache.http.HttpHost;
+import org.apache.http.HttpRequest;
+import org.apache.http.params.HttpParams;
+import org.apache.http.message.BasicHeader;
+import org.apache.http.message.BasicHttpResponse;
+import org.apache.http.protocol.HttpContext;
+import org.apache.http.impl.client.CloseableHttpClient;
+import com.sedmelluq.discord.lavaplayer.tools.http.HttpContextFilter;
+
+public final class GatePersistentHttpStream {
+  public static void main(String[] args) throws Exception {
+    constructionAndConnection();
+    reconnectAndSeeking();
+    statusAndMetadata();
+    lifecycleAndFailures();
+    reflection();
+    System.out.println("contracts=constructor-state,unknown-length,known-length,connect-request,connect-latch,read-position,bulk-position,available,range-reconnect,release-connection,seek-hard,seek-capability,reset-failure,mark-unsupported,provider-empty,provider-icy,provider-fallback,close-clears,close-swallow,nonretriable-failure,status-check,status-retry,missing-entity,content-stream,protected-state,field-metadata,method-metadata,reflection");
+  }
+
+  private static void constructionAndConnection() throws Exception {
+    RecordingHttp http = new RecordingHttp();
+    URI url = URI.create("https://example.test/audio");
+    ExposedPersistentHttpStream unknown = new ExposedPersistentHttpStream(http.proxy(), url, null);
+    check(unknown.getPosition() == 0 && unknown.getContentLength() == Long.MAX_VALUE
+        && unknown.getMaxSkipDistance() == 524288 && unknown.getCurrentResponse() == null,
+        "unknown constructor");
+    check(unknown.connectUrl().equals(url) && unknown.headersForRange(), "connect request defaults");
+    Response response = response(200, new byte[] {1, 2, 3});
+    response.addHeader("Content-Length", "3");
+    http.responses.add(response);
+    check(unknown.read() == 1 && unknown.getPosition() == 1 && unknown.getContentLength() == 3,
+        "connect and single read");
+    check(unknown.getCurrentResponse() == response && http.requests.size() == 1,
+        "connection latch");
+    check(http.requests.get(0).getURI().equals(url)
+        && http.requests.get(0).getFirstHeader("Range") == null, "initial request");
+    byte[] buffer = new byte[4];
+    check(unknown.read(buffer, 1, 2) == 2 && Arrays.equals(buffer, new byte[] {0, 2, 3, 0})
+        && unknown.getPosition() == 3, "bulk read position");
+    check(unknown.read() == -1 && unknown.getPosition() == 3 && unknown.available() == 0,
+        "eof and available");
+  }
+
+  private static void reconnectAndSeeking() throws Exception {
+    RecordingHttp http = new RecordingHttp();
+    ExposedPersistentHttpStream stream = new ExposedPersistentHttpStream(http.proxy(),
+        URI.create("https://example.test/range"), 5L);
+    Response first = response(200, new byte[] {10, 11});
+    Response second = response(206, new byte[] {12, 13, 14});
+    http.responses.add(first); http.responses.add(second);
+    check(stream.read() == 10 && stream.getPosition() == 1, "range setup");
+    stream.releaseConnection();
+    check(stream.getCurrentResponse() == null && stream.getPosition() == 1,
+        "release connection state");
+    check(stream.read() == 12 && http.requests.size() == 2
+        && "bytes=1-".equals(http.requests.get(1).getFirstHeader("Range").getValue()),
+        "range reconnect");
+    stream.seekHardPublic(0);
+    check(stream.getPosition() == 0 && stream.getCurrentResponse() == null
+        && stream.canSeekHard(), "hard seek");
+    check(stream.markSupported() == false, "mark unsupported");
+    check(catchThrowable(stream::reset) instanceof IOException, "reset failure");
+    check("mark/reset not supported".equals(catchThrowable(stream::reset).getMessage()),
+        "reset message");
+  }
+
+  private static void statusAndMetadata() throws Exception {
+    RecordingHttp statusHttp = new RecordingHttp();
+    PersistentHttpStream status = new PersistentHttpStream(statusHttp.proxy(),
+        URI.create("https://example.test/status"), null);
+    Response serverError = response(500, new byte[] {1});
+    Response success = response(200, new byte[] {2});
+    statusHttp.responses.add(serverError); statusHttp.responses.add(success);
+    check(status.read() == 2 && statusHttp.requests.size() == 2, "server error retry");
+
+    RecordingHttp checkHttp = new RecordingHttp();
+    PersistentHttpStream checker = new PersistentHttpStream(checkHttp.proxy(),
+        URI.create("https://example.test/check"), null);
+    Response acceptedError = response(503, null);
+    checkHttp.responses.add(acceptedError);
+    check(checker.checkStatusCode() == 503 && checker.getCurrentResponse() == acceptedError
+        && checker.getContentLength() == 0, "status check bypass");
+
+    RecordingHttp badHttp = new RecordingHttp();
+    PersistentHttpStream bad = new PersistentHttpStream(badHttp.proxy(),
+        URI.create("https://example.test/bad"), null);
+    badHttp.responses.add(response(404, new byte[] {1}));
+    Throwable failure = catchThrowable(bad::read);
+    check(failure instanceof RuntimeException && failure.getMessage().equals("Not success status code: 404"),
+        "status failure");
+
+    RecordingHttp icyHttp = new RecordingHttp();
+    PersistentHttpStream icy = new PersistentHttpStream(icyHttp.proxy(),
+        URI.create("https://example.test/icy"), null);
+    Response icyResponse = response(200, new byte[] {9});
+    icyResponse.addHeader("icy-description", "Description");
+    icyResponse.addHeader("icy-name", "Station");
+    icyHttp.responses.add(icyResponse);
+    check(icy.getTrackInfoProviders().isEmpty(), "provider before connect");
+    icy.read();
+    List<AudioTrackInfoProvider> providers = icy.getTrackInfoProviders();
+    check(providers.size() == 1 && providers.get(0).getTitle().equals("Description")
+        && providers.get(0).getAuthor().equals("Station"), "icy provider");
+    icy.close();
+    check(icy.getTrackInfoProviders().isEmpty(), "provider after close");
+  }
+
+  private static void lifecycleAndFailures() throws Exception {
+    RecordingHttp http = new RecordingHttp();
+    PersistentHttpStream stream = new PersistentHttpStream(http.proxy(),
+        URI.create("https://example.test/lifecycle"), 1L);
+    Response response = response(200, new byte[] {7});
+    http.responses.add(response);
+    check(stream.createContentInputStream(response).read() == 7, "content stream");
+    stream.read();
+    response.closeFailure = new IOException("ignored");
+    stream.close();
+    check(stream.getCurrentResponse() == null && currentContent(stream) == null,
+        "close clears and swallows failure");
+    IOException io = new IOException("read");
+    RecordingHttp failing = new RecordingHttp();
+    failing.responses.add(responseWithStream(200, new FailingInputStream(io)));
+    PersistentHttpStream failed = new PersistentHttpStream(failing.proxy(),
+        URI.create("https://example.test/fail"), null);
+    check(catchThrowable(failed::read) == io, "non-retriable read failure");
+
+    RecordingHttp missing = new RecordingHttp();
+    missing.responses.add(response(200, null));
+    PersistentHttpStream noEntity = new PersistentHttpStream(missing.proxy(),
+        URI.create("https://example.test/empty"), null);
+    check(noEntity.read() == -1 && noEntity.getContentLength() == 0, "missing entity");
+  }
+
+  private static void reflection() throws Exception {
+    Class<PersistentHttpStream> type = PersistentHttpStream.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == SeekableInputStream.class
+        && Arrays.equals(type.getInterfaces(), new Class<?>[] {AutoCloseable.class}), "class shape");
+    check(type.getDeclaredFields().length == 8 && type.getDeclaredConstructors().length == 1,
+        "field/constructor count");
+    check(fieldInfo(type, "httpInterface", HttpInterface.class, Modifier.PROTECTED | Modifier.FINAL)
+        && fieldInfo(type, "contentUrl", URI.class, Modifier.PROTECTED | Modifier.FINAL)
+        && fieldInfo(type, "currentContent", InputStream.class, Modifier.PROTECTED)
+        && fieldInfo(type, "position", long.class, Modifier.PROTECTED), "exported fields");
+    check(fieldInfo(type, "MAX_SKIP_DISTANCE", long.class, Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL),
+        "constant field");
+    check(type.getDeclaredConstructor(HttpInterface.class, URI.class, Long.class).getExceptionTypes().length == 0,
+        "constructor metadata");
+    check(method(type, "checkStatusCode", Modifier.PUBLIC, int.class, IOException.class)
+        && method(type, "getCurrentResponse", Modifier.PUBLIC, HttpResponse.class)
+        && method(type, "getConnectUrl", Modifier.PROTECTED, URI.class)
+        && method(type, "useHeadersForRange", Modifier.PROTECTED, boolean.class)
+        && method(type, "getConnectRequest", Modifier.PROTECTED, HttpGet.class)
+        && method(type, "connect", Modifier.PROTECTED, void.class, IOException.class)
+        && method(type, "createContentInputStream", Modifier.PUBLIC, InputStream.class, IOException.class)
+        && method(type, "read", Modifier.PUBLIC, int.class, IOException.class)
+        && method(type, "internalRead", Modifier.PROTECTED, int.class, IOException.class)
+        && method(type, "skip", Modifier.PUBLIC, long.class, IOException.class)
+        && method(type, "available", Modifier.PUBLIC, int.class, IOException.class)
+        && method(type, "reset", Modifier.PUBLIC | Modifier.SYNCHRONIZED, void.class, IOException.class)
+        && method(type, "markSupported", Modifier.PUBLIC, boolean.class)
+        && method(type, "close", Modifier.PUBLIC, void.class, IOException.class)
+        && method(type, "releaseConnection", Modifier.PUBLIC, void.class)
+        && method(type, "getPosition", Modifier.PUBLIC, long.class)
+        && method(type, "seekHard", Modifier.PROTECTED, void.class, IOException.class)
+        && method(type, "canSeekHard", Modifier.PUBLIC, boolean.class)
+        && method(type, "getTrackInfoProviders", Modifier.PUBLIC, List.class), "method metadata");
+  }
+
+  private static boolean method(Class<?> type, String name, int modifiers, Class<?> result,
+      Class<?>... exceptions) throws Exception {
+    for (Method candidate : type.getDeclaredMethods()) {
+      if (candidate.getName().equals(name) && candidate.getModifiers() == modifiers
+          && candidate.getReturnType() == result
+          && Arrays.equals(candidate.getExceptionTypes(), exceptions)) return true;
+    }
+    return false;
+  }
+  private static boolean fieldInfo(Class<?> type, String name, Class<?> result, int modifiers) throws Exception {
+    Field field = type.getDeclaredField(name);
+    return field.getType() == result && field.getModifiers() == modifiers;
+  }
+  private static InputStream currentContent(PersistentHttpStream stream) throws Exception {
+    Field field = PersistentHttpStream.class.getDeclaredField("currentContent"); field.setAccessible(true); return (InputStream) field.get(stream);
+  }
+  private static Throwable catchThrowable(ThrowingAction action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
+  @FunctionalInterface private interface ThrowingAction { void run() throws Throwable; }
+
+  private static Response response(int status, byte[] bytes) { return responseWithStream(status, bytes == null ? null : new ByteArrayInputStream(bytes)); }
+  private static Response responseWithStream(int status, InputStream stream) {
+    Response response = new Response(status);
+    if (stream != null) { BasicHttpEntity entity = new BasicHttpEntity(); entity.setContent(stream); response.setEntity(entity); }
+    return response;
+  }
+  private static final class Response extends BasicHttpResponse implements CloseableHttpResponse {
+    IOException closeFailure;
+    Response(int status) { super(new ProtocolVersion("HTTP", 1, 1), status, "status"); }
+    public void close() throws IOException { if (closeFailure != null) throw closeFailure; }
+  }
+  private static final class RecordingHttp {
+    final List<Response> responses = new ArrayList<>();
+    final List<HttpUriRequest> requests = new ArrayList<>();
+    HttpInterface proxy() {
+      return new HttpInterface(new RecordingClient(this), HttpClientContext.create(), false,
+          new NoopFilter());
+    }
+  }
+  private static final class RecordingClient extends CloseableHttpClient {
+    final RecordingHttp owner;
+    RecordingClient(RecordingHttp owner) { this.owner = owner; }
+    public HttpParams getParams() { return null; }
+    public ClientConnectionManager getConnectionManager() { return null; }
+    protected CloseableHttpResponse doExecute(HttpHost host, HttpRequest request, HttpContext context)
+        throws IOException {
+      HttpUriRequest uri = (HttpUriRequest) request;
+      owner.requests.add(uri);
+      return owner.responses.remove(0);
+    }
+    public void close() {}
+  }
+  private static final class NoopFilter implements HttpContextFilter {
+    public void onContextOpen(HttpClientContext context) {}
+    public void onContextClose(HttpClientContext context) {}
+    public void onRequest(HttpClientContext context, HttpUriRequest request, boolean repeated) {}
+    public boolean onRequestResponse(HttpClientContext context, HttpUriRequest request, HttpResponse response) { return false; }
+    public boolean onRequestException(HttpClientContext context, HttpUriRequest request, Throwable error) { return false; }
+  }
+  private static final class FailingInputStream extends InputStream {
+    final IOException failure; FailingInputStream(IOException failure) { this.failure = failure; }
+    public int read() throws IOException { throw failure; }
+  }
+  private static final class ExposedPersistentHttpStream extends PersistentHttpStream {
+    ExposedPersistentHttpStream(HttpInterface http, URI url, Long length) { super(http, url, length); }
+    URI connectUrl() { return getConnectUrl(); }
+    boolean headersForRange() { return useHeadersForRange(); }
+    void seekHardPublic(long position) throws IOException { seekHard(position); }
+  }
+}
+"#;
+
+const RESETTABLE_BOUNDED_INPUT_STREAM_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.io.ResettableBoundedInputStream;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateResettableBoundedInputStream {
+  public static void main(String[] args) throws Exception {
+    limitsAndReads();
+    skipAvailableAndReset();
+    failuresAndBoundaries();
+    reflection();
+    System.out.println("contracts=constructor-state,unbounded-default,reset-limit,single-read,bounded-bulk,bulk-position,eof-limit,skip-limit,available-limit,close-noop,mark-unsupported,read-failure-identity,bulk-failure-identity,skip-failure-identity,available-failure-identity,negative-limit,null-input,private-state,reflection");
+  }
+
+  private static void limitsAndReads() throws Exception {
+    TrackingInputStream source = new TrackingInputStream(new byte[] {1, 2, 3, 4, 5});
+    ResettableBoundedInputStream input = new ResettableBoundedInputStream(source);
+    check(longField(input, "limit") == Long.MAX_VALUE && longField(input, "position") == 0,
+        "constructor state");
+    check(input.read() == 1 && longField(input, "position") == 1, "default read");
+    input.resetLimit(2);
+    check(longField(input, "position") == 0 && longField(input, "limit") == 2,
+        "reset limit");
+    check(input.read() == 2 && input.read() == 3 && input.read() == -1
+        && longField(input, "position") == 2, "single bounded reads");
+
+    input.resetLimit(3);
+    byte[] buffer = new byte[] {-1, -1, -1, -1, -1};
+    check(input.read(buffer, 1, 4) == 2 && Arrays.equals(buffer, new byte[] {-1, 4, 5, -1, -1})
+        && longField(input, "position") == 2, "bounded bulk read");
+    input.resetLimit(0);
+    check(input.read(buffer, 0, 0) == -1, "bulk eof at limit");
+  }
+
+  private static void skipAvailableAndReset() throws Exception {
+    TrackingInputStream source = new TrackingInputStream(new byte[] {10, 11, 12, 13, 14});
+    ResettableBoundedInputStream input = new ResettableBoundedInputStream(source);
+    input.resetLimit(3);
+    check(input.available() == 3, "available limit");
+    check(input.skip(2) == 2 && longField(input, "position") == 2 && input.available() == 1,
+        "bounded skip");
+    check(input.skip(10) == 1 && longField(input, "position") == 3, "skip clamps");
+    check(input.skip(1) == 0 && source.skipCalls == 3, "skip at eof delegates zero");
+    input.resetLimit(1);
+    check(input.read() == 13 && input.available() == 0, "reset reuses underlying position");
+    input.close();
+    check(!source.closed && !input.markSupported(), "close no-op and mark");
+  }
+
+  private static void failuresAndBoundaries() throws Exception {
+    IOException readFailure = new IOException("read");
+    ResettableBoundedInputStream read = new ResettableBoundedInputStream(new FailingInputStream(readFailure));
+    check(catchThrowable(read::read) == readFailure, "read failure identity");
+    IOException bulkFailure = new IOException("bulk");
+    ResettableBoundedInputStream bulk = new ResettableBoundedInputStream(new FailingInputStream(bulkFailure));
+    check(catchThrowable(() -> bulk.read(new byte[2], 0, 2)) == bulkFailure, "bulk failure identity");
+    IOException skipFailure = new IOException("skip");
+    ResettableBoundedInputStream skip = new ResettableBoundedInputStream(new FailingInputStream(skipFailure));
+    check(catchThrowable(() -> skip.skip(1)) == skipFailure, "skip failure identity");
+    IOException availableFailure = new IOException("available");
+    ResettableBoundedInputStream available = new ResettableBoundedInputStream(new FailingInputStream(null, availableFailure));
+    check(catchThrowable(available::available) == availableFailure, "available failure identity");
+    ResettableBoundedInputStream negative = new ResettableBoundedInputStream(new ByteArrayInputStream(new byte[] {1}));
+    negative.resetLimit(-1);
+    check(negative.read() == -1 && negative.skip(1) == 0 && negative.available() == -1,
+        "negative limit");
+    ResettableBoundedInputStream nullInput = new ResettableBoundedInputStream(null);
+    check(catchThrowable(nullInput::read) instanceof NullPointerException, "null input");
+  }
+
+  private static void reflection() throws Exception {
+    Class<ResettableBoundedInputStream> type = ResettableBoundedInputStream.class;
+    check(Modifier.isPublic(type.getModifiers()) && !Modifier.isFinal(type.getModifiers())
+        && type.getSuperclass() == InputStream.class && type.getInterfaces().length == 0,
+        "class shape");
+    check(type.getDeclaredFields().length == 3 && type.getDeclaredMethods().length == 7
+        && type.getDeclaredConstructors().length == 1, "member counts");
+    check(fieldInfo(type, "delegate", InputStream.class, Modifier.PRIVATE | Modifier.FINAL)
+        && fieldInfo(type, "limit", long.class, Modifier.PRIVATE)
+        && fieldInfo(type, "position", long.class, Modifier.PRIVATE), "field metadata");
+    check(type.getDeclaredConstructor(InputStream.class).getExceptionTypes().length == 0,
+        "constructor metadata");
+    check(method(type, "resetLimit", void.class, new Class<?>[] {long.class}, new Class<?>[] {})
+        && method(type, "read", int.class, new Class<?>[] {}, new Class<?>[] {IOException.class})
+        && method(type, "read", int.class, new Class<?>[] {byte[].class, int.class, int.class}, new Class<?>[] {IOException.class})
+        && method(type, "skip", long.class, new Class<?>[] {long.class}, new Class<?>[] {IOException.class})
+        && method(type, "available", int.class, new Class<?>[] {}, new Class<?>[] {IOException.class})
+        && method(type, "close", void.class, new Class<?>[] {}, new Class<?>[] {IOException.class})
+        && method(type, "markSupported", boolean.class, new Class<?>[] {}, new Class<?>[] {}), "method metadata");
+  }
+
+  private static boolean method(Class<?> type, String name, Class<?> result, Class<?>[] parameters,
+      Class<?>[] exceptions)
+      throws Exception {
+    for (Method method : type.getDeclaredMethods()) {
+      if (!method.getName().equals(name) || method.getReturnType() != result) continue;
+      if (Arrays.equals(method.getParameterTypes(), parameters)
+          && Arrays.equals(method.getExceptionTypes(), exceptions)) return true;
+    }
+    return false;
+  }
+  private static boolean fieldInfo(Class<?> type, String name, Class<?> result, int modifiers) throws Exception {
+    Field field = type.getDeclaredField(name); return field.getType() == result && field.getModifiers() == modifiers;
+  }
+  private static long longField(Object target, String name) throws Exception {
+    Field field = target.getClass().getDeclaredField(name); field.setAccessible(true); return field.getLong(target);
+  }
+  private static Throwable catchThrowable(ThrowingAction action) { try { action.run(); return null; } catch (Throwable error) { return error; } }
+  private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
+  @FunctionalInterface private interface ThrowingAction { void run() throws Throwable; }
+  private static final class TrackingInputStream extends ByteArrayInputStream {
+    boolean closed; int skipCalls;
+    TrackingInputStream(byte[] data) { super(data); }
+    public long skip(long distance) { skipCalls++; return super.skip(distance); }
+    public void close() { closed = true; }
+  }
+  private static final class FailingInputStream extends InputStream {
+    final IOException readFailure; final IOException availableFailure;
+    FailingInputStream(IOException readFailure) { this(readFailure, null); }
+    FailingInputStream(IOException readFailure, IOException availableFailure) { this.readFailure = readFailure; this.availableFailure = availableFailure; }
+    public int read() throws IOException { if (readFailure != null) throw readFailure; return -1; }
+    public int read(byte[] b, int o, int l) throws IOException { if (readFailure != null) throw readFailure; return -1; }
+    public long skip(long n) throws IOException { if (readFailure != null) throw readFailure; return 0; }
+    public int available() throws IOException { if (availableFailure != null) throw availableFailure; return 0; }
+  }
+}
+"#;
+
+const SAVED_HEAD_SEEKABLE_INPUT_STREAM_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.io.SavedHeadSeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateSavedHeadSeekableInputStream {
+  private static final String DIRECT_READ_MESSAGE = "Reads beyond saved head are disabled.";
+
+  public static void main(String[] args) throws Exception {
+    constructionAndHeadLoading();
+    replaySeekingAndDirectReads();
+    disabledDirectReads();
+    forwardingAndFailures();
+    boundaries();
+    reflection();
+    System.out.println("contracts=constructor-state,delegate-identity,content-length,max-skip,saved-buffer,load-rewind,head-capture,head-position,head-available,single-replay,bulk-replay,head-transition,direct-single,direct-bulk,direct-skip,direct-available,seek-within-head,seek-boundary,hard-seek-forwarding,negative-seek,disabled-single,disabled-bulk,disabled-skip,disabled-available,disabled-hard-seek,provider-identity,seek-capability,close-forwarding,load-failure-identity,read-failure-identity,bulk-failure-identity,skip-failure-identity,available-failure-identity,seek-failure-identity,close-failure-identity,empty-head,negative-size,null-delegate,private-state,generics,checked-throws,subclassable,reflection");
+  }
+
+  private static void constructionAndHeadLoading() throws Exception {
+    List<AudioTrackInfoProvider> providers = Collections.singletonList(null);
+    MemoryStream source = new MemoryStream(new byte[] {10, 11, 12, 13, 14}, 99L, 0L, providers);
+    source.position = 4;
+    ExposedSavedHead input = new ExposedSavedHead(source, 3);
+    check(input.getContentLength() == 99L && input.getMaxSkipDistance() == 0L,
+        "superclass construction copies stream bounds");
+    check(field(input, "delegate") == source && ((byte[]) field(input, "savedHead")).length == 3
+        && !booleanField(input, "usingHead") && booleanField(input, "allowDirectReads")
+        && longField(input, "headPosition") == 0L && longField(input, "savedUntilPosition") == 0L,
+        "constructor retains exact delegate and initial state");
+
+    input.loadHead();
+    check(source.hardSeekCalls == 1 && source.lastHardSeek == 0L && source.position == 3L
+        && source.bulkReadCalls == 1, "load rewinds and captures through the delegate bulk read");
+    check(Arrays.equals((byte[]) field(input, "savedHead"), new byte[] {10, 11, 12})
+        && booleanField(input, "usingHead") && longField(input, "savedUntilPosition") == 3L
+        && input.getPosition() == 0L && input.available() == 3,
+        "loaded head starts replay at zero with exact availability");
+    check(input.canSeekHard() && input.getTrackInfoProviders() == providers,
+        "capability and provider list preserve delegate identity");
+  }
+
+  private static void replaySeekingAndDirectReads() throws Exception {
+    MemoryStream source = new MemoryStream(new byte[] {20, 21, 22, 23, 24, 25}, 6L, 0L,
+        Collections.emptyList());
+    ExposedSavedHead input = new ExposedSavedHead(source, 3);
+    input.loadHead();
+    check(input.read() == 20 && input.getPosition() == 1L && source.position == 3L,
+        "single replay advances only the saved-head position");
+    byte[] replay = new byte[] {-1, -1, -1, -1};
+    check(input.read(replay, 1, 2) == 2 && Arrays.equals(replay, new byte[] {-1, 21, 22, -1})
+        && input.getPosition() == 3L && source.position == 3L && !booleanField(input, "usingHead"),
+        "bulk replay crosses the exact head boundary and rejoins the delegate");
+    check(input.read() == 23 && input.getPosition() == 4L, "direct single read forwards");
+    byte[] direct = new byte[3];
+    check(input.read(direct, 0, 2) == 2 && Arrays.equals(direct, new byte[] {24, 25, 0})
+        && input.available() == 0, "direct bulk and availability forward");
+
+    source = new MemoryStream(new byte[] {30, 31, 32, 33, 34}, 5L, 0L,
+        Collections.emptyList());
+    input = new ExposedSavedHead(source, 3);
+    input.loadHead();
+    input.hard(1L);
+    check(input.getPosition() == 1L && source.position == 3L && input.read() == 31,
+        "hard seek within the head performs no delegate I/O");
+    input.hard(3L);
+    check(!booleanField(input, "usingHead") && source.hardSeekCalls == 1
+        && source.lastHardSeek == 3L && input.skip(1L) == 1L && input.read() == 34,
+        "head-boundary hard seek and direct skip forward exactly");
+    input.seek(0L);
+    check(input.getPosition() == 0L && source.position == 5L && input.read() == 30,
+        "public backward seek re-enters the saved head without delegate movement");
+  }
+
+  private static void disabledDirectReads() throws Exception {
+    MemoryStream source = new MemoryStream(new byte[] {40, 41, 42, 43}, 4L, 0L,
+        Collections.emptyList());
+    ExposedSavedHead input = new ExposedSavedHead(source, 2);
+    input.loadHead();
+    input.setAllowDirectReads(false);
+    check(input.available() == 2 && input.read() == 40 && input.read() == 41,
+        "saved bytes remain readable while direct reads are disabled");
+    check(directReadFailure(catchThrowable(input::read))
+        && directReadFailure(catchThrowable(() -> input.read(new byte[1], 0, 1)))
+        && directReadFailure(catchThrowable(() -> input.skip(1L)))
+        && directReadFailure(catchThrowable(input::available)),
+        "all direct read paths fail with the exact boundary diagnostic");
+
+    input.setAllowDirectReads(true);
+    input.hard(0L);
+    input.setAllowDirectReads(false);
+    Throwable hardFailure = catchThrowable(() -> input.hard(2L));
+    check(directReadFailure(hardFailure) && input.getPosition() == 0L
+        && booleanField(input, "usingHead") && source.position == 2L,
+        "disabled boundary seek preserves head state and delegate position");
+    input.loadHead();
+    check(booleanField(input, "usingHead") && input.getPosition() == 0L
+        && longField(input, "savedUntilPosition") == 2L,
+        "reloading an active saved head remains replayable while direct reads are disabled");
+  }
+
+  private static void forwardingAndFailures() throws Exception {
+    MemoryStream source = new MemoryStream(new byte[] {50, 51, 52}, 3L, 0L,
+        Collections.emptyList());
+    ExposedSavedHead input = new ExposedSavedHead(source, 1);
+    input.loadHead();
+    input.read();
+    IOException readFailure = new IOException("single");
+    source.readFailure = readFailure;
+    check(catchThrowable(input::read) == readFailure, "single-read failure identity");
+    IOException bulkFailure = new IOException("bulk");
+    source.readFailure = bulkFailure;
+    check(catchThrowable(() -> input.read(new byte[1], 0, 1)) == bulkFailure,
+        "bulk-read failure identity");
+    source.readFailure = null;
+    IOException skipFailure = new IOException("skip");
+    source.skipFailure = skipFailure;
+    check(catchThrowable(() -> input.skip(1L)) == skipFailure, "skip failure identity");
+    IOException availableFailure = new IOException("available");
+    source.availableFailure = availableFailure;
+    check(catchThrowable(input::available) == availableFailure, "available failure identity");
+    source.skipFailure = null;
+    source.availableFailure = null;
+    IOException seekFailure = new IOException("seek");
+    source.seekFailure = seekFailure;
+    check(catchThrowable(() -> input.hard(2L)) == seekFailure
+        && !booleanField(input, "usingHead"), "hard-seek failure identity and state order");
+    IOException closeFailure = new IOException("close");
+    source.closeFailure = closeFailure;
+    check(catchThrowable(input::close) == closeFailure && source.closeCalls == 1,
+        "close failure identity");
+
+    MemoryStream loadSource = new MemoryStream(new byte[] {1}, 1L, 0L, Collections.emptyList());
+    IOException loadFailure = new IOException("load");
+    loadSource.readFailure = loadFailure;
+    check(catchThrowable(() -> new ExposedSavedHead(loadSource, 1).loadHead()) == loadFailure,
+        "head-load failure identity");
+  }
+
+  private static void boundaries() throws Exception {
+    MemoryStream emptySource = new MemoryStream(new byte[0], 0L, 0L, Collections.emptyList());
+    ExposedSavedHead empty = new ExposedSavedHead(emptySource, 0);
+    empty.loadHead();
+    check(longField(empty, "savedUntilPosition") == 0L && !booleanField(empty, "usingHead")
+        && empty.getPosition() == 0L && empty.read() == -1, "empty saved head remains direct");
+    check(catchThrowable(() -> new ExposedSavedHead(emptySource, -1))
+        instanceof NegativeArraySizeException, "negative saved size");
+    check(catchThrowable(() -> new ExposedSavedHead(null, 1)) instanceof NullPointerException,
+        "null delegate fails during superclass argument evaluation");
+
+    MemoryStream source = new MemoryStream(new byte[] {60, 61}, 2L, 0L, Collections.emptyList());
+    ExposedSavedHead input = new ExposedSavedHead(source, 2);
+    input.loadHead();
+    input.hard(-1L);
+    check(input.getPosition() == -1L && catchThrowable(input::read)
+        instanceof ArrayIndexOutOfBoundsException, "negative head seek preserves raw array boundary");
+    input.close();
+    check(source.closed && source.closeCalls == 1 && !input.markSupported(),
+        "close forwards once and mark remains unsupported");
+  }
+
+  private static void reflection() throws Exception {
+    Class<SavedHeadSeekableInputStream> type = SavedHeadSeekableInputStream.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == SeekableInputStream.class
+        && type.getInterfaces().length == 0 && type.getDeclaredAnnotations().length == 0
+        && type.getDeclaredFields().length == 6 && type.getDeclaredMethods().length == 12
+        && type.getDeclaredConstructors().length == 1, "public subclass and member counts");
+    check(fieldInfo(type, "delegate", SeekableInputStream.class, Modifier.PRIVATE | Modifier.FINAL)
+        && fieldInfo(type, "savedHead", byte[].class, Modifier.PRIVATE | Modifier.FINAL)
+        && fieldInfo(type, "usingHead", boolean.class, Modifier.PRIVATE)
+        && fieldInfo(type, "allowDirectReads", boolean.class, Modifier.PRIVATE)
+        && fieldInfo(type, "headPosition", long.class, Modifier.PRIVATE)
+        && fieldInfo(type, "savedUntilPosition", long.class, Modifier.PRIVATE),
+        "private field metadata");
+    Constructor<?> constructor = type.getDeclaredConstructor(SeekableInputStream.class, int.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    check(method(type, "setAllowDirectReads", Modifier.PUBLIC, void.class,
+            new Class<?>[] {boolean.class}, new Class<?>[0])
+        && method(type, "loadHead", Modifier.PUBLIC, void.class, new Class<?>[0],
+            new Class<?>[] {IOException.class})
+        && method(type, "getPosition", Modifier.PUBLIC, long.class, new Class<?>[0], new Class<?>[0])
+        && method(type, "seekHard", Modifier.PROTECTED, void.class, new Class<?>[] {long.class},
+            new Class<?>[] {IOException.class})
+        && method(type, "canSeekHard", Modifier.PUBLIC, boolean.class, new Class<?>[0], new Class<?>[0])
+        && method(type, "getTrackInfoProviders", Modifier.PUBLIC, List.class, new Class<?>[0], new Class<?>[0])
+        && method(type, "read", Modifier.PUBLIC, int.class, new Class<?>[0], new Class<?>[] {IOException.class})
+        && method(type, "read", Modifier.PUBLIC, int.class,
+            new Class<?>[] {byte[].class, int.class, int.class}, new Class<?>[] {IOException.class})
+        && method(type, "skip", Modifier.PUBLIC, long.class, new Class<?>[] {long.class},
+            new Class<?>[] {IOException.class})
+        && method(type, "available", Modifier.PUBLIC, int.class, new Class<?>[0],
+            new Class<?>[] {IOException.class})
+        && method(type, "close", Modifier.PUBLIC, void.class, new Class<?>[0],
+            new Class<?>[] {IOException.class})
+        && method(type, "markSupported", Modifier.PUBLIC, boolean.class, new Class<?>[0], new Class<?>[0]),
+        "method metadata and checked throws");
+    Method providers = type.getDeclaredMethod("getTrackInfoProviders");
+    check(providers.getGenericReturnType() instanceof ParameterizedType
+        && providers.getGenericReturnType().getTypeName().equals(
+            "java.util.List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider>"),
+        "provider generic signature");
+  }
+
+  private static boolean directReadFailure(Throwable failure) {
+    return failure instanceof IndexOutOfBoundsException
+        && DIRECT_READ_MESSAGE.equals(failure.getMessage());
+  }
+  private static boolean method(Class<?> type, String name, int modifiers, Class<?> result,
+      Class<?>[] parameters, Class<?>[] exceptions) throws Exception {
+    Method method = type.getDeclaredMethod(name, parameters);
+    return method.getModifiers() == modifiers && method.getReturnType() == result
+        && Arrays.equals(method.getExceptionTypes(), exceptions) && !method.isSynthetic()
+        && !method.isBridge() && !method.isVarArgs();
+  }
+  private static boolean fieldInfo(Class<?> type, String name, Class<?> result, int modifiers)
+      throws Exception {
+    Field field = type.getDeclaredField(name);
+    return field.getType() == result && field.getModifiers() == modifiers && !field.isSynthetic()
+        && field.getDeclaredAnnotations().length == 0;
+  }
+  private static Object field(Object target, String name) throws Exception {
+    Field field = SavedHeadSeekableInputStream.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
+  }
+  private static boolean booleanField(Object target, String name) throws Exception {
+    return (Boolean) field(target, name);
+  }
+  private static long longField(Object target, String name) throws Exception {
+    return (Long) field(target, name);
+  }
+  private static Throwable catchThrowable(ThrowingAction action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+  @FunctionalInterface private interface ThrowingAction { void run() throws Throwable; }
+
+  private static final class ExposedSavedHead extends SavedHeadSeekableInputStream {
+    ExposedSavedHead(SeekableInputStream delegate, int savedSize) { super(delegate, savedSize); }
+    void hard(long position) throws IOException { seekHard(position); }
+  }
+
+  private static final class MemoryStream extends SeekableInputStream {
+    final byte[] data;
+    final List<AudioTrackInfoProvider> providers;
+    long position;
+    long lastHardSeek;
+    int hardSeekCalls;
+    int bulkReadCalls;
+    int closeCalls;
+    boolean closed;
+    boolean hardSeekable = true;
+    IOException readFailure;
+    IOException skipFailure;
+    IOException availableFailure;
+    IOException seekFailure;
+    IOException closeFailure;
+
+    MemoryStream(byte[] data, long contentLength, long maxSkipDistance,
+        List<AudioTrackInfoProvider> providers) {
+      super(contentLength, maxSkipDistance);
+      this.data = data;
+      this.providers = providers;
+    }
+    @Override public int read() throws IOException {
+      if (readFailure != null) throw readFailure;
+      return position >= data.length ? -1 : data[(int) position++] & 0xff;
+    }
+    @Override public int read(byte[] target, int offset, int length) throws IOException {
+      bulkReadCalls++;
+      if (readFailure != null) throw readFailure;
+      if (length == 0) return 0;
+      if (position >= data.length) return -1;
+      int count = (int) Math.min(length, data.length - position);
+      System.arraycopy(data, (int) position, target, offset, count);
+      position += count;
+      return count;
+    }
+    @Override public long skip(long distance) throws IOException {
+      if (skipFailure != null) throw skipFailure;
+      long count = Math.min(Math.max(distance, 0L), data.length - position);
+      position += count;
+      return count;
+    }
+    @Override public int available() throws IOException {
+      if (availableFailure != null) throw availableFailure;
+      return (int) (data.length - position);
+    }
+    @Override public long getPosition() { return position; }
+    @Override protected void seekHard(long target) throws IOException {
+      hardSeekCalls++;
+      lastHardSeek = target;
+      if (seekFailure != null) throw seekFailure;
+      position = target;
+    }
+    @Override public boolean canSeekHard() { return hardSeekable; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() { return providers; }
+    @Override public void close() throws IOException {
+      closeCalls++;
+      if (closeFailure != null) throw closeFailure;
+      closed = true;
+    }
+  }
+}
+"#;
+
+const SEEKABLE_INPUT_STREAM_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.io.SeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public final class GateSeekableInputStream {
+  public static void main(String[] args) throws Exception {
+    constructionAndAccessors();
+    skipFullyBehavior();
+    seekPolicies();
+    failuresAndBoundaries();
+    reflection();
+    System.out.println("contracts=constructor-state,content-length,max-skip,position,skip-fully,skip-partial,skip-fallback,skip-negative,eof-identity,eof-message,seek-forward-soft,seek-forward-hard,seek-backward-hard,seek-nonhard-backward,seek-nonhard-forward,seek-same,seek-failure-identity,skip-failure-identity,read-failure-identity,provider-identity,abstract-shape,private-state,method-metadata,generics,checked-throws,reflection");
+  }
+
+  private static void constructionAndAccessors() throws Exception {
+    List<AudioTrackInfoProvider> providers = Collections.singletonList(null);
+    RecordingStream stream = new RecordingStream(new byte[] {1, 2}, 123L, 7L, providers);
+    check(stream.getContentLength() == 123L && stream.getMaxSkipDistance() == 7L
+        && stream.getPosition() == 0L && stream.getTrackInfoProviders() == providers,
+        "constructor bounds, position, and provider identity");
+    check(longField(stream, "contentLength") == 123L
+        && longField(stream, "maxSkipDistance") == 7L,
+        "constructor stores exact protected and private state");
+  }
+
+  private static void skipFullyBehavior() throws Exception {
+    RecordingStream partial = new RecordingStream(new byte[] {10, 11, 12, 13, 14}, 5L, 99L,
+        Collections.emptyList());
+    partial.maxSkip = 2;
+    partial.skipFully(5L);
+    check(partial.position == 5L && partial.skipCalls == 3 && partial.readCalls == 0,
+        "skipFully loops over partial skips without reading");
+
+    RecordingStream fallback = new RecordingStream(new byte[] {20, 21, 22}, 3L, 0L,
+        Collections.emptyList());
+    fallback.alwaysZeroSkip = true;
+    fallback.skipFully(2L);
+    check(fallback.position == 2L && fallback.skipCalls == 2 && fallback.readCalls == 2,
+        "zero skip falls back to single-byte reads");
+    fallback.skipFully(0L);
+    fallback.skipFully(-3L);
+    check(fallback.position == 2L && fallback.skipCalls == 2 && fallback.readCalls == 2,
+        "zero and negative distances are no-ops");
+
+    RecordingStream eof = new RecordingStream(new byte[] {30}, 1L, 0L, Collections.emptyList());
+    eof.alwaysZeroSkip = true;
+    eof.position = 1L;
+    Throwable failure = catchThrowable(() -> eof.skipFully(1L));
+    check(failure instanceof EOFException && "Cannot skip any further.".equals(failure.getMessage())
+        && eof.readCalls == 1, "skipFully reports exact EOF failure and message");
+  }
+
+  private static void seekPolicies() throws Exception {
+    RecordingStream soft = new RecordingStream(new byte[] {1, 2, 3, 4, 5}, 5L, 2L,
+        Collections.emptyList());
+    soft.seek(2L);
+    check(soft.position == 2L && soft.skipCalls == 1 && soft.hardSeekCalls == 0,
+        "short forward seek uses skipFully");
+    soft.seek(2L);
+    check(soft.skipCalls == 1 && soft.hardSeekCalls == 0, "same-position seek is a no-op");
+    soft.seek(5L);
+    check(soft.position == 5L && soft.hardSeekCalls == 1 && soft.lastHardSeek == 5L,
+        "long forward seek uses hard seek");
+    soft.position = 4L;
+    soft.seek(1L);
+    check(soft.position == 1L && soft.hardSeekCalls == 2 && soft.lastHardSeek == 1L,
+        "backward seek uses hard seek when available");
+
+    RecordingStream nonhardBack = new RecordingStream(new byte[] {6, 7, 8, 9}, 4L, 0L,
+        Collections.emptyList());
+    nonhardBack.hardSeekable = false;
+    nonhardBack.position = 3L;
+    nonhardBack.seek(1L);
+    check(nonhardBack.position == 1L && nonhardBack.hardSeekCalls == 1
+        && nonhardBack.lastHardSeek == 0L && nonhardBack.skipCalls == 1,
+        "non-hard backward seek rewinds to zero then skips");
+    RecordingStream nonhardForward = new RecordingStream(new byte[] {10, 11, 12}, 3L, 0L,
+        Collections.emptyList());
+    nonhardForward.hardSeekable = false;
+    nonhardForward.seek(2L);
+    check(nonhardForward.position == 2L && nonhardForward.hardSeekCalls == 0
+        && nonhardForward.skipCalls == 1, "non-hard forward seek skips");
+  }
+
+  private static void failuresAndBoundaries() throws Exception {
+    IOException skipFailure = new IOException("skip");
+    RecordingStream skip = new RecordingStream(new byte[] {1}, 1L, 0L, Collections.emptyList());
+    skip.skipFailure = skipFailure;
+    check(catchThrowable(() -> skip.skipFully(1L)) == skipFailure,
+        "skipFully preserves skip IOException identity");
+
+    IOException hardFailure = new IOException("hard");
+    RecordingStream hard = new RecordingStream(new byte[] {1}, 1L, 0L, Collections.emptyList());
+    hard.seekFailure = hardFailure;
+    check(catchThrowable(() -> hard.seek(1L)) == hardFailure,
+        "seek preserves hard-seek IOException identity");
+
+    IOException readFailure = new IOException("read");
+    RecordingStream read = new RecordingStream(new byte[] {1}, 1L, 0L, Collections.emptyList());
+    read.alwaysZeroSkip = true;
+    read.readFailure = readFailure;
+    check(catchThrowable(() -> read.skipFully(1L)) == readFailure,
+        "skip fallback preserves read IOException identity");
+    check(catchThrowable(() -> new RecordingStream(null, 0L, 0L, Collections.emptyList()).read())
+        instanceof NullPointerException, "null data remains a subclass concern");
+  }
+
+  private static void reflection() throws Exception {
+    Class<SeekableInputStream> type = SeekableInputStream.class;
+    check(type.getModifiers() == (Modifier.PUBLIC | Modifier.ABSTRACT)
+        && type.getSuperclass() == InputStream.class && type.getInterfaces().length == 0
+        && type.getDeclaredAnnotations().length == 0 && type.getDeclaredFields().length == 2
+        && type.getDeclaredMethods().length == 8 && type.getDeclaredConstructors().length == 1,
+        "abstract class shape and member counts");
+    check(fieldInfo(type, "contentLength", long.class, Modifier.PROTECTED)
+        && fieldInfo(type, "maxSkipDistance", long.class, Modifier.PRIVATE | Modifier.FINAL),
+        "field metadata");
+    Constructor<?> constructor = type.getDeclaredConstructor(long.class, long.class);
+    check(constructor.getModifiers() == Modifier.PUBLIC && constructor.getExceptionTypes().length == 0,
+        "constructor metadata");
+    check(method(type, "getContentLength", Modifier.PUBLIC, long.class, new Class<?>[0], new Class<?>[0])
+        && method(type, "getMaxSkipDistance", Modifier.PUBLIC, long.class, new Class<?>[0], new Class<?>[0])
+        && method(type, "getPosition", Modifier.PUBLIC | Modifier.ABSTRACT, long.class,
+            new Class<?>[0], new Class<?>[0])
+        && method(type, "seekHard", Modifier.PROTECTED | Modifier.ABSTRACT, void.class,
+            new Class<?>[] {long.class}, new Class<?>[] {IOException.class})
+        && method(type, "canSeekHard", Modifier.PUBLIC | Modifier.ABSTRACT, boolean.class,
+            new Class<?>[0], new Class<?>[0])
+        && method(type, "skipFully", Modifier.PUBLIC, void.class, new Class<?>[] {long.class},
+            new Class<?>[] {IOException.class})
+        && method(type, "seek", Modifier.PUBLIC, void.class, new Class<?>[] {long.class},
+            new Class<?>[] {IOException.class})
+        && method(type, "getTrackInfoProviders", Modifier.PUBLIC | Modifier.ABSTRACT, List.class,
+            new Class<?>[0], new Class<?>[0]), "method metadata and checked throws");
+    Method providers = type.getDeclaredMethod("getTrackInfoProviders");
+    check(providers.getGenericReturnType() instanceof ParameterizedType
+        && providers.getGenericReturnType().getTypeName().equals(
+            "java.util.List<com.sedmelluq.discord.lavaplayer.track.info.AudioTrackInfoProvider>"),
+        "provider generic signature");
+  }
+
+  private static boolean method(Class<?> type, String name, int modifiers, Class<?> result,
+      Class<?>[] parameters, Class<?>[] exceptions) throws Exception {
+    Method method = type.getDeclaredMethod(name, parameters);
+    return method.getModifiers() == modifiers && method.getReturnType() == result
+        && Arrays.equals(method.getExceptionTypes(), exceptions) && !method.isSynthetic()
+        && !method.isBridge() && !method.isVarArgs();
+  }
+  private static boolean fieldInfo(Class<?> type, String name, Class<?> result, int modifiers)
+      throws Exception {
+    Field field = type.getDeclaredField(name);
+    return field.getType() == result && field.getModifiers() == modifiers && !field.isSynthetic()
+        && field.getDeclaredAnnotations().length == 0;
+  }
+  private static long longField(Object target, String name) throws Exception {
+    Field field = SeekableInputStream.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.getLong(target);
+  }
+  private static Throwable catchThrowable(ThrowingAction action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+  @FunctionalInterface private interface ThrowingAction { void run() throws Throwable; }
+
+  private static final class RecordingStream extends SeekableInputStream {
+    final byte[] data;
+    final List<AudioTrackInfoProvider> providers;
+    long position;
+    long lastHardSeek;
+    int hardSeekCalls;
+    int skipCalls;
+    int readCalls;
+    int maxSkip = Integer.MAX_VALUE;
+    boolean alwaysZeroSkip;
+    boolean hardSeekable = true;
+    IOException skipFailure;
+    IOException readFailure;
+    IOException seekFailure;
+
+    RecordingStream(byte[] data, long contentLength, long maxSkipDistance,
+        List<AudioTrackInfoProvider> providers) {
+      super(contentLength, maxSkipDistance);
+      this.data = data;
+      this.providers = providers;
+    }
+    @Override public int read() throws IOException {
+      readCalls++;
+      if (readFailure != null) throw readFailure;
+      return position >= data.length ? -1 : data[(int) position++] & 0xff;
+    }
+    @Override public long skip(long distance) throws IOException {
+      skipCalls++;
+      if (skipFailure != null) throw skipFailure;
+      if (alwaysZeroSkip) return 0L;
+      long count = Math.min(Math.max(distance, 0L), Math.min(maxSkip, data.length - position));
+      position += count;
+      return count;
+    }
+    @Override public long getPosition() { return position; }
+    @Override protected void seekHard(long target) throws IOException {
+      hardSeekCalls++;
+      lastHardSeek = target;
+      if (seekFailure != null) throw seekFailure;
+      position = target;
+    }
+    @Override public boolean canSeekHard() { return hardSeekable; }
+    @Override public List<AudioTrackInfoProvider> getTrackInfoProviders() { return providers; }
+  }
+}
+"#;
+
+const STREAM_TOOLS_CONSUMER: &str = r#"
+import com.sedmelluq.discord.lavaplayer.tools.io.StreamTools;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+public final class GateStreamTools {
+  public static void main(String[] args) throws Exception {
+    completeAndPartialReads();
+    boundaryBehavior();
+    failureIdentity();
+    reflection();
+    System.out.println("contracts=constructor,partial-reads,zero-read-retry,offset-preservation,exact-length,early-eof,zero-length,negative-length,argument-validation-order,overreported-count,io-identity,runtime-identity,error-identity,null-boundaries,range-failure,subclassable,checked-throws,reflection");
+  }
+
+  private static void completeAndPartialReads() throws Exception {
+    byte[] buffer = new byte[] {90, 91, 92, 93, 94, 95, 96, 97, 98};
+    ScriptedInput input = new ScriptedInput(new byte[] {1, 2, 3, 4, 5}, 2, 0, 1, 2);
+    int count = StreamTools.readUntilEnd(input, buffer, 2, 5);
+    check(count == 5 && input.calls == 4
+        && Arrays.equals(buffer, new byte[] {90, 91, 1, 2, 3, 4, 5, 97, 98}),
+        "partial reads, a zero read, offsets, and exact fill");
+
+    byte[] partialBuffer = new byte[] {8, 8, 8, 8, 8, 8};
+    ScriptedInput partial = new ScriptedInput(new byte[] {10, 11}, 1, 1, -1);
+    check(StreamTools.readUntilEnd(partial, partialBuffer, 1, 4) == 2
+        && partial.calls == 3
+        && Arrays.equals(partialBuffer, new byte[] {8, 10, 11, 8, 8, 8}),
+        "early EOF returns the accumulated count");
+  }
+
+  private static void boundaryBehavior() throws Exception {
+    check(StreamTools.readUntilEnd(null, null, Integer.MIN_VALUE, 0) == 0,
+        "zero length bypasses argument access");
+    check(StreamTools.readUntilEnd(null, null, Integer.MAX_VALUE, -7) == 0,
+        "negative length bypasses argument access");
+
+    InputStream overreporting = new InputStream() {
+      @Override public int read() { return -1; }
+      @Override public int read(byte[] target, int offset, int length) { return length + 1; }
+    };
+    check(StreamTools.readUntilEnd(overreporting, new byte[2], 0, 2) == 3,
+        "the stream's overreported count is accumulated verbatim");
+
+    check(catchThrowable(() -> StreamTools.readUntilEnd(null, new byte[1], 0, 1))
+        instanceof NullPointerException, "positive length dereferences a null stream");
+    check(catchThrowable(() -> StreamTools.readUntilEnd(
+        new ByteArrayInputStream(new byte[] {1}), null, 0, 1)) instanceof NullPointerException,
+        "positive length forwards a null buffer");
+    check(catchThrowable(() -> StreamTools.readUntilEnd(
+        new ByteArrayInputStream(new byte[] {1, 2}), new byte[4], 3, 2))
+        instanceof IndexOutOfBoundsException, "invalid target range failure is delegated");
+  }
+
+  private static void failureIdentity() throws Exception {
+    IOException ioFailure = new IOException("io");
+    ScriptedInput checked = new ScriptedInput(new byte[] {1, 2}, 1);
+    checked.failure = ioFailure;
+    checked.failureCall = 2;
+    byte[] checkedBuffer = new byte[3];
+    check(catchThrowable(() -> StreamTools.readUntilEnd(checked, checkedBuffer, 0, 3)) == ioFailure
+        && checkedBuffer[0] == 1 && checked.calls == 2,
+        "checked failure identity and partial mutation");
+
+    RuntimeException runtimeFailure = new RuntimeException("runtime");
+    ScriptedInput runtime = new ScriptedInput(new byte[] {1}, 1);
+    runtime.uncheckedFailure = runtimeFailure;
+    check(catchThrowable(() -> StreamTools.readUntilEnd(runtime, new byte[1], 0, 1))
+        == runtimeFailure, "runtime failure identity");
+
+    AssertionError errorFailure = new AssertionError("error");
+    ScriptedInput error = new ScriptedInput(new byte[] {1}, 1);
+    error.errorFailure = errorFailure;
+    check(catchThrowable(() -> StreamTools.readUntilEnd(error, new byte[1], 0, 1))
+        == errorFailure, "error identity");
+  }
+
+  private static void reflection() throws Exception {
+    Class<StreamTools> type = StreamTools.class;
+    check(type.getModifiers() == Modifier.PUBLIC && type.getSuperclass() == Object.class
+        && type.getInterfaces().length == 0 && type.getDeclaredAnnotations().length == 0
+        && type.getDeclaredFields().length == 0 && type.getDeclaredMethods().length == 1
+        && type.getDeclaredConstructors().length == 1, "class shape");
+    Constructor<StreamTools> constructor = type.getDeclaredConstructor();
+    check(constructor.getModifiers() == Modifier.PUBLIC
+        && constructor.getExceptionTypes().length == 0, "constructor metadata");
+    check(new StreamTools() != new StreamTools() && new Derived() instanceof StreamTools,
+        "construction and subclassability");
+    Method method = type.getDeclaredMethod("readUntilEnd", InputStream.class, byte[].class,
+        int.class, int.class);
+    check(method.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)
+        && method.getReturnType() == int.class
+        && Arrays.equals(method.getExceptionTypes(), new Class<?>[] {IOException.class})
+        && !method.isBridge() && !method.isSynthetic() && !method.isVarArgs(),
+        "method metadata and checked exception");
+  }
+
+  private static Throwable catchThrowable(ThrowingAction action) {
+    try { action.run(); return null; } catch (Throwable error) { return error; }
+  }
+  private static void check(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+  @FunctionalInterface private interface ThrowingAction { void run() throws Throwable; }
+  private static final class Derived extends StreamTools {}
+
+  private static final class ScriptedInput extends InputStream {
+    final byte[] data;
+    final int[] results;
+    int dataPosition;
+    int resultPosition;
+    int calls;
+    int failureCall = -1;
+    IOException failure;
+    RuntimeException uncheckedFailure;
+    Error errorFailure;
+
+    ScriptedInput(byte[] data, int... results) {
+      this.data = data;
+      this.results = results;
+    }
+    @Override public int read() { throw new AssertionError("single-byte read"); }
+    @Override public int read(byte[] target, int offset, int length) throws IOException {
+      calls++;
+      if (errorFailure != null) throw errorFailure;
+      if (uncheckedFailure != null) throw uncheckedFailure;
+      if (calls == failureCall) throw failure;
+      int result = results[resultPosition++];
+      if (result > 0) {
+        System.arraycopy(data, dataPosition, target, offset, result);
+        dataPosition += result;
+      }
+      return result;
+    }
+  }
 }
 "#;
 

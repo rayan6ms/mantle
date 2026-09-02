@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "status": "COMPLETE",
+  "phase": "phase15-hardening",
+  "compatibility_baseline": "dev.arbjerg:lavaplayer:2.2.6",
+  "completed_slice": "phase15-hardening-exit",
+  "campaigns": [
+    {"id": "property_tests", "status": "PASS", "scope": "workspace invariants and deterministic model tests"},
+    {"id": "fuzzing", "status": "PASS", "scope": "seven bounded local-media libFuzzer targets"},
+    {"id": "loom", "status": "PASS", "scope": "one bounded terminal-release state exploration"},
+    {"id": "miri", "status": "PASS", "scope": "Rust undefined-behavior audit"},
+    {"id": "asan_lsan_tsan", "status": "PASS", "scope": "native and Rust sanitizer builds"},
+    {"id": "realtime_sanitizer", "status": "PASS", "scope": "marked Opus passthrough and bounded SPSC callback with allocating negative control"},
+    {"id": "dependency_audit", "status": "PASS", "scope": "workspace and fuzz RustSec scans, deny policy, and locked vet coverage"},
+    {"id": "jni_leak_stress", "status": "PASS", "scope": "bounded explicit release, Cleaner, phantom, classloader, and ABI lifecycle"},
+    {"id": "native_soak", "status": "PASS", "scope": "74,112 deterministic five-format sessions over 86,400.008 seconds with zero mismatches and decreasing RSS/PSS edge medians"},
+    {"id": "replay_fault_soak", "status": "PASS_WITH_REDUCED_DURATION", "scope": "28,096 nine-scenario cycles over a 142,741.186-second uninterrupted observation; 72-hour endurance is explicitly not claimed"}
+  ],
+  "evidence": {
+    "checker": "scripts/check-phase15-hardening-exit.sh",
+    "result": "target/phase15/replay-fault-soak-interrupted-20260901T153521Z/result.json",
+    "active_blockers": []
+  },
+  "next_slice": null
+}

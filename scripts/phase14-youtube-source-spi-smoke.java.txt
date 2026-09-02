@@ -1,0 +1,65 @@
+import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager;
+import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.DelegatedAudioTrack;
+import dev.lavalink.youtube.YoutubeAudioSourceManager;
+import dev.lavalink.youtube.clients.Music;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+
+public final class YoutubeSourceSpiSmoke {
+  private static void require(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+
+  public static void main(String[] args) throws Exception {
+    if (args.length == 1) {
+      if (!args[0].startsWith("/")) throw new IllegalArgumentException("native path must be absolute");
+      Class.forName("dev.mantle.internal.NativeLoader")
+          .getMethod("load", String.class).invoke(null, args[0]);
+    } else if (args.length != 0) {
+      throw new IllegalArgumentException("expected zero or one native path");
+    }
+
+    DefaultAudioPlayerManager playerManager = new DefaultAudioPlayerManager();
+    YoutubeAudioSourceManager source = new YoutubeAudioSourceManager(true, false, false, new Music());
+    try {
+      require("youtube".equals(source.getSourceName()), "source name");
+      require(source.getClients().length == 1, "client registration");
+      require(source.getClient(Music.class) != null, "client lookup");
+      require(source.getHttpInterfaceManager() != null, "HTTP manager");
+      try (HttpInterface http = source.getInterface()) {
+        require(http.getContext() != null, "HTTP context");
+      }
+
+      require(source.loadItem(playerManager, new AudioReference("ytsearch:", "empty")) == AudioReference.NO_TRACK,
+          "empty search routing");
+
+      AudioTrackInfo info = new AudioTrackInfo("title", "author", 1234L, "video-id", false,
+          "https://youtube.test/watch?v=video-id");
+      AudioTrack track = source.buildAudioTrack(info);
+      require(track instanceof DelegatedAudioTrack, "delegated track inheritance");
+      require(track.getSourceManager() == source, "track source manager");
+      track.setUserData("phase14-user-data");
+      require("phase14-user-data".equals(track.getUserData(String.class)), "track user data");
+      require(((DelegatedAudioTrack) track).createLocalExecutor(playerManager) == null,
+          "delegated track executor factory contract");
+
+      ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+      source.encodeTrack(track, new DataOutputStream(bytes));
+      AudioTrack decoded = source.decodeTrack(info, new DataInputStream(new ByteArrayInputStream(bytes.toByteArray())));
+      require(decoded.getIdentifier().equals(track.getIdentifier()), "track decode");
+      require(decoded.getSourceManager() == source, "decoded source manager");
+      require(source.isTrackEncodable(track), "track encodable");
+      System.out.println("source_manager=PASS delegated_track=PASS http=PASS serialization=PASS executor=PASS container_spi=PASS");
+    } finally {
+      source.shutdown();
+      playerManager.shutdown();
+    }
+  }
+}

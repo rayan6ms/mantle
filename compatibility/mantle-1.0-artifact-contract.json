@@ -1,0 +1,193 @@
+{
+  "schema_version": 1,
+  "status": "COMPLETE",
+  "compatibility_baseline": "dev.arbjerg:lavaplayer:2.2.6",
+  "coordinate": {
+    "group_id": "io.github.rayan6ms",
+    "artifact_id": "mantle-lavaplayer",
+    "version": "1.0.0",
+    "packaging": "jar",
+    "automatic_module_name": "io.github.rayan6ms.mantle.lavaplayer"
+  },
+  "packaging": {
+    "strategy": "thin-compatibility-jar-plus-platform-native-artifacts",
+    "native_coordinate": "io.github.rayan6ms:mantle-native:1.0.0:<classifier>",
+    "native_classifiers": [
+      "linux-x86_64",
+      "linux-aarch64",
+      "macos-x86_64",
+      "macos-aarch64",
+      "windows-x86_64"
+    ],
+    "native_selection": "The application selects one platform classifier and passes its verified absolute library path to dev.mantle.internal.NativeLoader.load(path).",
+    "bundled_or_extracted_native_libraries": false
+  },
+  "native_access": {
+    "jdk_11_through_23": "No native-access launcher option is required.",
+    "classpath_jdk_24_plus": "--enable-native-access=ALL-UNNAMED",
+    "module_path_jdk_24_plus": "--enable-native-access=io.github.rayan6ms.mantle.lavaplayer",
+    "library_manifest_policy": "Do not emit Enable-Native-Access: it is honored only when the JAR is the executable java -jar target. Mantle is a library, so the application launcher owns the grant.",
+    "scan_expectation": "ALL-UNNAMED"
+  },
+  "resources": [
+    {
+      "path": "META-INF/MANIFEST.MF",
+      "disposition": "mantle-generated",
+      "required_attributes": {
+        "Manifest-Version": "1.0",
+        "Implementation-Title": "Mantle Lavaplayer Compatibility",
+        "Implementation-Version": "1.0.0",
+        "Implementation-Vendor": "Mantle",
+        "Automatic-Module-Name": "io.github.rayan6ms.mantle.lavaplayer",
+        "Created-By": "Mantle Rust compatibility emitter"
+      }
+    },
+    {
+      "path": "certificates/bundled.txt",
+      "disposition": "exact-reference-resource",
+      "sha256": "cb0db382516ea81d8274bdfde4f30d67c0a31285b37db413156e031fb7bd0353"
+    },
+    {
+      "path": "certificates/dst-root-ca-x3.jks",
+      "disposition": "exact-reference-resource",
+      "sha256": "9c0714b4f8848af4ca66bb56b2a5e1e04bef4e1021c5431302d872c9d8fe8d0f"
+    },
+    {
+      "path": "com/sedmelluq/discord/lavaplayer/tools/version.txt",
+      "disposition": "exact-reference-resource",
+      "sha256": "e3b853e667eb0a54c5f989533325a17cc9c0be73e57323df8c2fafc2f14c41b0",
+      "compatibility_value": "2.2.6"
+    }
+  ],
+  "reference_dependencies": [
+    {
+      "coordinate": "dev.arbjerg:lava-common:2.2.6",
+      "reference_scope": "compile",
+      "disposition": "retain-compatibility",
+      "published_scope": "compile",
+      "reason": "NativeResourceHolder is a public superclass."
+    },
+    {
+      "coordinate": "org.apache.httpcomponents:httpclient:4.5.14",
+      "reference_scope": "compile",
+      "disposition": "retain-compatibility",
+      "published_scope": "compile",
+      "reason": "Thirty public signature types belong to HttpComponents."
+    },
+    {
+      "coordinate": "com.fasterxml.jackson.core:jackson-core:2.15.2",
+      "reference_scope": "compile",
+      "disposition": "retain-compatibility",
+      "published_scope": "compile",
+      "reason": "TypeReference is exposed by the public compatibility surface."
+    },
+    {
+      "coordinate": "com.fasterxml.jackson.core:jackson-databind:2.15.2",
+      "reference_scope": "compile",
+      "disposition": "retain-runtime",
+      "published_scope": "compile",
+      "reason": "The retained JsonBrowser shell resolves Jackson databind classes."
+    },
+    {
+      "coordinate": "dev.arbjerg:lavaplayer-natives:2.2.6",
+      "reference_scope": "runtime",
+      "disposition": "replace-mantle-native",
+      "replacement": "io.github.rayan6ms:mantle-native:1.0.0:<classifier>",
+      "reason": "ADR-0024 forbids loading the obsolete Lavaplayer native binaries."
+    },
+    {
+      "coordinate": "org.mozilla:rhino-engine:1.7.14",
+      "reference_scope": "runtime",
+      "disposition": "retain-runtime",
+      "published_scope": "runtime",
+      "reason": "Retained compatibility shells can resolve the JSR-223 JavaScript engine."
+    },
+    {
+      "coordinate": "org.slf4j:slf4j-api:2.0.7",
+      "reference_scope": "runtime",
+      "disposition": "retain-compatibility",
+      "published_scope": "compile",
+      "reason": "Logger is a public signature type and generated shells use LoggerFactory."
+    },
+    {
+      "coordinate": "commons-io:commons-io:2.13.0",
+      "reference_scope": "runtime",
+      "disposition": "retain-runtime",
+      "published_scope": "runtime",
+      "reason": "Retained compatibility shells may resolve Commons IO helpers."
+    },
+    {
+      "coordinate": "org.jsoup:jsoup:1.16.1",
+      "reference_scope": "runtime",
+      "disposition": "retain-runtime",
+      "published_scope": "runtime",
+      "reason": "Retained source-manager shells contain Jsoup descriptors and helpers."
+    },
+    {
+      "coordinate": "net.iharder:base64:2.3.9",
+      "reference_scope": "runtime",
+      "disposition": "retain-runtime",
+      "published_scope": "runtime",
+      "reason": "Retained compatibility shells may resolve the legacy Base64 helper."
+    },
+    {
+      "coordinate": "org.json:json:20240303",
+      "reference_scope": "runtime",
+      "disposition": "retain-compatibility",
+      "published_scope": "compile",
+      "reason": "JSONObject is a public signature type."
+    },
+    {
+      "coordinate": "org.jetbrains:annotations:24.0.0",
+      "reference_scope": "runtime",
+      "disposition": "retain-compatibility",
+      "published_scope": "compile",
+      "reason": "Nullable is present on the public compatibility surface."
+    }
+  ],
+  "external_public_type_groups": [
+    {
+      "selector": "prefix",
+      "value": "org.apache.http",
+      "expected_count": 30,
+      "dependency": "org.apache.httpcomponents:httpclient:4.5.14"
+    },
+    {
+      "selector": "exact",
+      "value": "com.fasterxml.jackson.core.type.TypeReference",
+      "expected_count": 1,
+      "dependency": "com.fasterxml.jackson.core:jackson-core:2.15.2"
+    },
+    {
+      "selector": "exact",
+      "value": "com.sedmelluq.lava.common.natives.NativeResourceHolder",
+      "expected_count": 1,
+      "dependency": "dev.arbjerg:lava-common:2.2.6"
+    },
+    {
+      "selector": "exact",
+      "value": "org.jetbrains.annotations.Nullable",
+      "expected_count": 1,
+      "dependency": "org.jetbrains:annotations:24.0.0"
+    },
+    {
+      "selector": "exact",
+      "value": "org.json.JSONObject",
+      "expected_count": 1,
+      "dependency": "org.json:json:20240303"
+    },
+    {
+      "selector": "exact",
+      "value": "org.slf4j.Logger",
+      "expected_count": 1,
+      "dependency": "org.slf4j:slf4j-api:2.0.7"
+    }
+  ],
+  "evidence": [
+    "scripts/check-phase13-artifacts.sh",
+    "scripts/run-jvm-gate-a.sh",
+    "tools/jvm-gate/src/emitter.rs",
+    "compatibility/mantle-lavaplayer-1.0.0.pom",
+    "docs/architecture/ADR-0025-thin-jvm-artifact-packaging.md"
+  ]
+}

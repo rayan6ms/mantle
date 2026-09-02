@@ -1,0 +1,74 @@
+import com.sedmelluq.discord.lavaplayer.filter.equalizer.EqualizerFactory;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
+import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler;
+import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.track.AudioItem;
+import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.player.event.AudioEventAdapter;
+import com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame;
+
+import java.nio.ByteBuffer;
+import java.util.concurrent.Future;
+
+public final class SimpleVoiceChatLinkageSmoke {
+  private static void require(boolean condition, String message) {
+    if (!condition) throw new AssertionError(message);
+  }
+
+  public static void main(String[] args) throws Exception {
+    if (args.length == 1) {
+      if (!args[0].startsWith("/")) throw new IllegalArgumentException("native path must be absolute");
+      Class.forName("dev.mantle.internal.NativeLoader")
+          .getMethod("load", String.class).invoke(null, args[0]);
+    } else if (args.length != 0) {
+      throw new IllegalArgumentException("expected zero or one native path");
+    }
+    DefaultAudioPlayerManager manager = new DefaultAudioPlayerManager();
+    AudioPlayer player = manager.createPlayer();
+    try {
+      MutableAudioFrame frame = new MutableAudioFrame(ByteBuffer.allocate(32));
+      byte[] pcm = new byte[] {1, -2, 3, -4};
+      frame.store(pcm, 0, pcm.length);
+      require(frame.getDataLength() == pcm.length, "PCM frame length");
+      byte[] copied = new byte[pcm.length];
+      frame.getData(copied, 0);
+      for (int i = 0; i < pcm.length; i++) require(copied[i] == pcm[i], "PCM frame data");
+
+      EqualizerFactory equalizer = new EqualizerFactory();
+      equalizer.setGain(0, 0.5f);
+      require(Float.compare(equalizer.getGain(0), 0.5f) == 0, "equalizer gain");
+      player.setFilterFactory(equalizer);
+      player.setFrameBufferDuration(500);
+      require(player.getVolume() == 100, "default volume");
+      player.setVolume(37);
+      require(player.getVolume() == 37, "volume round trip");
+
+      AudioEventAdapter listener = new AudioEventAdapter() {};
+      player.addListener(listener);
+      player.removeListener(listener);
+
+      Future<Void> ordered = manager.loadItemOrdered(
+          new Object(), new AudioReference("phase14:missing", "missing"), new AudioLoadResultHandler() {
+            @Override public void trackLoaded(AudioTrack track) { }
+            @Override public void playlistLoaded(AudioPlaylist playlist) { }
+            @Override public void noMatches() { }
+            @Override public void loadFailed(FriendlyException exception) { }
+          });
+      require(ordered != null, "ordered loading future");
+      ordered.cancel(true);
+
+      require(!player.isPaused(), "initial pause state");
+      player.setPaused(true);
+      require(player.isPaused(), "pause state");
+      player.setPaused(false);
+      require(!player.isPaused(), "resume state");
+      System.out.println("frame=PASS equalizer=PASS listener=PASS ordered_loading=PASS player_state=PASS");
+    } finally {
+      player.destroy();
+      manager.shutdown();
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "status": "COMPLETE",
+  "slice": "phase15-realtime-sanitizer",
+  "compatibility_baseline": "dev.arbjerg:lavaplayer:2.2.6",
+  "toolchain": {
+    "rust": "1.97.1",
+    "clang": "22.1.8",
+    "compiler_rt": "22.1.8",
+    "container": "localhost/mantle-phase15-rtsan:fedora44-clang22",
+    "container_image_id": "7f06e2cb3103e8e13f41f0e949c09a04ecbfcb5f724b76c671b7fc60641e2bff"
+  },
+  "bounds": {
+    "callbacks": 1,
+    "iterations": 8192,
+    "queue_capacity": 8,
+    "packet_bytes": 3,
+    "timeout_seconds": 30,
+    "negative_controls": 1
+  },
+  "campaigns": {
+    "mantle_hot_path": {
+      "status": "PASS",
+      "entry": "clang::nonblocking C++ callback into Rust",
+      "scope": "Opus passthrough, fixed inline frame slots, and bounded SPSC push/pop",
+      "realtime_errors": 0,
+      "unique_errors": 0
+    },
+    "allocating_negative_control": {
+      "status": "DETECTED",
+      "unsafe_function": "malloc",
+      "finding": "unsafe-library-call",
+      "realtime_errors": 1,
+      "unique_errors": 1
+    }
+  },
+  "active_blockers": [],
+  "evidence": {
+    "checker": "scripts/check-phase15-realtime-sanitizer.sh",
+    "result": "target/phase15/realtime-sanitizer/result.json",
+    "logs": [
+      "target/phase15/realtime-sanitizer/positive.log",
+      "target/phase15/realtime-sanitizer/negative.log",
+      "target/phase15/realtime-sanitizer/container-build.log",
+      "target/phase15/realtime-sanitizer/rust-build.log"
+    ]
+  },
+  "next_slice": "phase15-native-soak"
+}

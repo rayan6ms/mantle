@@ -7,6 +7,40 @@ readonly REVISION="8d9809f480fb56c68ff6b76927aceb382d55045e"
 readonly REPOSITORY="https://android.googlesource.com/platform/external/libxaac"
 readonly SOURCE="${LIBXAAC_SOURCE:-$ROOT/.cache/libxaac-platform-source}"
 readonly PATCH="$ROOT/third_party/libxaac/patches/0001-bound-decoder-indices-and-lifetimes.patch"
+TOOLCHAIN_LINK_DIR=""
+BUILD=""
+BUILD_IS_TEMPORARY=false
+
+# T3 Code is distributed as an AppImage. Its inherited AppImage variables can make a system CMake
+# look for modules below the application mount instead of /usr/share/cmake. The checked media
+# toolchain also supplies the C++ driver required by upstream libxaac's mixed C/C++ project.
+if ! command -v c++ >/dev/null 2>&1 && [[ -x "$ROOT/.cache/media-toolchains/xaac-root/usr/bin/c++" ]]; then
+  export CC="$ROOT/.cache/media-toolchains/xaac-root/usr/bin/cc"
+  export CXX="$ROOT/.cache/media-toolchains/xaac-root/usr/bin/c++"
+  export PATH="$ROOT/.cache/media-toolchains/xaac-root/usr/bin:$PATH"
+  export LD_LIBRARY_PATH="$ROOT/.cache/media-toolchains/xaac-root/usr/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  if [[ ! -e "$ROOT/.cache/media-toolchains/xaac-root/usr/lib64/libstdc++.so" && -e /usr/lib64/libstdc++.so.6 ]]; then
+    mkdir -p "$ROOT/.cache"
+    TOOLCHAIN_LINK_DIR="$(mktemp -d "$ROOT/.cache/libxaac-toolchain-links.XXXXXX")"
+    ln -s /usr/lib64/libstdc++.so.6 "$TOOLCHAIN_LINK_DIR/libstdc++.so"
+    export LIBRARY_PATH="$TOOLCHAIN_LINK_DIR${LIBRARY_PATH:+:$LIBRARY_PATH}"
+  fi
+fi
+
+cleanup() {
+  if [[ -n "$TOOLCHAIN_LINK_DIR" ]]; then
+    [[ ! -L "$TOOLCHAIN_LINK_DIR/libstdc++.so" ]] || unlink "$TOOLCHAIN_LINK_DIR/libstdc++.so"
+    rmdir "$TOOLCHAIN_LINK_DIR"
+  fi
+  [[ ! -e "${VERIFY_INDEX:-}" ]] || unlink "$VERIFY_INDEX"
+  if [[ "$BUILD_IS_TEMPORARY" == true && -n "$BUILD" && -d "$BUILD" ]]; then
+    case "$BUILD" in
+      "$ROOT/.cache/libxaac-platform-build."*) find "$BUILD" -xdev -depth -delete ;;
+      *) printf 'refusing to clean unexpected libxaac build directory: %s\n' "$BUILD" >&2 ;;
+    esac
+  fi
+}
+trap cleanup EXIT
 
 if [[ ! -f "$SOURCE/CMakeLists.txt" ]]; then
   mkdir -p "$SOURCE"
@@ -41,7 +75,6 @@ fi
 
 VERIFY_INDEX="$(mktemp "$ROOT/.cache/libxaac-verify-index.XXXXXX")"
 readonly VERIFY_INDEX
-trap 'rm -f "$VERIFY_INDEX"' EXIT
 rm -f "$VERIFY_INDEX"
 GIT_INDEX_FILE="$VERIFY_INDEX" git -C "$SOURCE" read-tree HEAD
 GIT_INDEX_FILE="$VERIFY_INDEX" git -C "$SOURCE" apply --cached "$PATCH"
@@ -55,12 +88,18 @@ fi
 git -C "$SOURCE" diff --check
 
 mkdir -p "$ROOT/.cache"
-readonly BUILD="${LIBXAAC_BUILD_DIR:-$(mktemp -d "$ROOT/.cache/libxaac-platform-build.XXXXXX")}"
-cmake -S "$SOURCE" -B "$BUILD" \
+if [[ -n "${LIBXAAC_BUILD_DIR:-}" ]]; then
+  BUILD="$LIBXAAC_BUILD_DIR"
+else
+  BUILD="$(mktemp -d "$ROOT/.cache/libxaac-platform-build.XXXXXX")"
+  BUILD_IS_TEMPORARY=true
+fi
+readonly BUILD BUILD_IS_TEMPORARY
+env -u APPIMAGE -u APPDIR cmake -S "$SOURCE" -B "$BUILD" \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
   -DCMAKE_POSITION_INDEPENDENT_CODE=ON
-cmake --build "$BUILD" --config Release --target libxaacdec \
+env -u APPIMAGE -u APPDIR cmake --build "$BUILD" --config Release --target libxaacdec \
   --parallel "${LIBXAAC_JOBS:-2}"
 
 archive="$(find "$BUILD" -type f \( -name 'libxaacdec.a' -o -name 'libxaacdec.lib' \) -print -quit)"

@@ -1,0 +1,327 @@
+{
+  "schema_version": 1,
+  "status": "PINNED",
+  "observed_at": "2026-08-30",
+  "compatibility_baseline": "dev.arbjerg:lavaplayer:2.2.6",
+  "mantle_replacement": "io.github.rayan6ms:mantle-lavaplayer:1.0.0",
+  "source_policy": "Upstream Java and Kotlin remain in a git cache and are never committed to Mantle. Later gates create ephemeral migration overlays under target/.",
+  "required_behaviors": [
+    "normal_player_scheduler",
+    "jda_style_frame_provider",
+    "listeners",
+    "ordered_loading",
+    "user_data",
+    "markers",
+    "serialized_tracks",
+    "source_configuration",
+    "custom_source_or_subclass"
+  ],
+  "consumers": [
+    {
+      "id": "lavalink",
+      "role": "audio_server_and_plugin_api",
+      "repository": "https://github.com/lavalink-devs/Lavalink",
+      "revision": "3d24006d1eed2bd9b4f5916298cf87ab34408b6f",
+      "revision_date": "2026-08-25T20:45:48+02:00",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "bdc661a91a465e3266e9031cffc6698e9c0c22c8e33e771e26d682353c2d3a1b"
+      },
+      "build_system": "gradle-kotlin-dsl",
+      "dependency": {
+        "coordinate": "dev.arbjerg:lavaplayer:2.2.6",
+        "manifest": "settings.gradle.kts",
+        "manifest_sha256": "8540516b2a91c8d78c02c376fac8cbb1497757c309e0b8dcd82d3fdff4f99896",
+        "baseline_relation": "exact"
+      },
+      "planned_compile_command": "./gradlew :plugin-api:compileKotlin :LavalinkServer:compileKotlin --no-daemon",
+      "migration_constraints": [
+        "Replace the version-catalog coordinate with Mantle's published coordinate.",
+        "Remove the LavalinkServer task that discovers and repackages lavaplayer-natives by filename.",
+        "Select one mantle-native platform classifier and pass its verified absolute library path to Mantle's native loader.",
+        "Compile the plugin API as well as the server because it exposes Lavaplayer types transitively."
+      ],
+      "declared_lavaplayer_class_dispositions": {
+        "A_EXACT": 33,
+        "C_SEMANTIC": 7,
+        "D_LEGACY": 0
+      },
+      "evidence": [
+        {
+          "path": "LavalinkServer/src/main/java/lavalink/server/player/LavalinkPlayer.kt",
+          "sha256": "6ce63cd775c45f551cf9a679bc3fa34ed88af6327908f05409a2231de46dcf68",
+          "behaviors": [
+            "normal_player_scheduler",
+            "listeners",
+            "jda_style_frame_provider"
+          ],
+          "observation": "Creates the player, installs three listeners, schedules updates, and implements a MutableAudioFrame-backed Discord-compatible frame provider."
+        },
+        {
+          "path": "LavalinkServer/src/main/java/lavalink/server/player/PlayerRestHandler.kt",
+          "sha256": "3b50e84dfdc27d79cfb2f12519409db9c8a240cbc5e91c35e0d8be46e96c749a",
+          "behaviors": [
+            "markers",
+            "serialized_tracks"
+          ],
+          "observation": "Installs end markers and decodes client-supplied serialized tracks."
+        },
+        {
+          "path": "LavalinkServer/src/main/java/lavalink/server/util/util.kt",
+          "sha256": "21f55ae45cb5ed1056fbdcd58026569b9de2c9690e386739f86a43435f3ce4cf",
+          "behaviors": [
+            "serialized_tracks"
+          ],
+          "observation": "Uses AudioPlayerManager encodeTrack/decodeTrack through MessageInput and MessageOutput."
+        },
+        {
+          "path": "LavalinkServer/src/main/java/lavalink/server/config/AudioPlayerConfiguration.kt",
+          "sha256": "8c36e542dc64ea4da5989a1f24e19fd6c36ce5376181472c46feb6523a821ca6",
+          "behaviors": [
+            "source_configuration"
+          ],
+          "observation": "Configures built-in and plugin-provided source managers and HTTP policy."
+        }
+      ]
+    },
+    {
+      "id": "jmusicbot",
+      "role": "jda_music_bot",
+      "repository": "https://github.com/jagrosh/MusicBot",
+      "revision": "859e5c5862decf433f8face5eaca3372d7d27b22",
+      "revision_date": "2024-08-12T13:28:38-04:00",
+      "license": {
+        "spdx": "Apache-2.0",
+        "path": "LICENSE",
+        "sha256": "bf1214a8b903429779a354cdabffc4f9b286fb3f36ef38402113e99e0d55ccc8"
+      },
+      "build_system": "maven",
+      "dependency": {
+        "coordinate": "dev.arbjerg:lavaplayer:2.2.1",
+        "manifest": "pom.xml",
+        "manifest_sha256": "b744d9e140a49552e0c379c80e34a8a40b5043c935864c8157f8a4baea1ba1e2",
+        "baseline_relation": "earlier_2_2_release_compile_against_2_2_6_first"
+      },
+      "planned_compile_command": "mvn -DskipTests compile",
+      "migration_constraints": [
+        "First compile unchanged source against the frozen Lavaplayer 2.2.6 artifact to separate upstream-version drift from Mantle differences.",
+        "Replace only the Lavaplayer coordinate for the Mantle compile.",
+        "Treat Beam and Getyarn registration as D_LEGACY linkage checks; do not claim those retired services work."
+      ],
+      "declared_lavaplayer_class_dispositions": {
+        "A_EXACT": 17,
+        "C_SEMANTIC": 6,
+        "D_LEGACY": 2
+      },
+      "evidence": [
+        {
+          "path": "src/main/java/com/jagrosh/jmusicbot/audio/AudioHandler.java",
+          "sha256": "00fbc05c3593c6db807c55d337b4c109c59587f22111ec5c595b031fa26fe7a4",
+          "behaviors": [
+            "normal_player_scheduler",
+            "jda_style_frame_provider",
+            "listeners",
+            "user_data"
+          ],
+          "observation": "A real JDA AudioSendHandler and AudioEventAdapter drives the queue and pulls AudioFrame instances."
+        },
+        {
+          "path": "src/main/java/com/jagrosh/jmusicbot/audio/PlayerManager.java",
+          "sha256": "1d501ca7cecdc1d2b3afc717b7472e2f03d811ec13ab0776e7264faf3ca9e616",
+          "behaviors": [
+            "normal_player_scheduler",
+            "listeners",
+            "source_configuration"
+          ],
+          "observation": "Creates per-guild players, attaches handlers, and registers built-in, legacy, and transformed sources."
+        },
+        {
+          "path": "src/main/java/com/jagrosh/jmusicbot/audio/QueuedTrack.java",
+          "sha256": "d4ba3588519a47951dbe44e54706538c75e116d55f96c509efab4392cb48275e",
+          "behaviors": [
+            "user_data"
+          ],
+          "observation": "Stores and retrieves typed request metadata on AudioTrack."
+        },
+        {
+          "path": "src/main/java/com/jagrosh/jmusicbot/commands/music/PlayCmd.java",
+          "sha256": "37d0961e6333a160f2b10af8d69b8a41c41638ea7e2ccc9e57601ce9d52b9ba5",
+          "behaviors": [
+            "ordered_loading"
+          ],
+          "observation": "Uses loadItemOrdered with the guild as the ordering key."
+        },
+        {
+          "path": "src/main/java/com/jagrosh/jmusicbot/audio/TransformativeAudioSourceManager.java",
+          "sha256": "3bac5278a9ab1b6c010f90c0240e1da2cf933d8bcadb419802bce571158a4dfb",
+          "behaviors": [
+            "custom_source_or_subclass"
+          ],
+          "observation": "Provides a real custom source-manager subclass that rewrites identifiers before delegation."
+        }
+      ]
+    },
+    {
+      "id": "simplevoicechat_music",
+      "role": "minecraft_voice_chat_mod",
+      "repository": "https://github.com/ItzDerock/simplevoicechat-music",
+      "revision": "f21305f4deafc4c5869a060e8dcfbbf24d73c82b",
+      "revision_date": "2024-07-20T14:55:51-04:00",
+      "license": {
+        "spdx": "Apache-2.0",
+        "path": "LICENSE",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      },
+      "build_system": "gradle-groovy-dsl",
+      "dependency": {
+        "coordinate": "dev.arbjerg:lavaplayer:2.2.1",
+        "manifest": "build.gradle",
+        "manifest_sha256": "915ea09f4ca2caf5b65ced93936ecf96cc6f6a8117bf2504009c5d978aa749ef",
+        "baseline_relation": "earlier_2_2_release_compile_against_2_2_6_first"
+      },
+      "planned_compile_command": "./gradlew compileJava --no-daemon",
+      "migration_constraints": [
+        "First compile unchanged source against Lavaplayer 2.2.6, then replace only the coordinate for Mantle.",
+        "Exercise its PCM MutableAudioFrame path rather than treating it as another Discord Opus sender.",
+        "Keep Fabric and voice-chat dependencies pinned so their failures cannot be attributed to Mantle."
+      ],
+      "declared_lavaplayer_class_dispositions": {
+        "A_EXACT": 14,
+        "C_SEMANTIC": 1,
+        "D_LEGACY": 0
+      },
+      "evidence": [
+        {
+          "path": "src/main/java/dev/derock/svcmusic/audio/GroupManager.java",
+          "sha256": "9b2a781232813fc6e86ad2e27cb48dd828d788ded3b12650ef4379c5e06aca4f",
+          "behaviors": [
+            "normal_player_scheduler",
+            "listeners",
+            "jda_style_frame_provider"
+          ],
+          "observation": "Creates a player, attaches a scheduler, and provides PCM through a reusable MutableAudioFrame to a non-Discord voice transport."
+        },
+        {
+          "path": "src/main/java/dev/derock/svcmusic/audio/TrackScheduler.java",
+          "sha256": "839d6508cc215d427a25093efae7a02ffb357381d8d5cab11f59d43dac363357",
+          "behaviors": [
+            "normal_player_scheduler",
+            "listeners"
+          ],
+          "observation": "Advances a concurrent queue from AudioEventAdapter callbacks."
+        },
+        {
+          "path": "src/main/java/dev/derock/svcmusic/audio/MusicManager.java",
+          "sha256": "c0c0df75161ecab00a4794dc54626fa09babdb6253ee167623ee5d788e7fc2f0",
+          "behaviors": [
+            "source_configuration"
+          ],
+          "observation": "Registers and replaces source managers through the public manager API."
+        },
+        {
+          "path": "src/main/java/dev/derock/svcmusic/commands/PlayCommand.java",
+          "sha256": "7de3df00d984275c1e02ed0aac543b19c565c5be35789cd11f69438ccfb1792a",
+          "behaviors": [
+            "ordered_loading"
+          ],
+          "observation": "Uses loadItemOrdered for group-scoped playback."
+        }
+      ]
+    },
+    {
+      "id": "youtube_source",
+      "role": "third_party_source_extension",
+      "repository": "https://github.com/lavalink-devs/youtube-source",
+      "revision": "f45bbb7aebfcbc1c553769e04af6cd43afa8b7c3",
+      "revision_date": "2026-08-19T17:33:31+01:00",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "ffa7f85dfe3dd5da7eb6e5609ea4d7c9b8b4e43d62f0a02ebe86bc282a9498fc"
+      },
+      "build_system": "gradle-kotlin-dsl",
+      "dependency": {
+        "coordinate": "dev.arbjerg:lavaplayer:2.1.1",
+        "manifest": "settings.gradle.kts",
+        "manifest_sha256": "9f32f610ec581a4d4dfc26845be71bb6885d27eff3c8e63045588f6975333666",
+        "baseline_relation": "earlier_2_x_release_compile_against_2_2_6_first"
+      },
+      "planned_compile_command": "./gradlew :v2:compileJava --no-daemon",
+      "migration_constraints": [
+        "Compile the v2 extension unchanged against Lavaplayer 2.2.6 before testing Mantle.",
+        "Replace only the v2 compileOnly/test dependency; the v1 and Lavalink plugin targets remain outside this first migration.",
+        "Treat its HTTP, delegated-track, container, and source-manager inheritance as the primary SPI boundary test."
+      ],
+      "declared_lavaplayer_class_dispositions": {
+        "A_EXACT": 28,
+        "C_SEMANTIC": 1,
+        "D_LEGACY": 0
+      },
+      "evidence": [
+        {
+          "path": "common/src/main/java/dev/lavalink/youtube/YoutubeAudioSourceManager.java",
+          "sha256": "5be746b2aa9325b9acb8c6aef9d1fb4d46aeffbb6f5d67fb8fcef7c8409f6de8",
+          "behaviors": [
+            "source_configuration",
+            "custom_source_or_subclass",
+            "serialized_tracks"
+          ],
+          "observation": "Implements AudioSourceManager, owns HTTP configuration, and implements source-specific encode/decode."
+        },
+        {
+          "path": "common/src/main/java/dev/lavalink/youtube/track/YoutubeAudioTrack.java",
+          "sha256": "06069af5415293a6060c3575305078f7e46e4710bc482a90507bd5cf19785086",
+          "behaviors": [
+            "user_data",
+            "custom_source_or_subclass"
+          ],
+          "observation": "Subclasses DelegatedAudioTrack, preserves user data, and executes through LocalAudioTrackExecutor."
+        }
+      ]
+    }
+  ],
+  "coverage": [
+    {
+      "behavior": "normal_player_scheduler",
+      "consumers": ["lavalink", "jmusicbot", "simplevoicechat_music"]
+    },
+    {
+      "behavior": "jda_style_frame_provider",
+      "consumers": ["lavalink", "jmusicbot", "simplevoicechat_music"]
+    },
+    {
+      "behavior": "listeners",
+      "consumers": ["lavalink", "jmusicbot", "simplevoicechat_music"]
+    },
+    {
+      "behavior": "ordered_loading",
+      "consumers": ["jmusicbot", "simplevoicechat_music"]
+    },
+    {
+      "behavior": "user_data",
+      "consumers": ["jmusicbot", "youtube_source"]
+    },
+    {
+      "behavior": "markers",
+      "consumers": ["lavalink"]
+    },
+    {
+      "behavior": "serialized_tracks",
+      "consumers": ["lavalink", "youtube_source"]
+    },
+    {
+      "behavior": "source_configuration",
+      "consumers": ["lavalink", "jmusicbot", "simplevoicechat_music", "youtube_source"]
+    },
+    {
+      "behavior": "custom_source_or_subclass",
+      "consumers": ["jmusicbot", "youtube_source"]
+    }
+  ],
+  "phase_entry": {
+    "completed_slice": "phase14-real-consumer-inventory",
+    "next_slice": "phase14-lavalink-source-compatibility",
+    "kill_gate": "A material dependency on unsupported internals or subclass behavior must be supported, cause a boundary redesign, or reduce the compatibility claim explicitly."
+  }
+}
