@@ -57,6 +57,11 @@ jq --exit-status '
   .release_policy.validation_upload_performed == false and
   .release_policy.artifact_publication_performed == false and
   .release_policy.publish_requires_separate_explicit_action == true and
+  .hosted_evidence.status == "PASS" and
+  .hosted_evidence.source_digest == "d1e8d737fec2dca5975fc6ac88edd4a4b14fef46" and
+  .hosted_evidence.workflow_run == 33582611518 and
+  .hosted_evidence.jobs_passed == 1 and
+  .hosted_evidence.result_sha256 == "6e2ffbbb4180793e4cbe4ffae510bc9b4cdec3b246dce591ef8de2909409b774" and
   .next_slice == "publication-central-validation-deployment"
 ' "$CONTRACT" >/dev/null
 
@@ -91,6 +96,7 @@ jq --exit-status '
     .status == "PASS" and
     .checker == "scripts/check-publication-central-release-identity.sh" and
     .workflow == ".github/workflows/central-release-identity.yml" and
+    .hosted_evidence == "https://github.com/rayan6ms/mantle/actions/runs/33582611518" and
     .publishing_type == "USER_MANAGED" and
     .network_upload_performed == false) and
   .active_blockers == ["central-validation-deployment"] and

@@ -131,6 +131,7 @@
       "scope": "verified io.github.rayan6ms namespace, public release-key distribution, and authenticated protected Portal token",
       "checker": "scripts/check-publication-central-release-identity.sh",
       "workflow": ".github/workflows/central-release-identity.yml",
+      "hosted_evidence": "https://github.com/rayan6ms/mantle/actions/runs/33582611518",
       "publishing_type": "USER_MANAGED",
       "network_upload_performed": false
     },

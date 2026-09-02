@@ -34,5 +34,12 @@
     "artifact_publication_performed": false,
     "publish_requires_separate_explicit_action": true
   },
+  "hosted_evidence": {
+    "status": "PASS",
+    "source_digest": "d1e8d737fec2dca5975fc6ac88edd4a4b14fef46",
+    "workflow_run": 33582611518,
+    "jobs_passed": 1,
+    "result_sha256": "6e2ffbbb4180793e4cbe4ffae510bc9b4cdec3b246dce591ef8de2909409b774"
+  },
   "next_slice": "publication-central-validation-deployment"
 }
