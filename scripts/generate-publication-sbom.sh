@@ -134,12 +134,15 @@ while IFS=$'\t' read -r filename kind classifier rust_target; do
 done < <(jq -r '.subjects[] | [.file, .kind, (.classifier // ""), (.rust_target // "")] | @tsv' "$CONTRACT") | jq -s . >"$subjects_json"
 
 timestamp="$(date -u --date="@$SOURCE_EPOCH" '+%Y-%m-%dT%H:%M:%SZ')"
+serial_digest="$(jq -c 'map({file, sha256})' "$subjects_json" | sha256sum | awk '{print $1}')"
+serial_number="urn:uuid:${serial_digest:0:8}-${serial_digest:8:4}-5${serial_digest:13:3}-8${serial_digest:17:3}-${serial_digest:20:12}"
 mkdir -p "$(dirname "$OUTPUT")" "$(dirname "$RESULT")"
 jq -n \
   --slurpfile rust "$RUST_SBOM" \
   --slurpfile maven "$MAVEN_SBOM" \
   --slurpfile subjects "$subjects_json" \
-  --arg timestamp "$timestamp" '
+  --arg timestamp "$timestamp" \
+  --arg serial_number "$serial_number" '
   ($rust[0]) as $r |
   ($maven[0]) as $m |
   ($subjects[0]) as $subjects |
@@ -192,6 +195,7 @@ jq -n \
   {
     bomFormat: "CycloneDX",
     specVersion: "1.5",
+    serialNumber: $serial_number,
     version: 1,
     metadata: {
       timestamp: $timestamp,
@@ -230,6 +234,7 @@ sbom_sha256="$(sha256sum "$OUTPUT" | awk '{print $1}')"
 jq -n \
   --arg sbom "$(basename "$OUTPUT")" \
   --arg sbom_sha256 "$sbom_sha256" \
+  --arg serial_number "$serial_number" \
   --argjson source_date_epoch "$SOURCE_EPOCH" \
   --argjson component_count "$component_count" \
   --argjson dependency_count "$dependency_count" \
@@ -239,6 +244,7 @@ jq -n \
     slice: "publication-sbom-provenance",
     sbom: $sbom,
     sbom_sha256: $sbom_sha256,
+    serial_number: $serial_number,
     format: "CycloneDX JSON 1.5",
     source_date_epoch: $source_date_epoch,
     subject_count: ($subjects[0] | length),

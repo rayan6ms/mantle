@@ -89,4 +89,14 @@ if "$CHECKER" --subject-root "$subjects" --checksums "$checksums" --sbom "$missi
   exit 1
 fi
 
-printf 'Publication SBOM reproducibility, subject-tamper, path-leak, and dependency-edge regressions passed.\n'
+missing_serial="$test_root/missing-serial.cdx.json"
+jq 'del(.serialNumber)' "$sbom" >"$missing_serial"
+missing_serial_result="$test_root/missing-serial-result.json"
+jq --arg sbom "$(basename "$missing_serial")" --arg sha "$(sha256sum "$missing_serial" | awk '{print $1}')" \
+  '.sbom = $sbom | .sbom_sha256 = $sha' "$result" >"$missing_serial_result"
+if "$CHECKER" --subject-root "$subjects" --checksums "$checksums" --sbom "$missing_serial" --result "$missing_serial_result" >/dev/null 2>&1; then
+  printf 'Publication SBOM checker accepted a document without the GitHub-required serial number.\n' >&2
+  exit 1
+fi
+
+printf 'Publication SBOM reproducibility, subject-tamper, path-leak, dependency-edge, and serial regressions passed.\n'

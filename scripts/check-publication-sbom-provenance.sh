@@ -41,6 +41,7 @@ jq --exit-status '
   .schema_version == 1 and .status == "IMPLEMENTED_HOSTED_RUN_PENDING" and
   .slice == "publication-sbom-provenance" and .version == "1.0.0" and
   .sbom.format == "CycloneDX JSON" and .sbom.spec_version == "1.5" and
+  (.sbom.serial_number | startswith("deterministic RFC 4122-shaped UUID")) and
   .sbom.subject_count == 6 and
   .sbom.rust_generator == {
     name: "cargo-cyclonedx", version: "0.5.9",
@@ -85,6 +86,9 @@ mapfile -t checksum_names < <(awk '{sub(/^\*/, "", $2); print $2}' "$CHECKSUMS" 
   exit 1
 }
 
+serial_digest="$(jq -c '[.subjects[] | {file, sha256}]' "$RESULT" | sha256sum | awk '{print $1}')"
+expected_serial="urn:uuid:${serial_digest:0:8}-${serial_digest:8:4}-5${serial_digest:13:3}-8${serial_digest:17:3}-${serial_digest:20:12}"
+
 if grep -E 'path\+file://|file://|/home/|/Users/|[A-Za-z]:\\\\|github/workspace|mantle-reference|mantle-jvm-gate|mantle-media-bench|loom@' "$SBOM" >/dev/null; then
   printf 'Publication SBOM exposes a local path or development-only component.\n' >&2
   exit 1
@@ -93,7 +97,7 @@ fi
 jq --exit-status '
   ([.metadata.component["bom-ref"]] + [.components[]."bom-ref"]) as $refs |
   .bomFormat == "CycloneDX" and .specVersion == "1.5" and .version == 1 and
-  (.serialNumber | not) and
+  (.serialNumber | test("^urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-8[0-9a-f]{3}-[0-9a-f]{12}$")) and
   .metadata.component == {
     type: "application",
     "bom-ref": "urn:mantle:release:1.0.0",
@@ -140,16 +144,23 @@ done < <(awk '{sub(/^\*/, "", $2); print $2 "\t" $1}' "$CHECKSUMS")
 
 jq --exit-status \
   --arg sbom "$(basename "$SBOM")" \
-  --arg sha "$(sha256sum "$SBOM" | awk '{print $1}')" '
+  --arg sha "$(sha256sum "$SBOM" | awk '{print $1}')" \
+  --arg serial "$expected_serial" '
   .schema_version == 1 and .status == "PASS" and
   .slice == "publication-sbom-provenance" and
   .sbom == $sbom and .sbom_sha256 == $sha and
+  .serial_number == $serial and
   .format == "CycloneDX JSON 1.5" and
   .subject_count == 6 and (.subjects | length) == 6 and
   .component_count == 131 and .dependency_relationship_count == 132 and
   .generators == ["cargo-cyclonedx 0.5.9", "org.cyclonedx:cyclonedx-maven-plugin:2.9.3"] and
   .hosted_attestations == "PENDING"
 ' "$RESULT" >/dev/null
+
+[[ "$(jq -r '.serialNumber' "$SBOM")" == "$expected_serial" ]] || {
+  printf 'SBOM serial number is not derived from the six attestation subjects.\n' >&2
+  exit 1
+}
 
 [[ "$(grep -c -- 'uses: actions/attest@v4' "$WORKFLOW")" == 2 ]]
 grep -F 'id-token: write' "$WORKFLOW" >/dev/null
