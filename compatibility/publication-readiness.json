@@ -112,7 +112,7 @@
       "fully_audited_packages": 171,
       "remaining_exact_version_exemptions": 0,
       "checker": "scripts/check-publication-cargo-vet-exemption-closure.sh",
-      "hosted_evidence": "https://github.com/rayan6ms/mantle/actions/runs/33580304900"
+      "hosted_evidence": "https://github.com/rayan6ms/mantle/actions/runs/33664503665"
     },
     {
       "id": "native_classifier_matrix",
@@ -172,9 +172,9 @@
       "sbom_format": "CycloneDX JSON 1.5",
       "checker": "scripts/check-publication-sbom-provenance.sh",
       "hosted_workflow": ".github/workflows/native-classifier-matrix.yml",
-      "hosted_evidence": "https://github.com/rayan6ms/mantle/actions/runs/33577053812",
-      "provenance_attestation": "https://github.com/rayan6ms/mantle/attestations/44571212",
-      "sbom_attestation": "https://github.com/rayan6ms/mantle/attestations/44571213"
+      "hosted_evidence": "https://github.com/rayan6ms/mantle/actions/runs/33664503912",
+      "provenance_attestation": "https://github.com/rayan6ms/mantle/attestations/44785392",
+      "sbom_attestation": "https://github.com/rayan6ms/mantle/attestations/44785400"
     }
   ],
   "active_blockers": [],

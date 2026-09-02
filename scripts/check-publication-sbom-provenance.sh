@@ -61,21 +61,21 @@ jq --exit-status '
   .attestations.action == "actions/attest@v4" and
   .attestations.predicate_types == ["SLSA build provenance", "CycloneDX SBOM"] and
   .hosted_evidence.status == "PASS" and
-  .hosted_evidence.workflow_run == 33577053812 and .hosted_evidence.jobs_passed == 6 and
+  .hosted_evidence.workflow_run == 33664503912 and .hosted_evidence.jobs_passed == 6 and
   .hosted_evidence.subjects_verified == 6 and
-  .hosted_evidence.source_digest == "8371b73c51bc93cc66b887333ef095aa84a0f2f4" and
+  .hosted_evidence.source_digest == "3b9864cf1a4ad792535f467b6c02984148621977" and
   .hosted_evidence.signer_workflow == "github.com/rayan6ms/mantle/.github/workflows/native-classifier-matrix.yml" and
   .hosted_evidence.provenance_attestation == {
-    id: 44571212,
-    url: "https://github.com/rayan6ms/mantle/attestations/44571212",
+    id: 44785392,
+    url: "https://github.com/rayan6ms/mantle/attestations/44785392",
     predicate_type: "https://slsa.dev/provenance/v1",
-    sigstore_log_index: 2681978438
+    sigstore_log_index: 2688801431
   } and
   .hosted_evidence.sbom_attestation == {
-    id: 44571213,
-    url: "https://github.com/rayan6ms/mantle/attestations/44571213",
+    id: 44785400,
+    url: "https://github.com/rayan6ms/mantle/attestations/44785400",
     predicate_type: "https://cyclonedx.org/bom",
-    sigstore_log_index: 2681978494
+    sigstore_log_index: 2688801592
   } and
   .regressions.github_cyclonedx_serial_number.failing_run == 33576693730 and
   .regressions.github_cyclonedx_serial_number.test == "scripts/test-publication-sbom-provenance.sh"
@@ -87,7 +87,7 @@ jq --exit-status '
   (.gates[] | select(.id == "sbom_and_provenance") |
     .status == "PASS" and .subject_count == 6 and
     .sbom_format == "CycloneDX JSON 1.5" and
-    .hosted_evidence == "https://github.com/rayan6ms/mantle/actions/runs/33577053812") and
+    .hosted_evidence == "https://github.com/rayan6ms/mantle/actions/runs/33664503912") and
   (.completed_slices | index("publication-central-release-identity")) != null and
   (.completed_slices | index("publication-central-validation-deployment")) != null and
   (.completed_slices | index("publication-central-release")) != null and

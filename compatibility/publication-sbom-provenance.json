@@ -39,25 +39,25 @@
   },
   "hosted_evidence": {
     "status": "PASS",
-    "workflow_run": 33577053812,
-    "workflow_url": "https://github.com/rayan6ms/mantle/actions/runs/33577053812",
+    "workflow_run": 33664503912,
+    "workflow_url": "https://github.com/rayan6ms/mantle/actions/runs/33664503912",
     "jobs_passed": 6,
     "subjects_verified": 6,
-    "source_digest": "8371b73c51bc93cc66b887333ef095aa84a0f2f4",
+    "source_digest": "3b9864cf1a4ad792535f467b6c02984148621977",
     "signer_workflow": "github.com/rayan6ms/mantle/.github/workflows/native-classifier-matrix.yml",
     "provenance_attestation": {
-      "id": 44571212,
-      "url": "https://github.com/rayan6ms/mantle/attestations/44571212",
+      "id": 44785392,
+      "url": "https://github.com/rayan6ms/mantle/attestations/44785392",
       "predicate_type": "https://slsa.dev/provenance/v1",
-      "sigstore_log_index": 2681978438
+      "sigstore_log_index": 2688801431
     },
     "sbom_attestation": {
-      "id": 44571213,
-      "url": "https://github.com/rayan6ms/mantle/attestations/44571213",
+      "id": 44785400,
+      "url": "https://github.com/rayan6ms/mantle/attestations/44785400",
       "predicate_type": "https://cyclonedx.org/bom",
-      "sigstore_log_index": 2681978494
+      "sigstore_log_index": 2688801592
     },
-    "verification": "All six reconstructed/downloaded JARs matched the checksum manifest; gh attestation verify passed both retained bundles with the exact source digest and signer workflow; both signed subject lists matched the manifest; the signed CycloneDX predicate matched the retained SBOM."
+    "verification": "All six current JARs matched the checksum manifest; gh attestation verify passed both retained bundles with source digest 3b9864cf1a4ad792535f467b6c02984148621977 and the exact signer workflow; both signed subject lists matched the manifest; the signed CycloneDX predicate contains 132 components, including pkg:cargo/socket2@0.6.5, and 133 dependency relationships."
   },
   "regressions": {
     "github_cyclonedx_serial_number": {

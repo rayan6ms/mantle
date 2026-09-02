@@ -64,10 +64,10 @@ jq --exit-status '
   .policy.additional_registry_imports_added == false and
   .policy.network_upload_performed == false and
   .hosted_evidence.status == "PASS" and
-  .hosted_evidence.source_digest == "5dbd66ad8b08d8c72e280f71bcc132dd335c832c" and
-  .hosted_evidence.ci_run == 33580304900 and .hosted_evidence.ci_jobs_passed == 22 and
+  .hosted_evidence.source_digest == "3b9864cf1a4ad792535f467b6c02984148621977" and
+  .hosted_evidence.ci_run == 33664503665 and .hosted_evidence.ci_jobs_passed == 22 and
   .hosted_evidence.supply_chain_job == "PASS" and
-  .hosted_evidence.native_matrix_run == 33580304850 and .hosted_evidence.native_jobs_passed == 6 and
+  .hosted_evidence.native_matrix_run == 33664503912 and .hosted_evidence.native_jobs_passed == 6 and
   .next_slice == "publication-central-release-identity"
 ' "$CONTRACT" >/dev/null
 
@@ -83,7 +83,7 @@ jq --exit-status '
     .status == "PASS" and .imports == 6 and .local_exact_version_audits == 141 and
     .fully_audited_packages == 171 and .remaining_exact_version_exemptions == 0 and
     .checker == "scripts/check-publication-cargo-vet-exemption-closure.sh" and
-    .hosted_evidence == "https://github.com/rayan6ms/mantle/actions/runs/33580304900") and
+    .hosted_evidence == "https://github.com/rayan6ms/mantle/actions/runs/33664503665") and
   .active_blockers == [] and .next_slice == null
 ' "$READINESS" >/dev/null
 
