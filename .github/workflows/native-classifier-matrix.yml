@@ -125,23 +125,38 @@ jobs:
         run: |
           scripts/stage-publication-attestation-subjects.sh \
             --jvm-jar target/publication-sbom-provenance/mantle-lavaplayer-1.0.0.jar \
-            --native-artifact-root target/publication-native-matrix/artifacts
-          scripts/generate-publication-sbom.sh
-          scripts/check-publication-sbom-provenance.sh
+            --native-artifact-root target/publication-native-matrix/artifacts \
+            --output-root '${{ runner.temp }}/mantle-publication-sbom/subjects' \
+            --checksums '${{ runner.temp }}/mantle-publication-sbom/subjects.sha256'
+          scripts/generate-publication-sbom.sh \
+            --subject-root '${{ runner.temp }}/mantle-publication-sbom/subjects' \
+            --output '${{ runner.temp }}/mantle-publication-sbom/mantle-1.0.0.cdx.json' \
+            --result '${{ runner.temp }}/mantle-publication-sbom/result.json'
+          scripts/check-publication-sbom-provenance.sh \
+            --subject-root '${{ runner.temp }}/mantle-publication-sbom/subjects' \
+            --checksums '${{ runner.temp }}/mantle-publication-sbom/subjects.sha256' \
+            --sbom '${{ runner.temp }}/mantle-publication-sbom/mantle-1.0.0.cdx.json' \
+            --result '${{ runner.temp }}/mantle-publication-sbom/result.json'
           scripts/test-publication-sbom-provenance.sh
       - name: Attest build provenance
         id: provenance
         uses: actions/attest@v4
         with:
-          subject-checksums: target/publication-sbom-provenance/subjects.sha256
+          subject-checksums: ${{ runner.temp }}/mantle-publication-sbom/subjects.sha256
       - name: Attest release SBOM
         id: sbom
         uses: actions/attest@v4
         with:
-          subject-checksums: target/publication-sbom-provenance/subjects.sha256
-          sbom-path: target/publication-sbom-provenance/mantle-1.0.0.cdx.json
+          subject-checksums: ${{ runner.temp }}/mantle-publication-sbom/subjects.sha256
+          sbom-path: ${{ runner.temp }}/mantle-publication-sbom/mantle-1.0.0.cdx.json
       - name: Collect attestation bundles
         run: |
+          cp '${{ runner.temp }}/mantle-publication-sbom/mantle-1.0.0.cdx.json' \
+            target/publication-sbom-provenance/mantle-1.0.0.cdx.json
+          cp '${{ runner.temp }}/mantle-publication-sbom/result.json' \
+            target/publication-sbom-provenance/result.json
+          cp '${{ runner.temp }}/mantle-publication-sbom/subjects.sha256' \
+            target/publication-sbom-provenance/subjects.sha256
           cp '${{ steps.provenance.outputs.bundle-path }}' \
             target/publication-sbom-provenance/provenance.sigstore.json
           cp '${{ steps.sbom.outputs.bundle-path }}' \

@@ -185,7 +185,8 @@ jq --exit-status \
 grep -F 'id-token: write' "$WORKFLOW" >/dev/null
 grep -F 'attestations: write' "$WORKFLOW" >/dev/null
 grep -F 'artifact-metadata: write' "$WORKFLOW" >/dev/null
-[[ "$(grep -c -- 'subject-checksums: target/publication-sbom-provenance/subjects.sha256' "$WORKFLOW")" == 2 ]]
-grep -F 'sbom-path: target/publication-sbom-provenance/mantle-1.0.0.cdx.json' "$WORKFLOW" >/dev/null
+[[ "$(grep -c -- "subject-checksums: \${{ runner.temp }}/mantle-publication-sbom/subjects.sha256" "$WORKFLOW")" == 2 ]]
+grep -F "sbom-path: \${{ runner.temp }}/mantle-publication-sbom/mantle-1.0.0.cdx.json" "$WORKFLOW" >/dev/null
+grep -F -- "--output-root '\${{ runner.temp }}/mantle-publication-sbom/subjects'" "$WORKFLOW" >/dev/null
 
 printf 'Publication SBOM/provenance preflight passed: six hashed subjects, complete production graphs, and two hosted attestation modes are wired.\n'
