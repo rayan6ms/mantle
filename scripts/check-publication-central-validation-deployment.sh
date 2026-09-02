@@ -52,10 +52,17 @@ jq --exit-status '
     automatic_publication_allowed: false,
     publish_requires_separate_explicit_action: true
   } and
-  (.hosted_consumer_evidence.status == "PENDING" or
-    (.hosted_consumer_evidence.status == "PASS" and
-     (.hosted_consumer_evidence.workflow_run | type) == "number" and
-     (.hosted_consumer_evidence.result_sha256 | test("^[0-9a-f]{64}$")))) and
+  .hosted_consumer_evidence == {
+    status: "PASS",
+    workflow_source_digest: "fcff19ab6b4b7ab029edc061847cc70425c9bc68",
+    workflow_run: 33584029684,
+    jobs_passed: 1,
+    result_sha256: "f27f6d8d10063be450eae41f0122e80299f6dc1624348c98e373d3d58bff52a5",
+    release_source_full_ci_run: 33582729774,
+    release_source_full_ci_jobs_passed: 22,
+    release_source_native_matrix_run: 33582760659,
+    release_source_native_matrix_jobs_passed: 6
+  } and
   .next_slice == "publication-explicit-release-decision"
 ' "$CONTRACT" >/dev/null
 
