@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "slice": "publication-cargo-vet-exemption-closure",
+  "version": "1.0.0",
+  "toolchain": {
+    "cargo_vet": "0.10.2"
+  },
+  "baseline": {
+    "imports": 6,
+    "fully_audited_packages": 30,
+    "exact_version_exemptions": 140,
+    "safe_to_deploy_exemptions": 120,
+    "safe_to_run_exemptions": 20
+  },
+  "closure": {
+    "local_exact_version_audits": 140,
+    "safe_to_deploy_audits": 120,
+    "safe_to_run_audits": 20,
+    "remaining_exemptions": 0,
+    "fully_audited_packages": 170,
+    "canonical_tuple_sha256": "5d66025d8589798b5b54c8fa32447e14a8b8557d4b231acf4f18ba4ad5b4a53b"
+  },
+  "review_scope": {
+    "package_files": 7603,
+    "package_lines": 4009282,
+    "rust_files": 5312,
+    "packages_with_unsafe_lexical_surface": 84,
+    "packages_with_build_scripts": 35,
+    "packages_with_native_source": 5,
+    "procedural_macro_packages": 8,
+    "method": [
+      "exact Cargo.lock name, version, registry checksum, and dependency edge review",
+      "complete packaged-source capability review including unsafe, build, native, generated-code, and procedural-macro surfaces",
+      "component-specific ADR and call-site review for JNI, HTTP/TLS, crypto, media, Opus, platform bindings, and test tooling",
+      "retained Cargo Audit, Cargo Deny, ASan, TSan, Miri, RealtimeSanitizer, lifecycle, soak, and replay/fault evidence"
+    ]
+  },
+  "policy": {
+    "publisher_trust_used_for_closure": false,
+    "additional_registry_imports_added": false,
+    "network_upload_performed": false,
+    "dependency_update_rule": "Every changed package version requires an imported audit or reviewed local full/delta audit before publication."
+  },
+  "evidence": {
+    "decision": "docs/architecture/ADR-0028-local-cargo-vet-audit-closure.md",
+    "audits": "supply-chain/audits.toml",
+    "configuration": "supply-chain/config.toml",
+    "imports_lock": "supply-chain/imports.lock",
+    "phase15_dependency_audit": "compatibility/phase15-dependency-audit.json",
+    "checker": "scripts/check-publication-cargo-vet-exemption-closure.sh",
+    "regression": "scripts/test-publication-cargo-vet-exemption-closure.sh"
+  },
+  "next_slice": "publication-central-release-identity"
+}

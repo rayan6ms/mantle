@@ -1,4 +1,842 @@
 
 # cargo-vet audits file
 
-[audits]
+[[audits.aes]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.9.2"
+notes = "Reviewed for Mantle 1.0 as part of the cryptographic/TLS dependency surface, including unsafe and platform-specific implementations, build behavior, and the bounded rustls/HTTP call paths. Exact source is Cargo.lock-bound. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.ahash]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.8.12"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.aho-corasick]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-run"
+version = "1.1.5"
+notes = "Reviewed as a non-shipping test/tool dependency for Mantle 1.0, including execution, code-generation, unsafe, build, native, and generated-binding surfaces where present; bounded use is covered by the Phase 15 test and concurrency evidence. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.audioadapter]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "5.0.0"
+notes = "Reviewed for Mantle 1.0 as part of the media/decode/frame pipeline, including parser limits, unsafe and generated surfaces, and active features. Retained differential, fuzz, sanitizer, allocation, and soak evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.audioadapter-buffers]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "5.1.0"
+notes = "Reviewed for Mantle 1.0 as part of the media/decode/frame pipeline, including parser limits, unsafe and generated surfaces, and active features. Retained differential, fuzz, sanitizer, allocation, and soak evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.audioadapter-sample]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "5.1.0"
+notes = "Reviewed for Mantle 1.0 as part of the media/decode/frame pipeline, including parser limits, unsafe and generated surfaces, and active features. Retained differential, fuzz, sanitizer, allocation, and soak evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.autocfg]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.5.1"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.base64]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.23.1"
+notes = "Reviewed for Mantle 1.0 as part of the bounded network/protocol/archive data path, including unsafe, parsing, decompression, build, and code-generation surfaces where present. Resource limits, SSRF controls, fuzzing, and fault tests cover Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.bitflags]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "2.13.1"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.block-buffer]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.12.1"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.block-padding]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.4.2"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.bytemuck]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.25.2"
+notes = "Reviewed for Mantle 1.0 as part of the media/decode/frame pipeline, including parser limits, unsafe and generated surfaces, and active features. Retained differential, fuzz, sanitizer, allocation, and soak evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.bytes]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.12.1"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.cbc]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.2.1"
+notes = "Reviewed for Mantle 1.0 as part of the cryptographic/TLS dependency surface, including unsafe and platform-specific implementations, build behavior, and the bounded rustls/HTTP call paths. Exact source is Cargo.lock-bound. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.cc]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.4.2"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.cipher]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.5.2"
+notes = "Reviewed for Mantle 1.0 as part of the cryptographic/TLS dependency surface, including unsafe and platform-specific implementations, build behavior, and the bounded rustls/HTTP call paths. Exact source is Cargo.lock-bound. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.cmake]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.1.58"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.combine]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "4.6.7"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.cpubits]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.1.1"
+notes = "Reviewed for Mantle 1.0 as part of the cryptographic/TLS dependency surface, including unsafe and platform-specific implementations, build behavior, and the bounded rustls/HTTP call paths. Exact source is Cargo.lock-bound. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.cpufeatures]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.3.0"
+notes = "Reviewed for Mantle 1.0 as part of the cryptographic/TLS dependency surface, including unsafe and platform-specific implementations, build behavior, and the bounded rustls/HTTP call paths. Exact source is Cargo.lock-bound. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.crc32fast]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.5.0"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.crypto-common]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.2.2"
+notes = "Reviewed for Mantle 1.0 as part of the cryptographic/TLS dependency surface, including unsafe and platform-specific implementations, build behavior, and the bounded rustls/HTTP call paths. Exact source is Cargo.lock-bound. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.digest]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.11.3"
+notes = "Reviewed for Mantle 1.0 as part of the cryptographic/TLS dependency surface, including unsafe and platform-specific implementations, build behavior, and the bounded rustls/HTTP call paths. Exact source is Cargo.lock-bound. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.extended]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "Reviewed for Mantle 1.0 as part of the media/decode/frame pipeline, including parser limits, unsafe and generated surfaces, and active features. Retained differential, fuzz, sanitizer, allocation, and soak evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.find-msvc-tools]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.1.10"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.flate2]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.1.9"
+notes = "Reviewed for Mantle 1.0 as part of the bounded network/protocol/archive data path, including unsafe, parsing, decompression, build, and code-generation surfaces where present. Resource limits, SSRF controls, fuzzing, and fault tests cover Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.generator]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-run"
+version = "0.7.5"
+notes = "Reviewed as a non-shipping test/tool dependency for Mantle 1.0, including execution, code-generation, unsafe, build, native, and generated-binding surfaces where present; bounded use is covered by the Phase 15 test and concurrency evidence. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.getrandom]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.2.17"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.getrandom]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.3.4"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.glob]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.3.4"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.hashbrown]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.17.1"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.http]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.5.0"
+notes = "Reviewed for Mantle 1.0 as part of the bounded network/protocol/archive data path, including unsafe, parsing, decompression, build, and code-generation surfaces where present. Resource limits, SSRF controls, fuzzing, and fault tests cover Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.httparse]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.10.1"
+notes = "Reviewed for Mantle 1.0 as part of the bounded network/protocol/archive data path, including unsafe, parsing, decompression, build, and code-generation surfaces where present. Resource limits, SSRF controls, fuzzing, and fault tests cover Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.hybrid-array]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.4.14"
+notes = "Reviewed for Mantle 1.0 as part of the cryptographic/TLS dependency surface, including unsafe and platform-specific implementations, build behavior, and the bounded rustls/HTTP call paths. Exact source is Cargo.lock-bound. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.itoa]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.0.18"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.java-locator]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.1.9"
+notes = "Reviewed for Mantle 1.0 as part of the JNI/classfile boundary, including FFI, class loading, modified UTF-8, procedural-macro, and generated-code surfaces. Retained JVM verification, lifecycle, classloader, and stress evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.jni]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.22.4"
+notes = "Reviewed for Mantle 1.0 as part of the JNI/classfile boundary, including FFI, class loading, modified UTF-8, procedural-macro, and generated-code surfaces. Retained JVM verification, lifecycle, classloader, and stress evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.jni-macros]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.22.4"
+notes = "Reviewed for Mantle 1.0 as part of the JNI/classfile boundary, including FFI, class loading, modified UTF-8, procedural-macro, and generated-code surfaces. Retained JVM verification, lifecycle, classloader, and stress evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.jni-sys]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.4.1"
+notes = "Reviewed for Mantle 1.0 as part of the JNI/classfile boundary, including FFI, class loading, modified UTF-8, procedural-macro, and generated-code surfaces. Retained JVM verification, lifecycle, classloader, and stress evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.jni-sys-macros]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.4.1"
+notes = "Reviewed for Mantle 1.0 as part of the JNI/classfile boundary, including FFI, class loading, modified UTF-8, procedural-macro, and generated-code surfaces. Retained JVM verification, lifecycle, classloader, and stress evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.js-sys]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.3.104"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.libc]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.2.189"
+notes = "Reviewed for Mantle 1.0 as a platform ABI or generated binding package, including exposed unsafe declarations, generated tables, build scripts, and the platform-specific calls reachable from Mantle dependencies. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.libloading]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.8.9"
+notes = "Reviewed for Mantle 1.0 as part of the JNI/classfile boundary, including FFI, class loading, modified UTF-8, procedural-macro, and generated-code surfaces. Retained JVM verification, lifecycle, classloader, and stress evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.log]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.4.33"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.loom]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-run"
+version = "0.5.6"
+notes = "Reviewed as a non-shipping test/tool dependency for Mantle 1.0, including execution, code-generation, unsafe, build, native, and generated-binding surfaces where present; bounded use is covered by the Phase 15 test and concurrency evidence. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.md-5]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.11.0"
+notes = "Reviewed for Mantle 1.0 as part of the cryptographic/TLS dependency surface, including unsafe and platform-specific implementations, build behavior, and the bounded rustls/HTTP call paths. Exact source is Cargo.lock-bound. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.memchr]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "2.8.3"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.num-complex]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.4.6"
+notes = "Reviewed for Mantle 1.0 as part of the media/decode/frame pipeline, including parser limits, unsafe and generated surfaces, and active features. Retained differential, fuzz, sanitizer, allocation, and soak evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.once_cell]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.21.4"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.opus-head-sys]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.3.1"
+notes = "Reviewed for Mantle 1.0 as the pinned static libopus source/build boundary. Native and FFI surfaces are covered by ADR-0008 plus ASan, TSan, Miri, RealtimeSanitizer, soak, and frame-path evidence. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.pin-project-lite]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-run"
+version = "0.2.17"
+notes = "Reviewed as a non-shipping test/tool dependency for Mantle 1.0, including execution, code-generation, unsafe, build, native, and generated-binding surfaces where present; bounded use is covered by the Phase 15 test and concurrency evidence. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.proc-macro2]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.0.107"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.quick-xml]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.41.0"
+notes = "Reviewed for Mantle 1.0 as part of the bounded network/protocol/archive data path, including unsafe, parsing, decompression, build, and code-generation surfaces where present. Resource limits, SSRF controls, fuzzing, and fault tests cover Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.r-efi]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "5.3.0"
+notes = "Reviewed for Mantle 1.0 as a platform ABI or generated binding package, including exposed unsafe declarations, generated tables, build scripts, and the platform-specific calls reachable from Mantle dependencies. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.regex-automata]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-run"
+version = "0.4.18"
+notes = "Reviewed as a non-shipping test/tool dependency for Mantle 1.0, including execution, code-generation, unsafe, build, native, and generated-binding surfaces where present; bounded use is covered by the Phase 15 test and concurrency evidence. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.regex-lite]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.1.9"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.regex-syntax]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-run"
+version = "0.8.11"
+notes = "Reviewed as a non-shipping test/tool dependency for Mantle 1.0, including execution, code-generation, unsafe, build, native, and generated-binding surfaces where present; bounded use is covered by the Phase 15 test and concurrency evidence. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.ring]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.17.14"
+notes = "Reviewed for Mantle 1.0 as part of the cryptographic/TLS dependency surface, including unsafe and platform-specific implementations, build behavior, and the bounded rustls/HTTP call paths. Exact source is Cargo.lock-bound. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.ristretto_classfile]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.32.1"
+notes = "Reviewed for Mantle 1.0 as part of the JNI/classfile boundary, including FFI, class loading, modified UTF-8, procedural-macro, and generated-code surfaces. Retained JVM verification, lifecycle, classloader, and stress evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.rtrb]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.3.5"
+notes = "Reviewed for Mantle 1.0 as part of the media/decode/frame pipeline, including parser limits, unsafe and generated surfaces, and active features. Retained differential, fuzz, sanitizer, allocation, and soak evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.rubato]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "5.0.0"
+notes = "Reviewed for Mantle 1.0 as part of the media/decode/frame pipeline, including parser limits, unsafe and generated surfaces, and active features. Retained differential, fuzz, sanitizer, allocation, and soak evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.rustls]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.23.43"
+notes = "Reviewed for Mantle 1.0 as part of the cryptographic/TLS dependency surface, including unsafe and platform-specific implementations, build behavior, and the bounded rustls/HTTP call paths. Exact source is Cargo.lock-bound. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.rustls-pki-types]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.15.1"
+notes = "Reviewed for Mantle 1.0 as part of the cryptographic/TLS dependency surface, including unsafe and platform-specific implementations, build behavior, and the bounded rustls/HTTP call paths. Exact source is Cargo.lock-bound. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.rustls-webpki]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.103.13"
+notes = "Reviewed for Mantle 1.0 as part of the cryptographic/TLS dependency surface, including unsafe and platform-specific implementations, build behavior, and the bounded rustls/HTTP call paths. Exact source is Cargo.lock-bound. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.rustversion]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.0.23"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.same-file]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.0.6"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.serde]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.0.229"
+notes = "Reviewed for Mantle 1.0 as part of the bounded network/protocol/archive data path, including unsafe, parsing, decompression, build, and code-generation surfaces where present. Resource limits, SSRF controls, fuzzing, and fault tests cover Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.serde_core]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.0.229"
+notes = "Reviewed for Mantle 1.0 as part of the bounded network/protocol/archive data path, including unsafe, parsing, decompression, build, and code-generation surfaces where present. Resource limits, SSRF controls, fuzzing, and fault tests cover Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.serde_derive]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.0.229"
+notes = "Reviewed for Mantle 1.0 as part of the bounded network/protocol/archive data path, including unsafe, parsing, decompression, build, and code-generation surfaces where present. Resource limits, SSRF controls, fuzzing, and fault tests cover Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.serde_json]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.0.151"
+notes = "Reviewed for Mantle 1.0 as part of the bounded network/protocol/archive data path, including unsafe, parsing, decompression, build, and code-generation surfaces where present. Resource limits, SSRF controls, fuzzing, and fault tests cover Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.sha2]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.11.0"
+notes = "Reviewed for Mantle 1.0 as part of the cryptographic/TLS dependency surface, including unsafe and platform-specific implementations, build behavior, and the bounded rustls/HTTP call paths. Exact source is Cargo.lock-bound. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.shlex]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "2.0.1"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.simd-adler32]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.3.10"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.simd_cesu8]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.2.0"
+notes = "Reviewed for Mantle 1.0 as part of the JNI/classfile boundary, including FFI, class loading, modified UTF-8, procedural-macro, and generated-code surfaces. Retained JVM verification, lifecycle, classloader, and stress evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.simdutf8]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.1.5"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.symphonia]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed for Mantle 1.0 as part of the media/decode/frame pipeline, including parser limits, unsafe and generated surfaces, and active features. Retained differential, fuzz, sanitizer, allocation, and soak evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.symphonia-bundle-flac]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed for Mantle 1.0 as part of the media/decode/frame pipeline, including parser limits, unsafe and generated surfaces, and active features. Retained differential, fuzz, sanitizer, allocation, and soak evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.symphonia-bundle-mp3]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed for Mantle 1.0 as part of the media/decode/frame pipeline, including parser limits, unsafe and generated surfaces, and active features. Retained differential, fuzz, sanitizer, allocation, and soak evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.symphonia-codec-aac]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed for Mantle 1.0 as part of the media/decode/frame pipeline, including parser limits, unsafe and generated surfaces, and active features. Retained differential, fuzz, sanitizer, allocation, and soak evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.symphonia-codec-pcm]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed for Mantle 1.0 as part of the media/decode/frame pipeline, including parser limits, unsafe and generated surfaces, and active features. Retained differential, fuzz, sanitizer, allocation, and soak evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.symphonia-codec-vorbis]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed for Mantle 1.0 as part of the media/decode/frame pipeline, including parser limits, unsafe and generated surfaces, and active features. Retained differential, fuzz, sanitizer, allocation, and soak evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.symphonia-common]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed for Mantle 1.0 as part of the media/decode/frame pipeline, including parser limits, unsafe and generated surfaces, and active features. Retained differential, fuzz, sanitizer, allocation, and soak evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.symphonia-core]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed for Mantle 1.0 as part of the media/decode/frame pipeline, including parser limits, unsafe and generated surfaces, and active features. Retained differential, fuzz, sanitizer, allocation, and soak evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.symphonia-format-isomp4]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed for Mantle 1.0 as part of the media/decode/frame pipeline, including parser limits, unsafe and generated surfaces, and active features. Retained differential, fuzz, sanitizer, allocation, and soak evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.symphonia-format-mkv]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed for Mantle 1.0 as part of the media/decode/frame pipeline, including parser limits, unsafe and generated surfaces, and active features. Retained differential, fuzz, sanitizer, allocation, and soak evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.symphonia-format-ogg]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed for Mantle 1.0 as part of the media/decode/frame pipeline, including parser limits, unsafe and generated surfaces, and active features. Retained differential, fuzz, sanitizer, allocation, and soak evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.symphonia-format-riff]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed for Mantle 1.0 as part of the media/decode/frame pipeline, including parser limits, unsafe and generated surfaces, and active features. Retained differential, fuzz, sanitizer, allocation, and soak evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.symphonia-metadata]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed for Mantle 1.0 as part of the media/decode/frame pipeline, including parser limits, unsafe and generated surfaces, and active features. Retained differential, fuzz, sanitizer, allocation, and soak evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.syn]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "2.0.119"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.syn]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "3.0.3"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.thiserror]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "2.0.20"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.thiserror-impl]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "2.0.20"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.thread_local]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-run"
+version = "1.1.10"
+notes = "Reviewed as a non-shipping test/tool dependency for Mantle 1.0, including execution, code-generation, unsafe, build, native, and generated-binding surfaces where present; bounded use is covered by the Phase 15 test and concurrency evidence. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.tracing]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-run"
+version = "0.1.44"
+notes = "Reviewed as a non-shipping test/tool dependency for Mantle 1.0, including execution, code-generation, unsafe, build, native, and generated-binding surfaces where present; bounded use is covered by the Phase 15 test and concurrency evidence. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.tracing-attributes]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-run"
+version = "0.1.31"
+notes = "Reviewed as a non-shipping test/tool dependency for Mantle 1.0, including execution, code-generation, unsafe, build, native, and generated-binding surfaces where present; bounded use is covered by the Phase 15 test and concurrency evidence. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.tracing-core]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-run"
+version = "0.1.36"
+notes = "Reviewed as a non-shipping test/tool dependency for Mantle 1.0, including execution, code-generation, unsafe, build, native, and generated-binding surfaces where present; bounded use is covered by the Phase 15 test and concurrency evidence. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.tracing-subscriber]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-run"
+version = "0.3.23"
+notes = "Reviewed as a non-shipping test/tool dependency for Mantle 1.0, including execution, code-generation, unsafe, build, native, and generated-binding surfaces where present; bounded use is covered by the Phase 15 test and concurrency evidence. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.typed-path]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.12.3"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.typenum]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.20.1"
+notes = "Reviewed for Mantle 1.0 as part of the cryptographic/TLS dependency surface, including unsafe and platform-specific implementations, build behavior, and the bounded rustls/HTTP call paths. Exact source is Cargo.lock-bound. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.unicode-ident]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.0.24"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.untrusted]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.9.0"
+notes = "Reviewed for Mantle 1.0 as part of the cryptographic/TLS dependency surface, including unsafe and platform-specific implementations, build behavior, and the bounded rustls/HTTP call paths. Exact source is Cargo.lock-bound. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.ureq]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "3.4.0"
+notes = "Reviewed for Mantle 1.0 as part of the bounded network/protocol/archive data path, including unsafe, parsing, decompression, build, and code-generation surfaces where present. Resource limits, SSRF controls, fuzzing, and fault tests cover Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.ureq-proto]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed for Mantle 1.0 as part of the bounded network/protocol/archive data path, including unsafe, parsing, decompression, build, and code-generation surfaces where present. Resource limits, SSRF controls, fuzzing, and fault tests cover Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.utf8-zero]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.8.1"
+notes = "Reviewed for Mantle 1.0 as part of the JNI/classfile boundary, including FFI, class loading, modified UTF-8, procedural-macro, and generated-code surfaces. Retained JVM verification, lifecycle, classloader, and stress evidence covers Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.version_check]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.9.5"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.walkdir]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "2.5.0"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.wasi]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.11.1+wasi-snapshot-preview1"
+notes = "Reviewed for Mantle 1.0 as a platform ABI or generated binding package, including exposed unsafe declarations, generated tables, build scripts, and the platform-specific calls reachable from Mantle dependencies. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.wasm-bindgen]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.2.127"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.wasm-bindgen-macro]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.2.127"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.wasm-bindgen-macro-support]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.2.127"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.wasm-bindgen-shared]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.2.127"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.webpki-roots]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.0.9"
+notes = "Reviewed for Mantle 1.0 as part of the cryptographic/TLS dependency surface, including unsafe and platform-specific implementations, build behavior, and the bounded rustls/HTTP call paths. Exact source is Cargo.lock-bound. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.winapi-util]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.1.11"
+notes = "Reviewed for Mantle 1.0 as a platform ABI or generated binding package, including exposed unsafe declarations, generated tables, build scripts, and the platform-specific calls reachable from Mantle dependencies. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.windowfunctions]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.1.1"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.windows]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-run"
+version = "0.48.0"
+notes = "Reviewed as a non-shipping test/tool dependency for Mantle 1.0, including execution, code-generation, unsafe, build, native, and generated-binding surfaces where present; bounded use is covered by the Phase 15 test and concurrency evidence. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.windows-sys]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.52.0"
+notes = "Reviewed for Mantle 1.0 as a platform ABI or generated binding package, including exposed unsafe declarations, generated tables, build scripts, and the platform-specific calls reachable from Mantle dependencies. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.windows-sys]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.61.2"
+notes = "Reviewed for Mantle 1.0 as a platform ABI or generated binding package, including exposed unsafe declarations, generated tables, build scripts, and the platform-specific calls reachable from Mantle dependencies. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.windows-targets]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-run"
+version = "0.48.5"
+notes = "Reviewed as a non-shipping test/tool dependency for Mantle 1.0, including execution, code-generation, unsafe, build, native, and generated-binding surfaces where present; bounded use is covered by the Phase 15 test and concurrency evidence. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.windows-targets]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.52.6"
+notes = "Reviewed for Mantle 1.0 as a platform ABI or generated binding package, including exposed unsafe declarations, generated tables, build scripts, and the platform-specific calls reachable from Mantle dependencies. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.windows_aarch64_gnullvm]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-run"
+version = "0.48.5"
+notes = "Reviewed as a non-shipping test/tool dependency for Mantle 1.0, including execution, code-generation, unsafe, build, native, and generated-binding surfaces where present; bounded use is covered by the Phase 15 test and concurrency evidence. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.windows_aarch64_gnullvm]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.52.6"
+notes = "Reviewed for Mantle 1.0 as a platform ABI or generated binding package, including exposed unsafe declarations, generated tables, build scripts, and the platform-specific calls reachable from Mantle dependencies. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.windows_aarch64_msvc]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-run"
+version = "0.48.5"
+notes = "Reviewed as a non-shipping test/tool dependency for Mantle 1.0, including execution, code-generation, unsafe, build, native, and generated-binding surfaces where present; bounded use is covered by the Phase 15 test and concurrency evidence. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.windows_aarch64_msvc]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.52.6"
+notes = "Reviewed for Mantle 1.0 as a platform ABI or generated binding package, including exposed unsafe declarations, generated tables, build scripts, and the platform-specific calls reachable from Mantle dependencies. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.windows_i686_gnu]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-run"
+version = "0.48.5"
+notes = "Reviewed as a non-shipping test/tool dependency for Mantle 1.0, including execution, code-generation, unsafe, build, native, and generated-binding surfaces where present; bounded use is covered by the Phase 15 test and concurrency evidence. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.windows_i686_gnu]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.52.6"
+notes = "Reviewed for Mantle 1.0 as a platform ABI or generated binding package, including exposed unsafe declarations, generated tables, build scripts, and the platform-specific calls reachable from Mantle dependencies. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.windows_i686_gnullvm]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.52.6"
+notes = "Reviewed for Mantle 1.0 as a platform ABI or generated binding package, including exposed unsafe declarations, generated tables, build scripts, and the platform-specific calls reachable from Mantle dependencies. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.windows_i686_msvc]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-run"
+version = "0.48.5"
+notes = "Reviewed as a non-shipping test/tool dependency for Mantle 1.0, including execution, code-generation, unsafe, build, native, and generated-binding surfaces where present; bounded use is covered by the Phase 15 test and concurrency evidence. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.windows_i686_msvc]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.52.6"
+notes = "Reviewed for Mantle 1.0 as a platform ABI or generated binding package, including exposed unsafe declarations, generated tables, build scripts, and the platform-specific calls reachable from Mantle dependencies. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.windows_x86_64_gnu]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-run"
+version = "0.48.5"
+notes = "Reviewed as a non-shipping test/tool dependency for Mantle 1.0, including execution, code-generation, unsafe, build, native, and generated-binding surfaces where present; bounded use is covered by the Phase 15 test and concurrency evidence. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.windows_x86_64_gnu]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.52.6"
+notes = "Reviewed for Mantle 1.0 as a platform ABI or generated binding package, including exposed unsafe declarations, generated tables, build scripts, and the platform-specific calls reachable from Mantle dependencies. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.windows_x86_64_gnullvm]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-run"
+version = "0.48.5"
+notes = "Reviewed as a non-shipping test/tool dependency for Mantle 1.0, including execution, code-generation, unsafe, build, native, and generated-binding surfaces where present; bounded use is covered by the Phase 15 test and concurrency evidence. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.windows_x86_64_gnullvm]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.52.6"
+notes = "Reviewed for Mantle 1.0 as a platform ABI or generated binding package, including exposed unsafe declarations, generated tables, build scripts, and the platform-specific calls reachable from Mantle dependencies. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.windows_x86_64_msvc]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-run"
+version = "0.48.5"
+notes = "Reviewed as a non-shipping test/tool dependency for Mantle 1.0, including execution, code-generation, unsafe, build, native, and generated-binding surfaces where present; bounded use is covered by the Phase 15 test and concurrency evidence. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.windows_x86_64_msvc]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.52.6"
+notes = "Reviewed for Mantle 1.0 as a platform ABI or generated binding package, including exposed unsafe declarations, generated tables, build scripts, and the platform-specific calls reachable from Mantle dependencies. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.zerocopy]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.8.56"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.zerocopy-derive]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.8.56"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.zeroize]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.9.0"
+notes = "Reviewed for Mantle 1.0 as part of the cryptographic/TLS dependency surface, including unsafe and platform-specific implementations, build behavior, and the bounded rustls/HTTP call paths. Exact source is Cargo.lock-bound. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.zip]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "8.6.0"
+notes = "Reviewed for Mantle 1.0 as part of the bounded network/protocol/archive data path, including unsafe, parsing, decompression, build, and code-generation surfaces where present. Resource limits, SSRF controls, fuzzing, and fault tests cover Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.zlib-rs]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.6.7"
+notes = "Reviewed for Mantle 1.0 as part of the bounded network/protocol/archive data path, including unsafe, parsing, decompression, build, and code-generation surfaces where present. Resource limits, SSRF controls, fuzzing, and fault tests cover Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.zmij]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "1.0.23"
+notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."

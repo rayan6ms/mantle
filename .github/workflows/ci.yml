@@ -103,6 +103,9 @@ jobs:
       - run: cargo audit --file fuzz/Cargo.lock --deny warnings
       - run: cargo deny check
       - run: cargo vet --locked
+      - run: scripts/run-publication-cargo-vet-exemption-closure.sh
+      - run: scripts/check-publication-cargo-vet-exemption-closure.sh
+      - run: scripts/test-publication-cargo-vet-exemption-closure.sh
 
   jvm-gate-a:
     name: Gate A (${{ matrix.os }}, JDK ${{ matrix.java }})

@@ -3,12 +3,13 @@
   "status": "IN_PROGRESS",
   "phase": "publication-readiness",
   "compatibility_baseline": "dev.arbjerg:lavaplayer:2.2.6",
-  "completed_slice": "publication-sbom-provenance",
+  "completed_slice": "publication-cargo-vet-exemption-closure",
   "completed_slices": [
     "publication-artifact-boundary",
     "publication-native-matrix",
     "publication-central-bundle",
-    "publication-sbom-provenance"
+    "publication-sbom-provenance",
+    "publication-cargo-vet-exemption-closure"
   ],
   "publication_ready": false,
   "channels": {
@@ -100,9 +101,12 @@
     },
     {
       "id": "dependency_audits",
-      "status": "BLOCKED",
-      "ledger": "D-001",
-      "remaining_exact_version_exemptions": 140
+      "status": "PASS",
+      "imports": 6,
+      "local_exact_version_audits": 140,
+      "fully_audited_packages": 170,
+      "remaining_exact_version_exemptions": 0,
+      "checker": "scripts/check-publication-cargo-vet-exemption-closure.sh"
     },
     {
       "id": "native_classifier_matrix",
@@ -132,6 +136,6 @@
       "sbom_attestation": "https://github.com/rayan6ms/mantle/attestations/44571213"
     }
   ],
-  "active_blockers": ["D-001", "central-release-identity"],
-  "next_slice": "publication-cargo-vet-exemption-closure"
+  "active_blockers": ["central-release-identity"],
+  "next_slice": "publication-central-release-identity"
 }

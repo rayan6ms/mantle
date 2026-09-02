@@ -18,5 +18,8 @@ mantle-audio = { version = "0.0.0", path = "../mantle-audio" }
 mantle-core = { version = "0.0.0", path = "../mantle-core" }
 mantle-media = { version = "0.0.0", path = "../mantle-media" }
 
+[dev-dependencies]
+loom = "=0.5.6"
+
 [lints]
 workspace = true

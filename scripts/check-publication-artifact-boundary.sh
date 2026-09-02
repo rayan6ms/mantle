@@ -47,14 +47,15 @@ jq --exit-status '
   .channels.repository_snapshot.status == "NOT_PUBLISHED" and
   ([.gates[].id] | sort) == ["artifact_boundary", "central_metadata_and_signing", "dependency_audits", "native_classifier_matrix", "sbom_and_provenance"] and
   (.gates[] | select(.id == "artifact_boundary") | .status) == "PASS" and
-  (.gates[] | select(.id == "dependency_audits") | .remaining_exact_version_exemptions) == 140 and
+  (.gates[] | select(.id == "dependency_audits") |
+    .status == "PASS" and .remaining_exact_version_exemptions == 0) and
   (.gates[] | select(.id == "native_classifier_matrix") | .status) == "PASS" and
   (.gates[] | select(.id == "central_metadata_and_signing") | .status) == "PREFLIGHT_PASS" and
   (.gates[] | select(.id == "sbom_and_provenance") |
     .status == "PASS" and .subject_count == 6 and
     .sbom_format == "CycloneDX JSON 1.5") and
-  .active_blockers == ["D-001", "central-release-identity"] and
-  .next_slice == "publication-cargo-vet-exemption-closure"
+  .active_blockers == ["central-release-identity"] and
+  .next_slice == "publication-central-release-identity"
 ' "$PLAN" >/dev/null
 
 mapfile -t expected < <(jq --raw-output '.channels.maven.artifact_boundary_files[]' "$PLAN" | sort)

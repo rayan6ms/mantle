@@ -87,8 +87,8 @@ jq --exit-status '
     .status == "PASS" and .subject_count == 6 and
     .sbom_format == "CycloneDX JSON 1.5" and
     .hosted_evidence == "https://github.com/rayan6ms/mantle/actions/runs/33577053812") and
-  .active_blockers == ["D-001", "central-release-identity"] and
-  .next_slice == "publication-cargo-vet-exemption-closure"
+  .active_blockers == ["central-release-identity"] and
+  .next_slice == "publication-central-release-identity"
 ' "$READINESS" >/dev/null
 
 mapfile -t expected < <(jq -r '.subjects[].file' "$CONTRACT" | LC_ALL=C sort)

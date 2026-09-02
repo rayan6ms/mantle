@@ -55,5 +55,5 @@
     "A release PGP key and public-key distribution are configured.",
     "A Central Portal user token is configured only in the protected release environment."
   ],
-  "next_validation": "Upload with USER_MANAGED publishing only after D-001 is resolved, then require Central state VALIDATED before any explicit publish action."
+  "next_validation": "After the operator supplies the verified Central namespace, release PGP key, and Portal token, upload with USER_MANAGED publishing and require Central state VALIDATED before any separate explicit publish action."
 }
