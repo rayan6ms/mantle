@@ -3,11 +3,12 @@
   "status": "IN_PROGRESS",
   "phase": "publication-readiness",
   "compatibility_baseline": "dev.arbjerg:lavaplayer:2.2.6",
-  "completed_slice": "publication-central-bundle",
+  "completed_slice": "publication-sbom-provenance",
   "completed_slices": [
     "publication-artifact-boundary",
     "publication-native-matrix",
-    "publication-central-bundle"
+    "publication-central-bundle",
+    "publication-sbom-provenance"
   ],
   "publication_ready": false,
   "channels": {
@@ -120,10 +121,14 @@
     },
     {
       "id": "sbom_and_provenance",
-      "status": "INCOMPLETE",
-      "scope": "release SBOM plus GitHub build-provenance and SBOM attestations"
+      "status": "IMPLEMENTED_HOSTED_RUN_PENDING",
+      "scope": "CycloneDX 1.5 release SBOM plus GitHub build-provenance and SBOM attestations",
+      "subject_count": 6,
+      "sbom_format": "CycloneDX JSON 1.5",
+      "checker": "scripts/check-publication-sbom-provenance.sh",
+      "hosted_workflow": ".github/workflows/native-classifier-matrix.yml"
     }
   ],
-  "active_blockers": ["D-001", "central-release-identity", "sbom-and-provenance"],
-  "next_slice": "publication-sbom-provenance"
+  "active_blockers": ["D-001", "central-release-identity", "sbom-and-provenance-hosted-evidence"],
+  "next_slice": "publication-sbom-provenance-hosted-validation"
 }

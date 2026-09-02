@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "status": "IMPLEMENTED_HOSTED_RUN_PENDING",
+  "slice": "publication-sbom-provenance",
+  "version": "1.0.0",
+  "sbom": {
+    "format": "CycloneDX JSON",
+    "spec_version": "1.5",
+    "filename": "mantle-1.0.0.cdx.json",
+    "subject_count": 6,
+    "rust_generator": {
+      "name": "cargo-cyclonedx",
+      "version": "0.5.9",
+      "scope": "union of the mantle-jvm production graph for the five supported release targets",
+      "dev_dependencies_included": false
+    },
+    "maven_generator": {
+      "coordinate": "org.cyclonedx:cyclonedx-maven-plugin:2.9.3",
+      "goal": "makeBom",
+      "scope": "resolved compile and runtime graph for mantle-lavaplayer"
+    }
+  },
+  "subjects": [
+    {"file": "mantle-lavaplayer-1.0.0.jar", "kind": "jvm"},
+    {"file": "mantle-native-1.0.0-linux-x86_64.jar", "kind": "native", "classifier": "linux-x86_64", "rust_target": "x86_64-unknown-linux-gnu"},
+    {"file": "mantle-native-1.0.0-linux-aarch64.jar", "kind": "native", "classifier": "linux-aarch64", "rust_target": "aarch64-unknown-linux-gnu"},
+    {"file": "mantle-native-1.0.0-macos-x86_64.jar", "kind": "native", "classifier": "macos-x86_64", "rust_target": "x86_64-apple-darwin"},
+    {"file": "mantle-native-1.0.0-macos-aarch64.jar", "kind": "native", "classifier": "macos-aarch64", "rust_target": "aarch64-apple-darwin"},
+    {"file": "mantle-native-1.0.0-windows-x86_64.jar", "kind": "native", "classifier": "windows-x86_64", "rust_target": "x86_64-pc-windows-msvc"}
+  ],
+  "attestations": {
+    "action": "actions/attest@v4",
+    "workflow": ".github/workflows/native-classifier-matrix.yml",
+    "predicate_types": ["SLSA build provenance", "CycloneDX SBOM"],
+    "subject_identification": "one SHA-256 checksum manifest covering exactly the six binary JARs",
+    "permissions": ["contents: read", "id-token: write", "attestations: write", "artifact-metadata: write"]
+  },
+  "hosted_evidence": {
+    "status": "PENDING",
+    "workflow_run": null,
+    "provenance_attestation": null,
+    "sbom_attestation": null
+  },
+  "exclusions": {
+    "central_metadata_and_placeholders": "POM and NOTICE-only companion JARs contain no executable code and are excluded as attestation subjects.",
+    "central_signatures_and_checksums": "Operator PGP signatures and Central checksum sidecars are produced after the binary build and remain covered by the signed Central bundle contract.",
+    "development_graph": "Benchmarks, reference tools, fuzz packages, tests, and dev-dependencies are not shipped and must not appear in the release SBOM."
+  },
+  "next_validation": "Run the hosted native classifier workflow, verify both GitHub attestations against all six SHA-256 subjects, and record the run and attestation URLs before clearing the blocker."
+}

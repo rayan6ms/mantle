@@ -50,9 +50,11 @@ jq --exit-status '
   (.gates[] | select(.id == "dependency_audits") | .remaining_exact_version_exemptions) == 140 and
   (.gates[] | select(.id == "native_classifier_matrix") | .status) == "PASS" and
   (.gates[] | select(.id == "central_metadata_and_signing") | .status) == "PREFLIGHT_PASS" and
-  (.gates[] | select(.id == "sbom_and_provenance") | .status) == "INCOMPLETE" and
-  .active_blockers == ["D-001", "central-release-identity", "sbom-and-provenance"] and
-  .next_slice == "publication-sbom-provenance"
+  (.gates[] | select(.id == "sbom_and_provenance") |
+    .status == "IMPLEMENTED_HOSTED_RUN_PENDING" and .subject_count == 6 and
+    .sbom_format == "CycloneDX JSON 1.5") and
+  .active_blockers == ["D-001", "central-release-identity", "sbom-and-provenance-hosted-evidence"] and
+  .next_slice == "publication-sbom-provenance-hosted-validation"
 ' "$PLAN" >/dev/null
 
 mapfile -t expected < <(jq --raw-output '.channels.maven.artifact_boundary_files[]' "$PLAN" | sort)

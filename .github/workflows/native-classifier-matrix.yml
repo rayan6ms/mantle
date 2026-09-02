@@ -9,9 +9,14 @@ on:
       - Cargo.toml
       - rust-toolchain.toml
       - compatibility/publication-native-matrix.json
+      - compatibility/publication-sbom-provenance.json
       - crates/**
+      - scripts/check-publication-sbom-provenance.sh
       - scripts/check-publication-native-matrix.sh
+      - scripts/generate-publication-sbom.sh
       - scripts/package-native-classifier.sh
+      - scripts/stage-publication-attestation-subjects.sh
+      - scripts/test-publication-sbom-provenance.sh
       - third_party/**
   workflow_dispatch:
 
@@ -77,8 +82,24 @@ jobs:
     name: Verify complete native matrix
     needs: build
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-cyclonedx@0.5.9
+      - uses: Swatinem/rust-cache@v2
       - uses: actions/download-artifact@v7
         with:
           pattern: native-*
@@ -86,9 +107,54 @@ jobs:
           merge-multiple: true
       - name: Verify classifier matrix
         run: scripts/check-publication-native-matrix.sh
+      - name: Emit JVM compatibility artifact
+        run: |
+          mkdir -p .cache/reference/lavaplayer-2.2.6 target/publication-sbom-provenance
+          curl --fail --location --silent --show-error \
+            https://repo1.maven.org/maven2/dev/arbjerg/lavaplayer/2.2.6/lavaplayer-2.2.6.jar \
+            --output .cache/reference/lavaplayer-2.2.6/lavaplayer-2.2.6.jar
+          expected=$(jq -r '.published_artifacts[] | select(.file == "lavaplayer-2.2.6.jar") | .sha256' \
+            reference/lavaplayer-2.2.6.lock.json)
+          actual=$(sha256sum .cache/reference/lavaplayer-2.2.6/lavaplayer-2.2.6.jar | awk '{print $1}')
+          [[ "$actual" == "$expected" ]]
+          cargo run --locked -q -p mantle-jvm-gate -- emit \
+            --reference-jar .cache/reference/lavaplayer-2.2.6/lavaplayer-2.2.6.jar \
+            --output target/publication-sbom-provenance/mantle-lavaplayer-1.0.0.jar \
+            --expected-abi 1
+      - name: Generate and validate release SBOM
+        run: |
+          scripts/stage-publication-attestation-subjects.sh \
+            --jvm-jar target/publication-sbom-provenance/mantle-lavaplayer-1.0.0.jar \
+            --native-artifact-root target/publication-native-matrix/artifacts
+          scripts/generate-publication-sbom.sh
+          scripts/check-publication-sbom-provenance.sh
+          scripts/test-publication-sbom-provenance.sh
+      - name: Attest build provenance
+        id: provenance
+        uses: actions/attest@v4
+        with:
+          subject-checksums: target/publication-sbom-provenance/subjects.sha256
+      - name: Attest release SBOM
+        id: sbom
+        uses: actions/attest@v4
+        with:
+          subject-checksums: target/publication-sbom-provenance/subjects.sha256
+          sbom-path: target/publication-sbom-provenance/mantle-1.0.0.cdx.json
+      - name: Collect attestation bundles
+        run: |
+          cp '${{ steps.provenance.outputs.bundle-path }}' \
+            target/publication-sbom-provenance/provenance.sigstore.json
+          cp '${{ steps.sbom.outputs.bundle-path }}' \
+            target/publication-sbom-provenance/sbom.sigstore.json
       - uses: actions/upload-artifact@v7
         with:
           name: publication-native-matrix-result
-          path: target/publication-native-matrix/result.json
+          path: |
+            target/publication-native-matrix/result.json
+            target/publication-sbom-provenance/mantle-1.0.0.cdx.json
+            target/publication-sbom-provenance/provenance.sigstore.json
+            target/publication-sbom-provenance/result.json
+            target/publication-sbom-provenance/sbom.sigstore.json
+            target/publication-sbom-provenance/subjects.sha256
           if-no-files-found: error
           retention-days: 30
