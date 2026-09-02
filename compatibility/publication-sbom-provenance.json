@@ -13,7 +13,8 @@
       "name": "cargo-cyclonedx",
       "version": "0.5.9",
       "scope": "union of the mantle-jvm production graph for the five supported release targets",
-      "dev_dependencies_included": false
+      "dev_dependencies_included": false,
+      "required_components": ["pkg:cargo/socket2@0.6.5"]
     },
     "maven_generator": {
       "coordinate": "org.cyclonedx:cyclonedx-maven-plugin:2.9.3",

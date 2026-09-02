@@ -108,8 +108,8 @@
       "id": "dependency_audits",
       "status": "PASS",
       "imports": 6,
-      "local_exact_version_audits": 140,
-      "fully_audited_packages": 170,
+      "local_exact_version_audits": 141,
+      "fully_audited_packages": 171,
       "remaining_exact_version_exemptions": 0,
       "checker": "scripts/check-publication-cargo-vet-exemption-closure.sh",
       "hosted_evidence": "https://github.com/rayan6ms/mantle/actions/runs/33580304900"

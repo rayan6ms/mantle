@@ -89,6 +89,17 @@ if "$CHECKER" --subject-root "$subjects" --checksums "$checksums" --sbom "$missi
   exit 1
 fi
 
+missing_socket="$test_root/missing-socket.cdx.json"
+jq 'del(.components[] | select(.purl == "pkg:cargo/socket2@0.6.5"))' \
+  "$sbom" >"$missing_socket"
+missing_socket_result="$test_root/missing-socket-result.json"
+jq --arg sbom "$(basename "$missing_socket")" --arg sha "$(sha256sum "$missing_socket" | awk '{print $1}')" \
+  '.sbom = $sbom | .sbom_sha256 = $sha | .component_count -= 1' "$result" >"$missing_socket_result"
+if "$CHECKER" --subject-root "$subjects" --checksums "$checksums" --sbom "$missing_socket" --result "$missing_socket_result" >/dev/null 2>&1; then
+  printf 'Publication SBOM checker accepted omission of the routed-socket production dependency.\n' >&2
+  exit 1
+fi
+
 missing_serial="$test_root/missing-serial.cdx.json"
 jq 'del(.serialNumber)' "$sbom" >"$missing_serial"
 missing_serial_result="$test_root/missing-serial-result.json"

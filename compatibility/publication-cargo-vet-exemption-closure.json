@@ -14,18 +14,18 @@
     "safe_to_run_exemptions": 20
   },
   "closure": {
-    "local_exact_version_audits": 140,
-    "safe_to_deploy_audits": 120,
+    "local_exact_version_audits": 141,
+    "safe_to_deploy_audits": 121,
     "safe_to_run_audits": 20,
     "remaining_exemptions": 0,
-    "fully_audited_packages": 170,
-    "canonical_tuple_sha256": "5d66025d8589798b5b54c8fa32447e14a8b8557d4b231acf4f18ba4ad5b4a53b"
+    "fully_audited_packages": 171,
+    "canonical_tuple_sha256": "3a1a0f74d5773d769e88a2bb853f2a10c3c37fda7a12d7d56990b5c43160fee9"
   },
   "review_scope": {
-    "package_files": 7603,
-    "package_lines": 4009282,
-    "rust_files": 5312,
-    "packages_with_unsafe_lexical_surface": 84,
+    "package_files": 7616,
+    "package_lines": 4018147,
+    "rust_files": 5318,
+    "packages_with_unsafe_lexical_surface": 85,
     "packages_with_build_scripts": 35,
     "packages_with_native_source": 5,
     "procedural_macro_packages": 8,

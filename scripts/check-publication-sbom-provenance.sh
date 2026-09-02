@@ -46,7 +46,8 @@ jq --exit-status '
   .sbom.rust_generator == {
     name: "cargo-cyclonedx", version: "0.5.9",
     scope: "union of the mantle-jvm production graph for the five supported release targets",
-    dev_dependencies_included: false
+    dev_dependencies_included: false,
+    required_components: ["pkg:cargo/socket2@0.6.5"]
   } and
   .sbom.maven_generator.coordinate == "org.cyclonedx:cyclonedx-maven-plugin:2.9.3" and
   ([.subjects[].file] | length == 6 and length == (unique | length)) and
@@ -133,11 +134,12 @@ jq --exit-status '
   .metadata.tools.components[0].version == "0.5.9" and
   .metadata.tools.components[1].name == "cyclonedx-maven-plugin" and
   .metadata.tools.components[1].version == "2.9.3" and
-  (.components | length) == 131 and
+  (.components | length) == 132 and
   ([.components[] | select(.["bom-ref"] | startswith("urn:mantle:artifact:"))] | length) == 6 and
-  ([.components[] | select((.purl // "") | startswith("pkg:cargo/"))] | length) == 108 and
+  ([.components[] | select((.purl // "") | startswith("pkg:cargo/"))] | length) == 109 and
   ([.components[] | select(.["bom-ref"] | startswith("pkg:maven/"))] | length) == 17 and
   ([.components[]."bom-ref"] | length == (unique | length)) and
+  ([.components[].purl // empty] | index("pkg:cargo/socket2@0.6.5")) != null and
   all(.dependencies[];
     . as $edge |
     (($refs | index($edge.ref)) != null) and
@@ -174,7 +176,7 @@ jq --exit-status \
   .serial_number == $serial and
   .format == "CycloneDX JSON 1.5" and
   .subject_count == 6 and (.subjects | length) == 6 and
-  .component_count == 131 and .dependency_relationship_count == 132 and
+  .component_count == 132 and .dependency_relationship_count == 133 and
   .generators == ["cargo-cyclonedx 0.5.9", "org.cyclonedx:cyclonedx-maven-plugin:2.9.3"] and
   .hosted_attestations == "PENDING"
 ' "$RESULT" >/dev/null

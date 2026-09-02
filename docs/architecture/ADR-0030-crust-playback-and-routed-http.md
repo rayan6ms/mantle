@@ -25,8 +25,8 @@ allow a connection selected for route A to escape through or be reused after sel
 - Rust's standard networking API does not provide portable bind-before-connect sockets.
   `socket2` 0.6.5 is current as of this decision, supports Rust 1.70+, is MIT OR Apache-2.0, is
   actively maintained at `rust-lang/socket2`, and supplies the required portable socket calls.
-  Cargo Vet accepts its publisher under the existing Mozilla and Bytecode Alliance trust imports;
-  Cargo Deny accepts its license, source, and graph.
+  Its exact locked source has a local `safe-to-deploy` Cargo Vet audit; no publisher-trust record or
+  exemption is used. Cargo Deny accepts its license, source, and graph.
 
 Regression evidence is in `mantle-opus` decoder tests,
 `phase12_youtube::finite_opus_session_seeks_filters_and_returns_safely_to_passthrough`, and

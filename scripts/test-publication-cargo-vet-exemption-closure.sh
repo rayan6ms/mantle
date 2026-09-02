@@ -32,10 +32,19 @@ if "$CHECKER" --store-path "$weakened" --result "$result_root/result.json" \
 fi
 
 stale_result="$test_root/stale-result.json"
-jq '.audit_graph.fully_audited_packages = 169' "$result_root/result.json" >"$stale_result"
+jq '.audit_graph.fully_audited_packages = 170' "$result_root/result.json" >"$stale_result"
 if "$CHECKER" --result "$stale_result" --vet-result "$result_root/cargo-vet.json" >/dev/null 2>&1; then
   printf 'Publication Cargo Vet checker accepted stale result counts.\n' >&2
   exit 1
 fi
 
-printf 'Publication Cargo Vet success, exemption, criterion, and stale-result regressions passed.\n'
+publisher_trust="$test_root/publisher-trust"
+cp -a "$ROOT/supply-chain" "$publisher_trust"
+printf '\n[[trusted.socket2]]\ncriteria = "safe-to-deploy"\nuser-id = 6025\nstart = "2020-09-09"\nend = "2027-09-02"\n' >>"$publisher_trust/audits.toml"
+if "$CHECKER" --store-path "$publisher_trust" --result "$result_root/result.json" \
+    --vet-result "$result_root/cargo-vet.json" >/dev/null 2>&1; then
+  printf 'Publication Cargo Vet checker accepted publisher trust in place of exact review.\n' >&2
+  exit 1
+fi
+
+printf 'Publication Cargo Vet success, exemption, criterion, publisher-trust, and stale-result regressions passed.\n'

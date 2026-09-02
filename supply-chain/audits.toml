@@ -451,6 +451,12 @@ criteria = "safe-to-deploy"
 version = "0.1.5"
 notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
 
+[[audits.socket2]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+version = "0.6.5"
+notes = "Reviewed for Mantle's exact Cargo.lock-bound route-binding dependency. The packaged source contains no build script or native source; its unsafe surface is the platform socket ABI wrapper, with ownership transferred through OwnedFd/OwnedSocket and address buffers bounded by OS socket structures. Mantle enables no optional features and reaches only socket creation, local bind, timed connect, and TcpStream ownership transfer. Route binding, timeout, error, and rotation behavior is covered by phase12_remote_http. See ADR-0030."
+
 [[audits.symphonia]]
 who = "OpenAI Codex for Mantle <noreply@openai.com>"
 criteria = "safe-to-deploy"
@@ -840,9 +846,3 @@ who = "OpenAI Codex for Mantle <noreply@openai.com>"
 criteria = "safe-to-deploy"
 version = "1.0.23"
 notes = "Reviewed for Mantle 1.0 using the exact Cargo.lock-bound package source, including unsafe, filesystem/process, build, native, generated-code, and procedural-macro surfaces where present. Component evidence is retained by ADR-0028 and the publication Cargo Vet closure contract."
-
-[[trusted.socket2]]
-criteria = "safe-to-deploy"
-user-id = 6025 # Thomas de Zeeuw (Thomasdezeeuw)
-start = "2020-09-09"
-end = "2027-09-02"
