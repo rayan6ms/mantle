@@ -1,21 +1,23 @@
 {
   "schema_version": 1,
-  "status": "IN_PROGRESS",
+  "status": "COMPLETE",
   "phase": "publication-readiness",
   "compatibility_baseline": "dev.arbjerg:lavaplayer:2.2.6",
-  "completed_slice": "publication-central-release-identity",
+  "completed_slice": "publication-central-release",
   "completed_slices": [
     "publication-artifact-boundary",
     "publication-native-matrix",
     "publication-central-bundle",
     "publication-sbom-provenance",
     "publication-cargo-vet-exemption-closure",
-    "publication-central-release-identity"
+    "publication-central-release-identity",
+    "publication-central-validation-deployment",
+    "publication-central-release"
   ],
-  "publication_ready": false,
+  "publication_ready": true,
   "channels": {
     "maven": {
-      "status": "PREFLIGHT_PASS",
+      "status": "PUBLISHED",
       "group_id": "io.github.rayan6ms",
       "version": "1.0.0",
       "artifact_boundary_files": [
@@ -40,7 +42,9 @@
       "source_artifact": "TRUTHFUL_PLACEHOLDER_NOTICE",
       "documentation_artifact": "TRUTHFUL_PLACEHOLDER_NOTICE",
       "publishing_type": "USER_MANAGED",
-      "network_upload_performed": false
+      "network_upload_performed": true,
+      "deployment_id": "9205c170-5232-4817-980f-0ff92e581ee9",
+      "public_repository": "https://repo.maven.apache.org/maven2"
     },
     "cargo_registry": {
       "status": "DISABLED",
@@ -119,7 +123,7 @@
     },
     {
       "id": "central_metadata_and_signing",
-      "status": "PREFLIGHT_PASS",
+      "status": "PASS",
       "scope": "repository/SCM metadata, Central placeholder companions, four checksum formats, detached PGP signatures, and exact bundle layout",
       "checker": "scripts/check-publication-central-bundle.sh",
       "network_upload_performed": false,
@@ -136,6 +140,28 @@
       "network_upload_performed": false
     },
     {
+      "id": "central_validation_deployment",
+      "status": "PASS",
+      "scope": "USER_MANAGED Portal validation, exact deployment downloads, Maven resolution, JVM verification, and native loading before publication",
+      "checker": "scripts/check-publication-central-validation-deployment.sh",
+      "workflow": ".github/workflows/central-validation-deployment.yml",
+      "hosted_evidence": "https://github.com/rayan6ms/mantle/actions/runs/33584029684",
+      "deployment_id": "9205c170-5232-4817-980f-0ff92e581ee9",
+      "validated_state": "VALIDATED",
+      "artifact_publication_performed": false
+    },
+    {
+      "id": "central_public_release",
+      "status": "PASS",
+      "scope": "terminal Portal publication plus exact 60-file public repository and unauthenticated Maven/JVM/native consumer verification",
+      "checker": "scripts/check-publication-central-release.sh",
+      "deployment_id": "9205c170-5232-4817-980f-0ff92e581ee9",
+      "terminal_state": "PUBLISHED",
+      "public_repository": "https://repo.maven.apache.org/maven2",
+      "repository_file_count": 60,
+      "repository_manifest_sha256": "1ab7f682451ea5d3283b6cb29df20f23d71da80eca59569eea96645b3ae41a6d"
+    },
+    {
       "id": "sbom_and_provenance",
       "status": "PASS",
       "scope": "CycloneDX 1.5 release SBOM plus GitHub build-provenance and SBOM attestations",
@@ -148,6 +174,6 @@
       "sbom_attestation": "https://github.com/rayan6ms/mantle/attestations/44571213"
     }
   ],
-  "active_blockers": ["central-validation-deployment"],
-  "next_slice": "publication-central-validation-deployment"
+  "active_blockers": [],
+  "next_slice": null
 }

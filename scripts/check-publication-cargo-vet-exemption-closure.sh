@@ -72,18 +72,19 @@ jq --exit-status '
 ' "$CONTRACT" >/dev/null
 
 jq --exit-status '
-  .schema_version == 1 and .status == "IN_PROGRESS" and
-  .completed_slice == "publication-central-release-identity" and
+  .schema_version == 1 and .status == "COMPLETE" and
+  .completed_slice == "publication-central-release" and
   (.completed_slices | index("publication-cargo-vet-exemption-closure")) != null and
   (.completed_slices | index("publication-central-release-identity")) != null and
-  .publication_ready == false and
+  (.completed_slices | index("publication-central-validation-deployment")) != null and
+  (.completed_slices | index("publication-central-release")) != null and
+  .publication_ready == true and
   (.gates[] | select(.id == "dependency_audits") |
     .status == "PASS" and .imports == 6 and .local_exact_version_audits == 140 and
     .fully_audited_packages == 170 and .remaining_exact_version_exemptions == 0 and
     .checker == "scripts/check-publication-cargo-vet-exemption-closure.sh" and
     .hosted_evidence == "https://github.com/rayan6ms/mantle/actions/runs/33580304900") and
-  .active_blockers == ["central-validation-deployment"] and
-  .next_slice == "publication-central-validation-deployment"
+  .active_blockers == [] and .next_slice == null
 ' "$READINESS" >/dev/null
 
 tuples="$(mktemp)"

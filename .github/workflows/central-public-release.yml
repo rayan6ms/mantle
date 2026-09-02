@@ -1,0 +1,32 @@
+name: Central public release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-public-release:
+    name: Verify public Maven release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Verify exact public repository and consumer
+        run: |
+          scripts/run-publication-central-release.sh \
+            --result '${{ runner.temp }}/mantle-central-release/result.json'
+          scripts/check-publication-central-release.sh \
+            --result '${{ runner.temp }}/mantle-central-release/result.json'
+          scripts/test-publication-central-release.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: publication-central-release-result
+          path: ${{ runner.temp }}/mantle-central-release/result.json
+          if-no-files-found: error
+          retention-days: 30

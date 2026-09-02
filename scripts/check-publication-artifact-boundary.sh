@@ -31,32 +31,42 @@ for command in cargo jq sha256sum unzip xmllint; do
 done
 
 jq --exit-status '
-  .schema_version == 1 and .status == "IN_PROGRESS" and
+  .schema_version == 1 and .status == "COMPLETE" and
   .phase == "publication-readiness" and
   (.completed_slices | index("publication-artifact-boundary")) != null and
-  .publication_ready == false and
-  .channels.maven.status == "PREFLIGHT_PASS" and
+  .completed_slice == "publication-central-release" and
+  (.completed_slices | index("publication-central-validation-deployment")) != null and
+  (.completed_slices | index("publication-central-release")) != null and
+  .publication_ready == true and
+  .channels.maven.status == "PUBLISHED" and
   (.channels.maven.artifact_boundary_files | length) == 4 and
   (.channels.maven.central_deployables | length) == 10 and
   .channels.maven.source_artifact == "TRUTHFUL_PLACEHOLDER_NOTICE" and
   .channels.maven.documentation_artifact == "TRUTHFUL_PLACEHOLDER_NOTICE" and
-  .channels.maven.network_upload_performed == false and
+  .channels.maven.network_upload_performed == true and
+  .channels.maven.deployment_id == "9205c170-5232-4817-980f-0ff92e581ee9" and
+  .channels.maven.public_repository == "https://repo.maven.apache.org/maven2" and
   .channels.cargo_registry.status == "DISABLED" and
   .channels.cargo_registry.workspace_packages == 12 and
   .channels.cargo_registry.fuzz_packages == 1 and
   .channels.repository_snapshot.status == "NOT_PUBLISHED" and
-  ([.gates[].id] | sort) == ["artifact_boundary", "central_metadata_and_signing", "central_release_identity", "dependency_audits", "native_classifier_matrix", "sbom_and_provenance"] and
+  ([.gates[].id] | sort) == ["artifact_boundary", "central_metadata_and_signing", "central_public_release", "central_release_identity", "central_validation_deployment", "dependency_audits", "native_classifier_matrix", "sbom_and_provenance"] and
   (.gates[] | select(.id == "artifact_boundary") | .status) == "PASS" and
   (.gates[] | select(.id == "dependency_audits") |
     .status == "PASS" and .remaining_exact_version_exemptions == 0) and
   (.gates[] | select(.id == "native_classifier_matrix") | .status) == "PASS" and
-  (.gates[] | select(.id == "central_metadata_and_signing") | .status) == "PREFLIGHT_PASS" and
+  (.gates[] | select(.id == "central_metadata_and_signing") | .status) == "PASS" and
   (.gates[] | select(.id == "sbom_and_provenance") |
     .status == "PASS" and .subject_count == 6 and
     .sbom_format == "CycloneDX JSON 1.5") and
   (.gates[] | select(.id == "central_release_identity") | .status) == "PASS" and
-  .active_blockers == ["central-validation-deployment"] and
-  .next_slice == "publication-central-validation-deployment"
+  (.gates[] | select(.id == "central_validation_deployment") |
+    .status == "PASS" and .validated_state == "VALIDATED" and
+    .artifact_publication_performed == false) and
+  (.gates[] | select(.id == "central_public_release") |
+    .status == "PASS" and .terminal_state == "PUBLISHED" and
+    .repository_file_count == 60) and
+  .active_blockers == [] and .next_slice == null
 ' "$PLAN" >/dev/null
 
 mapfile -t expected < <(jq --raw-output '.channels.maven.artifact_boundary_files[]' "$PLAN" | sort)

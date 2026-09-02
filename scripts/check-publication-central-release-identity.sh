@@ -88,10 +88,12 @@ jq --exit-status '
 ' "$RESULT" >/dev/null
 
 jq --exit-status '
-  .schema_version == 1 and .status == "IN_PROGRESS" and
-  .completed_slice == "publication-central-release-identity" and
+  .schema_version == 1 and .status == "COMPLETE" and
+  .completed_slice == "publication-central-release" and
   (.completed_slices | index("publication-central-release-identity")) != null and
-  .publication_ready == false and
+  (.completed_slices | index("publication-central-validation-deployment")) != null and
+  (.completed_slices | index("publication-central-release")) != null and
+  .publication_ready == true and
   (.gates[] | select(.id == "central_release_identity") |
     .status == "PASS" and
     .checker == "scripts/check-publication-central-release-identity.sh" and
@@ -99,8 +101,7 @@ jq --exit-status '
     .hosted_evidence == "https://github.com/rayan6ms/mantle/actions/runs/33582611518" and
     .publishing_type == "USER_MANAGED" and
     .network_upload_performed == false) and
-  .active_blockers == ["central-validation-deployment"] and
-  .next_slice == "publication-central-validation-deployment"
+  .active_blockers == [] and .next_slice == null
 ' "$READINESS" >/dev/null
 
 for input in "$CONTRACT" "$READINESS" "$RESULT"; do

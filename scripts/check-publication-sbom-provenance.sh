@@ -81,15 +81,17 @@ jq --exit-status '
 ' "$CONTRACT" >/dev/null
 
 jq --exit-status '
-  .schema_version == 1 and .status == "IN_PROGRESS" and
+  .schema_version == 1 and .status == "COMPLETE" and
   (.completed_slices | index("publication-sbom-provenance")) != null and
   (.gates[] | select(.id == "sbom_and_provenance") |
     .status == "PASS" and .subject_count == 6 and
     .sbom_format == "CycloneDX JSON 1.5" and
     .hosted_evidence == "https://github.com/rayan6ms/mantle/actions/runs/33577053812") and
   (.completed_slices | index("publication-central-release-identity")) != null and
-  .active_blockers == ["central-validation-deployment"] and
-  .next_slice == "publication-central-validation-deployment"
+  (.completed_slices | index("publication-central-validation-deployment")) != null and
+  (.completed_slices | index("publication-central-release")) != null and
+  .publication_ready == true and
+  .active_blockers == [] and .next_slice == null
 ' "$READINESS" >/dev/null
 
 mapfile -t expected < <(jq -r '.subjects[].file' "$CONTRACT" | LC_ALL=C sort)

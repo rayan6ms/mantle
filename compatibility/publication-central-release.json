@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "status": "OPERATOR_PUBLISHED",
+  "slice": "publication-central-release",
+  "version": "1.0.0",
+  "source_digest": "62d02f6f0c6a312dc1ec5fec85213dc7e24cc4c1",
+  "deployment": {
+    "id": "9205c170-5232-4817-980f-0ff92e581ee9",
+    "name": "Mantle 1.0.0 validation 62d02f6",
+    "state": "PUBLISHED",
+    "observed_at": "2026-09-02T02:49:15Z"
+  },
+  "public_repository": {
+    "base_url": "https://repo.maven.apache.org/maven2",
+    "group_id": "io.github.rayan6ms",
+    "coordinates": [
+      "io.github.rayan6ms:mantle-lavaplayer:1.0.0",
+      "io.github.rayan6ms:mantle-native:1.0.0"
+    ],
+    "repository_file_count": 60,
+    "repository_manifest_sha256": "1ab7f682451ea5d3283b6cb29df20f23d71da80eca59569eea96645b3ae41a6d"
+  },
+  "release_artifacts": {
+    "bundle_sha256": "f677efdd40a8ae10f68e381f83c98d12ae3c43303065932f905f74de4ee43d1e",
+    "signing_fingerprint": "B7CEFF5211EA68CB834AED549FA70609D2B9F145",
+    "deployable_count": 10,
+    "integrity_sidecars_per_deployable": 5
+  },
+  "verification": {
+    "workflow": ".github/workflows/central-public-release.yml",
+    "runner": "scripts/run-publication-central-release.sh",
+    "checker": "scripts/check-publication-central-release.sh",
+    "validation_contract": "compatibility/publication-central-validation-deployment.json",
+    "public_maven_resolution": "REQUIRED",
+    "public_native_loader_smoke": "REQUIRED"
+  },
+  "hosted_evidence": {
+    "status": "PENDING"
+  },
+  "release_policy": {
+    "user_managed_validation_preceded_publication": true,
+    "deployment_consumer_gate_preceded_publication": true,
+    "artifact_publication_performed": true,
+    "release_complete": true
+  }
+}
