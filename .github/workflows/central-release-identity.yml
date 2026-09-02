@@ -1,0 +1,30 @@
+name: Central release identity
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Central release identity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate namespace, distributed signing key, and Portal token
+        env:
+          CENTRAL_PORTAL_TOKEN: ${{ secrets.CENTRAL_PORTAL_TOKEN }}
+        run: |
+          scripts/run-publication-central-release-identity.sh \
+            --result '${{ runner.temp }}/mantle-central-identity/result.json'
+          scripts/check-publication-central-release-identity.sh \
+            --result '${{ runner.temp }}/mantle-central-identity/result.json'
+          scripts/test-publication-central-release-identity.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: publication-central-release-identity-result
+          path: ${{ runner.temp }}/mantle-central-identity/result.json
+          if-no-files-found: error
+          retention-days: 30

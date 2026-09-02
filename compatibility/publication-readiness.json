@@ -3,13 +3,14 @@
   "status": "IN_PROGRESS",
   "phase": "publication-readiness",
   "compatibility_baseline": "dev.arbjerg:lavaplayer:2.2.6",
-  "completed_slice": "publication-cargo-vet-exemption-closure",
+  "completed_slice": "publication-central-release-identity",
   "completed_slices": [
     "publication-artifact-boundary",
     "publication-native-matrix",
     "publication-central-bundle",
     "publication-sbom-provenance",
-    "publication-cargo-vet-exemption-closure"
+    "publication-cargo-vet-exemption-closure",
+    "publication-central-release-identity"
   ],
   "publication_ready": false,
   "channels": {
@@ -125,6 +126,15 @@
       "external_prerequisites": ["verified Central namespace", "release PGP key", "Central Portal user token"]
     },
     {
+      "id": "central_release_identity",
+      "status": "PASS",
+      "scope": "verified io.github.rayan6ms namespace, public release-key distribution, and authenticated protected Portal token",
+      "checker": "scripts/check-publication-central-release-identity.sh",
+      "workflow": ".github/workflows/central-release-identity.yml",
+      "publishing_type": "USER_MANAGED",
+      "network_upload_performed": false
+    },
+    {
       "id": "sbom_and_provenance",
       "status": "PASS",
       "scope": "CycloneDX 1.5 release SBOM plus GitHub build-provenance and SBOM attestations",
@@ -137,6 +147,6 @@
       "sbom_attestation": "https://github.com/rayan6ms/mantle/attestations/44571213"
     }
   ],
-  "active_blockers": ["central-release-identity"],
-  "next_slice": "publication-central-release-identity"
+  "active_blockers": ["central-validation-deployment"],
+  "next_slice": "publication-central-validation-deployment"
 }

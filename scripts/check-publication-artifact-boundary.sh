@@ -45,7 +45,7 @@ jq --exit-status '
   .channels.cargo_registry.workspace_packages == 12 and
   .channels.cargo_registry.fuzz_packages == 1 and
   .channels.repository_snapshot.status == "NOT_PUBLISHED" and
-  ([.gates[].id] | sort) == ["artifact_boundary", "central_metadata_and_signing", "dependency_audits", "native_classifier_matrix", "sbom_and_provenance"] and
+  ([.gates[].id] | sort) == ["artifact_boundary", "central_metadata_and_signing", "central_release_identity", "dependency_audits", "native_classifier_matrix", "sbom_and_provenance"] and
   (.gates[] | select(.id == "artifact_boundary") | .status) == "PASS" and
   (.gates[] | select(.id == "dependency_audits") |
     .status == "PASS" and .remaining_exact_version_exemptions == 0) and
@@ -54,8 +54,9 @@ jq --exit-status '
   (.gates[] | select(.id == "sbom_and_provenance") |
     .status == "PASS" and .subject_count == 6 and
     .sbom_format == "CycloneDX JSON 1.5") and
-  .active_blockers == ["central-release-identity"] and
-  .next_slice == "publication-central-release-identity"
+  (.gates[] | select(.id == "central_release_identity") | .status) == "PASS" and
+  .active_blockers == ["central-validation-deployment"] and
+  .next_slice == "publication-central-validation-deployment"
 ' "$PLAN" >/dev/null
 
 mapfile -t expected < <(jq --raw-output '.channels.maven.artifact_boundary_files[]' "$PLAN" | sort)

@@ -73,16 +73,17 @@ jq --exit-status '
 
 jq --exit-status '
   .schema_version == 1 and .status == "IN_PROGRESS" and
-  .completed_slice == "publication-cargo-vet-exemption-closure" and
+  .completed_slice == "publication-central-release-identity" and
   (.completed_slices | index("publication-cargo-vet-exemption-closure")) != null and
+  (.completed_slices | index("publication-central-release-identity")) != null and
   .publication_ready == false and
   (.gates[] | select(.id == "dependency_audits") |
     .status == "PASS" and .imports == 6 and .local_exact_version_audits == 140 and
     .fully_audited_packages == 170 and .remaining_exact_version_exemptions == 0 and
     .checker == "scripts/check-publication-cargo-vet-exemption-closure.sh" and
     .hosted_evidence == "https://github.com/rayan6ms/mantle/actions/runs/33580304900") and
-  .active_blockers == ["central-release-identity"] and
-  .next_slice == "publication-central-release-identity"
+  .active_blockers == ["central-validation-deployment"] and
+  .next_slice == "publication-central-validation-deployment"
 ' "$READINESS" >/dev/null
 
 tuples="$(mktemp)"

@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "status": "OPERATOR_VERIFIED",
+  "slice": "publication-central-release-identity",
+  "version": "1.0.0",
+  "namespace": {
+    "group_id": "io.github.rayan6ms",
+    "portal_status": "VERIFIED",
+    "organization": "Rayan6ms",
+    "observed_at": "2026-09-02T02:05:33Z"
+  },
+  "signing_key": {
+    "primary_fingerprint": "B7CEFF5211EA68CB834AED549FA70609D2B9F145",
+    "primary_signing_capability": true,
+    "signing_subkey": false,
+    "expires_at_epoch": 1862422660,
+    "keyserver": "hkps://keyserver.ubuntu.com",
+    "isolated_round_trip": "PASS",
+    "secret_key_location": "OPERATOR_LOCAL_ONLY"
+  },
+  "portal_token": {
+    "name": "Mantle-1-0-release-2026-09",
+    "scope": "UNLIMITED",
+    "expires_on": "2026-10-01",
+    "github_actions_secret": "CENTRAL_PORTAL_TOKEN",
+    "authentication_probe": "PASS",
+    "authentication_probe_http_status": 404,
+    "secret_material_retained_in_repository": false
+  },
+  "release_policy": {
+    "publishing_type": "USER_MANAGED",
+    "automatic_publication_allowed": false,
+    "validation_upload_performed": false,
+    "artifact_publication_performed": false,
+    "publish_requires_separate_explicit_action": true
+  },
+  "next_slice": "publication-central-validation-deployment"
+}
