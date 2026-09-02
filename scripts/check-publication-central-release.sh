@@ -57,6 +57,11 @@ jq --exit-status '
     jobs_passed: 1,
     result_sha256: "8de7b144f0161b93d79077ddae7830b76fe3c3b7bb47d64c2d2f1c8b3f0c466f"
   } and
+  .credential_cleanup.portal_token_name == "Mantle-1-0-release-2026-09" and
+  .credential_cleanup.portal_status == "REVOKED" and
+  .credential_cleanup.active_portal_tokens_remaining == 0 and
+  .credential_cleanup.github_actions_secret == "CENTRAL_PORTAL_TOKEN" and
+  .credential_cleanup.github_actions_secret_status == "REMOVED" and
   .release_policy == {
     user_managed_validation_preceded_publication: true,
     deployment_consumer_gate_preceded_publication: true,
@@ -99,6 +104,7 @@ jq --exit-status '
     .workflow == ".github/workflows/central-public-release.yml" and
     .hosted_evidence == "https://github.com/rayan6ms/mantle/actions/runs/33601586857" and
     .terminal_state == "PUBLISHED" and
+    .publishing_credential_cleanup == "PASS" and
     .repository_file_count == 60 and
     .repository_manifest_sha256 == "1ab7f682451ea5d3283b6cb29df20f23d71da80eca59569eea96645b3ae41a6d") and
   .active_blockers == [] and .next_slice == null

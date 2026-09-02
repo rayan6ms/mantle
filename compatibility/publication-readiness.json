@@ -159,6 +159,7 @@
       "hosted_evidence": "https://github.com/rayan6ms/mantle/actions/runs/33601586857",
       "deployment_id": "9205c170-5232-4817-980f-0ff92e581ee9",
       "terminal_state": "PUBLISHED",
+      "publishing_credential_cleanup": "PASS",
       "public_repository": "https://repo.maven.apache.org/maven2",
       "repository_file_count": 60,
       "repository_manifest_sha256": "1ab7f682451ea5d3283b6cb29df20f23d71da80eca59569eea96645b3ae41a6d"

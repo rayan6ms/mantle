@@ -41,6 +41,14 @@
     "jobs_passed": 1,
     "result_sha256": "8de7b144f0161b93d79077ddae7830b76fe3c3b7bb47d64c2d2f1c8b3f0c466f"
   },
+  "credential_cleanup": {
+    "portal_token_name": "Mantle-1-0-release-2026-09",
+    "portal_status": "REVOKED",
+    "active_portal_tokens_remaining": 0,
+    "github_actions_secret": "CENTRAL_PORTAL_TOKEN",
+    "github_actions_secret_status": "REMOVED",
+    "observed_at": "2026-09-02T07:17:45Z"
+  },
   "release_policy": {
     "user_managed_validation_preceded_publication": true,
     "deployment_consumer_gate_preceded_publication": true,
