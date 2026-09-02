@@ -71,6 +71,7 @@ pub use hls::{
 };
 pub use http_input::{
     HttpNetworkAccess, HttpRangeInput, HttpRangeOptions, HttpStreamInput, HttpStreamOptions,
+    OutboundRoute, OutboundRouteContext, OutboundRouteOutcome, OutboundRoutePolicy,
 };
 pub use mantle_audio::PcmFrame;
 pub use mpeg_ts::{
@@ -960,6 +961,18 @@ impl MediaSession {
             requested,
             actual: timestamp_to_std(self.time_base, result.actual_ts),
         })
+    }
+
+    pub(crate) fn reset_decoder(&mut self) -> Result<(), MediaError> {
+        if let Some(decoder) = self.decoder.as_mut() {
+            match decoder {
+                PcmDecoder::Symphonia(decoder) => decoder.reset(),
+                PcmDecoder::Xaac(decoder) => decoder.reset()?,
+            }
+        }
+        self.pending_packets.clear();
+        self.consecutive_decode_errors = 0;
+        Ok(())
     }
 
     fn next_audio_packet(&mut self) -> Result<Option<symphonia::core::packet::Packet>, MediaError> {
@@ -2671,6 +2684,7 @@ fn map_audio_frame_error(error: AudioFrameError) -> MediaError {
         | AudioFrameError::ResamplerFailure
         | AudioFrameError::InvalidOpusPcmSamples { .. }
         | AudioFrameError::OpusEncodingFailure
+        | AudioFrameError::OpusDecodingFailure
         | AudioFrameError::EncodedFrameTooLarge { .. } => MediaError::Backend {
             operation: "decode",
             message: error.to_string(),

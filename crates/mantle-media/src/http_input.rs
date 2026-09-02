@@ -1,15 +1,20 @@
 use std::fmt;
-use std::io::{self, Read, Seek, SeekFrom};
-use std::net::IpAddr;
+use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::net::{IpAddr, SocketAddr, TcpStream};
+use std::sync::Arc;
 use std::time::Duration;
 
+use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use ureq::http::header::{
     ACCEPT_ENCODING, CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_RANGE, ETAG, IF_RANGE,
     LAST_MODIFIED, RANGE,
 };
 use ureq::http::{HeaderMap, HeaderName, Uri};
 use ureq::unversioned::resolver::{DefaultResolver, ResolvedSocketAddrs, Resolver};
-use ureq::unversioned::transport::{DefaultConnector, NextTimeout};
+use ureq::unversioned::transport::{
+    Buffers, Connector, DefaultConnector, Either, LazyBuffers, NextTimeout, RustlsConnector,
+    Transport,
+};
 use ureq::{Agent, BodyReader, Error as UreqError, ResponseExt};
 
 use crate::{MediaCancellation, MediaError, MediaInput};
@@ -27,6 +32,36 @@ pub enum HttpNetworkAccess {
     ///
     /// This is intended for explicitly trusted deployments and deterministic loopback tests.
     AllowPrivateNetworks,
+}
+
+/// One selected outbound source address and opaque connection-pool identity.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OutboundRoute {
+    pub local_ip: IpAddr,
+    pub identity: u64,
+}
+
+/// Credential-safe destination context passed to an outbound route policy.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OutboundRouteContext<'a> {
+    pub scheme: &'a str,
+    pub authority: &'a str,
+}
+
+/// Stable outcome classes reported after a routed request or connection attempt.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OutboundRouteOutcome {
+    ConnectionEstablished,
+    DestinationDenied,
+    Timeout,
+    TransportFailure,
+}
+
+/// Injectable outbound address selection used by RoutePlanner-style integrations.
+pub trait OutboundRoutePolicy: fmt::Debug + Send + Sync {
+    fn select_route(&self, context: OutboundRouteContext<'_>) -> Option<OutboundRoute>;
+
+    fn report_outcome(&self, route: OutboundRoute, outcome: OutboundRouteOutcome);
 }
 
 /// Resource and network policy for a seekable HTTP range input.
@@ -133,16 +168,41 @@ impl HttpRangeInput {
         options: HttpRangeOptions,
         cancellation: MediaCancellation,
     ) -> Result<Self, MediaError> {
+        Self::open_inner(url, options, cancellation, None)
+    }
+
+    /// Opens a ranged object with a selected local-address policy on every new connection.
+    ///
+    /// # Errors
+    ///
+    /// Returns the bounded option, cancellation, URL, destination, transport, or range-response
+    /// errors documented by [`Self::open_with_cancellation`].
+    pub fn open_routed_with_cancellation(
+        url: impl AsRef<str>,
+        options: HttpRangeOptions,
+        cancellation: MediaCancellation,
+        route_policy: Arc<dyn OutboundRoutePolicy>,
+    ) -> Result<Self, MediaError> {
+        Self::open_inner(url, options, cancellation, Some(route_policy))
+    }
+
+    fn open_inner(
+        url: impl AsRef<str>,
+        options: HttpRangeOptions,
+        cancellation: MediaCancellation,
+        route_policy: Option<Arc<dyn OutboundRoutePolicy>>,
+    ) -> Result<Self, MediaError> {
         let options = options.validate()?;
         cancellation.check()?;
         let uri = parse_uri(url.as_ref())?;
-        let agent = create_agent(
+        let agent = create_agent_with_route_policy(
             options.max_response_header_bytes,
             options.socket_buffer_bytes,
             options.connect_timeout,
             options.request_timeout,
             options.max_redirects,
             options.network_access,
+            route_policy,
         );
         let mut input = Self {
             agent,
@@ -402,16 +462,41 @@ impl HttpStreamInput {
         options: HttpStreamOptions,
         cancellation: MediaCancellation,
     ) -> Result<Self, MediaError> {
+        Self::open_inner(url, options, cancellation, None)
+    }
+
+    /// Opens a bounded stream whose new connection selects and binds an outbound route.
+    ///
+    /// # Errors
+    ///
+    /// Returns the bounded option, cancellation, URL, destination, transport, status, or body
+    /// errors documented by [`Self::open_with_cancellation`].
+    pub fn open_routed_with_cancellation(
+        url: impl AsRef<str>,
+        options: HttpStreamOptions,
+        cancellation: MediaCancellation,
+        route_policy: Arc<dyn OutboundRoutePolicy>,
+    ) -> Result<Self, MediaError> {
+        Self::open_inner(url, options, cancellation, Some(route_policy))
+    }
+
+    fn open_inner(
+        url: impl AsRef<str>,
+        options: HttpStreamOptions,
+        cancellation: MediaCancellation,
+        route_policy: Option<Arc<dyn OutboundRoutePolicy>>,
+    ) -> Result<Self, MediaError> {
         let options = options.validate()?;
         cancellation.check()?;
         let uri = parse_uri(url.as_ref())?;
-        let agent = create_agent(
+        let agent = create_agent_with_route_policy(
             options.max_response_header_bytes,
             options.socket_buffer_bytes,
             options.connect_timeout,
             options.request_timeout,
             options.max_redirects,
             options.network_access,
+            route_policy,
         );
         let response = call_with_retries(
             || {
@@ -697,13 +782,14 @@ fn validate_request_counts(max_redirects: u32, max_retries: u32) -> Result<(), M
     Ok(())
 }
 
-pub(crate) fn create_agent(
+pub(crate) fn create_agent_with_route_policy(
     max_response_header_bytes: usize,
     socket_buffer_bytes: usize,
     connect_timeout: Duration,
     request_timeout: Duration,
     max_redirects: u32,
     network_access: HttpNetworkAccess,
+    route_policy: Option<Arc<dyn OutboundRoutePolicy>>,
 ) -> Agent {
     let config = Agent::config_builder()
         .proxy(None)
@@ -718,14 +804,189 @@ pub(crate) fn create_agent(
         .timeout_connect(Some(connect_timeout))
         .timeout_recv_response(Some(request_timeout))
         .timeout_recv_body(Some(request_timeout))
+        .max_idle_connections(if route_policy.is_some() { 0 } else { 10 })
         .build();
-    Agent::with_parts(
-        config,
-        DefaultConnector::default(),
-        PolicyResolver {
-            access: network_access,
-        },
-    )
+    let resolver = PolicyResolver {
+        access: network_access,
+    };
+    if let Some(policy) = route_policy {
+        let connector = ().chain(RoutedTcpConnector { policy }).chain(RustlsConnector::default());
+        Agent::with_parts(config, connector, resolver)
+    } else {
+        Agent::with_parts(config, DefaultConnector::default(), resolver)
+    }
+}
+
+#[derive(Debug)]
+struct RoutedTcpConnector {
+    policy: Arc<dyn OutboundRoutePolicy>,
+}
+
+impl<In: Transport> Connector<In> for RoutedTcpConnector {
+    type Out = Either<In, RoutedTcpTransport>;
+
+    fn connect(
+        &self,
+        details: &ureq::unversioned::transport::ConnectionDetails<'_>,
+        chained: Option<In>,
+    ) -> Result<Option<Self::Out>, UreqError> {
+        if chained.is_some() {
+            return Ok(chained.map(Either::A));
+        }
+        let scheme = details.uri.scheme_str().unwrap_or_default();
+        let authority = details
+            .uri
+            .authority()
+            .map_or("", ureq::http::uri::Authority::as_str);
+        let route = self
+            .policy
+            .select_route(OutboundRouteContext { scheme, authority });
+        let stream = connect_routed(
+            &details.addrs,
+            route,
+            details.timeout,
+            details.config.no_delay(),
+        )
+        .map_err(|error| {
+            if let Some(route) = route {
+                self.policy.report_outcome(
+                    route,
+                    if error.kind() == io::ErrorKind::TimedOut {
+                        OutboundRouteOutcome::Timeout
+                    } else {
+                        OutboundRouteOutcome::TransportFailure
+                    },
+                );
+            }
+            UreqError::Io(error)
+        })?;
+        if let Some(route) = route {
+            self.policy
+                .report_outcome(route, OutboundRouteOutcome::ConnectionEstablished);
+        }
+        let buffers = LazyBuffers::new(
+            details.config.input_buffer_size(),
+            details.config.output_buffer_size(),
+        );
+        Ok(Some(Either::B(RoutedTcpTransport {
+            stream,
+            buffers,
+            read_timeout: None,
+            write_timeout: None,
+        })))
+    }
+}
+
+struct RoutedTcpTransport {
+    stream: TcpStream,
+    buffers: LazyBuffers,
+    read_timeout: Option<Duration>,
+    write_timeout: Option<Duration>,
+}
+
+impl fmt::Debug for RoutedTcpTransport {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("RoutedTcpTransport")
+            .field("peer", &self.stream.peer_addr().ok())
+            .finish_non_exhaustive()
+    }
+}
+
+impl Transport for RoutedTcpTransport {
+    fn buffers(&mut self) -> &mut dyn Buffers {
+        &mut self.buffers
+    }
+
+    fn transmit_output(&mut self, amount: usize, timeout: NextTimeout) -> Result<(), UreqError> {
+        let next = timeout.not_zero().map(|duration| *duration);
+        if next != self.write_timeout {
+            self.stream.set_write_timeout(next)?;
+            self.write_timeout = next;
+        }
+        let output = &self.buffers.output()[..amount];
+        self.stream.write_all(output).map_err(|error| {
+            if error.kind() == io::ErrorKind::TimedOut {
+                UreqError::Timeout(timeout.reason)
+            } else {
+                UreqError::Io(error)
+            }
+        })
+    }
+
+    fn await_input(&mut self, timeout: NextTimeout) -> Result<bool, UreqError> {
+        let next = timeout.not_zero().map(|duration| *duration);
+        if next != self.read_timeout {
+            self.stream.set_read_timeout(next)?;
+            self.read_timeout = next;
+        }
+        let input = self.buffers.input_append_buf();
+        let amount = self.stream.read(input).map_err(|error| {
+            if error.kind() == io::ErrorKind::TimedOut {
+                UreqError::Timeout(timeout.reason)
+            } else {
+                UreqError::Io(error)
+            }
+        })?;
+        self.buffers.input_appended(amount);
+        Ok(amount > 0)
+    }
+
+    fn is_open(&mut self) -> bool {
+        false
+    }
+}
+
+fn connect_routed(
+    destinations: &ResolvedSocketAddrs,
+    route: Option<OutboundRoute>,
+    timeout: NextTimeout,
+    no_delay: bool,
+) -> io::Result<TcpStream> {
+    let mut last_error = None;
+    let started = std::time::Instant::now();
+    let total_timeout = timeout.not_zero().map(|duration| *duration);
+    for destination in destinations {
+        let domain = Domain::for_address(*destination);
+        let socket = Socket::new(domain, Type::STREAM, Some(Protocol::TCP))?;
+        if let Some(route) = route {
+            if route.local_ip.is_ipv4() != destination.is_ipv4() {
+                last_error = Some(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "outbound route address family does not match destination",
+                ));
+                continue;
+            }
+            socket.bind(&SockAddr::from(SocketAddr::new(route.local_ip, 0)))?;
+        }
+        let address = SockAddr::from(*destination);
+        let result = if let Some(total_timeout) = total_timeout {
+            let remaining = total_timeout.saturating_sub(started.elapsed());
+            if remaining.is_zero() {
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "routed connection timed out",
+                ));
+            }
+            socket.connect_timeout(&address, remaining)
+        } else {
+            socket.connect(&address)
+        };
+        match result {
+            Ok(()) => {
+                let stream: TcpStream = socket.into();
+                stream.set_nodelay(no_delay)?;
+                return Ok(stream);
+            }
+            Err(error) => last_error = Some(error),
+        }
+    }
+    Err(last_error.unwrap_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::AddrNotAvailable,
+            "no routed destination address",
+        )
+    }))
 }
 
 fn call_with_retries(

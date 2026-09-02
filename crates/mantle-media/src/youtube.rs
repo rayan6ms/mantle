@@ -1876,6 +1876,36 @@ impl YoutubeAudioSourceManager {
         )
     }
 
+    /// Creates a manager whose control-plane requests select and bind outbound routes.
+    ///
+    /// Pass the same policy to [`YoutubeAudioSourceManager::open_selected_playback_routed`] so
+    /// discovery, cipher/control requests, and media range connections share `RoutePlanner` state.
+    ///
+    /// # Errors
+    ///
+    /// Returns a policy error when options or credentials are invalid.
+    pub fn with_route_policy(
+        options: YoutubeSourceOptions,
+        authentication: YoutubeAuthentication,
+        route_policy: Arc<dyn crate::OutboundRoutePolicy>,
+    ) -> Result<Self, YoutubeError> {
+        options.validate()?;
+        authentication.validate()?;
+        let oauth = Mutex::new(YoutubeOAuthState::new(&authentication));
+        let http = RemoteHttpClient::with_route_policy(options.http, route_policy)
+            .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?;
+        Ok(Self {
+            options,
+            authentication,
+            oauth,
+            oauth_clock: Arc::new(SystemYoutubeOAuthClock::default()),
+            http,
+            cipher_resolver: None,
+            player_script: Mutex::new(None),
+            shutdown: AtomicBool::new(false),
+        })
+    }
+
     /// Creates the manager with a caller-provided monotonic clock for deterministic token expiry.
     ///
     /// # Errors

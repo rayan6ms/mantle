@@ -1,6 +1,7 @@
 use std::fmt;
 use std::io::{self, Read};
 use std::str::FromStr;
+use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -9,9 +10,10 @@ use ureq::http::{HeaderMap, HeaderName, HeaderValue, Uri};
 use ureq::{Agent, Error as UreqError};
 
 use crate::http_input::{
-    MAX_CONFIGURED_REDIRECTS, MAX_CONFIGURED_RETRIES, create_agent, is_blocked_destination_error,
+    MAX_CONFIGURED_REDIRECTS, MAX_CONFIGURED_RETRIES, create_agent_with_route_policy,
+    is_blocked_destination_error,
 };
-use crate::{HttpNetworkAccess, MediaCancellation};
+use crate::{HttpNetworkAccess, MediaCancellation, OutboundRoutePolicy};
 
 const RETRY_WAIT_POLL_INTERVAL: Duration = Duration::from_millis(10);
 const MAX_CONFIGURED_REQUEST_BYTES: u64 = 64 * 1024 * 1024;
@@ -362,6 +364,7 @@ pub struct RemoteHttpClient {
     agent: Agent,
     non_redirecting_agent: Agent,
     options: RemoteHttpOptions,
+    route_policy: Option<Arc<dyn OutboundRoutePolicy>>,
 }
 
 impl RemoteHttpClient {
@@ -372,27 +375,52 @@ impl RemoteHttpClient {
     /// Returns [`RemoteHttpErrorKind::InvalidOptions`] when any configured resource, timeout,
     /// redirect, retry, or backoff bound is invalid.
     pub fn new(options: RemoteHttpOptions) -> Result<Self, RemoteHttpError> {
+        Self::new_inner(options, None)
+    }
+
+    /// Creates a client whose new connections select and bind an outbound route.
+    ///
+    /// Routed clients disable idle reuse because ureq's pool key cannot include the opaque route
+    /// identity. This prevents a later selection from reusing a socket bound to an earlier IP.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RemoteHttpErrorKind::InvalidOptions`] for invalid bounded HTTP policy.
+    pub fn with_route_policy(
+        options: RemoteHttpOptions,
+        route_policy: Arc<dyn OutboundRoutePolicy>,
+    ) -> Result<Self, RemoteHttpError> {
+        Self::new_inner(options, Some(route_policy))
+    }
+
+    fn new_inner(
+        options: RemoteHttpOptions,
+        route_policy: Option<Arc<dyn OutboundRoutePolicy>>,
+    ) -> Result<Self, RemoteHttpError> {
         let options = options.validate()?;
-        let agent = create_agent(
+        let agent = create_agent_with_route_policy(
             options.max_response_header_bytes,
             options.socket_buffer_bytes,
             options.connect_timeout,
             options.request_timeout,
             options.max_redirects,
             options.network_access,
+            route_policy.clone(),
         );
-        let non_redirecting_agent = create_agent(
+        let non_redirecting_agent = create_agent_with_route_policy(
             options.max_response_header_bytes,
             options.socket_buffer_bytes,
             options.connect_timeout,
             options.request_timeout,
             0,
             options.network_access,
+            route_policy.clone(),
         );
         Ok(Self {
             agent,
             non_redirecting_agent,
             options,
+            route_policy,
         })
     }
 
@@ -517,6 +545,7 @@ impl fmt::Debug for RemoteHttpClient {
         formatter
             .debug_struct("RemoteHttpClient")
             .field("options", &self.options)
+            .field("routed", &self.route_policy.is_some())
             .finish_non_exhaustive()
     }
 }

@@ -1,12 +1,17 @@
 use std::collections::VecDeque;
 use std::fmt;
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
+use std::sync::Arc;
 use std::time::Duration;
 
-use crate::playlist::{PlaylistError, PlaylistLoadError, load_http_bytes, validate_line_lengths};
+use crate::playlist::{
+    PlaylistError, PlaylistLoadError, load_http_bytes, load_http_bytes_routed,
+    validate_line_lengths,
+};
 use crate::{
     HttpPlaylistOptions, HttpStreamInput, HttpStreamOptions, MediaCancellation, MediaError,
-    MediaInput, MpegTsLimits, PlaylistLimits, extract_mpeg_ts_adts, resolve_http_reference,
+    MediaInput, MpegTsLimits, OutboundRoutePolicy, PlaylistLimits, extract_mpeg_ts_adts,
+    resolve_http_reference,
 };
 
 /// Resource limits for one parsed HLS master or media playlist.
@@ -104,6 +109,34 @@ pub fn load_http_hls_segment_with_cancellation(
 ) -> Result<Vec<u8>, MediaError> {
     let cancellation_state = cancellation.clone();
     let mut input = HttpStreamInput::open_with_cancellation(&segment.uri, options, cancellation)?;
+    let capacity = input
+        .byte_len()
+        .and_then(|length| usize::try_from(length).ok())
+        .unwrap_or(0)
+        .min(usize::try_from(options.max_response_bytes).unwrap_or(usize::MAX));
+    let mut bytes = Vec::with_capacity(capacity);
+    if let Err(error) = input.read_to_end(&mut bytes) {
+        if cancellation_state.is_cancelled() {
+            return Err(MediaError::Cancelled);
+        }
+        return Err(MediaError::Io(error));
+    }
+    Ok(bytes)
+}
+
+pub(crate) fn load_http_hls_segment_routed_with_cancellation(
+    segment: &HlsSegment,
+    options: HttpStreamOptions,
+    cancellation: MediaCancellation,
+    route_policy: Arc<dyn OutboundRoutePolicy>,
+) -> Result<Vec<u8>, MediaError> {
+    let cancellation_state = cancellation.clone();
+    let mut input = HttpStreamInput::open_routed_with_cancellation(
+        &segment.uri,
+        options,
+        cancellation,
+        route_policy,
+    )?;
     let capacity = input
         .byte_len()
         .and_then(|length| usize::try_from(length).ok())
@@ -383,6 +416,40 @@ impl HlsLiveSequence {
         self.poll(&media, now)
     }
 
+    pub(crate) fn poll_http_routed_with_cancellation(
+        &mut self,
+        url: impl AsRef<str>,
+        options: HttpPlaylistOptions,
+        hls_limits: HlsLimits,
+        now: Duration,
+        cancellation: MediaCancellation,
+        route_policy: Arc<dyn OutboundRoutePolicy>,
+    ) -> Result<HlsLivePoll, HlsError> {
+        cancellation.check().map_err(HlsError::Media)?;
+        if self.last_poll_at.is_some_and(|previous| now < previous) {
+            return Err(HlsError::InvalidPlaylist("live poll time moved backwards"));
+        }
+        if let Some(next_reload_at) = self.next_reload_at
+            && now < next_reload_at
+        {
+            self.last_poll_at = Some(now);
+            return Ok(HlsLivePoll::WaitUntil(next_reload_at));
+        }
+        let playlist = load_http_hls_playlist_routed_with_cancellation(
+            url,
+            options,
+            hls_limits,
+            cancellation,
+            route_policy,
+        )?;
+        let HlsPlaylist::Media(media) = playlist else {
+            return Err(HlsError::InvalidPlaylist(
+                "live reload returned a master playlist",
+            ));
+        };
+        self.poll(&media, now)
+    }
+
     #[must_use]
     pub fn retained_segments(&self) -> usize {
         self.retained_uris.len()
@@ -630,6 +697,18 @@ pub fn load_http_hls_playlist_with_cancellation(
 ) -> Result<HlsPlaylist, HlsError> {
     let playlist_limits = options.playlist;
     let (base, bytes) = load_http_bytes(url, options, cancellation)?;
+    parse_hls_playlist(&bytes, &base, playlist_limits, hls_limits)
+}
+
+pub(crate) fn load_http_hls_playlist_routed_with_cancellation(
+    url: impl AsRef<str>,
+    options: HttpPlaylistOptions,
+    hls_limits: HlsLimits,
+    cancellation: MediaCancellation,
+    route_policy: Arc<dyn OutboundRoutePolicy>,
+) -> Result<HlsPlaylist, HlsError> {
+    let playlist_limits = options.playlist;
+    let (base, bytes) = load_http_bytes_routed(url, options, cancellation, route_policy)?;
     parse_hls_playlist(&bytes, &base, playlist_limits, hls_limits)
 }
 

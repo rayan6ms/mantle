@@ -8,8 +8,9 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use mantle_audio::{
-    COMPATIBLE_PCM_SAMPLES, EncodedFrameSlot, OpusEncodingQuality, PcmFormat, PcmFrame,
-    PcmOpusEncoder, VolumeLevel,
+    AudioFrameError, COMPATIBLE_PCM_SAMPLES, EncodedFrameSlot, FilterChainBuilder,
+    OpusEncodingQuality, PcmFilter, PcmFilterFactory, PcmFormat, PcmFrame, PcmOpusEncoder,
+    VolumeLevel,
 };
 use mantle_core::{
     SourceCancellation, SourceLoad, SourceManager, SourceReference, SourceRegistryError, TrackInfo,
@@ -17,19 +18,80 @@ use mantle_core::{
 use mantle_media::{
     Codec, EncodedPacket, HlsLimits, HlsLiveLimits, HttpNetworkAccess, HttpPlaylistOptions,
     HttpRangeOptions, HttpStreamOptions, MediaCancellation, MediaLimits, MediaSession,
-    MpegTsLimits, PlaylistLimits, YoutubeAudioSourceManager, YoutubeAuthentication,
-    YoutubeCipherChallenge, YoutubeCipherResolver, YoutubeCipherResolverError,
-    YoutubeCipherSolution, YoutubeClientKind, YoutubeErrorKind, YoutubeLivePlaybackOptions,
-    YoutubeLivePlaybackPoll, YoutubeOAuthClock, YoutubeOAuthOptions, YoutubePlaybackErrorKind,
-    YoutubePlaybackFormatKind, YoutubePlaybackMode, YoutubeProcessCipherOptions,
-    YoutubeProcessCipherResolver, YoutubeRoute, YoutubeSourceItem, YoutubeSourceOptions,
-    route_youtube_identifier,
+    MpegTsLimits, OutboundRoute, OutboundRouteContext, OutboundRouteOutcome, OutboundRoutePolicy,
+    PlaylistLimits, YoutubeAudioSourceManager, YoutubeAuthentication, YoutubeCipherChallenge,
+    YoutubeCipherResolver, YoutubeCipherResolverError, YoutubeCipherSolution, YoutubeClientKind,
+    YoutubeErrorKind, YoutubeLivePlaybackOptions, YoutubeLivePlaybackPoll, YoutubeOAuthClock,
+    YoutubeOAuthOptions, YoutubePlaybackErrorKind, YoutubePlaybackFormatKind, YoutubePlaybackMode,
+    YoutubeProcessCipherOptions, YoutubeProcessCipherResolver, YoutubeRoute, YoutubeSourceItem,
+    YoutubeSourceOptions, route_youtube_identifier,
 };
 use serde_json::Value;
 
 struct StaticCipherResolver {
     solution: YoutubeCipherSolution,
     calls: AtomicUsize,
+}
+
+struct SilenceFilter;
+
+impl PcmFilter for SilenceFilter {
+    fn process(&mut self, frame: &mut PcmFrame) -> Result<(), AudioFrameError> {
+        frame.samples_mut().fill(0.0);
+        Ok(())
+    }
+
+    fn reset(&mut self) {}
+}
+
+struct SilenceFactory;
+
+impl PcmFilterFactory for SilenceFactory {
+    fn build(
+        &self,
+        _format: PcmFormat,
+        builder: &mut FilterChainBuilder,
+    ) -> Result<(), AudioFrameError> {
+        builder.push(SilenceFilter)
+    }
+}
+
+struct OversizedFilterFactory;
+
+impl PcmFilterFactory for OversizedFilterFactory {
+    fn build(
+        &self,
+        _format: PcmFormat,
+        builder: &mut FilterChainBuilder,
+    ) -> Result<(), AudioFrameError> {
+        for _ in 0..=mantle_audio::MAX_FILTERS_PER_CHAIN {
+            builder.push(SilenceFilter)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+struct LoopbackRoutePolicy {
+    selections: AtomicUsize,
+    outcomes: AtomicUsize,
+}
+
+impl OutboundRoutePolicy for LoopbackRoutePolicy {
+    fn select_route(&self, context: OutboundRouteContext<'_>) -> Option<OutboundRoute> {
+        assert_eq!(context.scheme, "http");
+        self.selections.fetch_add(1, Ordering::AcqRel);
+        Some(OutboundRoute {
+            local_ip: "127.0.0.2".parse().unwrap(),
+            identity: 7,
+        })
+    }
+
+    fn report_outcome(&self, route: OutboundRoute, outcome: OutboundRouteOutcome) {
+        assert_eq!(route.identity, 7);
+        assert_eq!(outcome, OutboundRouteOutcome::ConnectionEstablished);
+        self.outcomes.fetch_add(1, Ordering::AcqRel);
+    }
 }
 
 impl StaticCipherResolver {
@@ -1149,16 +1211,31 @@ fn finite_webm_opus_handoff_preserves_the_exact_passthrough_packet() {
     let media_url = media.url("audio.webm?signature=media-secret");
     let response = playback_response(&media_url, "audio/webm; codecs=\"opus\"", bytes.len());
     let api = ReplayServer::start(move |_, _| ReplayResponse::json(&response));
-    let manager = playback_manager(&api);
+    let route_policy = Arc::new(LoopbackRoutePolicy {
+        selections: AtomicUsize::new(0),
+        outcomes: AtomicUsize::new(0),
+    });
+    let manager = YoutubeAudioSourceManager::with_route_policy(
+        YoutubeSourceOptions {
+            api_base_url: api.url("youtubei/v1"),
+            clients: vec![YoutubeClientKind::AndroidVr],
+            http: private_http_options(),
+            ..YoutubeSourceOptions::default()
+        },
+        YoutubeAuthentication::default(),
+        route_policy.clone(),
+    )
+    .unwrap();
     let formats = manager
         .discover_playback_formats("dQw4w9WgXcQ", &MediaCancellation::new())
         .unwrap();
     let mut playback = manager
-        .open_selected_playback(
+        .open_selected_playback_routed(
             &formats,
             private_range_options(),
             MediaLimits::default(),
             MediaCancellation::new(),
+            route_policy.clone(),
         )
         .unwrap();
     assert_eq!(playback.mode(), YoutubePlaybackMode::OpusPassthrough);
@@ -1174,6 +1251,67 @@ fn finite_webm_opus_handoff_preserves_the_exact_passthrough_packet() {
     assert_eq!(actual.timestamp(), expected.timestamp());
     assert_eq!(actual.duration(), Duration::from_millis(20));
     assert!(!media.requests().is_empty());
+    assert!(route_policy.selections.load(Ordering::Acquire) >= 2);
+    assert_eq!(
+        route_policy.selections.load(Ordering::Acquire),
+        route_policy.outcomes.load(Ordering::Acquire)
+    );
+}
+
+#[test]
+fn finite_opus_session_seeks_filters_and_returns_safely_to_passthrough() {
+    let bytes = fs::read(media_fixture("tone-opus.webm")).unwrap();
+    let media = RangeMediaServer::start(bytes.clone());
+    let response = playback_response(
+        &media.url("audio.webm"),
+        "audio/webm; codecs=\"opus\"",
+        bytes.len(),
+    );
+    let api = ReplayServer::start(move |_, _| ReplayResponse::json(&response));
+    let manager = playback_manager(&api);
+    let formats = manager
+        .discover_playback_formats("dQw4w9WgXcQ", &MediaCancellation::new())
+        .unwrap();
+    let mut playback = manager
+        .open_selected_playback(
+            &formats,
+            private_range_options(),
+            MediaLimits::default(),
+            MediaCancellation::new(),
+        )
+        .unwrap();
+    let mut output = EncodedFrameSlot::new();
+    assert!(playback.read_frame(&mut output).unwrap());
+    let direct = output.data().to_vec();
+
+    playback.seek(Duration::ZERO).unwrap();
+    playback.set_filter_factory(Some(&SilenceFactory)).unwrap();
+    assert_eq!(playback.mode(), YoutubePlaybackMode::Transcode);
+    assert!(playback.read_frame(&mut output).unwrap());
+    let filtered = output.data().to_vec();
+    assert_ne!(filtered, direct);
+
+    playback.seek(Duration::ZERO).unwrap();
+    assert!(playback.read_frame(&mut output).unwrap());
+    assert_eq!(output.data(), filtered);
+
+    assert!(
+        playback
+            .set_filter_factory(Some(&OversizedFilterFactory))
+            .is_err()
+    );
+    assert_eq!(playback.mode(), YoutubePlaybackMode::Transcode);
+
+    playback.set_filter_factory(None).unwrap();
+    assert_eq!(playback.mode(), YoutubePlaybackMode::OpusPassthrough);
+    playback.seek(Duration::ZERO).unwrap();
+    assert!(playback.read_frame(&mut output).unwrap());
+    let mut expected =
+        MediaSession::open_file(media_fixture("tone-opus.webm"), MediaLimits::default()).unwrap();
+    expected.seek(Duration::ZERO).unwrap();
+    let mut packet = EncodedPacket::with_capacity(expected.limits().max_packet_bytes);
+    assert!(expected.read_encoded(&mut packet).unwrap());
+    assert_eq!(output.data(), packet.data());
 }
 
 #[test]
@@ -1289,6 +1427,7 @@ fn finite_media_handoff_rejects_mismatch_bounds_and_preflight_cancellation() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn live_hls_handoff_reloads_at_deadlines_and_preserves_continuous_output() {
     let transport: Arc<[u8]> = fs::read(media_fixture("tone-aac-lc.ts")).unwrap().into();
     let media_reloads = Arc::new(AtomicUsize::new(0));
@@ -1318,10 +1457,20 @@ fn live_hls_handoff_reloads_at_deadlines_and_preserves_continuous_output() {
     let formats = manager
         .discover_playback_formats("dQw4w9WgXcQ", &MediaCancellation::new())
         .unwrap();
+    let route_policy = Arc::new(LoopbackRoutePolicy {
+        selections: AtomicUsize::new(0),
+        outcomes: AtomicUsize::new(0),
+    });
     let mut playback = manager
-        .open_selected_live_playback(&formats, private_live_options(), MediaCancellation::new())
+        .open_selected_live_playback_routed(
+            &formats,
+            private_live_options(),
+            MediaCancellation::new(),
+            route_policy.clone(),
+        )
         .unwrap();
     assert_eq!(playback.mode(), YoutubePlaybackMode::Transcode);
+    playback.set_filter_factory(Some(&SilenceFactory)).unwrap();
 
     let mut output = EncodedFrameSlot::new();
     let mut previous = None;
@@ -1380,6 +1529,11 @@ fn live_hls_handoff_reloads_at_deadlines_and_preserves_continuous_output() {
             .poll_frame(Duration::from_millis(200), &mut output)
             .unwrap(),
         YoutubeLivePlaybackPoll::Ended
+    );
+    assert!(route_policy.selections.load(Ordering::Acquire) >= 4);
+    assert_eq!(
+        route_policy.selections.load(Ordering::Acquire),
+        route_policy.outcomes.load(Ordering::Acquire)
     );
 }
 

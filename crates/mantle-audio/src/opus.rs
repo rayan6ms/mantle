@@ -1,4 +1,4 @@
-use mantle_opus::OpusEncoder;
+use mantle_opus::{OpusDecoder, OpusEncoder};
 
 use super::{
     AudioFrameError, COMPATIBLE_CHANNELS, COMPATIBLE_PCM_SAMPLES, COMPATIBLE_SAMPLE_RATE,
@@ -37,6 +37,72 @@ pub struct PcmOpusEncoder {
     pcm: [i16; COMPATIBLE_PCM_SAMPLES],
     scratch: [u8; MAX_COMPATIBLE_OPUS_FRAME_BYTES],
     quality: OpusEncodingQuality,
+}
+
+/// Allocation-stable decoder for bounded mono/stereo Opus packets.
+pub struct PcmOpusDecoder {
+    inner: OpusDecoder,
+    format: PcmFormat,
+    max_samples_per_channel: usize,
+}
+
+impl PcmOpusDecoder {
+    /// Allocates one native decoder state. Caller-owned frames hold all PCM storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an unsupported format or zero frame ceiling.
+    pub fn new(format: PcmFormat, max_samples_per_channel: usize) -> Result<Self, AudioFrameError> {
+        if max_samples_per_channel == 0 {
+            return Err(AudioFrameError::OpusDecodingFailure);
+        }
+        let inner = OpusDecoder::new(format.sample_rate(), format.channels())
+            .map_err(|_| AudioFrameError::OpusDecodingFailure)?;
+        Ok(Self {
+            inner,
+            format,
+            max_samples_per_channel,
+        })
+    }
+
+    /// Decodes one packet into a reusable canonical PCM frame without allocation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the output capacity is below the configured ceiling or libopus
+    /// rejects the packet.
+    pub fn decode(
+        &mut self,
+        packet: &[u8],
+        timestamp: Option<std::time::Duration>,
+        output: &mut PcmFrame,
+    ) -> Result<(), AudioFrameError> {
+        let capacity = self
+            .max_samples_per_channel
+            .checked_mul(usize::from(self.format.channels()))
+            .ok_or(AudioFrameError::OpusDecodingFailure)?;
+        let samples = output.prepare(capacity, self.format, timestamp)?;
+        let frames = self
+            .inner
+            .decode(packet, samples)
+            .map_err(|_| AudioFrameError::OpusDecodingFailure)?;
+        let actual = frames
+            .checked_mul(usize::from(self.format.channels()))
+            .ok_or(AudioFrameError::OpusDecodingFailure)?;
+        output.prepare(actual, self.format, timestamp)?;
+        Ok(())
+    }
+
+    /// Clears decoder history after a seek or processing replacement.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if libopus rejects its reset control request.
+    pub fn reset(&mut self) -> Result<(), AudioFrameError> {
+        self.inner
+            .reset()
+            .map_err(|_| AudioFrameError::OpusDecodingFailure)
+    }
 }
 
 impl PcmOpusEncoder {

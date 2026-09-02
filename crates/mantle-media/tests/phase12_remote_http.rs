@@ -1,14 +1,42 @@
 use std::io::{Read, Write};
-use std::net::{Shutdown, TcpListener, TcpStream};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::net::{IpAddr, Ipv4Addr, Shutdown, TcpListener, TcpStream};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use mantle_media::{
-    HttpNetworkAccess, MediaCancellation, RemoteHttpClient, RemoteHttpErrorKind, RemoteHttpOptions,
-    RemoteHttpRequest, RemoteRetryMode,
+    HttpNetworkAccess, MediaCancellation, OutboundRoute, OutboundRouteContext,
+    OutboundRouteOutcome, OutboundRoutePolicy, RemoteHttpClient, RemoteHttpErrorKind,
+    RemoteHttpOptions, RemoteHttpRequest, RemoteRetryMode,
 };
+
+#[derive(Debug)]
+struct AlternatingRoutePolicy {
+    selections: AtomicUsize,
+    outcomes: Mutex<Vec<(OutboundRoute, OutboundRouteOutcome)>>,
+}
+
+impl OutboundRoutePolicy for AlternatingRoutePolicy {
+    fn select_route(&self, context: OutboundRouteContext<'_>) -> Option<OutboundRoute> {
+        assert_eq!(context.scheme, "http");
+        assert!(context.authority.starts_with("127.0.0.1:"));
+        let index = self.selections.fetch_add(1, Ordering::AcqRel);
+        Some(OutboundRoute {
+            local_ip: IpAddr::V4(Ipv4Addr::new(
+                127,
+                0,
+                0,
+                2 + u8::try_from(index % 2).unwrap(),
+            )),
+            identity: index as u64,
+        })
+    }
+
+    fn report_outcome(&self, route: OutboundRoute, outcome: OutboundRouteOutcome) {
+        self.outcomes.lock().unwrap().push((route, outcome));
+    }
+}
 
 #[test]
 fn enforces_ssrf_policy_and_redacts_request_credentials() {
@@ -280,6 +308,35 @@ fn rejects_unbounded_policy_and_credential_bearing_request_syntax() {
     assert_eq!(error.kind(), RemoteHttpErrorKind::InvalidRequest);
 }
 
+#[test]
+fn routed_client_binds_each_selected_ip_and_reports_connection_outcomes() {
+    let server = ReplayServer::start(|_, _| ReplayResponse::ok(b"routed"));
+    let policy = Arc::new(AlternatingRoutePolicy {
+        selections: AtomicUsize::new(0),
+        outcomes: Mutex::new(Vec::new()),
+    });
+    let options = RemoteHttpOptions {
+        network_access: HttpNetworkAccess::AllowPrivateNetworks,
+        ..RemoteHttpOptions::default()
+    };
+    let client = RemoteHttpClient::with_route_policy(options, policy.clone()).unwrap();
+    let request = RemoteHttpRequest::get(server.url("route")).unwrap();
+
+    assert_eq!(client.execute(&request).unwrap().body(), b"routed");
+    assert_eq!(client.execute(&request).unwrap().body(), b"routed");
+    let requests = server.requests();
+    assert_eq!(requests[0].peer_ip, IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2)));
+    assert_eq!(requests[1].peer_ip, IpAddr::V4(Ipv4Addr::new(127, 0, 0, 3)));
+    assert_eq!(policy.selections.load(Ordering::Acquire), 2);
+    let outcomes = policy.outcomes.lock().unwrap();
+    assert_eq!(outcomes.len(), 2);
+    assert!(
+        outcomes
+            .iter()
+            .all(|(_, outcome)| *outcome == OutboundRouteOutcome::ConnectionEstablished)
+    );
+}
+
 fn private_client(mut options: RemoteHttpOptions) -> RemoteHttpClient {
     options.network_access = HttpNetworkAccess::AllowPrivateNetworks;
     options.connect_timeout = Duration::from_secs(2);
@@ -291,6 +348,7 @@ fn private_client(mut options: RemoteHttpOptions) -> RemoteHttpClient {
 struct ReplayRequest {
     headers: Vec<(String, String)>,
     body: Vec<u8>,
+    peer_ip: IpAddr,
 }
 
 impl ReplayRequest {
@@ -359,7 +417,9 @@ impl ReplayServer {
         let thread = thread::spawn(move || {
             while !thread_stop.load(Ordering::Acquire) {
                 match listener.accept() {
-                    Ok((stream, _)) => serve(stream, &thread_requests, responder.as_ref()),
+                    Ok((stream, peer)) => {
+                        serve(stream, peer.ip(), &thread_requests, responder.as_ref());
+                    }
                     Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                         thread::sleep(Duration::from_millis(1));
                     }
@@ -396,6 +456,7 @@ impl Drop for ReplayServer {
 
 fn serve(
     mut stream: TcpStream,
+    peer_ip: IpAddr,
     requests: &Mutex<Vec<ReplayRequest>>,
     responder: &(dyn Fn(ReplayRequest, usize) -> ReplayResponse + Send + Sync),
 ) {
@@ -446,6 +507,7 @@ fn serve(
     let request = ReplayRequest {
         headers,
         body: raw[header_end..header_end + content_len].to_vec(),
+        peer_ip,
     };
     let count = requests.lock().unwrap().len();
     requests.lock().unwrap().push(request.clone());

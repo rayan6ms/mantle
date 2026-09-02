@@ -14,7 +14,7 @@ pub use filter::{
     EQUALIZER_BANDS, EqualizerFactory, FilterChainBuilder, FilterPipeline, MAX_FILTERS_PER_CHAIN,
     PcmFilter, PcmFilterFactory,
 };
-pub use opus::{OpusEncodingQuality, PcmOpusEncoder};
+pub use opus::{OpusEncodingQuality, PcmOpusDecoder, PcmOpusEncoder};
 pub use passthrough::{
     OpusModeTransition, OpusPacketRoute, OpusPassthrough, OpusPipelineMode, opus_packet_duration,
 };
@@ -336,6 +336,7 @@ pub enum AudioFrameError {
         actual: usize,
     },
     OpusEncodingFailure,
+    OpusDecodingFailure,
     EncodedFrameTooLarge {
         actual: usize,
         limit: usize,
@@ -403,6 +404,7 @@ impl fmt::Display for AudioFrameError {
                 "Opus input contains {actual} PCM samples; expected {expected}"
             ),
             Self::OpusEncodingFailure => formatter.write_str("Opus encoding failed"),
+            Self::OpusDecodingFailure => formatter.write_str("Opus decoding failed"),
             Self::EncodedFrameTooLarge { actual, limit } => write!(
                 formatter,
                 "encoded frame has {actual} bytes; fixed slot limit is {limit}"

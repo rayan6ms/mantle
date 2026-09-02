@@ -1,10 +1,14 @@
 use std::collections::BTreeMap;
 use std::fmt;
 use std::io::Read;
+use std::sync::Arc;
 
 use ureq::http::Uri;
 
-use crate::{HttpStreamInput, HttpStreamOptions, MediaCancellation, MediaError, MediaInput};
+use crate::{
+    HttpStreamInput, HttpStreamOptions, MediaCancellation, MediaError, MediaInput,
+    OutboundRoutePolicy,
+};
 
 const PLAIN_PROBE_BYTES: usize = 1_000;
 
@@ -198,13 +202,40 @@ pub(crate) fn load_http_bytes(
     options: HttpPlaylistOptions,
     cancellation: MediaCancellation,
 ) -> Result<(String, Vec<u8>), PlaylistLoadError> {
+    load_http_bytes_inner(url, options, cancellation, None)
+}
+
+pub(crate) fn load_http_bytes_routed(
+    url: impl AsRef<str>,
+    options: HttpPlaylistOptions,
+    cancellation: MediaCancellation,
+    route_policy: Arc<dyn OutboundRoutePolicy>,
+) -> Result<(String, Vec<u8>), PlaylistLoadError> {
+    load_http_bytes_inner(url, options, cancellation, Some(route_policy))
+}
+
+fn load_http_bytes_inner(
+    url: impl AsRef<str>,
+    options: HttpPlaylistOptions,
+    cancellation: MediaCancellation,
+    route_policy: Option<Arc<dyn OutboundRoutePolicy>>,
+) -> Result<(String, Vec<u8>), PlaylistLoadError> {
     let playlist_limits = options.playlist.validate()?;
     let mut http_options = options.http;
     http_options.max_response_bytes = http_options
         .max_response_bytes
         .min(u64::try_from(playlist_limits.max_playlist_bytes).unwrap_or(u64::MAX));
     let cancellation_state = cancellation.clone();
-    let mut input = HttpStreamInput::open_with_cancellation(url, http_options, cancellation)?;
+    let mut input = if let Some(route_policy) = route_policy {
+        HttpStreamInput::open_routed_with_cancellation(
+            url,
+            http_options,
+            cancellation,
+            route_policy,
+        )?
+    } else {
+        HttpStreamInput::open_with_cancellation(url, http_options, cancellation)?
+    };
     let base = input.final_uri().to_string();
     let capacity = input
         .byte_len()

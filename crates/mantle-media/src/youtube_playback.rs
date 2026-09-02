@@ -1,13 +1,18 @@
 use std::fmt;
+use std::sync::Arc;
 use std::time::Duration;
 
 use mantle_audio::{
     AudioFrameError, COMPATIBLE_CHANNELS, COMPATIBLE_FRAME_DURATION, COMPATIBLE_PCM_SAMPLES,
-    COMPATIBLE_SAMPLE_RATE, EncodedFrameSlot, MAX_RESAMPLER_BUFFERED_FRAMES, OpusEncodingQuality,
-    OpusPassthrough, PcmFormat, PcmFrame, PcmOpusEncoder, PcmResampler, ResamplingQuality,
+    COMPATIBLE_SAMPLE_RATE, EncodedFrameSlot, FilterPipeline, MAX_FILTERS_PER_CHAIN,
+    MAX_RESAMPLER_BUFFERED_FRAMES, OpusEncodingQuality, OpusPassthrough, PcmFilterFactory,
+    PcmFormat, PcmFrame, PcmOpusDecoder, PcmOpusEncoder, PcmResampler, ResamplingQuality,
     VolumeLevel,
 };
 
+use crate::hls::{
+    load_http_hls_playlist_routed_with_cancellation, load_http_hls_segment_routed_with_cancellation,
+};
 use crate::{
     Codec, Container, EncodedPacket, HlsError, HlsLimits, HlsLiveLimits, HlsLivePoll,
     HlsLiveSequence, HlsPlaylist, HttpPlaylistOptions, HttpRangeInput, HttpRangeOptions,
@@ -109,6 +114,8 @@ pub struct YoutubeLivePlaybackSession {
     transcoder: Option<PcmTranscoder>,
     terminal_after_drain: Option<YoutubeLivePlaybackPoll>,
     terminal: Option<YoutubeLivePlaybackPoll>,
+    route_policy: Option<Arc<dyn crate::OutboundRoutePolicy>>,
+    pending_filters: FilterPipeline,
 }
 
 impl fmt::Debug for YoutubeLivePlaybackSession {
@@ -142,6 +149,10 @@ struct OpusPlayback {
     session: MediaSession,
     packet: EncodedPacket,
     passthrough: OpusPassthrough,
+    decoder: PcmOpusDecoder,
+    decoded: PcmFrame,
+    filters: FilterPipeline,
+    encoder: PcmOpusEncoder,
 }
 
 struct PcmTranscoder {
@@ -157,6 +168,7 @@ struct PcmTranscoder {
     assembled_len: usize,
     encoder_input: PcmFrame,
     encoder: PcmOpusEncoder,
+    filters: FilterPipeline,
     input_eof: bool,
     timestamp_initialized: bool,
     base_timestamp: Option<Duration>,
@@ -222,6 +234,58 @@ impl YoutubeAudioSourceManager {
         YoutubePlaybackSession::new(session, kind)
     }
 
+    /// Resolves and opens finite media through the same injectable outbound route policy used by
+    /// control-plane requests.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same source, policy, cancellation, network, or media failures as
+    /// [`Self::open_selected_playback`].
+    pub fn open_selected_playback_routed(
+        &self,
+        formats: &YoutubePlaybackFormats,
+        range_options: HttpRangeOptions,
+        media_limits: MediaLimits,
+        cancellation: MediaCancellation,
+        route_policy: Arc<dyn crate::OutboundRoutePolicy>,
+    ) -> Result<YoutubePlaybackSession, YoutubePlaybackError> {
+        let selected = formats.selected();
+        let kind = selected.kind().ok_or_else(|| {
+            YoutubePlaybackError::new(YoutubePlaybackErrorKind::IncompatibleFormat)
+        })?;
+        let content_length = selected.content_length().ok_or_else(|| {
+            YoutubePlaybackError::new(YoutubePlaybackErrorKind::IncompatibleFormat)
+        })?;
+        if content_length == 0 || content_length > range_options.max_source_bytes {
+            return Err(YoutubePlaybackError::new(
+                YoutubePlaybackErrorKind::InvalidOptions,
+            ));
+        }
+        let resolved = self
+            .resolve_selected_playback_url(formats, &cancellation)
+            .map_err(map_source_error)?;
+        let input = HttpRangeInput::open_routed_with_cancellation(
+            resolved.as_str(),
+            range_options,
+            cancellation.clone(),
+            route_policy,
+        )
+        .map_err(map_media_error)?;
+        if input.byte_len() != Some(content_length) {
+            return Err(YoutubePlaybackError::new(
+                YoutubePlaybackErrorKind::InvalidMedia,
+            ));
+        }
+        let session = MediaSession::open_with_cancellation(
+            Box::new(input),
+            Some(extension_hint(kind)),
+            media_limits,
+            cancellation,
+        )
+        .map_err(map_media_error)?;
+        YoutubePlaybackSession::new(session, kind)
+    }
+
     /// Resolves and opens the selected live HLS manifest without performing an eager request.
     ///
     /// Playlist reloads remain caller-clock-driven through
@@ -255,6 +319,24 @@ impl YoutubeAudioSourceManager {
             cancellation,
         )
     }
+
+    /// Opens live HLS with route selection applied to every playlist and segment connection.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same policy, source, cancellation, or incompatible-format failures as
+    /// [`Self::open_selected_live_playback`].
+    pub fn open_selected_live_playback_routed(
+        &self,
+        formats: &YoutubePlaybackFormats,
+        options: YoutubeLivePlaybackOptions,
+        cancellation: MediaCancellation,
+        route_policy: Arc<dyn crate::OutboundRoutePolicy>,
+    ) -> Result<YoutubeLivePlaybackSession, YoutubePlaybackError> {
+        let mut session = self.open_selected_live_playback(formats, options, cancellation)?;
+        session.route_policy = Some(route_policy);
+        Ok(session)
+    }
 }
 
 impl YoutubeLivePlaybackSession {
@@ -276,12 +358,42 @@ impl YoutubeLivePlaybackSession {
             transcoder: None,
             terminal_after_drain: None,
             terminal: None,
+            route_policy: None,
+            pending_filters: FilterPipeline::new(
+                PcmFormat::new(COMPATIBLE_SAMPLE_RATE, COMPATIBLE_CHANNELS)
+                    .map_err(map_audio_error)?,
+                MAX_FILTERS_PER_CHAIN,
+            )
+            .map_err(map_audio_error)?,
         })
     }
 
     #[must_use]
     pub const fn mode(&self) -> YoutubePlaybackMode {
         YoutubePlaybackMode::Transcode
+    }
+
+    /// Atomically replaces filters for the current or next live HLS transcoder.
+    ///
+    /// The factory is consumed into Mantle-owned per-session filter instances immediately; the
+    /// caller does not need to keep the factory alive between playlist reloads.
+    ///
+    /// # Errors
+    ///
+    /// Returns a bounded filter-factory or audio-state reset error.
+    pub fn set_filter_factory(
+        &mut self,
+        factory: Option<&dyn PcmFilterFactory>,
+    ) -> Result<(), YoutubePlaybackError> {
+        if let Some(transcoder) = self.transcoder.as_mut() {
+            transcoder.set_filter_factory(factory)
+        } else {
+            self.pending_filters
+                .install_factory(factory)
+                .map_err(map_audio_error)?;
+            self.pending_filters.reset();
+            Ok(())
+        }
     }
 
     /// Produces one frame or a deterministic reload/terminal outcome at monotonic `now`.
@@ -326,11 +438,20 @@ impl YoutubeLivePlaybackSession {
 
             match self.poll_next_segment(now)? {
                 HlsLivePoll::Segment(segment) => {
-                    let transport = load_http_hls_segment_with_cancellation(
-                        &segment,
-                        self.options.segment,
-                        self.cancellation.clone(),
-                    )
+                    let transport = if let Some(policy) = &self.route_policy {
+                        load_http_hls_segment_routed_with_cancellation(
+                            &segment,
+                            self.options.segment,
+                            self.cancellation.clone(),
+                            Arc::clone(policy),
+                        )
+                    } else {
+                        load_http_hls_segment_with_cancellation(
+                            &segment,
+                            self.options.segment,
+                            self.cancellation.clone(),
+                        )
+                    }
                     .map_err(map_media_error)?;
                     self.cancellation.check().map_err(map_media_error)?;
                     let elementary = extract_mpeg_ts_adts(&transport, self.options.mpeg_ts)
@@ -345,7 +466,9 @@ impl YoutubeLivePlaybackSession {
                     if let Some(transcoder) = self.transcoder.as_mut() {
                         transcoder.replace_input(session)?;
                     } else {
-                        self.transcoder = Some(PcmTranscoder::new_continuous(session)?);
+                        let mut transcoder = PcmTranscoder::new_continuous(session)?;
+                        std::mem::swap(&mut transcoder.filters, &mut self.pending_filters);
+                        self.transcoder = Some(transcoder);
                     }
                 }
                 HlsLivePoll::WaitUntil(deadline) => {
@@ -364,24 +487,43 @@ impl YoutubeLivePlaybackSession {
 
     fn poll_next_segment(&mut self, now: Duration) -> Result<HlsLivePoll, YoutubePlaybackError> {
         if let Some(url) = self.media_playlist_url.as_deref() {
-            return self
-                .sequence
-                .poll_http_with_cancellation(
+            return if let Some(policy) = &self.route_policy {
+                self.sequence.poll_http_routed_with_cancellation(
+                    url,
+                    self.options.playlist,
+                    self.options.hls,
+                    now,
+                    self.cancellation.clone(),
+                    Arc::clone(policy),
+                )
+            } else {
+                self.sequence.poll_http_with_cancellation(
                     url,
                     self.options.playlist,
                     self.options.hls,
                     now,
                     self.cancellation.clone(),
                 )
-                .map_err(map_hls_error);
+            }
+            .map_err(map_hls_error);
         }
 
-        let playlist = load_http_hls_playlist_with_cancellation(
-            &self.manifest_url,
-            self.options.playlist,
-            self.options.hls,
-            self.cancellation.clone(),
-        )
+        let playlist = if let Some(policy) = &self.route_policy {
+            load_http_hls_playlist_routed_with_cancellation(
+                &self.manifest_url,
+                self.options.playlist,
+                self.options.hls,
+                self.cancellation.clone(),
+                Arc::clone(policy),
+            )
+        } else {
+            load_http_hls_playlist_with_cancellation(
+                &self.manifest_url,
+                self.options.playlist,
+                self.options.hls,
+                self.cancellation.clone(),
+            )
+        }
         .map_err(map_hls_error)?;
         match playlist {
             HlsPlaylist::Master(master) => {
@@ -437,6 +579,13 @@ impl YoutubePlaybackSession {
                 session,
                 packet,
                 passthrough: OpusPassthrough::new(format),
+                decoder: PcmOpusDecoder::new(format, mantle_audio::COMPATIBLE_SAMPLES_PER_CHANNEL)
+                    .map_err(map_audio_error)?,
+                decoded: PcmFrame::with_capacity(COMPATIBLE_PCM_SAMPLES),
+                filters: FilterPipeline::new(format, MAX_FILTERS_PER_CHAIN)
+                    .map_err(map_audio_error)?,
+                encoder: PcmOpusEncoder::new(OpusEncodingQuality::MAXIMUM)
+                    .map_err(map_audio_error)?,
             }))
         } else {
             YoutubePlaybackInner::Transcode(Box::new(PcmTranscoder::new(session)?))
@@ -445,10 +594,14 @@ impl YoutubePlaybackSession {
     }
 
     #[must_use]
-    pub const fn mode(&self) -> YoutubePlaybackMode {
-        match self.inner {
-            YoutubePlaybackInner::Opus(_) => YoutubePlaybackMode::OpusPassthrough,
-            YoutubePlaybackInner::Transcode(_) => YoutubePlaybackMode::Transcode,
+    pub fn mode(&self) -> YoutubePlaybackMode {
+        match &self.inner {
+            YoutubePlaybackInner::Opus(playback) if playback.filters.filter_count() == 0 => {
+                YoutubePlaybackMode::OpusPassthrough
+            }
+            YoutubePlaybackInner::Opus(_) | YoutubePlaybackInner::Transcode(_) => {
+                YoutubePlaybackMode::Transcode
+            }
         }
     }
 
@@ -487,14 +640,86 @@ impl YoutubePlaybackSession {
                     .passthrough
                     .route_packet(playback.packet.data(), playback.packet.timestamp(), output)
                     .map_err(map_audio_error)?;
-                if !route.delivered() {
+                if route.delivered() {
+                    return Ok(true);
+                }
+                playback
+                    .decoder
+                    .decode(
+                        playback.packet.data(),
+                        playback.packet.timestamp(),
+                        &mut playback.decoded,
+                    )
+                    .map_err(map_audio_error)?;
+                if playback.decoded.samples().len() != COMPATIBLE_PCM_SAMPLES {
                     return Err(YoutubePlaybackError::new(
                         YoutubePlaybackErrorKind::IncompatibleFormat,
                     ));
                 }
+                playback
+                    .filters
+                    .process(&mut playback.decoded)
+                    .map_err(map_audio_error)?;
+                playback
+                    .encoder
+                    .encode(&playback.decoded, output, VolumeLevel::NORMAL)
+                    .map_err(map_audio_error)?;
                 Ok(true)
             }
             YoutubePlaybackInner::Transcode(transcoder) => transcoder.read_frame(output),
+        }
+    }
+
+    /// Seeks the media session and resets every decoder, filter, resampler, encoder, and
+    /// passthrough transition state before another frame can be produced.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selected object is not seekable or any owned media/audio state
+    /// cannot be reset.
+    pub fn seek(&mut self, requested: Duration) -> Result<crate::SeekResult, YoutubePlaybackError> {
+        match &mut self.inner {
+            YoutubePlaybackInner::Opus(playback) => {
+                let result = playback.session.seek(requested).map_err(map_media_error)?;
+                playback.decoded.clear();
+                playback.passthrough.reset();
+                playback.decoder.reset().map_err(map_audio_error)?;
+                playback.filters.reset();
+                playback.encoder.reset().map_err(map_audio_error)?;
+                Ok(result)
+            }
+            YoutubePlaybackInner::Transcode(transcoder) => transcoder.seek(requested),
+        }
+    }
+
+    /// Atomically replaces the active per-session filter chain.
+    ///
+    /// Passing `None` removes filters. On Opus input this switches back to direct packet delivery
+    /// after resetting both processing and passthrough state. A failed factory leaves the previous
+    /// chain and mode active.
+    ///
+    /// # Errors
+    ///
+    /// Returns a bounded filter-factory or audio-state reset error.
+    pub fn set_filter_factory(
+        &mut self,
+        factory: Option<&dyn PcmFilterFactory>,
+    ) -> Result<(), YoutubePlaybackError> {
+        match &mut self.inner {
+            YoutubePlaybackInner::Opus(playback) => {
+                playback
+                    .filters
+                    .install_factory(factory)
+                    .map_err(map_audio_error)?;
+                playback
+                    .passthrough
+                    .set_filters_active(playback.filters.filter_count() != 0);
+                playback.passthrough.reset();
+                playback.decoder.reset().map_err(map_audio_error)?;
+                playback.filters.reset();
+                playback.encoder.reset().map_err(map_audio_error)
+            }
+            YoutubePlaybackInner::Transcode(transcoder) => transcoder.set_filter_factory(factory),
         }
     }
 }
@@ -541,6 +766,12 @@ impl PcmTranscoder {
             assembled_len: 0,
             encoder_input: PcmFrame::with_capacity(COMPATIBLE_PCM_SAMPLES),
             encoder: PcmOpusEncoder::new(OpusEncodingQuality::MAXIMUM).map_err(map_audio_error)?,
+            filters: FilterPipeline::new(
+                PcmFormat::new(COMPATIBLE_SAMPLE_RATE, COMPATIBLE_CHANNELS)
+                    .map_err(map_audio_error)?,
+                MAX_FILTERS_PER_CHAIN,
+            )
+            .map_err(map_audio_error)?,
             input_eof: false,
             timestamp_initialized: base_timestamp.is_some(),
             base_timestamp,
@@ -641,6 +872,9 @@ impl PcmTranscoder {
         self.encoder_input
             .copy_from_interleaved(&self.assembled, output_format, timestamp)
             .map_err(map_audio_error)?;
+        self.filters
+            .process(&mut self.encoder_input)
+            .map_err(map_audio_error)?;
         self.encoder
             .encode(&self.encoder_input, output, VolumeLevel::NORMAL)
             .map_err(map_audio_error)?;
@@ -663,6 +897,62 @@ impl PcmTranscoder {
             ));
         }
         self.session = Some(session);
+        Ok(())
+    }
+
+    fn seek(&mut self, requested: Duration) -> Result<crate::SeekResult, YoutubePlaybackError> {
+        let session = self
+            .session
+            .as_mut()
+            .ok_or_else(|| YoutubePlaybackError::new(YoutubePlaybackErrorKind::AudioPipeline))?;
+        let result = session.seek(requested).map_err(map_media_error)?;
+        self.decoded.clear();
+        self.decoded_offset = 0;
+        self.resampled.clear();
+        self.resampled_offset = 0;
+        self.assembled.fill(0.0);
+        self.assembled_len = 0;
+        self.encoder_input.clear();
+        if let Some(resampler) = self.resampler.as_mut() {
+            resampler.reset();
+        }
+        self.encoder.reset().map_err(map_audio_error)?;
+        self.filters.reset();
+        self.input_eof = false;
+        self.timestamp_initialized = false;
+        self.base_timestamp = None;
+        self.frames_encoded = 0;
+        Ok(result)
+    }
+
+    fn set_filter_factory(
+        &mut self,
+        factory: Option<&dyn PcmFilterFactory>,
+    ) -> Result<(), YoutubePlaybackError> {
+        self.filters
+            .install_factory(factory)
+            .map_err(map_audio_error)?;
+        let session = self
+            .session
+            .as_mut()
+            .ok_or_else(|| YoutubePlaybackError::new(YoutubePlaybackErrorKind::AudioPipeline))?;
+        session.reset_decoder().map_err(map_media_error)?;
+        self.decoded.clear();
+        self.decoded_offset = 0;
+        self.resampled.clear();
+        self.resampled_offset = 0;
+        self.assembled.fill(0.0);
+        self.assembled_len = 0;
+        self.encoder_input.clear();
+        if let Some(resampler) = self.resampler.as_mut() {
+            resampler.reset();
+        }
+        self.filters.reset();
+        self.encoder.reset().map_err(map_audio_error)?;
+        self.input_eof = false;
+        self.timestamp_initialized = false;
+        self.base_timestamp = None;
+        self.frames_encoded = 0;
         Ok(())
     }
 

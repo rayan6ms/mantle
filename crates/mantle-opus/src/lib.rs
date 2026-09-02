@@ -90,6 +90,126 @@ pub struct OpusEncoder {
     channels: usize,
 }
 
+/// One independently owned libopus decoder state.
+pub struct OpusDecoder {
+    state: NonNull<ffi::OpusDecoder>,
+    channels: usize,
+}
+
+impl OpusDecoder {
+    /// Creates a decoder for one supported Opus output geometry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for unsupported rates, channels, or native initialization failure.
+    pub fn new(sample_rate: u32, channels: u16) -> Result<Self, OpusError> {
+        if !matches!(sample_rate, 8_000 | 12_000 | 16_000 | 24_000 | 48_000) {
+            return Err(OpusError::InvalidConfiguration(
+                "sample rate must be 8000, 12000, 16000, 24000, or 48000 Hz",
+            ));
+        }
+        if !(1..=2).contains(&channels) {
+            return Err(OpusError::InvalidConfiguration(
+                "channel count must be one or two",
+            ));
+        }
+        let sample_rate = i32::try_from(sample_rate).map_err(|_| {
+            OpusError::InvalidConfiguration("sample rate does not fit the native API")
+        })?;
+        let mut status = OPUS_OK;
+        // SAFETY: the scalar parameters are validated against libopus's documented domain and
+        // `status` is writable for the duration of the call.
+        let state =
+            unsafe { ffi::opus_decoder_create(sample_rate, i32::from(channels), &raw mut status) };
+        let state = NonNull::new(state).ok_or(OpusError::NativeStatus {
+            operation: "decoder creation",
+            status,
+        })?;
+        if status != OPUS_OK {
+            // SAFETY: the non-null state was returned to this call and has not been published.
+            unsafe { ffi::opus_decoder_destroy(state.as_ptr()) };
+            return Err(OpusError::NativeStatus {
+                operation: "decoder creation",
+                status,
+            });
+        }
+        Ok(Self {
+            state,
+            channels: usize::from(channels),
+        })
+    }
+
+    /// Decodes one packet to interleaved floating-point PCM in caller-owned storage.
+    ///
+    /// Returns the number of decoded frames per channel.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an empty packet, misaligned/empty output, oversized lengths, or a
+    /// packet rejected by libopus.
+    pub fn decode(&mut self, packet: &[u8], output: &mut [f32]) -> Result<usize, OpusError> {
+        if packet.is_empty() {
+            return Err(OpusError::InvalidConfiguration("packet must not be empty"));
+        }
+        if output.is_empty() || !output.len().is_multiple_of(self.channels) {
+            return Err(OpusError::InvalidConfiguration(
+                "decoder output must contain channel-aligned storage",
+            ));
+        }
+        let packet_len = i32::try_from(packet.len()).map_err(|_| {
+            OpusError::InvalidConfiguration("packet length does not fit the native API")
+        })?;
+        let frame_capacity = output.len() / self.channels;
+        let frame_capacity = i32::try_from(frame_capacity).map_err(|_| {
+            OpusError::InvalidConfiguration("PCM capacity does not fit the native API")
+        })?;
+        // SAFETY: `state` is exclusively borrowed; packet and output lengths are represented by
+        // the validated scalar arguments; output is writable for `frame_capacity * channels`
+        // samples; libopus retains neither pointer.
+        let decoded = unsafe {
+            ffi::opus_decode_float(
+                self.state.as_ptr(),
+                packet.as_ptr(),
+                packet_len,
+                output.as_mut_ptr(),
+                frame_capacity,
+                0,
+            )
+        };
+        if decoded < 0 {
+            return Err(OpusError::NativeStatus {
+                operation: "decoding",
+                status: decoded,
+            });
+        }
+        usize::try_from(decoded)
+            .map_err(|_| OpusError::NativeContract("negative decoded length escaped status"))
+    }
+
+    /// Clears decoder history after a seek or processing-mode replacement.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if libopus rejects its reset control request.
+    pub fn reset(&mut self) -> Result<(), OpusError> {
+        // SAFETY: `state` is an exclusively borrowed live decoder and `OPUS_RESET_STATE` takes no
+        // variadic argument.
+        let status = unsafe { ffi::opus_decoder_ctl(self.state.as_ptr(), OPUS_RESET_STATE) };
+        native_status("decoder reset", status)
+    }
+}
+
+impl Drop for OpusDecoder {
+    fn drop(&mut self) {
+        // SAFETY: `state` is non-null, solely owned by this value, and destroyed exactly once.
+        unsafe { ffi::opus_decoder_destroy(self.state.as_ptr()) };
+    }
+}
+
+// SAFETY: libopus permits independently owned decoder states to move between threads. Stateful
+// operations require `&mut self`, so the wrapper is `Send` and intentionally not `Sync`.
+unsafe impl Send for OpusDecoder {}
+
 impl OpusEncoder {
     /// Creates an audio-mode encoder and applies Lavaplayer's `0..=10` complexity setting.
     ///
@@ -259,7 +379,7 @@ fn native_status(operation: &'static str, status: i32) -> Result<(), OpusError> 
 
 #[cfg(test)]
 mod tests {
-    use super::{OpusEncoder, OpusError, packet_samples};
+    use super::{OpusDecoder, OpusEncoder, OpusError, packet_samples};
 
     #[test]
     fn encodes_into_caller_storage_and_reset_reproduces_the_packet() {
@@ -303,5 +423,33 @@ mod tests {
         assert_eq!(output, [0xa5; 64]);
         assert!(packet_samples(&[], 48_000).is_err());
         assert!(packet_samples(&[(19 << 3) | 3, 7], 48_000).is_err());
+    }
+
+    #[test]
+    fn decoder_round_trip_and_reset_are_deterministic() {
+        let mut encoder = OpusEncoder::new(48_000, 2, 10).unwrap();
+        let mut input = [0_i16; 960 * 2];
+        for (index, sample) in input.iter_mut().enumerate() {
+            *sample = i16::try_from(index % 257).unwrap() - 128;
+        }
+        let mut packet = [0_u8; 1_568];
+        let packet_len = encoder.encode(&input, 960, &mut packet).unwrap();
+        let mut decoder = OpusDecoder::new(48_000, 2).unwrap();
+        let mut first = [0.0_f32; 960 * 2];
+        assert_eq!(
+            decoder.decode(&packet[..packet_len], &mut first).unwrap(),
+            960
+        );
+        decoder.reset().unwrap();
+        let mut second = [0.0_f32; 960 * 2];
+        assert_eq!(
+            decoder.decode(&packet[..packet_len], &mut second).unwrap(),
+            960
+        );
+        assert_eq!(
+            first.map(f32::to_bits),
+            second.map(f32::to_bits),
+            "decoder reset must reproduce bit-identical PCM"
+        );
     }
 }
