@@ -38,7 +38,7 @@ for input in "$SUBJECT_ROOT" "$CHECKSUMS" "$SBOM" "$RESULT" "$CONTRACT" "$READIN
 done
 
 jq --exit-status '
-  .schema_version == 1 and .status == "IMPLEMENTED_HOSTED_RUN_PENDING" and
+  .schema_version == 1 and .status == "PASS" and
   .slice == "publication-sbom-provenance" and .version == "1.0.0" and
   .sbom.format == "CycloneDX JSON" and .sbom.spec_version == "1.5" and
   (.sbom.serial_number | startswith("deterministic RFC 4122-shaped UUID")) and
@@ -59,17 +59,36 @@ jq --exit-status '
   ] and
   .attestations.action == "actions/attest@v4" and
   .attestations.predicate_types == ["SLSA build provenance", "CycloneDX SBOM"] and
-  .hosted_evidence.status == "PENDING" and .hosted_evidence.workflow_run == null
+  .hosted_evidence.status == "PASS" and
+  .hosted_evidence.workflow_run == 33577053812 and .hosted_evidence.jobs_passed == 6 and
+  .hosted_evidence.subjects_verified == 6 and
+  .hosted_evidence.source_digest == "8371b73c51bc93cc66b887333ef095aa84a0f2f4" and
+  .hosted_evidence.signer_workflow == "github.com/rayan6ms/mantle/.github/workflows/native-classifier-matrix.yml" and
+  .hosted_evidence.provenance_attestation == {
+    id: 44571212,
+    url: "https://github.com/rayan6ms/mantle/attestations/44571212",
+    predicate_type: "https://slsa.dev/provenance/v1",
+    sigstore_log_index: 2681978438
+  } and
+  .hosted_evidence.sbom_attestation == {
+    id: 44571213,
+    url: "https://github.com/rayan6ms/mantle/attestations/44571213",
+    predicate_type: "https://cyclonedx.org/bom",
+    sigstore_log_index: 2681978494
+  } and
+  .regressions.github_cyclonedx_serial_number.failing_run == 33576693730 and
+  .regressions.github_cyclonedx_serial_number.test == "scripts/test-publication-sbom-provenance.sh"
 ' "$CONTRACT" >/dev/null
 
 jq --exit-status '
   .schema_version == 1 and .status == "IN_PROGRESS" and
   (.completed_slices | index("publication-sbom-provenance")) != null and
   (.gates[] | select(.id == "sbom_and_provenance") |
-    .status == "IMPLEMENTED_HOSTED_RUN_PENDING" and .subject_count == 6 and
-    .sbom_format == "CycloneDX JSON 1.5") and
-  (.active_blockers | index("sbom-and-provenance-hosted-evidence")) != null and
-  .next_slice == "publication-sbom-provenance-hosted-validation"
+    .status == "PASS" and .subject_count == 6 and
+    .sbom_format == "CycloneDX JSON 1.5" and
+    .hosted_evidence == "https://github.com/rayan6ms/mantle/actions/runs/33577053812") and
+  .active_blockers == ["D-001", "central-release-identity"] and
+  .next_slice == "publication-cargo-vet-exemption-closure"
 ' "$READINESS" >/dev/null
 
 mapfile -t expected < <(jq -r '.subjects[].file' "$CONTRACT" | LC_ALL=C sort)

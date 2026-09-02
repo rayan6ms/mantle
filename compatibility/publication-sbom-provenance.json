@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "IMPLEMENTED_HOSTED_RUN_PENDING",
+  "status": "PASS",
   "slice": "publication-sbom-provenance",
   "version": "1.0.0",
   "sbom": {
@@ -37,15 +37,39 @@
     "permissions": ["contents: read", "id-token: write", "attestations: write", "artifact-metadata: write"]
   },
   "hosted_evidence": {
-    "status": "PENDING",
-    "workflow_run": null,
-    "provenance_attestation": null,
-    "sbom_attestation": null
+    "status": "PASS",
+    "workflow_run": 33577053812,
+    "workflow_url": "https://github.com/rayan6ms/mantle/actions/runs/33577053812",
+    "jobs_passed": 6,
+    "subjects_verified": 6,
+    "source_digest": "8371b73c51bc93cc66b887333ef095aa84a0f2f4",
+    "signer_workflow": "github.com/rayan6ms/mantle/.github/workflows/native-classifier-matrix.yml",
+    "provenance_attestation": {
+      "id": 44571212,
+      "url": "https://github.com/rayan6ms/mantle/attestations/44571212",
+      "predicate_type": "https://slsa.dev/provenance/v1",
+      "sigstore_log_index": 2681978438
+    },
+    "sbom_attestation": {
+      "id": 44571213,
+      "url": "https://github.com/rayan6ms/mantle/attestations/44571213",
+      "predicate_type": "https://cyclonedx.org/bom",
+      "sigstore_log_index": 2681978494
+    },
+    "verification": "All six reconstructed/downloaded JARs matched the checksum manifest; gh attestation verify passed both retained bundles with the exact source digest and signer workflow; both signed subject lists matched the manifest; the signed CycloneDX predicate matched the retained SBOM."
+  },
+  "regressions": {
+    "github_cyclonedx_serial_number": {
+      "failing_run": 33576693730,
+      "failure": "actions/attest@v4 rejected CycloneDX JSON without serialNumber",
+      "resolution": "derive a reproducible UUID-shaped serial from the six subject names and SHA-256 digests",
+      "test": "scripts/test-publication-sbom-provenance.sh"
+    }
   },
   "exclusions": {
     "central_metadata_and_placeholders": "POM and NOTICE-only companion JARs contain no executable code and are excluded as attestation subjects.",
     "central_signatures_and_checksums": "Operator PGP signatures and Central checksum sidecars are produced after the binary build and remain covered by the signed Central bundle contract.",
     "development_graph": "Benchmarks, reference tools, fuzz packages, tests, and dev-dependencies are not shipped and must not appear in the release SBOM."
   },
-  "next_validation": "Run the hosted native classifier workflow, verify both GitHub attestations against all six SHA-256 subjects, and record the run and attestation URLs before clearing the blocker."
+  "next_validation": "Keep both predicates bound to the final release bytes; rerun the matrix if any binary subject or dependency graph changes."
 }

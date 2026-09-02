@@ -121,14 +121,17 @@
     },
     {
       "id": "sbom_and_provenance",
-      "status": "IMPLEMENTED_HOSTED_RUN_PENDING",
+      "status": "PASS",
       "scope": "CycloneDX 1.5 release SBOM plus GitHub build-provenance and SBOM attestations",
       "subject_count": 6,
       "sbom_format": "CycloneDX JSON 1.5",
       "checker": "scripts/check-publication-sbom-provenance.sh",
-      "hosted_workflow": ".github/workflows/native-classifier-matrix.yml"
+      "hosted_workflow": ".github/workflows/native-classifier-matrix.yml",
+      "hosted_evidence": "https://github.com/rayan6ms/mantle/actions/runs/33577053812",
+      "provenance_attestation": "https://github.com/rayan6ms/mantle/attestations/44571212",
+      "sbom_attestation": "https://github.com/rayan6ms/mantle/attestations/44571213"
     }
   ],
-  "active_blockers": ["D-001", "central-release-identity", "sbom-and-provenance-hosted-evidence"],
-  "next_slice": "publication-sbom-provenance-hosted-validation"
+  "active_blockers": ["D-001", "central-release-identity"],
+  "next_slice": "publication-cargo-vet-exemption-closure"
 }
