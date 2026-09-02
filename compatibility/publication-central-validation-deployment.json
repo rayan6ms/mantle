@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "status": "OPERATOR_VALIDATED",
+  "slice": "publication-central-validation-deployment",
+  "version": "1.0.0",
+  "source_digest": "62d02f6f0c6a312dc1ec5fec85213dc7e24cc4c1",
+  "deployment": {
+    "id": "9205c170-5232-4817-980f-0ff92e581ee9",
+    "name": "Mantle 1.0.0 validation 62d02f6",
+    "publishing_type": "USER_MANAGED",
+    "portal_state": "VALIDATED",
+    "validated_components": 3,
+    "total_components": 3,
+    "observed_at": "2026-09-02T02:35:07Z",
+    "download_base": "https://central.sonatype.com/api/v1/publisher/deployment/9205c170-5232-4817-980f-0ff92e581ee9/download"
+  },
+  "bundle": {
+    "sha256": "f677efdd40a8ae10f68e381f83c98d12ae3c43303065932f905f74de4ee43d1e",
+    "repository_file_count": 60,
+    "signing_fingerprint": "B7CEFF5211EA68CB834AED549FA70609D2B9F145"
+  },
+  "deployables": [
+    {
+      "path": "io/github/rayan6ms/mantle-lavaplayer/1.0.0/mantle-lavaplayer-1.0.0-javadoc.jar",
+      "sha256": "79f08c680ef2545f6048641e1efe35213eb64c3618583542820a0ae13745b743"
+    },
+    {
+      "path": "io/github/rayan6ms/mantle-lavaplayer/1.0.0/mantle-lavaplayer-1.0.0-sources.jar",
+      "sha256": "591f6cea01060f170e27351a99f90a86afb0905f1b3735c475103b9928107be6"
+    },
+    {
+      "path": "io/github/rayan6ms/mantle-lavaplayer/1.0.0/mantle-lavaplayer-1.0.0.jar",
+      "sha256": "253a4b3c2ac02b1929cabde2747c01187ac851156c54cb41f174b5ce24c2f79b"
+    },
+    {
+      "path": "io/github/rayan6ms/mantle-lavaplayer/1.0.0/mantle-lavaplayer-1.0.0.pom",
+      "sha256": "23091f2fad4d1f48d59077360282fff4a14b851d4ba9c15384add884b1544829"
+    },
+    {
+      "path": "io/github/rayan6ms/mantle-native/1.0.0/mantle-native-1.0.0-linux-aarch64.jar",
+      "sha256": "78c5bab6b36b58b2643eb628db48d0a13ae071b956928caa9b466d9eefefdc2a"
+    },
+    {
+      "path": "io/github/rayan6ms/mantle-native/1.0.0/mantle-native-1.0.0-linux-x86_64.jar",
+      "sha256": "6976614981fbf20924358d6cd4257f97c144cb9866490e7faa9c7ac708ce938a"
+    },
+    {
+      "path": "io/github/rayan6ms/mantle-native/1.0.0/mantle-native-1.0.0-macos-aarch64.jar",
+      "sha256": "110ffd26c044e16126bc5617f59cd641fd2ce58a8195c791e457a1ad13f8eb3d"
+    },
+    {
+      "path": "io/github/rayan6ms/mantle-native/1.0.0/mantle-native-1.0.0-macos-x86_64.jar",
+      "sha256": "8109f7885a1889a98a8675569adaa150e5b6226e86074a3d1244dd7f5f63d709"
+    },
+    {
+      "path": "io/github/rayan6ms/mantle-native/1.0.0/mantle-native-1.0.0-windows-x86_64.jar",
+      "sha256": "347e62c9f115c7c2e0e8bf1b96cd5b884ca324a413947428da7d0436efd57318"
+    },
+    {
+      "path": "io/github/rayan6ms/mantle-native/1.0.0/mantle-native-1.0.0.pom",
+      "sha256": "6345c911725a3addb4a46c12c14ebbe13c38478498a5d8bdd9e3806ad3a37ba9"
+    }
+  ],
+  "consumer_gate": {
+    "workflow": ".github/workflows/central-validation-deployment.yml",
+    "runner": "scripts/run-publication-central-validation-deployment.sh",
+    "checker": "scripts/check-publication-central-validation-deployment.sh",
+    "github_actions_secret": "CENTRAL_PORTAL_TOKEN",
+    "platform_classifier": "linux-x86_64",
+    "maven_resolution": "REQUIRED",
+    "native_loader_smoke": "REQUIRED"
+  },
+  "release_policy": {
+    "artifact_publication_performed": false,
+    "automatic_publication_allowed": false,
+    "publish_requires_separate_explicit_action": true
+  },
+  "hosted_consumer_evidence": {
+    "status": "PENDING"
+  },
+  "next_slice": "publication-explicit-release-decision"
+}

@@ -1,0 +1,41 @@
+name: Central validation deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_id:
+        description: Locked USER_MANAGED Central deployment UUID
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  validate-consumer:
+    name: Validate deployment-scoped consumer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Resolve and execute the validated deployment
+        env:
+          CENTRAL_PORTAL_TOKEN: ${{ secrets.CENTRAL_PORTAL_TOKEN }}
+        run: |
+          scripts/run-publication-central-validation-deployment.sh \
+            --deployment-id '${{ inputs.deployment_id }}' \
+            --result '${{ runner.temp }}/mantle-central-validation/result.json'
+          scripts/check-publication-central-validation-deployment.sh \
+            --result '${{ runner.temp }}/mantle-central-validation/result.json'
+          scripts/test-publication-central-validation-deployment.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: publication-central-validation-deployment-result
+          path: ${{ runner.temp }}/mantle-central-validation/result.json
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,15 @@
+import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager;
+
+public final class CentralValidationConsumerSmoke {
+  private CentralValidationConsumerSmoke() {}
+
+  public static void main(String[] args) {
+    if (args.length != 1 || !args[0].startsWith("/")) {
+      throw new IllegalArgumentException("expected one absolute native-library path");
+    }
+    System.load(args[0]);
+    DefaultAudioPlayerManager manager = new DefaultAudioPlayerManager();
+    manager.shutdown();
+    System.out.println("central-validation-consumer-smoke-ok");
+  }
+}
