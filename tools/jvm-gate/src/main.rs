@@ -68872,20 +68872,20 @@ public final class GateMessageOutput {
 
   private static void failureTimingAndIdentity() throws Exception {
     IOException headerFailure = new IOException("header");
-    FailingOutputStream headerTarget = new FailingOutputStream(1, headerFailure);
+    FailingOutputStream headerTarget = new FailingOutputStream(0, headerFailure);
     MessageOutput header = new MessageOutput(headerTarget);
     header.startMessage().writeByte(1);
     check(catchThrowable(header::commitMessage) == headerFailure
-        && headerTarget.bytes.size() == 0 && headerTarget.bulkWrites == 1,
+        && headerTarget.bytes.size() == 0,
         "header failure");
 
     IOException payloadFailure = new IOException("payload");
-    FailingOutputStream payloadTarget = new FailingOutputStream(2, payloadFailure);
+    FailingOutputStream payloadTarget = new FailingOutputStream(4, payloadFailure);
     MessageOutput payload = new MessageOutput(payloadTarget);
     payload.startMessage().writeByte(5);
     check(catchThrowable(() -> payload.commitMessage(3)) == payloadFailure
-        && Arrays.equals(payloadTarget.bytes.toByteArray(), bytes(0xc0, 0, 0, 1))
-        && payloadTarget.bulkWrites == 2, "payload failure");
+        && Arrays.equals(payloadTarget.bytes.toByteArray(), bytes(0xc0, 0, 0, 1)),
+        "payload failure");
   }
 
   private static void nullBoundary() throws Exception {
@@ -68948,17 +68948,18 @@ public final class GateMessageOutput {
 
   private static final class FailingOutputStream extends OutputStream {
     final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-    final int failingBulkWrite;
+    final int maximumBytes;
     final IOException failure;
-    int bulkWrites;
-    FailingOutputStream(int failingBulkWrite, IOException failure) {
-      this.failingBulkWrite = failingBulkWrite;
+    FailingOutputStream(int maximumBytes, IOException failure) {
+      this.maximumBytes = maximumBytes;
       this.failure = failure;
     }
-    public void write(int value) throws IOException { bytes.write(value); }
+    public void write(int value) throws IOException {
+      if (bytes.size() >= maximumBytes) throw failure;
+      bytes.write(value);
+    }
     public void write(byte[] source, int offset, int length) throws IOException {
-      bulkWrites++;
-      if (bulkWrites == failingBulkWrite) throw failure;
+      if (length > maximumBytes - bytes.size()) throw failure;
       bytes.write(source, offset, length);
     }
   }

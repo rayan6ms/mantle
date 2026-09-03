@@ -2579,7 +2579,7 @@ java -Xverify:all \
   -cp "$REFERENCE_PROVIDER_TOOLS_CLASSPATH" GateConnectorNativeLibLoader reference \
   >"$WORK/connector-native-lib-loader-reference.txt"
 java -Xverify:all \
-  -cp "$CLASSES$classpath_separator$JAR" GateConnectorNativeLibLoader candidate \
+  -cp "$classes_argument$classpath_separator$jar_argument" GateConnectorNativeLibLoader candidate \
   >"$WORK/connector-native-lib-loader-candidate.txt"
 grep --fixed-strings \
   'common=public-concrete,constructor,static-load,subclassable,reflection;legacy=two-loaders,windows-mpg123,connector,external-loader' \
