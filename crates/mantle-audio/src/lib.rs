@@ -12,7 +12,8 @@ mod transform;
 
 pub use filter::{
     EQUALIZER_BANDS, EqualizerFactory, FilterChainBuilder, FilterPipeline, MAX_FILTERS_PER_CHAIN,
-    PcmFilter, PcmFilterFactory,
+    MAX_STREAMING_PROCESSORS_PER_CHAIN, PcmFilter, PcmFilterFactory, StreamingPcmPoll,
+    StreamingPcmProcessor, StreamingPcmProgress,
 };
 pub use opus::{OpusEncodingQuality, PcmOpusDecoder, PcmOpusEncoder};
 pub use passthrough::{
@@ -316,6 +317,28 @@ pub enum AudioFrameError {
     FilterLimitExceeded {
         limit: usize,
     },
+    StreamingProcessorLimitExceeded {
+        limit: usize,
+    },
+    StreamingProcessorFormatUnsupported {
+        format: PcmFormat,
+    },
+    StreamingProcessorRequiresPull,
+    StreamingInputPending {
+        samples: usize,
+    },
+    StreamingInputAlreadyFinished,
+    InvalidStreamingProcessorProgress {
+        consumed: usize,
+        produced: usize,
+        input: usize,
+        output_capacity: usize,
+    },
+    StreamingProcessorStalled,
+    StreamingProcessorCapacityExceeded {
+        required: usize,
+        capacity: usize,
+    },
     PcmFormatMismatch {
         expected: PcmFormat,
         actual: Option<PcmFormat>,
@@ -377,6 +400,41 @@ impl fmt::Display for AudioFrameError {
                     "PCM filter chain exceeds its {limit}-filter limit"
                 )
             }
+            Self::StreamingProcessorLimitExceeded { limit } => write!(
+                formatter,
+                "PCM processing chain exceeds its {limit}-streaming-processor limit"
+            ),
+            Self::StreamingProcessorFormatUnsupported { format } => write!(
+                formatter,
+                "streaming PCM processing requires 48 kHz stereo, got {} Hz/{} channels",
+                format.sample_rate(),
+                format.channels()
+            ),
+            Self::StreamingProcessorRequiresPull => formatter
+                .write_str("streaming PCM graphs must be driven through submit_input/read_output"),
+            Self::StreamingInputPending { samples } => write!(
+                formatter,
+                "streaming PCM pipeline still has {samples} unconsumed input samples"
+            ),
+            Self::StreamingInputAlreadyFinished => {
+                formatter.write_str("cannot submit PCM after finishing streaming input")
+            }
+            Self::InvalidStreamingProcessorProgress {
+                consumed,
+                produced,
+                input,
+                output_capacity,
+            } => write!(
+                formatter,
+                "streaming PCM processor reported consumed={consumed}/{input}, produced={produced}/{output_capacity}"
+            ),
+            Self::StreamingProcessorStalled => formatter.write_str(
+                "streaming PCM processor consumed and produced no samples while input remained",
+            ),
+            Self::StreamingProcessorCapacityExceeded { required, capacity } => write!(
+                formatter,
+                "streaming PCM processor requires {required} samples; bounded capacity is {capacity}"
+            ),
             Self::PcmFormatMismatch { expected, actual } => write!(
                 formatter,
                 "PCM frame format {actual:?} does not match pipeline format {expected:?}"

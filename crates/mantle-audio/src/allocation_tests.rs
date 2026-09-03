@@ -6,8 +6,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::{
     COMPATIBLE_CHANNELS, COMPATIBLE_PCM_SAMPLES, COMPATIBLE_SAMPLE_RATE, EncodedFrameSlot,
     FilterChainBuilder, FilterPipeline, OpusEncodingQuality, OpusPassthrough, PcmFilter,
-    PcmFilterFactory, PcmFormat, PcmFrame, PcmOpusDecoder, PcmOpusEncoder, VolumeLevel,
-    encoded_frame_queue,
+    PcmFilterFactory, PcmFormat, PcmFrame, PcmOpusDecoder, PcmOpusEncoder, StreamingPcmPoll,
+    StreamingPcmProcessor, StreamingPcmProgress, VolumeLevel, encoded_frame_queue,
 };
 
 struct IdentityFilter;
@@ -29,6 +29,38 @@ impl PcmFilterFactory for IdentityFactory {
         builder: &mut FilterChainBuilder,
     ) -> Result<(), crate::AudioFrameError> {
         builder.push(IdentityFilter)
+    }
+}
+
+struct StreamingIdentity;
+
+impl StreamingPcmProcessor for StreamingIdentity {
+    fn process(
+        &mut self,
+        input: &[f32],
+        output: &mut [f32],
+    ) -> Result<StreamingPcmProgress, crate::AudioFrameError> {
+        let copied = input.len().min(output.len());
+        output[..copied].copy_from_slice(&input[..copied]);
+        Ok(StreamingPcmProgress::new(copied, copied))
+    }
+
+    fn finish(&mut self, _output: &mut [f32]) -> Result<usize, crate::AudioFrameError> {
+        Ok(0)
+    }
+
+    fn reset(&mut self) {}
+}
+
+struct StreamingIdentityFactory;
+
+impl PcmFilterFactory for StreamingIdentityFactory {
+    fn build(
+        &self,
+        _format: PcmFormat,
+        builder: &mut FilterChainBuilder,
+    ) -> Result<(), crate::AudioFrameError> {
+        builder.push_streaming(StreamingIdentity)
     }
 }
 
@@ -191,6 +223,38 @@ fn opus_decode_filter_encode_allocates_zero_times_after_construction() {
             encoder
                 .encode(&pcm_output, &mut output, VolumeLevel::NORMAL)
                 .unwrap();
+        }
+    });
+
+    assert_eq!(allocations, 0);
+}
+
+#[test]
+fn streaming_pcm_assembly_allocates_zero_times_after_construction() {
+    const ITERATIONS: usize = 5_000;
+
+    let format = PcmFormat::new(COMPATIBLE_SAMPLE_RATE, COMPATIBLE_CHANNELS).unwrap();
+    let mut input = PcmFrame::with_capacity(COMPATIBLE_PCM_SAMPLES);
+    input
+        .copy_from_interleaved(&[0.125; COMPATIBLE_PCM_SAMPLES], format, None)
+        .unwrap();
+    let mut output = PcmFrame::with_capacity(COMPATIBLE_PCM_SAMPLES);
+    let mut pipeline = FilterPipeline::new(format, 1).unwrap();
+    pipeline
+        .install_factory(Some(&StreamingIdentityFactory))
+        .unwrap();
+
+    let allocations = count_allocations(|| {
+        for _ in 0..ITERATIONS {
+            pipeline.submit_input(&input).unwrap();
+            assert_eq!(
+                pipeline.read_output(&mut output).unwrap(),
+                StreamingPcmPoll::Frame
+            );
+            assert_eq!(
+                pipeline.read_output(&mut output).unwrap(),
+                StreamingPcmPoll::NeedInput
+            );
         }
     });
 

@@ -10,7 +10,7 @@ use std::time::Duration;
 use mantle_audio::{
     AudioFrameError, COMPATIBLE_PCM_SAMPLES, EncodedFrameSlot, FilterChainBuilder,
     OpusEncodingQuality, PcmFilter, PcmFilterFactory, PcmFormat, PcmFrame, PcmOpusEncoder,
-    VolumeLevel,
+    StreamingPcmProcessor, StreamingPcmProgress, VolumeLevel,
 };
 use mantle_core::{
     SourceCancellation, SourceLoad, SourceManager, SourceReference, SourceRegistryError, TrackInfo,
@@ -68,6 +68,75 @@ impl PcmFilterFactory for OversizedFilterFactory {
             builder.push(SilenceFilter)?;
         }
         Ok(())
+    }
+}
+
+struct DelayedProcessor {
+    buffered: [f32; COMPATIBLE_PCM_SAMPLES],
+    buffered_valid: bool,
+    nonempty_calls: Arc<AtomicUsize>,
+    resets: Arc<AtomicUsize>,
+}
+
+impl StreamingPcmProcessor for DelayedProcessor {
+    fn process(
+        &mut self,
+        input: &[f32],
+        output: &mut [f32],
+    ) -> Result<StreamingPcmProgress, AudioFrameError> {
+        if input.is_empty() {
+            return Ok(StreamingPcmProgress::default());
+        }
+        self.nonempty_calls.fetch_add(1, Ordering::AcqRel);
+        if self.buffered_valid {
+            output[..COMPATIBLE_PCM_SAMPLES].copy_from_slice(&self.buffered);
+            self.buffered_valid = false;
+            return Ok(StreamingPcmProgress::new(0, COMPATIBLE_PCM_SAMPLES));
+        }
+        if input.len() != COMPATIBLE_PCM_SAMPLES {
+            return Err(AudioFrameError::StreamingProcessorCapacityExceeded {
+                required: COMPATIBLE_PCM_SAMPLES,
+                capacity: input.len(),
+            });
+        }
+        self.buffered.copy_from_slice(input);
+        self.buffered_valid = true;
+        Ok(StreamingPcmProgress::new(input.len(), 0))
+    }
+
+    fn finish(&mut self, output: &mut [f32]) -> Result<usize, AudioFrameError> {
+        if !self.buffered_valid {
+            return Ok(0);
+        }
+        output[..COMPATIBLE_PCM_SAMPLES].copy_from_slice(&self.buffered);
+        self.buffered_valid = false;
+        Ok(COMPATIBLE_PCM_SAMPLES)
+    }
+
+    fn reset(&mut self) {
+        self.buffered.fill(0.0);
+        self.buffered_valid = false;
+        self.resets.fetch_add(1, Ordering::AcqRel);
+    }
+}
+
+struct DelayedFactory {
+    nonempty_calls: Arc<AtomicUsize>,
+    resets: Arc<AtomicUsize>,
+}
+
+impl PcmFilterFactory for DelayedFactory {
+    fn build(
+        &self,
+        _format: PcmFormat,
+        builder: &mut FilterChainBuilder,
+    ) -> Result<(), AudioFrameError> {
+        builder.push_streaming(DelayedProcessor {
+            buffered: [0.0; COMPATIBLE_PCM_SAMPLES],
+            buffered_valid: false,
+            nonempty_calls: Arc::clone(&self.nonempty_calls),
+            resets: Arc::clone(&self.resets),
+        })
     }
 }
 
@@ -1312,6 +1381,106 @@ fn finite_opus_session_seeks_filters_and_returns_safely_to_passthrough() {
     let mut packet = EncodedPacket::with_capacity(expected.limits().max_packet_bytes);
     assert!(expected.read_encoded(&mut packet).unwrap());
     assert_eq!(output.data(), packet.data());
+}
+
+#[test]
+fn finite_streaming_filter_pulls_resets_replaces_and_restores_passthrough() {
+    let bytes = fs::read(media_fixture("tone-opus.webm")).unwrap();
+    let media = RangeMediaServer::start(bytes.clone());
+    let response = playback_response(
+        &media.url("audio.webm"),
+        "audio/webm; codecs=\"opus\"",
+        bytes.len(),
+    );
+    let api = ReplayServer::start(move |_, _| ReplayResponse::json(&response));
+    let manager = playback_manager(&api);
+    let formats = manager
+        .discover_playback_formats("dQw4w9WgXcQ", &MediaCancellation::new())
+        .unwrap();
+    let nonempty_calls = Arc::new(AtomicUsize::new(0));
+    let resets = Arc::new(AtomicUsize::new(0));
+    let factory = DelayedFactory {
+        nonempty_calls: Arc::clone(&nonempty_calls),
+        resets: Arc::clone(&resets),
+    };
+    let mut playback = manager
+        .open_selected_playback(
+            &formats,
+            private_range_options(),
+            MediaLimits::default(),
+            MediaCancellation::new(),
+        )
+        .unwrap();
+    playback.set_filter_factory(Some(&factory)).unwrap();
+    assert_eq!(playback.mode(), YoutubePlaybackMode::Transcode);
+
+    let mut output = EncodedFrameSlot::new();
+    assert!(playback.read_frame(&mut output).unwrap());
+    assert!(!output.data().is_empty());
+    assert!(nonempty_calls.load(Ordering::Acquire) >= 2);
+    let first_timestamp = output.timestamp().unwrap();
+    let first_source_position = playback.source_media_position().unwrap();
+    assert!(first_source_position >= first_timestamp + output.duration());
+
+    assert!(
+        playback
+            .set_filter_factory(Some(&OversizedFilterFactory))
+            .is_err()
+    );
+    assert_eq!(playback.mode(), YoutubePlaybackMode::Transcode);
+    assert_eq!(resets.load(Ordering::Acquire), 0);
+
+    let seek = playback.seek(Duration::ZERO).unwrap();
+    assert_eq!(resets.load(Ordering::Acquire), 1);
+    assert!(playback.read_frame(&mut output).unwrap());
+    let mut clean_after_seek = manager
+        .open_selected_playback(
+            &formats,
+            private_range_options(),
+            MediaLimits::default(),
+            MediaCancellation::new(),
+        )
+        .unwrap();
+    let clean_factory = DelayedFactory {
+        nonempty_calls: Arc::new(AtomicUsize::new(0)),
+        resets: Arc::new(AtomicUsize::new(0)),
+    };
+    clean_after_seek
+        .set_filter_factory(Some(&clean_factory))
+        .unwrap();
+    clean_after_seek.seek(Duration::ZERO).unwrap();
+    let mut clean_output = EncodedFrameSlot::new();
+    assert!(clean_after_seek.read_frame(&mut clean_output).unwrap());
+    assert_eq!(output.data(), clean_output.data());
+    assert_eq!(output.timestamp(), clean_output.timestamp());
+    assert!(playback.source_media_position().unwrap() >= seek.actual.unwrap_or_default());
+
+    playback.set_filter_factory(Some(&factory)).unwrap();
+    assert_eq!(resets.load(Ordering::Acquire), 2);
+    assert_eq!(playback.mode(), YoutubePlaybackMode::Transcode);
+    playback.set_filter_factory(None).unwrap();
+    assert_eq!(resets.load(Ordering::Acquire), 3);
+    assert_eq!(playback.mode(), YoutubePlaybackMode::OpusPassthrough);
+
+    assert!(playback.read_frame(&mut output).unwrap());
+    let mut expected =
+        MediaSession::open_file(media_fixture("tone-opus.webm"), MediaLimits::default()).unwrap();
+    expected.seek(Duration::ZERO).unwrap();
+    let mut packet = EncodedPacket::with_capacity(expected.limits().max_packet_bytes);
+    for _ in 0..3 {
+        assert!(expected.read_encoded(&mut packet).unwrap());
+    }
+    assert_eq!(output.data(), packet.data());
+
+    playback.seek(Duration::ZERO).unwrap();
+    assert!(playback.read_frame(&mut output).unwrap());
+    expected.seek(Duration::ZERO).unwrap();
+    assert!(expected.read_encoded(&mut packet).unwrap());
+    assert_eq!(output.data(), packet.data());
+
+    playback.set_filter_factory(Some(&factory)).unwrap();
+    drop(playback);
+    assert_eq!(resets.load(Ordering::Acquire), 4);
 }
 
 #[test]

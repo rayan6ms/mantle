@@ -2676,6 +2676,14 @@ fn map_audio_frame_error(error: AudioFrameError) -> MediaError {
         | AudioFrameError::MisalignedPcmSamples { .. }
         | AudioFrameError::SampleBufferTooSmall { .. }
         | AudioFrameError::FilterLimitExceeded { .. }
+        | AudioFrameError::StreamingProcessorLimitExceeded { .. }
+        | AudioFrameError::StreamingProcessorFormatUnsupported { .. }
+        | AudioFrameError::StreamingProcessorRequiresPull
+        | AudioFrameError::StreamingInputPending { .. }
+        | AudioFrameError::StreamingInputAlreadyFinished
+        | AudioFrameError::InvalidStreamingProcessorProgress { .. }
+        | AudioFrameError::StreamingProcessorStalled
+        | AudioFrameError::StreamingProcessorCapacityExceeded { .. }
         | AudioFrameError::PcmFormatMismatch { .. }
         | AudioFrameError::InvalidResamplerConfiguration(_)
         | AudioFrameError::UnsupportedResampleRatio { .. }
