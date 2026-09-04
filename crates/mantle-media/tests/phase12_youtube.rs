@@ -23,8 +23,8 @@ use mantle_media::{
     YoutubeCipherResolver, YoutubeCipherResolverError, YoutubeCipherSolution, YoutubeClientKind,
     YoutubeErrorKind, YoutubeLivePlaybackOptions, YoutubeLivePlaybackPoll, YoutubeOAuthClock,
     YoutubeOAuthOptions, YoutubePlaybackErrorKind, YoutubePlaybackFormatKind, YoutubePlaybackMode,
-    YoutubeProcessCipherOptions, YoutubeProcessCipherResolver, YoutubeRoute, YoutubeSourceItem,
-    YoutubeSourceOptions, route_youtube_identifier,
+    YoutubePlaybackSession, YoutubeProcessCipherOptions, YoutubeProcessCipherResolver,
+    YoutubeRoute, YoutubeSourceItem, YoutubeSourceOptions, route_youtube_identifier,
 };
 use serde_json::Value;
 
@@ -1533,6 +1533,121 @@ fn finite_aac_handoff_uses_the_normal_pcm_to_opus_fallback() {
     assert_eq!(actual.data(), expected.data());
     assert_eq!(actual.timestamp(), expected.timestamp());
     assert!(!media.requests().is_empty());
+}
+
+#[test]
+fn public_offline_handoff_drains_complete_opus_mp3_aac_and_flac_fixtures() {
+    let cases = [
+        (
+            "tone-opus.webm",
+            Codec::Opus,
+            YoutubePlaybackMode::OpusPassthrough,
+            Some(YoutubePlaybackFormatKind::WebmOpus),
+        ),
+        (
+            "tone-mp3.mp3",
+            Codec::Mp3,
+            YoutubePlaybackMode::Transcode,
+            None,
+        ),
+        (
+            "tone-aac-lc.m4a",
+            Codec::AacLc,
+            YoutubePlaybackMode::Transcode,
+            Some(YoutubePlaybackFormatKind::Mp4AacLc),
+        ),
+        (
+            "tone-flac.flac",
+            Codec::Flac,
+            YoutubePlaybackMode::Transcode,
+            None,
+        ),
+    ];
+
+    for (fixture_name, codec, mode, selected_kind) in cases {
+        let session =
+            MediaSession::open_file(media_fixture(fixture_name), MediaLimits::default()).unwrap();
+        let mut playback = if let Some(selected_kind) = selected_kind {
+            YoutubePlaybackSession::from_media_session(session, selected_kind).unwrap()
+        } else {
+            YoutubePlaybackSession::from_probed_media_session(session).unwrap()
+        };
+        assert_eq!(playback.info().codec, codec, "fixture={fixture_name}");
+        assert_eq!(playback.mode(), mode, "fixture={fixture_name}");
+
+        let mut output = EncodedFrameSlot::new();
+        let mut previous_timestamp = None;
+        let mut previous_source_position = None;
+        let mut frames = 0_usize;
+        while playback.read_frame(&mut output).unwrap() {
+            assert!(!output.data().is_empty(), "fixture={fixture_name}");
+            assert_eq!(
+                output.duration(),
+                Duration::from_millis(20),
+                "fixture={fixture_name}"
+            );
+            if let (Some(previous), Some(current)) = (previous_timestamp, output.timestamp()) {
+                assert!(current >= previous, "fixture={fixture_name}");
+            }
+            if let (Some(previous), Some(current)) =
+                (previous_source_position, playback.source_media_position())
+            {
+                assert!(current >= previous, "fixture={fixture_name}");
+            }
+            previous_timestamp = output.timestamp();
+            previous_source_position = playback.source_media_position();
+            frames += 1;
+        }
+        assert!(frames > 0, "fixture={fixture_name}");
+        assert!(output.data().is_empty(), "fixture={fixture_name}");
+    }
+}
+
+#[test]
+fn public_offline_handoff_preserves_validation_filters_seek_and_mode_transitions() {
+    let mismatch =
+        MediaSession::open_file(media_fixture("tone-aac-lc.m4a"), MediaLimits::default()).unwrap();
+    let error =
+        YoutubePlaybackSession::from_media_session(mismatch, YoutubePlaybackFormatKind::WebmOpus)
+            .unwrap_err();
+    assert_eq!(error.kind(), YoutubePlaybackErrorKind::IncompatibleFormat);
+    assert_eq!(
+        error.to_string(),
+        "YouTube media does not match the selected format"
+    );
+
+    let session =
+        MediaSession::open_file(media_fixture("tone-opus.webm"), MediaLimits::default()).unwrap();
+    let mut playback =
+        YoutubePlaybackSession::from_media_session(session, YoutubePlaybackFormatKind::WebmOpus)
+            .unwrap();
+    let mut output = EncodedFrameSlot::new();
+    assert_eq!(playback.mode(), YoutubePlaybackMode::OpusPassthrough);
+    assert!(playback.read_frame(&mut output).unwrap());
+
+    playback.set_filter_factory(Some(&SilenceFactory)).unwrap();
+    assert_eq!(playback.mode(), YoutubePlaybackMode::Transcode);
+    let seek = playback.seek(Duration::ZERO).unwrap();
+    let actual_seek = seek.actual.unwrap();
+    assert!(playback.read_frame(&mut output).unwrap());
+    assert!(playback.source_media_position().unwrap() >= actual_seek);
+
+    playback.set_filter_factory(None).unwrap();
+    assert_eq!(playback.mode(), YoutubePlaybackMode::OpusPassthrough);
+    playback.seek(Duration::ZERO).unwrap();
+    assert!(playback.read_frame(&mut output).unwrap());
+
+    let pcm =
+        MediaSession::open_file(media_fixture("tone-mp3.mp3"), MediaLimits::default()).unwrap();
+    let mut pcm_playback = YoutubePlaybackSession::from_probed_media_session(pcm).unwrap();
+    pcm_playback
+        .set_filter_factory(Some(&SilenceFactory))
+        .unwrap();
+    pcm_playback.set_filter_factory(None).unwrap();
+    assert_eq!(pcm_playback.mode(), YoutubePlaybackMode::Transcode);
+    pcm_playback.seek(Duration::ZERO).unwrap();
+    assert!(pcm_playback.read_frame(&mut output).unwrap());
+    assert!(pcm_playback.source_media_position().is_some());
 }
 
 #[test]

@@ -570,11 +570,51 @@ impl YoutubeLivePlaybackSession {
 }
 
 impl YoutubePlaybackSession {
+    /// Takes ownership of an already opened media session after verifying it matches a selected
+    /// finite `YouTube` format.
+    ///
+    /// This is the deterministic, network-free handoff for callers that already own the selected
+    /// media bytes. Playback still uses Mantle's normal passthrough or decode, resample, filter,
+    /// encode, seek-reset, and clock paths.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`YoutubePlaybackErrorKind::IncompatibleFormat`] when the probed container or codec
+    /// does not match `expected`, or the same credential-safe audio-pipeline failures as
+    /// [`YoutubeAudioSourceManager::open_selected_playback`].
+    #[allow(clippy::large_types_passed_by_value)]
+    pub fn from_media_session(
+        session: MediaSession,
+        expected: YoutubePlaybackFormatKind,
+    ) -> Result<Self, YoutubePlaybackError> {
+        Self::new(session, expected)
+    }
+
+    /// Takes ownership of an already probed local fixture for deterministic offline playback.
+    ///
+    /// Unlike [`Self::from_media_session`], this constructor has no independently advertised
+    /// `YouTube` format to compare with the probe result. It therefore accepts finite codecs
+    /// supported by the playback pipeline, including MP3 and FLAC benchmark fixtures, while
+    /// retaining all playback processing inside Mantle.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same credential-safe compatibility or audio-pipeline failures as the selected
+    /// media constructor.
+    #[allow(clippy::large_types_passed_by_value)]
+    pub fn from_probed_media_session(session: MediaSession) -> Result<Self, YoutubePlaybackError> {
+        Self::initialize(session)
+    }
+
     fn new(
         session: MediaSession,
         expected: YoutubePlaybackFormatKind,
     ) -> Result<Self, YoutubePlaybackError> {
         validate_media_kind(session.info(), expected)?;
+        Self::initialize(session)
+    }
+
+    fn initialize(session: MediaSession) -> Result<Self, YoutubePlaybackError> {
         let inner = if session.info().codec == Codec::Opus {
             if session.info().sample_rate != COMPATIBLE_SAMPLE_RATE
                 || session.info().channels != COMPATIBLE_CHANNELS

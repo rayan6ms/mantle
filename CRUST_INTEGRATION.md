@@ -4,6 +4,21 @@ Mantle owns the playback, processing, and routed-network boundaries Crust needs.
 
 ## Integrated YouTube playback
 
+For deterministic offline benchmarks, open content-addressed fixtures with
+`MediaSession::open_file(...)`, then transfer ownership with
+`YoutubePlaybackSession::from_media_session(session, expected_kind)`. This path validates the
+probed container and codec against `YoutubePlaybackFormatKind` exactly like selected finite
+YouTube playback. Because YouTube's format enum has no MP3 or FLAC variants, use
+`YoutubePlaybackSession::from_probed_media_session(session)` for already probed local MP3 and FLAC
+fixtures. Both constructors enter the same Mantle-owned finite playback implementation; neither
+performs discovery or network access.
+
+The offline session produces complete 20 ms Opus frames through `read_frame`. Compatible 48 kHz
+stereo Opus begins in `OpusPassthrough`; MP3, AAC, FLAC, and other decoded inputs begin and remain
+in `Transcode`. The existing `seek`, `set_filter_factory`, `mode`, and `source_media_position`
+operations apply unchanged. Crust must not decode, resample, assemble, filter, or encode around
+this seam.
+
 Use `YoutubePlaybackSession::seek(Duration)` to seek. Use
 `YoutubePlaybackSession::set_filter_factory(Some(factory))` to install or replace filters and pass
 `None` to remove them. `mode()` reports `Transcode` while an effective filter chain is active and
