@@ -1,5 +1,9 @@
 # Mantle
 
+<p align="center">
+  <img src="icons/mantle.png" alt="Mantle mascot: a smiling molten rock wearing headphones" width="240" height="240">
+</p>
+
 Mantle is a Rust-native replacement for [Lavaplayer](https://github.com/lavalink-devs/lavaplayer).
 It combines a native Rust audio and media engine with a generated JVM compatibility layer that
 forwards Lavaplayer-compatible calls through JNI.
