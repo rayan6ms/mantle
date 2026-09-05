@@ -1,7 +1,12 @@
 # Mantle
 
 <p align="center">
-  <img src="icons/mantle.png" alt="Mantle mascot: a smiling molten rock wearing headphones" width="240" height="240">
+  <img src="icons/mantle.png" alt="Mantle mascot: a smiling molten rock wearing headphones" width="200" height="200">
+</p>
+
+<p align="center">
+  <a href="https://github.com/rayan6ms/mantle/actions/workflows/ci.yml"><img src="https://github.com/rayan6ms/mantle/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a>
 </p>
 
 Mantle is a Rust-native replacement for [Lavaplayer](https://github.com/lavalink-devs/lavaplayer).
