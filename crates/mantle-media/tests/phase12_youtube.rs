@@ -641,6 +641,59 @@ fn video_loading_falls_through_clients_and_builds_bounded_track_metadata() {
 }
 
 #[test]
+fn metadata_loading_does_not_require_playback_but_playback_still_does() {
+    // youtube-source 1.18.2 NonMusicClient.loadVideo validates playability only
+    // when videoDetails is absent. WEB can return public metadata without formats.
+    let server = ReplayServer::start(|_, _| {
+        ReplayResponse::json(
+            br#"{"playabilityStatus":{"status":"UNPLAYABLE","reason":"Video unavailable"},"videoDetails":{"videoId":"5NV6Rdv1a3I","title":"Fixture","author":"Artist","lengthSeconds":"248"}}"#,
+        )
+    });
+    let manager = YoutubeAudioSourceManager::new(
+        YoutubeSourceOptions {
+            api_base_url: server.url("youtubei/v1"),
+            clients: vec![YoutubeClientKind::AndroidVr],
+            http: private_http_options(),
+            ..YoutubeSourceOptions::default()
+        },
+        YoutubeAuthentication::default(),
+    )
+    .unwrap();
+    let loaded = manager.load(&SourceReference::new(Some("5NV6Rdv1a3I".to_owned()), false));
+    assert!(matches!(
+        loaded,
+        Ok(Some(SourceLoad::Item(YoutubeSourceItem::Track(_))))
+    ));
+    assert_eq!(
+        manager
+            .discover_playback_formats("5NV6Rdv1a3I", &MediaCancellation::new())
+            .unwrap_err()
+            .kind(),
+        YoutubeErrorKind::Unavailable
+    );
+}
+
+#[test]
+fn unavailable_metadata_cannot_invent_a_track() {
+    for body in [
+        br#"{"playabilityStatus":{"status":"LOGIN_REQUIRED"}}"#.as_slice(),
+        br#"{"playabilityStatus":{"status":"UNPLAYABLE"},"videoDetails":{"videoId":"wrong-video","title":"Fixture","lengthSeconds":"248"}}"#.as_slice(),
+    ] {
+        let server = ReplayServer::start(move |_, _| ReplayResponse::json(body));
+        let manager = YoutubeAudioSourceManager::new(
+            YoutubeSourceOptions {
+                api_base_url: server.url("youtubei/v1"),
+                clients: vec![YoutubeClientKind::AndroidVr],
+                http: private_http_options(),
+                ..YoutubeSourceOptions::default()
+            },
+            YoutubeAuthentication::default(),
+        ).unwrap();
+        assert_eq!(manager.load(&SourceReference::new(Some("5NV6Rdv1a3I".to_owned()), false)), Err(SourceRegistryError::SourceFailure));
+    }
+}
+
+#[test]
 fn ordinary_search_falls_through_clients_and_skips_non_tracks() {
     let server = ReplayServer::start(|request, count| {
         assert_eq!(request.target, "/youtubei/v1/search?prettyPrint=false");

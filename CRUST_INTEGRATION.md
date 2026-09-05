@@ -4,6 +4,10 @@ Mantle owns the playback, processing, and routed-network boundaries Crust needs.
 
 ## Integrated YouTube playback
 
+Track metadata may load even when the metadata client's player response reports an unavailable
+format. This matches youtube-source 1.18.2; callers must handle playback discovery failing
+independently. Missing or mismatched video details still fail, and playback checks playability.
+
 For deterministic offline benchmarks, open content-addressed fixtures with
 `MediaSession::open_file(...)`, then transfer ownership with
 `YoutubePlaybackSession::from_media_session(session, expected_kind)`. This path validates the

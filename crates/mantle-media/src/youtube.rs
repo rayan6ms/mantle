@@ -3167,19 +3167,24 @@ fn parse_player_response(
 ) -> Result<YoutubeSourceTrack, YoutubeError> {
     let response: PlayerResponse = serde_json::from_slice(bytes)
         .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
-    let status = response
-        .playability_status
-        .and_then(|status| status.status)
-        .ok_or_else(|| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
-    match status.as_str() {
-        "OK" => {}
-        "LOGIN_REQUIRED" | "CONTENT_CHECK_REQUIRED" => {
-            return Err(YoutubeError::new(YoutubeErrorKind::LoginRequired));
+    // Metadata loading is independent of format availability, as in the pinned
+    // youtube-source NonMusicClient.loadVideo. A client may expose public details
+    // while refusing playback. Format discovery still validates playability.
+    if response.video_details.is_none() {
+        let status = response
+            .playability_status
+            .and_then(|status| status.status)
+            .ok_or_else(|| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
+        match status.as_str() {
+            "OK" => {}
+            "LOGIN_REQUIRED" | "CONTENT_CHECK_REQUIRED" => {
+                return Err(YoutubeError::new(YoutubeErrorKind::LoginRequired));
+            }
+            "ERROR" | "UNPLAYABLE" | "LIVE_STREAM_OFFLINE" => {
+                return Err(YoutubeError::new(YoutubeErrorKind::Unavailable));
+            }
+            _ => return Err(YoutubeError::new(YoutubeErrorKind::InvalidResponse)),
         }
-        "ERROR" | "UNPLAYABLE" | "LIVE_STREAM_OFFLINE" => {
-            return Err(YoutubeError::new(YoutubeErrorKind::Unavailable));
-        }
-        _ => return Err(YoutubeError::new(YoutubeErrorKind::InvalidResponse)),
     }
     let details = response
         .video_details
