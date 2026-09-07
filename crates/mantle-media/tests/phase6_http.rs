@@ -551,6 +551,103 @@ fn private_test_options() -> HttpRangeOptions {
     }
 }
 
+#[test]
+#[cfg(unix)]
+fn staged_ranges_read_and_seek_after_the_origin_is_gone() {
+    use std::io::{Seek, SeekFrom};
+    let bytes = (0..100_000)
+        .map(|i| u8::try_from(i % 251).unwrap())
+        .collect::<Vec<_>>();
+    let server = RangeServer::start(bytes.clone(), ResponseMode::Partial);
+    let cancellation = MediaCancellation::new();
+    let mut input = HttpRangeInput::open_with_cancellation(
+        server.url("staged"),
+        HttpRangeOptions {
+            staging_max_bytes: bytes.len() as u64,
+            ..private_test_options()
+        },
+        cancellation.clone(),
+    )
+    .unwrap();
+    assert_eq!(
+        server.requests().len(),
+        4,
+        "all compressed ranges precede playback"
+    );
+    drop(server);
+    let mut actual = Vec::new();
+    input.read_to_end(&mut actual).unwrap();
+    assert_eq!(actual, bytes);
+    input.seek(SeekFrom::Start(32_700)).unwrap();
+    let mut across_boundary = [0_u8; 200];
+    input.read_exact(&mut across_boundary).unwrap();
+    assert_eq!(&across_boundary, &bytes[32_700..32_900]);
+    assert!(input.seek(SeekFrom::End(1)).is_err());
+    cancellation.cancel();
+    assert!(input.read(&mut across_boundary).is_err());
+    assert!(input.seek(SeekFrom::Start(0)).is_err());
+}
+
+#[test]
+#[cfg(unix)]
+fn staging_ceiling_preserves_streaming_for_larger_objects() {
+    let bytes = vec![17_u8; 100_000];
+    let server = RangeServer::start(bytes.clone(), ResponseMode::Partial);
+    let mut input = HttpRangeInput::open(
+        server.url("larger"),
+        HttpRangeOptions {
+            staging_max_bytes: 50_000,
+            ..private_test_options()
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        server.requests().len(),
+        1,
+        "oversized source must not be staged or rejected"
+    );
+    let mut actual = Vec::new();
+    input.read_to_end(&mut actual).unwrap();
+    assert_eq!(actual, bytes);
+    assert_eq!(server.requests().len(), 4);
+    assert!(
+        HttpRangeInput::open(
+            server.url("invalid"),
+            HttpRangeOptions {
+                staging_max_bytes: 64 * 1024 * 1024 + 1,
+                ..private_test_options()
+            }
+        )
+        .is_err()
+    );
+    assert_eq!(
+        server.requests().len(),
+        4,
+        "invalid option must fail before network I/O"
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn staged_open_honors_cancellation_and_response_validation() {
+    let server = RangeServer::start(vec![1_u8; 100_000], ResponseMode::Partial);
+    let polls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let linked = Arc::clone(&polls);
+    let cancellation =
+        MediaCancellation::linked(move || linked.fetch_add(1, Ordering::Relaxed) >= 12);
+    let options = HttpRangeOptions {
+        staging_max_bytes: 100_000,
+        ..private_test_options()
+    };
+    assert!(
+        HttpRangeInput::open_with_cancellation(server.url("cancel"), options, cancellation)
+            .is_err()
+    );
+    assert!(server.requests().len() < 4);
+    let wrong = RangeServer::start(vec![1_u8; 100_000], ResponseMode::WrongRange);
+    assert!(HttpRangeInput::open(wrong.url("signed?secret=not-for-logs"), options).is_err());
+}
+
 fn private_stream_options() -> HttpStreamOptions {
     HttpStreamOptions {
         max_response_bytes: 64,

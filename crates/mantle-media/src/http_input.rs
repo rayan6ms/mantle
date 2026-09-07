@@ -1,8 +1,9 @@
 use std::fmt;
+use std::fs::File;
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::net::{IpAddr, SocketAddr, TcpStream};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use ureq::http::header::{
@@ -67,6 +68,11 @@ pub trait OutboundRoutePolicy: fmt::Debug + Send + Sync {
 /// Resource and network policy for a seekable HTTP range input.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HttpRangeOptions {
+    /// Stage finite objects no larger than this many bytes in an anonymous
+    /// temporary file before returning from open. Zero disables staging;
+    /// larger objects retain ordinary range streaming. Maximum 64 MiB.
+    /// Available on Unix; nonzero values are rejected on other platforms.
+    pub staging_max_bytes: u64,
     pub range_window_bytes: usize,
     pub max_source_bytes: u64,
     pub max_response_header_bytes: usize,
@@ -81,6 +87,7 @@ pub struct HttpRangeOptions {
 impl Default for HttpRangeOptions {
     fn default() -> Self {
         Self {
+            staging_max_bytes: 0,
             range_window_bytes: 256 * 1024,
             max_source_bytes: 64 * 1024 * 1024 * 1024,
             max_response_header_bytes: 32 * 1024,
@@ -96,6 +103,16 @@ impl Default for HttpRangeOptions {
 
 impl HttpRangeOptions {
     fn validate(self) -> Result<Self, MediaError> {
+        if self.staging_max_bytes != 0 && !cfg!(unix) {
+            return Err(MediaError::InvalidHttpOptions(
+                "source staging requires Unix",
+            ));
+        }
+        if self.staging_max_bytes > 64 * 1024 * 1024 {
+            return Err(MediaError::InvalidHttpOptions(
+                "staging_max_bytes must not exceed 64 MiB",
+            ));
+        }
         if self.range_window_bytes == 0 {
             return Err(MediaError::InvalidHttpOptions(
                 "range_window_bytes must be non-zero",
@@ -141,6 +158,7 @@ pub struct HttpRangeInput {
     position: u64,
     source_len: u64,
     active: Option<ActiveRange>,
+    staged: Option<File>,
     validator: Option<Validator>,
     cancellation: MediaCancellation,
 }
@@ -211,11 +229,47 @@ impl HttpRangeInput {
             position: 0,
             source_len: 0,
             active: None,
+            staged: None,
             validator: None,
             cancellation,
         };
         input.open_range()?;
+        if input.source_len <= input.options.staging_max_bytes {
+            input.stage()?;
+        }
         Ok(input)
+    }
+
+    fn stage(&mut self) -> io::Result<()> {
+        // The file is anonymous and closes on every error/cancellation path.
+        // Keep compressed bytes off the heap and reuse one bounded copy buffer.
+        let mut file = staging_file()?;
+        let mut buffer = vec![0_u8; 64 * 1024];
+        let started = Instant::now();
+        loop {
+            if started.elapsed() >= self.options.request_timeout {
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "HTTP staging deadline exceeded",
+                ));
+            }
+            let count = self.read(&mut buffer)?;
+            if started.elapsed() >= self.options.request_timeout {
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "HTTP staging deadline exceeded",
+                ));
+            }
+            if count == 0 {
+                break;
+            }
+            file.write_all(&buffer[..count])?;
+        }
+        self.cancellation.check_io()?;
+        file.seek(SeekFrom::Start(0))?;
+        self.position = 0;
+        self.staged = Some(file);
+        Ok(())
     }
 
     #[must_use]
@@ -315,11 +369,65 @@ impl HttpRangeInput {
     }
 }
 
+#[cfg(unix)]
+fn staging_file() -> io::Result<File> {
+    use std::fs::OpenOptions;
+    use std::os::unix::fs::OpenOptionsExt;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::SystemTime;
+    static NEXT_FILE: AtomicU64 = AtomicU64::new(0);
+    let stamp = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    for _ in 0..32 {
+        let serial = NEXT_FILE.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "mantle-{}-{stamp:x}-{serial:x}.tmp",
+            std::process::id()
+        ));
+        // create_new atomically rejects every existing path, including symlinks.
+        // The name is not a security boundary: no existing file can be opened,
+        // contents start private, and unlink occurs before source bytes arrive.
+        match OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&path)
+        {
+            Ok(file) => {
+                std::fs::remove_file(path)?;
+                return Ok(file);
+            }
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
+            Err(error) => return Err(error),
+        }
+    }
+    Err(io::Error::new(
+        io::ErrorKind::AlreadyExists,
+        "temporary staging namespace exhausted",
+    ))
+}
+
+#[cfg(not(unix))]
+fn staging_file() -> io::Result<File> {
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "source staging requires Unix",
+    ))
+}
+
 impl Read for HttpRangeInput {
     fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
         self.cancellation.check_io()?;
         if buffer.is_empty() || self.position >= self.source_len {
             return Ok(0);
+        }
+        if let Some(file) = &mut self.staged {
+            let count = file.read(buffer)?;
+            self.position += count as u64;
+            return Ok(count);
         }
         if self.active.is_none() {
             self.open_range()?;
@@ -368,6 +476,9 @@ impl Seek for HttpRangeInput {
             io::Error::new(io::ErrorKind::InvalidInput, "HTTP seek position is invalid")
         })?;
         if target != self.position {
+            if let Some(file) = &mut self.staged {
+                file.seek(SeekFrom::Start(target))?;
+            }
             self.position = target;
             self.active = None;
         }
@@ -1176,6 +1287,20 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_RANGE, "bytes 9-10/10".parse().unwrap());
         assert!(parse_content_range(&headers).is_err());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn staging_storage_is_private_and_anonymous() {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        let file = super::staging_file().unwrap();
+        let metadata = file.metadata().unwrap();
+        assert_eq!(metadata.permissions().mode() & 0o777, 0o600);
+        assert_eq!(
+            metadata.nlink(),
+            0,
+            "staging must have no persistent pathname"
+        );
     }
 
     #[test]
