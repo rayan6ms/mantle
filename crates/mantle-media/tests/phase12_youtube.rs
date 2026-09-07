@@ -2847,3 +2847,63 @@ fn serve_media_range(mut stream: TcpStream, bytes: &[u8], requests: &Mutex<Vec<(
     let _ = stream.flush();
     let _ = stream.shutdown(Shutdown::Both);
 }
+
+#[test]
+#[cfg(unix)]
+fn staged_playback_reopens_after_eof_without_network_or_previous_cancellation() {
+    for (fixture, mime) in [
+        ("tone-opus.webm", "audio/webm; codecs=\"opus\""),
+        ("tone-aac-lc.m4a", "audio/mp4; codecs=\"mp4a.40.2\""),
+    ] {
+        let bytes = fs::read(media_fixture(fixture)).unwrap();
+        let media = RangeMediaServer::start(bytes.clone());
+        let response = playback_response(&media.url("staged"), mime, bytes.len());
+        let api = ReplayServer::start(move |_, _| ReplayResponse::json(&response));
+        let manager = playback_manager(&api);
+        let first_cancel = MediaCancellation::new();
+        let formats = manager
+            .discover_playback_formats("dQw4w9WgXcQ", &first_cancel)
+            .unwrap();
+        let mut playback = manager
+            .open_selected_playback(
+                &formats,
+                HttpRangeOptions {
+                    staging_max_bytes: bytes.len() as u64,
+                    ..private_range_options()
+                },
+                MediaLimits::default(),
+                first_cancel.clone(),
+            )
+            .unwrap();
+        drop(media);
+        drop(api);
+        let mut output = EncodedFrameSlot::new();
+        let mut expected = Vec::new();
+        while playback.read_frame(&mut output).unwrap() {
+            assert!(expected.len() < 1000);
+            expected.push((output.timestamp(), output.data().to_vec()));
+        }
+        assert!(!expected.is_empty());
+        let staged = playback
+            .into_staged_input()
+            .expect("completed input must retain staged bytes");
+        first_cancel.cancel();
+        let next_cancel = MediaCancellation::new();
+        let mut playback = staged.open(next_cancel.clone()).unwrap();
+        let mut actual = Vec::new();
+        while playback.read_frame(&mut output).unwrap() {
+            assert!(actual.len() < 1000);
+            actual.push((output.timestamp(), output.data().to_vec()));
+        }
+        assert_eq!(
+            actual, expected,
+            "fresh decoder must repeat exactly: {fixture}"
+        );
+        let staged = playback.into_staged_input().unwrap();
+        next_cancel.cancel();
+        assert_eq!(
+            staged.open(next_cancel).err().unwrap().kind(),
+            YoutubePlaybackErrorKind::Cancelled
+        );
+    }
+}

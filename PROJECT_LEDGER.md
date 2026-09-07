@@ -15,3 +15,11 @@ ceiling and one temporary 64 KiB copy buffer. Media HTTP (16), media unit
 (20 plus anonymous-file lifecycle), YouTube (38), remote HTTP (10), formatting,
 Clippy, cargo audit, cargo deny, and cargo vet (171 audited) pass. Existing
 live/environment test exclusions remain unchanged. No dependency changes.
+
+Replay must rebuild the media pipeline from the retained compressed file:
+WebM seek after EOF can fail in the demuxer, and the PCM transcoder releases
+its consumed media session. StagedPlaybackInput consumes the old playback
+session and retains one anonymous file handle, then opens fresh decoder/DSP
+state with independent cancellation. Exact Opus and AAC packets repeat after
+both source servers are dropped; old cancellation cannot poison the replay.
+YouTube suite now passes 39 tests with the same 3 environment/live exclusions.

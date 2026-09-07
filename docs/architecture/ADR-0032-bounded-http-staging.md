@@ -36,3 +36,11 @@ is explicit rather than silently accepting incomplete media.
 Revisit when startup time, eligible-file coverage, disk footprint, multi-player
 resource budgets, or live receiver evidence contradict the benefit. Disk
 staging does not address downstream loss or receiver scheduling.
+
+For replay, a playback session can be consumed into StagedPlaybackInput. This
+retains compressed storage only, releasing decoder/DSP buffers. Reopening
+creates a fresh pipeline with independent cancellation; filters are explicitly
+reinstalled by the caller. Active playback holds two handles to the same
+anonymous file, completed cache holds one, and compressed bytes are never
+copied. Consuming the old session before reopening prevents shared-cursor
+races. This avoids unreliable post-EOF seeks and retains existing live cleanup.

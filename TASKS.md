@@ -5,3 +5,5 @@
 - [x] Verify full validation, staging cancellation/errors, seek after origin shutdown, oversized fallback, default streaming, and resource ceilings.
 - [x] Run media regressions, formatting, Clippy, and supply-chain checks; record new dependency decision.
 - [ ] Integrate and repeat real Raydio playback before any reliability claim.
+
+- [x] Reopen staged compressed input with a fresh demuxer/decoder and cancellation token; verify exact Opus/AAC output after EOF and origin shutdown.

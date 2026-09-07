@@ -132,8 +132,9 @@ pub use youtube::{
 };
 pub use youtube_cipher_process::{YoutubeProcessCipherOptions, YoutubeProcessCipherResolver};
 pub use youtube_playback::{
-    YoutubeLivePlaybackOptions, YoutubeLivePlaybackPoll, YoutubeLivePlaybackSession,
-    YoutubePlaybackError, YoutubePlaybackErrorKind, YoutubePlaybackMode, YoutubePlaybackSession,
+    StagedPlaybackInput, YoutubeLivePlaybackOptions, YoutubeLivePlaybackPoll,
+    YoutubeLivePlaybackSession, YoutubePlaybackError, YoutubePlaybackErrorKind,
+    YoutubePlaybackMode, YoutubePlaybackSession,
 };
 
 /// Bounds applied before and around the media backend.

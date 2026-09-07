@@ -101,6 +101,50 @@ impl std::error::Error for YoutubePlaybackError {}
 /// A finite selected `YouTube` media object connected to Mantle's fixed Opus frame contract.
 pub struct YoutubePlaybackSession {
     inner: YoutubePlaybackInner,
+    staged_input: Option<StagedPlaybackInput>,
+}
+
+/// One bounded anonymous compressed object, without decoder/DSP state.
+/// Obtain it by consuming a completed staged playback session. Dropping it
+/// releases storage; reopening never contacts the source network.
+pub struct StagedPlaybackInput {
+    file: std::fs::File,
+    kind: YoutubePlaybackFormatKind,
+    limits: MediaLimits,
+}
+
+impl StagedPlaybackInput {
+    /// Opens a fresh demuxer, decoder and encoder with a new cancellation signal.
+    /// Filters must be installed again by the caller.
+    ///
+    /// # Errors
+    /// Returns a credential-safe cancellation, file I/O or media error.
+    pub fn open(
+        mut self,
+        cancellation: MediaCancellation,
+    ) -> Result<YoutubePlaybackSession, YoutubePlaybackError> {
+        use std::io::{Seek, SeekFrom};
+        cancellation.check().map_err(map_media_error)?;
+        self.file
+            .seek(SeekFrom::Start(0))
+            .map_err(MediaError::Io)
+            .map_err(map_media_error)?;
+        let input = self
+            .file
+            .try_clone()
+            .map_err(MediaError::Io)
+            .map_err(map_media_error)?;
+        let media = MediaSession::open_with_cancellation(
+            Box::new(input),
+            Some(extension_hint(self.kind)),
+            self.limits,
+            cancellation,
+        )
+        .map_err(map_media_error)?;
+        let mut playback = YoutubePlaybackSession::new(media, self.kind)?;
+        playback.staged_input = Some(self);
+        Ok(playback)
+    }
 }
 
 /// A bounded live HLS session driven by caller-supplied monotonic time.
@@ -227,6 +271,14 @@ impl YoutubeAudioSourceManager {
                 YoutubePlaybackErrorKind::InvalidMedia,
             ));
         }
+        let staged_input = input
+            .clone_staged_file()
+            .map_err(map_media_error)?
+            .map(|file| StagedPlaybackInput {
+                file,
+                kind,
+                limits: media_limits,
+            });
         let session = MediaSession::open_with_cancellation(
             Box::new(input),
             Some(extension_hint(kind)),
@@ -234,7 +286,9 @@ impl YoutubeAudioSourceManager {
             cancellation,
         )
         .map_err(map_media_error)?;
-        YoutubePlaybackSession::new(session, kind)
+        let mut playback = YoutubePlaybackSession::new(session, kind)?;
+        playback.staged_input = staged_input;
+        Ok(playback)
     }
 
     /// Resolves and opens finite media through the same injectable outbound route policy used by
@@ -279,6 +333,14 @@ impl YoutubeAudioSourceManager {
                 YoutubePlaybackErrorKind::InvalidMedia,
             ));
         }
+        let staged_input = input
+            .clone_staged_file()
+            .map_err(map_media_error)?
+            .map(|file| StagedPlaybackInput {
+                file,
+                kind,
+                limits: media_limits,
+            });
         let session = MediaSession::open_with_cancellation(
             Box::new(input),
             Some(extension_hint(kind)),
@@ -286,7 +348,9 @@ impl YoutubeAudioSourceManager {
             cancellation,
         )
         .map_err(map_media_error)?;
-        YoutubePlaybackSession::new(session, kind)
+        let mut playback = YoutubePlaybackSession::new(session, kind)?;
+        playback.staged_input = staged_input;
+        Ok(playback)
     }
 
     /// Resolves and opens the selected live HLS manifest without performing an eager request.
@@ -570,6 +634,13 @@ impl YoutubeLivePlaybackSession {
 }
 
 impl YoutubePlaybackSession {
+    /// Releases decoder/DSP state and returns the staged object, when present.
+    /// Consuming the session ensures no reader shares its file cursor on reopen.
+    #[must_use]
+    pub fn into_staged_input(self) -> Option<StagedPlaybackInput> {
+        self.staged_input
+    }
+
     /// Takes ownership of an already opened media session after verifying it matches a selected
     /// finite `YouTube` format.
     ///
@@ -644,7 +715,10 @@ impl YoutubePlaybackSession {
         } else {
             YoutubePlaybackInner::Transcode(Box::new(PcmTranscoder::new(session)?))
         };
-        Ok(Self { inner })
+        Ok(Self {
+            inner,
+            staged_input: None,
+        })
     }
 
     #[must_use]

@@ -240,6 +240,16 @@ impl HttpRangeInput {
         Ok(input)
     }
 
+    // Duplicate only the handle, not the compressed bytes. The consumer must
+    // drop the active reader before seeking the shared file cursor for replay.
+    pub(crate) fn clone_staged_file(&self) -> Result<Option<File>, MediaError> {
+        self.staged
+            .as_ref()
+            .map(File::try_clone)
+            .transpose()
+            .map_err(MediaError::Io)
+    }
+
     fn stage(&mut self) -> io::Result<()> {
         // The file is anonymous and closes on every error/cancellation path.
         // Keep compressed bytes off the heap and reuse one bounded copy buffer.
