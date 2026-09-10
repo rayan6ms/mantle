@@ -158,6 +158,8 @@ pub struct HttpRangeInput {
     position: u64,
     source_len: u64,
     active: Option<ActiveRange>,
+    body_retries: u32,
+    recovery: Option<(Instant, u64)>,
     staged: Option<File>,
     validator: Option<Validator>,
     cancellation: MediaCancellation,
@@ -229,6 +231,8 @@ impl HttpRangeInput {
             position: 0,
             source_len: 0,
             active: None,
+            body_retries: 0,
+            recovery: None,
             staged: None,
             validator: None,
             cancellation,
@@ -297,11 +301,28 @@ impl HttpRangeInput {
         let requested_end = self
             .position
             .saturating_add(window.saturating_sub(1))
-            .min(self.options.max_source_bytes.saturating_sub(1));
+            .min(self.options.max_source_bytes.saturating_sub(1))
+            .min(
+                self.recovery
+                    .map_or(u64::MAX, |(_, end)| end.saturating_sub(1)),
+            );
         let range_value = format!("bytes={}-{}", self.position, requested_end);
         let agent = self.agent.clone();
         let uri = self.uri.clone();
         let validator = self.validator.clone();
+        let request_timeout = self
+            .recovery
+            .map_or(self.options.request_timeout, |(started, _)| {
+                self.options
+                    .request_timeout
+                    .saturating_sub(started.elapsed())
+            });
+        if request_timeout.is_zero() {
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "HTTP body recovery deadline exceeded",
+            ));
+        }
         let response = call_with_retries(
             || {
                 let mut request = agent
@@ -311,9 +332,17 @@ impl HttpRangeInput {
                 if let Some(validator) = &validator {
                     request = request.header(IF_RANGE, validator.value.as_str());
                 }
-                request.call()
+                request
+                    .config()
+                    .timeout_global(Some(request_timeout))
+                    .build()
+                    .call()
             },
-            self.options.max_retries,
+            if self.recovery.is_some() {
+                0
+            } else {
+                self.options.max_retries
+            },
             &self.cancellation,
         )?;
         self.uri = response.get_uri().clone();
@@ -439,32 +468,59 @@ impl Read for HttpRangeInput {
             self.position += count as u64;
             return Ok(count);
         }
-        if self.active.is_none() {
-            self.open_range()?;
-        }
-        let Some(active) = self.active.as_mut() else {
-            return Ok(0);
-        };
-        let allowed = usize::try_from(active.remaining)
-            .unwrap_or(usize::MAX)
-            .min(buffer.len());
-        let count = active
-            .reader
-            .read(&mut buffer[..allowed])
-            .map_err(|error| sanitize_body_error(&error))?;
-        self.cancellation.check_io()?;
-        if count == 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                "HTTP range body ended before its declared length",
-            ));
-        }
-        self.position = self.position.saturating_add(count as u64);
-        active.remaining = active.remaining.saturating_sub(count as u64);
-        if active.remaining == 0 {
+        loop {
+            self.cancellation.check_io()?;
+            if self.active.is_none() {
+                self.open_range()?;
+            }
+            let Some(active) = self.active.as_mut() else {
+                return Ok(0);
+            };
+            let end = self.position.saturating_add(active.remaining);
+            let allowed = usize::try_from(active.remaining)
+                .unwrap_or(usize::MAX)
+                .min(buffer.len());
+            let read = active.reader.read(&mut buffer[..allowed]);
+            self.cancellation.check_io()?;
+            let error = match read {
+                Ok(count) if count != 0 => {
+                    self.position = self.position.saturating_add(count as u64);
+                    active.remaining = active.remaining.saturating_sub(count as u64);
+                    if active.remaining == 0 {
+                        self.active = None;
+                    }
+                    if self.recovery.is_some_and(|(_, end)| self.position >= end) {
+                        self.recovery = None;
+                    }
+                    return Ok(count);
+                }
+                Ok(_) => io::Error::new(
+                    io::ErrorKind::UnexpectedEof,
+                    "HTTP range body ended before its declared length",
+                ),
+                Err(error) => sanitize_body_error(&error),
+            };
+            let retriable = matches!(
+                error.kind(),
+                io::ErrorKind::ConnectionAborted
+                    | io::ErrorKind::ConnectionReset
+                    | io::ErrorKind::TimedOut
+                    | io::ErrorKind::UnexpectedEof
+                    | io::ErrorKind::Interrupted
+            );
+            // A strong entity tag is required before splicing a reopened response
+            // into a decoder. Last-Modified alone can miss same-second changes.
+            if !retriable
+                || self.body_retries >= self.options.max_retries
+                || !self.validator.as_ref().is_some_and(|v| v.name == ETAG)
+            {
+                return Err(error);
+            }
+            self.body_retries += 1;
+            self.recovery.get_or_insert((Instant::now(), end));
             self.active = None;
+            // open_range validates identity, total length and the exact consumed offset.
         }
-        Ok(count)
     }
 }
 
@@ -491,6 +547,7 @@ impl Seek for HttpRangeInput {
             }
             self.position = target;
             self.active = None;
+            self.recovery = None;
         }
         Ok(self.position)
     }

@@ -24,6 +24,154 @@ fn fixture(name: &str) -> PathBuf {
 }
 
 #[test]
+fn body_recovery_resumes_at_consumed_byte_and_preserves_exact_media() {
+    let expected: Vec<_> = (0..96).collect();
+    let bytes = expected.clone();
+    let server = ReplayServer::start(move |request, count| {
+        let mut response = partial_response(&request, &bytes, Some("\"stable\""));
+        if count == 0 {
+            response.declared_length = Some(response.body.len());
+            response.body.truncate(8);
+        }
+        response
+    });
+    let mut input = HttpRangeInput::open(
+        server.url("body"),
+        HttpRangeOptions {
+            range_window_bytes: 32,
+            max_retries: 3,
+            ..private_test_options()
+        },
+    )
+    .unwrap();
+    let mut actual = Vec::new();
+    input.read_to_end(&mut actual).unwrap();
+    assert_eq!(expected, actual);
+    assert_eq!(
+        server
+            .requests()
+            .iter()
+            .map(|r| r.range.unwrap())
+            .collect::<Vec<_>>(),
+        [(0, 31), (8, 31), (32, 63), (64, 95)]
+    );
+    std::io::Seek::rewind(&mut input).unwrap();
+    actual.clear();
+    input.read_to_end(&mut actual).unwrap();
+    assert_eq!(expected, actual);
+}
+
+#[test]
+fn body_recovery_requires_unchanged_strong_identity_and_exact_range() {
+    for fault in ["missing", "weak", "changed", "length", "offset"] {
+        let server = ReplayServer::start(move |request, count| {
+            let tag = match fault {
+                "missing" => None,
+                "weak" => Some("W/\"stable\""),
+                "changed" if count != 0 => Some("\"changed\""),
+                _ => Some("\"stable\""),
+            };
+            let len = if fault == "length" && count != 0 {
+                97
+            } else {
+                96
+            };
+            let mut response = partial_response(&request, &vec![7; len], tag);
+            if count == 0 {
+                response.declared_length = Some(response.body.len());
+                response.body.truncate(8);
+            } else if fault == "offset" {
+                response.headers[0].1 = "bytes 0-23/96".to_owned();
+            }
+            response
+        });
+        let mut input = HttpRangeInput::open(
+            server.url("identity"),
+            HttpRangeOptions {
+                range_window_bytes: 32,
+                max_retries: 3,
+                ..private_test_options()
+            },
+        )
+        .unwrap();
+        let mut actual = Vec::new();
+        assert!(input.read_to_end(&mut actual).is_err(), "{fault}");
+        assert_eq!(
+            actual,
+            vec![7; 8],
+            "must not splice rejected bytes: {fault}"
+        );
+        assert_eq!(
+            server.requests().len(),
+            if matches!(fault, "missing" | "weak") {
+                1
+            } else {
+                2
+            }
+        );
+    }
+}
+
+#[test]
+fn body_recovery_is_bounded_across_partial_progress_and_cancellation() {
+    let server = ReplayServer::start(|request, _| {
+        let mut response = partial_response(&request, &[7; 96], Some("\"stable\""));
+        response.declared_length = Some(response.body.len());
+        response.body.truncate(2);
+        response
+    });
+    let cancellation = MediaCancellation::new();
+    let mut input = HttpRangeInput::open_with_cancellation(
+        server.url("bounded"),
+        HttpRangeOptions {
+            range_window_bytes: 32,
+            max_retries: 2,
+            ..private_test_options()
+        },
+        cancellation.clone(),
+    )
+    .unwrap();
+    let mut actual = Vec::new();
+    assert!(input.read_to_end(&mut actual).is_err());
+    assert_eq!(server.requests().len(), 3);
+    assert_eq!(actual, vec![7; 6]);
+    cancellation.cancel();
+    assert!(input.read(&mut [0; 8]).is_err());
+    assert_eq!(server.requests().len(), 3);
+}
+
+#[test]
+fn body_recovery_has_one_total_deadline() {
+    let server = ReplayServer::start(|request, count| {
+        if count != 0 {
+            thread::sleep(Duration::from_millis(120));
+        }
+        let mut response = partial_response(&request, &[7; 96], Some("\"stable\""));
+        if count == 0 {
+            response.declared_length = Some(response.body.len());
+            response.body.truncate(8);
+        }
+        response
+    });
+    let mut input = HttpRangeInput::open(
+        server.url("deadline"),
+        HttpRangeOptions {
+            range_window_bytes: 32,
+            max_retries: 3,
+            request_timeout: Duration::from_millis(60),
+            ..private_test_options()
+        },
+    )
+    .unwrap();
+    let mut actual = Vec::new();
+    let start = std::time::Instant::now();
+    assert!(input.read_to_end(&mut actual).is_err());
+    assert_eq!(actual, vec![7; 8]);
+    assert!(start.elapsed() < Duration::from_secs(1));
+    assert_eq!(server.requests().len(), 2);
+}
+
+#[test]
 fn decodes_and_seeks_over_bounded_http_ranges() {
     let bytes = fs::read(fixture("tone-mp3.mp3")).unwrap();
     let server = RangeServer::start(bytes.clone(), ResponseMode::Partial);

@@ -643,6 +643,7 @@ pub struct MediaSession {
     format: Box<dyn FormatReader>,
     pending_packets: VecDeque<symphonia::core::packet::Packet>,
     decoder: Option<PcmDecoder>,
+    decoder_params: symphonia::core::codecs::audio::AudioCodecParameters,
     info: Box<MediaInfo>,
     cancellation: MediaCancellation,
     track_id: u32,
@@ -791,6 +792,7 @@ impl MediaSession {
             format,
             pending_packets,
             decoder,
+            decoder_params: params,
             info: Box::new(MediaInfo {
                 container,
                 codec,
@@ -951,12 +953,10 @@ impl MediaSession {
         self.cancellation.check()?;
         let result = result?;
         self.pending_packets.clear();
-        if let Some(decoder) = self.decoder.as_mut() {
-            match decoder {
-                PcmDecoder::Symphonia(decoder) => decoder.reset(),
-                PcmDecoder::Xaac(decoder) => decoder.reset()?,
-            }
-        }
+        // Recreate the decoder so every history component returns to its
+        // initial state. Some backends' reset methods leave ancillary state
+        // (for example AAC noise-substitution PRNG state) intact.
+        self.decoder = create_pcm_decoder(&self.decoder_params, self.info.codec, self.limits)?;
         self.consecutive_decode_errors = 0;
         Ok(SeekResult {
             requested,
@@ -1610,6 +1610,9 @@ fn inspect_mp4_packet_sizes(
     Ok(())
 }
 
+static MEDIA_PROBE: std::sync::OnceLock<symphonia::core::formats::probe::Probe> =
+    std::sync::OnceLock::new();
+
 fn probe_media_input(
     input: Box<dyn MediaInput>,
     extension_hint: Option<&str>,
@@ -1684,12 +1687,13 @@ fn probe_media_input(
     let metadata_options = MetadataOptions::default()
         .limit_tag_bytes(Limit::Maximum(limits.max_metadata_string_bytes))
         .limit_visual_bytes(Limit::Maximum(0));
-    let probed = symphonia::default::get_probe().probe(
-        &hint,
-        stream,
-        FormatOptions::default(),
-        metadata_options,
-    );
+    let probe = MEDIA_PROBE.get_or_init(|| {
+        let mut probe = symphonia::core::formats::probe::Probe::default();
+        symphonia::default::register_enabled_formats(&mut probe);
+        probe.register_format::<mantle_symphonia_isomp4::IsoMp4Reader>();
+        probe
+    });
+    let probed = probe.probe(&hint, stream, FormatOptions::default(), metadata_options);
     probe_state.active.store(false, Ordering::Release);
     cancellation.check()?;
     match probed {
@@ -2216,14 +2220,6 @@ impl XaacPcmDecoder {
         }
         Ok(true)
     }
-
-    fn reset(&mut self) -> Result<(), MediaError> {
-        self.decoder
-            .reset()
-            .map_err(|error| native_backend_error("seek reset", &error))?;
-        self.pending_timestamps.clear();
-        Ok(())
-    }
 }
 
 fn create_pcm_decoder(
@@ -2675,6 +2671,7 @@ fn map_audio_frame_error(error: AudioFrameError) -> MediaError {
         | AudioFrameError::StreamingProcessorCapacityExceeded { .. }
         | AudioFrameError::PcmFormatMismatch { .. }
         | AudioFrameError::InvalidResamplerConfiguration(_)
+        | AudioFrameError::InvalidFilterConfiguration(_)
         | AudioFrameError::UnsupportedResampleRatio { .. }
         | AudioFrameError::ResamplerInputLimitExceeded { .. }
         | AudioFrameError::ResamplerAlreadyFinished

@@ -1034,10 +1034,10 @@ impl PcmTranscoder {
                         .read_pcm(&mut self.decoded)
                         .map_err(map_media_error)?
                     {
-                        self.session = None;
                         if finish_at_eof {
                             self.finish_input()?;
                         } else {
+                            self.session = None;
                             output.clear();
                             return Ok(PcmTranscodePoll::NeedInput);
                         }
@@ -1064,10 +1064,10 @@ impl PcmTranscoder {
                         self.validate_decoded_format()?;
                         self.decoded_offset = 0;
                     } else {
-                        self.session = None;
                         if finish_at_eof {
                             self.finish_input()?;
                         } else {
+                            self.session = None;
                             output.clear();
                             return Ok(PcmTranscodePoll::NeedInput);
                         }
@@ -1167,7 +1167,8 @@ impl PcmTranscoder {
         if self.input_eof {
             return Ok(());
         }
-        self.session = None;
+        // Retain the seekable session through EOF/drain. Live segment rollover
+        // explicitly releases its session in the nonterminal path above.
         self.input_eof = true;
         if let Some(resampler) = self.resampler.as_mut() {
             resampler.finish().map_err(map_audio_error)?;
@@ -1465,6 +1466,79 @@ mod tests {
             );
             if !filtered {
                 assert_eq!(frame.data(), packet.data());
+            }
+        }
+    }
+
+    #[test]
+    fn pcm_seek_after_eof_resets_decoder_history() {
+        for name in [
+            "tone-he-aac-v1.m4a",
+            "tone-he-aac-v2.m4a",
+            "tone-aac-lc.m4a",
+            "tone-aac-lc-fragmented.m4a",
+            "tone-flac.flac",
+            "tone-pcm-s16le-mono-8k.wav",
+        ] {
+            let mut session =
+                MediaSession::open_file(fixture(name), MediaLimits::default()).unwrap();
+            session.seek(std::time::Duration::ZERO).unwrap();
+            let mut frame =
+                crate::PcmFrame::with_capacity(session.limits().max_pcm_samples_per_frame);
+            let mut expected = Vec::new();
+            while session.read_pcm(&mut frame).unwrap() {
+                expected.extend_from_slice(frame.samples());
+            }
+            session.seek(std::time::Duration::ZERO).unwrap();
+            let mut actual = Vec::new();
+            while session.read_pcm(&mut frame).unwrap() {
+                actual.extend_from_slice(frame.samples());
+            }
+            assert_eq!(expected.len(), actual.len(), "sample count: {name}");
+            let difference = expected.iter().zip(&actual).position(|(a, b)| a != b);
+            assert!(
+                difference.is_none(),
+                "decoded PCM differs: {name}; first diff {difference:?}; expected {:?}; actual {:?}",
+                &expected[..expected.len().min(8)],
+                &actual[..actual.len().min(8)]
+            );
+        }
+    }
+
+    #[test]
+    fn seek_after_eof_reproduces_fresh_transcoded_audio() {
+        for name in [
+            "tone-aac-lc.m4a",
+            "tone-aac-lc-fragmented.m4a",
+            "tone-he-aac-v1.m4a",
+            "tone-he-aac-v2.m4a",
+            "tone-flac.flac",
+            "tone-mp3.mp3",
+            "tone-vorbis-tags.ogg",
+            "tone-pcm-s16le-mono-8k.wav",
+        ] {
+            let session = MediaSession::open_file(fixture(name), MediaLimits::default()).unwrap();
+            let mut playback = YoutubePlaybackSession::from_probed_media_session(session).unwrap();
+            playback.seek(std::time::Duration::ZERO).unwrap();
+            let mut frame = EncodedFrameSlot::new();
+            let mut before = Vec::new();
+            while playback.read_frame(&mut frame).unwrap() {
+                before.push(frame.data().to_vec());
+            }
+            playback.seek(std::time::Duration::ZERO).unwrap();
+            let mut after = Vec::new();
+            while playback
+                .read_frame(&mut frame)
+                .unwrap_or_else(|e| panic!("{name}: {e:?}"))
+            {
+                after.push(frame.data().to_vec());
+            }
+            assert_eq!(before.len(), after.len(), "frame count: {name}");
+            for (index, (expected, actual)) in before.iter().zip(&after).enumerate() {
+                assert!(
+                    expected == actual,
+                    "seek after EOF changed frame {index}: {name}"
+                );
             }
         }
     }

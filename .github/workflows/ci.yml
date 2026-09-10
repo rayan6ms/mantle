@@ -24,7 +24,8 @@ jobs:
           components: clippy,rustfmt
       - uses: Swatinem/rust-cache@v2
       - run: scripts/check-no-jvm-source.sh
-      - run: cargo fmt --all -- --check
+      # Retain upstream formatting in the narrowly patched MP4 demuxer.
+      - run: cargo fmt --all --exclude mantle-symphonia-isomp4 -- --check
       - run: cargo fmt --manifest-path fuzz/Cargo.toml --all -- --check
       - run: scripts/check-local-media-fuzz-layout.sh
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings

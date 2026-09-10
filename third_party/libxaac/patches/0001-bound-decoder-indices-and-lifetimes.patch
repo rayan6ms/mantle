@@ -1,3 +1,17 @@
+diff --git a/decoder/ixheaacd_api.c b/decoder/ixheaacd_api.c
+--- a/decoder/ixheaacd_api.c
++++ b/decoder/ixheaacd_api.c
+@@ -3774,6 +3774,10 @@
+ 
+   if (p_obj_exhaacplus_dec->aac_config.ui_err_conceal &&
+       p_obj_exhaacplus_dec->aac_config.first_frame) {
++    /* EC retains the first spectral frame instead of synthesizing it. The
++       output aliases AAC scratch and contains pointers, not PCM, here. */
++    memset(time_data, 0,
++           p_obj_exhaacplus_dec->p_state_aac->ui_out_bytes);
+     p_obj_exhaacplus_dec->aac_config.first_frame = 0;
+   }
+ 
 diff --git a/decoder/ixheaacd_channel.c b/decoder/ixheaacd_channel.c
 index f1371ec..0928203 100644
 --- a/decoder/ixheaacd_channel.c

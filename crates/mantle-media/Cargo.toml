@@ -20,6 +20,7 @@ serde.workspace = true
 serde_json.workspace = true
 socket2.workspace = true
 symphonia.workspace = true
+mantle-symphonia-isomp4 = { path = "../../third_party/symphonia-format-isomp4" }
 ureq.workspace = true
 
 [lints]

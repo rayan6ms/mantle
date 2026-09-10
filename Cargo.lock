@@ -542,6 +542,7 @@ dependencies = [
  "log",
  "mantle-audio",
  "mantle-core",
+ "mantle-symphonia-isomp4",
  "mantle-xaac",
  "md-5",
  "quick-xml",
@@ -587,6 +588,16 @@ dependencies = [
  "serde_json",
  "sha2",
  "zip",
+]
+
+[[package]]
+name = "mantle-symphonia-isomp4"
+version = "0.6.1"
+dependencies = [
+ "log",
+ "symphonia-common",
+ "symphonia-core",
+ "symphonia-metadata",
 ]
 
 [[package]]
@@ -1003,7 +1014,6 @@ dependencies = [
  "symphonia-codec-pcm",
  "symphonia-codec-vorbis",
  "symphonia-core",
- "symphonia-format-isomp4",
  "symphonia-format-mkv",
  "symphonia-format-ogg",
  "symphonia-format-riff",
@@ -1089,18 +1099,6 @@ dependencies = [
  "log",
  "num-complex",
  "smallvec",
-]
-
-[[package]]
-name = "symphonia-format-isomp4"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e681a70e1870d34e02abf1dbc51e4267c3f1827801474e8870be8c689fc4dc3"
-dependencies = [
- "log",
- "symphonia-common",
- "symphonia-core",
- "symphonia-metadata",
 ]
 
 [[package]]

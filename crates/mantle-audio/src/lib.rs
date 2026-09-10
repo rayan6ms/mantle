@@ -344,6 +344,7 @@ pub enum AudioFrameError {
         actual: Option<PcmFormat>,
     },
     InvalidResamplerConfiguration(&'static str),
+    InvalidFilterConfiguration(&'static str),
     UnsupportedResampleRatio {
         source_rate: u32,
         target_rate: u32,
@@ -367,6 +368,7 @@ pub enum AudioFrameError {
 }
 
 impl fmt::Display for AudioFrameError {
+    #[allow(clippy::too_many_lines)]
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidSampleRate { sample_rate } => {
@@ -441,6 +443,9 @@ impl fmt::Display for AudioFrameError {
             ),
             Self::InvalidResamplerConfiguration(message) => {
                 write!(formatter, "invalid resampler configuration: {message}")
+            }
+            Self::InvalidFilterConfiguration(message) => {
+                write!(formatter, "invalid filter configuration: {message}")
             }
             Self::UnsupportedResampleRatio {
                 source_rate,

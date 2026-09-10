@@ -59,7 +59,7 @@ fn main() {
         "--target",
         "libxaacdec",
         "--parallel",
-        "2",
+        "1",
     ]));
 
     let archive = find_archive(&build).unwrap_or_else(|| {
