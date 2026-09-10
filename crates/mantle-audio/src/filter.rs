@@ -175,6 +175,7 @@ impl FilterChainBuilder {
 
 /// Per-track chain whose storage and filter count are fixed outside steady-state processing.
 pub struct FilterPipeline {
+    replacement_after_drain: Option<Box<Self>>,
     format: PcmFormat,
     before: Vec<Box<dyn PcmFilter>>,
     streaming: Option<Box<dyn StreamingPcmProcessor>>,
@@ -207,6 +208,7 @@ impl FilterPipeline {
             });
         }
         Ok(Self {
+            replacement_after_drain: None,
             format,
             before: Vec::with_capacity(filter_limit),
             streaming: None,
@@ -261,6 +263,62 @@ impl FilterPipeline {
     /// Commits a previously built replacement and deterministically resets the discarded graph.
     pub fn commit_replacement(&mut self, replacement: Self) {
         *self = replacement;
+    }
+
+    /// Replaces filters after draining accepted input and processor latency.
+    /// Source/output clocks and a partial output frame survive the transition.
+    /// At most one replacement is retained; a newer update supersedes it.
+    pub fn replace_after_drain(&mut self, mut replacement: Self) {
+        replacement.input_finished = self
+            .replacement_after_drain
+            .as_ref()
+            .map_or(self.input_finished, |pending| pending.input_finished);
+        if self.streaming.is_none()
+            && self.pending_offset == self.pending_input.samples().len()
+            && self.processor_output_offset == self.processor_output.samples().len()
+            && self.assembled_len == 0
+        {
+            self.replacement_after_drain = None;
+            self.adopt_filters(replacement);
+            return;
+        }
+        self.replacement_after_drain = Some(Box::new(replacement));
+        self.input_finished = true;
+    }
+
+    /// True only when direct delivery cannot overtake accepted processed audio.
+    #[must_use]
+    pub fn passthrough_ready(&self) -> bool {
+        self.filter_count() == 0
+            && self.replacement_after_drain.is_none()
+            && self.pending_offset == self.pending_input.samples().len()
+            && self.processor_output_offset == self.processor_output.samples().len()
+            && self.assembled_len == 0
+    }
+
+    /// Advances the idle processing clock while packets bypass PCM processing.
+    /// Call only at a proven empty passthrough boundary.
+    pub fn advance_passthrough_clock(&mut self, position: Option<Duration>) {
+        debug_assert!(self.passthrough_ready());
+        self.source_base_timestamp = position;
+        self.source_timestamp_initialized = position.is_some();
+        self.source_frames_consumed = 0;
+        self.output_frames_emitted = 0;
+    }
+
+    fn finish_replacement(&mut self) {
+        let Some(next) = self.replacement_after_drain.take() else {
+            return;
+        };
+        self.adopt_filters(*next);
+    }
+
+    fn adopt_filters(&mut self, mut next: Self) {
+        std::mem::swap(&mut self.before, &mut next.before);
+        std::mem::swap(&mut self.streaming, &mut next.streaming);
+        std::mem::swap(&mut self.after, &mut next.after);
+        self.input_finished = next.input_finished;
+        self.processor_finished = false;
     }
 
     /// Rebuilds a chain and swaps it in only after the factory succeeds.
@@ -345,6 +403,9 @@ impl FilterPipeline {
     /// terminal frame.
     pub fn finish_input(&mut self) {
         self.input_finished = true;
+        if let Some(next) = &mut self.replacement_after_drain {
+            next.input_finished = true;
+        }
     }
 
     /// Produces one canonical 20 ms frame, requests more source input, or reports full drain.
@@ -368,6 +429,10 @@ impl FilterPipeline {
                 return Ok(StreamingPcmPoll::Frame);
             }
             if self.processor_finished {
+                if self.replacement_after_drain.is_some() {
+                    self.finish_replacement();
+                    continue;
+                }
                 if self.assembled_len == 0 {
                     output.clear();
                     return Ok(StreamingPcmPoll::Finished);
@@ -399,6 +464,7 @@ impl FilterPipeline {
 
     /// Clears state in every active filter after a seek or track reset.
     pub fn reset(&mut self) {
+        self.finish_replacement();
         for filter in &mut self.before {
             filter.reset();
         }
@@ -1388,6 +1454,59 @@ mod tests {
         );
         assert_eq!(output.timestamp(), None);
         assert_eq!(pipeline.source_position(), None);
+    }
+
+    #[test]
+    fn replacement_preserves_partial_frame_without_padding_at_rate_boundary() {
+        let format = canonical_format();
+        let mut pipeline = FilterPipeline::new(format, 1).unwrap();
+        pipeline
+            .install_factory(Some(&RateFactory(TestRate::DoubleSpeed)))
+            .unwrap();
+        pipeline
+            .submit_input(&frame_with_timestamp(
+                format,
+                &[0.25; COMPATIBLE_PCM_SAMPLES],
+                Duration::ZERO,
+            ))
+            .unwrap();
+        let mut output = PcmFrame::with_capacity(COMPATIBLE_PCM_SAMPLES);
+        assert_eq!(
+            pipeline.read_output(&mut output).unwrap(),
+            StreamingPcmPoll::NeedInput
+        );
+        pipeline.replace_after_drain(pipeline.replacement(None).unwrap());
+        assert_eq!(
+            pipeline.read_output(&mut output).unwrap(),
+            StreamingPcmPoll::NeedInput
+        );
+        pipeline
+            .submit_input(&frame_with_timestamp(
+                format,
+                &[0.5; COMPATIBLE_PCM_SAMPLES],
+                Duration::from_millis(20),
+            ))
+            .unwrap();
+        assert_eq!(
+            pipeline.read_output(&mut output).unwrap(),
+            StreamingPcmPoll::Frame
+        );
+        assert_eq!(&output.samples()[..960], &[0.25; 960]);
+        assert_eq!(&output.samples()[960..], &[0.5; 960]);
+        assert_eq!(output.timestamp(), Some(Duration::ZERO));
+        pipeline.finish_input();
+        assert_eq!(
+            pipeline.read_output(&mut output).unwrap(),
+            StreamingPcmPoll::Frame
+        );
+        assert_eq!(&output.samples()[..960], &[0.5; 960]);
+        assert_eq!(&output.samples()[960..], &[0.0; 960]);
+        assert_eq!(output.timestamp(), Some(Duration::from_millis(20)));
+        assert_eq!(pipeline.source_position(), Some(Duration::from_millis(40)));
+        assert_eq!(
+            pipeline.read_output(&mut output).unwrap(),
+            StreamingPcmPoll::Finished
+        );
     }
 
     struct RateRun {

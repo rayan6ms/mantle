@@ -189,6 +189,7 @@ enum YoutubePlaybackInner {
 }
 
 struct OpusPlayback {
+    decoder_stale: bool,
     session: MediaSession,
     packet: EncodedPacket,
     passthrough: OpusPassthrough,
@@ -698,6 +699,7 @@ impl YoutubePlaybackSession {
                 .map_err(map_audio_error)?;
             let packet = EncodedPacket::with_capacity(session.limits().max_packet_bytes);
             YoutubePlaybackInner::Opus(Box::new(OpusPlayback {
+                decoder_stale: true,
                 session,
                 packet,
                 passthrough: OpusPassthrough::new(format),
@@ -724,7 +726,7 @@ impl YoutubePlaybackSession {
     #[must_use]
     pub fn mode(&self) -> YoutubePlaybackMode {
         match &self.inner {
-            YoutubePlaybackInner::Opus(playback) if playback.filters.filter_count() == 0 => {
+            YoutubePlaybackInner::Opus(playback) if playback.filters.passthrough_ready() => {
                 YoutubePlaybackMode::OpusPassthrough
             }
             YoutubePlaybackInner::Opus(_) | YoutubePlaybackInner::Transcode(_) => {
@@ -749,7 +751,7 @@ impl YoutubePlaybackSession {
     #[must_use]
     pub fn source_media_position(&self) -> Option<Duration> {
         match &self.inner {
-            YoutubePlaybackInner::Opus(playback) if playback.filters.filter_count() == 0 => {
+            YoutubePlaybackInner::Opus(playback) if playback.filters.passthrough_ready() => {
                 playback.direct_source_position
             }
             YoutubePlaybackInner::Opus(playback) => playback.filters.source_position(),
@@ -791,6 +793,7 @@ impl YoutubePlaybackSession {
                 playback.encoder_input.clear();
                 playback.passthrough.reset();
                 playback.decoder.reset().map_err(map_audio_error)?;
+                playback.decoder_stale = false;
                 playback.filters.reset();
                 playback.encoder.reset().map_err(map_audio_error)?;
                 playback.input_eof = false;
@@ -804,8 +807,8 @@ impl YoutubePlaybackSession {
     /// Atomically replaces the active per-session filter chain.
     ///
     /// Passing `None` removes filters. On Opus input this switches back to direct packet delivery
-    /// after resetting both processing and passthrough state. A failed factory leaves the previous
-    /// chain and mode active.
+    /// after accepted PCM and processor latency drain. Decoder/resampler/encoder state and source
+    /// EOF are preserved. A failed factory leaves the previous chain and mode active.
     ///
     /// # Errors
     ///
@@ -820,17 +823,7 @@ impl YoutubePlaybackSession {
                     .filters
                     .replacement(factory)
                     .map_err(map_audio_error)?;
-                playback.decoder.reset().map_err(map_audio_error)?;
-                playback.encoder.reset().map_err(map_audio_error)?;
-                playback.decoded.clear();
-                playback.encoder_input.clear();
-                playback.input_eof = false;
-                playback.direct_source_position = None;
-                playback
-                    .passthrough
-                    .set_filters_active(next.filter_count() != 0);
-                playback.passthrough.reset();
-                playback.filters.commit_replacement(next);
+                playback.filters.replace_after_drain(next);
                 Ok(())
             }
             YoutubePlaybackInner::Transcode(transcoder) => transcoder.set_filter_factory(factory),
@@ -840,31 +833,35 @@ impl YoutubePlaybackSession {
 
 impl OpusPlayback {
     fn read_frame(&mut self, output: &mut EncodedFrameSlot) -> Result<bool, YoutubePlaybackError> {
-        if self.filters.filter_count() == 0 {
-            if !self
-                .session
-                .read_encoded(&mut self.packet)
-                .map_err(map_media_error)?
-            {
-                output.clear();
-                return Ok(false);
-            }
-            let route = self
-                .passthrough
-                .route_packet(self.packet.data(), self.packet.timestamp(), output)
-                .map_err(map_audio_error)?;
-            if !route.delivered() {
-                return Err(YoutubePlaybackError::new(
-                    YoutubePlaybackErrorKind::AudioPipeline,
-                ));
-            }
-            self.direct_source_position = output
-                .timestamp()
-                .map(|timestamp| timestamp.saturating_add(output.duration()));
-            return Ok(true);
-        }
-
         loop {
+            if self.filters.passthrough_ready() {
+                if !self
+                    .session
+                    .read_encoded(&mut self.packet)
+                    .map_err(map_media_error)?
+                {
+                    output.clear();
+                    return Ok(false);
+                }
+                self.passthrough.set_filters_active(false);
+                let route = self
+                    .passthrough
+                    .route_packet(self.packet.data(), self.packet.timestamp(), output)
+                    .map_err(map_audio_error)?;
+                if !route.delivered() {
+                    return Err(YoutubePlaybackError::new(
+                        YoutubePlaybackErrorKind::AudioPipeline,
+                    ));
+                }
+                self.direct_source_position = output
+                    .timestamp()
+                    .map(|timestamp| timestamp.saturating_add(output.duration()));
+                self.filters
+                    .advance_passthrough_clock(self.direct_source_position);
+                self.decoder_stale = true;
+                return Ok(true);
+            }
+
             match self
                 .filters
                 .read_output(&mut self.encoder_input)
@@ -883,6 +880,10 @@ impl OpusPlayback {
                 StreamingPcmPoll::NeedInput => {}
             }
 
+            if self.filters.passthrough_ready() {
+                continue;
+            }
+
             if self.input_eof {
                 self.filters.finish_input();
                 continue;
@@ -895,6 +896,11 @@ impl OpusPlayback {
                 self.input_eof = true;
                 self.filters.finish_input();
                 continue;
+            }
+            if self.decoder_stale {
+                self.decoder.reset().map_err(map_audio_error)?;
+                self.encoder.reset().map_err(map_audio_error)?;
+                self.decoder_stale = false;
             }
             self.decoder
                 .decode(
@@ -975,7 +981,9 @@ impl PcmTranscoder {
         match self.poll_frame(output, true)? {
             PcmTranscodePoll::Frame => Ok(true),
             PcmTranscodePoll::Ended => Ok(false),
-            PcmTranscodePoll::NeedInput => unreachable!("finite input finalizes at EOF"),
+            PcmTranscodePoll::NeedInput => Err(YoutubePlaybackError::new(
+                YoutubePlaybackErrorKind::AudioPipeline,
+            )),
         }
     }
 
@@ -1151,26 +1159,7 @@ impl PcmTranscoder {
         factory: Option<&dyn PcmFilterFactory>,
     ) -> Result<(), YoutubePlaybackError> {
         let next = self.filters.replacement(factory).map_err(map_audio_error)?;
-        if let Some(session) = self.session.as_mut() {
-            session.reset_decoder().map_err(map_media_error)?;
-        }
-        self.encoder.reset().map_err(map_audio_error)?;
-        self.decoded.clear();
-        self.decoded_offset = 0;
-        self.resampled.clear();
-        self.resampled_offset = 0;
-        self.assembled.fill(0.0);
-        self.assembled_len = 0;
-        self.processor_input.clear();
-        self.encoder_input.clear();
-        if let Some(resampler) = self.resampler.as_mut() {
-            resampler.reset();
-        }
-        self.input_eof = false;
-        self.timestamp_initialized = false;
-        self.base_timestamp = None;
-        self.source_frames_submitted = 0;
-        self.filters.commit_replacement(next);
+        self.filters.replace_after_drain(next);
         Ok(())
     }
 
@@ -1436,6 +1425,88 @@ const fn map_audio_error(_: AudioFrameError) -> YoutubePlaybackError {
 
 #[cfg(test)]
 mod tests {
+    struct Identity;
+    impl mantle_audio::PcmFilter for Identity {
+        fn process(&mut self, _: &mut mantle_audio::PcmFrame) -> Result<(), AudioFrameError> {
+            Ok(())
+        }
+        fn reset(&mut self) {}
+    }
+    impl PcmFilterFactory for Identity {
+        fn build(
+            &self,
+            _: PcmFormat,
+            builder: &mut FilterChainBuilder,
+        ) -> Result<(), AudioFrameError> {
+            builder.push(Identity)
+        }
+    }
+
+    #[test]
+    fn repeated_opus_bypass_transitions_preserve_packet_order_and_source_clock() {
+        let session =
+            MediaSession::open_file(fixture("tone-opus.webm"), MediaLimits::default()).unwrap();
+        let mut playback = YoutubePlaybackSession::from_probed_media_session(session).unwrap();
+        let mut reference =
+            MediaSession::open_file(fixture("tone-opus.webm"), MediaLimits::default()).unwrap();
+        let mut packet = EncodedPacket::with_capacity(reference.limits().max_packet_bytes);
+        let mut frame = EncodedFrameSlot::new();
+        for index in 0..60 {
+            let filtered = index % 8 >= 4;
+            playback
+                .set_filter_factory(if filtered { Some(&Identity) } else { None })
+                .unwrap();
+            assert!(reference.read_encoded(&mut packet).unwrap());
+            assert!(playback.read_frame(&mut frame).unwrap());
+            assert_eq!(frame.timestamp(), packet.timestamp(), "packet {index}");
+            assert_eq!(
+                playback.source_media_position(),
+                packet.timestamp().map(|t| t + frame.duration())
+            );
+            if !filtered {
+                assert_eq!(frame.data(), packet.data());
+            }
+        }
+    }
+
+    #[test]
+    fn filter_changes_preserve_exact_audio_for_decoded_and_resampled_input() {
+        for name in [
+            "tone-flac.flac",
+            "tone-mp3.mp3",
+            "tone-aac-lc.m4a",
+            "tone-aac-lc-24k.mkv",
+            "tone-pcm-s16le-mono-8k.wav",
+        ] {
+            let render = |updates: bool| {
+                let session =
+                    MediaSession::open_file(fixture(name), MediaLimits::default()).unwrap();
+                let mut transcoder = PcmTranscoder::new(session).unwrap();
+                let mut frame = EncodedFrameSlot::new();
+                let mut frames = Vec::new();
+                while transcoder.read_frame(&mut frame).unwrap() {
+                    frames.push((frame.data().to_vec(), frame.timestamp()));
+                    if updates && frames.len() % 7 == 1 {
+                        transcoder.set_filter_factory(Some(&Identity)).unwrap();
+                    }
+                }
+                for _ in 0..3 {
+                    transcoder.set_filter_factory(Some(&Identity)).unwrap();
+                    assert!(
+                        !transcoder.read_frame(&mut frame).unwrap(),
+                        "EOF survives replacement"
+                    );
+                }
+                frames
+            };
+            assert_eq!(
+                render(false),
+                render(true),
+                "filter updates changed audio: {name}"
+            );
+        }
+    }
+
     use std::path::{Path, PathBuf};
 
     use mantle_audio::{
@@ -1443,8 +1514,8 @@ mod tests {
         StreamingPcmProcessor, StreamingPcmProgress,
     };
 
-    use super::PcmTranscoder;
-    use crate::{MediaLimits, MediaSession};
+    use super::{PcmTranscoder, YoutubePlaybackSession};
+    use crate::{EncodedPacket, MediaLimits, MediaSession};
 
     fn fixture(name: &str) -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR"))

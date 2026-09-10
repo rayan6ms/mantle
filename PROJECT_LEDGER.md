@@ -1,3 +1,21 @@
+# Filter continuity audit resolved (2026-09-10)
+
+Replacing a filter graph no longer resets decoded/resampled PCM, encoder state,
+source clocks, or true EOF. A single bounded pending graph drains already
+accepted streaming input and latency, retaining partial frames across the
+transition. Returning to Opus passthrough waits for an empty boundary; reentering
+processing resets stale codec history and advances the source clock past packets
+that bypassed decoding. A finite unexpected NeedInput is a typed error, not a panic.
+
+Regression evidence: repeated identity changes preserve every encoded byte and
+timestamp for FLAC, MP3, AAC 48 kHz, resampled AAC 24 kHz and mono PCM 8 kHz;
+three post-EOF changes remain EOF. Rate transitions retain partial samples
+without inserting an intermediate padded frame. Repeated Opus bypass changes
+preserve source packet order/clocks. Audio 34, media unit 23 (one environment
+exclusion), YouTube 39 (three exclusions), allocation 3 tests pass; scoped Clippy
+passes. The existing allocation bounds remain unchanged. No live receiver or
+cloud performance improvement is inferred from these deterministic tests.
+
 # Active integration findings
 
 Raydio isolated source pull on Oracle reproduced a 3.94-second request stall.

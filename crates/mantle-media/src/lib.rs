@@ -964,18 +964,6 @@ impl MediaSession {
         })
     }
 
-    pub(crate) fn reset_decoder(&mut self) -> Result<(), MediaError> {
-        if let Some(decoder) = self.decoder.as_mut() {
-            match decoder {
-                PcmDecoder::Symphonia(decoder) => decoder.reset(),
-                PcmDecoder::Xaac(decoder) => decoder.reset()?,
-            }
-        }
-        self.pending_packets.clear();
-        self.consecutive_decode_errors = 0;
-        Ok(())
-    }
-
     fn next_audio_packet(&mut self) -> Result<Option<symphonia::core::packet::Packet>, MediaError> {
         if let Some(packet) = self.pending_packets.pop_front() {
             return Ok(Some(packet));

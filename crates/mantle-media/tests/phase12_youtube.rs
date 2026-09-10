@@ -1436,6 +1436,10 @@ fn finite_opus_session_seeks_filters_and_returns_safely_to_passthrough() {
     assert_eq!(output.data(), packet.data());
 }
 
+fn assert_reset_count(resets: &AtomicUsize, expected: usize, reason: &str) {
+    assert_eq!(resets.load(Ordering::Acquire), expected, "{reason}");
+}
+
 #[test]
 fn finite_streaming_filter_pulls_resets_replaces_and_restores_passthrough() {
     let bytes = fs::read(media_fixture("tone-opus.webm")).unwrap();
@@ -1509,13 +1513,22 @@ fn finite_streaming_filter_pulls_resets_replaces_and_restores_passthrough() {
     assert!(playback.source_media_position().unwrap() >= seek.actual.unwrap_or_default());
 
     playback.set_filter_factory(Some(&factory)).unwrap();
-    assert_eq!(resets.load(Ordering::Acquire), 2);
+    assert_reset_count(&resets, 1, "old processor must drain before reset");
     assert_eq!(playback.mode(), YoutubePlaybackMode::Transcode);
     playback.set_filter_factory(None).unwrap();
-    assert_eq!(resets.load(Ordering::Acquire), 3);
-    assert_eq!(playback.mode(), YoutubePlaybackMode::OpusPassthrough);
+    assert_reset_count(&resets, 2, "superseded pending processor is released");
+    assert_eq!(playback.mode(), YoutubePlaybackMode::Transcode);
+
+    // The second decoded packet was already accepted by the delayed graph.
+    // It must reach the receiver before direct packet three can overtake it.
+    assert!(playback.read_frame(&mut output).unwrap());
+    assert!(clean_after_seek.read_frame(&mut clean_output).unwrap());
+    assert_eq!(output.data(), clean_output.data());
+    assert_eq!(output.timestamp(), clean_output.timestamp());
 
     assert!(playback.read_frame(&mut output).unwrap());
+    assert_eq!(resets.load(Ordering::Acquire), 3);
+    assert_eq!(playback.mode(), YoutubePlaybackMode::OpusPassthrough);
     let mut expected =
         MediaSession::open_file(media_fixture("tone-opus.webm"), MediaLimits::default()).unwrap();
     expected.seek(Duration::ZERO).unwrap();
