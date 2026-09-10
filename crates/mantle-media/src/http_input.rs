@@ -291,6 +291,7 @@ impl HttpRangeInput {
         &self.uri
     }
 
+    #[allow(clippy::too_many_lines)]
     fn open_range(&mut self) -> io::Result<()> {
         self.cancellation.check_io()?;
         if self.source_len != 0 && self.position >= self.source_len {

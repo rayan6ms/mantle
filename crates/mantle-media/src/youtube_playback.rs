@@ -1063,14 +1063,12 @@ impl PcmTranscoder {
                     {
                         self.validate_decoded_format()?;
                         self.decoded_offset = 0;
+                    } else if finish_at_eof {
+                        self.finish_input()?;
                     } else {
-                        if finish_at_eof {
-                            self.finish_input()?;
-                        } else {
-                            self.session = None;
-                            output.clear();
-                            return Ok(PcmTranscodePoll::NeedInput);
-                        }
+                        self.session = None;
+                        output.clear();
+                        return Ok(PcmTranscodePoll::NeedInput);
                     }
                 }
             }
@@ -1495,7 +1493,10 @@ mod tests {
                 actual.extend_from_slice(frame.samples());
             }
             assert_eq!(expected.len(), actual.len(), "sample count: {name}");
-            let difference = expected.iter().zip(&actual).position(|(a, b)| a != b);
+            let difference = expected
+                .iter()
+                .zip(&actual)
+                .position(|(a, b)| a.to_bits() != b.to_bits());
             assert!(
                 difference.is_none(),
                 "decoded PCM differs: {name}; first diff {difference:?}; expected {:?}; actual {:?}",

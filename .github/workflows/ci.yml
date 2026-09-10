@@ -25,7 +25,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: scripts/check-no-jvm-source.sh
       # Retain upstream formatting in the narrowly patched MP4 demuxer.
-      - run: cargo fmt --all --exclude mantle-symphonia-isomp4 -- --check
+      - run: cargo fmt -p mantle-audio -p mantle-core -p mantle-jvm -p mantle-media -p mantle-opus -p mantle-xaac -p mantle-audio-layout-bench -p mantle-jvm-gate -p mantle-media-bench -p mantle-worker-bench -p mantle-oracle -p mantle-reference -- --check
       - run: cargo fmt --manifest-path fuzz/Cargo.toml --all -- --check
       - run: scripts/check-local-media-fuzz-layout.sh
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
