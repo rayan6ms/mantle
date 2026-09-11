@@ -343,6 +343,28 @@ impl OpusEncoder {
         native_status("encoder reset", status)
     }
 
+    /// Tunes prediction for expected transport loss without forcing a codec mode,
+    /// changing complexity/bitrate, or enabling in-band FEC.
+    ///
+    /// # Errors
+    /// Returns an error for a percentage above 100 or a rejected native request.
+    pub fn set_packet_loss_percent(&mut self, percent: u8) -> Result<(), OpusError> {
+        if percent > 100 {
+            return Err(OpusError::InvalidConfiguration(
+                "packet loss must be 0..=100 percent",
+            ));
+        }
+        // SAFETY: exclusive live encoder; this CTL takes one C int in 0..=100.
+        let status = unsafe {
+            ffi::opus_encoder_ctl(
+                self.state.as_ptr(),
+                ffi::OPUS_SET_PACKET_LOSS_PERC_REQUEST.cast_signed(),
+                i32::from(percent),
+            )
+        };
+        native_status("packet loss configuration", status)
+    }
+
     fn set_complexity(&mut self, complexity: u8) -> Result<(), OpusError> {
         // SAFETY: `state` is an exclusively borrowed live encoder. The request requires one C int,
         // and `complexity` was validated to the inclusive `0..=10` domain.
@@ -380,6 +402,37 @@ fn native_status(operation: &'static str, status: i32) -> Result<(), OpusError> 
 #[cfg(test)]
 mod tests {
     use super::{OpusDecoder, OpusEncoder, OpusError, packet_samples};
+
+    #[test]
+    fn loss_hint_is_validated_and_survives_reset_without_forcing_fec() {
+        let mut encoder = OpusEncoder::new(48_000, 2, 10).unwrap();
+        encoder.set_packet_loss_percent(5).unwrap();
+        assert!(encoder.set_packet_loss_percent(101).is_err());
+        encoder.reset().unwrap();
+        let mut hint = -1;
+        let mut fec = -1;
+        // SAFETY: the GET controls each take one writable C int pointer.
+        unsafe {
+            assert_eq!(
+                super::ffi::opus_encoder_ctl(
+                    encoder.state.as_ptr(),
+                    super::ffi::OPUS_GET_PACKET_LOSS_PERC_REQUEST.cast_signed(),
+                    &raw mut hint
+                ),
+                0
+            );
+            assert_eq!(
+                super::ffi::opus_encoder_ctl(
+                    encoder.state.as_ptr(),
+                    super::ffi::OPUS_GET_INBAND_FEC_REQUEST.cast_signed(),
+                    &raw mut fec
+                ),
+                0
+            );
+        }
+        assert_eq!(hint, 5);
+        assert_eq!(fec, 0);
+    }
 
     #[test]
     fn encodes_into_caller_storage_and_reset_reproduces_the_packet() {

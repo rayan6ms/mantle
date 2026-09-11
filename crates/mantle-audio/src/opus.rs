@@ -112,7 +112,23 @@ impl PcmOpusEncoder {
     ///
     /// Returns an error when the pinned libopus backend cannot create or configure its state.
     pub fn new(quality: OpusEncodingQuality) -> Result<Self, AudioFrameError> {
-        let inner = OpusEncoder::new(COMPATIBLE_SAMPLE_RATE, COMPATIBLE_CHANNELS, quality.get())
+        Self::with_packet_loss_percent(quality, 0)
+    }
+
+    /// Configures prediction resilience for network playback. This does not force
+    /// speech mode, enable FEC, or change the output geometry or complexity.
+    ///
+    /// # Errors
+    /// Returns an error for a loss percentage above 100 or native setup failure.
+    pub fn with_packet_loss_percent(
+        quality: OpusEncodingQuality,
+        percent: u8,
+    ) -> Result<Self, AudioFrameError> {
+        let mut inner =
+            OpusEncoder::new(COMPATIBLE_SAMPLE_RATE, COMPATIBLE_CHANNELS, quality.get())
+                .map_err(|_| AudioFrameError::OpusEncodingFailure)?;
+        inner
+            .set_packet_loss_percent(percent)
             .map_err(|_| AudioFrameError::OpusEncodingFailure)?;
         Ok(Self {
             inner,

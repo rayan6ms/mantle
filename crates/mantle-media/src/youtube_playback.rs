@@ -709,7 +709,9 @@ impl YoutubePlaybackSession {
                 encoder_input: PcmFrame::with_capacity(COMPATIBLE_PCM_SAMPLES),
                 filters: FilterPipeline::new(format, MAX_FILTERS_PER_CHAIN)
                     .map_err(map_audio_error)?,
-                encoder: PcmOpusEncoder::new(OpusEncodingQuality::MAXIMUM)
+                // A modest loss hint shortens prediction error after a missing packet;
+                // leave music mode, bitrate, complexity, and FEC decisions unchanged.
+                encoder: PcmOpusEncoder::with_packet_loss_percent(OpusEncodingQuality::MAXIMUM, 5)
                     .map_err(map_audio_error)?,
                 input_eof: false,
                 direct_source_position: None,
@@ -963,7 +965,8 @@ impl PcmTranscoder {
             assembled_len: 0,
             processor_input: PcmFrame::with_capacity(COMPATIBLE_PCM_SAMPLES),
             encoder_input: PcmFrame::with_capacity(COMPATIBLE_PCM_SAMPLES),
-            encoder: PcmOpusEncoder::new(OpusEncodingQuality::MAXIMUM).map_err(map_audio_error)?,
+            encoder: PcmOpusEncoder::with_packet_loss_percent(OpusEncodingQuality::MAXIMUM, 5)
+                .map_err(map_audio_error)?,
             filters: FilterPipeline::new(
                 PcmFormat::new(COMPATIBLE_SAMPLE_RATE, COMPATIBLE_CHANNELS)
                     .map_err(map_audio_error)?,
