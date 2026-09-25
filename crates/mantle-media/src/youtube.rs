@@ -319,6 +319,7 @@ impl Default for YoutubeSourceOptions {
                 YoutubeClientKind::AndroidVr,
                 YoutubeClientKind::Web,
                 YoutubeClientKind::WebEmbedded,
+                YoutubeClientKind::Tv,
                 YoutubeClientKind::VisionOs,
             ],
         }
@@ -395,6 +396,7 @@ impl YoutubeSourceOptions {
 pub struct YoutubeAuthentication {
     oauth_access_token: Option<String>,
     oauth_refresh_token: Option<String>,
+    cookies: Option<String>,
     po_token: Option<String>,
     visitor_data: Option<String>,
 }
@@ -411,9 +413,22 @@ impl YoutubeAuthentication {
         po_token: Option<String>,
         visitor_data: Option<String>,
     ) -> Result<Self, YoutubeError> {
+        Self::with_credentials(oauth_access_token, None, None, po_token, visitor_data)
+    }
+
+    /// Creates credentials for deployments that keep YouTube authentication outside the
+    /// repository. Cookies are sent only to YouTube control-plane requests and are never logged.
+    pub fn with_credentials(
+        oauth_access_token: Option<String>,
+        oauth_refresh_token: Option<String>,
+        cookies: Option<String>,
+        po_token: Option<String>,
+        visitor_data: Option<String>,
+    ) -> Result<Self, YoutubeError> {
         let authentication = Self {
             oauth_access_token,
-            oauth_refresh_token: None,
+            oauth_refresh_token,
+            cookies,
             po_token,
             visitor_data,
         };
@@ -435,14 +450,29 @@ impl YoutubeAuthentication {
         po_token: Option<String>,
         visitor_data: Option<String>,
     ) -> Result<Self, YoutubeError> {
-        let authentication = Self {
-            oauth_access_token: None,
-            oauth_refresh_token: Some(oauth_refresh_token),
+        Self::with_credentials(
+            None,
+            Some(oauth_refresh_token),
+            None,
             po_token,
             visitor_data,
-        };
-        authentication.validate()?;
-        Ok(authentication)
+        )
+    }
+
+    /// Creates refresh-token credentials with an optional browser-cookie header.
+    pub fn with_refresh_token_and_cookies(
+        oauth_refresh_token: String,
+        cookies: Option<String>,
+        po_token: Option<String>,
+        visitor_data: Option<String>,
+    ) -> Result<Self, YoutubeError> {
+        Self::with_credentials(
+            None,
+            Some(oauth_refresh_token),
+            cookies,
+            po_token,
+            visitor_data,
+        )
     }
 
     fn validate(&self) -> Result<(), YoutubeError> {
@@ -450,6 +480,7 @@ impl YoutubeAuthentication {
             || [
                 &self.oauth_access_token,
                 &self.oauth_refresh_token,
+                &self.cookies,
                 &self.po_token,
                 &self.visitor_data,
             ]
@@ -472,6 +503,7 @@ impl fmt::Debug for YoutubeAuthentication {
                 &(self.oauth_access_token.is_some() || self.oauth_refresh_token.is_some()),
             )
             .field("oauth_refresh", &self.oauth_refresh_token.is_some())
+            .field("cookies", &self.cookies.is_some())
             .field("proof_of_origin", &self.po_token.is_some())
             .field("visitor_data", &self.visitor_data.is_some())
             .finish()
@@ -1886,6 +1918,18 @@ pub struct YoutubeAudioSourceManager {
 }
 
 impl YoutubeAudioSourceManager {
+    fn attach_cookies(
+        &self,
+        request: RemoteHttpRequest,
+    ) -> Result<RemoteHttpRequest, YoutubeError> {
+        match self.authentication.cookies.as_deref() {
+            Some(cookies) => request
+                .header("Cookie", cookies)
+                .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidAuthentication)),
+            None => Ok(request),
+        }
+    }
+
     /// Creates the manager after validating all client, parser, HTTP, and authentication bounds.
     ///
     /// # Errors
@@ -2267,8 +2311,16 @@ impl YoutubeAudioSourceManager {
             return Ok(cached.player_script.clone());
         }
 
-        let embed_request = RemoteHttpRequest::get(&self.options.player_embed_url)
-            .and_then(|request| request.max_response_bytes(self.options.max_player_embed_bytes))
+        let embed_request = self
+            .attach_cookies(
+                RemoteHttpRequest::get(&self.options.player_embed_url)
+                    .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?,
+            )
+            .and_then(|request| {
+                request
+                    .max_response_bytes(self.options.max_player_embed_bytes)
+                    .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))
+            })
             .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?;
         let embed = self
             .http
@@ -2284,8 +2336,16 @@ impl YoutubeAudioSourceManager {
             &script_reference,
             self.options.max_player_script_url_bytes,
         )?;
-        let script_request = RemoteHttpRequest::get(&script_url)
-            .and_then(|request| request.max_response_bytes(self.options.max_player_script_bytes))
+        let script_request = self
+            .attach_cookies(
+                RemoteHttpRequest::get(&script_url)
+                    .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?,
+            )
+            .and_then(|request| {
+                request
+                    .max_response_bytes(self.options.max_player_script_bytes)
+                    .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))
+            })
             .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
         let source = self
             .http
@@ -2322,8 +2382,16 @@ impl YoutubeAudioSourceManager {
             return Ok(Some(value));
         }
         let embed_url = format!("{}{}", self.options.player_embed_url, video_id);
-        let request = RemoteHttpRequest::get(embed_url)
-            .and_then(|request| request.max_response_bytes(self.options.max_player_embed_bytes))
+        let request = self
+            .attach_cookies(
+                RemoteHttpRequest::get(embed_url)
+                    .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?,
+            )
+            .and_then(|request| {
+                request
+                    .max_response_bytes(self.options.max_player_embed_bytes)
+                    .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))
+            })
             .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?;
         let response = self
             .http
@@ -2909,10 +2977,12 @@ impl YoutubeAudioSourceManager {
             "{}/{operation}?prettyPrint=false",
             base_url.trim_end_matches('/')
         );
-        let mut request = RemoteHttpRequest::post(endpoint, body)
-            .and_then(|request| request.header("Content-Type", "application/json"))
-            .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?
-            .retry_mode(RemoteRetryMode::Idempotent);
+        let mut request = self.attach_cookies(
+            RemoteHttpRequest::post(endpoint, body)
+                .and_then(|request| request.header("Content-Type", "application/json"))
+                .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?
+                .retry_mode(RemoteRetryMode::Idempotent),
+        )?;
         if let Some(user_agent) = client.user_agent() {
             request = request
                 .header("User-Agent", user_agent)
@@ -3044,10 +3114,12 @@ impl YoutubeAudioSourceManager {
             "{}/player?prettyPrint=false",
             self.options.api_base_url.trim_end_matches('/')
         );
-        let mut request = RemoteHttpRequest::post(endpoint, body)
-            .and_then(|request| request.header("Content-Type", "application/json"))
-            .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?
-            .retry_mode(RemoteRetryMode::Idempotent);
+        let mut request = self.attach_cookies(
+            RemoteHttpRequest::post(endpoint, body)
+                .and_then(|request| request.header("Content-Type", "application/json"))
+                .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?
+                .retry_mode(RemoteRetryMode::Idempotent),
+        )?;
         if let Some(user_agent) = client.user_agent() {
             request = request
                 .header("User-Agent", user_agent)
