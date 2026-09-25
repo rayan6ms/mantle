@@ -285,6 +285,7 @@ fn default_clients_preserve_the_pinned_order_and_capabilities() {
             YoutubeClientKind::AndroidVr,
             YoutubeClientKind::Web,
             YoutubeClientKind::WebEmbedded,
+            YoutubeClientKind::VisionOs,
         ]
     );
     assert!(!YoutubeClientKind::Music.supports_video_loading());
@@ -293,6 +294,8 @@ fn default_clients_preserve_the_pinned_order_and_capabilities() {
     assert!(YoutubeClientKind::AndroidVr.supports_playback());
     assert!(YoutubeClientKind::Web.supports_search());
     assert!(YoutubeClientKind::Web.supports_playlist_loading());
+    assert!(YoutubeClientKind::VisionOs.supports_playback());
+    assert!(!YoutubeClientKind::VisionOs.supports_video_loading());
     assert!(!YoutubeClientKind::WebEmbedded.supports_search());
     assert!(!YoutubeClientKind::WebEmbedded.supports_playlist_loading());
     assert!(YoutubeClientKind::Tv.supports_playback());
