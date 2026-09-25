@@ -54,12 +54,13 @@ pub enum YoutubeClientKind {
     Web,
     WebEmbedded,
     Tv,
+    VisionOs,
 }
 
 impl YoutubeClientKind {
     #[must_use]
     pub const fn supports_video_loading(self) -> bool {
-        !matches!(self, Self::Music | Self::Tv)
+        !matches!(self, Self::Music | Self::Tv | Self::VisionOs)
     }
 
     #[must_use]
@@ -99,6 +100,7 @@ impl YoutubeClientKind {
             Self::Web => "WEB",
             Self::WebEmbedded => "WEB_EMBEDDED_PLAYER",
             Self::Tv => "TVHTML5",
+            Self::VisionOs => "VISIONOS",
         }
     }
 
@@ -109,6 +111,7 @@ impl YoutubeClientKind {
             Self::Web => "2.20250403.01.00",
             Self::WebEmbedded => "1.20250401.01.00",
             Self::Tv => "7.20250319.10.00",
+            Self::VisionOs => "1.02",
         }
     }
 
@@ -118,6 +121,9 @@ impl YoutubeClientKind {
                 "com.google.android.apps.youtube.vr.oculus/1.60.19 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip",
             ),
             Self::Tv => Some("Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version"),
+            Self::VisionOs => Some(
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
+            ),
             _ => None,
         }
     }
@@ -125,7 +131,7 @@ impl YoutubeClientKind {
     const fn player_params(self) -> Option<&'static str> {
         match self {
             Self::Web | Self::WebEmbedded | Self::Tv => Some("2AMB"),
-            Self::Music | Self::AndroidVr => None,
+            Self::Music | Self::AndroidVr | Self::VisionOs => None,
         }
     }
 
@@ -313,6 +319,7 @@ impl Default for YoutubeSourceOptions {
                 YoutubeClientKind::AndroidVr,
                 YoutubeClientKind::Web,
                 YoutubeClientKind::WebEmbedded,
+                YoutubeClientKind::VisionOs,
             ],
         }
     }
@@ -791,6 +798,25 @@ fn extract_player_script_reference(embed: &[u8]) -> Option<String> {
             }
         }
         return None;
+    }
+    None
+}
+
+fn extract_visitor_data(embed: &[u8], max_bytes: usize) -> Option<String> {
+    let text = std::str::from_utf8(embed).ok()?;
+    for marker in ["\"VISITOR_DATA\":\"", "\\\"VISITOR_DATA\\\":\\\""] {
+        let Some(start) = text.find(marker).map(|index| index + marker.len()) else {
+            continue;
+        };
+        let remainder = &text[start..];
+        let end = remainder.find('"')?;
+        let value = &remainder[..end];
+        if !value.is_empty()
+            && value.len() <= max_bytes
+            && value.bytes().all(|byte| byte.is_ascii())
+        {
+            return Some(value.to_owned());
+        }
     }
     None
 }
@@ -1855,6 +1881,7 @@ pub struct YoutubeAudioSourceManager {
     http: RemoteHttpClient,
     cipher_resolver: Option<Arc<dyn YoutubeCipherResolver>>,
     player_script: Mutex<Option<CachedYoutubePlayerScript>>,
+    visitor_data: Mutex<Option<String>>,
     shutdown: AtomicBool,
 }
 
@@ -1891,6 +1918,7 @@ impl YoutubeAudioSourceManager {
     ) -> Result<Self, YoutubeError> {
         options.validate()?;
         authentication.validate()?;
+        let initial_visitor_data = authentication.visitor_data.clone();
         let oauth = Mutex::new(YoutubeOAuthState::new(&authentication));
         let http = RemoteHttpClient::with_route_policy(options.http, route_policy)
             .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?;
@@ -1902,6 +1930,7 @@ impl YoutubeAudioSourceManager {
             http,
             cipher_resolver: None,
             player_script: Mutex::new(None),
+            visitor_data: Mutex::new(initial_visitor_data),
             shutdown: AtomicBool::new(false),
         })
     }
@@ -1946,6 +1975,7 @@ impl YoutubeAudioSourceManager {
     ) -> Result<Self, YoutubeError> {
         options.validate()?;
         authentication.validate()?;
+        let initial_visitor_data = authentication.visitor_data.clone();
         let oauth = Mutex::new(YoutubeOAuthState::new(&authentication));
         let http = RemoteHttpClient::new(options.http)
             .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?;
@@ -1957,6 +1987,7 @@ impl YoutubeAudioSourceManager {
             http,
             cipher_resolver,
             player_script: Mutex::new(None),
+            visitor_data: Mutex::new(initial_visitor_data),
             shutdown: AtomicBool::new(false),
         })
     }
@@ -2277,6 +2308,37 @@ impl YoutubeAudioSourceManager {
         Ok(player_script)
     }
 
+    fn acquire_visitor_data(
+        &self,
+        video_id: &str,
+        cancellation: &MediaCancellation,
+    ) -> Result<Option<String>, YoutubeError> {
+        if let Some(value) = self
+            .visitor_data
+            .lock()
+            .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?
+            .clone()
+        {
+            return Ok(Some(value));
+        }
+        let embed_url = format!("{}{}", self.options.player_embed_url, video_id);
+        let request = RemoteHttpRequest::get(embed_url)
+            .and_then(|request| request.max_response_bytes(self.options.max_player_embed_bytes))
+            .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?;
+        let response = self
+            .http
+            .execute_with_cancellation(&request, cancellation)
+            .map_err(map_remote_error)?;
+        let value = extract_visitor_data(response.body(), MAX_CREDENTIAL_BYTES)
+            .ok_or_else(|| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
+        let mut cached = self
+            .visitor_data
+            .lock()
+            .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
+        *cached = Some(value.clone());
+        Ok(Some(value))
+    }
+
     /// Resolves the selected format's signature and `n` challenges with either the configured
     /// provider or the cached bounded native player-script program.
     ///
@@ -2471,11 +2533,17 @@ impl YoutubeAudioSourceManager {
                     None
                 };
                 let authorization = self.oauth_authorization_header(client, cancellation)?;
+                let visitor_data = if client == YoutubeClientKind::VisionOs {
+                    self.acquire_visitor_data(video_id, cancellation)?
+                } else {
+                    self.authentication.visitor_data.clone()
+                };
                 self.player_request(
                     video_id,
                     client,
                     signature_timestamp,
                     authorization.as_deref(),
+                    visitor_data.as_deref(),
                 )
                 .and_then(|request| {
                     self.http
@@ -2538,7 +2606,7 @@ impl YoutubeAudioSourceManager {
         client: YoutubeClientKind,
         cancellation: &MediaCancellation,
     ) -> Result<YoutubeSourceTrack, YoutubeError> {
-        let request = self.player_request(video_id, client, None, None)?;
+        let request = self.player_request(video_id, client, None, None, None)?;
         let response = self
             .http
             .execute_with_cancellation(&request, cancellation)
@@ -2871,6 +2939,7 @@ impl YoutubeAudioSourceManager {
         client: YoutubeClientKind,
         signature_timestamp: Option<u64>,
         authorization: Option<&str>,
+        visitor_data: Option<&str>,
     ) -> Result<RemoteHttpRequest, YoutubeError> {
         let mut client_fields = Map::new();
         client_fields.insert(
@@ -2881,23 +2950,36 @@ impl YoutubeAudioSourceManager {
             "clientVersion".to_owned(),
             Value::String(client.version().to_owned()),
         );
-        if client != YoutubeClientKind::Tv {
+        if !matches!(client, YoutubeClientKind::Tv | YoutubeClientKind::VisionOs) {
             client_fields.insert("clientScreen".to_owned(), Value::String("EMBED".to_owned()));
         }
         if client == YoutubeClientKind::AndroidVr {
             client_fields.insert("androidSdkVersion".to_owned(), Value::Number(32.into()));
         }
-        if client.uses_proof_of_origin()
-            && let Some(visitor_data) = &self.authentication.visitor_data
+        if client == YoutubeClientKind::VisionOs {
+            client_fields.insert("deviceMake".to_owned(), Value::String("Apple".to_owned()));
+            client_fields.insert(
+                "deviceModel".to_owned(),
+                Value::String("RealityDevice17,1".to_owned()),
+            );
+            client_fields.insert("osName".to_owned(), Value::String("visionOS".to_owned()));
+            client_fields.insert(
+                "osVersion".to_owned(),
+                Value::String("26.5.23O471".to_owned()),
+            );
+            client_fields.insert("userAgent".to_owned(), Value::String("Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15".to_owned()));
+        }
+        if (client.uses_proof_of_origin() || client == YoutubeClientKind::VisionOs)
+            && let Some(visitor_data) = visitor_data.or(self.authentication.visitor_data.as_deref())
         {
             client_fields.insert(
                 "visitorData".to_owned(),
-                Value::String(visitor_data.clone()),
+                Value::String(visitor_data.to_owned()),
             );
         }
         let mut context = Map::new();
         context.insert("client".to_owned(), Value::Object(client_fields));
-        if client != YoutubeClientKind::Tv {
+        if !matches!(client, YoutubeClientKind::Tv | YoutubeClientKind::VisionOs) {
             let mut third_party = Map::new();
             third_party.insert(
                 "embedUrl".to_owned(),
@@ -2913,6 +2995,22 @@ impl YoutubeAudioSourceManager {
             content_playback_context.insert(
                 "signatureTimestamp".to_owned(),
                 Value::String(signature_timestamp.to_string()),
+            );
+            let mut playback_context = Map::new();
+            playback_context.insert(
+                "contentPlaybackContext".to_owned(),
+                Value::Object(content_playback_context),
+            );
+            root.insert(
+                "playbackContext".to_owned(),
+                Value::Object(playback_context),
+            );
+        }
+        if client == YoutubeClientKind::VisionOs && signature_timestamp.is_none() {
+            let mut content_playback_context = Map::new();
+            content_playback_context.insert(
+                "html5Preference".to_owned(),
+                Value::String("HTML5_PREF_WANTS".to_owned()),
             );
             let mut playback_context = Map::new();
             playback_context.insert(
@@ -2955,8 +3053,15 @@ impl YoutubeAudioSourceManager {
                 .header("User-Agent", user_agent)
                 .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?;
         }
-        if client.uses_proof_of_origin()
-            && let Some(visitor_data) = &self.authentication.visitor_data
+        if client == YoutubeClientKind::VisionOs {
+            request = request
+                .header("X-YouTube-Client-Name", "101")
+                .and_then(|request| request.header("X-YouTube-Client-Version", client.version()))
+                .and_then(|request| request.header("Origin", "https://www.youtube.com"))
+                .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?;
+        }
+        if (client.uses_proof_of_origin() || client == YoutubeClientKind::VisionOs)
+            && let Some(visitor_data) = visitor_data.or(self.authentication.visitor_data.as_deref())
         {
             request = request
                 .header("X-Goog-Visitor-Id", visitor_data)
