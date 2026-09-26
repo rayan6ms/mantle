@@ -2572,6 +2572,21 @@ impl YoutubeAudioSourceManager {
         video_id: &str,
         cancellation: &MediaCancellation,
     ) -> Result<YoutubePlaybackFormats, YoutubeError> {
+        self.discover_playback_formats_skipping(video_id, cancellation, &[])
+    }
+
+    /// Discovers playback formats while excluding clients whose media handoff already failed.
+    ///
+    /// Metadata discovery can succeed for a client whose signed media URL is rejected when the
+    /// range request begins. Callers that open media after discovery use this bounded skip list to
+    /// continue through the configured client order instead of treating that first client as
+    /// terminal.
+    pub fn discover_playback_formats_skipping(
+        &self,
+        video_id: &str,
+        cancellation: &MediaCancellation,
+        skipped: &[YoutubeClientKind],
+    ) -> Result<YoutubePlaybackFormats, YoutubeError> {
         if self.shutdown.load(Ordering::Acquire) || !valid_video_id(video_id) {
             return Err(YoutubeError::new(YoutubeErrorKind::InvalidOptions));
         }
@@ -2582,7 +2597,7 @@ impl YoutubeAudioSourceManager {
             .clients
             .iter()
             .copied()
-            .filter(|client| client.supports_playback())
+            .filter(|client| client.supports_playback() && !skipped.contains(client))
         {
             if cancellation.is_cancelled() {
                 return Err(YoutubeError::with_attempts(
