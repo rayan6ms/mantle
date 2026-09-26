@@ -349,6 +349,7 @@ impl HttpRangeInput {
         self.uri = response.get_uri().clone();
         let status = response.status().as_u16();
         if status != 206 {
+            log::debug!("HTTP media range rejected with status {status}");
             return Err(invalid_response(format_args!(
                 "HTTP range request returned status {status}, expected 206"
             )));
