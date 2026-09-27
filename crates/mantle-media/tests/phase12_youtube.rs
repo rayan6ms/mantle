@@ -1027,6 +1027,36 @@ fn playback_discovery_preserves_bounded_cipher_inputs_without_logging_them() {
 }
 
 #[test]
+fn playback_discovery_recovers_finite_length_from_signed_cipher_clen() {
+    let server = ReplayServer::start(|request, _| {
+        if request.target == "/embed/" {
+            return ReplayResponse::json(br#"{"jsUrl":"/s/player/base.js"}"#);
+        }
+        if request.target == "/s/player/base.js" {
+            return ReplayResponse::json(b"var config={sts:20434};");
+        }
+        ReplayResponse::json(
+            br#"{"playabilityStatus":{"status":"OK"},"videoDetails":{"videoId":"dQw4w9WgXcQ","isLive":false},"streamingData":{"adaptiveFormats":[{"itag":251,"mimeType":"audio/webm; codecs=\"opus\"","bitrate":128000,"audioChannels":2,"signatureCipher":"url=https%3A%2F%2Fmedia.example.test%2Faudio%3Fclen%3D123456%26n%3Dwxyz&sp=sig&s=cipher-secret"}]}}"#,
+        )
+    });
+    let manager = YoutubeAudioSourceManager::new(
+        YoutubeSourceOptions {
+            api_base_url: server.url("youtubei/v1"),
+            player_embed_url: server.url("embed/"),
+            clients: vec![YoutubeClientKind::Web],
+            http: private_http_options(),
+            ..YoutubeSourceOptions::default()
+        },
+        YoutubeAuthentication::default(),
+    )
+    .unwrap();
+    let discovery = manager
+        .discover_playback_formats("dQw4w9WgXcQ", &MediaCancellation::new())
+        .unwrap();
+    assert_eq!(discovery.selected().content_length(), Some(123_456));
+}
+
+#[test]
 fn native_cipher_program_resolves_signature_and_n_without_executing_javascript() {
     let server = ReplayServer::start(|request, _| {
         if request.target == "/embed/" {

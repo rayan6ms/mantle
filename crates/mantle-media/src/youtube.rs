@@ -3702,17 +3702,29 @@ fn parse_playback_format(
         .unwrap_or(2)
         .try_into()
         .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
-    let content_length = value_u64(json.get("contentLength"));
-    if content_length.is_none() && !is_live && itag != 18 {
-        return Ok(None);
-    }
-
     let direct_url = bounded_value_text(json.get("url"), max_url_bytes)?;
     let cipher = bounded_value_text(json.get("signatureCipher"), max_url_bytes)?;
     let cipher = cipher
         .as_deref()
         .map(|cipher| parse_signature_cipher(cipher, max_url_bytes, max_string_bytes))
         .transpose()?;
+    // Browser watch pages often put the finite media length in the signed URL's `clen`
+    // parameter while omitting the top-level `contentLength`. Recover only that bounded numeric
+    // value so range validation remains mandatory before any media bytes are accepted.
+    let cipher_content_length = cipher
+        .as_ref()
+        .and_then(|cipher| cipher.url.as_deref())
+        .and_then(|url| {
+            url_query_parameter(url, "clen", max_string_bytes)
+                .ok()
+                .flatten()
+                .and_then(|value| value.parse::<u64>().ok())
+        });
+    let content_length = value_u64(json.get("contentLength")).or(cipher_content_length);
+    if content_length.is_none() && !is_live && itag != 18 {
+        return Ok(None);
+    }
+
     let playback_url = cipher
         .as_ref()
         .and_then(|cipher| cipher.url.clone())
