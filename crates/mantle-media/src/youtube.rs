@@ -1974,6 +1974,17 @@ impl YoutubeAudioSourceManager {
         authentication: YoutubeAuthentication,
         route_policy: Arc<dyn crate::OutboundRoutePolicy>,
     ) -> Result<Self, YoutubeError> {
+        Self::with_route_policy_and_cipher_resolver(options, authentication, route_policy, None)
+    }
+
+    /// Creates a routed manager with an optional isolated resolver for player scripts that are
+    /// outside the bounded native transform grammar.
+    pub fn with_route_policy_and_cipher_resolver(
+        options: YoutubeSourceOptions,
+        authentication: YoutubeAuthentication,
+        route_policy: Arc<dyn crate::OutboundRoutePolicy>,
+        cipher_resolver: Option<Arc<dyn YoutubeCipherResolver>>,
+    ) -> Result<Self, YoutubeError> {
         options.validate()?;
         authentication.validate()?;
         let initial_visitor_data = authentication.visitor_data.clone();
@@ -1986,7 +1997,7 @@ impl YoutubeAudioSourceManager {
             oauth,
             oauth_clock: Arc::new(SystemYoutubeOAuthClock::default()),
             http,
-            cipher_resolver: None,
+            cipher_resolver,
             player_script: Mutex::new(None),
             visitor_data: Mutex::new(initial_visitor_data),
             shutdown: AtomicBool::new(false),
@@ -2488,6 +2499,13 @@ impl YoutubeAudioSourceManager {
         format: &YoutubePlaybackFormat,
         cancellation: &MediaCancellation,
     ) -> Result<YoutubeCipherSolution, YoutubeError> {
+        match self.resolve_native_cipher_solution(player_script, format) {
+            Ok(solution) => return Ok(solution),
+            Err(error) if self.cipher_resolver.is_none() || cancellation.is_cancelled() => {
+                return Err(error);
+            }
+            Err(_) => {}
+        }
         if let Some(resolver) = self.cipher_resolver.as_ref() {
             let source = {
                 let cache = self
@@ -2524,52 +2542,60 @@ impl YoutubeAudioSourceManager {
             }
             Ok(solution)
         } else {
-            let program = {
-                let mut cache = self
-                    .player_script
-                    .lock()
-                    .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
-                let cached = cache
-                    .as_mut()
-                    .filter(|cached| cached.player_script.url == player_script.url)
-                    .ok_or_else(|| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
-                if cached.cipher.is_none() {
-                    cached.cipher = Some(
-                        parse_youtube_cipher_program(
-                            &cached.source,
-                            self.options.max_cipher_operations,
-                        )
-                        .map_err(|error| error.kind),
-                    );
-                }
-                cached
-                    .cipher
-                    .as_ref()
-                    .ok_or_else(|| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?
-                    .clone()
-                    .map_err(YoutubeError::new)?
-            };
-            Ok(YoutubeCipherSolution {
-                signature: format
-                    .signature
-                    .as_deref()
-                    .map(|signature| {
-                        program
-                            .signature
-                            .apply(signature, self.options.max_cipher_input_bytes)
-                    })
-                    .transpose()?,
-                n_parameter: format
-                    .n_parameter
-                    .as_deref()
-                    .map(|n_parameter| {
-                        program
-                            .n_parameter
-                            .apply(n_parameter, self.options.max_cipher_input_bytes)
-                    })
-                    .transpose()?,
-            })
+            Err(YoutubeError::new(YoutubeErrorKind::InvalidResponse))
         }
+    }
+
+    fn resolve_native_cipher_solution(
+        &self,
+        player_script: &YoutubePlayerScript,
+        format: &YoutubePlaybackFormat,
+    ) -> Result<YoutubeCipherSolution, YoutubeError> {
+        let program = {
+            let mut cache = self
+                .player_script
+                .lock()
+                .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
+            let cached = cache
+                .as_mut()
+                .filter(|cached| cached.player_script.url == player_script.url)
+                .ok_or_else(|| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
+            if cached.cipher.is_none() {
+                cached.cipher = Some(
+                    parse_youtube_cipher_program(
+                        &cached.source,
+                        self.options.max_cipher_operations,
+                    )
+                    .map_err(|error| error.kind),
+                );
+            }
+            cached
+                .cipher
+                .as_ref()
+                .ok_or_else(|| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?
+                .clone()
+                .map_err(YoutubeError::new)?
+        };
+        Ok(YoutubeCipherSolution {
+            signature: format
+                .signature
+                .as_deref()
+                .map(|signature| {
+                    program
+                        .signature
+                        .apply(signature, self.options.max_cipher_input_bytes)
+                })
+                .transpose()?,
+            n_parameter: format
+                .n_parameter
+                .as_deref()
+                .map(|n_parameter| {
+                    program
+                        .n_parameter
+                        .apply(n_parameter, self.options.max_cipher_input_bytes)
+                })
+                .transpose()?,
+        })
     }
 
     /// Discovers and ranks bounded playback candidates using playback-capable clients in order.
