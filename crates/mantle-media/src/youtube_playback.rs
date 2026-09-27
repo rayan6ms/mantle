@@ -232,9 +232,9 @@ enum PcmTranscodePoll {
 impl YoutubeAudioSourceManager {
     /// Resolves and opens the selected finite media object through bounded HTTP range input.
     ///
-    /// Live formats without a content length are rejected here and belong to the separate HLS
-    /// playback path. The advertised content length and container/codec must match the fetched
-    /// object before any output is produced.
+    /// Live formats without a content length belong to the separate HLS playback path. Finite
+    /// formats normally advertise a length; when a signed browser URL omits it, the bounded range
+    /// opener supplies the length and it is validated before any output is produced.
     ///
     /// # Errors
     ///
@@ -250,10 +250,10 @@ impl YoutubeAudioSourceManager {
         let kind = selected.kind().ok_or_else(|| {
             YoutubePlaybackError::new(YoutubePlaybackErrorKind::IncompatibleFormat)
         })?;
-        let content_length = selected.content_length().ok_or_else(|| {
-            YoutubePlaybackError::new(YoutubePlaybackErrorKind::IncompatibleFormat)
-        })?;
-        if content_length == 0 || content_length > range_options.max_source_bytes {
+        if selected
+            .content_length()
+            .is_some_and(|length| length == 0 || length > range_options.max_source_bytes)
+        {
             return Err(YoutubePlaybackError::new(
                 YoutubePlaybackErrorKind::InvalidOptions,
             ));
@@ -267,7 +267,13 @@ impl YoutubeAudioSourceManager {
             cancellation.clone(),
         )
         .map_err(map_media_error)?;
-        if input.byte_len() != Some(content_length) {
+        let actual_length = input
+            .byte_len()
+            .ok_or_else(|| YoutubePlaybackError::new(YoutubePlaybackErrorKind::InvalidMedia))?;
+        if selected
+            .content_length()
+            .is_some_and(|content_length| actual_length != content_length)
+        {
             return Err(YoutubePlaybackError::new(
                 YoutubePlaybackErrorKind::InvalidMedia,
             ));
@@ -311,10 +317,10 @@ impl YoutubeAudioSourceManager {
         let kind = selected.kind().ok_or_else(|| {
             YoutubePlaybackError::new(YoutubePlaybackErrorKind::IncompatibleFormat)
         })?;
-        let content_length = selected.content_length().ok_or_else(|| {
-            YoutubePlaybackError::new(YoutubePlaybackErrorKind::IncompatibleFormat)
-        })?;
-        if content_length == 0 || content_length > range_options.max_source_bytes {
+        if selected
+            .content_length()
+            .is_some_and(|length| length == 0 || length > range_options.max_source_bytes)
+        {
             return Err(YoutubePlaybackError::new(
                 YoutubePlaybackErrorKind::InvalidOptions,
             ));
@@ -329,7 +335,13 @@ impl YoutubeAudioSourceManager {
             route_policy,
         )
         .map_err(map_media_error)?;
-        if input.byte_len() != Some(content_length) {
+        let actual_length = input
+            .byte_len()
+            .ok_or_else(|| YoutubePlaybackError::new(YoutubePlaybackErrorKind::InvalidMedia))?;
+        if selected
+            .content_length()
+            .is_some_and(|content_length| actual_length != content_length)
+        {
             return Err(YoutubePlaybackError::new(
                 YoutubePlaybackErrorKind::InvalidMedia,
             ));
