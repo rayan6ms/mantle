@@ -252,6 +252,11 @@ pub struct YoutubeSourceOptions {
     pub max_cipher_input_bytes: usize,
     pub api_base_url: String,
     pub music_api_base_url: String,
+    /// Browser watch-page URL prefix used as a cookie-authenticated playback fallback.
+    ///
+    /// The default is YouTube's canonical watch URL. This is configurable so the bounded
+    /// parser can be exercised against a local replay server without changing network code.
+    pub watch_url_prefix: String,
     pub player_embed_url: String,
     pub clients: Vec<YoutubeClientKind>,
 }
@@ -283,6 +288,7 @@ impl fmt::Debug for YoutubeSourceOptions {
             .field("player_script_cache_ttl", &self.player_script_cache_ttl)
             .field("max_cipher_operations", &self.max_cipher_operations)
             .field("max_cipher_input_bytes", &self.max_cipher_input_bytes)
+            .field("watch_url_prefix", &self.watch_url_prefix)
             .field("client_count", &self.clients.len())
             .finish_non_exhaustive()
     }
@@ -313,6 +319,7 @@ impl Default for YoutubeSourceOptions {
             max_cipher_input_bytes: 16 * 1024,
             api_base_url: DEFAULT_API_BASE_URL.to_owned(),
             music_api_base_url: DEFAULT_MUSIC_API_BASE_URL.to_owned(),
+            watch_url_prefix: WATCH_URL_PREFIX.to_owned(),
             player_embed_url: DEFAULT_PLAYER_EMBED_URL.to_owned(),
             clients: vec![
                 YoutubeClientKind::Music,
@@ -368,6 +375,8 @@ impl YoutubeSourceOptions {
             || self.api_base_url.len() > MAX_API_BASE_URL_BYTES
             || self.music_api_base_url.is_empty()
             || self.music_api_base_url.len() > MAX_API_BASE_URL_BYTES
+            || self.watch_url_prefix.is_empty()
+            || self.watch_url_prefix.len() > MAX_API_BASE_URL_BYTES
             || self.player_embed_url.is_empty()
             || self.player_embed_url.len() > MAX_API_BASE_URL_BYTES
         {
@@ -384,6 +393,8 @@ impl YoutubeSourceOptions {
             self.music_api_base_url.trim_end_matches('/')
         );
         RemoteHttpRequest::post(music_endpoint, [])
+            .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?;
+        RemoteHttpRequest::get(format!("{}dQw4w9WgXcQ", self.watch_url_prefix))
             .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?;
         RemoteHttpRequest::get(&self.player_embed_url)
             .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?;
@@ -2650,7 +2661,60 @@ impl YoutubeAudioSourceManager {
                 Err(error) => final_kind = error.kind,
             }
         }
+        // YouTube increasingly serves playable data to a signed-in browser watch page while
+        // returning LOGIN_REQUIRED from InnerTube player calls made from datacenter egress. A
+        // cookie-authenticated watch-page request follows the same control-plane path as the
+        // browser and is therefore a bounded fallback, rather than a new unauthenticated client.
+        if self.authentication.cookies.is_some() && !cancellation.is_cancelled() {
+            match self.discover_watch_page_playback(video_id, cancellation) {
+                Ok(formats) => return Ok(formats),
+                Err(error) if error.kind == YoutubeErrorKind::Cancelled => return Err(error),
+                Err(error) => final_kind = error.kind,
+            }
+        }
         Err(YoutubeError::with_attempts(final_kind, attempts))
+    }
+
+    fn discover_watch_page_playback(
+        &self,
+        video_id: &str,
+        cancellation: &MediaCancellation,
+    ) -> Result<YoutubePlaybackFormats, YoutubeError> {
+        let url = format!("{}{}", self.options.watch_url_prefix, video_id);
+        let request = self
+            .attach_cookies(
+                RemoteHttpRequest::get(url)
+                    .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?,
+            )
+            .and_then(|request| {
+                request
+                    .header(
+                        "User-Agent",
+                        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140 Safari/537.36",
+                    )
+                    .and_then(|request| request.header("Accept-Language", "en-US,en;q=0.9"))
+                    .and_then(|request| request.header("Referer", "https://www.youtube.com/"))
+                    .and_then(|request| {
+                        request.max_response_bytes(self.options.max_player_embed_bytes)
+                    })
+                    .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))
+            })?;
+        let response = self
+            .http
+            .execute_with_cancellation(&request, cancellation)
+            .map_err(map_remote_error)?;
+        let player_response = extract_watch_player_response(
+            response.body(),
+            self.options.max_player_embed_bytes as usize,
+        )?;
+        parse_playback_response_value(
+            &player_response,
+            video_id,
+            YoutubeClientKind::Web,
+            self.options.max_playback_formats,
+            self.options.max_metadata_string_bytes,
+            self.options.max_playback_url_bytes,
+        )
     }
 
     fn load_video(
@@ -3451,7 +3515,25 @@ fn parse_playback_response(
 ) -> Result<YoutubePlaybackFormats, YoutubeError> {
     let json: Value = serde_json::from_slice(bytes)
         .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
-    validate_playability_value(&json)?;
+    parse_playback_response_value(
+        &json,
+        requested_video_id,
+        client,
+        max_formats,
+        max_string_bytes,
+        max_url_bytes,
+    )
+}
+
+fn parse_playback_response_value(
+    json: &Value,
+    requested_video_id: &str,
+    client: YoutubeClientKind,
+    max_formats: usize,
+    max_string_bytes: usize,
+    max_url_bytes: usize,
+) -> Result<YoutubePlaybackFormats, YoutubeError> {
+    validate_playability_value(json)?;
     let details = json
         .get("videoDetails")
         .ok_or_else(|| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
@@ -3539,6 +3621,54 @@ fn validate_playability_value(json: &Value) -> Result<(), YoutubeError> {
         }
         _ => Err(YoutubeError::new(YoutubeErrorKind::InvalidResponse)),
     }
+}
+
+/// Extracts the first playable player response embedded in a bounded YouTube watch document.
+///
+/// Modern browser responses assign a JSON object to `ytInitialPlayerResponse` instead of
+/// exposing the same object through `youtubei/v1/player`. The deserializer intentionally parses
+/// one value from the marker onward and never evaluates the surrounding HTML or JavaScript.
+fn extract_watch_player_response(bytes: &[u8], max_bytes: usize) -> Result<Value, YoutubeError> {
+    if bytes.is_empty() || bytes.len() > max_bytes {
+        return Err(YoutubeError::new(YoutubeErrorKind::InvalidResponse));
+    }
+    for marker in [
+        b"ytInitialPlayerResponse".as_slice(),
+        b"playerResponse".as_slice(),
+    ] {
+        let mut offset = 0_usize;
+        while let Some(relative) = find_bytes(&bytes[offset..], marker) {
+            let marker_end = offset
+                .checked_add(relative)
+                .and_then(|value| value.checked_add(marker.len()))
+                .ok_or_else(|| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
+            let tail = &bytes[marker_end..];
+            let Some(start) = tail.iter().position(|byte| *byte == b'{') else {
+                break;
+            };
+            let mut deserializer = serde_json::Deserializer::from_slice(&tail[start..]);
+            if let Ok(value) = Value::deserialize(&mut deserializer)
+                && value.get("playabilityStatus").is_some()
+                && value.get("videoDetails").is_some()
+            {
+                return Ok(value);
+            }
+            offset = marker_end;
+            if offset >= bytes.len() {
+                break;
+            }
+        }
+    }
+    Err(YoutubeError::new(YoutubeErrorKind::InvalidResponse))
+}
+
+fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.is_empty() || needle.len() > haystack.len() {
+        return None;
+    }
+    haystack
+        .windows(needle.len())
+        .position(|window| window == needle)
 }
 
 fn optional_value_array(value: Option<&Value>) -> Result<&[Value], YoutubeError> {

@@ -285,6 +285,7 @@ fn default_clients_preserve_the_pinned_order_and_capabilities() {
             YoutubeClientKind::AndroidVr,
             YoutubeClientKind::Web,
             YoutubeClientKind::WebEmbedded,
+            YoutubeClientKind::Tv,
             YoutubeClientKind::VisionOs,
         ]
     );
@@ -1930,6 +1931,130 @@ fn live_hls_handoff_rejects_finite_selection_and_preflight_cancellation() {
             .unwrap_err()
             .kind(),
         YoutubePlaybackErrorKind::IncompatibleFormat
+    );
+}
+
+#[test]
+fn cookie_authenticated_watch_page_fallback_handles_inner_tube_login_required() {
+    let server = ReplayServer::start(|request, _| {
+        match request.target.as_str() {
+        "/youtubei/v1/player?prettyPrint=false" => {
+            ReplayResponse::json(br#"{"playabilityStatus":{"status":"LOGIN_REQUIRED"}}"#)
+        }
+        "/watch?v=dQw4w9WgXcQ" => ReplayResponse::json(
+            br#"<!doctype html><script>var ytInitialPlayerResponse = {"playabilityStatus":{"status":"OK"},"videoDetails":{"videoId":"dQw4w9WgXcQ","isLive":false},"streamingData":{"adaptiveFormats":[{"itag":251,"mimeType":"audio/webm; codecs=\"opus\"","bitrate":128000,"contentLength":"1000","audioChannels":2,"url":"https://media.example.test/audio.webm"}]}};</script>"#,
+        ),
+        target => panic!("unexpected target {target}"),
+    }
+    });
+    let manager = YoutubeAudioSourceManager::new(
+        YoutubeSourceOptions {
+            api_base_url: server.url("youtubei/v1"),
+            watch_url_prefix: server.url("watch?v="),
+            player_embed_url: server.url("embed/"),
+            clients: vec![YoutubeClientKind::AndroidVr],
+            http: private_http_options(),
+            ..YoutubeSourceOptions::default()
+        },
+        YoutubeAuthentication::with_credentials(
+            None,
+            None,
+            Some("SID=fixture".to_owned()),
+            None,
+            None,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
+    let formats = manager
+        .discover_playback_formats("dQw4w9WgXcQ", &MediaCancellation::new())
+        .unwrap();
+    assert_eq!(formats.client(), YoutubeClientKind::Web);
+    assert_eq!(formats.selected().itag(), 251);
+    let watch = server
+        .requests()
+        .into_iter()
+        .find(|request| request.target == "/watch?v=dQw4w9WgXcQ")
+        .expect("watch fallback request");
+    assert_eq!(watch.header("cookie"), Some("SID=fixture"));
+    assert_eq!(watch.header("referer"), Some("https://www.youtube.com/"));
+}
+
+#[test]
+fn cookie_watch_page_fallback_rejects_malformed_or_oversized_embedded_json() {
+    let malformed = ReplayServer::start(|request, _| match request.target.as_str() {
+        "/youtubei/v1/player?prettyPrint=false" => {
+            ReplayResponse::json(br#"{"playabilityStatus":{"status":"LOGIN_REQUIRED"}}"#)
+        }
+        "/watch?v=dQw4w9WgXcQ" => ReplayResponse::json(br#"<script>ytInitialPlayerResponse = {"#),
+        target => panic!("unexpected target {target}"),
+    });
+    let options = YoutubeSourceOptions {
+        api_base_url: malformed.url("youtubei/v1"),
+        watch_url_prefix: malformed.url("watch?v="),
+        player_embed_url: malformed.url("embed/"),
+        clients: vec![YoutubeClientKind::AndroidVr],
+        http: private_http_options(),
+        ..YoutubeSourceOptions::default()
+    };
+    let manager = YoutubeAudioSourceManager::new(
+        options,
+        YoutubeAuthentication::with_credentials(
+            None,
+            None,
+            Some("SID=fixture".to_owned()),
+            None,
+            None,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        manager
+            .discover_playback_formats("dQw4w9WgXcQ", &MediaCancellation::new())
+            .unwrap_err()
+            .kind(),
+        YoutubeErrorKind::InvalidResponse
+    );
+
+    let oversized = ReplayServer::start(|request, _| {
+        match request.target.as_str() {
+        "/youtubei/v1/player?prettyPrint=false" => {
+            ReplayResponse::json(br#"{"playabilityStatus":{"status":"LOGIN_REQUIRED"}}"#)
+        }
+        "/watch?v=dQw4w9WgXcQ" => {
+            ReplayResponse::json(br#"<script>ytInitialPlayerResponse = {"playabilityStatus":{"status":"OK"},"videoDetails":{"videoId":"dQw4w9WgXcQ"},"streamingData":{"adaptiveFormats":[]}};xxxxxxxx</script>"#)
+        }
+        target => panic!("unexpected target {target}"),
+    }
+    });
+    let manager = YoutubeAudioSourceManager::new(
+        YoutubeSourceOptions {
+            api_base_url: oversized.url("youtubei/v1"),
+            watch_url_prefix: oversized.url("watch?v="),
+            player_embed_url: oversized.url("embed/"),
+            max_player_embed_bytes: 16,
+            clients: vec![YoutubeClientKind::AndroidVr],
+            http: private_http_options(),
+            ..YoutubeSourceOptions::default()
+        },
+        YoutubeAuthentication::with_credentials(
+            None,
+            None,
+            Some("SID=fixture".to_owned()),
+            None,
+            None,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        manager
+            .discover_playback_formats("dQw4w9WgXcQ", &MediaCancellation::new())
+            .unwrap_err()
+            .kind(),
+        YoutubeErrorKind::InvalidResponse
     );
 }
 
