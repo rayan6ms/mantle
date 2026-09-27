@@ -312,7 +312,10 @@ impl Default for YoutubeSourceOptions {
             max_playback_formats: 256,
             max_playback_url_bytes: 64 * 1024,
             max_player_script_url_bytes: 16 * 1024,
-            max_player_embed_bytes: 1024 * 1024,
+            // Signed-in watch documents commonly exceed 1 MiB as YouTube adds player
+            // configuration and ad metadata. Keep the request bounded while leaving room for
+            // the embedded player response used by the cookie-authenticated fallback.
+            max_player_embed_bytes: 4 * 1024 * 1024,
             max_player_script_bytes: 4 * 1024 * 1024,
             player_script_cache_ttl: Duration::from_hours(24),
             max_cipher_operations: 64,
