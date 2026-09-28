@@ -466,8 +466,7 @@ impl YoutubeAuthentication {
     ) -> Result<Self, YoutubeError> {
         if base_url.is_empty()
             || base_url.len() > MAX_API_BASE_URL_BYTES
-            || bearer_token.is_empty()
-            || bearer_token.len() > MAX_CREDENTIAL_BYTES
+            || bearer_token.len() != 16
         {
             return Err(YoutubeError::new(YoutubeErrorKind::InvalidAuthentication));
         }
