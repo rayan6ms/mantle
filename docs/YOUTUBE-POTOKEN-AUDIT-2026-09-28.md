@@ -6,7 +6,9 @@ The pair is validated as a pair and is never logged.
 
 Oracle testing generated a session pair through Invidious Companion, but its
 validator could not obtain playable formats for several videos from the Oracle
-egress. Those values were discarded and are not installed in production.
+egress. A second run using the existing Oracle cookie session repeated this
+result across six validation videos. Those values were discarded and are not
+installed in production.
 
 The current Companion flow also mints per-video content tokens after the session
 token. A static pair is therefore not automatically equivalent to the complete
