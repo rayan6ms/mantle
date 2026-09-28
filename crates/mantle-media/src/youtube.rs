@@ -10,8 +10,8 @@ use serde::Deserialize;
 use serde_json::{Map, Value};
 
 use crate::{
-    MediaCancellation, RemoteHttpClient, RemoteHttpErrorKind, RemoteHttpOptions, RemoteHttpRequest,
-    RemoteRetryMode,
+    HttpNetworkAccess, MediaCancellation, RemoteHttpClient, RemoteHttpErrorKind, RemoteHttpOptions,
+    RemoteHttpRequest, RemoteRetryMode,
 };
 
 const VIDEO_ID_BYTES: usize = 11;
@@ -1962,6 +1962,7 @@ pub struct YoutubeAudioSourceManager {
     oauth: Mutex<YoutubeOAuthState>,
     oauth_clock: Arc<dyn YoutubeOAuthClock>,
     http: RemoteHttpClient,
+    companion_http: Option<RemoteHttpClient>,
     cipher_resolver: Option<Arc<dyn YoutubeCipherResolver>>,
     player_script: Mutex<Option<CachedYoutubePlayerScript>>,
     visitor_data: Mutex<Option<String>>,
@@ -2028,12 +2029,24 @@ impl YoutubeAudioSourceManager {
         let oauth = Mutex::new(YoutubeOAuthState::new(&authentication));
         let http = RemoteHttpClient::with_route_policy(options.http, route_policy)
             .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?;
+        let companion_http = authentication
+            .companion_url
+            .as_ref()
+            .map(|_| {
+                RemoteHttpClient::new_direct(RemoteHttpOptions {
+                    network_access: HttpNetworkAccess::AllowPrivateNetworks,
+                    ..options.http
+                })
+            })
+            .transpose()
+            .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?;
         Ok(Self {
             options,
             authentication,
             oauth,
             oauth_clock: Arc::new(SystemYoutubeOAuthClock::default()),
             http,
+            companion_http,
             cipher_resolver,
             player_script: Mutex::new(None),
             visitor_data: Mutex::new(initial_visitor_data),
@@ -2085,12 +2098,24 @@ impl YoutubeAudioSourceManager {
         let oauth = Mutex::new(YoutubeOAuthState::new(&authentication));
         let http = RemoteHttpClient::new(options.http)
             .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?;
+        let companion_http = authentication
+            .companion_url
+            .as_ref()
+            .map(|_| {
+                RemoteHttpClient::new_direct(RemoteHttpOptions {
+                    network_access: HttpNetworkAccess::AllowPrivateNetworks,
+                    ..options.http
+                })
+            })
+            .transpose()
+            .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?;
         Ok(Self {
             options,
             authentication,
             oauth,
             oauth_clock,
             http,
+            companion_http,
             cipher_resolver,
             player_script: Mutex::new(None),
             visitor_data: Mutex::new(initial_visitor_data),
@@ -2673,8 +2698,8 @@ impl YoutubeAudioSourceManager {
             attempts += 1;
             match (|| {
                 let request = self.companion_player_request(video_id)?;
-                let response = self
-                    .http
+                let companion_http = self.companion_http.as_ref().unwrap_or(&self.http);
+                let response = companion_http
                     .execute_with_cancellation(&request, cancellation)
                     .map_err(map_remote_error)?;
                 parse_playback_response(

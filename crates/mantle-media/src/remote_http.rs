@@ -11,7 +11,7 @@ use ureq::{Agent, Error as UreqError};
 
 use crate::http_input::{
     MAX_CONFIGURED_REDIRECTS, MAX_CONFIGURED_RETRIES, create_agent_with_route_policy,
-    is_blocked_destination_error,
+    create_direct_agent_with_route_policy, is_blocked_destination_error,
 };
 use crate::{HttpNetworkAccess, MediaCancellation, OutboundRoutePolicy};
 
@@ -378,6 +378,14 @@ impl RemoteHttpClient {
         Self::new_inner(options, None)
     }
 
+    /// Creates a client that bypasses the process-wide source proxy.
+    ///
+    /// This is used only for the explicitly configured local Companion sidecar. Keeping it
+    /// separate prevents a loopback Companion request from being sent through the YouTube proxy.
+    pub fn new_direct(options: RemoteHttpOptions) -> Result<Self, RemoteHttpError> {
+        Self::new_inner_direct(options, None)
+    }
+
     /// Creates a client whose new connections select and bind an outbound route.
     ///
     /// Routed clients disable idle reuse because ureq's pool key cannot include the opaque route
@@ -397,8 +405,28 @@ impl RemoteHttpClient {
         options: RemoteHttpOptions,
         route_policy: Option<Arc<dyn OutboundRoutePolicy>>,
     ) -> Result<Self, RemoteHttpError> {
+        Self::new_inner_with_agent(options, route_policy, false)
+    }
+
+    fn new_inner_direct(
+        options: RemoteHttpOptions,
+        route_policy: Option<Arc<dyn OutboundRoutePolicy>>,
+    ) -> Result<Self, RemoteHttpError> {
+        Self::new_inner_with_agent(options, route_policy, true)
+    }
+
+    fn new_inner_with_agent(
+        options: RemoteHttpOptions,
+        route_policy: Option<Arc<dyn OutboundRoutePolicy>>,
+        direct: bool,
+    ) -> Result<Self, RemoteHttpError> {
         let options = options.validate()?;
-        let agent = create_agent_with_route_policy(
+        let agent_builder = if direct {
+            create_direct_agent_with_route_policy
+        } else {
+            create_agent_with_route_policy
+        };
+        let agent = agent_builder(
             options.max_response_header_bytes,
             options.socket_buffer_bytes,
             options.connect_timeout,
@@ -407,7 +435,7 @@ impl RemoteHttpClient {
             options.network_access,
             route_policy.clone(),
         );
-        let non_redirecting_agent = create_agent_with_route_policy(
+        let non_redirecting_agent = agent_builder(
             options.max_response_header_bytes,
             options.socket_buffer_bytes,
             options.connect_timeout,

@@ -971,8 +971,55 @@ pub(crate) fn create_agent_with_route_policy(
     network_access: HttpNetworkAccess,
     route_policy: Option<Arc<dyn OutboundRoutePolicy>>,
 ) -> Agent {
+    create_agent_with_route_policy_and_proxy(
+        max_response_header_bytes,
+        socket_buffer_bytes,
+        connect_timeout,
+        request_timeout,
+        max_redirects,
+        network_access,
+        route_policy,
+        configured_proxy(),
+    )
+}
+
+/// Creates a source HTTP agent without the process-wide YouTube proxy.
+///
+/// Companion is an explicitly trusted loopback sidecar. It must be reached directly while
+/// ordinary YouTube control and media requests continue to use `RAYDIO_YOUTUBE_PROXY`.
+pub(crate) fn create_direct_agent_with_route_policy(
+    max_response_header_bytes: usize,
+    socket_buffer_bytes: usize,
+    connect_timeout: Duration,
+    request_timeout: Duration,
+    max_redirects: u32,
+    network_access: HttpNetworkAccess,
+    route_policy: Option<Arc<dyn OutboundRoutePolicy>>,
+) -> Agent {
+    create_agent_with_route_policy_and_proxy(
+        max_response_header_bytes,
+        socket_buffer_bytes,
+        connect_timeout,
+        request_timeout,
+        max_redirects,
+        network_access,
+        route_policy,
+        None,
+    )
+}
+
+fn create_agent_with_route_policy_and_proxy(
+    max_response_header_bytes: usize,
+    socket_buffer_bytes: usize,
+    connect_timeout: Duration,
+    request_timeout: Duration,
+    max_redirects: u32,
+    network_access: HttpNetworkAccess,
+    route_policy: Option<Arc<dyn OutboundRoutePolicy>>,
+    proxy: Option<Proxy>,
+) -> Agent {
     let config = Agent::config_builder()
-        .proxy(configured_proxy())
+        .proxy(proxy)
         .max_redirects(max_redirects)
         .max_redirects_will_error(true)
         .http_status_as_error(false)
