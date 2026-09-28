@@ -2432,6 +2432,45 @@ fn authentication_is_applied_but_never_appears_in_diagnostics() {
 }
 
 #[test]
+fn companion_player_endpoint_receives_video_id_and_bearer_secret() {
+    let companion = ReplayServer::start(|request, _| {
+        assert_eq!(request.target, "/youtubei/v1/player?prettyPrint=false");
+        assert_eq!(
+            request.header("authorization"),
+            Some("Bearer companion-secret")
+        );
+        assert_eq!(request.header("cookie"), None);
+        let payload: Value = serde_json::from_slice(&request.body).unwrap();
+        assert_eq!(payload["videoId"], "dQw4w9WgXcQ");
+        ReplayResponse::json(&playback_response(
+            "https://media.example.test/audio.webm",
+            "audio/webm; codecs=\"opus\"",
+            100,
+        ))
+    });
+    let authentication = YoutubeAuthentication::default()
+        .with_companion_endpoint(companion.url(""), "companion-secret".to_owned())
+        .unwrap();
+    let diagnostic = format!("{authentication:?}");
+    assert!(diagnostic.contains("companion: true"), "{diagnostic}");
+    assert!(!diagnostic.contains("companion-secret"), "{diagnostic}");
+    let manager = YoutubeAudioSourceManager::new(
+        YoutubeSourceOptions {
+            clients: vec![YoutubeClientKind::Web],
+            http: private_http_options(),
+            ..YoutubeSourceOptions::default()
+        },
+        authentication,
+    )
+    .unwrap();
+    let formats = manager
+        .discover_playback_formats("dQw4w9WgXcQ", &MediaCancellation::new())
+        .unwrap();
+    assert_eq!(formats.client(), YoutubeClientKind::Web);
+    assert_eq!(companion.requests().len(), 1);
+}
+
+#[test]
 fn authentication_and_source_policy_reject_invalid_bounds() {
     let error = YoutubeAuthentication::new(None, Some("po-secret".to_owned()), None).unwrap_err();
     assert_eq!(error.kind(), YoutubeErrorKind::InvalidAuthentication);

@@ -413,6 +413,8 @@ pub struct YoutubeAuthentication {
     cookies: Option<String>,
     po_token: Option<String>,
     visitor_data: Option<String>,
+    companion_url: Option<String>,
+    companion_token: Option<String>,
 }
 
 impl YoutubeAuthentication {
@@ -445,9 +447,39 @@ impl YoutubeAuthentication {
             cookies,
             po_token,
             visitor_data,
+            companion_url: None,
+            companion_token: None,
         };
         authentication.validate()?;
         Ok(authentication)
+    }
+
+    /// Adds an optional Invidious Companion player endpoint.
+    ///
+    /// Companion performs BotGuard session setup and mints a video-specific content PoToken
+    /// for each player request. The endpoint must be the Companion base URL (without
+    /// `/youtubei/v1/player`) and the token is sent only as an HTTP Bearer credential.
+    pub fn with_companion_endpoint(
+        mut self,
+        base_url: String,
+        bearer_token: String,
+    ) -> Result<Self, YoutubeError> {
+        if base_url.is_empty()
+            || base_url.len() > MAX_API_BASE_URL_BYTES
+            || bearer_token.is_empty()
+            || bearer_token.len() > MAX_CREDENTIAL_BYTES
+        {
+            return Err(YoutubeError::new(YoutubeErrorKind::InvalidAuthentication));
+        }
+        let endpoint = format!(
+            "{}/youtubei/v1/player?prettyPrint=false",
+            base_url.trim_end_matches('/')
+        );
+        RemoteHttpRequest::post(endpoint, [])
+            .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidAuthentication))?;
+        self.companion_url = Some(base_url);
+        self.companion_token = Some(bearer_token);
+        Ok(self)
     }
 
     /// Creates validated refresh-token credentials for an OAuth-capable playback client.
@@ -501,6 +533,11 @@ impl YoutubeAuthentication {
             .into_iter()
             .flatten()
             .any(|value| value.is_empty() || value.len() > MAX_CREDENTIAL_BYTES)
+            || self.companion_url.is_some() != self.companion_token.is_some()
+            || self
+                .companion_url
+                .as_deref()
+                .is_some_and(|value| value.is_empty() || value.len() > MAX_API_BASE_URL_BYTES)
         {
             return Err(YoutubeError::new(YoutubeErrorKind::InvalidAuthentication));
         }
@@ -520,6 +557,7 @@ impl fmt::Debug for YoutubeAuthentication {
             .field("cookies", &self.cookies.is_some())
             .field("proof_of_origin", &self.po_token.is_some())
             .field("visitor_data", &self.visitor_data.is_some())
+            .field("companion", &self.companion_url.is_some())
             .finish()
     }
 }
@@ -2632,6 +2670,28 @@ impl YoutubeAudioSourceManager {
         }
         let mut attempts = 0_usize;
         let mut final_kind = YoutubeErrorKind::UnsupportedRoute;
+        if self.authentication.companion_url.is_some() {
+            attempts += 1;
+            match (|| {
+                let request = self.companion_player_request(video_id)?;
+                let response = self
+                    .http
+                    .execute_with_cancellation(&request, cancellation)
+                    .map_err(map_remote_error)?;
+                parse_playback_response(
+                    response.body(),
+                    video_id,
+                    YoutubeClientKind::Web,
+                    self.options.max_playback_formats,
+                    self.options.max_metadata_string_bytes,
+                    self.options.max_playback_url_bytes,
+                )
+            })() {
+                Ok(formats) => return Ok(formats),
+                Err(error) if error.kind == YoutubeErrorKind::Cancelled => return Err(error),
+                Err(error) => final_kind = error.kind,
+            }
+        }
         for client in self
             .options
             .clients
@@ -3255,6 +3315,26 @@ impl YoutubeAudioSourceManager {
                 .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidAuthentication))?;
         }
         Ok(request)
+    }
+
+    fn companion_player_request(&self, video_id: &str) -> Result<RemoteHttpRequest, YoutubeError> {
+        let Some(base_url) = self.authentication.companion_url.as_deref() else {
+            return Err(YoutubeError::new(YoutubeErrorKind::InvalidOptions));
+        };
+        let Some(token) = self.authentication.companion_token.as_deref() else {
+            return Err(YoutubeError::new(YoutubeErrorKind::InvalidAuthentication));
+        };
+        let endpoint = format!(
+            "{}/youtubei/v1/player?prettyPrint=false",
+            base_url.trim_end_matches('/')
+        );
+        let body = serde_json::to_vec(&serde_json::json!({ "videoId": video_id }))
+            .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?;
+        RemoteHttpRequest::post(endpoint, body)
+            .and_then(|request| request.header("Content-Type", "application/json"))
+            .and_then(|request| request.header("Authorization", &format!("Bearer {token}")))
+            .map(|request| request.retry_mode(RemoteRetryMode::Idempotent))
+            .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidAuthentication))
     }
 }
 
