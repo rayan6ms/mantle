@@ -16,7 +16,7 @@ use ureq::unversioned::transport::{
     Buffers, Connector, DefaultConnector, Either, LazyBuffers, NextTimeout, RustlsConnector,
     Transport,
 };
-use ureq::{Agent, BodyReader, Error as UreqError, ResponseExt};
+use ureq::{Agent, BodyReader, Error as UreqError, Proxy, ResponseExt};
 
 use crate::{MediaCancellation, MediaError, MediaInput};
 
@@ -972,7 +972,7 @@ pub(crate) fn create_agent_with_route_policy(
     route_policy: Option<Arc<dyn OutboundRoutePolicy>>,
 ) -> Agent {
     let config = Agent::config_builder()
-        .proxy(None)
+        .proxy(configured_proxy())
         .max_redirects(max_redirects)
         .max_redirects_will_error(true)
         .http_status_as_error(false)
@@ -995,6 +995,18 @@ pub(crate) fn create_agent_with_route_policy(
     } else {
         Agent::with_parts(config, DefaultConnector::default(), resolver)
     }
+}
+
+/// Returns the optional YouTube/source proxy without ever logging its URL or credentials.
+///
+/// The process sets this only for source traffic (`RAYDIO_YOUTUBE_PROXY`). Discord gateway and
+/// voice traffic use separate clients and are unaffected. HTTP CONNECT, HTTPS CONNECT, and
+/// SOCKS4/4A/5 URLs are supported by ureq; SOCKS support is compiled in explicitly above.
+fn configured_proxy() -> Option<Proxy> {
+    std::env::var("RAYDIO_YOUTUBE_PROXY")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .and_then(|value| Proxy::new(value.trim()).ok())
 }
 
 #[derive(Debug)]
