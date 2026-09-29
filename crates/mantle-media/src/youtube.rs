@@ -2910,9 +2910,49 @@ impl YoutubeAudioSourceManager {
         cancellation: &MediaCancellation,
     ) -> Result<Option<YoutubeSourcePlaylist>, YoutubeError> {
         let _ = bounded_text(query, self.options.max_metadata_string_bytes)?;
-        self.load_collection_with_clients(YoutubeClientKind::supports_search, |client| {
+        let api_result = self.load_collection_with_clients(YoutubeClientKind::supports_search, |client| {
             self.load_search_with_client(query, client, cancellation)
-        })
+        });
+        match api_result {
+            Ok(result) => Ok(result),
+            Err(error) if error.kind == YoutubeErrorKind::Cancelled => Err(error),
+            Err(error) if self.authentication.cookies.is_some() => {
+                self.load_search_watch_page(query, cancellation).or(Err(error))
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    fn load_search_watch_page(
+        &self,
+        query: &str,
+        cancellation: &MediaCancellation,
+    ) -> Result<Option<YoutubeSourcePlaylist>, YoutubeError> {
+        let url = format!(
+            "https://www.youtube.com/results?search_query={}",
+            percent_encode_query_component(query)
+        );
+        let request = self
+            .attach_cookies(RemoteHttpRequest::get(url).map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?)
+            .and_then(|request| {
+                request
+                    .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140 Safari/537.36")
+                    .and_then(|request| request.header("Accept-Language", "en-US,en;q=0.9"))
+                    .and_then(|request| request.max_response_bytes(self.options.max_player_embed_bytes))
+                    .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))
+            })?;
+        let response = self
+            .http
+            .execute_with_cancellation(&request, cancellation)
+            .map_err(map_remote_error)?;
+        let json = extract_watch_initial_data(response.body(), self.options.max_player_embed_bytes as usize)?;
+        parse_search_response(
+            &serde_json::to_vec(&json).map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?,
+            query,
+            self.options.max_search_results,
+            self.options.max_metadata_string_bytes,
+            self.options.max_thumbnails,
+        )
     }
 
     fn load_search_with_client(
@@ -3815,6 +3855,22 @@ fn extract_watch_player_response(bytes: &[u8], max_bytes: usize) -> Result<Value
             if offset >= bytes.len() {
                 break;
             }
+        }
+    }
+    Err(YoutubeError::new(YoutubeErrorKind::InvalidResponse))
+}
+
+fn extract_watch_initial_data(bytes: &[u8], max_bytes: usize) -> Result<Value, YoutubeError> {
+    if bytes.is_empty() || bytes.len() > max_bytes {
+        return Err(YoutubeError::new(YoutubeErrorKind::InvalidResponse));
+    }
+    for marker in [b"ytInitialData".as_slice(), b"ytInitialData =".as_slice()] {
+        let Some(relative) = find_bytes(bytes, marker) else { continue };
+        let tail = &bytes[relative + marker.len()..];
+        let Some(start) = tail.iter().position(|byte| *byte == b'{') else { continue };
+        let mut deserializer = serde_json::Deserializer::from_slice(&tail[start..]);
+        if let Ok(value) = Value::deserialize(&mut deserializer) {
+            return Ok(value);
         }
     }
     Err(YoutubeError::new(YoutubeErrorKind::InvalidResponse))
