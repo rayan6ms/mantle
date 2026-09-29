@@ -2837,6 +2837,31 @@ impl YoutubeAudioSourceManager {
     ) -> Result<YoutubeSourceTrack, YoutubeError> {
         let mut attempts = 0;
         let mut final_kind = YoutubeErrorKind::UnsupportedRoute;
+        // Companion performs the browser-equivalent player request from the trusted
+        // home egress. Use it for metadata loading as well as format discovery;
+        // otherwise a datacenter InnerTube request can fail before Companion gets
+        // a chance to provide the playable response.
+        if self.authentication.companion_url.is_some() {
+            attempts += 1;
+            let result = (|| {
+                let request = self.companion_player_request(video_id)?;
+                let companion_http = self.companion_http.as_ref().unwrap_or(&self.http);
+                let response = companion_http
+                    .execute_with_cancellation(&request, cancellation)
+                    .map_err(map_remote_error)?;
+                parse_player_response(
+                    response.body(),
+                    video_id,
+                    self.options.max_metadata_string_bytes,
+                    self.options.max_thumbnails,
+                )
+            })();
+            match result {
+                Ok(track) => return Ok(track),
+                Err(error) if error.kind == YoutubeErrorKind::Cancelled => return Err(error),
+                Err(error) => final_kind = error.kind,
+            }
+        }
         for client in self
             .options
             .clients

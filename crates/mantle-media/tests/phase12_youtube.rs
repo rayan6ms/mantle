@@ -2463,11 +2463,15 @@ fn companion_player_endpoint_receives_video_id_and_bearer_secret() {
         authentication,
     )
     .unwrap();
+    let loaded = manager
+        .load(&SourceReference::new(Some("dQw4w9WgXcQ".to_owned()), false))
+        .unwrap();
+    assert!(matches!(loaded, Some(SourceLoad::Item(YoutubeSourceItem::Track(_)))));
     let formats = manager
         .discover_playback_formats("dQw4w9WgXcQ", &MediaCancellation::new())
         .unwrap();
     assert_eq!(formats.client(), YoutubeClientKind::Web);
-    assert_eq!(companion.requests().len(), 1);
+    assert_eq!(companion.requests().len(), 2);
 }
 
 #[test]
