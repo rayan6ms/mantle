@@ -2914,7 +2914,11 @@ impl YoutubeAudioSourceManager {
             self.load_search_with_client(query, client, cancellation)
         });
         match api_result {
-            Ok(result) => Ok(result),
+            Ok(Some(result)) => Ok(Some(result)),
+            Ok(None) if self.authentication.cookies.is_some() => {
+                self.load_search_watch_page(query, cancellation)
+            }
+            Ok(None) => Ok(None),
             Err(error) if error.kind == YoutubeErrorKind::Cancelled => Err(error),
             Err(error) if self.authentication.cookies.is_some() => {
                 self.load_search_watch_page(query, cancellation).or(Err(error))
