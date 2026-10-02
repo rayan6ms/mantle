@@ -1856,6 +1856,8 @@ pub struct YoutubePlaybackFormats {
     client: YoutubeClientKind,
     formats: Vec<YoutubePlaybackFormat>,
     selected_index: usize,
+    // Only the authenticated Companion handoff provides pre-deciphered URLs.
+    urls_resolved: bool,
 }
 
 impl YoutubePlaybackFormats {
@@ -1876,7 +1878,7 @@ impl YoutubePlaybackFormats {
 
     #[must_use]
     pub const fn requires_player_script(&self) -> bool {
-        self.client.requires_player_script()
+        self.client.requires_player_script() && !self.urls_resolved
     }
 }
 
@@ -1887,6 +1889,7 @@ impl fmt::Debug for YoutubePlaybackFormats {
             .field("client", &self.client)
             .field("format_count", &self.formats.len())
             .field("selected_index", &self.selected_index)
+            .field("urls_resolved", &self.urls_resolved)
             .finish()
     }
 }
@@ -2529,7 +2532,7 @@ impl YoutubeAudioSourceManager {
             return Err(YoutubeError::new(YoutubeErrorKind::Cancelled));
         }
         let format = formats.selected();
-        if !formats.client.requires_player_script() {
+        if !formats.requires_player_script() {
             if format.signature.is_some() {
                 return Err(YoutubeError::new(YoutubeErrorKind::InvalidResponse));
             }
@@ -2728,14 +2731,7 @@ impl YoutubeAudioSourceManager {
                 let response = companion_http
                     .execute_with_cancellation(&request, cancellation)
                     .map_err(map_remote_error)?;
-                parse_playback_response(
-                    response.body(),
-                    video_id,
-                    YoutubeClientKind::Web,
-                    self.options.max_playback_formats,
-                    self.options.max_metadata_string_bytes,
-                    self.options.max_playback_url_bytes,
-                )
+                self.parse_companion_playback(response.body(), video_id)
             })() {
                 Ok(formats) => return Ok(formats),
                 Err(error) if error.kind == YoutubeErrorKind::Cancelled => return Err(error),
@@ -2812,6 +2808,33 @@ impl YoutubeAudioSourceManager {
             }
         }
         Err(YoutubeError::with_attempts(final_kind, attempts))
+    }
+
+    fn parse_companion_playback(
+        &self,
+        body: &[u8],
+        video_id: &str,
+    ) -> Result<YoutubePlaybackFormats, YoutubeError> {
+        let mut formats = parse_playback_response(
+            body,
+            video_id,
+            YoutubeClientKind::Web,
+            self.options.max_playback_formats,
+            self.options.max_metadata_string_bytes,
+            self.options.max_playback_url_bytes,
+        )?;
+        // Companion returns already deciphered direct URLs. Their remaining
+        // `n` is the solution, not a fresh challenge. Raw InnerTube/watch
+        // responses retain local deciphering. Reject unresolved signatures.
+        if formats
+            .formats
+            .iter()
+            .any(|format| format.signature.is_some())
+        {
+            return Err(YoutubeError::new(YoutubeErrorKind::InvalidResponse));
+        }
+        formats.urls_resolved = true;
+        Ok(formats)
     }
 
     fn discover_watch_page_playback(
@@ -3839,6 +3862,7 @@ fn parse_playback_response_value(
         client,
         formats,
         selected_index,
+        urls_resolved: false,
     })
 }
 

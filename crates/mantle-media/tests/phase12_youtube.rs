@@ -2466,12 +2466,109 @@ fn companion_player_endpoint_receives_video_id_and_bearer_secret() {
     let loaded = manager
         .load(&SourceReference::new(Some("dQw4w9WgXcQ".to_owned()), false))
         .unwrap();
-    assert!(matches!(loaded, Some(SourceLoad::Item(YoutubeSourceItem::Track(_)))));
+    assert!(matches!(
+        loaded,
+        Some(SourceLoad::Item(YoutubeSourceItem::Track(_)))
+    ));
     let formats = manager
         .discover_playback_formats("dQw4w9WgXcQ", &MediaCancellation::new())
         .unwrap();
     assert_eq!(formats.client(), YoutubeClientKind::Web);
     assert_eq!(companion.requests().len(), 2);
+}
+
+#[test]
+fn companion_resolved_n_parameter_is_not_deciphered_twice() {
+    let companion = ReplayServer::start(|_, _| {
+        ReplayResponse::json(&playback_response(
+            "https://media.example.test/audio.webm?n=already-deciphered",
+            "audio/webm; codecs=\"opus\"",
+            100,
+        ))
+    });
+    let raw = ReplayServer::start(|_, _| ReplayResponse::json(br"{}"));
+    let manager = YoutubeAudioSourceManager::new(
+        YoutubeSourceOptions {
+            clients: vec![YoutubeClientKind::Web],
+            player_embed_url: raw.url("must-not-fetch-script"),
+            http: private_http_options(),
+            ..YoutubeSourceOptions::default()
+        },
+        YoutubeAuthentication::default()
+            .with_companion_endpoint(companion.url(""), "companion-secret".to_owned())
+            .unwrap(),
+    )
+    .unwrap();
+    let cancellation = MediaCancellation::new();
+    let formats = manager
+        .discover_playback_formats("dQw4w9WgXcQ", &cancellation)
+        .unwrap();
+    let resolved = manager
+        .resolve_selected_playback_url(&formats, &cancellation)
+        .unwrap();
+    assert_eq!(
+        resolved.as_str(),
+        "https://media.example.test/audio.webm?n=already-deciphered"
+    );
+    assert!(!formats.requires_player_script());
+    assert!(raw.requests().is_empty());
+    assert_eq!(companion.requests().len(), 1);
+}
+
+#[test]
+fn unresolved_companion_signature_falls_back_to_a_raw_client() {
+    let companion = ReplayServer::start(|_, _| {
+        let mut response: Value = serde_json::from_slice(&playback_response(
+            "https://media.example.test/audio.webm",
+            "audio/webm; codecs=\"opus\"",
+            100,
+        ))
+        .unwrap();
+        let format = response["streamingData"]["adaptiveFormats"][0]
+            .as_object_mut()
+            .unwrap();
+        format.remove("url");
+        format.insert(
+            "signatureCipher".into(),
+            Value::String(
+                "url=https%3A%2F%2Fmedia.example.test%2Faudio.webm&sp=sig&s=unresolved".into(),
+            ),
+        );
+        ReplayResponse::json(&serde_json::to_vec(&response).unwrap())
+    });
+    let api = ReplayServer::start(|_, _| {
+        ReplayResponse::json(&playback_response(
+            "https://media.example.test/raw-client.webm",
+            "audio/webm; codecs=\"opus\"",
+            100,
+        ))
+    });
+    let manager = YoutubeAudioSourceManager::new(
+        YoutubeSourceOptions {
+            clients: vec![YoutubeClientKind::AndroidVr],
+            api_base_url: api.url("youtubei/v1"),
+            http: private_http_options(),
+            ..YoutubeSourceOptions::default()
+        },
+        YoutubeAuthentication::default()
+            .with_companion_endpoint(companion.url(""), "companion-secret".to_owned())
+            .unwrap(),
+    )
+    .unwrap();
+    let cancellation = MediaCancellation::new();
+    let formats = manager
+        .discover_playback_formats("dQw4w9WgXcQ", &cancellation)
+        .unwrap();
+    assert_eq!(formats.client(), YoutubeClientKind::AndroidVr);
+    assert_eq!(
+        manager
+            .resolve_selected_playback_url(&formats, &cancellation)
+            .unwrap()
+            .as_str(),
+        "https://media.example.test/raw-client.webm"
+    );
+    assert_eq!(companion.requests().len(), 1);
+    assert_eq!(api.requests().len(), 1);
 }
 
 #[test]

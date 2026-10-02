@@ -69,3 +69,17 @@ The complete media suite, all-target media Clippy with warnings denied, and
 formatting of changed Rust files pass. Existing proxy/Companion documentation
 lint findings were corrected, with checked watch-document size conversions and
 an explicitly non-exhaustive credential-redacting Debug implementation.
+
+# Companion URL provenance (2026-10-02)
+
+Installed Invidious Companion revision `bb3b37ff40c69475e45785d16eb7da8876b80089`
+deciphers every media URL and removes signatureCipher before returning it
+(`src/lib/helpers/youtubePlayerHandling.ts`). Oracle's authenticated response
+contained direct signed Opus URLs with `n` already present and no cipher.
+Mantle incorrectly treated that value as a fresh Web challenge, reproducing
+InvalidResponse before media I/O and causing an avoidable fallback. An explicit
+private provenance flag now preserves URLs only from the configured authenticated
+Companion endpoint. Raw InnerTube/watch responses retain normal deciphering;
+unresolved Companion signatures are rejected and fall through to another client.
+The regression failed before the fix; it now returns the exact URL without any
+player-script request. Existing raw-cipher and media handoff tests still pass.
