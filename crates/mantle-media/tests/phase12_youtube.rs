@@ -2017,7 +2017,7 @@ fn cookie_watch_page_fallback_rejects_malformed_or_oversized_embedded_json() {
         "/youtubei/v1/player?prettyPrint=false" => {
             ReplayResponse::json(br#"{"playabilityStatus":{"status":"LOGIN_REQUIRED"}}"#)
         }
-        "/watch?v=dQw4w9WgXcQ" => ReplayResponse::json(br#"<script>ytInitialPlayerResponse = {"#),
+        "/watch?v=dQw4w9WgXcQ" => ReplayResponse::json(br"<script>ytInitialPlayerResponse = {"),
         target => panic!("unexpected target {target}"),
     });
     let options = YoutubeSourceOptions {

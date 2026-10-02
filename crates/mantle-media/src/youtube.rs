@@ -254,7 +254,7 @@ pub struct YoutubeSourceOptions {
     pub music_api_base_url: String,
     /// Browser watch-page URL prefix used as a cookie-authenticated playback fallback.
     ///
-    /// The default is YouTube's canonical watch URL. This is configurable so the bounded
+    /// The default is `YouTube`'s canonical watch URL. This is configurable so the bounded
     /// parser can be exercised against a local replay server without changing network code.
     pub watch_url_prefix: String,
     pub player_embed_url: String,
@@ -432,8 +432,12 @@ impl YoutubeAuthentication {
         Self::with_credentials(oauth_access_token, None, None, po_token, visitor_data)
     }
 
-    /// Creates credentials for deployments that keep YouTube authentication outside the
-    /// repository. Cookies are sent only to YouTube control-plane requests and are never logged.
+    /// Creates credentials for deployments that keep `YouTube` authentication outside the
+    /// repository. Cookies are sent only to `YouTube` control-plane requests and are never logged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`YoutubeErrorKind::InvalidAuthentication`] for empty, oversized or unpaired values.
     pub fn with_credentials(
         oauth_access_token: Option<String>,
         oauth_refresh_token: Option<String>,
@@ -456,9 +460,13 @@ impl YoutubeAuthentication {
 
     /// Adds an optional Invidious Companion player endpoint.
     ///
-    /// Companion performs BotGuard session setup and mints a video-specific content PoToken
+    /// Companion performs `BotGuard` session setup and mints a video-specific content `PoToken`
     /// for each player request. The endpoint must be the Companion base URL (without
     /// `/youtubei/v1/player`) and the token is sent only as an HTTP Bearer credential.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`YoutubeErrorKind::InvalidAuthentication`] for an invalid endpoint or token.
     pub fn with_companion_endpoint(
         mut self,
         base_url: String,
@@ -505,6 +513,10 @@ impl YoutubeAuthentication {
     }
 
     /// Creates refresh-token credentials with an optional browser-cookie header.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`YoutubeErrorKind::InvalidAuthentication`] for empty, oversized or unpaired values.
     pub fn with_refresh_token_and_cookies(
         oauth_refresh_token: String,
         cookies: Option<String>,
@@ -557,7 +569,7 @@ impl fmt::Debug for YoutubeAuthentication {
             .field("proof_of_origin", &self.po_token.is_some())
             .field("visitor_data", &self.visitor_data.is_some())
             .field("companion", &self.companion_url.is_some())
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -2017,6 +2029,10 @@ impl YoutubeAudioSourceManager {
 
     /// Creates a routed manager with an optional isolated resolver for player scripts that are
     /// outside the bounded native transform grammar.
+    ///
+    /// # Errors
+    ///
+    /// Returns a stable configuration error for invalid source, HTTP or authentication policy.
     pub fn with_route_policy_and_cipher_resolver(
         options: YoutubeSourceOptions,
         authentication: YoutubeAuthentication,
@@ -2683,6 +2699,11 @@ impl YoutubeAudioSourceManager {
     /// range request begins. Callers that open media after discovery use this bounded skip list to
     /// continue through the configured client order instead of treating that first client as
     /// terminal.
+    ///
+    /// # Errors
+    ///
+    /// Returns a stable policy, cancellation, network, playability or response error when all
+    /// eligible clients fail.
     pub fn discover_playback_formats_skipping(
         &self,
         video_id: &str,
@@ -2698,7 +2719,8 @@ impl YoutubeAudioSourceManager {
         // downstream playback path can apply the same format policy. If that handoff
         // failed, the caller records Web in `skipped`; honor that marker here or the
         // retry would call Companion again and never reach the next client.
-        if self.authentication.companion_url.is_some() && !skipped.contains(&YoutubeClientKind::Web) {
+        if self.authentication.companion_url.is_some() && !skipped.contains(&YoutubeClientKind::Web)
+        {
             attempts += 1;
             match (|| {
                 let request = self.companion_player_request(video_id)?;
@@ -2822,7 +2844,8 @@ impl YoutubeAudioSourceManager {
             .map_err(map_remote_error)?;
         let player_response = extract_watch_player_response(
             response.body(),
-            self.options.max_player_embed_bytes as usize,
+            usize::try_from(self.options.max_player_embed_bytes)
+                .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?,
         )?;
         parse_playback_response_value(
             &player_response,
@@ -2914,9 +2937,10 @@ impl YoutubeAudioSourceManager {
         cancellation: &MediaCancellation,
     ) -> Result<Option<YoutubeSourcePlaylist>, YoutubeError> {
         let _ = bounded_text(query, self.options.max_metadata_string_bytes)?;
-        let api_result = self.load_collection_with_clients(YoutubeClientKind::supports_search, |client| {
-            self.load_search_with_client(query, client, cancellation)
-        });
+        let api_result = self
+            .load_collection_with_clients(YoutubeClientKind::supports_search, |client| {
+                self.load_search_with_client(query, client, cancellation)
+            });
         match api_result {
             Ok(Some(result)) => Ok(Some(result)),
             Ok(None) if self.authentication.cookies.is_some() => {
@@ -2924,9 +2948,9 @@ impl YoutubeAudioSourceManager {
             }
             Ok(None) => Ok(None),
             Err(error) if error.kind == YoutubeErrorKind::Cancelled => Err(error),
-            Err(error) if self.authentication.cookies.is_some() => {
-                self.load_search_watch_page(query, cancellation).or(Err(error))
-            }
+            Err(error) if self.authentication.cookies.is_some() => self
+                .load_search_watch_page(query, cancellation)
+                .or(Err(error)),
             Err(error) => Err(error),
         }
     }
@@ -2953,9 +2977,14 @@ impl YoutubeAudioSourceManager {
             .http
             .execute_with_cancellation(&request, cancellation)
             .map_err(map_remote_error)?;
-        let json = extract_watch_initial_data(response.body(), self.options.max_player_embed_bytes as usize)?;
+        let json = extract_watch_initial_data(
+            response.body(),
+            usize::try_from(self.options.max_player_embed_bytes)
+                .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?,
+        )?;
         parse_search_response(
-            &serde_json::to_vec(&json).map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?,
+            &serde_json::to_vec(&json)
+                .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?,
             query,
             self.options.max_search_results,
             self.options.max_metadata_string_bytes,
@@ -3268,6 +3297,7 @@ impl YoutubeAudioSourceManager {
         Ok(request)
     }
 
+    #[allow(clippy::too_many_lines)]
     fn player_request(
         &self,
         video_id: &str,
@@ -3829,7 +3859,7 @@ fn validate_playability_value(json: &Value) -> Result<(), YoutubeError> {
     }
 }
 
-/// Extracts the first playable player response embedded in a bounded YouTube watch document.
+/// Extracts the first playable player response embedded in a bounded `YouTube` watch document.
 ///
 /// Modern browser responses assign a JSON object to `ytInitialPlayerResponse` instead of
 /// exposing the same object through `youtubei/v1/player`. The deserializer intentionally parses
@@ -3873,9 +3903,13 @@ fn extract_watch_initial_data(bytes: &[u8], max_bytes: usize) -> Result<Value, Y
         return Err(YoutubeError::new(YoutubeErrorKind::InvalidResponse));
     }
     for marker in [b"ytInitialData".as_slice(), b"ytInitialData =".as_slice()] {
-        let Some(relative) = find_bytes(bytes, marker) else { continue };
+        let Some(relative) = find_bytes(bytes, marker) else {
+            continue;
+        };
         let tail = &bytes[relative + marker.len()..];
-        let Some(start) = tail.iter().position(|byte| *byte == b'{') else { continue };
+        let Some(start) = tail.iter().position(|byte| *byte == b'{') else {
+            continue;
+        };
         let mut deserializer = serde_json::Deserializer::from_slice(&tail[start..]);
         if let Ok(value) = Value::deserialize(&mut deserializer) {
             return Ok(value);

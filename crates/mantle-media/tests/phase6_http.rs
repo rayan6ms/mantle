@@ -701,6 +701,92 @@ fn private_test_options() -> HttpRangeOptions {
 
 #[test]
 #[cfg(unix)]
+fn staged_open_avoids_per_window_network_round_trips() {
+    let bytes = vec![19_u8; 4 * 1024 * 1024];
+    let expected = bytes.clone();
+    let server = ReplayServer::start(move |request, _| {
+        // Model fixed request latency, independently of body size or throughput.
+        thread::sleep(Duration::from_millis(20));
+        partial_response(&request, &bytes, Some("\"stable\""))
+    });
+    let started = std::time::Instant::now();
+    let mut input = HttpRangeInput::open(
+        server.url("staging-latency"),
+        HttpRangeOptions {
+            staging_max_bytes: expected.len() as u64,
+            network_access: HttpNetworkAccess::AllowPrivateNetworks,
+            ..HttpRangeOptions::default()
+        },
+    )
+    .unwrap();
+    let elapsed = started.elapsed();
+    let requests = server.requests();
+    eprintln!(
+        "staging 4 MiB, 20 ms/request: {} requests, {:.3} ms startup",
+        requests.len(),
+        elapsed.as_secs_f64() * 1000.0
+    );
+    drop(server);
+    let mut actual = Vec::new();
+    input.read_to_end(&mut actual).unwrap();
+    assert_eq!(actual, expected);
+    assert_eq!(
+        requests.len(),
+        2,
+        "probe then one bounded remainder transfer"
+    );
+    assert_eq!(requests[0].range, Some((0, 256 * 1024 - 1)));
+    assert_eq!(requests[1].range, Some((256 * 1024, 4 * 1024 * 1024 - 1)));
+}
+
+#[test]
+#[cfg(unix)]
+fn staged_remainder_recovers_at_consumed_offset_and_rejects_changed_objects() {
+    let bytes = vec![23_u8; 100_000];
+    let expected = bytes.clone();
+    let server = ReplayServer::start(move |request, count| {
+        let mut response = partial_response(&request, &bytes, Some("\"stable\""));
+        if count == 1 {
+            response.declared_length = Some(response.body.len());
+            response.body.truncate(17);
+        }
+        response
+    });
+    let options = HttpRangeOptions {
+        staging_max_bytes: expected.len() as u64,
+        ..private_test_options()
+    };
+    let mut input = HttpRangeInput::open(server.url("truncated-remainder"), options).unwrap();
+    assert_eq!(
+        server
+            .requests()
+            .iter()
+            .map(|r| r.range.unwrap())
+            .collect::<Vec<_>>(),
+        [(0, 32_767), (32_768, 99_999), (32_785, 99_999)]
+    );
+    drop(server);
+    let mut actual = Vec::new();
+    input.read_to_end(&mut actual).unwrap();
+    assert_eq!(actual, expected);
+
+    let changed = ReplayServer::start(move |request, count| {
+        partial_response(
+            &request,
+            &expected,
+            Some(if count == 0 {
+                "\"stable\""
+            } else {
+                "\"changed\""
+            }),
+        )
+    });
+    assert!(HttpRangeInput::open(changed.url("changed-remainder"), options).is_err());
+    assert_eq!(changed.requests().len(), 2);
+}
+
+#[test]
+#[cfg(unix)]
 fn staged_ranges_read_and_seek_after_the_origin_is_gone() {
     use std::io::{Seek, SeekFrom};
     let bytes = (0..100_000)
@@ -719,8 +805,8 @@ fn staged_ranges_read_and_seek_after_the_origin_is_gone() {
     .unwrap();
     assert_eq!(
         server.requests().len(),
-        4,
-        "all compressed ranges precede playback"
+        2,
+        "probe and bounded remainder precede playback"
     );
     drop(server);
     let mut actual = Vec::new();

@@ -52,3 +52,20 @@ The resolver now permits only the configured proxy authority as a private except
 directly resolved destination addresses remain subject to the public-address filter.
 Regression coverage verifies the authority match. Oracle probes now load search and
 playlist inputs successfully through the home egress.
+
+# Staged startup round trips (2026-10-02)
+
+Raydio took 26.2 seconds from command receipt to track start while encrypted
+voice became ready in 2.4 seconds. Finite staging unnecessarily fetched every
+256 KiB window separately. A controlled 4 MiB fixture with 20 ms fixed request
+latency measured 16 requests / 372.728 ms before, versus 2 requests / 72.658 ms
+after. Once the first bounded probe establishes a stageable object's length,
+the next range consumes its remainder through the existing 64 KiB copy buffer.
+No new dependency, heap-sized media buffer, or streaming-default change.
+Interrupted-body recovery retains the original response bounds; changed object
+validators still fail. Exact bytes, cancellation, oversized fallback and replay
+tests pass. These simulated timings do not establish the live Oracle gain.
+The complete media suite, all-target media Clippy with warnings denied, and
+formatting of changed Rust files pass. Existing proxy/Companion documentation
+lint findings were corrected, with checked watch-document size conversions and
+an explicitly non-exhaustive credential-redacting Debug implementation.

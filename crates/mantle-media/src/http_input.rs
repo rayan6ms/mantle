@@ -298,7 +298,15 @@ impl HttpRangeInput {
             self.active = None;
             return Ok(());
         }
-        let window = u64::try_from(self.options.range_window_bytes).unwrap_or(u64::MAX);
+        // After the bounded probe establishes the total length, staging consumes
+        // the complete remainder anyway. Avoid a request round trip for each
+        // streaming window without buffering the body on the heap. Recovery
+        // below still caps retries to the interrupted response's original end.
+        let window = if self.source_len != 0 && self.source_len <= self.options.staging_max_bytes {
+            self.source_len.saturating_sub(self.position)
+        } else {
+            u64::try_from(self.options.range_window_bytes).unwrap_or(u64::MAX)
+        };
         let requested_end = self
             .position
             .saturating_add(window.saturating_sub(1))
@@ -983,10 +991,10 @@ pub(crate) fn create_agent_with_route_policy(
     )
 }
 
-/// Creates a source HTTP agent without the process-wide YouTube proxy.
+/// Creates a source HTTP agent without the process-wide `YouTube` proxy.
 ///
 /// Companion is an explicitly trusted loopback sidecar. It must be reached directly while
-/// ordinary YouTube control and media requests continue to use `RAYDIO_YOUTUBE_PROXY`.
+/// ordinary `YouTube` control and media requests continue to use `RAYDIO_YOUTUBE_PROXY`.
 pub(crate) fn create_direct_agent_with_route_policy(
     max_response_header_bytes: usize,
     socket_buffer_bytes: usize,
@@ -1008,6 +1016,8 @@ pub(crate) fn create_direct_agent_with_route_policy(
     )
 }
 
+// Keep the explicit transport limits aligned with both existing agent constructors.
+#[allow(clippy::too_many_arguments)]
 fn create_agent_with_route_policy_and_proxy(
     max_response_header_bytes: usize,
     socket_buffer_bytes: usize,
@@ -1426,15 +1436,9 @@ mod tests {
             access: HttpNetworkAccess::PublicInternetOnly,
             proxy_authority: Some("127.0.0.1:18080".to_owned()),
         };
-        assert!(resolver.is_configured_proxy(&Uri::from_static(
-            "socks5://127.0.0.1:18080",
-        )));
-        assert!(!resolver.is_configured_proxy(&Uri::from_static(
-            "https://127.0.0.1:18081",
-        )));
-        assert!(!resolver.is_configured_proxy(&Uri::from_static(
-            "https://youtube.com",
-        )));
+        assert!(resolver.is_configured_proxy(&Uri::from_static("socks5://127.0.0.1:18080",)));
+        assert!(!resolver.is_configured_proxy(&Uri::from_static("https://127.0.0.1:18081",)));
+        assert!(!resolver.is_configured_proxy(&Uri::from_static("https://youtube.com",)));
     }
 
     #[test]

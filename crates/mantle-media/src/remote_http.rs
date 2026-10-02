@@ -381,7 +381,11 @@ impl RemoteHttpClient {
     /// Creates a client that bypasses the process-wide source proxy.
     ///
     /// This is used only for the explicitly configured local Companion sidecar. Keeping it
-    /// separate prevents a loopback Companion request from being sent through the YouTube proxy.
+    /// separate prevents a loopback Companion request from being sent through the `YouTube` proxy.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RemoteHttpErrorKind::InvalidOptions`] for invalid bounded HTTP policy.
     pub fn new_direct(options: RemoteHttpOptions) -> Result<Self, RemoteHttpError> {
         Self::new_inner_direct(options, None)
     }
