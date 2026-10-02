@@ -3193,10 +3193,16 @@ impl YoutubeAudioSourceManager {
         request: &RemoteHttpRequest,
         cancellation: &MediaCancellation,
     ) -> Result<Vec<u8>, YoutubeError> {
-        self.http
+        let result = self.http
             .execute_with_cancellation(request, cancellation)
             .map(|response| response.body().to_vec())
-            .map_err(map_remote_error)
+            .map_err(|error| {
+                if std::env::var_os("MANTLE_DEBUG_YOUTUBE").is_some() {
+                    eprintln!("youtube data request error kind={:?} status={:?}", error.kind(), error.status_code());
+                }
+                map_remote_error(error)
+            });
+        result
     }
 
     fn data_request(
