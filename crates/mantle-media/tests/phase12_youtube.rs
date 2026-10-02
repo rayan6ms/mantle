@@ -2475,6 +2475,45 @@ fn companion_player_endpoint_receives_video_id_and_bearer_secret() {
 }
 
 #[test]
+fn skipped_web_client_does_not_retry_companion_before_next_playback_client() {
+    let companion = ReplayServer::start(|_, _| {
+        panic!("Companion must be skipped after its Web-labelled handoff fails")
+    });
+    let api = ReplayServer::start(|request, _| {
+        assert_eq!(request.target, "/youtubei/v1/player?prettyPrint=false");
+        ReplayResponse::json(&playback_response(
+            "https://media.example.test/android-vr.webm",
+            "audio/webm; codecs=\"opus\"",
+            100,
+        ))
+    });
+    let authentication = YoutubeAuthentication::default()
+        .with_companion_endpoint(companion.url(""), "companion-secret".to_owned())
+        .unwrap();
+    let manager = YoutubeAudioSourceManager::new(
+        YoutubeSourceOptions {
+            api_base_url: api.url("youtubei/v1"),
+            clients: vec![YoutubeClientKind::Web, YoutubeClientKind::AndroidVr],
+            http: private_http_options(),
+            ..YoutubeSourceOptions::default()
+        },
+        authentication,
+    )
+    .unwrap();
+
+    let formats = manager
+        .discover_playback_formats_skipping(
+            "dQw4w9WgXcQ",
+            &MediaCancellation::new(),
+            &[YoutubeClientKind::Web],
+        )
+        .unwrap();
+    assert_eq!(formats.client(), YoutubeClientKind::AndroidVr);
+    assert!(companion.requests().is_empty());
+    assert_eq!(api.requests().len(), 1);
+}
+
+#[test]
 fn authentication_and_source_policy_reject_invalid_bounds() {
     let error = YoutubeAuthentication::new(None, Some("po-secret".to_owned()), None).unwrap_err();
     assert_eq!(error.kind(), YoutubeErrorKind::InvalidAuthentication);

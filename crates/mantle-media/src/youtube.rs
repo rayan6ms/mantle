@@ -2694,7 +2694,11 @@ impl YoutubeAudioSourceManager {
         }
         let mut attempts = 0_usize;
         let mut final_kind = YoutubeErrorKind::UnsupportedRoute;
-        if self.authentication.companion_url.is_some() {
+        // Companion responses are intentionally represented as the Web client so the
+        // downstream playback path can apply the same format policy. If that handoff
+        // failed, the caller records Web in `skipped`; honor that marker here or the
+        // retry would call Companion again and never reach the next client.
+        if self.authentication.companion_url.is_some() && !skipped.contains(&YoutubeClientKind::Web) {
             attempts += 1;
             match (|| {
                 let request = self.companion_player_request(video_id)?;
