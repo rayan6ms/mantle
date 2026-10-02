@@ -267,11 +267,20 @@ impl YoutubeAudioSourceManager {
                 .or(selected.content_length()),
             ..range_options
         };
-        let input = HttpRangeInput::open_with_cancellation(
-            resolved.as_str(),
-            range_options,
-            cancellation.clone(),
-        )
+        let input = if let Some(agent) = self.media_range_agent(range_options) {
+            HttpRangeInput::open_with_agent(
+                resolved.as_str(),
+                range_options,
+                cancellation.clone(),
+                agent,
+            )
+        } else {
+            HttpRangeInput::open_with_cancellation(
+                resolved.as_str(),
+                range_options,
+                cancellation.clone(),
+            )
+        }
         .map_err(map_media_error)?;
         let actual_length = input
             .byte_len()

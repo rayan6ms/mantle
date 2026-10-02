@@ -368,6 +368,19 @@ pub struct RemoteHttpClient {
 }
 
 impl RemoteHttpClient {
+    // Share only an identical, non-routed transport. Custom range policy keeps
+    // its own agent; routed requests must never reuse an earlier local address.
+    pub(crate) fn range_agent(&self, options: crate::HttpRangeOptions) -> Option<Agent> {
+        (self.route_policy.is_none()
+            && self.options.max_response_header_bytes == options.max_response_header_bytes
+            && self.options.socket_buffer_bytes == options.socket_buffer_bytes
+            && self.options.connect_timeout == options.connect_timeout
+            && self.options.request_timeout == options.request_timeout
+            && self.options.max_redirects == options.max_redirects
+            && self.options.network_access == options.network_access)
+            .then(|| self.agent.clone())
+    }
+
     /// Creates a client after validating all resource and retry bounds.
     ///
     /// # Errors

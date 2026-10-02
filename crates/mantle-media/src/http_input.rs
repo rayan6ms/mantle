@@ -200,7 +200,18 @@ impl HttpRangeInput {
         options: HttpRangeOptions,
         cancellation: MediaCancellation,
     ) -> Result<Self, MediaError> {
-        Self::open_inner(url, options, cancellation, None)
+        Self::open_inner(url, options, cancellation, None, None)
+    }
+
+    // The caller must supply an agent with exactly the same transport policy.
+    // Source control and media can then share their existing bounded pool.
+    pub(crate) fn open_with_agent(
+        url: impl AsRef<str>,
+        options: HttpRangeOptions,
+        cancellation: MediaCancellation,
+        agent: Agent,
+    ) -> Result<Self, MediaError> {
+        Self::open_inner(url, options, cancellation, None, Some(agent))
     }
 
     /// Opens a ranged object with a selected local-address policy on every new connection.
@@ -215,7 +226,7 @@ impl HttpRangeInput {
         cancellation: MediaCancellation,
         route_policy: Arc<dyn OutboundRoutePolicy>,
     ) -> Result<Self, MediaError> {
-        Self::open_inner(url, options, cancellation, Some(route_policy))
+        Self::open_inner(url, options, cancellation, Some(route_policy), None)
     }
 
     fn open_inner(
@@ -223,19 +234,22 @@ impl HttpRangeInput {
         options: HttpRangeOptions,
         cancellation: MediaCancellation,
         route_policy: Option<Arc<dyn OutboundRoutePolicy>>,
+        agent: Option<Agent>,
     ) -> Result<Self, MediaError> {
         let options = options.validate()?;
         cancellation.check()?;
         let uri = parse_uri(url.as_ref())?;
-        let agent = create_agent_with_route_policy(
-            options.max_response_header_bytes,
-            options.socket_buffer_bytes,
-            options.connect_timeout,
-            options.request_timeout,
-            options.max_redirects,
-            options.network_access,
-            route_policy,
-        );
+        let agent = agent.unwrap_or_else(|| {
+            create_agent_with_route_policy(
+                options.max_response_header_bytes,
+                options.socket_buffer_bytes,
+                options.connect_timeout,
+                options.request_timeout,
+                options.max_redirects,
+                options.network_access,
+                route_policy,
+            )
+        });
         let mut input = Self {
             agent,
             uri,
@@ -249,10 +263,17 @@ impl HttpRangeInput {
             validator: None,
             cancellation,
         };
+        let opened_at = Instant::now();
         input.open_range()?;
+        let response_elapsed = opened_at.elapsed();
+        let staging_at = Instant::now();
         if input.source_len <= input.options.staging_max_bytes {
             input.stage()?;
         }
+        log::info!(target: "mantle_media::startup",
+            "HTTP media opened: source_bytes={} response_ms={:.3} staging_ms={:.3} staged={}",
+            input.source_len, response_elapsed.as_secs_f64() * 1000.0,
+            staging_at.elapsed().as_secs_f64() * 1000.0, input.staged.is_some());
         Ok(input)
     }
 
@@ -521,6 +542,20 @@ impl Read for HttpRangeInput {
                     self.position = self.position.saturating_add(count as u64);
                     active.remaining = active.remaining.saturating_sub(count as u64);
                     if active.remaining == 0 {
+                        // ureq finalizes a length-delimited body on the next
+                        // read. Without this EOF observation, dropping the
+                        // reader closes a fully consumed socket instead of
+                        // returning it to the agent's bounded pool. This read
+                        // completes locally; it does not wait for another byte.
+                        let completed = active
+                            .reader
+                            .read(&mut [0_u8; 1])
+                            .map_err(|error| sanitize_body_error(&error))?;
+                        if completed != 0 {
+                            return Err(invalid_response(format_args!(
+                                "HTTP body exceeded its declared range"
+                            )));
+                        }
                         self.active = None;
                     }
                     if self.recovery.is_some_and(|(_, end)| self.position >= end) {
@@ -1425,6 +1460,195 @@ mod tests {
     use std::net::{Ipv4Addr, Ipv6Addr};
 
     use super::*;
+
+    #[test]
+    #[cfg(unix)]
+    #[allow(clippy::too_many_lines)] // Keep the bounded keep-alive fixture with its regression.
+    fn completed_ranges_return_connections_to_the_shared_pool() {
+        use std::net::TcpListener;
+        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+        use std::thread;
+
+        fn measure(shared: bool) -> (usize, Duration) {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            listener.set_nonblocking(true).unwrap();
+            let url = format!("http://{}/media", listener.local_addr().unwrap());
+            let connections = Arc::new(AtomicUsize::new(0));
+            let stop = Arc::new(AtomicBool::new(false));
+            let accepted = Arc::clone(&connections);
+            let stopped = Arc::clone(&stop);
+            let bytes = vec![23_u8; 4 * 1024 * 1024];
+            let server = thread::spawn(move || {
+                while !stopped.load(Ordering::Acquire) {
+                    let (mut stream, _) = match listener.accept() {
+                        Ok(pair) => pair,
+                        Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                            thread::sleep(Duration::from_millis(1));
+                            continue;
+                        }
+                        Err(error) => panic!("accept failed: {error}"),
+                    };
+                    accepted.fetch_add(1, Ordering::Relaxed);
+                    stream
+                        .set_read_timeout(Some(Duration::from_secs(2)))
+                        .unwrap();
+                    stream
+                        .set_write_timeout(Some(Duration::from_secs(2)))
+                        .unwrap();
+                    // Model transport establishment without a wall-time assertion.
+                    thread::sleep(Duration::from_millis(20));
+                    loop {
+                        let mut header = Vec::new();
+                        let mut byte = [0_u8; 1];
+                        while header.len() < 16 * 1024 && !header.ends_with(b"\r\n\r\n") {
+                            if !matches!(stream.read(&mut byte), Ok(1)) {
+                                break;
+                            }
+                            header.push(byte[0]);
+                        }
+                        if !header.ends_with(b"\r\n\r\n") {
+                            break;
+                        }
+                        let header = String::from_utf8(header).unwrap();
+                        let (start, end) = header
+                            .lines()
+                            .filter_map(|line| line.split_once(':'))
+                            .find_map(|(name, value)| {
+                                name.eq_ignore_ascii_case("range").then_some(value.trim())
+                            })
+                            .unwrap()
+                            .strip_prefix("bytes=")
+                            .unwrap()
+                            .split_once('-')
+                            .unwrap();
+                        let start: usize = start.parse().unwrap();
+                        let end: usize = end.parse().unwrap();
+                        let end = end.min(bytes.len() - 1);
+                        write!(stream, "HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nContent-Range: bytes {start}-{end}/{}\r\nETag: \"stable\"\r\n\r\n", end - start + 1, bytes.len()).unwrap();
+                        stream.write_all(&bytes[start..=end]).unwrap();
+                    }
+                }
+            });
+            let options = HttpRangeOptions {
+                expected_source_bytes: Some(4 * 1024 * 1024),
+                staging_max_bytes: 4 * 1024 * 1024,
+                network_access: HttpNetworkAccess::AllowPrivateNetworks,
+                ..HttpRangeOptions::default()
+            };
+            let client = crate::RemoteHttpClient::new(crate::RemoteHttpOptions {
+                network_access: options.network_access,
+                ..crate::RemoteHttpOptions::default()
+            })
+            .unwrap();
+            let began = Instant::now();
+            for _ in 0..3 {
+                let mut input = if shared {
+                    HttpRangeInput::open_with_agent(
+                        &url,
+                        options,
+                        MediaCancellation::new(),
+                        client.range_agent(options).unwrap(),
+                    )
+                } else {
+                    HttpRangeInput::open(&url, options)
+                }
+                .unwrap();
+                let mut actual = Vec::new();
+                input.read_to_end(&mut actual).unwrap();
+                assert_eq!(actual, vec![23_u8; 4 * 1024 * 1024]);
+            }
+            let elapsed = began.elapsed();
+            let cancellation = MediaCancellation::new();
+            cancellation.cancel();
+            assert!(
+                HttpRangeInput::open_with_agent(
+                    &url,
+                    options,
+                    cancellation,
+                    client.range_agent(options).unwrap()
+                )
+                .is_err()
+            );
+            drop(client);
+            stop.store(true, Ordering::Release);
+            server.join().unwrap();
+            (connections.load(Ordering::Relaxed), elapsed)
+        }
+        let separate = measure(false);
+        let pooled = measure(true);
+        eprintln!(
+            "3 staged 4 MiB sources, 20 ms/connect: separate {} connections / {:.3} ms; pooled {} connections / {:.3} ms",
+            separate.0,
+            separate.1.as_secs_f64() * 1000.0,
+            pooled.0,
+            pooled.1.as_secs_f64() * 1000.0
+        );
+        assert_eq!(separate.0, 3);
+        assert_eq!(
+            pooled.0, 1,
+            "fully consumed bodies must finalize before drop"
+        );
+    }
+
+    #[test]
+    fn shared_range_agent_requires_identical_transport_policy() {
+        #[derive(Debug)]
+        struct NoRoute;
+        impl OutboundRoutePolicy for NoRoute {
+            fn select_route(&self, _: OutboundRouteContext<'_>) -> Option<OutboundRoute> {
+                None
+            }
+            fn report_outcome(&self, _: OutboundRoute, _: OutboundRouteOutcome) {}
+        }
+        let client = crate::RemoteHttpClient::new(crate::RemoteHttpOptions::default()).unwrap();
+        let defaults = HttpRangeOptions::default();
+        assert!(client.range_agent(defaults).is_some());
+        for options in [
+            HttpRangeOptions {
+                max_response_header_bytes: 64 * 1024,
+                ..defaults
+            },
+            HttpRangeOptions {
+                socket_buffer_bytes: 32 * 1024,
+                ..defaults
+            },
+            HttpRangeOptions {
+                connect_timeout: Duration::from_secs(1),
+                ..defaults
+            },
+            HttpRangeOptions {
+                request_timeout: Duration::from_secs(1),
+                ..defaults
+            },
+            HttpRangeOptions {
+                max_redirects: 0,
+                ..defaults
+            },
+            HttpRangeOptions {
+                network_access: HttpNetworkAccess::AllowPrivateNetworks,
+                ..defaults
+            },
+        ] {
+            assert!(client.range_agent(options).is_none());
+        }
+        // Response/source bounds are enforced by the range input itself.
+        assert!(
+            client
+                .range_agent(HttpRangeOptions {
+                    staging_max_bytes: 1024,
+                    max_source_bytes: 1024,
+                    max_retries: 0,
+                    ..defaults
+                })
+                .is_some()
+        );
+        let routed = crate::RemoteHttpClient::with_route_policy(
+            crate::RemoteHttpOptions::default(),
+            Arc::new(NoRoute),
+        )
+        .unwrap();
+        assert!(routed.range_agent(defaults).is_none());
+    }
 
     #[test]
     fn public_address_policy_denies_special_ranges() {

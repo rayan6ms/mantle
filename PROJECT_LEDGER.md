@@ -101,3 +101,25 @@ Tests also cover stale/invalid metadata, exact-offset truncated-body recovery,
 changed validators, cancellation, oversized streaming and real Opus/AAC replay.
 No encoder, bitrate, pacing or read-ahead setting changes. Live qualification is
 recorded by Raydio's startup audit; controlled latency is not an Oracle promise.
+
+# Completed range connections and shared media transport (2026-10-02)
+
+The range reader dropped ureq's length-delimited body after its last payload
+read, before the EOF read that finalizes and returns the socket to its pool.
+An HTTP keep-alive regression reproduced three connections for three staged
+objects even with a shared agent. Finalizing each fully consumed response now
+allows one connection; incomplete/failed bodies still close normally. Finite
+YouTube media also shares the manager's existing bounded non-routed HTTP pool
+only when header/buffer limits, timeouts, redirects and network access match.
+Routed/custom transports retain their independent policy. No new client, cache,
+worker, dependency, codec, gain or buffering policy is introduced.
+
+The 3 x 4 MiB, 20 ms/connect fixture measured separate clients at 152.927 ms
+versus pooled at 108.237 ms (three versus one connection), with identical bytes.
+Full media tests and all-target Clippy pass. Oracle same-video source probes
+returned identical 12,460 Opus packets on all five opens; separate-manager opens
+took 4.684/4.185 s and shared-manager opens 3.742/3.219/3.490 s. External
+network/cache variation was uncontrolled, so these source-only samples establish
+preservation and a reuse opportunity, not a guaranteed fresh Discord startup.
+Credential-free opening logs now separate response setup from complete staging.
+Raydio records deployment and live qualification in its startup audit.

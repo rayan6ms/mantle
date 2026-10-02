@@ -1985,6 +1985,13 @@ pub struct YoutubeAudioSourceManager {
 }
 
 impl YoutubeAudioSourceManager {
+    pub(crate) fn media_range_agent(
+        &self,
+        options: crate::HttpRangeOptions,
+    ) -> Option<ureq::Agent> {
+        self.http.range_agent(options)
+    }
+
     fn attach_cookies(
         &self,
         request: RemoteHttpRequest,
