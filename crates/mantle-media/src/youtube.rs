@@ -3171,7 +3171,11 @@ impl YoutubeAudioSourceManager {
             .filter(|client| supports(*client))
         {
             attempted = true;
-            match load(client) {
+            let result = load(client);
+            if std::env::var_os("MANTLE_DEBUG_YOUTUBE").is_some() {
+                eprintln!("youtube collection client={client:?} result={result:?}");
+            }
+            match result {
                 Ok(result) => return Ok(result),
                 Err(error) if error.kind == YoutubeErrorKind::Cancelled => return Err(error),
                 Err(error) => final_error = error,
