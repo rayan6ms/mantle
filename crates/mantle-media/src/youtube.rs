@@ -2913,9 +2913,15 @@ impl YoutubeAudioSourceManager {
         let api_result = self.load_collection_with_clients(YoutubeClientKind::supports_search, |client| {
             self.load_search_with_client(query, client, cancellation)
         });
+        if std::env::var_os("MANTLE_DEBUG_YOUTUBE").is_some() {
+            eprintln!("youtube search api_result={api_result:?}");
+        }
         match api_result {
             Ok(Some(result)) => Ok(Some(result)),
             Ok(None) if self.authentication.cookies.is_some() => {
+                if std::env::var_os("MANTLE_DEBUG_YOUTUBE").is_some() {
+                    eprintln!("youtube search browser fallback");
+                }
                 self.load_search_watch_page(query, cancellation)
             }
             Ok(None) => Ok(None),
@@ -2971,13 +2977,17 @@ impl YoutubeAudioSourceManager {
         let request =
             self.data_request(&self.options.api_base_url, "search", client, fields, None)?;
         let bytes = self.execute_data_request(&request, cancellation)?;
-        parse_search_response(
+        let result = parse_search_response(
             &bytes,
             query,
             self.options.max_search_results,
             self.options.max_metadata_string_bytes,
             self.options.max_thumbnails,
-        )
+        );
+        if std::env::var_os("MANTLE_DEBUG_YOUTUBE").is_some() {
+            eprintln!("youtube search client={client:?} result={result:?}");
+        }
+        result
     }
 
     fn load_music_search(
@@ -4805,6 +4815,16 @@ fn push_bounded_track(
 #[cfg(test)]
 mod live_player_script_tests {
     use super::{YoutubeSourceOptions, parse_youtube_cipher_program};
+
+    #[test]
+    fn debug_live_search_page_parser() {
+        let bytes = std::fs::read("/tmp/raydio-search-akcent-auth.html").unwrap();
+        let json = super::extract_watch_initial_data(&bytes, 4 * 1024 * 1024).unwrap();
+        let encoded = serde_json::to_vec(&json).unwrap();
+        let parsed = super::parse_search_response(&encoded, "akcent", 100, 64 * 1024, 64).unwrap();
+        println!("parsed={:?}", parsed.as_ref().map(|p| p.tracks.len()));
+        assert!(parsed.is_some());
+    }
 
     #[test]
     #[ignore = "requires MANTLE_YOUTUBE_PLAYER_SCRIPT_PATH from the bounded live validator"]
