@@ -73,6 +73,9 @@ pub struct HttpRangeOptions {
     /// larger objects retain ordinary range streaming. Maximum 64 MiB.
     /// Available on Unix; nonzero values are rejected on other platforms.
     pub staging_max_bytes: u64,
+    /// Optional metadata length, checked against the server's Content-Range total.
+    /// Stageable objects can use it to avoid a preliminary range request.
+    pub expected_source_bytes: Option<u64>,
     pub range_window_bytes: usize,
     pub max_source_bytes: u64,
     pub max_response_header_bytes: usize,
@@ -88,6 +91,7 @@ impl Default for HttpRangeOptions {
     fn default() -> Self {
         Self {
             staging_max_bytes: 0,
+            expected_source_bytes: None,
             range_window_bytes: 256 * 1024,
             max_source_bytes: 64 * 1024 * 1024 * 1024,
             max_response_header_bytes: 32 * 1024,
@@ -121,6 +125,14 @@ impl HttpRangeOptions {
         if self.max_source_bytes == 0 {
             return Err(MediaError::InvalidHttpOptions(
                 "max_source_bytes must be non-zero",
+            ));
+        }
+        if self
+            .expected_source_bytes
+            .is_some_and(|length| length == 0 || length > self.max_source_bytes)
+        {
+            return Err(MediaError::InvalidHttpOptions(
+                "expected_source_bytes must be within the source limit",
             ));
         }
         if self.max_response_header_bytes < 1024 {
@@ -298,15 +310,18 @@ impl HttpRangeInput {
             self.active = None;
             return Ok(());
         }
-        // After the bounded probe establishes the total length, staging consumes
-        // the complete remainder anyway. Avoid a request round trip for each
-        // streaming window without buffering the body on the heap. Recovery
-        // below still caps retries to the interrupted response's original end.
-        let window = if self.source_len != 0 && self.source_len <= self.options.staging_max_bytes {
-            self.source_len.saturating_sub(self.position)
-        } else {
-            u64::try_from(self.options.range_window_bytes).unwrap_or(u64::MAX)
-        };
+        // A metadata length can avoid the probe, but the response must confirm
+        // that length below before staging accepts any bytes. Otherwise use the
+        // bounded probe, followed by the complete stageable remainder. Recovery
+        // still caps retries to the interrupted response's original end.
+        let stage_len = (self.source_len != 0)
+            .then_some(self.source_len)
+            .or(self.options.expected_source_bytes)
+            .filter(|length| *length <= self.options.staging_max_bytes);
+        let window = stage_len.map_or_else(
+            || u64::try_from(self.options.range_window_bytes).unwrap_or(u64::MAX),
+            |length| length.saturating_sub(self.position),
+        );
         let requested_end = self
             .position
             .saturating_add(window.saturating_sub(1))
@@ -374,6 +389,15 @@ impl HttpRangeInput {
             return Err(invalid_response(format_args!(
                 "HTTP source length {} is outside the configured limit {}",
                 parsed.total, self.options.max_source_bytes
+            )));
+        }
+        if self
+            .options
+            .expected_source_bytes
+            .is_some_and(|length| length != parsed.total)
+        {
+            return Err(invalid_response(format_args!(
+                "HTTP source length does not match metadata"
             )));
         }
         if self.source_len != 0 && parsed.total != self.source_len {

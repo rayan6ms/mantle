@@ -741,6 +741,168 @@ fn staged_open_avoids_per_window_network_round_trips() {
 
 #[test]
 #[cfg(unix)]
+fn known_length_staging_skips_the_probe_and_preserves_exact_bytes() {
+    let bytes = vec![19_u8; 4 * 1024 * 1024];
+    let expected = bytes.clone();
+    let server = ReplayServer::start(move |request, _| {
+        thread::sleep(Duration::from_millis(20));
+        partial_response(&request, &bytes, Some("\"stable\""))
+    });
+    let started = std::time::Instant::now();
+    let mut input = HttpRangeInput::open(
+        server.url("known-length-staging-latency"),
+        HttpRangeOptions {
+            staging_max_bytes: expected.len() as u64,
+            expected_source_bytes: Some(expected.len() as u64),
+            network_access: HttpNetworkAccess::AllowPrivateNetworks,
+            ..HttpRangeOptions::default()
+        },
+    )
+    .unwrap();
+    let elapsed = started.elapsed();
+    let requests = server.requests();
+    eprintln!(
+        "known-length staging 4 MiB, 20 ms/request: {} requests, {:.3} ms startup",
+        requests.len(),
+        elapsed.as_secs_f64() * 1000.0
+    );
+    drop(server);
+    let mut actual = Vec::new();
+    input.read_to_end(&mut actual).unwrap();
+    assert_eq!(actual, expected);
+    assert_eq!(requests.len(), 1, "validated metadata avoids the probe");
+    assert_eq!(requests[0].range, Some((0, 4 * 1024 * 1024 - 1)));
+}
+
+#[test]
+#[cfg(unix)]
+fn known_length_staging_rejects_stale_metadata_and_invalid_limits() {
+    let server = ReplayServer::start(|request, _| {
+        partial_response(&request, &vec![7; 100_000], Some("\"stable\""))
+    });
+    for length in [99_999, 100_001] {
+        assert!(
+            HttpRangeInput::open(
+                server.url("stale-length"),
+                HttpRangeOptions {
+                    staging_max_bytes: 200_000,
+                    expected_source_bytes: Some(length),
+                    ..private_test_options()
+                },
+            )
+            .is_err()
+        );
+    }
+    assert_eq!(server.requests().len(), 2);
+    for length in [0, 200_001] {
+        assert!(
+            HttpRangeInput::open(
+                server.url("invalid-length"),
+                HttpRangeOptions {
+                    staging_max_bytes: 200_000,
+                    max_source_bytes: 200_000,
+                    expected_source_bytes: Some(length),
+                    ..private_test_options()
+                },
+            )
+            .is_err()
+        );
+    }
+    assert_eq!(server.requests().len(), 2, "invalid bounds precede I/O");
+}
+
+#[test]
+#[cfg(unix)]
+fn known_length_staging_recovers_exact_offset_and_rejects_changed_identity() {
+    let expected: Vec<_> = (0..100_000)
+        .map(|n| u8::try_from(n % 251).unwrap())
+        .collect();
+    for changed in [false, true] {
+        let bytes = expected.clone();
+        let server = ReplayServer::start(move |request, count| {
+            let tag = if changed && count != 0 {
+                "\"changed\""
+            } else {
+                "\"stable\""
+            };
+            let mut response = partial_response(&request, &bytes, Some(tag));
+            if count == 0 {
+                response.declared_length = Some(response.body.len());
+                response.body.truncate(17);
+            }
+            response
+        });
+        let result = HttpRangeInput::open(
+            server.url("known-length-recovery"),
+            HttpRangeOptions {
+                staging_max_bytes: 100_000,
+                expected_source_bytes: Some(100_000),
+                ..private_test_options()
+            },
+        );
+        if changed {
+            assert!(result.is_err());
+        } else {
+            let mut input = result.unwrap();
+            let mut actual = Vec::new();
+            input.read_to_end(&mut actual).unwrap();
+            assert_eq!(actual, expected);
+        }
+        assert_eq!(
+            server
+                .requests()
+                .iter()
+                .map(|r| r.range.unwrap())
+                .collect::<Vec<_>>(),
+            [(0, 99_999), (17, 99_999)]
+        );
+    }
+}
+
+#[test]
+#[cfg(unix)]
+fn known_length_staging_observes_cancellation_and_preserves_oversized_streaming() {
+    let cancellation = MediaCancellation::new();
+    let cancel = cancellation.clone();
+    let server = ReplayServer::start(move |request, _| {
+        cancel.cancel();
+        partial_response(&request, &vec![7; 100_000], Some("\"stable\""))
+    });
+    let options = HttpRangeOptions {
+        staging_max_bytes: 100_000,
+        expected_source_bytes: Some(100_000),
+        ..private_test_options()
+    };
+    assert!(
+        HttpRangeInput::open_with_cancellation(server.url("cancel"), options, cancellation)
+            .is_err()
+    );
+    assert_eq!(server.requests().len(), 1);
+    let server = ReplayServer::start(|request, _| {
+        partial_response(&request, &vec![7; 100_000], Some("\"stable\""))
+    });
+    let mut input = HttpRangeInput::open(
+        server.url("streaming"),
+        HttpRangeOptions {
+            staging_max_bytes: 50_000,
+            ..options
+        },
+    )
+    .unwrap();
+    assert_eq!(server.requests()[0].range, Some((0, 32_767)));
+    assert_eq!(
+        server.requests().len(),
+        1,
+        "oversized object must not stage"
+    );
+    let mut actual = Vec::new();
+    input.read_to_end(&mut actual).unwrap();
+    assert_eq!(actual, vec![7; 100_000]);
+    assert_eq!(server.requests().len(), 4);
+}
+
+#[test]
+#[cfg(unix)]
 fn staged_remainder_recovers_at_consumed_offset_and_rejects_changed_objects() {
     let bytes = vec![23_u8; 100_000];
     let expected = bytes.clone();

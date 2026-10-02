@@ -3219,12 +3219,18 @@ fn staged_playback_reopens_after_eof_without_network_or_previous_cancellation() 
                 &formats,
                 HttpRangeOptions {
                     staging_max_bytes: bytes.len() as u64,
+                    range_window_bytes: 17,
                     ..private_range_options()
                 },
                 MediaLimits::default(),
                 first_cancel.clone(),
             )
             .unwrap();
+        assert_eq!(
+            media.requests().len(),
+            1,
+            "metadata avoids the staging probe"
+        );
         drop(media);
         drop(api);
         let mut output = EncodedFrameSlot::new();

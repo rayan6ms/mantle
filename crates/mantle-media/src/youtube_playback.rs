@@ -261,6 +261,12 @@ impl YoutubeAudioSourceManager {
         let resolved = self
             .resolve_selected_playback_url(formats, &cancellation)
             .map_err(map_source_error)?;
+        let range_options = HttpRangeOptions {
+            expected_source_bytes: range_options
+                .expected_source_bytes
+                .or(selected.content_length()),
+            ..range_options
+        };
         let input = HttpRangeInput::open_with_cancellation(
             resolved.as_str(),
             range_options,
@@ -328,6 +334,12 @@ impl YoutubeAudioSourceManager {
         let resolved = self
             .resolve_selected_playback_url(formats, &cancellation)
             .map_err(map_source_error)?;
+        let range_options = HttpRangeOptions {
+            expected_source_bytes: range_options
+                .expected_source_bytes
+                .or(selected.content_length()),
+            ..range_options
+        };
         let input = HttpRangeInput::open_routed_with_cancellation(
             resolved.as_str(),
             range_options,

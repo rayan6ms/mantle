@@ -83,3 +83,21 @@ Companion endpoint. Raw InnerTube/watch responses retain normal deciphering;
 unresolved Companion signatures are rejected and fall through to another client.
 The regression failed before the fix; it now returns the exact URL without any
 player-script request. Existing raw-cipher and media handoff tests still pass.
+
+# Metadata-length staging (2026-10-02)
+
+After the Companion correction, Oracle spent 10.455 seconds opening a 4.17 MB
+Opus object. A bounded same-route curl probe attributed 1.775 seconds to its
+preliminary 256 KiB request. Finite YouTube metadata already supplies the size.
+`HttpRangeOptions::expected_source_bytes` now validates that size against the
+server's Content-Range and lets stageable objects use one full range immediately.
+Missing lengths retain the probe, oversized objects retain windowed streaming,
+and the existing anonymous file, 64 KiB copy buffer, deadlines and recovery remain.
+
+The regression failed before optimization with two requests / 70.886 ms. An
+isolated 4 MiB, 20 ms/request comparison measured two requests / 71.390 ms versus
+one / 50.263 ms, with exact staged bytes available after the origin shuts down.
+Tests also cover stale/invalid metadata, exact-offset truncated-body recovery,
+changed validators, cancellation, oversized streaming and real Opus/AAC replay.
+No encoder, bitrate, pacing or read-ahead setting changes. Live qualification is
+recorded by Raydio's startup audit; controlled latency is not an Oracle promise.
