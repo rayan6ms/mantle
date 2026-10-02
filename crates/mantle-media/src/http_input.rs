@@ -13,8 +13,7 @@ use ureq::http::header::{
 use ureq::http::{HeaderMap, HeaderName, Uri};
 use ureq::unversioned::resolver::{DefaultResolver, ResolvedSocketAddrs, Resolver};
 use ureq::unversioned::transport::{
-    Buffers, Connector, DefaultConnector, Either, LazyBuffers, NextTimeout, RustlsConnector,
-    Transport,
+    Buffers, Connector, Either, LazyBuffers, NextTimeout, RustlsConnector, Transport,
 };
 use ureq::{Agent, BodyReader, Error as UreqError, Proxy, ResponseExt};
 
@@ -73,6 +72,10 @@ pub struct HttpRangeOptions {
     /// larger objects retain ordinary range streaming. Maximum 64 MiB.
     /// Available on Unix; nonzero values are rejected on other platforms.
     pub staging_max_bytes: u64,
+    /// Begin playback after this prefix is cached, then download the remainder
+    /// concurrently. Zero retains complete staging. Requires staging, Unix,
+    /// and a prefix between 16 KiB and 1 MiB, no larger than the staging bound.
+    pub progressive_buffer_bytes: u64,
     /// Optional metadata length, checked against the server's Content-Range total.
     /// Stageable objects can use it to avoid a preliminary range request.
     pub expected_source_bytes: Option<u64>,
@@ -91,6 +94,7 @@ impl Default for HttpRangeOptions {
     fn default() -> Self {
         Self {
             staging_max_bytes: 0,
+            progressive_buffer_bytes: 0,
             expected_source_bytes: None,
             range_window_bytes: 256 * 1024,
             max_source_bytes: 64 * 1024 * 1024 * 1024,
@@ -115,6 +119,14 @@ impl HttpRangeOptions {
         if self.staging_max_bytes > 64 * 1024 * 1024 {
             return Err(MediaError::InvalidHttpOptions(
                 "staging_max_bytes must not exceed 64 MiB",
+            ));
+        }
+        if self.progressive_buffer_bytes != 0
+            && (!(16 * 1024..=1024 * 1024).contains(&self.progressive_buffer_bytes)
+                || self.progressive_buffer_bytes > self.staging_max_bytes)
+        {
+            return Err(MediaError::InvalidHttpOptions(
+                "progressive prefix must be 16 KiB..1 MiB and fit the staging bound",
             ));
         }
         if self.range_window_bytes == 0 {
@@ -166,15 +178,82 @@ impl HttpRangeOptions {
 pub struct HttpRangeInput {
     agent: Agent,
     uri: Uri,
-    options: HttpRangeOptions,
+    pub(crate) options: HttpRangeOptions,
     position: u64,
     source_len: u64,
     active: Option<ActiveRange>,
     body_retries: u32,
     recovery: Option<(Instant, u64)>,
-    staged: Option<File>,
+    staged: Option<CachedHttpInput>,
     validator: Option<Validator>,
-    cancellation: MediaCancellation,
+    pub(crate) cancellation: MediaCancellation,
+}
+
+pub(crate) enum CachedHttpInput {
+    Complete(File),
+    #[cfg(unix)]
+    Progressive(crate::progressive_input::ProgressiveInput),
+}
+impl CachedHttpInput {
+    pub(crate) fn try_clone(&self) -> io::Result<Self> {
+        match self {
+            Self::Complete(file) => file.try_clone().map(Self::Complete),
+            #[cfg(unix)]
+            Self::Progressive(input) => Ok(Self::Progressive(input.try_clone())),
+        }
+    }
+    pub(crate) fn set_cancellation(&mut self, cancellation: MediaCancellation) {
+        #[cfg(unix)]
+        if let Self::Progressive(input) = self {
+            input.set_cancellation(cancellation);
+        }
+        #[cfg(not(unix))]
+        let _ = cancellation;
+    }
+}
+impl Read for CachedHttpInput {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        match self {
+            Self::Complete(file) => file.read(buffer),
+            #[cfg(unix)]
+            Self::Progressive(input) => input.read(buffer),
+        }
+    }
+}
+impl Seek for CachedHttpInput {
+    fn seek(&mut self, target: SeekFrom) -> io::Result<u64> {
+        match self {
+            Self::Complete(file) => file.seek(target),
+            #[cfg(unix)]
+            Self::Progressive(input) => input.seek(target),
+        }
+    }
+}
+impl MediaInput for CachedHttpInput {
+    fn is_seekable(&self) -> bool {
+        true
+    }
+    fn byte_len(&self) -> Option<u64> {
+        match self {
+            Self::Complete(file) => file.metadata().ok().map(|metadata| metadata.len()),
+            #[cfg(unix)]
+            Self::Progressive(input) => input.byte_len(),
+        }
+    }
+    fn buffered_prefix_bytes(&self) -> Option<u64> {
+        match self {
+            Self::Complete(_) => None,
+            #[cfg(unix)]
+            Self::Progressive(input) => input.buffered_prefix_bytes(),
+        }
+    }
+    fn clone_buffered_input(&self) -> Option<Box<dyn MediaInput>> {
+        match self {
+            Self::Complete(_) => None,
+            #[cfg(unix)]
+            Self::Progressive(input) => input.clone_buffered_input(),
+        }
+    }
 }
 
 impl HttpRangeInput {
@@ -268,6 +347,30 @@ impl HttpRangeInput {
         let response_elapsed = opened_at.elapsed();
         let staging_at = Instant::now();
         if input.source_len <= input.options.staging_max_bytes {
+            #[cfg(unix)]
+            if input.options.progressive_buffer_bytes != 0 {
+                let mut cached = Self {
+                    agent: input.agent.clone(),
+                    uri: input.uri.clone(),
+                    options: input.options,
+                    position: 0,
+                    source_len: input.source_len,
+                    active: None,
+                    body_retries: 0,
+                    recovery: None,
+                    staged: None,
+                    validator: input.validator.clone(),
+                    cancellation: input.cancellation.clone(),
+                };
+                let prefix = input.options.progressive_buffer_bytes;
+                cached.staged = Some(CachedHttpInput::Progressive(
+                    crate::progressive_input::ProgressiveInput::start(input, prefix)?,
+                ));
+                input = cached;
+            } else {
+                input.stage()?;
+            }
+            #[cfg(not(unix))]
             input.stage()?;
         }
         log::info!(target: "mantle_media::startup",
@@ -279,10 +382,10 @@ impl HttpRangeInput {
 
     // Duplicate only the handle, not the compressed bytes. The consumer must
     // drop the active reader before seeking the shared file cursor for replay.
-    pub(crate) fn clone_staged_file(&self) -> Result<Option<File>, MediaError> {
+    pub(crate) fn clone_cached_input(&self) -> Result<Option<CachedHttpInput>, MediaError> {
         self.staged
             .as_ref()
-            .map(File::try_clone)
+            .map(CachedHttpInput::try_clone)
             .transpose()
             .map_err(MediaError::Io)
     }
@@ -315,7 +418,7 @@ impl HttpRangeInput {
         self.cancellation.check_io()?;
         file.seek(SeekFrom::Start(0))?;
         self.position = 0;
-        self.staged = Some(file);
+        self.staged = Some(CachedHttpInput::Complete(file));
         Ok(())
     }
 
@@ -464,7 +567,7 @@ impl HttpRangeInput {
 }
 
 #[cfg(unix)]
-fn staging_file() -> io::Result<File> {
+pub(crate) fn staging_file() -> io::Result<File> {
     use std::fs::OpenOptions;
     use std::os::unix::fs::OpenOptionsExt;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -857,6 +960,16 @@ impl MediaInput for HttpRangeInput {
     fn byte_len(&self) -> Option<u64> {
         Some(self.source_len)
     }
+    fn buffered_prefix_bytes(&self) -> Option<u64> {
+        self.staged
+            .as_ref()
+            .and_then(MediaInput::buffered_prefix_bytes)
+    }
+    fn clone_buffered_input(&self) -> Option<Box<dyn MediaInput>> {
+        self.staged
+            .as_ref()
+            .and_then(MediaInput::clone_buffered_input)
+    }
 }
 
 struct ActiveRange {
@@ -1117,10 +1230,19 @@ fn create_agent_with_route_policy_and_proxy(
         proxy_authority,
     };
     if let Some(policy) = route_policy {
-        let connector = ().chain(RoutedTcpConnector { policy }).chain(RustlsConnector::default());
+        let connector =
+            ().chain(RoutedTcpConnector { policy })
+                .chain(RustlsConnector::default())
+                .chain(BodyCancellationConnector);
         Agent::with_parts(config, connector, resolver)
     } else {
-        Agent::with_parts(config, DefaultConnector::default(), resolver)
+        Agent::with_parts(
+            config,
+            ().chain(crate::bounded_proxy::BoundedSocksConnector)
+                .chain(RustlsConnector::default())
+                .chain(BodyCancellationConnector),
+            resolver,
+        )
     }
 }
 
@@ -1128,12 +1250,100 @@ fn create_agent_with_route_policy_and_proxy(
 ///
 /// The process sets this only for source traffic (`RAYDIO_YOUTUBE_PROXY`). Discord gateway and
 /// voice traffic use separate clients and are unaffected. HTTP CONNECT, HTTPS CONNECT, and
-/// SOCKS4/4A/5 URLs are supported by ureq; SOCKS support is compiled in explicitly above.
+/// SOCKS4/4A/5 URLs use the bounded connector; CONNECT proxies use ureq's transport.
 fn configured_proxy() -> Option<Proxy> {
     std::env::var("RAYDIO_YOUTUBE_PROXY")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .and_then(|value| Proxy::new(value.trim()).ok())
+}
+
+// Cancellation is request-local to the blocking downloader, never retained on
+// a pooled transport. Ordinary users of the same source agent keep their exact
+// timeout behavior. A short body poll is retried internally, not reported as a
+// failed HTTP range or spliced into a new response.
+thread_local! {
+    static BODY_CANCELLATION: std::cell::RefCell<Option<MediaCancellation>> = const { std::cell::RefCell::new(None) };
+}
+pub(crate) fn with_body_cancellation<T>(signal: MediaCancellation, work: impl FnOnce() -> T) -> T {
+    struct Reset(Option<MediaCancellation>);
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            BODY_CANCELLATION.with(|value| {
+                value.replace(self.0.take());
+            });
+        }
+    }
+    let previous = BODY_CANCELLATION.with(|value| value.replace(Some(signal)));
+    let _reset = Reset(previous);
+    work()
+}
+pub(crate) fn check_body_cancellation() -> io::Result<()> {
+    BODY_CANCELLATION.with(|value| {
+        value
+            .borrow()
+            .as_ref()
+            .map_or(Ok(()), MediaCancellation::check_io)
+    })
+}
+#[derive(Debug)]
+struct BodyCancellationConnector;
+impl<T: Transport> Connector<T> for BodyCancellationConnector {
+    type Out = BodyCancellationTransport<T>;
+    fn connect(
+        &self,
+        _: &ureq::unversioned::transport::ConnectionDetails<'_>,
+        chained: Option<T>,
+    ) -> Result<Option<Self::Out>, UreqError> {
+        Ok(chained.map(BodyCancellationTransport))
+    }
+}
+#[derive(Debug)]
+struct BodyCancellationTransport<T>(T);
+impl<T: Transport> Transport for BodyCancellationTransport<T> {
+    fn buffers(&mut self) -> &mut dyn Buffers {
+        self.0.buffers()
+    }
+    fn transmit_output(&mut self, amount: usize, timeout: NextTimeout) -> Result<(), UreqError> {
+        self.0.transmit_output(amount, timeout)
+    }
+    fn await_input(&mut self, timeout: NextTimeout) -> Result<bool, UreqError> {
+        let signal = BODY_CANCELLATION.with(|value| value.borrow().clone());
+        let Some(signal) = signal else {
+            return self.0.await_input(timeout);
+        };
+        let started = Instant::now();
+        let total = timeout.not_zero().map(|duration| *duration);
+        loop {
+            signal.check_io()?;
+            let remaining = total.map(|total| total.saturating_sub(started.elapsed()));
+            if remaining.is_some_and(|left| left.is_zero()) {
+                return Err(UreqError::Timeout(timeout.reason));
+            }
+            let poll = remaining.map_or(Duration::from_millis(100), |left| {
+                left.min(Duration::from_millis(100))
+            });
+            let short = NextTimeout {
+                after: poll.into(),
+                reason: timeout.reason,
+            };
+            match self.0.await_input(short) {
+                Err(UreqError::Timeout(_)) => {}
+                Err(UreqError::Io(error))
+                    if matches!(
+                        error.kind(),
+                        io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock
+                    ) => {}
+                result => return result,
+            }
+        }
+    }
+    fn is_open(&mut self) -> bool {
+        self.0.is_open()
+    }
+    fn is_tls(&self) -> bool {
+        self.0.is_tls()
+    }
 }
 
 #[derive(Debug)]
@@ -1368,7 +1578,19 @@ fn sanitize_ureq_error(error: &UreqError) -> io::Error {
 }
 
 fn sanitize_body_error(error: &io::Error) -> io::Error {
-    io::Error::new(error.kind(), "HTTP range body read failed")
+    // ureq represents its deadlines as io::ErrorKind::Other containing a
+    // typed Timeout. Preserve the safe class so recovery/diagnostics can
+    // distinguish a deadline from an arbitrary body failure.
+    let kind = if error
+        .get_ref()
+        .and_then(|inner| inner.downcast_ref::<UreqError>())
+        .is_some_and(|inner| matches!(inner, UreqError::Timeout(_)))
+    {
+        io::ErrorKind::TimedOut
+    } else {
+        error.kind()
+    };
+    io::Error::new(kind, "HTTP range body read failed")
 }
 
 #[derive(Clone, Debug)]
@@ -1457,6 +1679,208 @@ fn is_public_address(address: IpAddr) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn bounded_proxy_retains_socks4_and_numeric_socks5_support() {
+        use std::net::TcpListener;
+        for (protocol, host, kind) in [
+            ("socks4", "8.8.8.8", 1),
+            ("socks4a", "youtube.invalid", 3),
+            ("socks5", "8.8.8.8", 1),
+            ("socks5", "[2001:4860:4860::8888]", 4),
+        ] {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let proxy =
+                Proxy::new(&format!("{protocol}://{}", listener.local_addr().unwrap())).unwrap();
+            let peer = std::thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(3)))
+                    .unwrap();
+                if protocol.starts_with("socks4") {
+                    let mut request = [0; 9];
+                    stream.read_exact(&mut request).unwrap();
+                    assert_eq!(&request[..4], &[4, 1, 0, 80]);
+                    assert_eq!(request[8], 0);
+                    if kind == 3 {
+                        assert_eq!(&request[4..8], &[0, 0, 0, 1]);
+                        let mut domain = Vec::new();
+                        loop {
+                            let mut byte = [0];
+                            stream.read_exact(&mut byte).unwrap();
+                            if byte[0] == 0 {
+                                break;
+                            }
+                            domain.push(byte[0]);
+                            assert!(domain.len() <= 255);
+                        }
+                        assert_eq!(domain, b"youtube.invalid");
+                    } else {
+                        assert_eq!(&request[4..8], &[8, 8, 8, 8]);
+                    }
+                    stream.write_all(&[0, 90, 0, 80, 8, 8, 8, 8]).unwrap();
+                } else {
+                    let mut greeting = [0; 3];
+                    stream.read_exact(&mut greeting).unwrap();
+                    assert_eq!(greeting, [5, 1, 0]);
+                    stream.write_all(&[5, 0]).unwrap();
+                    let mut head = [0; 4];
+                    stream.read_exact(&mut head).unwrap();
+                    assert_eq!(head, [5, 1, 0, kind]);
+                    let mut destination = vec![0; if kind == 4 { 18 } else { 6 }];
+                    stream.read_exact(&mut destination).unwrap();
+                    assert_eq!(&destination[destination.len() - 2..], &[0, 80]);
+                    stream.write_all(&[5, 0, 0, 1, 0, 0, 0, 0, 0, 80]).unwrap();
+                }
+                let mut request = Vec::new();
+                while !request.ends_with(b"\r\n\r\n") && request.len() < 16384 {
+                    let mut byte = [0];
+                    stream.read_exact(&mut byte).unwrap();
+                    request.push(byte[0]);
+                }
+                stream
+                    .write_all(
+                        b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\nokay",
+                    )
+                    .unwrap();
+            });
+            let agent = create_agent_with_route_policy_and_proxy(
+                16384,
+                16384,
+                Duration::from_secs(2),
+                Duration::from_secs(2),
+                0,
+                HttpNetworkAccess::PublicInternetOnly,
+                None,
+                Some(proxy),
+            );
+            let response = agent.get(format!("http://{host}/source")).call().unwrap();
+            let mut bytes = Vec::new();
+            response
+                .into_body()
+                .into_reader()
+                .read_to_end(&mut bytes)
+                .unwrap();
+            assert_eq!(bytes, b"okay");
+            peer.join().unwrap();
+        }
+    }
+
+    #[test]
+    fn bounded_socks_auth_remote_dns_and_http_pool_preserve_bytes() {
+        use std::net::TcpListener;
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let proxy = Proxy::new(&format!(
+            "socks5h://user:pass@{}",
+            listener.local_addr().unwrap()
+        ))
+        .unwrap();
+        let peer = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(3)))
+                .unwrap();
+            stream
+                .set_write_timeout(Some(Duration::from_secs(3)))
+                .unwrap();
+            let mut greeting = [0; 3];
+            stream.read_exact(&mut greeting).unwrap();
+            assert_eq!(greeting, [5, 1, 2]);
+            stream.write_all(&[5, 2]).unwrap();
+            let mut auth = [0; 11];
+            stream.read_exact(&mut auth).unwrap();
+            assert_eq!(auth, *b"\x01\x04user\x04pass");
+            stream.write_all(&[1, 0]).unwrap();
+            let mut head = [0; 5];
+            stream.read_exact(&mut head).unwrap();
+            assert_eq!(&head[..4], &[5, 1, 0, 3]);
+            let mut destination = vec![0; usize::from(head[4]) + 2];
+            stream.read_exact(&mut destination).unwrap();
+            assert_eq!(&destination[..destination.len() - 2], b"youtube.invalid");
+            assert_eq!(&destination[destination.len() - 2..], &80_u16.to_be_bytes());
+            // Reply with a domain bound address and fragment its header.
+            stream.write_all(&[5, 0]).unwrap();
+            stream
+                .write_all(&[0, 3, 3, b'p', b'o', b'p', 0, 80])
+                .unwrap();
+            for _ in 0..3 {
+                let mut request = Vec::new();
+                while !request.ends_with(b"\r\n\r\n") && request.len() < 16384 {
+                    let mut byte = [0];
+                    stream.read_exact(&mut byte).unwrap();
+                    request.push(byte[0]);
+                }
+                assert!(request.ends_with(b"\r\n\r\n"));
+                stream.write_all(b"HTTP/1.1 206 Partial Content\r\nContent-Length: 4\r\nContent-Range: bytes 0-3/4\r\n\r\n\x09\x08\x07\x06").unwrap();
+            }
+        });
+        let options = HttpRangeOptions {
+            staging_max_bytes: 4096,
+            expected_source_bytes: Some(4),
+            ..HttpRangeOptions::default()
+        };
+        let agent = create_agent_with_route_policy_and_proxy(
+            options.max_response_header_bytes,
+            options.socket_buffer_bytes,
+            options.connect_timeout,
+            options.request_timeout,
+            options.max_redirects,
+            options.network_access,
+            None,
+            Some(proxy),
+        );
+        for _ in 0..3 {
+            let mut input = HttpRangeInput::open_with_agent(
+                "http://youtube.invalid/source",
+                options,
+                MediaCancellation::new(),
+                agent.clone(),
+            )
+            .unwrap();
+            let mut bytes = Vec::new();
+            input.read_to_end(&mut bytes).unwrap();
+            assert_eq!(bytes, [9, 8, 7, 6]);
+        }
+        peer.join().unwrap();
+    }
+
+    #[test]
+    fn socks_handshake_timeout_does_not_wait_for_the_proxy_to_close() {
+        use std::net::TcpListener;
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let proxy = Proxy::new(&format!("socks5h://{}", listener.local_addr().unwrap())).unwrap();
+        let peer = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut greeting = [0; 3];
+            stream.read_exact(&mut greeting).unwrap();
+            assert_eq!(greeting, [5, 1, 0]);
+            // Longer than the client's actual deadline, but always bounded so
+            // this regression cannot leave a stuck fixture thread behind.
+            std::thread::sleep(Duration::from_millis(700));
+        });
+        let agent = create_agent_with_route_policy_and_proxy(
+            16384,
+            16384,
+            Duration::from_millis(200),
+            Duration::from_millis(250),
+            0,
+            HttpNetworkAccess::PublicInternetOnly,
+            None,
+            Some(proxy),
+        );
+        let started = Instant::now();
+        assert!(agent.get("https://youtube.invalid/source").call().is_err());
+        let elapsed = started.elapsed();
+        peer.join().unwrap();
+        eprintln!(
+            "SOCKS handshake deadline=200 ms observed={:.3} ms",
+            elapsed.as_secs_f64() * 1000.0
+        );
+        assert!(
+            elapsed < Duration::from_millis(500),
+            "proxy handshake exceeded deadline: {elapsed:?}"
+        );
+    }
+
     use std::net::{Ipv4Addr, Ipv6Addr};
 
     use super::*;

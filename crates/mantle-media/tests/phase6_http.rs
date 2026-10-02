@@ -949,6 +949,58 @@ fn staged_remainder_recovers_at_consumed_offset_and_rejects_changed_objects() {
 
 #[test]
 #[cfg(unix)]
+fn progressive_remainder_recovers_and_never_splices_a_changed_entity() {
+    for changed in [false, true] {
+        let expected = vec![23; 100_000];
+        let bytes = expected.clone();
+        let server = ReplayServer::start(move |request, count| {
+            let mut response = partial_response(
+                &request,
+                &bytes,
+                Some(if changed && count > 1 {
+                    "\"changed\""
+                } else {
+                    "\"stable\""
+                }),
+            );
+            if count == 1 {
+                response.declared_length = Some(response.body.len());
+                response.body.truncate(17);
+            }
+            response
+        });
+        let mut input = HttpRangeInput::open(
+            server.url("progressive-recovery"),
+            HttpRangeOptions {
+                staging_max_bytes: 100_000,
+                progressive_buffer_bytes: 16 * 1024,
+                ..private_test_options()
+            },
+        )
+        .unwrap();
+        let mut actual = Vec::new();
+        let result = input.read_to_end(&mut actual);
+        if changed {
+            assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::InvalidData);
+            assert_eq!(actual, expected[..actual.len()]);
+            assert!(actual.len() < expected.len());
+        } else {
+            result.unwrap();
+            assert_eq!(actual, expected);
+        }
+        assert_eq!(
+            server
+                .requests()
+                .iter()
+                .map(|r| r.range.unwrap())
+                .collect::<Vec<_>>(),
+            [(0, 32_767), (32_768, 99_999), (32_785, 99_999)]
+        );
+    }
+}
+
+#[test]
+#[cfg(unix)]
 fn staged_ranges_read_and_seek_after_the_origin_is_gone() {
     use std::io::{Seek, SeekFrom};
     let bytes = (0..100_000)

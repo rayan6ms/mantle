@@ -33,12 +33,15 @@ const MAX_EBML_INSPECTION_BYTES: usize = 128 * 1024;
 
 mod bandcamp;
 mod beam;
+mod bounded_proxy;
 mod getyarn;
 mod hls;
 mod http_input;
 mod mpeg_ts;
 mod niconico;
 mod playlist;
+#[cfg(unix)]
+mod progressive_input;
 mod remote_http;
 mod soundcloud;
 mod source;
@@ -217,6 +220,18 @@ impl MediaLimits {
 pub trait MediaInput: Read + Seek + Send + Sync {
     fn is_seekable(&self) -> bool;
     fn byte_len(&self) -> Option<u64>;
+    /// Contiguous bytes already cached by a progressive source, if applicable.
+    /// Optional metadata inspection must not fetch beyond this prefix. Reads
+    /// and explicit seeks still wait for real bytes under the input's policy.
+    fn buffered_prefix_bytes(&self) -> Option<u64> {
+        None
+    }
+    /// An independent reader of the same bounded progressive cache, if any.
+    /// Used to build deferred seek indexes without replacing an active session
+    /// until opening and seeking the replacement succeeds.
+    fn clone_buffered_input(&self) -> Option<Box<dyn MediaInput>> {
+        None
+    }
 }
 
 impl MediaInput for File {
@@ -641,6 +656,7 @@ impl From<io::Error> for MediaError {
 /// A probed audio track with a private, replaceable backend implementation.
 pub struct MediaSession {
     format: Box<dyn FormatReader>,
+    deferred_seek_input: Option<Box<dyn MediaInput>>,
     pending_packets: VecDeque<symphonia::core::packet::Packet>,
     decoder: Option<PcmDecoder>,
     decoder_params: symphonia::core::codecs::audio::AudioCodecParameters,
@@ -701,6 +717,7 @@ impl MediaSession {
     ///
     /// Returns [`MediaError::Cancelled`] when cancellation is requested before or during probing,
     /// in addition to the errors from [`Self::open`].
+    #[allow(clippy::too_many_lines)] // Cohesive probe/codec/session initialization.
     pub fn open_with_cancellation(
         input: Box<dyn MediaInput>,
         extension_hint: Option<&str>,
@@ -715,6 +732,7 @@ impl MediaSession {
             ebml_metadata,
             adts_config,
             id3_metadata,
+            deferred_seek_input,
         } = probe_media_input(input, extension_hint, limits, &cancellation)?;
 
         let container = map_container(
@@ -790,6 +808,7 @@ impl MediaSession {
 
         Ok(Self {
             format,
+            deferred_seek_input,
             pending_packets,
             decoder,
             decoder_params: params,
@@ -938,6 +957,27 @@ impl MediaSession {
                 "media input is not seekable",
             )));
         }
+        if let Some(input) = &self.deferred_seek_input
+            && let Some(mut cached) = input.clone_buffered_input()
+        {
+            // Explicit seeks may require the optional tail index. Finish
+            // the existing download without another source request, then
+            // open a fresh indexed reader. Keep self intact on failure.
+            if let Some(len) = cached.byte_len().filter(|len| *len > 0) {
+                cached.seek(SeekFrom::Start(len - 1))?;
+                cached.read_exact(&mut [0])?;
+            }
+            cached.seek(SeekFrom::Start(0))?;
+            let mut replacement = Self::open_with_cancellation(
+                cached,
+                Some("webm"),
+                self.limits,
+                self.cancellation.clone(),
+            )?;
+            let result = replacement.seek(requested)?;
+            *self = replacement;
+            return Ok(result);
+        }
         let total_nanos =
             u64::try_from(requested.as_nanos().min(i64::MAX as u128)).unwrap_or(u64::MAX);
         let result = self
@@ -992,6 +1032,7 @@ impl MediaSession {
 
 struct ProbedMedia {
     format: Box<dyn FormatReader>,
+    deferred_seek_input: Option<Box<dyn MediaInput>>,
     seekable: bool,
     ebml_metadata: Option<EbmlMetadata>,
     adts_config: Option<AdtsConfig>,
@@ -1667,7 +1708,14 @@ fn probe_media_input(
         None
     };
     let probe_state = Arc::new(ProbeState::new(limits.max_probe_bytes));
+    let deferred_seek_input = ebml_metadata
+        .as_ref()
+        .and_then(|_| clone_growing_input(input.as_ref()));
     let source = Box::new(InputAdapter {
+        // Matroska/WebM probes eagerly seek optional tail cues/tags on a
+        // seekable source. Defer those seeks while this cache is growing;
+        // the same source remains seekable for explicit playback controls.
+        defer_metadata_seeks: deferred_seek_input.is_some(),
         input,
         probe_state: Arc::clone(&probe_state),
         cancellation: cancellation.clone(),
@@ -1699,6 +1747,7 @@ fn probe_media_input(
     match probed {
         Ok(format) => Ok(ProbedMedia {
             format,
+            deferred_seek_input,
             seekable,
             ebml_metadata,
             adts_config,
@@ -1711,6 +1760,13 @@ fn probe_media_input(
         }
         Err(error) => Err(backend_error("probe", &error)),
     }
+}
+
+fn clone_growing_input(input: &dyn MediaInput) -> Option<Box<dyn MediaInput>> {
+    if input.buffered_prefix_bytes()? >= input.byte_len()? {
+        return None;
+    }
+    input.clone_buffered_input()
 }
 
 #[derive(Clone, Copy)]
@@ -1899,6 +1955,9 @@ fn inspect_ebml_metadata(
         .unwrap_or(usize::MAX)
         .min(usize::try_from(max_probe_bytes).unwrap_or(usize::MAX))
         .min(MAX_EBML_INSPECTION_BYTES);
+    let inspection_bytes = inspection_bytes.min(
+        usize::try_from(input.buffered_prefix_bytes().unwrap_or(u64::MAX)).unwrap_or(usize::MAX),
+    );
     let mut header = vec![0_u8; inspection_bytes];
     let mut read = 0;
     while read < header.len() {
@@ -2262,6 +2321,7 @@ impl ProbeState {
 
 struct InputAdapter {
     input: Box<dyn MediaInput>,
+    defer_metadata_seeks: bool,
     probe_state: Arc<ProbeState>,
     cancellation: MediaCancellation,
 }
@@ -2307,6 +2367,7 @@ impl Seek for InputAdapter {
 impl SymphoniaMediaSource for InputAdapter {
     fn is_seekable(&self) -> bool {
         self.input.is_seekable()
+            && !(self.defer_metadata_seeks && self.probe_state.active.load(Ordering::Acquire))
     }
 
     fn byte_len(&self) -> Option<u64> {

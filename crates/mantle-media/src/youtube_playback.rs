@@ -108,7 +108,7 @@ pub struct YoutubePlaybackSession {
 /// Obtain it by consuming a completed staged playback session. Dropping it
 /// releases storage; reopening never contacts the source network.
 pub struct StagedPlaybackInput {
-    file: std::fs::File,
+    input: crate::http_input::CachedHttpInput,
     kind: YoutubePlaybackFormatKind,
     limits: MediaLimits,
 }
@@ -125,12 +125,13 @@ impl StagedPlaybackInput {
     ) -> Result<YoutubePlaybackSession, YoutubePlaybackError> {
         use std::io::{Seek, SeekFrom};
         cancellation.check().map_err(map_media_error)?;
-        self.file
+        self.input.set_cancellation(cancellation.clone());
+        self.input
             .seek(SeekFrom::Start(0))
             .map_err(MediaError::Io)
             .map_err(map_media_error)?;
         let input = self
-            .file
+            .input
             .try_clone()
             .map_err(MediaError::Io)
             .map_err(map_media_error)?;
@@ -294,10 +295,10 @@ impl YoutubeAudioSourceManager {
             ));
         }
         let staged_input = input
-            .clone_staged_file()
+            .clone_cached_input()
             .map_err(map_media_error)?
-            .map(|file| StagedPlaybackInput {
-                file,
+            .map(|input| StagedPlaybackInput {
+                input,
                 kind,
                 limits: media_limits,
             });
@@ -368,10 +369,10 @@ impl YoutubeAudioSourceManager {
             ));
         }
         let staged_input = input
-            .clone_staged_file()
+            .clone_cached_input()
             .map_err(map_media_error)?
-            .map(|file| StagedPlaybackInput {
-                file,
+            .map(|input| StagedPlaybackInput {
+                input,
                 kind,
                 limits: media_limits,
             });

@@ -31,9 +31,9 @@ deny_summary="$(jq -cs '[.[] | select(.type == "summary")][0].fields' "$RESULT_R
 duplicate_warnings="$(jq -cs '[.[] | select(.type == "diagnostic" and .fields.code == "duplicate")]|length' "$RESULT_ROOT/cargo-deny.jsonl")"
 fully_audited="$(jq -r '.vetted_fully|length' "$RESULT_ROOT/cargo-vet.json")"
 exempted="$(jq -r '.vetted_with_exemptions|length' "$RESULT_ROOT/cargo-vet.json")"
-imports="$(rg -c '^\[imports\.' supply-chain/config.toml)"
-safe_to_deploy="$(rg -c 'criteria = "safe-to-deploy"' supply-chain/config.toml)"
-safe_to_run="$(rg -c 'criteria = "safe-to-run"' supply-chain/config.toml)"
+imports="$(rg -c '^\[imports\.' supply-chain/config.toml || printf '0\n')"
+safe_to_deploy="$(rg -c 'criteria = "safe-to-deploy"' supply-chain/config.toml || printf '0\n')"
+safe_to_run="$(rg -c 'criteria = "safe-to-run"' supply-chain/config.toml || printf '0\n')"
 
 jq -n \
   --arg rust "$rust_version" \

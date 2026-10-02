@@ -123,3 +123,28 @@ network/cache variation was uncontrolled, so these source-only samples establish
 preservation and a reuse opportunity, not a guaranteed fresh Discord startup.
 Credential-free opening logs now separate response setup from complete staging.
 Raydio records deployment and live qualification in its startup audit.
+
+# Progressive finite cache (2026-10-02)
+
+Raydio's current Oracle baseline spent 4.716 s downloading a finite 4.17 MB
+source before playback. An opt-in bounded prefix now starts an owned downloader
+and returns when the prefix exists; complete caching continues with existing
+validation, deadline and retry policies. Complete cached repeats remain offline.
+The controlled gated-source comparison is 404.266 versus 2.154 ms to open,
+with identical bytes. A real WebM regression exposed eager optional metadata
+reads/tail indexes; these are deferred during growing-cache startup. Explicit
+seek completes and indexes the same cache transactionally, preserving the old
+session on failure. Body deadline errors also retain their typed TimedOut class
+instead of being incorrectly sanitized to Other. Bounds, lifecycle, seek,
+truncation, cancellation, retry/validator and exact AAC/Opus output regressions
+are documented in `docs/architecture/ADR-PROGRESSIVE-FINITE-CACHE.md`. Live
+qualification is Raydio's responsibility; this does not eliminate downstream
+packet loss or guarantee uninterrupted playback on an indefinitely slow origin.
+
+The same proxy audit reproduced a 200 ms SOCKS deadline returning only after
+the mock peer closed at 701.061 ms. Ureq's scoped helper joined unbounded socket
+I/O. SOCKS setup now uses its ordinary pooled TCP transport directly under the
+shared deadline, without a helper thread; protocol/auth/DNS/IPv6 and pool byte
+preservation regressions pass. The unused upstream SOCKS dependency closure is
+removed. The advisory gate also required Rustls 0.23.45 and WebPKI 0.103.15;
+reviewed deltas are recorded in Cargo Vet, without advisory exemptions.

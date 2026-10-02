@@ -373,6 +373,12 @@ criteria = "safe-to-deploy"
 version = "0.23.43"
 notes = "Reviewed for Mantle 1.0 as part of the cryptographic/TLS dependency surface, including unsafe and platform-specific implementations, build behavior, and the bounded rustls/HTTP call paths. Exact source is Cargo.lock-bound. See ADR-0028 and the publication Cargo Vet closure contract."
 
+[[audits.rustls]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+delta = "0.23.43 -> 0.23.45"
+notes = "Reviewed registry source delta against existing audit: handshake alignment update after message extraction closes RUSTSEC-2026-0285; retry/PSK and signature validation tighten rejection; OCSP nonempty validation and keylog file owner permissions improve checks; key material is zeroized. Ring-backed TLS remains the configured deployed provider. AWS-LC ML-DSA wrappers delegate to provider validation, with checked output size. No new unsafe block or build behavior in this delta. Exact checksum is locked; live proxy/TLS handoff remains part of Raydio qualification."
+
 [[audits.rustls-pki-types]]
 who = "OpenAI Codex for Mantle <noreply@openai.com>"
 criteria = "safe-to-deploy"
@@ -384,6 +390,12 @@ who = "OpenAI Codex for Mantle <noreply@openai.com>"
 criteria = "safe-to-deploy"
 version = "0.103.13"
 notes = "Reviewed for Mantle 1.0 as part of the cryptographic/TLS dependency surface, including unsafe and platform-specific implementations, build behavior, and the bounded rustls/HTTP call paths. Exact source is Cargo.lock-bound. See ADR-0028 and the publication Cargo Vet closure contract."
+
+[[audits.rustls-webpki]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+delta = "0.103.13 -> 0.103.15"
+notes = "Reviewed registry source delta against existing audit: CRL serial loop preserves error propagation, AWS-LC ML-DSA exports move from unstable to provider APIs, with unchanged checked verification wrapper and public-key algorithm matching. Ring-backed certificate verification used by Mantle is unchanged. No new unsafe code or platform build execution in this delta; exact registry checksum is locked."
 
 [[audits.rustversion]]
 who = "OpenAI Codex for Mantle <noreply@openai.com>"

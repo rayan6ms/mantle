@@ -1,9 +1,9 @@
-# Current task: bounded finite-source staging for Raydio
+# Current task: progressive finite-source buffering for Raydio
 
-- [x] Measure Oracle compressed input: streamed max 244.864 ms versus staged 0.957 ms; startup 0.603 versus 2.286 seconds, 3.27 MiB anonymous file.
-- [x] Implement opt-in size-bounded anonymous-file staging using the existing HTTP policies and cancellation.
-- [x] Verify full validation, staging cancellation/errors, seek after origin shutdown, oversized fallback, default streaming, and resource ceilings.
-- [x] Run media regressions, formatting, Clippy, and supply-chain checks; record new dependency decision.
-- [ ] Integrate and repeat real Raydio playback before any reliability claim.
-
-- [x] Reopen staged compressed input with a fresh demuxer/decoder and cancellation token; verify exact Opus/AAC output after EOF and origin shutdown.
+- [x] Measure complete-stage Oracle startup and reproduce the delayed-remainder bottleneck.
+- [x] Implement opt-in prefix buffering with bounded owned workers/cache and joined cancellation.
+- [x] Preserve range validation, retries, deadlines, proxy transport and cached repeat.
+- [x] Reproduce and fix eager WebM metadata/tail-index waits, preserving explicit seeks atomically.
+- [x] Verify exact Opus/AAC output, failures, cancellation/drop and storage/resource bounds.
+- [x] Complete media release checks: 241 tests passed, eight existing manual fixtures ignored; Clippy and advisory/license/vet audits pass.
+- [ ] Complete Raydio's live Oracle qualification before a live improvement claim.

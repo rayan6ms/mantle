@@ -3200,10 +3200,105 @@ fn serve_media_range(mut stream: TcpStream, bytes: &[u8], requests: &Mutex<Vec<(
 
 #[test]
 #[cfg(unix)]
+fn progressive_opus_handoff_delivers_a_real_frame_before_the_remainder_arrives() {
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::sync::mpsc;
+    let bytes = fs::read(media_fixture("tone-opus.webm")).unwrap();
+    let length = bytes.len();
+    let prefix = 16 * 1024;
+    assert!(length > prefix);
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}/progressive", listener.local_addr().unwrap());
+    let (release, gate) = mpsc::channel();
+    let origin = thread::spawn(move || {
+        let (mut socket, _) = listener.accept().unwrap();
+        socket
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        socket
+            .set_write_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        let mut request = Vec::new();
+        while !request.ends_with(b"\r\n\r\n") && request.len() < 16384 {
+            let mut byte = [0];
+            socket.read_exact(&mut byte).unwrap();
+            request.push(byte[0]);
+        }
+        write!(socket, "HTTP/1.1 206 Partial Content\r\nContent-Length: {length}\r\nContent-Range: bytes 0-{}/{length}\r\nConnection: close\r\n\r\n", length-1).unwrap();
+        socket.write_all(&bytes[..prefix]).unwrap();
+        if gate.recv_timeout(Duration::from_secs(3)).is_ok() {
+            let _ = socket.write_all(&bytes[prefix..]);
+        }
+    });
+    let response = playback_response(&url, "audio/webm; codecs=\"opus\"", length);
+    let api = ReplayServer::start(move |_, _| ReplayResponse::json(&response));
+    let manager = playback_manager(&api);
+    let formats = manager
+        .discover_playback_formats("dQw4w9WgXcQ", &MediaCancellation::new())
+        .unwrap();
+    let (first, received) = mpsc::channel();
+    let reader = thread::spawn(move || {
+        let mut playback = manager
+            .open_selected_playback(
+                &formats,
+                HttpRangeOptions {
+                    staging_max_bytes: length as u64,
+                    progressive_buffer_bytes: prefix as u64,
+                    ..private_range_options()
+                },
+                MediaLimits::default(),
+                MediaCancellation::new(),
+            )
+            .unwrap();
+        let mut frame = EncodedFrameSlot::new();
+        assert!(playback.read_frame(&mut frame).unwrap());
+        first.send(frame.data().to_vec()).unwrap();
+        assert!(playback.info().seekable);
+        let mut packets = vec![(frame.timestamp(), frame.data().to_vec())];
+        assert!(playback.seek(Duration::from_mins(10)).is_err());
+        // Drain and validate the same input after the gate opens.
+        while playback.read_frame(&mut frame).unwrap() {
+            assert!(packets.len() < 1000);
+            packets.push((frame.timestamp(), frame.data().to_vec()));
+        }
+        playback.seek(Duration::ZERO).unwrap();
+        assert!(playback.read_frame(&mut frame).unwrap());
+        packets
+    });
+    let early = received.recv_timeout(Duration::from_millis(750));
+    release.send(()).unwrap();
+    let packets = reader.join().unwrap();
+    origin.join().unwrap();
+    let actual = early.expect("demux/probe must not wait for the complete WebM source");
+    let local =
+        MediaSession::open_file(media_fixture("tone-opus.webm"), MediaLimits::default()).unwrap();
+    let mut reference = YoutubePlaybackSession::from_probed_media_session(local).unwrap();
+    let mut frame = EncodedFrameSlot::new();
+    assert!(reference.read_frame(&mut frame).unwrap());
+    assert_eq!(actual, frame.data());
+    let mut expected = vec![(frame.timestamp(), frame.data().to_vec())];
+    while reference.read_frame(&mut frame).unwrap() {
+        expected.push((frame.timestamp(), frame.data().to_vec()));
+    }
+    assert_eq!(
+        packets, expected,
+        "every Opus packet and timestamp must match"
+    );
+}
+
+#[test]
+#[cfg(unix)]
 fn staged_playback_reopens_after_eof_without_network_or_previous_cancellation() {
-    for (fixture, mime) in [
-        ("tone-opus.webm", "audio/webm; codecs=\"opus\""),
-        ("tone-aac-lc.m4a", "audio/mp4; codecs=\"mp4a.40.2\""),
+    for (fixture, mime, prefix) in [
+        ("tone-opus.webm", "audio/webm; codecs=\"opus\"", 0),
+        ("tone-aac-lc.m4a", "audio/mp4; codecs=\"mp4a.40.2\"", 0),
+        ("tone-opus.webm", "audio/webm; codecs=\"opus\"", 16 * 1024),
+        (
+            "tone-aac-lc.m4a",
+            "audio/mp4; codecs=\"mp4a.40.2\"",
+            16 * 1024,
+        ),
     ] {
         let bytes = fs::read(media_fixture(fixture)).unwrap();
         let media = RangeMediaServer::start(bytes.clone());
@@ -3219,6 +3314,7 @@ fn staged_playback_reopens_after_eof_without_network_or_previous_cancellation() 
                 &formats,
                 HttpRangeOptions {
                     staging_max_bytes: bytes.len() as u64,
+                    progressive_buffer_bytes: prefix,
                     range_window_bytes: 17,
                     ..private_range_options()
                 },
