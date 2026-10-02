@@ -1018,6 +1018,16 @@ fn create_agent_with_route_policy_and_proxy(
     route_policy: Option<Arc<dyn OutboundRoutePolicy>>,
     proxy: Option<Proxy>,
 ) -> Agent {
+    // A configured source proxy is an explicitly trusted local sidecar in deployments such as
+    // the home-egress tunnel. Resolve and connect to that proxy even when the normal source
+    // policy rejects loopback/private destinations; the policy still filters any destination
+    // URI that is resolved directly by the agent.
+    let proxy_authority = proxy.as_ref().and_then(|proxy| {
+        proxy
+            .uri()
+            .authority()
+            .map(|authority| authority.as_str().to_owned())
+    });
     let config = Agent::config_builder()
         .proxy(proxy)
         .max_redirects(max_redirects)
@@ -1035,6 +1045,7 @@ fn create_agent_with_route_policy_and_proxy(
         .build();
     let resolver = PolicyResolver {
         access: network_access,
+        proxy_authority,
     };
     if let Some(policy) = route_policy {
         let connector = ().chain(RoutedTcpConnector { policy }).chain(RustlsConnector::default());
@@ -1291,9 +1302,10 @@ fn sanitize_body_error(error: &io::Error) -> io::Error {
     io::Error::new(error.kind(), "HTTP range body read failed")
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct PolicyResolver {
     access: HttpNetworkAccess,
+    proxy_authority: Option<String>,
 }
 
 impl Resolver for PolicyResolver {
@@ -1304,7 +1316,8 @@ impl Resolver for PolicyResolver {
         timeout: NextTimeout,
     ) -> Result<ResolvedSocketAddrs, UreqError> {
         let resolved = DefaultResolver::default().resolve(uri, config, timeout)?;
-        if self.access == HttpNetworkAccess::AllowPrivateNetworks {
+        let is_configured_proxy = self.is_configured_proxy(uri);
+        if self.access == HttpNetworkAccess::AllowPrivateNetworks || is_configured_proxy {
             return Ok(resolved);
         }
         let mut allowed = self.empty();
@@ -1318,6 +1331,15 @@ impl Resolver for PolicyResolver {
         } else {
             Ok(allowed)
         }
+    }
+}
+
+impl PolicyResolver {
+    fn is_configured_proxy(&self, uri: &Uri) -> bool {
+        self.proxy_authority.as_deref().is_some_and(|authority| {
+            uri.authority()
+                .is_some_and(|candidate| candidate.as_str() == authority)
+        })
     }
 }
 
@@ -1395,6 +1417,23 @@ mod tests {
         ))));
         assert!(is_public_address(IpAddr::V6(
             "2606:2800:220:1:248:1893:25c8:1946".parse().unwrap()
+        )));
+    }
+
+    #[test]
+    fn source_proxy_authority_is_the_only_private_exception() {
+        let resolver = PolicyResolver {
+            access: HttpNetworkAccess::PublicInternetOnly,
+            proxy_authority: Some("127.0.0.1:18080".to_owned()),
+        };
+        assert!(resolver.is_configured_proxy(&Uri::from_static(
+            "socks5://127.0.0.1:18080",
+        )));
+        assert!(!resolver.is_configured_proxy(&Uri::from_static(
+            "https://127.0.0.1:18081",
+        )));
+        assert!(!resolver.is_configured_proxy(&Uri::from_static(
+            "https://youtube.com",
         )));
     }
 

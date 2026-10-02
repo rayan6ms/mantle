@@ -41,3 +41,14 @@ session and retains one anonymous file handle, then opens fresh decoder/DSP
 state with independent cancellation. Exact Opus and AAC packets repeat after
 both source servers are dropped; old cancellation cannot poison the replay.
 YouTube suite now passes 39 tests with the same 3 environment/live exclusions.
+
+# Configured source-proxy policy fix (2026-10-01)
+
+`HttpNetworkAccess::PublicInternetOnly` was also applied to the loopback address
+of an explicitly configured SOCKS source proxy. The proxy handshake was therefore
+classified as `DestinationDenied`, so YouTube search and playlist control requests
+failed while Companion player requests (which bypass the proxy) still worked.
+The resolver now permits only the configured proxy authority as a private exception;
+directly resolved destination addresses remain subject to the public-address filter.
+Regression coverage verifies the authority match. Oracle probes now load search and
+playlist inputs successfully through the home egress.

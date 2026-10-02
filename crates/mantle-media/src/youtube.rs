@@ -2913,15 +2913,9 @@ impl YoutubeAudioSourceManager {
         let api_result = self.load_collection_with_clients(YoutubeClientKind::supports_search, |client| {
             self.load_search_with_client(query, client, cancellation)
         });
-        if std::env::var_os("MANTLE_DEBUG_YOUTUBE").is_some() {
-            eprintln!("youtube search api_result={api_result:?}");
-        }
         match api_result {
             Ok(Some(result)) => Ok(Some(result)),
             Ok(None) if self.authentication.cookies.is_some() => {
-                if std::env::var_os("MANTLE_DEBUG_YOUTUBE").is_some() {
-                    eprintln!("youtube search browser fallback");
-                }
                 self.load_search_watch_page(query, cancellation)
             }
             Ok(None) => Ok(None),
@@ -2977,17 +2971,13 @@ impl YoutubeAudioSourceManager {
         let request =
             self.data_request(&self.options.api_base_url, "search", client, fields, None)?;
         let bytes = self.execute_data_request(&request, cancellation)?;
-        let result = parse_search_response(
+        parse_search_response(
             &bytes,
             query,
             self.options.max_search_results,
             self.options.max_metadata_string_bytes,
             self.options.max_thumbnails,
-        );
-        if std::env::var_os("MANTLE_DEBUG_YOUTUBE").is_some() {
-            eprintln!("youtube search client={client:?} result={result:?}");
-        }
-        result
+        )
     }
 
     fn load_music_search(
@@ -3171,11 +3161,7 @@ impl YoutubeAudioSourceManager {
             .filter(|client| supports(*client))
         {
             attempted = true;
-            let result = load(client);
-            if std::env::var_os("MANTLE_DEBUG_YOUTUBE").is_some() {
-                eprintln!("youtube collection client={client:?} result={result:?}");
-            }
-            match result {
+            match load(client) {
                 Ok(result) => return Ok(result),
                 Err(error) if error.kind == YoutubeErrorKind::Cancelled => return Err(error),
                 Err(error) => final_error = error,
@@ -3193,16 +3179,10 @@ impl YoutubeAudioSourceManager {
         request: &RemoteHttpRequest,
         cancellation: &MediaCancellation,
     ) -> Result<Vec<u8>, YoutubeError> {
-        let result = self.http
+        self.http
             .execute_with_cancellation(request, cancellation)
             .map(|response| response.body().to_vec())
-            .map_err(|error| {
-                if std::env::var_os("MANTLE_DEBUG_YOUTUBE").is_some() {
-                    eprintln!("youtube data request error kind={:?} status={:?}", error.kind(), error.status_code());
-                }
-                map_remote_error(error)
-            });
-        result
+            .map_err(map_remote_error)
     }
 
     fn data_request(
@@ -4825,16 +4805,6 @@ fn push_bounded_track(
 #[cfg(test)]
 mod live_player_script_tests {
     use super::{YoutubeSourceOptions, parse_youtube_cipher_program};
-
-    #[test]
-    fn debug_live_search_page_parser() {
-        let bytes = std::fs::read("/tmp/raydio-search-akcent-auth.html").unwrap();
-        let json = super::extract_watch_initial_data(&bytes, 4 * 1024 * 1024).unwrap();
-        let encoded = serde_json::to_vec(&json).unwrap();
-        let parsed = super::parse_search_response(&encoded, "akcent", 100, 64 * 1024, 64).unwrap();
-        println!("parsed={:?}", parsed.as_ref().map(|p| p.tracks.len()));
-        assert!(parsed.is_some());
-    }
 
     #[test]
     #[ignore = "requires MANTLE_YOUTUBE_PLAYER_SCRIPT_PATH from the bounded live validator"]
