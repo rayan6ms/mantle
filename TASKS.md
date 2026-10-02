@@ -6,4 +6,5 @@
 - [x] Reproduce and fix eager WebM metadata/tail-index waits, preserving explicit seeks atomically.
 - [x] Verify exact Opus/AAC output, failures, cancellation/drop and storage/resource bounds.
 - [x] Complete media release checks: 241 tests passed, eight existing manual fixtures ignored; Clippy and advisory/license/vet audits pass.
-- [ ] Complete Raydio's live Oracle qualification before a live improvement claim.
+- [x] Measure live HTTPS/home-proxy startup: command-to-first-send 6.745 to 3.713 s; repeat/cache/source delivery remain healthy.
+- [ ] Establish a clean live no-degradation comparison; VM scheduling and a receiver ICE outage confounded the receiver samples.

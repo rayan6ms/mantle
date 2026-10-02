@@ -1,3 +1,20 @@
+# Progressive Oracle qualification (2026-10-02)
+
+The integrated Raydio 256 KiB prefix reduces command-to-first-successful-send
+from 6.745 to 3.713 s (44.95%) in one matched-source observation. Initial
+buffering falls from 4715.639 to 279.813 ms; sending begins 3.846 s before the
+4,167,934-byte downloader completes. The receiver recording starts afterward,
+so initial delivery is covered by sender evidence, not receiver PCM. Playback
+PSS median rises about 0.398 MiB. Two five-minute samples retain zero source
+underruns/overruns/send failures, natural cached repeats and intact RTP timelines.
+
+Live no-degradation is not established: the first sample has 247.75 versus
+79.6875 ms concealment, alongside four wake-delay gaps and 24% VM steal. The
+recheck has nine scheduling gaps with 34.742% steal plus a 14.767 s receiver
+ICE outage while Oracle sends normally. These are not reproduced cache stalls;
+no downstream-loss fix is claimed. Full observations/limits and safe evidence
+are in Raydio docs/PROGRESSIVE-BUFFERING-2026-10-02.md. Keep complete-stage rollback.
+
 # Filter continuity audit resolved (2026-09-10)
 
 Replacing a filter graph no longer resets decoded/resampled PCM, encoder state,
