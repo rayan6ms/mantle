@@ -62,7 +62,7 @@ RUSTSEC-2026-0285 found in the release audit; the locked WebPKI patch is 0.103.1
 
 Production progressive downloads that advanced about 32 KiB/s were cut off by
 the ordinary 30-second request deadline. Three successive objects cached only
-about 934–950 KiB of 12.6–14.1 MB and failed when playback exhausted those bytes.
+about 934–950 kB of 12.6–14.1 MB and failed when playback exhausted those bytes.
 A paced local origin reproduced a healthy transfer failing at 49,152 bytes.
 
 Progressive caching now has a separate total download budget, default 30 minutes
