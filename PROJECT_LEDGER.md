@@ -158,6 +158,19 @@ are documented in `docs/architecture/ADR-PROGRESSIVE-FINITE-CACHE.md`. Live
 qualification is Raydio's responsibility; this does not eliminate downstream
 packet loss or guarantee uninterrupted playback on an indefinitely slow origin.
 
+# Progressive transfer deadline correction (2026-10-03)
+
+Oracle playlist downloads made healthy forward progress but expired after 30s,
+then failed when the partial cache ran out; three failures stopped the queue.
+The local paced-origin regression reproduced TimedOut at 49,152 bytes. Progressive
+downloads now use one 30-minute total budget (bounded to one hour), retain a short
+body-inactivity/setup limit, and preserve the total deadline across recovery.
+Ureq 3.4.2 is required: 3.4.0 incorrectly enforced completed-phase timeouts during
+body reads even with a longer body budget. The identical healthy origin now
+finishes in about 0.7s with exact bytes. ADR-PROGRESSIVE-FINITE-CACHE documents
+dependency review and positive/negative regressions. Codec, prefix, buffer sizes,
+ordinary streaming and complete-stage policy remain unchanged.
+
 The same proxy audit reproduced a 200 ms SOCKS deadline returning only after
 the mock peer closed at 701.061 ms. Ureq's scoped helper joined unbounded socket
 I/O. SOCKS setup now uses its ordinary pooled TCP transport directly under the

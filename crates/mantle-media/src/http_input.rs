@@ -84,7 +84,11 @@ pub struct HttpRangeOptions {
     pub max_response_header_bytes: usize,
     pub socket_buffer_bytes: usize,
     pub connect_timeout: Duration,
+    /// Per-request deadline, and maximum body inactivity for a progressive cache.
     pub request_timeout: Duration,
+    /// Total lifetime of an eligible progressive download, including recovery.
+    /// Healthy body progress does not reset this bound. Must be at most one hour.
+    pub progressive_download_timeout: Duration,
     pub max_redirects: u32,
     pub max_retries: u32,
     pub network_access: HttpNetworkAccess,
@@ -102,6 +106,7 @@ impl Default for HttpRangeOptions {
             socket_buffer_bytes: 64 * 1024,
             connect_timeout: Duration::from_secs(10),
             request_timeout: Duration::from_secs(30),
+            progressive_download_timeout: Duration::from_mins(30),
             max_redirects: 5,
             max_retries: 1,
             network_access: HttpNetworkAccess::PublicInternetOnly,
@@ -167,6 +172,13 @@ impl HttpRangeOptions {
                 "request_timeout must be non-zero",
             ));
         }
+        if self.progressive_download_timeout.is_zero()
+            || self.progressive_download_timeout > Duration::from_hours(1)
+        {
+            return Err(MediaError::InvalidHttpOptions(
+                "progressive_download_timeout must be non-zero and at most one hour",
+            ));
+        }
         validate_request_counts(self.max_redirects, self.max_retries)?;
         Ok(self)
     }
@@ -184,6 +196,7 @@ pub struct HttpRangeInput {
     active: Option<ActiveRange>,
     body_retries: u32,
     recovery: Option<(Instant, u64)>,
+    pub(crate) progressive_deadline: Option<Instant>,
     staged: Option<CachedHttpInput>,
     validator: Option<Validator>,
     pub(crate) cancellation: MediaCancellation,
@@ -338,6 +351,7 @@ impl HttpRangeInput {
             active: None,
             body_retries: 0,
             recovery: None,
+            progressive_deadline: None,
             staged: None,
             validator: None,
             cancellation,
@@ -358,6 +372,7 @@ impl HttpRangeInput {
                     active: None,
                     body_retries: 0,
                     recovery: None,
+                    progressive_deadline: input.progressive_deadline,
                     staged: None,
                     validator: input.validator.clone(),
                     cancellation: input.cancellation.clone(),
@@ -458,13 +473,27 @@ impl HttpRangeInput {
         let agent = self.agent.clone();
         let uri = self.uri.clone();
         let validator = self.validator.clone();
-        let request_timeout = self
-            .recovery
-            .map_or(self.options.request_timeout, |(started, _)| {
-                self.options
-                    .request_timeout
-                    .saturating_sub(started.elapsed())
-            });
+        // A full progressive response may legitimately take longer than a
+        // small range request. Keep one total download deadline, plus a short
+        // inactivity timeout in the downloader's transport policy.
+        let progressive =
+            cfg!(unix) && self.options.progressive_buffer_bytes != 0 && stage_len.is_some();
+        let progressive_deadline = progressive.then(|| {
+            *self
+                .progressive_deadline
+                .get_or_insert_with(|| Instant::now() + self.options.progressive_download_timeout)
+        });
+        let request_timeout = progressive_deadline.map_or_else(
+            || {
+                self.recovery
+                    .map_or(self.options.request_timeout, |(started, _)| {
+                        self.options
+                            .request_timeout
+                            .saturating_sub(started.elapsed())
+                    })
+            },
+            |deadline| deadline.saturating_duration_since(Instant::now()),
+        );
         if request_timeout.is_zero() {
             return Err(io::Error::new(
                 io::ErrorKind::TimedOut,
@@ -473,6 +502,13 @@ impl HttpRangeInput {
         }
         let response = call_with_retries(
             || {
+                let budget = progressive_deadline.map_or(request_timeout, |deadline| {
+                    deadline.saturating_duration_since(Instant::now())
+                });
+                if budget.is_zero() {
+                    return Err(UreqError::Timeout(ureq::Timeout::Global));
+                }
+                let header_budget = self.options.request_timeout.min(budget);
                 let mut request = agent
                     .get(uri.clone())
                     .header(RANGE, range_value.as_str())
@@ -482,7 +518,11 @@ impl HttpRangeInput {
                 }
                 request
                     .config()
-                    .timeout_global(Some(request_timeout))
+                    .timeout_global(Some(budget))
+                    .timeout_resolve(Some(header_budget))
+                    .timeout_send_request(Some(header_budget))
+                    .timeout_recv_response(Some(header_budget))
+                    .timeout_recv_body(Some(budget))
                     .build()
                     .call()
             },
@@ -1262,11 +1302,20 @@ fn configured_proxy() -> Option<Proxy> {
 // a pooled transport. Ordinary users of the same source agent keep their exact
 // timeout behavior. A short body poll is retried internally, not reported as a
 // failed HTTP range or spliced into a new response.
-thread_local! {
-    static BODY_CANCELLATION: std::cell::RefCell<Option<MediaCancellation>> = const { std::cell::RefCell::new(None) };
+#[derive(Clone)]
+struct BodyReadPolicy {
+    signal: MediaCancellation,
+    idle_timeout: Duration,
 }
-pub(crate) fn with_body_cancellation<T>(signal: MediaCancellation, work: impl FnOnce() -> T) -> T {
-    struct Reset(Option<MediaCancellation>);
+thread_local! {
+    static BODY_CANCELLATION: std::cell::RefCell<Option<BodyReadPolicy>> = const { std::cell::RefCell::new(None) };
+}
+pub(crate) fn with_body_cancellation<T>(
+    signal: MediaCancellation,
+    idle_timeout: Duration,
+    work: impl FnOnce() -> T,
+) -> T {
+    struct Reset(Option<BodyReadPolicy>);
     impl Drop for Reset {
         fn drop(&mut self) {
             BODY_CANCELLATION.with(|value| {
@@ -1274,7 +1323,12 @@ pub(crate) fn with_body_cancellation<T>(signal: MediaCancellation, work: impl Fn
             });
         }
     }
-    let previous = BODY_CANCELLATION.with(|value| value.replace(Some(signal)));
+    let previous = BODY_CANCELLATION.with(|value| {
+        value.replace(Some(BodyReadPolicy {
+            signal,
+            idle_timeout,
+        }))
+    });
     let _reset = Reset(previous);
     work()
 }
@@ -1283,7 +1337,7 @@ pub(crate) fn check_body_cancellation() -> io::Result<()> {
         value
             .borrow()
             .as_ref()
-            .map_or(Ok(()), MediaCancellation::check_io)
+            .map_or(Ok(()), |policy| policy.signal.check_io())
     })
 }
 #[derive(Debug)]
@@ -1309,16 +1363,24 @@ impl<T: Transport> Transport for BodyCancellationTransport<T> {
     }
     fn await_input(&mut self, timeout: NextTimeout) -> Result<bool, UreqError> {
         let signal = BODY_CANCELLATION.with(|value| value.borrow().clone());
-        let Some(signal) = signal else {
+        let Some(policy) = signal else {
             return self.0.await_input(timeout);
         };
         let started = Instant::now();
-        let total = timeout.not_zero().map(|duration| *duration);
+        let original = timeout.not_zero().map(|duration| *duration);
+        let idle_limited = original.is_none_or(|duration| policy.idle_timeout < duration);
+        let total = Some(original.map_or(policy.idle_timeout, |duration| {
+            duration.min(policy.idle_timeout)
+        }));
         loop {
-            signal.check_io()?;
+            policy.signal.check_io()?;
             let remaining = total.map(|total| total.saturating_sub(started.elapsed()));
             if remaining.is_some_and(|left| left.is_zero()) {
-                return Err(UreqError::Timeout(timeout.reason));
+                return Err(UreqError::Timeout(if idle_limited {
+                    ureq::Timeout::RecvBody
+                } else {
+                    timeout.reason
+                }));
             }
             let poll = remaining.map_or(Duration::from_millis(100), |left| {
                 left.min(Duration::from_millis(100))

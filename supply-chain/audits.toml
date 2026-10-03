@@ -631,11 +631,23 @@ criteria = "safe-to-deploy"
 version = "3.4.0"
 notes = "Reviewed for Mantle 1.0 as part of the bounded network/protocol/archive data path, including unsafe, parsing, decompression, build, and code-generation surfaces where present. Resource limits, SSRF controls, fuzzing, and fault tests cover Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
 
+[[audits.ureq]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+delta = "3.4.0 -> 3.4.2"
+notes = "Reviewed the registry source delta: per-phase versus total deadline calculation and expiry; TLS handshake within connect deadline; conservative TLS/transport pool compatibility, unread-input pool rejection; bounded small-JSON buffering; address-specific connect fallback. No new build script, unsafe code or process execution. Mantle's socket-origin deadline, proxy, pooling and HTTP/source regressions exercise the deployed rustls path. See ADR-PROGRESSIVE-FINITE-CACHE (2026-10-03)."
+
 [[audits.ureq-proto]]
 who = "OpenAI Codex for Mantle <noreply@openai.com>"
 criteria = "safe-to-deploy"
 version = "0.6.1"
 notes = "Reviewed for Mantle 1.0 as part of the bounded network/protocol/archive data path, including unsafe, parsing, decompression, build, and code-generation surfaces where present. Resource limits, SSRF controls, fuzzing, and fault tests cover Mantle call paths. Exact source is Cargo.lock-bound. See ADR-0028."
+
+[[audits.ureq-proto]]
+who = "OpenAI Codex for Mantle <noreply@openai.com>"
+criteria = "safe-to-deploy"
+delta = "0.6.1 -> 0.6.4"
+notes = "Reviewed the registry source delta: all Content-Length values must parse as digits with identical lengths; list/case handling for connection headers; invalid status codes become errors rather than panics; partial header parsing retains empty values; network-path redirects replace authority; bounded ArrayVec helpers validate capacity. No new build script, unsafe code or process execution. Mantle retains stricter single range-length validation, network destination policy and byte limits; media HTTP/proxy/source regressions cover integration. See ADR-PROGRESSIVE-FINITE-CACHE (2026-10-03)."
 
 [[audits.utf8-zero]]
 who = "OpenAI Codex for Mantle <noreply@openai.com>"

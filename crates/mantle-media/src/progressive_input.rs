@@ -95,21 +95,27 @@ impl ProgressiveInput {
         input.cancellation = stop.clone();
         let worker_stop = stop.clone();
         let work = shared.clone();
-        let timeout = input.options.request_timeout;
+        let deadline = *input
+            .progressive_deadline
+            .get_or_insert_with(|| Instant::now() + input.options.progressive_download_timeout);
+        let idle_timeout = input.options.request_timeout;
         let worker = std::thread::Builder::new()
             .name("mantle-http-cache".into()).stack_size(256 * 1024)
             .spawn(move || {
                 let _slot = slot;
                 let started = Instant::now();
                 let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    crate::http_input::with_body_cancellation(worker_stop.clone(), || {
+                    crate::http_input::with_body_cancellation(worker_stop.clone(), idle_timeout, || {
                         let mut buffer = vec![0; COPY_BYTES];
                         loop {
                             worker_stop.check_io()?;
-                            if started.elapsed() >= timeout {
+                            if Instant::now() >= deadline {
                                 return Err(io::Error::new(io::ErrorKind::TimedOut, "progressive download deadline exceeded"));
                             }
                             let count = input.read(&mut buffer)?;
+                            if Instant::now() >= deadline {
+                                return Err(io::Error::new(io::ErrorKind::TimedOut, "progressive download deadline exceeded"));
+                            }
                             if count == 0 { break; }
                             writer.write_all(&buffer[..count])?;
                             // Synchronize the condition and notification to avoid
@@ -455,18 +461,185 @@ mod tests {
     }
 
     #[test]
-    fn preserves_request_deadline_and_empty_reads() {
+    fn stalled_body_preserves_inactivity_deadline_and_empty_reads() {
         let origin = Origin::new();
+        let started = Instant::now();
         let mut input = origin.open(MediaCancellation::new());
         assert_eq!(input.read(&mut []).unwrap(), 0);
         input.seek(SeekFrom::Start(PREFIX as u64)).unwrap();
         let error = input.read(&mut [0]).unwrap_err();
         assert_eq!(error.kind(), io::ErrorKind::TimedOut);
+        assert!(started.elapsed() < Duration::from_millis(2750));
         drop(origin);
+    }
+
+    // A real socket origin is needed here: phase timeouts and transport polling
+    // were both involved in the production failure. The optional first-body
+    // truncation forces exact-offset recovery under the same total budget.
+    fn paced_origin(recover: bool, header_delay: Duration) -> (String, JoinHandle<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let url = format!("http://{}/paced", listener.local_addr().unwrap());
+        let worker = std::thread::spawn(move || {
+            let started = Instant::now();
+            for response in 0..=usize::from(recover) {
+                let mut socket = loop {
+                    match listener.accept() {
+                        Ok((socket, _)) => break socket,
+                        Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                            if started.elapsed() > Duration::from_secs(3) {
+                                return;
+                            }
+                            std::thread::sleep(Duration::from_millis(5));
+                        }
+                        Err(error) => panic!("origin accept failed: {error}"),
+                    }
+                };
+                socket
+                    .set_read_timeout(Some(Duration::from_secs(2)))
+                    .unwrap();
+                socket
+                    .set_write_timeout(Some(Duration::from_secs(2)))
+                    .unwrap();
+                let mut request = Vec::new();
+                while !request.ends_with(b"\r\n\r\n") {
+                    let mut byte = [0];
+                    if socket.read(&mut byte).unwrap_or(0) != 1 {
+                        return;
+                    }
+                    request.push(byte[0]);
+                    assert!(request.len() <= 16384);
+                }
+                let request = String::from_utf8(request).unwrap().to_ascii_lowercase();
+                let range = request
+                    .lines()
+                    .find_map(|line| line.strip_prefix("range: bytes="))
+                    .unwrap();
+                let (start, end) = range.split_once('-').unwrap();
+                let start = start.parse::<usize>().unwrap();
+                let end = end.parse::<usize>().unwrap().min(LENGTH - 1);
+                assert_eq!(start, if response == 0 { 0 } else { 2 * PREFIX });
+                std::thread::sleep(header_delay);
+                if write!(socket, "HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nContent-Range: bytes {start}-{end}/{LENGTH}\r\nETag: \"stable\"\r\nConnection: close\r\n\r\n", end+1-start).is_err() { return; }
+                for offset in (start..=end).step_by(PREFIX) {
+                    if offset != start {
+                        std::thread::sleep(Duration::from_millis(100));
+                    }
+                    if recover && response == 0 && offset == 2 * PREFIX {
+                        break;
+                    }
+                    if socket
+                        .write_all(&bytes(offset, PREFIX.min(end + 1 - offset)))
+                        .is_err()
+                    {
+                        return;
+                    }
+                }
+            }
+        });
+        (url, worker)
+    }
+
+    fn paced_options() -> HttpRangeOptions {
+        HttpRangeOptions {
+            staging_max_bytes: LENGTH as u64,
+            progressive_buffer_bytes: PREFIX as u64,
+            expected_source_bytes: Some(LENGTH as u64),
+            request_timeout: Duration::from_millis(250),
+            max_retries: 0,
+            network_access: HttpNetworkAccess::AllowPrivateNetworks,
+            ..HttpRangeOptions::default()
+        }
+    }
+
+    #[test]
+    fn healthy_progressive_transfer_can_outlive_one_request_timeout() {
+        let (url, worker) = paced_origin(false, Duration::ZERO);
+        let opened = Instant::now();
+        let mut input = HttpRangeInput::open(&url, paced_options()).unwrap();
+        assert!(
+            opened.elapsed() < Duration::from_millis(250),
+            "startup must not await the whole source"
+        );
+        let mut whole = Vec::new();
+        let outcome = input.read_to_end(&mut whole);
+        worker.join().unwrap();
+        assert!(
+            outcome.is_ok(),
+            "healthy source was terminated: {outcome:?}, bytes={}",
+            whole.len()
+        );
+        assert_eq!(whole, bytes(0, LENGTH));
+        assert!(opened.elapsed() > Duration::from_millis(500));
+    }
+
+    #[test]
+    fn continuous_progress_does_not_reset_the_total_download_deadline() {
+        let (url, worker) = paced_origin(false, Duration::from_millis(100));
+        let opened = Instant::now();
+        let mut options = paced_options();
+        options.progressive_download_timeout = Duration::from_millis(450);
+        let mut input = HttpRangeInput::open(&url, options).unwrap();
+        let mut whole = Vec::new();
+        assert_eq!(
+            input.read_to_end(&mut whole).unwrap_err().kind(),
+            io::ErrorKind::TimedOut
+        );
+        assert!(opened.elapsed() < Duration::from_millis(700));
+        assert!(!whole.is_empty() && whole.len() < LENGTH);
+        assert_eq!(whole, bytes(0, whole.len()));
+        drop(input);
+        worker.join().unwrap();
+    }
+
+    #[test]
+    fn body_recovery_cannot_reset_the_total_download_deadline() {
+        let (url, worker) = paced_origin(true, Duration::from_millis(100));
+        let opened = Instant::now();
+        let mut options = paced_options();
+        options.max_retries = 1;
+        options.progressive_download_timeout = Duration::from_millis(550);
+        let mut input = HttpRangeInput::open(&url, options).unwrap();
+        let mut whole = Vec::new();
+        assert_eq!(
+            input.read_to_end(&mut whole).unwrap_err().kind(),
+            io::ErrorKind::TimedOut
+        );
+        assert!(opened.elapsed() < Duration::from_millis(750));
+        assert!(whole.len() > 2 * PREFIX && whole.len() < LENGTH);
+        assert_eq!(whole, bytes(0, whole.len()));
+        drop(input);
+        worker.join().unwrap();
+    }
+
+    #[test]
+    fn complete_staging_keeps_the_short_request_deadline() {
+        let (url, worker) = paced_origin(false, Duration::ZERO);
+        let mut options = paced_options();
+        options.progressive_buffer_bytes = 0;
+        let opened = Instant::now();
+        let result = HttpRangeInput::open(&url, options);
+        assert!(
+            matches!(result, Err(crate::MediaError::Io(ref error)) if error.kind() == io::ErrorKind::TimedOut)
+        );
+        assert!(opened.elapsed() < Duration::from_millis(750));
+        worker.join().unwrap();
     }
 
     #[test]
     fn rejects_invalid_progressive_bounds_before_network_access() {
+        for timeout in [Duration::ZERO, Duration::from_secs(3601)] {
+            assert!(matches!(
+                HttpRangeInput::open(
+                    "http://127.0.0.1:1/",
+                    HttpRangeOptions {
+                        progressive_download_timeout: timeout,
+                        ..HttpRangeOptions::default()
+                    }
+                ),
+                Err(crate::MediaError::InvalidHttpOptions(_))
+            ));
+        }
         for (limit, prefix) in [
             (0, PREFIX as u64),
             (LENGTH as u64, 1),
