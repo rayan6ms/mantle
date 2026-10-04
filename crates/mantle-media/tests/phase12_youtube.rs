@@ -396,6 +396,139 @@ fn tv_oauth_refresh_is_cached_rotated_and_scoped_to_player_requests() {
     }
 }
 
+#[test]
+fn shared_source_operations_cancel_waiters_without_canceling_owner() {
+    for script in [false, true] {
+        let (entered, started) = std::sync::mpsc::channel();
+        let release = Arc::new((Mutex::new(false), std::sync::Condvar::new()));
+        let server_release = release.clone();
+        let server = ReplayServer::start(move |request, _| {
+            if request.target == "/embed" || request.target == "/oauth/token" {
+                entered.send(()).unwrap();
+                let (lock, changed) = &*server_release;
+                let mut ready = lock.lock().unwrap();
+                while !*ready {
+                    ready = changed.wait(ready).unwrap();
+                }
+            }
+            match request.target.as_str() {
+                "/oauth/token" => ReplayResponse::json(
+                    br#"{"access_token":"fixture-access","token_type":"Bearer","expires_in":3600}"#,
+                ),
+                "/embed" => ReplayResponse::json(br#"{"jsUrl":"/s/player/fixture/base.js"}"#),
+                _ => ReplayResponse::json(b"var config={signatureTimestamp:12345};"),
+            }
+        });
+        let manager = Arc::new(
+            YoutubeAudioSourceManager::new(
+                YoutubeSourceOptions {
+                    oauth: YoutubeOAuthOptions {
+                        token_url: server.url("oauth/token"),
+                        ..YoutubeOAuthOptions::default()
+                    },
+                    player_embed_url: server.url("embed"),
+                    http: private_http_options(),
+                    ..YoutubeSourceOptions::default()
+                },
+                YoutubeAuthentication::with_refresh_token("fixture-refresh".into(), None, None)
+                    .unwrap(),
+            )
+            .unwrap(),
+        );
+        let operation = move |manager: &YoutubeAudioSourceManager, signal: &MediaCancellation| {
+            if script {
+                manager.acquire_player_script(signal).map(|_| ())
+            } else {
+                manager
+                    .refresh_oauth_access_token(false, signal)
+                    .map(|_| ())
+            }
+        };
+        let owner_manager = manager.clone();
+        let owner = thread::spawn(move || operation(&owner_manager, &MediaCancellation::new()));
+        started.recv_timeout(Duration::from_secs(1)).unwrap();
+        let (checked, observed) = std::sync::mpsc::channel();
+        let signal = MediaCancellation::linked(move || {
+            let _ = checked.send(());
+            false
+        });
+        let waiter_signal = signal.clone();
+        let waiter_manager = manager.clone();
+        let (done, completion) = std::sync::mpsc::channel();
+        let waiter = thread::spawn(move || {
+            done.send(operation(&waiter_manager, &waiter_signal).map_err(|error| error.kind()))
+                .unwrap();
+        });
+        observed.recv_timeout(Duration::from_secs(1)).unwrap();
+        signal.cancel();
+        let outcome = completion.recv_timeout(Duration::from_millis(150));
+        let survivor_manager = manager.clone();
+        let survivor =
+            thread::spawn(move || operation(&survivor_manager, &MediaCancellation::new()));
+        // Always unblock the fixture before asserting, including on regression.
+        *release.0.lock().unwrap() = true;
+        release.1.notify_all();
+        owner.join().unwrap().unwrap();
+        waiter.join().unwrap();
+        survivor.join().unwrap().unwrap();
+        assert_eq!(outcome.unwrap(), Err(YoutubeErrorKind::Cancelled));
+        operation(&manager, &MediaCancellation::new()).unwrap();
+        assert_eq!(server.requests().len(), if script { 2 } else { 1 });
+    }
+}
+
+#[test]
+fn failed_shared_source_owner_does_not_poison_the_next_acquisition() {
+    for script in [false, true] {
+        let server = ReplayServer::start(move |request, count| {
+            if count == 0 {
+                return ReplayResponse::json(b"invalid");
+            }
+            if request.target == "/embed" {
+                ReplayResponse::json(br#"{"jsUrl":"/s/player/fixture/base.js"}"#)
+            } else if script {
+                ReplayResponse::json(b"var config={signatureTimestamp:12345};")
+            } else {
+                ReplayResponse::json(
+                    br#"{"access_token":"fixture-access","token_type":"Bearer","expires_in":3600}"#,
+                )
+            }
+        });
+        let manager = YoutubeAudioSourceManager::new(
+            YoutubeSourceOptions {
+                oauth: YoutubeOAuthOptions {
+                    token_url: server.url("oauth/token"),
+                    ..YoutubeOAuthOptions::default()
+                },
+                player_embed_url: server.url("embed"),
+                http: private_http_options(),
+                ..YoutubeSourceOptions::default()
+            },
+            YoutubeAuthentication::with_refresh_token("fixture-refresh".into(), None, None)
+                .unwrap(),
+        )
+        .unwrap();
+        let operation = || {
+            if script {
+                manager
+                    .acquire_player_script(&MediaCancellation::new())
+                    .map(|_| ())
+            } else {
+                manager
+                    .refresh_oauth_access_token(false, &MediaCancellation::new())
+                    .map(|_| ())
+            }
+        };
+        assert_eq!(
+            operation().unwrap_err().kind(),
+            YoutubeErrorKind::InvalidResponse
+        );
+        operation().unwrap();
+        operation().unwrap();
+        assert_eq!(server.requests().len(), if script { 3 } else { 2 });
+    }
+}
+
 fn oauth_refresh_replay(request: &ReplayRequest, count: usize) -> ReplayResponse {
     match request.target.as_str() {
         "/oauth/token" => {

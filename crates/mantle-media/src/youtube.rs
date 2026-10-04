@@ -1,6 +1,6 @@
 use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use mantle_core::{
@@ -640,6 +640,7 @@ impl YoutubeOAuthTokenStatus {
 }
 
 struct YoutubeOAuthState {
+    revision: u64,
     access_token: Option<String>,
     refresh_token: Option<String>,
     token_type: String,
@@ -649,6 +650,7 @@ struct YoutubeOAuthState {
 impl YoutubeOAuthState {
     fn new(authentication: &YoutubeAuthentication) -> Self {
         Self {
+            revision: 0,
             access_token: authentication.oauth_access_token.clone(),
             refresh_token: authentication.oauth_refresh_token.clone(),
             token_type: "Bearer".to_owned(),
@@ -1975,13 +1977,72 @@ pub struct YoutubeAudioSourceManager {
     options: YoutubeSourceOptions,
     authentication: YoutubeAuthentication,
     oauth: Mutex<YoutubeOAuthState>,
+    oauth_flight: YoutubeSingleFlight,
     oauth_clock: Arc<dyn YoutubeOAuthClock>,
     http: RemoteHttpClient,
     companion_http: Option<RemoteHttpClient>,
     cipher_resolver: Option<Arc<dyn YoutubeCipherResolver>>,
     player_script: Mutex<Option<CachedYoutubePlayerScript>>,
+    script_flight: YoutubeSingleFlight,
     visitor_data: Mutex<Option<String>>,
     shutdown: AtomicBool,
+}
+
+/// No waiter list or network-held state lock. Waiters periodically check their
+/// own cancellation and deadline while one owner performs bounded HTTP work.
+#[derive(Default)]
+struct YoutubeSingleFlight {
+    busy: Mutex<bool>,
+    changed: Condvar,
+}
+
+struct YoutubeFlightGuard<'a>(&'a YoutubeSingleFlight);
+
+impl YoutubeSingleFlight {
+    fn acquire<'a>(
+        &'a self,
+        shutdown: &AtomicBool,
+        cancellation: &MediaCancellation,
+        budget: Duration,
+    ) -> Result<YoutubeFlightGuard<'a>, YoutubeError> {
+        let deadline = Instant::now() + budget;
+        let mut busy = self
+            .busy
+            .lock()
+            .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
+        loop {
+            if cancellation.is_cancelled() {
+                return Err(YoutubeError::new(YoutubeErrorKind::Cancelled));
+            }
+            if shutdown.load(Ordering::Acquire) {
+                return Err(YoutubeError::new(YoutubeErrorKind::InvalidOptions));
+            }
+            if !*busy {
+                *busy = true;
+                return Ok(YoutubeFlightGuard(self));
+            }
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return Err(YoutubeError::new(YoutubeErrorKind::Network));
+            }
+            busy = self
+                .changed
+                .wait_timeout(busy, remaining.min(Duration::from_millis(10)))
+                .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?
+                .0;
+        }
+    }
+}
+
+impl Drop for YoutubeFlightGuard<'_> {
+    fn drop(&mut self) {
+        *self
+            .0
+            .busy
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = false;
+        self.0.changed.notify_all();
+    }
 }
 
 impl YoutubeAudioSourceManager {
@@ -2070,11 +2131,13 @@ impl YoutubeAudioSourceManager {
             options,
             authentication,
             oauth,
+            oauth_flight: YoutubeSingleFlight::default(),
             oauth_clock: Arc::new(SystemYoutubeOAuthClock::default()),
             http,
             companion_http,
             cipher_resolver,
             player_script: Mutex::new(None),
+            script_flight: YoutubeSingleFlight::default(),
             visitor_data: Mutex::new(initial_visitor_data),
             shutdown: AtomicBool::new(false),
         })
@@ -2140,10 +2203,12 @@ impl YoutubeAudioSourceManager {
             authentication,
             oauth,
             oauth_clock,
+            oauth_flight: YoutubeSingleFlight::default(),
             http,
             companion_http,
             cipher_resolver,
             player_script: Mutex::new(None),
+            script_flight: YoutubeSingleFlight::default(),
             visitor_data: Mutex::new(initial_visitor_data),
             shutdown: AtomicBool::new(false),
         })
@@ -2203,6 +2268,11 @@ impl YoutubeAudioSourceManager {
         cancellation: &MediaCancellation,
     ) -> Result<YoutubeOAuthTokenStatus, YoutubeError> {
         self.check_oauth_request(device_code, cancellation)?;
+        let _flight = self.oauth_flight.acquire(
+            &self.shutdown,
+            cancellation,
+            self.options.http.request_timeout,
+        )?;
         let body = serde_json::to_vec(&serde_json::json!({
             "client_id": self.options.oauth.client_id,
             "client_secret": self.options.oauth.client_secret,
@@ -2212,6 +2282,7 @@ impl YoutubeAudioSourceManager {
         .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?;
         let response =
             self.execute_oauth_json(&self.options.oauth.token_url, body, cancellation)?;
+        self.check_oauth_request(device_code, cancellation)?;
         let mut state = self
             .oauth
             .lock()
@@ -2236,11 +2307,24 @@ impl YoutubeAudioSourceManager {
         if cancellation.is_cancelled() {
             return Err(YoutubeError::new(YoutubeErrorKind::Cancelled));
         }
-        let mut state = self
+        let revision = self
+            .oauth
+            .lock()
+            .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?
+            .revision;
+        let _flight = self.oauth_flight.acquire(
+            &self.shutdown,
+            cancellation,
+            self.options.http.request_timeout,
+        )?;
+        let state = self
             .oauth
             .lock()
             .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
-        if !force
+        if cancellation.is_cancelled() {
+            return Err(YoutubeError::new(YoutubeErrorKind::Cancelled));
+        }
+        if (!force || state.revision != revision)
             && state.access_token.is_some()
             && let Some(expires_at) = state.expires_at
             && expires_at > self.oauth_clock.now()
@@ -2250,7 +2334,12 @@ impl YoutubeAudioSourceManager {
                 refresh_token_rotated: false,
             });
         }
-        self.refresh_oauth_locked(&mut state, cancellation)
+        let refresh_token = state
+            .refresh_token
+            .clone()
+            .ok_or_else(|| YoutubeError::new(YoutubeErrorKind::InvalidAuthentication))?;
+        drop(state);
+        self.refresh_oauth(&refresh_token, cancellation)
     }
 
     /// Returns the current refresh token for explicit secure persistence by the caller.
@@ -2300,15 +2389,11 @@ impl YoutubeAudioSourceManager {
             .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))
     }
 
-    fn refresh_oauth_locked(
+    fn refresh_oauth(
         &self,
-        state: &mut YoutubeOAuthState,
+        refresh_token: &str,
         cancellation: &MediaCancellation,
     ) -> Result<YoutubeOAuthTokenStatus, YoutubeError> {
-        let refresh_token = state
-            .refresh_token
-            .as_deref()
-            .ok_or_else(|| YoutubeError::new(YoutubeErrorKind::InvalidAuthentication))?;
         let body = serde_json::to_vec(&serde_json::json!({
             "client_id": self.options.oauth.client_id,
             "client_secret": self.options.oauth.client_secret,
@@ -2318,7 +2403,14 @@ impl YoutubeAudioSourceManager {
         .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidOptions))?;
         let response =
             self.execute_oauth_json(&self.options.oauth.token_url, body, cancellation)?;
-        self.apply_oauth_token_response(state, response)
+        if cancellation.is_cancelled() {
+            return Err(YoutubeError::new(YoutubeErrorKind::Cancelled));
+        }
+        let mut state = self
+            .oauth
+            .lock()
+            .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
+        self.apply_oauth_token_response(&mut state, response)
     }
 
     fn apply_oauth_token_response(
@@ -2359,6 +2451,7 @@ impl YoutubeAudioSourceManager {
             state.refresh_token = Some(refresh_token);
         }
         state.access_token = Some(access_token);
+        state.revision = state.revision.wrapping_add(1);
         state.token_type = token_type;
         state.expires_at = Some(
             self.oauth_clock
@@ -2379,6 +2472,9 @@ impl YoutubeAudioSourceManager {
         if !client.supports_oauth() {
             return Ok(None);
         }
+        if cancellation.is_cancelled() {
+            return Err(YoutubeError::new(YoutubeErrorKind::Cancelled));
+        }
         let mut state = self
             .oauth
             .lock()
@@ -2387,11 +2483,19 @@ impl YoutubeAudioSourceManager {
             .expires_at
             .is_some_and(|expires_at| expires_at <= self.oauth_clock.now());
         if (state.access_token.is_none() || expired) && state.refresh_token.is_some() {
-            self.refresh_oauth_locked(&mut state, cancellation)?;
+            drop(state);
+            self.refresh_oauth_access_token(false, cancellation)?;
+            state = self
+                .oauth
+                .lock()
+                .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
         }
         let Some(access_token) = state.access_token.as_deref() else {
             return Ok(None);
         };
+        if cancellation.is_cancelled() || self.shutdown.load(Ordering::Acquire) {
+            return Err(YoutubeError::new(YoutubeErrorKind::Cancelled));
+        }
         Ok(Some(format!("{} {access_token}", state.token_type)))
     }
 
@@ -2413,16 +2517,25 @@ impl YoutubeAudioSourceManager {
         if cancellation.is_cancelled() {
             return Err(YoutubeError::new(YoutubeErrorKind::Cancelled));
         }
-        let mut cache = self
+        let _flight = self.script_flight.acquire(
+            &self.shutdown,
+            cancellation,
+            self.options.http.request_timeout.saturating_mul(2),
+        )?;
+        let cache = self
             .player_script
             .lock()
             .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
         let now = Instant::now();
+        if cancellation.is_cancelled() {
+            return Err(YoutubeError::new(YoutubeErrorKind::Cancelled));
+        }
         if let Some(cached) = cache.as_ref()
             && cached.expires_at > now
         {
             return Ok(cached.player_script.clone());
         }
+        drop(cache);
 
         let embed_request = self
             .attach_cookies(
@@ -2472,12 +2585,19 @@ impl YoutubeAudioSourceManager {
             signature_timestamp,
             byte_len: source.len(),
         };
-        *cache = Some(CachedYoutubePlayerScript {
-            player_script: player_script.clone(),
-            source: source.into(),
-            cipher: None,
-            expires_at: Instant::now() + self.options.player_script_cache_ttl,
-        });
+        if cancellation.is_cancelled() || self.shutdown.load(Ordering::Acquire) {
+            return Err(YoutubeError::new(YoutubeErrorKind::Cancelled));
+        }
+        *self
+            .player_script
+            .lock()
+            .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))? =
+            Some(CachedYoutubePlayerScript {
+                player_script: player_script.clone(),
+                source: source.into(),
+                cipher: None,
+                expires_at: Instant::now() + self.options.player_script_cache_ttl,
+            });
         Ok(player_script)
     }
 
@@ -4663,7 +4783,7 @@ fn parse_playlist_tracks(
         let Some(renderer) = item.get("playlistVideoRenderer") else {
             continue;
         };
-        if renderer.get("isPlayable").is_none_or(Value::is_null)
+        if renderer.get("isPlayable").and_then(Value::as_bool) != Some(true)
             || renderer.get("shortBylineText").is_none_or(Value::is_null)
         {
             continue;
@@ -4677,10 +4797,11 @@ fn parse_playlist_tracks(
             .unwrap_or_else(|| "Unknown artist".to_owned());
         let duration = renderer
             .get("lengthSeconds")
-            .and_then(Value::as_str)
-            .map(str::parse::<u64>)
-            .transpose()
-            .map_err(|_| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?
+            .and_then(|value| {
+                value
+                    .as_u64()
+                    .or_else(|| value.as_str()?.parse::<u64>().ok())
+            })
             .map_or(Duration::ZERO, Duration::from_secs);
         let artwork_url = renderer_artwork(renderer, max_string_bytes, max_thumbnails)?;
         push_bounded_track(
@@ -4690,6 +4811,111 @@ fn parse_playlist_tracks(
         )?;
     }
     Ok(tracks)
+}
+
+#[cfg(test)]
+mod playlist_regressions {
+    use super::*;
+    use serde_json::json;
+
+    fn item(id: &str) -> Value {
+        json!({"playlistVideoRenderer":{"videoId":id,"isPlayable":true,
+            "title":{"simpleText":"Track"},"shortBylineText":{"simpleText":"Artist"},
+            "lengthSeconds":"180"}})
+    }
+
+    #[test]
+    fn unavailable_playlist_entries_are_filtered_without_reordering() {
+        let first = item("dQw4w9WgXcQ");
+        let last = item("4moWSMi1L_4");
+        let mut items = vec![first];
+        for flag in [json!(false), Value::Null, json!("true"), json!(1)] {
+            let mut bad = item("Ifq4NQWwVpg");
+            bad["playlistVideoRenderer"]["isPlayable"] = flag;
+            items.push(bad);
+        }
+        let mut missing = item("Ifq4NQWwVpg");
+        missing["playlistVideoRenderer"]
+            .as_object_mut()
+            .unwrap()
+            .remove("isPlayable");
+        items.push(missing);
+        items.push(last);
+        let tracks = parse_playlist_tracks(&items, 2, 4096, 10).unwrap();
+        assert_eq!(
+            tracks
+                .iter()
+                .map(|track| track.info.identifier.as_str())
+                .collect::<Vec<_>>(),
+            ["dQw4w9WgXcQ", "4moWSMi1L_4"]
+        );
+    }
+
+    #[test]
+    fn playlist_duration_accepts_numbers_and_preserves_unknown_finite_values() {
+        for (duration, expected) in [
+            (json!("180"), 180),
+            (json!(180), 180),
+            (Value::Null, 0),
+            (json!("unknown"), 0),
+            (json!(-1), 0),
+            (json!({}), 0),
+        ] {
+            let mut value = item("dQw4w9WgXcQ");
+            value["playlistVideoRenderer"]["lengthSeconds"] = duration;
+            let tracks = parse_playlist_tracks(&[value], 2, 4096, 10).unwrap();
+            assert_eq!(tracks[0].info.duration, Duration::from_secs(expected));
+            assert!(!tracks[0].info.is_stream);
+        }
+        let mut missing = item("dQw4w9WgXcQ");
+        missing["playlistVideoRenderer"]
+            .as_object_mut()
+            .unwrap()
+            .remove("lengthSeconds");
+        assert_eq!(
+            parse_playlist_tracks(&[missing], 2, 4096, 10).unwrap()[0]
+                .info
+                .duration,
+            Duration::ZERO
+        );
+    }
+}
+
+#[cfg(test)]
+mod single_flight_regressions {
+    use super::*;
+
+    #[test]
+    fn owner_drop_timeout_and_shutdown_release_bounded_waiters() {
+        let flight = YoutubeSingleFlight::default();
+        let shutdown = AtomicBool::new(false);
+        let signal = MediaCancellation::new();
+        let owner = flight
+            .acquire(&shutdown, &signal, Duration::from_secs(1))
+            .unwrap();
+        assert_eq!(
+            flight
+                .acquire(&shutdown, &signal, Duration::from_millis(20))
+                .err()
+                .unwrap()
+                .kind(),
+            YoutubeErrorKind::Network
+        );
+        shutdown.store(true, Ordering::Release);
+        assert_eq!(
+            flight
+                .acquire(&shutdown, &signal, Duration::from_secs(1))
+                .err()
+                .unwrap()
+                .kind(),
+            YoutubeErrorKind::InvalidOptions
+        );
+        drop(owner);
+        shutdown.store(false, Ordering::Release);
+        let _next = flight
+            .acquire(&shutdown, &signal, Duration::from_secs(1))
+            .unwrap();
+    }
 }
 
 fn playlist_continuation(

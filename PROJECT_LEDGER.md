@@ -178,3 +178,24 @@ shared deadline, without a helper thread; protocol/auth/DNS/IPv6 and pool byte
 preservation regressions pass. The unused upstream SOCKS dependency closure is
 removed. The advisory gate also required Rustls 0.23.45 and WebPKI 0.103.15;
 reviewed deltas are recorded in Cargo Vet, without advisory exemptions.
+
+# Playback audit repairs (2026-10-03)
+
+Playlist renderers now require boolean `isPlayable:true`; missing/invalid duration
+is the existing finite unknown-duration sentinel (zero), and numeric durations
+are parsed alongside strings. Raydio interprets that sentinel without an end
+cutoff, near-end preparation or a fabricated remaining-time display.
+
+OAuth and player-script acquisition have separate bounded single-owner gates.
+State mutexes are released before HTTP work; cancellation/shutdown is checked
+at most every 10 ms during contention, without a waiter list or duplicate owners.
+Forced refreshes overtaken by successful refresh share the new token revision.
+Cache publication and cached returns recheck cancellation. RAII releases ownership
+on success, error and unwinding. No new dependency or credential logging.
+
+Regression tests cover mixed playability/order, string/numeric/unknown duration,
+real HTTP owner contention, independent waiter cancellation, cache reuse, owner
+failure/retry, bounded wait timeout and shutdown. The full media suite and scoped
+warnings-denied all-target Clippy pass; audit/deny/vet release gates pass with their
+existing duplicate-version warnings. The original audit evidence remains in the
+sibling Raydio docs; Oracle integration qualification is tracked there.
