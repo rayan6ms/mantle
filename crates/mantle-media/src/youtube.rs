@@ -4482,6 +4482,7 @@ fn parse_search_response(
         .and_then(Value::as_array)
         .ok_or_else(|| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
     let mut tracks = Vec::new();
+    let mut omitted = 0_usize;
     for section in sections {
         let Some(items) = section
             .pointer("/itemSectionRenderer/contents")
@@ -4496,10 +4497,17 @@ fn parse_search_response(
             let Some(renderer) = renderer else { continue };
             let Some(track) = parse_search_track(renderer, max_string_bytes, max_thumbnails)?
             else {
+                omitted = omitted.saturating_add(1);
                 continue;
             };
             push_bounded_track(&mut tracks, track, max_tracks)?;
         }
+    }
+    if omitted > 0 {
+        log::debug!(
+            "youtube parse_search_response: retained={} omitted={omitted}",
+            tracks.len()
+        );
     }
     if tracks.is_empty() {
         return Ok(None);
@@ -4581,14 +4589,22 @@ fn parse_mix_response(
         .and_then(Value::as_array)
         .ok_or_else(|| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
     let mut tracks = Vec::new();
+    let mut omitted = 0_usize;
     for item in items {
         let Some(renderer) = item.get("playlistPanelVideoRenderer") else {
             continue;
         };
         let Some(track) = parse_search_track(renderer, max_string_bytes, max_thumbnails)? else {
+            omitted = omitted.saturating_add(1);
             continue;
         };
         push_bounded_track(&mut tracks, track, max_tracks)?;
+    }
+    if omitted > 0 {
+        log::debug!(
+            "youtube parse_mix_response: retained={} omitted={omitted}",
+            tracks.len()
+        );
     }
     if tracks.is_empty() {
         return Err(YoutubeError::new(YoutubeErrorKind::InvalidResponse));
@@ -4619,6 +4635,7 @@ fn parse_music_search_response(
         .and_then(Value::as_array)
         .ok_or_else(|| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
     let mut tracks = Vec::new();
+    let mut omitted = 0_usize;
     for section in sections {
         let Some(items) = section
             .pointer("/musicShelfRenderer/contents")
@@ -4631,10 +4648,17 @@ fn parse_music_search_response(
                 continue;
             };
             let Some(track) = parse_music_search_track(renderer, max_string_bytes)? else {
+                omitted = omitted.saturating_add(1);
                 continue;
             };
             push_bounded_track(&mut tracks, track, max_tracks)?;
         }
+    }
+    if omitted > 0 {
+        log::debug!(
+            "youtube parse_music_search_response: retained={} omitted={omitted}",
+            tracks.len()
+        );
     }
     if tracks.is_empty() {
         return Ok(None);
