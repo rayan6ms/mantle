@@ -4525,23 +4525,31 @@ fn parse_search_track(
     {
         return Ok(None);
     }
-    let video_id = bounded_value_text(renderer.get("videoId"), max_string_bytes)?
+    let Some(video_id) = item_value_text(renderer.get("videoId"), max_string_bytes)?
         .filter(|video_id| valid_video_id(video_id))
-        .ok_or_else(|| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
-    let title = renderer_text(
+    else {
+        return Ok(None);
+    };
+    let Some(title) = item_renderer_text(
         renderer.get("headline").or_else(|| renderer.get("title")),
         max_string_bytes,
     )?
-    .ok_or_else(|| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
-    let author = renderer_text(renderer.get("longBylineText"), max_string_bytes)?
-        .or(renderer_text(
+    else {
+        return Ok(None);
+    };
+    let author = item_renderer_text(renderer.get("longBylineText"), max_string_bytes)?
+        .or(item_renderer_text(
             renderer.get("shortBylineText"),
             max_string_bytes,
         )?)
         .unwrap_or_else(|| "Unknown artist".to_owned());
-    let duration_text = renderer_text(renderer.get("lengthText"), max_string_bytes)?
-        .ok_or_else(|| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
-    let duration = parse_duration_text(&duration_text)?;
+    let Some(duration_text) = item_renderer_text(renderer.get("lengthText"), max_string_bytes)?
+    else {
+        return Ok(None);
+    };
+    let Ok(duration) = parse_duration_text(&duration_text) else {
+        return Ok(None);
+    };
     let artwork_url = renderer_artwork(renderer, max_string_bytes, max_thumbnails)?;
     Ok(Some(make_result_track(
         &video_id,
@@ -4652,7 +4660,7 @@ fn parse_music_search_track(
     }) else {
         return Ok(None);
     };
-    let Some(video_id) = bounded_value_text(
+    let Some(video_id) = item_value_text(
         metadata.pointer("/navigationEndpoint/watchEndpoint/videoId"),
         max_string_bytes,
     )?
@@ -4660,10 +4668,11 @@ fn parse_music_search_track(
         return Ok(None);
     };
     if !valid_video_id(&video_id) {
-        return Err(YoutubeError::new(YoutubeErrorKind::InvalidResponse));
+        return Ok(None);
     }
-    let title = bounded_value_text(metadata.get("text"), max_string_bytes)?
-        .ok_or_else(|| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
+    let Some(title) = item_value_text(metadata.get("text"), max_string_bytes)? else {
+        return Ok(None);
+    };
     let Some(runs) = columns
         .get(1)
         .and_then(|column| column.pointer("/musicResponsiveListItemFlexColumnRenderer/text/runs"))
@@ -4682,13 +4691,16 @@ fn parse_music_search_track(
     }
     let author = runs
         .first()
-        .map(|run| bounded_value_text(run.get("text"), max_string_bytes))
+        .map(|run| item_value_text(run.get("text"), max_string_bytes))
         .transpose()?
         .flatten()
         .unwrap_or_else(|| "Unknown artist".to_owned());
-    let duration_text = bounded_value_text(last.get("text"), max_string_bytes)?
-        .ok_or_else(|| YoutubeError::new(YoutubeErrorKind::InvalidResponse))?;
-    let duration = parse_duration_text(&duration_text)?;
+    let Some(duration_text) = item_value_text(last.get("text"), max_string_bytes)? else {
+        return Ok(None);
+    };
+    let Ok(duration) = parse_duration_text(&duration_text) else {
+        return Ok(None);
+    };
     Ok(Some(make_result_track(
         &video_id, title, author, duration, false, None,
     )))
@@ -4972,6 +4984,20 @@ fn renderer_text(
     )
 }
 
+// Item-local schema/availability problems may be skipped. Strings that exceed
+// the configured metadata budget still fail the whole request explicitly.
+fn item_value_text(value: Option<&Value>, limit: usize) -> Result<Option<String>, YoutubeError> {
+    bounded_value_text(value.filter(|value| value.is_string()), limit)
+}
+
+fn item_renderer_text(value: Option<&Value>, limit: usize) -> Result<Option<String>, YoutubeError> {
+    let Some(value) = value else { return Ok(None) };
+    item_value_text(value.get("simpleText"), limit)?.map_or_else(
+        || item_value_text(value.pointer("/runs/0/text"), limit),
+        |text| Ok(Some(text)),
+    )
+}
+
 fn bounded_value_text(
     value: Option<&Value>,
     max_string_bytes: usize,
@@ -5095,6 +5121,106 @@ fn push_bounded_track(
     }
     tracks.push(track);
     Ok(())
+}
+
+#[cfg(test)]
+mod partial_search_regressions {
+    use super::*;
+    use serde_json::json;
+    fn video(id: &str, duration: &Value) -> Value {
+        json!({"videoRenderer":{"videoId":id,"title":{"simpleText":"Fixture"},"lengthText":{"simpleText":duration}}})
+    }
+    fn search(items: &[Value]) -> Vec<u8> {
+        serde_json::to_vec(&json!({"contents":{"sectionListRenderer":{"contents":[{"itemSectionRenderer":{"contents":items}}]}}})).unwrap()
+    }
+    #[test]
+    fn unusable_search_items_preserve_neighbors_but_not_limit_violations() {
+        for bad in [
+            video("bad-id", &json!("3:20")),
+            video("dQw4w9WgXcQ", &json!("unknown")),
+            video("dQw4w9WgXcQ", &json!(42)),
+        ] {
+            let bytes = search(&[
+                video("aaaaabbbbbb", &json!("3:20")),
+                bad.clone(),
+                video("ccccccddddd", &json!("4:10")),
+            ]);
+            let result = parse_search_response(&bytes, "fixture", 100, 4096, 32)
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                result
+                    .tracks
+                    .iter()
+                    .map(|t| t.info.identifier.as_str())
+                    .collect::<Vec<_>>(),
+                ["aaaaabbbbbb", "ccccccddddd"]
+            );
+            assert!(
+                parse_search_response(&search(&[bad]), "fixture", 100, 4096, 32)
+                    .unwrap()
+                    .is_none()
+            );
+        }
+        let oversized = video("dQw4w9WgXcQ", &json!("x".repeat(4097)));
+        assert!(parse_search_response(&search(&[oversized]), "fixture", 100, 4096, 32).is_err());
+        assert!(parse_search_response(b"not json", "fixture", 100, 4096, 32).is_err());
+        assert!(
+            parse_search_response(
+                &search(&[
+                    video("aaaaabbbbbb", &json!("1:00")),
+                    video("ccccccddddd", &json!("2:00"))
+                ]),
+                "fixture",
+                1,
+                4096,
+                32
+            )
+            .is_err()
+        );
+    }
+    #[test]
+    fn malformed_optional_author_uses_fallback_without_hiding_limits() {
+        let mut item = video("dQw4w9WgXcQ", &json!("3:20"));
+        item["videoRenderer"]["longBylineText"] = json!({"simpleText": 42});
+        let result = parse_search_response(&search(&[item.clone()]), "fixture", 100, 4096, 32)
+            .unwrap()
+            .unwrap();
+        assert_eq!(result.tracks[0].info.author, "Unknown artist");
+        item["videoRenderer"]["longBylineText"] = json!({"simpleText":"x".repeat(4097)});
+        assert!(parse_search_response(&search(&[item]), "fixture", 100, 4096, 32).is_err());
+    }
+
+    #[test]
+    fn music_and_mix_skip_item_local_metadata_errors() {
+        let song = |id: &str, duration: &str| {
+            json!({"musicResponsiveListItemRenderer":{"flexColumns":[
+                {"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Fixture","navigationEndpoint":{"watchEndpoint":{"videoId":id}}}]}}},
+                {"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Artist"},{"text":duration}]}}}
+            ]}})
+        };
+        let bytes=serde_json::to_vec(&json!({"contents":{"tabbedSearchResultsRenderer":{"tabs":[{"tabRenderer":{"content":{"sectionListRenderer":{"contents":[{"musicShelfRenderer":{"contents":[song("aaaaabbbbbb","1:00"),song("dQw4w9WgXcQ","bad"),song("ccccccddddd","2:00")]}}]}}}}]}}})).unwrap();
+        assert_eq!(
+            parse_music_search_response(&bytes, "fixture", 100, 4096)
+                .unwrap()
+                .unwrap()
+                .tracks
+                .len(),
+            2
+        );
+        let items = [
+            video("aaaaabbbbbb", &json!("1:00")),
+            video("dQw4w9WgXcQ", &json!("bad")),
+            video("ccccccddddd", &json!("2:00")),
+        ]
+        .into_iter()
+        .map(|item| json!({"playlistPanelVideoRenderer":item["videoRenderer"]}))
+        .collect::<Vec<_>>();
+        let bytes=serde_json::to_vec(&json!({"contents":{"twoColumnWatchNextResults":{"playlist":{"playlist":{"title":"Mix","contents":items}}}}})).unwrap();
+        let mix = parse_mix_response(&bytes, "ccccccddddd", 100, 4096, 32).unwrap();
+        assert_eq!(mix.tracks.len(), 2);
+        assert_eq!(mix.selected_track, Some(1));
+    }
 }
 
 #[cfg(test)]

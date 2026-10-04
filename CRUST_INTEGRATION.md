@@ -30,6 +30,11 @@ returns to `OpusPassthrough` when an Opus input has no filters. Live HLS is alwa
 exposes the same `set_filter_factory` operation on `YoutubeLivePlaybackSession`.
 
 Crust retains its `PcmFilterFactory`; Mantle creates and owns the per-session filter instances.
+Finite mono Opus and variable-duration Opus packets (up to 120 ms) are normalized
+into complete 20 ms stereo frames. Compatible passthrough bytes remain unchanged;
+Mantle keeps decoder history warm so enabling processing has no cold-start transient.
+The warmed path adds no allocations beyond the existing bounded demux envelope.
+
 Mantle owns Opus decoding, canonical PCM filtering, encoding, partial-frame state, and reset after
 seek or replacement. A failed factory build preserves the previous chain.
 

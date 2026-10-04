@@ -198,3 +198,27 @@ fn opus_packet_extraction_has_two_bounded_backend_allocations_per_packet() {
     assert!(maximum_bytes <= MAXIMUM_BYTES_PER_PACKET_READ);
     assert!(total_bytes <= MEASURED_PACKETS * MAXIMUM_BYTES_PER_PACKET_READ);
 }
+
+#[test]
+fn warm_opus_playback_adds_no_allocations_to_the_demux_envelope() {
+    use mantle_audio::EncodedFrameSlot;
+    use mantle_media::YoutubePlaybackSession;
+    let source =
+        MediaSession::open_file(fixture("tone-opus.webm"), MediaLimits::default()).unwrap();
+    let mut playback = YoutubePlaybackSession::from_probed_media_session(source).unwrap();
+    let mut slot = EncodedFrameSlot::new();
+    for _ in 0..8 {
+        assert!(playback.read_frame(&mut slot).unwrap());
+    }
+    let mut total_calls = 0;
+    let mut total_bytes = 0;
+    for _ in 0..64 {
+        let (ready, calls, bytes) = measured(|| playback.read_frame(&mut slot).unwrap());
+        assert!(ready);
+        assert_eq!(calls, 2, "only the existing demux allocations are allowed");
+        assert!(bytes <= 1024);
+        total_calls += calls;
+        total_bytes += bytes;
+    }
+    eprintln!("warm_opus_playback: frames=64 calls={total_calls} bytes={total_bytes}");
+}

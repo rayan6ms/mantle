@@ -1,4 +1,4 @@
-use mantle_opus::{OpusDecoder, OpusEncoder};
+use mantle_opus::{OpusDecoder, OpusEncoder, packet_samples};
 
 use super::{
     AudioFrameError, COMPATIBLE_CHANNELS, COMPATIBLE_PCM_SAMPLES, COMPATIBLE_SAMPLE_RATE,
@@ -69,7 +69,7 @@ impl PcmOpusDecoder {
     ///
     /// # Errors
     ///
-    /// Returns an error when the output capacity is below the configured ceiling or libopus
+    /// Returns an error when the output capacity is below the packet's validated sample count or libopus
     /// rejects the packet.
     pub fn decode(
         &mut self,
@@ -77,8 +77,12 @@ impl PcmOpusDecoder {
         timestamp: Option<std::time::Duration>,
         output: &mut PcmFrame,
     ) -> Result<(), AudioFrameError> {
-        let capacity = self
-            .max_samples_per_channel
+        let frames = packet_samples(packet, self.format.sample_rate())
+            .map_err(|_| AudioFrameError::OpusDecodingFailure)?;
+        if frames == 0 || frames > self.max_samples_per_channel {
+            return Err(AudioFrameError::OpusDecodingFailure);
+        }
+        let capacity = frames
             .checked_mul(usize::from(self.format.channels()))
             .ok_or(AudioFrameError::OpusDecodingFailure)?;
         let samples = output.prepare(capacity, self.format, timestamp)?;

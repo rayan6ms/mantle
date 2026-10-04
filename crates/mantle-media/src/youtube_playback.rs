@@ -23,6 +23,9 @@ use crate::{
 };
 
 const TRANSCODE_INPUT_CHUNK_FRAMES: usize = 1_024;
+// Opus allows at most 120 ms in one packet. Decode into one reusable bounded
+// block, then submit canonical chunks without assuming the packet duration.
+const MAX_OPUS_SAMPLES_PER_CHANNEL: usize = COMPATIBLE_SAMPLE_RATE as usize * 120 / 1_000;
 
 /// The active output path for one finite `YouTube` media object.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -190,12 +193,13 @@ enum YoutubePlaybackInner {
 }
 
 struct OpusPlayback {
-    decoder_stale: bool,
     session: MediaSession,
     packet: EncodedPacket,
     passthrough: OpusPassthrough,
     decoder: PcmOpusDecoder,
     decoded: PcmFrame,
+    decoded_offset: usize,
+    processor_input: PcmFrame,
     encoder_input: PcmFrame,
     filters: FilterPipeline,
     encoder: PcmOpusEncoder,
@@ -723,7 +727,7 @@ impl YoutubePlaybackSession {
     fn initialize(session: MediaSession) -> Result<Self, YoutubePlaybackError> {
         let inner = if session.info().codec == Codec::Opus {
             if session.info().sample_rate != COMPATIBLE_SAMPLE_RATE
-                || session.info().channels != COMPATIBLE_CHANNELS
+                || !matches!(session.info().channels, 1 | 2)
             {
                 return Err(YoutubePlaybackError::new(
                     YoutubePlaybackErrorKind::IncompatibleFormat,
@@ -733,16 +737,23 @@ impl YoutubePlaybackSession {
                 .map_err(map_audio_error)?;
             let packet = EncodedPacket::with_capacity(session.limits().max_packet_bytes);
             YoutubePlaybackInner::Opus(Box::new(OpusPlayback {
-                decoder_stale: true,
                 session,
                 packet,
                 passthrough: OpusPassthrough::new(format),
-                decoder: PcmOpusDecoder::new(format, mantle_audio::COMPATIBLE_SAMPLES_PER_CHANNEL)
+                decoder: PcmOpusDecoder::new(format, MAX_OPUS_SAMPLES_PER_CHANNEL)
                     .map_err(map_audio_error)?,
-                decoded: PcmFrame::with_capacity(COMPATIBLE_PCM_SAMPLES),
+                decoded: PcmFrame::with_capacity(
+                    MAX_OPUS_SAMPLES_PER_CHANNEL * usize::from(format.channels()),
+                ),
+                decoded_offset: 0,
+                processor_input: PcmFrame::with_capacity(COMPATIBLE_PCM_SAMPLES),
                 encoder_input: PcmFrame::with_capacity(COMPATIBLE_PCM_SAMPLES),
-                filters: FilterPipeline::new(format, MAX_FILTERS_PER_CHAIN)
-                    .map_err(map_audio_error)?,
+                filters: FilterPipeline::new(
+                    PcmFormat::new(COMPATIBLE_SAMPLE_RATE, COMPATIBLE_CHANNELS)
+                        .map_err(map_audio_error)?,
+                    MAX_FILTERS_PER_CHAIN,
+                )
+                .map_err(map_audio_error)?,
                 // A modest loss hint shortens prediction error after a missing packet;
                 // leave music mode, bitrate, complexity, and FEC decisions unchanged.
                 encoder: PcmOpusEncoder::with_packet_loss_percent(OpusEncodingQuality::MAXIMUM, 5)
@@ -762,7 +773,7 @@ impl YoutubePlaybackSession {
     #[must_use]
     pub fn mode(&self) -> YoutubePlaybackMode {
         match &self.inner {
-            YoutubePlaybackInner::Opus(playback) if playback.filters.passthrough_ready() => {
+            YoutubePlaybackInner::Opus(playback) if playback.can_bypass() => {
                 YoutubePlaybackMode::OpusPassthrough
             }
             YoutubePlaybackInner::Opus(_) | YoutubePlaybackInner::Transcode(_) => {
@@ -787,7 +798,7 @@ impl YoutubePlaybackSession {
     #[must_use]
     pub fn source_media_position(&self) -> Option<Duration> {
         match &self.inner {
-            YoutubePlaybackInner::Opus(playback) if playback.filters.passthrough_ready() => {
+            YoutubePlaybackInner::Opus(playback) if playback.can_bypass() => {
                 playback.direct_source_position
             }
             YoutubePlaybackInner::Opus(playback) => playback.filters.source_position(),
@@ -826,10 +837,11 @@ impl YoutubePlaybackSession {
             YoutubePlaybackInner::Opus(playback) => {
                 let result = playback.session.seek(requested).map_err(map_media_error)?;
                 playback.decoded.clear();
+                playback.decoded_offset = 0;
+                playback.processor_input.clear();
                 playback.encoder_input.clear();
                 playback.passthrough.reset();
                 playback.decoder.reset().map_err(map_audio_error)?;
-                playback.decoder_stale = false;
                 playback.filters.reset();
                 playback.encoder.reset().map_err(map_audio_error)?;
                 playback.input_eof = false;
@@ -868,36 +880,48 @@ impl YoutubePlaybackSession {
 }
 
 impl OpusPlayback {
+    fn can_bypass(&self) -> bool {
+        self.session.info().channels == COMPATIBLE_CHANNELS
+            && self.decoded_offset == self.decoded.samples().len()
+            && self.filters.passthrough_ready()
+    }
+
+    fn submit_decoded_chunk(&mut self) -> Result<(), YoutubePlaybackError> {
+        let channels = usize::from(self.session.info().channels);
+        let source_offset = self.decoded_offset;
+        let frames = ((self.decoded.samples().len() - source_offset) / channels)
+            .min(mantle_audio::COMPATIBLE_SAMPLES_PER_CHANNEL);
+        let timestamp = self.decoded.timestamp().map(|base| {
+            base.saturating_add(canonical_frames_to_duration(
+                (source_offset / channels) as u64,
+            ))
+        });
+        let format =
+            PcmFormat::new(COMPATIBLE_SAMPLE_RATE, COMPATIBLE_CHANNELS).map_err(map_audio_error)?;
+        let output = self
+            .processor_input
+            .prepare(frames * usize::from(COMPATIBLE_CHANNELS), format, timestamp)
+            .map_err(map_audio_error)?;
+        if channels == 1 {
+            for (frame, sample) in output
+                .chunks_exact_mut(2)
+                .zip(&self.decoded.samples()[source_offset..source_offset + frames])
+            {
+                frame.fill(*sample);
+            }
+        } else {
+            output.copy_from_slice(
+                &self.decoded.samples()[source_offset..source_offset + frames * channels],
+            );
+        }
+        self.decoded_offset += frames * channels;
+        self.filters
+            .submit_input(&self.processor_input)
+            .map_err(map_audio_error)
+    }
+
     fn read_frame(&mut self, output: &mut EncodedFrameSlot) -> Result<bool, YoutubePlaybackError> {
         loop {
-            if self.filters.passthrough_ready() {
-                if !self
-                    .session
-                    .read_encoded(&mut self.packet)
-                    .map_err(map_media_error)?
-                {
-                    output.clear();
-                    return Ok(false);
-                }
-                self.passthrough.set_filters_active(false);
-                let route = self
-                    .passthrough
-                    .route_packet(self.packet.data(), self.packet.timestamp(), output)
-                    .map_err(map_audio_error)?;
-                if !route.delivered() {
-                    return Err(YoutubePlaybackError::new(
-                        YoutubePlaybackErrorKind::AudioPipeline,
-                    ));
-                }
-                self.direct_source_position = output
-                    .timestamp()
-                    .map(|timestamp| timestamp.saturating_add(output.duration()));
-                self.filters
-                    .advance_passthrough_clock(self.direct_source_position);
-                self.decoder_stale = true;
-                return Ok(true);
-            }
-
             match self
                 .filters
                 .read_output(&mut self.encoder_input)
@@ -915,15 +939,15 @@ impl OpusPlayback {
                 }
                 StreamingPcmPoll::NeedInput => {}
             }
-
-            if self.filters.passthrough_ready() {
+            if self.decoded_offset < self.decoded.samples().len() {
+                self.submit_decoded_chunk()?;
                 continue;
             }
-
             if self.input_eof {
                 self.filters.finish_input();
                 continue;
             }
+            let bypass = self.can_bypass();
             if !self
                 .session
                 .read_encoded(&mut self.packet)
@@ -933,11 +957,9 @@ impl OpusPlayback {
                 self.filters.finish_input();
                 continue;
             }
-            if self.decoder_stale {
-                self.decoder.reset().map_err(map_audio_error)?;
-                self.encoder.reset().map_err(map_audio_error)?;
-                self.decoder_stale = false;
-            }
+            // Keep native prediction/overlap history continuous even for
+            // copied packets. A filter switch then starts with the same PCM
+            // that a continuous decoder would hear, with no cold-start dip.
             self.decoder
                 .decode(
                     self.packet.data(),
@@ -945,14 +967,25 @@ impl OpusPlayback {
                     &mut self.decoded,
                 )
                 .map_err(map_audio_error)?;
-            if self.decoded.samples().len() != COMPATIBLE_PCM_SAMPLES {
-                return Err(YoutubePlaybackError::new(
-                    YoutubePlaybackErrorKind::IncompatibleFormat,
-                ));
+            self.decoded_offset = 0;
+            if bypass {
+                self.passthrough.set_filters_active(false);
+                let route = self
+                    .passthrough
+                    .route_packet(self.packet.data(), self.packet.timestamp(), output)
+                    .map_err(map_audio_error)?;
+                if route.delivered() {
+                    self.decoded_offset = self.decoded.samples().len();
+                    self.direct_source_position = output
+                        .timestamp()
+                        .map(|timestamp| timestamp.saturating_add(output.duration()));
+                    self.filters
+                        .advance_passthrough_clock(self.direct_source_position);
+                    return Ok(true);
+                }
             }
-            self.filters
-                .submit_input(&self.decoded)
-                .map_err(map_audio_error)?;
+            // Mono, variable-duration and oversized-but-valid packets use the
+            // same canonical assembler as processed audio, never a false EOF.
         }
     }
 }
@@ -1461,6 +1494,36 @@ const fn map_audio_error(_: AudioFrameError) -> YoutubePlaybackError {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    #[ignore = "explicit bounded audio hot-path comparison"]
+    fn opus_path_cost_probe() {
+        for filtered in [false, true] {
+            for trial in 0..5 {
+                let started = std::time::Instant::now();
+                let mut frames = 0_usize;
+                for _ in 0..8 {
+                    let session =
+                        MediaSession::open_file(fixture("tone-opus.webm"), MediaLimits::default())
+                            .unwrap();
+                    let mut playback =
+                        YoutubePlaybackSession::from_probed_media_session(session).unwrap();
+                    if filtered {
+                        playback.set_filter_factory(Some(&Identity)).unwrap();
+                    }
+                    let mut output = EncodedFrameSlot::new();
+                    while playback.read_frame(&mut output).unwrap() {
+                        std::hint::black_box(output.data());
+                        frames += 1;
+                    }
+                }
+                eprintln!(
+                    "opus_cost filtered={filtered} trial={trial} frames={frames} us_per_frame={:.3}",
+                    started.elapsed().as_secs_f64() * 1e6
+                        / f64::from(u32::try_from(frames).unwrap())
+                );
+            }
+        }
+    }
     struct Identity;
     impl mantle_audio::PcmFilter for Identity {
         fn process(&mut self, _: &mut mantle_audio::PcmFrame) -> Result<(), AudioFrameError> {
@@ -1784,5 +1847,156 @@ mod tests {
         assert_eq!(frames, 50);
         assert!(!transcoder.read_frame(&mut output).unwrap());
         assert!(output.data().is_empty());
+    }
+}
+
+#[cfg(test)]
+mod opus_continuity_regressions {
+    use super::*;
+    use mantle_audio::FilterChainBuilder;
+    struct Identity;
+    impl mantle_audio::PcmFilter for Identity {
+        fn process(&mut self, _: &mut PcmFrame) -> Result<(), AudioFrameError> {
+            Ok(())
+        }
+        fn reset(&mut self) {}
+    }
+    impl PcmFilterFactory for Identity {
+        fn build(
+            &self,
+            _: PcmFormat,
+            builder: &mut FilterChainBuilder,
+        ) -> Result<(), AudioFrameError> {
+            builder.push(Identity)
+        }
+    }
+    fn open(channels: u16, duration: u16) -> MediaSession {
+        MediaSession::open_file(
+            format!(
+                "{}/../../tests/media/fixtures/tone-opus-{channels}ch-{duration}ms.webm",
+                env!("CARGO_MANIFEST_DIR")
+            ),
+            MediaLimits::default(),
+        )
+        .unwrap()
+    }
+    #[test]
+    fn valid_opus_variants_are_normalized_without_dropped_samples() {
+        for (channels, duration) in [(1, 20), (2, 10), (2, 20), (2, 40)] {
+            for filtered in [false, true] {
+                let session = open(channels, duration);
+                assert_eq!(session.info().channels, channels);
+                let mut playback =
+                    YoutubePlaybackSession::from_probed_media_session(session).unwrap();
+                if filtered {
+                    playback.set_filter_factory(Some(&Identity)).unwrap();
+                }
+                let mut slot = EncodedFrameSlot::new();
+                let first = playback.read_frame(&mut slot);
+                eprintln!(
+                    "AUDIT opus: channels={channels}, packet_ms={duration}, filtered={filtered}, first_read={first:?}"
+                );
+                assert!(first.unwrap());
+                let mut frames = 1;
+                let first_time = slot.timestamp().unwrap();
+                while playback.read_frame(&mut slot).unwrap() {
+                    assert_eq!(slot.duration(), Duration::from_millis(20));
+                    if filtered || channels == 1 || duration != 20 {
+                        assert_eq!(
+                            slot.timestamp(),
+                            Some(first_time + Duration::from_millis(frames * 20))
+                        );
+                    }
+                    frames += 1;
+                }
+                // libopus includes its initial/final overlap packet. Every
+                // decoded input sample is retained; only the last chunk pads.
+                let mut reference = open(channels, duration);
+                let mut packet = EncodedPacket::with_capacity(reference.limits().max_packet_bytes);
+                let mut decoder = PcmOpusDecoder::new(
+                    PcmFormat::new(48000, channels).unwrap(),
+                    MAX_OPUS_SAMPLES_PER_CHANNEL,
+                )
+                .unwrap();
+                let mut pcm =
+                    PcmFrame::with_capacity(MAX_OPUS_SAMPLES_PER_CHANNEL * usize::from(channels));
+                let mut samples = 0;
+                while reference.read_encoded(&mut packet).unwrap() {
+                    decoder
+                        .decode(packet.data(), packet.timestamp(), &mut pcm)
+                        .unwrap();
+                    samples += pcm.samples().len() / usize::from(channels);
+                }
+                assert_eq!(usize::try_from(frames).unwrap(), samples.div_ceil(960));
+                playback.set_filter_factory(Some(&Identity)).unwrap();
+                assert!(
+                    !playback.read_frame(&mut slot).unwrap(),
+                    "filter update cannot restart EOF"
+                );
+            }
+        }
+    }
+    #[test]
+    fn passthrough_to_identity_preserves_continuous_decoder_samples() {
+        let session = MediaSession::open_file(
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../tests/media/fixtures/tone-opus.webm"
+            ),
+            MediaLimits::default(),
+        )
+        .unwrap();
+        let mut reference = MediaSession::open_file(
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../tests/media/fixtures/tone-opus.webm"
+            ),
+            MediaLimits::default(),
+        )
+        .unwrap();
+        let mut packet = EncodedPacket::with_capacity(reference.limits().max_packet_bytes);
+        let format = PcmFormat::new(48000, 2).unwrap();
+        let mut decoder = PcmOpusDecoder::new(format, 960).unwrap();
+        let mut pcm = PcmFrame::with_capacity(1920);
+        let mut playback = YoutubePlaybackSession::from_probed_media_session(session).unwrap();
+        let mut slot = EncodedFrameSlot::new();
+        for _ in 0..50 {
+            assert!(reference.read_encoded(&mut packet).unwrap());
+            decoder
+                .decode(packet.data(), packet.timestamp(), &mut pcm)
+                .unwrap();
+            assert!(playback.read_frame(&mut slot).unwrap());
+        }
+        playback.set_filter_factory(Some(&Identity)).unwrap();
+        for index in 0..5 {
+            assert!(reference.read_encoded(&mut packet).unwrap());
+            decoder
+                .decode(packet.data(), packet.timestamp(), &mut pcm)
+                .unwrap();
+            assert!(playback.read_frame(&mut slot).unwrap());
+            let YoutubePlaybackInner::Opus(inner) = &playback.inner else {
+                panic!()
+            };
+            let expected = pcm.samples();
+            let actual = inner.decoded.samples();
+            let rms = |samples: &[f32]| {
+                (samples.iter().map(|x| f64::from(*x).powi(2)).sum::<f64>()
+                    / f64::from(u32::try_from(samples.len()).unwrap()))
+                .sqrt()
+            };
+            let error = (expected
+                .iter()
+                .zip(actual)
+                .map(|(a, b)| f64::from(a - b).powi(2))
+                .sum::<f64>()
+                / f64::from(u32::try_from(expected.len()).unwrap()))
+            .sqrt();
+            eprintln!(
+                "AUDIT switch: frame={index}, warm_rms={:.8}, actual_rms={:.8}, difference_rms={error:.8}",
+                rms(expected),
+                rms(actual)
+            );
+            assert_eq!(actual, expected, "no decoder transient at block {index}");
+        }
     }
 }

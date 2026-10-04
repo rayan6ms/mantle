@@ -1,3 +1,25 @@
+# Audio/search audit repairs (2026-10-04)
+
+Valid mono Opus and variable packet durations now use a bounded 20 ms stereo
+assembler instead of failing the selected source. Compatible packets retain
+their exact bytes. Passthrough also warms the native decoder, eliminating the
+reproduced 70.37% first-block amplitude dip when processing begins: five
+blocks now match the continuous reference exactly. Decoder output is sized
+to actual packet samples within the 120 ms ceiling; warmed playback retains
+the demux envelope (two allocations / 644 bytes per frame), adding none.
+
+Malformed item IDs/titles/durations are skipped in search, Music and mixes;
+malformed optional authors use the existing fallback. Invalid JSON, oversized
+strings and collection limits still fail explicitly. Regression tests preserve
+good neighbors, selected mix indices, full sample counts, seeks, EOF and filters.
+
+The explicit debug cost probe adds about 58 us/frame to bypass (about 0.29% of
+one core at 50 fps); identity processing is about 10.5 us/frame higher. This is
+a correctness tradeoff, not a release performance claim or downstream-loss fix.
+The probe is a documented manual exclusion and was run explicitly. Live
+qualification and original audit evidence are in Raydio docs/deep-audit-fixes-20261004/
+and docs/AUDIO-NETWORK-SEARCH-AUDIT-2026-10-04.md.
+
 # Progressive Oracle qualification (2026-10-02)
 
 The integrated Raydio 256 KiB prefix reduces command-to-first-successful-send
